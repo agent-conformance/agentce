@@ -1,0 +1,8 @@
+# Code owners. Replace individual handles with team handles as working groups form.
+*                 @sct-will
+/spec/            @sct-will
+/engines/         @sct-will
+/adapters/        @sct-will
+/corpus/          @sct-will
+/skills/          @sct-will
+/.github/         @sct-will

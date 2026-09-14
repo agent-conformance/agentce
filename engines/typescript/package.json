@@ -1,0 +1,18 @@
+{
+  "name": "@agent-conformance/cli",
+  "version": "0.0.1",
+  "description": "Agent Conformance Engine (AgentCE) command-line interface. Placeholder release; the engine is under development.",
+  "license": "Apache-2.0",
+  "homepage": "https://agent-conformance.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agent-conformance/agentce.git",
+    "directory": "engines/typescript"
+  },
+  "bugs": { "url": "https://github.com/agent-conformance/agentce/issues" },
+  "bin": { "agentce": "bin/agentce.js" },
+  "files": ["bin/", "README.md", "LICENSE"],
+  "engines": { "node": ">=20" },
+  "keywords": ["ai-agents", "conformance", "eu-ai-act", "oscal", "provenance", "shacl", "opentelemetry"],
+  "publishConfig": { "access": "public", "provenance": true }
+}

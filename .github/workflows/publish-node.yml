@@ -1,0 +1,61 @@
+# Publishes ONE npm package per run with provenance.
+# Packages: @agent-conformance/cli (engines/typescript), agentce (engines/typescript-alias),
+#           @agent-conformance/emit (engines/typescript-emit).
+# First releases use an npm granular access token stored as the `NPM_TOKEN` secret of the
+# `npm` GitHub environment. After the first release, configure npm Trusted Publishing on each
+# package (GitHub Actions: agent-conformance/agentce, workflow publish-node.yml, environment npm),
+# then delete the token and remove the NODE_AUTH_TOKEN line below.
+name: publish-node
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Which package to publish"
+        required: true
+        type: choice
+        options:
+          - "@agent-conformance/cli"
+          - agentce
+          - "@agent-conformance/emit"
+
+permissions: {}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm             # required-reviewer gate; holds the NPM_TOKEN secret
+    permissions:
+      id-token: write            # required for npm provenance
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Select package directory
+        id: select
+        run: |
+          case "${{ inputs.package }}" in
+            "@agent-conformance/cli")  echo "dir=engines/typescript" >> "$GITHUB_OUTPUT" ;;
+            agentce)                   echo "dir=engines/typescript-alias" >> "$GITHUB_OUTPUT" ;;
+            "@agent-conformance/emit") echo "dir=engines/typescript-emit" >> "$GITHUB_OUTPUT" ;;
+            *) echo "unknown package" >&2; exit 1 ;;
+          esac
+
+      - name: Smoke test and pack
+        working-directory: ${{ steps.select.outputs.dir }}
+        run: |
+          cp ../../LICENSE ./LICENSE
+          node -e "const p=require('./package.json'); console.log(p.name, p.version)"
+          if [ -f bin/agentce.js ]; then node bin/agentce.js --version; fi
+          npm pack --dry-run
+
+      - name: Publish with provenance
+        working-directory: ${{ steps.select.outputs.dir }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public

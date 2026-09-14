@@ -1,0 +1,66 @@
+# Repository hygiene checks. Real engine/adapter/corpus jobs are added as those components land.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guardrails
+        run: |
+          set -e
+          if git ls-files | grep -E '(^|/)SPECS/|(^|/)SPEC\.md$'; then
+            echo "::error::A specification file is tracked; SPECS/ must stay out of the repository until GA." >&2; exit 1
+          fi
+          test -f LICENSE || { echo "::error::LICENSE missing" >&2; exit 1; }
+          test -f SECURITY.md || { echo "::error::SECURITY.md missing" >&2; exit 1; }
+          lines=$(wc -l < README.md); if [ "$lines" -gt 40 ]; then echo "::error::Root README exceeds the pre-GA minimal size ($lines lines)" >&2; exit 1; fi
+          echo "guardrails ok"
+
+      - name: Validate YAML files
+        run: |
+          python3 - << 'PY'
+          import sys, glob, yaml
+          files = glob.glob(".github/**/*.yml", recursive=True) + glob.glob("spec/**/*.y*ml", recursive=True) + glob.glob("skills/**/*.y*ml", recursive=True)
+          bad = []
+          for f in files:
+              try: yaml.safe_load(open(f))
+              except Exception as e: bad.append((f, str(e)))
+          for f, e in bad: print(f"::error file={f}::{e}")
+          print(f"validated {len(files)} YAML files")
+          sys.exit(1 if bad else 0)
+          PY
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build Python placeholders
+        run: |
+          python -m pip install --quiet --upgrade build
+          for d in engines/python engines/python-alias engines/python-emit; do
+            [ -f "$d/pyproject.toml" ] && python -m build --outdir /tmp/dist "$d"
+          done
+          ls /tmp/dist
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check Node placeholders
+        run: |
+          for d in engines/typescript engines/typescript-alias engines/typescript-emit; do
+            if [ -f "$d/package.json" ]; then
+              (cd "$d" && node -e "require('./package.json')" && npm pack --dry-run >/dev/null && echo "$d ok")
+            fi
+          done
+          node engines/typescript/bin/agentce.js --version
