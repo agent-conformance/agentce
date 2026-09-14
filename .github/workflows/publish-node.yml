@@ -1,10 +1,6 @@
-# Publishes ONE npm package per run with provenance.
-# Packages: @agent-conformance/cli (engines/typescript), agentce (engines/typescript-alias),
-#           @agent-conformance/emit (engines/typescript-emit).
-# First releases use an npm granular access token stored as the `NPM_TOKEN` secret of the
-# `npm` GitHub environment. After the first release, configure npm Trusted Publishing on each
-# package (GitHub Actions: agent-conformance/agentce, workflow publish-node.yml, environment npm),
-# then delete the token and remove the NODE_AUTH_TOKEN line below.
+# Publishes ONE npm package per run with provenance via npm Trusted Publishing (OIDC).
+# Trusted publisher on every package: GitHub Actions, agent-conformance/agentce,
+# workflow publish-node.yml, environment npm. No npm token is used or stored.
 name: publish-node
 
 on:
@@ -24,9 +20,9 @@ permissions: {}
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment: npm             # required-reviewer gate; holds the NPM_TOKEN secret
+    environment: npm             # required-reviewer gate; matches the trusted-publisher environment
     permissions:
-      id-token: write            # required for npm provenance
+      id-token: write            # OIDC for trusted publishing and provenance
       contents: read
     steps:
       - uses: actions/checkout@v4
@@ -35,6 +31,9 @@ jobs:
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Use an npm version that supports trusted publishing
+        run: npm install -g npm@latest && npm --version
 
       - name: Select package directory
         id: select
@@ -57,8 +56,6 @@ jobs:
           if [ -f bin/agentce.js ]; then node bin/agentce.js --version; fi
           npm pack --dry-run
 
-      - name: Publish with provenance
+      - name: Publish with provenance (trusted publishing)
         working-directory: ${{ steps.select.outputs.dir }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --provenance --access public
