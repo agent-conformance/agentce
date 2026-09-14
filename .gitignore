@@ -7,3 +7,12 @@ build/
 __pycache__/
 *.egg-info/
 .venv/
+
+# Node
+node_modules/
+*.tgz
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

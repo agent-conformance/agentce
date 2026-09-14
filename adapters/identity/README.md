@@ -1,0 +1,1 @@
+Adapter: identity. Not started.
