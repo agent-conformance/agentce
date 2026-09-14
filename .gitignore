@@ -1,0 +1,9 @@
+# Private specifications (not for public consumption)
+SPECS/
+
+# Python build artifacts
+dist/
+build/
+__pycache__/
+*.egg-info/
+.venv/

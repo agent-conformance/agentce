@@ -15,7 +15,7 @@ def main(argv: list[str] | None = None) -> int:
     print(
         "agentce (Agent Conformance Engine) - placeholder release.\n"
         "The assessment engine is under development.\n"
-        "Specification: https://github.com/agent-conformance/agentce/blob/main/docs/SPEC.md\n"
+        "Specification: https://github.com/agent-conformance/agentce\n"
         "Usage: agentce --version"
     )
     return 0
