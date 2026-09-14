@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-conformance"
+version = "0.0.1"
+description = "Agent Conformance Engine (ACE) - deterministic conformance evidence for AI agents. Placeholder release; see the repository for the specification and roadmap."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+authors = [{ name = "Agent Conformance Engine maintainers" }]
+keywords = ["ai-agents", "conformance", "eu-ai-act", "oscal", "provenance", "shacl", "opentelemetry"]
+classifiers = [
+  "Development Status :: 1 - Planning",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.urls]
+Homepage = "https://agent-conformance.org"
+Repository = "https://github.com/agent-conformance/agentce"
+Specification = "https://github.com/agent-conformance/agentce/blob/main/docs/SPEC.md"
+
+[project.scripts]
+agentce = "agentce.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agentce"]

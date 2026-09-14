@@ -1,0 +1,81 @@
+# Publishes ONE Python package per run to PyPI using Trusted Publishing (OIDC).
+# PyPI allows one pending publisher per (owner, repo, workflow, environment),
+# so each package uses its own GitHub environment:
+#   agent-conformance -> pypi
+#   agentce           -> pypi-agentce
+#   agentce-emit      -> pypi-agentce-emit
+# The filename of this workflow and those environment names must match PyPI exactly.
+name: publish-python
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Which package to publish"
+        required: true
+        type: choice
+        options:
+          - agent-conformance
+          - agentce
+          - agentce-emit
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      env: ${{ steps.select.outputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Select package directory and environment
+        id: select
+        run: |
+          case "${{ inputs.package }}" in
+            agent-conformance)
+              echo "dir=engines/python" >> "$GITHUB_OUTPUT"
+              echo "env=pypi" >> "$GITHUB_OUTPUT" ;;
+            agentce)
+              echo "dir=engines/python-alias" >> "$GITHUB_OUTPUT"
+              echo "env=pypi-agentce" >> "$GITHUB_OUTPUT" ;;
+            agentce-emit)
+              echo "dir=engines/python-emit" >> "$GITHUB_OUTPUT"
+              echo "env=pypi-agentce-emit" >> "$GITHUB_OUTPUT" ;;
+            *) echo "unknown package" >&2; exit 1 ;;
+          esac
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build --outdir dist "${{ steps.select.outputs.dir }}"
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ inputs.package }}
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: ${{ needs.build.outputs.env }}   # pypi | pypi-agentce | pypi-agentce-emit
+    permissions:
+      id-token: write            # required for OIDC trusted publishing
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ inputs.package }}
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/

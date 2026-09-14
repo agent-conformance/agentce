@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentce"
+version = "0.0.1"
+description = "Alias package: installs agent-conformance (the Agent Conformance Engine) so that `pip install agentce` works."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+authors = [{ name = "Agent Conformance Engine maintainers" }]
+dependencies = ["agent-conformance==0.0.1"]
+classifiers = ["Development Status :: 1 - Planning"]
+
+[project.urls]
+Homepage = "https://agent-conformance.org"
+Repository = "https://github.com/agent-conformance/agentce"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agentce_alias"]

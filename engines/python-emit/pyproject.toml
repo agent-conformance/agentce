@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentce-emit"
+version = "0.0.1"
+description = "Evidence emitter library for the Agent Conformance Engine (canonical CloudEvents + JSON-LD). Placeholder release."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+authors = [{ name = "Agent Conformance Engine maintainers" }]
+classifiers = ["Development Status :: 1 - Planning"]
+
+[project.urls]
+Homepage = "https://agent-conformance.org"
+Repository = "https://github.com/agent-conformance/agentce"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agentce_emit"]
