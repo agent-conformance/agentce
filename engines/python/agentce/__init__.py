@@ -1,4 +1,4 @@
-"""Agent Conformance Engine (ACE).
+"""Agent Conformance Engine (AgentCE).
 
 Placeholder package reserving the name on PyPI. The specification lives at
 https://github.com/agent-conformance/agentce

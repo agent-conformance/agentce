@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "agent-conformance"
 version = "0.0.1"
-description = "Agent Conformance Engine (ACE) - deterministic conformance evidence for AI agents. Placeholder release; see the repository for the specification and roadmap."
+description = "Agent Conformance Engine (AgentCE) - deterministic conformance evidence for AI agents. Placeholder release; see the repository for the specification and roadmap."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
