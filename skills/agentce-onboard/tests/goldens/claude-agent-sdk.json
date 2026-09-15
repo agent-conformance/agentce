@@ -1,0 +1,47 @@
+{
+  "chokepoints": [
+    {
+      "confidence": "high",
+      "enforcement_point_present": false,
+      "kind": "tool_call",
+      "line": 9,
+      "path": "agent.py"
+    },
+    {
+      "confidence": "high",
+      "enforcement_point_present": false,
+      "kind": "instruction_entry",
+      "line": 13,
+      "path": "agent.py"
+    },
+    {
+      "confidence": "high",
+      "enforcement_point_present": false,
+      "kind": "model_call",
+      "line": 14,
+      "path": "agent.py"
+    },
+    {
+      "confidence": "high",
+      "enforcement_point_present": false,
+      "kind": "incident",
+      "line": 20,
+      "path": "agent.py"
+    },
+    {
+      "confidence": "medium",
+      "enforcement_point_present": false,
+      "kind": "incident",
+      "line": 21,
+      "path": "agent.py"
+    }
+  ],
+  "counts": {
+    "incident": 2,
+    "instruction_entry": 1,
+    "model_call": 1,
+    "tool_call": 1
+  },
+  "repo": "tests/fixtures/claude-agent-sdk",
+  "total": 5
+}

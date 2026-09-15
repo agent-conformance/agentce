@@ -1,0 +1,19 @@
+# Task effect-scope template for the Conduct overlay (SPEC §7.7, §7.7.5). Declare one scope per task
+# type; `lint_profile` refuses the overlay without a scope for every declared task type. Reference it
+# from the profile via `overlays: [conduct]`, `task_types: [...]`, and `task_scopes: {...}`.
+overlays: [conduct]
+task_types:
+  - "<task-type>"
+task_scopes:
+  "<task-type>":
+    allowed_tools: ["<tool-name>"]
+    allowed_effect_classes: [read, write]        # read | write | irreversible | external_communication | spend | physical
+    resources: ["<resource-uri-or-class>"]
+    data_classes: ["<data-class>"]
+    egress_destinations: ["<host-or-service>"]
+    budgets: {spend: "<limit>", calls: 0}
+    approval_required: [spend, irreversible]     # effect classes that require human approval
+    authorised_principal_roles: ["<role>"]
+    # effect classes are taken from the gateway's tool registry where one exists; otherwise declared
+    # and marked confirmed_by a named person (S-8).
+    confirmed_by: "<reviewer@org>"

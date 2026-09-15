@@ -1,0 +1,11 @@
+# Deviation register template (SPEC §10). This skill NEVER populates the register (rule S-3); the
+# operator adds entries and a named person confirms each (S-8). Left empty here on purpose.
+deviations: []
+# Example entry (operator-authored):
+# deviations:
+#   - control: "OVS-01"
+#     kind: compensating_control        # compensating_control | accepted_risk | not_applicable
+#     rationale: "<why>"
+#     evidence_ref: "<pointer>"
+#     confirmed_by: "<reviewer@org>"
+#     expires: "2027-01-01T00:00:00Z"

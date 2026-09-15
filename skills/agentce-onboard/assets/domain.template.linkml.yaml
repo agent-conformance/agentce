@@ -1,0 +1,20 @@
+# Domain binding template (SPEC §6.3). Subclass agentce:Decision and agentce:ContextItem for your
+# organisation's decision and context types, then run `linkml_validate`. Names are IRIs under your
+# namespace (here `dom:`).
+id: https://example.org/agentce/domain
+name: your-domain-binding
+prefixes:
+  agentce: https://agent-conformance.org/vocab/evidence/v1#
+  dom: https://example.org/dom#
+default_prefix: dom
+classes:
+  YourDecision:
+    is_a: agentce:Decision
+    class_uri: dom:YourDecision
+    annotations:
+      consequential: true                 # legal or similarly significant effect (Art. 86)
+      required_oversight_modality: review_before
+      data_classes: [personal, financial]
+  YourContextItem:
+    is_a: agentce:ContextItem
+    class_uri: dom:YourContextItem
