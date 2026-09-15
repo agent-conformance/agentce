@@ -286,10 +286,22 @@ def test_catalog_lint_missing_dir(capsys: pytest.CaptureFixture[str]) -> None:
     assert env["error"]["key"] == "input.dir_missing"
 
 
-def test_catalog_lint_ok(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    code, env = run(["catalog", "lint", str(tmp_path), "--json"], capsys)
+def test_catalog_lint_base_is_clean(capsys: pytest.CaptureFixture[str]) -> None:
+    base = (
+        Path(__file__).resolve().parents[3] / "spec" / "catalogs" / "base" / "eu-ai-act"
+    )
+    code, env = run(["catalog", "lint", str(base), "--json"], capsys)
     assert code == 0
-    assert env["action"] == "lint"
+    assert env["clean"] is True
+    assert env["problems"] == []
+
+
+def test_catalog_lint_no_catalog_yaml(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code, env = run(["catalog", "lint", str(tmp_path), "--json"], capsys)
+    assert code == 1
+    assert env["clean"] is False
 
 
 def test_conformance_run(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
