@@ -1,0 +1,13 @@
+# linkml-lint configuration for the evidence model.
+# Every correctness (error-level) rule stays on. The advisory style rules are disabled:
+#  - standard_naming: event-type classes/enum values are PascalCase by specification (SPEC 6.2.3);
+#  - recommended: per-slot descriptions are advisory, not required for a valid schema;
+#  - canonical_prefixes: the vocabulary IRIs are fixed by the specification's identifier table.
+extends: recommended
+rules:
+  recommended:
+    level: disabled
+  standard_naming:
+    level: disabled
+  canonical_prefixes:
+    level: disabled

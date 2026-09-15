@@ -1,0 +1,55 @@
+{
+  "specversion": "1.0",
+  "id": "08de79f7ce691cb0cb60bd00530b2cb60e3a24e40581c9322a2554f67087a121",
+  "source": "urn:agentce:source:agentgateway:prod-eu-1",
+  "type": "org.agent-conformance.evidence.ToolCall.v1",
+  "time": "2026-07-14T09:21:07.412Z",
+  "subject": "spiffe://corp/agents/claims-triage",
+  "datacontenttype": "application/ld+json",
+  "agentcetrace": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "agentcespan": "00f067aa0ba902b7",
+  "agentceparent": "53ce929d0e0e4736",
+  "agentcetask": "task-8812",
+  "agentcesourceclass": "enforcement_point",
+  "agentceconv": "mcp:2025-06-18",
+  "data": {
+    "@context": "https://agent-conformance.org/contexts/evidence/v1",
+    "@type": "ToolCall",
+    "agent": {
+      "id": "spiffe://corp/agents/claims-triage",
+      "name": "claims-triage",
+      "bundle_digest": "sha256:e80b28378013ea8d91ae3e6aa5aa31d6a548a86ddb86c33b6bc61a1ca5ce820a"
+    },
+    "acted_for": [
+      "spiffe://corp/services/claims-orchestrator",
+      "agentce:principal/4e31a28a2d836ac030e7f6a1179207f403e65f86b810054199ebeb411a6ba9f7"
+    ],
+    "session_id": "sess-01J9X7Q2M4",
+    "tool": {
+      "name": "claims.update_status",
+      "server": "mcp://claims-core.internal",
+      "protocol": "mcp",
+      "version_or_digest": "sha256:ebb7723961823a5edb9a3933821a448de9573b0e9f14ac3fb257a4eb1350b59a"
+    },
+    "args_ref": "sha256:b4489b2624b2f0d8808c87f1f117be75b95212f6c09bacb7b20f3a123da6fb57",
+    "result_ref": "sha256:cf63649f0db30ece2b50dc4c0f8d887b7324ee07d6f9df6554af4307ed60aa50",
+    "side_effect": "write",
+    "effect_class": "write",
+    "refs": {
+      "instruction": "agentce:event/810e7cbdb9451d38f87d181a4c9cc98d51a701dd2f5c768cb4343c38bfbb6651",
+      "authorization": "agentce:event/eafc3be6d9cea41d11c473b1e6cc33e82f825f6b3b45bee45503a597aaae070d",
+      "delegation": "agentce:event/4142bbf9434e2198ddc44de9c27b3546c5c0e425c43fa3911038b6fc3e6089b4",
+      "decision": "agentce:event/40964303f4c7ea1593e804b7d918dc332f705c605ffc6d96c8ec45b0052fc353"
+    },
+    "used": [
+      "agentce:event/7c4a51a3f15fbbd68de055d4ffe321c6e3a49799c68a7a05a2480da94836ec91"
+    ],
+    "integrity": {
+      "hash": "1b3b7a3f693062d23470295e11f04db6a2c2dca1e0de69867f19f2a6decef9f4",
+      "prev": "c822dd5b8043dbdb5f08d5601bc721284251eccebf1ae908179f63444bfa2d52",
+      "stream": "urn:agentce:source:agentgateway:prod-eu-1|spiffe://corp/agents/claims-triage",
+      "strength": "source_signed",
+      "sig_ref": "attestations/agentgateway-prod-eu-1/000042.dsse.json"
+    }
+  }
+}

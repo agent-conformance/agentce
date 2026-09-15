@@ -23,12 +23,12 @@ if os.environ.get("PYTHONHASHSEED") != "0":
     os.execv(sys.executable, [sys.executable, *sys.argv])
 
 import argparse
+import json
 import re
 from pathlib import Path
 
 from linkml.generators.golanggen import GolangGenerator
 from linkml.generators.javagen import JavaGenerator
-from linkml.generators.jsonldcontextgen import ContextGenerator
 from linkml.generators.jsonschemagen import JsonSchemaGenerator
 from linkml.generators.pythongen import PythonGenerator
 from linkml.generators.shaclgen import ShaclGenerator
@@ -38,6 +38,52 @@ from rdflib.compare import to_canonical_graph
 
 HERE = Path(__file__).resolve().parent
 MODEL = HERE / "agentce-evidence.linkml.yaml"
+
+# Event type terms map the payload @type (e.g. "ToolCall") to the vocabulary class IRI.
+EVENT_TYPES = [
+    "SessionStart", "SessionEnd", "BundleLoaded", "Attestation", "ModelCall", "ToolCall",
+    "ResourceAccess", "MemoryWrite", "MemoryRead", "Instruction", "Refusal", "PolicyDecision",
+    "AuthzCheck", "DelegationIssued", "Decision", "ApprovalRequested", "ApprovalDecided",
+    "Override", "Interrupt", "Outcome", "Incident", "Notice", "Disclosure", "IntegrityResult",
+]
+
+
+def agentce_context() -> dict:
+    """The vendored AgentCE JSON-LD context (SPEC 6.2.2, Appendix A). It encodes the glue relations
+    of SPEC 6.3 so that expanding an event (with the envelope's time/subject/source_class copied into
+    the payload and @id set to agentce:event/<id>) yields the provenance graph. LinkML's context
+    generator cannot express the nested refs mapping, so this is authored from the specification."""
+    obj: dict = {
+        "@version": 1.1,
+        "agentce": "https://agent-conformance.org/vocab/evidence/v1#",
+        "prov": "http://www.w3.org/ns/prov#",
+        "xsd": "http://www.w3.org/2001/XMLSchema#",
+        "id": "@id",
+    }
+    for t in EVENT_TYPES:
+        obj[t] = f"agentce:{t}"
+    obj.update({
+        "agent": {"@id": "prov:wasAssociatedWith", "@type": "@id"},
+        "acted_for": {"@id": "prov:actedOnBehalfOf", "@type": "@id", "@container": "@list"},
+        "used": {"@id": "prov:used", "@type": "@id", "@container": "@set"},
+        "time": {"@id": "prov:atTime", "@type": "xsd:dateTime"},
+        "subject": {"@id": "agentce:subject", "@type": "@id"},
+        "source_class": {"@id": "agentce:sourceClass", "@type": "@vocab"},
+        "enforcement_point": "agentce:enforcement_point",
+        "independent_system": "agentce:independent_system",
+        "self_report": "agentce:self_report",
+        "oversight_modality": {"@id": "agentce:oversightModality", "@type": "@vocab"},
+        "refs": {"@id": "agentce:refs", "@context": {
+            "authorization": {"@id": "agentce:authorizedBy", "@type": "@id"},
+            "delegation": {"@id": "agentce:delegatedVia", "@type": "@id"},
+            "decision": {"@id": "agentce:executes", "@type": "@id"},
+            "request": {"@id": "agentce:decides", "@type": "@id"},
+            "instruction": {"@id": "agentce:actsOn", "@type": "@id"},
+            "parent": {"@id": "agentce:derivedFrom", "@type": "@id"},
+            "origin": {"@id": "agentce:derivedFrom", "@type": "@id"},
+        }},
+    })
+    return {"@context": obj}
 
 
 def canonical_turtle(text: str) -> str:
@@ -69,7 +115,7 @@ def _write(path: Path, text: str) -> None:
 def generate(out: Path) -> None:
     model = str(MODEL)
     _write(out / "json-schema" / "agentce-evidence.schema.json", JsonSchemaGenerator(model).serialize())
-    _write(out / "jsonld-context.json", ContextGenerator(model).serialize())
+    _write(out / "jsonld-context.json", json.dumps(agentce_context(), indent=2, ensure_ascii=False))
     _write(out / "shacl" / "agentce-evidence.shacl.ttl", canonical_turtle(ShaclGenerator(model).serialize()))
     _write(out / "types" / "py" / "agentce_evidence.py", PythonGenerator(model).serialize())
     _write(out / "types" / "ts" / "agentce-evidence.ts", TypescriptGenerator(model).serialize())
