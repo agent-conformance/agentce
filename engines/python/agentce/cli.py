@@ -141,6 +141,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--engine", help="the engine path under test")
     run.add_argument("--corpus", help="the corpus directory")
     run.add_argument("--out", help="the output directory for the implementation report")
+    run.add_argument(
+        "--adapters",
+        help="the adapters directory; also run adapter conformance (SPEC 11.5, 12.3)",
+    )
     p.set_defaults(func=commands.cmd_conformance)
 
     p = sub.add_parser(

@@ -407,8 +407,17 @@ def cmd_conformance(ns: argparse.Namespace) -> CommandResult:
         _opt_str(ns, "corpus"), key="corpus", what="the corpus directory"
     )
     out = _opt_str(ns, "out")
+    adapters = _opt_str(ns, "adapters")
+    adapters_dir = (
+        _require_dir(adapters, key="adapters", what="the adapters directory")
+        if adapters is not None
+        else None
+    )
     report = run_ecs(
-        engine_path=engine, corpus_dir=corpus, out_dir=Path(out) if out else None
+        engine_path=engine,
+        corpus_dir=corpus,
+        out_dir=Path(out) if out else None,
+        adapters_dir=adapters_dir,
     )
     result.data.update({"action": "run", "engine": str(engine), "corpus": str(corpus)})
     if out is not None:
@@ -418,7 +427,19 @@ def cmd_conformance(ns: argparse.Namespace) -> CommandResult:
         f"ECS: {report['projects']['identical']}/{report['projects']['total']} identical; "
         f"claim {report['claim']}; no_ml {report['no_ml']}"
     )
+    adapter_report = report.get("adapters")
+    if isinstance(adapter_report, dict):
+        result.note(
+            f"adapters: {adapter_report['identical']}/{adapter_report['total']} identical; "
+            f"round_trip {adapter_report['round_trip']}"
+        )
     if report["claim"] != "full":
+        result.add_code(int(ExitCode.FINDINGS))
+    if isinstance(adapter_report, dict) and not (
+        adapter_report["total"] > 0
+        and adapter_report["identical"] == adapter_report["total"]
+        and adapter_report["round_trip"]
+    ):
         result.add_code(int(ExitCode.FINDINGS))
     return result
 

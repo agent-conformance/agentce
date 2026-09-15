@@ -125,10 +125,43 @@ def _assess_project(
     return {"id": pid, "assertions": len(assertions), "outcomes": counts}
 
 
+def _adapter_conformance(adapters_dir: Path, out_dir: Path | None) -> dict[str, Any]:
+    """Run adapter conformance in the adapters directory's own environments (SPEC 11.5, 12.3).
+
+    Each adapter is a separate environment (they share the ``agentce_adapters`` package name), so the
+    adapters' own orchestrator is invoked as a subprocess rather than imported.
+    """
+    cmd = ["uv", "run", "--quiet", "python", "conformance.py", "--json"]
+    if out_dir is not None:
+        cmd += ["--out", str(out_dir.resolve())]
+    proc = subprocess.run(
+        cmd, capture_output=True, text=True, cwd=str(adapters_dir), check=False
+    )
+    try:
+        parsed: dict[str, Any] = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return {
+            "adapters": [],
+            "total": 0,
+            "identical": 0,
+            "round_trip": False,
+            "error": (proc.stderr or proc.stdout).strip()[-800:],
+        }
+    return parsed
+
+
 def run_ecs(
-    *, engine_path: Path, corpus_dir: Path, out_dir: Path | None
+    *,
+    engine_path: Path,
+    corpus_dir: Path,
+    out_dir: Path | None,
+    adapters_dir: Path | None = None,
 ) -> dict[str, Any]:
-    """Run every corpus project through the engine and return the implementation report."""
+    """Run every corpus project through the engine and return the implementation report.
+
+    When ``adapters_dir`` is given, adapter conformance (byte-identity and round-trip over every
+    adapter's fixtures) is run too and folded into the report under ``adapters`` (SPEC 11.5, 12.3).
+    """
     repo_root = engine_path.resolve().parent.parent
     catalogs, labels = _catalogs_for(repo_root)
     corpus_root, tempdir = _materialise_corpus(corpus_dir)
@@ -180,6 +213,8 @@ def run_ecs(
         "claim": claim,
         "failures": failures,
     }
+    if adapters_dir is not None:
+        report["adapters"] = _adapter_conformance(adapters_dir, out_dir)
     if out_dir is not None:
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / "implementation-report.json").write_text(
