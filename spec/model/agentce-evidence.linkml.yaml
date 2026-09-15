@@ -1,0 +1,47 @@
+id: https://agent-conformance.org/schema/evidence/v1
+name: agentce-evidence
+title: AgentCE evidence model
+description: >-
+  Canonical evidence events for the assessment engine. Minimal slice used to prove the generation
+  pipeline; expanded to full coverage of the evidence data model in the same item.
+license: Apache-2.0
+version: 0.1.0
+default_prefix: agentce
+default_range: string
+prefixes:
+  linkml: https://w3id.org/linkml/
+  agentce: https://agent-conformance.org/vocab/evidence/v1#
+  xsd: http://www.w3.org/2001/XMLSchema#
+imports:
+  - linkml:types
+
+enums:
+  SourceClass:
+    description: Evidence trust class of the emitting system.
+    permissible_values:
+      enforcement_point:
+      independent_system:
+      self_report:
+
+classes:
+  EvidenceEvent:
+    description: A CloudEvent envelope carrying an AgentCE evidence payload.
+    attributes:
+      id:
+        identifier: true
+        required: true
+        description: Globally unique event id.
+      source:
+        required: true
+        description: URI of the emitting system.
+      type:
+        required: true
+        description: Event type IRI.
+      time:
+        range: datetime
+        required: true
+        description: Source timestamp (RFC 3339 UTC).
+      agentcesourceclass:
+        range: SourceClass
+        required: true
+        description: Evidence trust class.

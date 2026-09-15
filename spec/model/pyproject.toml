@@ -1,0 +1,12 @@
+[project]
+name = "agentce-model"
+version = "0.1.0"
+description = "AgentCE evidence model (LinkML) and deterministic generation of downstream artifacts."
+requires-python = ">=3.12"
+dependencies = [
+  "linkml>=1.8,<2",
+]
+
+# Run in place; uv only manages the environment.
+[tool.uv]
+package = false
