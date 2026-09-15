@@ -1,0 +1,17 @@
+{
+  "id": "arr-nested",
+  "description": "Nested arrays.",
+  "input": [
+    [
+      1
+    ],
+    [
+      2,
+      [
+        3
+      ]
+    ]
+  ],
+  "canonical": "[[1],[2,[3]]]",
+  "sha256": "b463871b36b0851f40bc7df94ab4cea5ce754b998ff6d7c462b45982ef9d447b"
+}

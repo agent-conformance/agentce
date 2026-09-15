@@ -1,0 +1,7 @@
+{
+  "id": "esc-bell",
+  "description": "The bell control has no short form.",
+  "input": "ring\u0007bell",
+  "canonical": "\"ring\\u0007bell\"",
+  "sha256": "518f932ac1fdd282a2cd3d11632b18c12797360c8461995e1cab22871029aa64"
+}

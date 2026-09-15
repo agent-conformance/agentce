@@ -1,0 +1,7 @@
+{
+  "id": "int-neg-one",
+  "description": "A small negative integer.",
+  "input": -1,
+  "canonical": "-1",
+  "sha256": "1bad6b8cf97131fceab8543e81f7757195fbb1d36b376ee994ad1cf17699c464"
+}

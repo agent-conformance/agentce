@@ -1,0 +1,7 @@
+{
+  "id": "esc-quote",
+  "description": "A quotation mark is escaped.",
+  "input": "say \"hi\"",
+  "canonical": "\"say \\\"hi\\\"\"",
+  "sha256": "aef1996098a3f76eca737487cf23b5cb02d934c4f61bde4e185931eed7834050"
+}

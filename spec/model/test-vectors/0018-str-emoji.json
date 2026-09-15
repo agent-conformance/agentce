@@ -1,0 +1,7 @@
+{
+  "id": "str-emoji",
+  "description": "An astral-plane emoji (surrogate pair).",
+  "input": "grin 😀",
+  "canonical": "\"grin 😀\"",
+  "sha256": "5574bc7862c1f630acc08e5255615855cca0e6b8fc08ef41f68d699cfb6d9861"
+}

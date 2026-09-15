@@ -1,0 +1,14 @@
+{
+  "id": "arr-of-objects",
+  "description": "An array of objects.",
+  "input": [
+    {
+      "b": 1
+    },
+    {
+      "a": 2
+    }
+  ],
+  "canonical": "[{\"b\":1},{\"a\":2}]",
+  "sha256": "49bacb43da62160b7e07a101638ab7a571869771f596730bc05e5d0f371e2b51"
+}

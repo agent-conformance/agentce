@@ -1,0 +1,10 @@
+{
+  "id": "obj-astral-key-order",
+  "description": "An astral key sorts before a BMP key by UTF-16 code unit, not code point.",
+  "input": {
+    "Ｚ": 1,
+    "𝐀": 2
+  },
+  "canonical": "{\"𝐀\":2,\"Ｚ\":1}",
+  "sha256": "c43c24bd494be8f360204fa20ce94a2eda49d848418f167f29083b0af206e6e5"
+}

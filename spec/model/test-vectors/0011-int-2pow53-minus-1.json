@@ -1,0 +1,7 @@
+{
+  "id": "int-2pow53-minus-1",
+  "description": "The largest exactly representable double integer.",
+  "input": 9007199254740991,
+  "canonical": "9007199254740991",
+  "sha256": "f40b423c2dd95ff2b2f027e22208f438cf7242862e5e746860e697308c9add26"
+}

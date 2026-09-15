@@ -1,0 +1,15 @@
+{
+  "id": "obj-values-mixed",
+  "description": "Mixed value types in one object.",
+  "input": {
+    "n": null,
+    "b": true,
+    "i": 5,
+    "s": "t",
+    "a": [
+      1
+    ]
+  },
+  "canonical": "{\"a\":[1],\"b\":true,\"i\":5,\"n\":null,\"s\":\"t\"}",
+  "sha256": "6b37fc76b9af1a6aa332bf0f4262ca72c79eed1619db1d777eaae1b5a609e25c"
+}

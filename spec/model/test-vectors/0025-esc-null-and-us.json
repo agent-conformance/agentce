@@ -1,0 +1,7 @@
+{
+  "id": "esc-null-and-us",
+  "description": "C0 controls without a short form use the backslash-u form.",
+  "input": "\u0000\u0001\u001f",
+  "canonical": "\"\\u0000\\u0001\\u001f\"",
+  "sha256": "842096a6d3fcd0968fe35809ea5810d33f7072b93743fc0f7b4ff484ae727d20"
+}

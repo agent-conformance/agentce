@@ -1,0 +1,7 @@
+{
+  "id": "str-ascii",
+  "description": "An ASCII phrase with a space.",
+  "input": "hello world",
+  "canonical": "\"hello world\"",
+  "sha256": "9ddefe4435b21d901439e546d54a14a175a3493b9fd8fbf38d9ea6d3cbf70826"
+}

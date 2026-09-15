@@ -1,0 +1,7 @@
+{
+  "id": "nfc-idempotent",
+  "description": "Already-NFC text is unchanged.",
+  "input": "café",
+  "canonical": "\"café\"",
+  "sha256": "28380feb8724d669bc8d4cf5b5a5bb1adbdc61b81ebd06f3fabc567b4f3b0fc5"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "str-combining-multiple",
+  "description": "Several combining marks that NFC composes.",
+  "input": "áé",
+  "canonical": "\"áé\"",
+  "sha256": "e6b9f61f5a363bd2a7c317b092e775d1cb25be6e49e017ca16cebadf68eecd80"
+}

@@ -1,0 +1,9 @@
+{
+  "id": "err-float-in-array",
+  "description": "A float nested in an array is refused.",
+  "input": [
+    1,
+    2.5
+  ],
+  "error": "non_integer_number"
+}

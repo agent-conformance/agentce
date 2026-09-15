@@ -1,0 +1,7 @@
+{
+  "id": "int-42",
+  "description": "A two-digit integer.",
+  "input": 42,
+  "canonical": "42",
+  "sha256": "73475cb40a568e8da8a045ced110137e159f890ac4da883b6b17dc651b3a8049"
+}

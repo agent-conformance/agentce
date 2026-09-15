@@ -1,0 +1,7 @@
+{
+  "id": "str-a",
+  "description": "A single ASCII letter.",
+  "input": "a",
+  "canonical": "\"a\"",
+  "sha256": "ac8d8342bbb2362d13f0a559a3621bb407011368895164b628a54f7fc33fc43c"
+}

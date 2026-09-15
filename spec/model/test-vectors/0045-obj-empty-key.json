@@ -1,0 +1,10 @@
+{
+  "id": "obj-empty-key",
+  "description": "The empty string is a valid key.",
+  "input": {
+    "": 1,
+    "a": 2
+  },
+  "canonical": "{\"\":1,\"a\":2}",
+  "sha256": "9cf535828d5dbc2d87d9c4c0b99d9e7308b5fdbd22aac02bac1d60f6ac9aa127"
+}

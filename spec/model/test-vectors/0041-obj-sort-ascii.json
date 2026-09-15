@@ -1,0 +1,11 @@
+{
+  "id": "obj-sort-ascii",
+  "description": "Members are sorted by key.",
+  "input": {
+    "b": 1,
+    "a": 2,
+    "A": 3
+  },
+  "canonical": "{\"A\":3,\"a\":2,\"b\":1}",
+  "sha256": "e36823485c211bdf27aa7bb577fe79ba2ad122cfbb95023ae886736fd48e9b7c"
+}

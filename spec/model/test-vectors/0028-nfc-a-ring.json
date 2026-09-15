@@ -1,0 +1,7 @@
+{
+  "id": "nfc-a-ring",
+  "description": "Decomposed A + combining ring composes to U+00C5.",
+  "input": "Å",
+  "canonical": "\"Å\"",
+  "sha256": "20d8dab8ec900ac4fb89517b03abf6cf0c88fb9488ad3530519d98e9b6a6046c"
+}

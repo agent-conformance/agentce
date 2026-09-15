@@ -1,0 +1,10 @@
+{
+  "id": "obj-key-with-space",
+  "description": "A key containing a space.",
+  "input": {
+    "a b": 1,
+    "a": 2
+  },
+  "canonical": "{\"a\":2,\"a b\":1}",
+  "sha256": "1b4441f4bbb54a6a66f7655c342a7e05f27ce3f9547d25570bf8b4ed70be0600"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "arr-mixed",
+  "description": "Mixed element types.",
+  "input": [
+    null,
+    true,
+    "x",
+    1
+  ],
+  "canonical": "[null,true,\"x\",1]",
+  "sha256": "69e7bd35bda24f9a546e041f1ff0c7fdd056853ba3638c20693457239d25e12a"
+}

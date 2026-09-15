@@ -1,0 +1,6 @@
+{
+  "id": "err-float-simple",
+  "description": "A non-integer number is not permitted.",
+  "input": 1.5,
+  "error": "non_integer_number"
+}

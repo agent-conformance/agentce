@@ -1,0 +1,7 @@
+{
+  "id": "str-del",
+  "description": "U+007F is at or above U+0020 and is not escaped.",
+  "input": "xy",
+  "canonical": "\"xy\"",
+  "sha256": "6a3be647df18dab6393c77c9e11c6c3de0085cc5fe2d0d8d178219b985b7eda1"
+}

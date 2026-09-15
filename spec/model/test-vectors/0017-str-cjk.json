@@ -1,0 +1,7 @@
+{
+  "id": "str-cjk",
+  "description": "CJK characters (BMP).",
+  "input": "日本語",
+  "canonical": "\"日本語\"",
+  "sha256": "d2b94e6e664483bbf04d80902abc235527ab68cecf488e8abe22112a6dd62bd4"
+}

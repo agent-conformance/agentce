@@ -1,0 +1,7 @@
+{
+  "id": "int-neg-42",
+  "description": "A negative two-digit integer.",
+  "input": -42,
+  "canonical": "-42",
+  "sha256": "fec80006df0542549b4cbaafb8987eee00bb49bca396eefe9ac8be5b5928e8f6"
+}

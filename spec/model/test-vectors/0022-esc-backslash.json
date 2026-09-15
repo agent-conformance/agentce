@@ -1,0 +1,7 @@
+{
+  "id": "esc-backslash",
+  "description": "A reverse solidus is escaped.",
+  "input": "a\\b",
+  "canonical": "\"a\\\\b\"",
+  "sha256": "d6b4439bd2d0fecbb8aeb27d4370b0354683ea72adc84cca99b5fe80aa0b62d0"
+}
