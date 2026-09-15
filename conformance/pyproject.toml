@@ -1,0 +1,30 @@
+[project]
+name = "agentce-conformance"
+version = "0.0.1"
+description = "AgentCE conformance suite tooling (SPEC 11.5-11.6): the precision/recall release gate and, later, implementation-report registry checks."
+requires-python = ">=3.12"
+dependencies = [
+  "agent-conformance",
+]
+
+# The scripts run in place (python precision_gate.py); uv manages only the environment.
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+agent-conformance = { path = "../engines/python", editable = true }
+
+[dependency-groups]
+dev = [
+  "pytest>=8,<9",
+  "mypy>=1.11,<2",
+  "ruff>=0.6,<0.13",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", ".."]
+addopts = "-p no:cacheprovider"
+
+[tool.mypy]
+python_version = "3.12"

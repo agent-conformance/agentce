@@ -76,27 +76,15 @@ def test_every_project_matches_authored_ground_truth(
     assert not mismatches, "\n".join(mismatches)
 
 
-def test_precision_recall_shape(corpus_dir: Path, tmp_path: Path) -> None:
-    # Recall over seeded faults and false-positive rate over known-pass controls, computed the way the
-    # gate (item 1.12) will: engine outcome vs authored outcome. Must be recall 1.0 and FPR 0.0.
-    manifest = _manifest(corpus_dir)
-    seeded = detected = negatives = false_positives = 0
-    for project in manifest["projects"]:
-        report = _assess(
-            corpus_dir, project["id"], tmp_path / project["id"].replace("/", "_")
-        )
-        got = _outcomes(report, project["subject"])
-        want = _expected(corpus_dir, project["id"])
-        for control, expected in want.items():
-            if expected == "non-conformant":
-                seeded += 1
-                detected += got.get(control) == "non-conformant"
-            if project["variant"] == "known-pass":
-                negatives += 1
-                false_positives += got.get(control) == "non-conformant"
-    assert seeded > 0 and negatives > 0
-    assert detected == seeded  # recall 1.0
-    assert false_positives == 0  # false-positive rate 0.0
+def test_precision_recall_gate(corpus_dir: Path) -> None:
+    # The detection/precision metric (SPEC §11.6), computed by the real gate function: recall over
+    # seeded faults and false-positive rate over known-pass controls. Must be recall 1.0 and FPR 0.0.
+    from corpus.precision_recall import compute_precision_recall
+
+    metrics = compute_precision_recall(corpus_dir)
+    assert metrics["seeded_faults"] > 0 and metrics["known_pass_controls"] > 0
+    assert metrics["recall"] == 1.0
+    assert metrics["fpr_rung2"] == 0.0
 
 
 def test_tampered_stream_is_detected(corpus_dir: Path, tmp_path: Path) -> None:
