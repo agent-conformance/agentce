@@ -29,21 +29,18 @@ jobs:
 
   no-network:
     # Scaffold for the offline assessment guarantee (real assessment lands with the engine).
-    # A dead proxy makes any accidental network call fail, so the step is proven to run offline.
+    # Dead proxies (set at shell level, so both letter cases are covered without a duplicate
+    # case-insensitive env key) make any accidental network call fail, proving the step runs offline.
     runs-on: ubuntu-latest
-    env:
-      HTTP_PROXY: http://127.0.0.1:9
-      HTTPS_PROXY: http://127.0.0.1:9
-      http_proxy: http://127.0.0.1:9
-      https_proxy: http://127.0.0.1:9
-      NO_PROXY: ""
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Offline check
         run: |
           set -e
+          export HTTP_PROXY=http://127.0.0.1:9 HTTPS_PROXY=http://127.0.0.1:9
+          export http_proxy=http://127.0.0.1:9 https_proxy=http://127.0.0.1:9 NO_PROXY=""
           python3 - <<'PY'
-          # Local-only computation; no sockets opened. Proven offline by the dead proxy above.
+          # Local-only computation; no sockets opened. Proven offline by the dead proxies above.
           total = sum(len(line) for line in open("AGENTS.md", encoding="utf-8"))
           assert total > 0
           print("no-network ok")
