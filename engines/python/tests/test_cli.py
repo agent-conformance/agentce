@@ -122,10 +122,30 @@ def test_verify_requires_exactly_one_target(capsys: pytest.CaptureFixture[str]) 
     assert env["error"]["key"] == "input.verify_target"
 
 
-def test_verify_bundle(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    code, env = run(["verify", "--bundle", str(tmp_path), "--json"], capsys)
+def test_verify_bundle(
+    make_bundle: Callable[..., Path],
+    example_event: dict[str, Any],
+    clone: Callable[[dict[str, Any]], dict[str, Any]],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from agentce.integrity import GENESIS_PREV, recompute_hash
+
+    first = clone(example_event)
+    first["data"]["integrity"]["strength"] = "export_chained"
+    first["data"]["integrity"]["prev"] = GENESIS_PREV
+    first["data"]["integrity"]["hash"] = recompute_hash(first)
+    second = clone(example_event)
+    second["id"] = "f" * 64
+    second["time"] = "2026-07-14T09:30:00.000Z"
+    second["data"]["integrity"]["strength"] = "export_chained"
+    second["data"]["integrity"]["prev"] = first["data"]["integrity"]["hash"]
+    second["data"]["integrity"]["hash"] = recompute_hash(second)
+
+    bundle = make_bundle([first, second])
+    code, env = run(["verify", "--bundle", str(bundle), "--json"], capsys)
     assert code == 0
-    assert env["bundle"] == str(tmp_path)
+    assert env["stream_count"] == 1
+    assert env["streams"][0]["status"] == "verified_weak"
 
 
 def test_assess_missing_profile(

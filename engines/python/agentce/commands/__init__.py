@@ -12,6 +12,8 @@ until then report ``status: not_implemented`` and exit ``ok``.
 from __future__ import annotations
 
 import argparse
+import json
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +22,7 @@ from ..bundle import load_bundle
 from ..errors import InputError
 from ..exit_codes import ExitCode
 from ..ingest import ingest
+from ..integrity import IntegrityStatus, verify_bundle
 from ..logsetup import get_logger
 from ..quarantine import counts_by_reason, write_quarantine
 from ..result import CommandResult
@@ -70,6 +73,14 @@ def _require_file(
             fix,
         )
     return path
+
+
+def _write_jsonl(records: Iterable[dict[str, Any]], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for record in records:
+            handle.write(json.dumps(record, sort_keys=True, separators=(",", ":")))
+            handle.write("\n")
 
 
 def _pending(result: CommandResult, summary: str) -> CommandResult:
@@ -134,10 +145,27 @@ def cmd_verify(ns: argparse.Namespace) -> CommandResult:
             "pass exactly one target, e.g. `agentce verify --bundle <dir>`.",
         )
     if bundle is not None:
-        result.data["bundle"] = str(
-            _require_dir(bundle, key="bundle", what="the evidence bundle")
+        bundle_dir = _require_dir(bundle, key="bundle", what="the evidence bundle")
+        loaded = load_bundle(bundle_dir)
+        ingested = ingest(loaded)
+        results = verify_bundle(ingested.accepted, loaded.manifest, loaded.root)
+        clean = {IntegrityStatus.VERIFIED.value, IntegrityStatus.VERIFIED_WEAK.value}
+        broken = [r for r in results if r.status not in clean]
+        result.data.update(
+            {
+                "bundle": str(bundle_dir),
+                "streams": [r.to_json() for r in results],
+                "stream_count": len(results),
+                "broken_streams": len(broken),
+            }
         )
-    elif catalog is not None:
+        result.note(
+            f"verified {bundle_dir}: {len(results)} streams, {len(broken)} broken"
+        )
+        if broken:
+            result.add_code(int(ExitCode.FINDINGS))
+        return result
+    if catalog is not None:
         result.data["catalog"] = str(
             _require_dir(catalog, key="catalog", what="the catalog directory")
         )
@@ -146,7 +174,7 @@ def cmd_verify(ns: argparse.Namespace) -> CommandResult:
             _require_file(release, key="release", what="the release artifact")
         )
     return _pending(
-        result, "Integrity and signature verification land in a later work item."
+        result, "Catalog and release signature verification land in a later work item."
     )
 
 
@@ -175,6 +203,9 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     ingested = ingest(loaded)
     out_dir = Path(out)
     write_quarantine(ingested.quarantined, out_dir / "quarantine.jsonl")
+    # Stage 2: integrity verification, one IntegrityResult per stream.
+    integrity_results = verify_bundle(ingested.accepted, loaded.manifest, loaded.root)
+    _write_jsonl((r.to_json() for r in integrity_results), out_dir / "integrity.jsonl")
     result.data.update(
         {
             "bundle": str(bundle),
@@ -184,11 +215,12 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "out": out,
             "accepted": len(ingested.accepted),
             "quarantined": len(ingested.quarantined),
+            "streams": len(integrity_results),
         }
     )
     return _pending(
         result,
-        "Ingest complete; the integrity, graph, evaluation, and report stages land "
+        "Ingest and integrity complete; the graph, evaluation, and report stages land "
         "across the later work items.",
     )
 
