@@ -454,6 +454,124 @@ def _apply_tamper(events: list[dict[str, Any]]) -> None:
             return
 
 
+def _otlp_attr(value: str | int) -> dict[str, Any]:
+    return (
+        {"intValue": str(value)} if isinstance(value, int) else {"stringValue": value}
+    )
+
+
+def _write_native_export(
+    proj_dir: Path, style_id: str, variant: str, conv: str, subject: str
+) -> str | None:
+    """Write the project's native OTLP/JSON GenAI export (SPEC §11.2, §12.3), or ``None``.
+
+    Only the OpenTelemetry-instrumented styles carry an OTLP export; the ``otel-genai`` adapter maps it
+    to the agent-runtime evidence (``SessionStart``/``SessionEnd``, ``ModelCall``, ``ToolCall``). The
+    hook-evidence and agentce-emit styles emit through their own paths, not OTLP. Deterministic: ids
+    derive from the style and variant, times from a fixed base — no wall clock.
+    """
+    if not conv.startswith("otel-genai:"):
+        return None
+    version = conv.split(":", 1)[1]
+    trace = hashlib.sha256(f"{style_id}/{variant}/native".encode()).hexdigest()[:32]
+    base_ns = (
+        1_746_090_000_000_000_000  # a fixed 2025 base; offsets keep spans in order
+    )
+    conversation = f"conv-{style_id}-{variant}"
+
+    def span(
+        span_id: str, name: str, attrs: dict[str, str | int], start_off: int, dur: int
+    ) -> dict[str, Any]:
+        return {
+            "traceId": trace,
+            "spanId": span_id,
+            "name": name,
+            "startTimeUnixNano": str(base_ns + start_off),
+            "endTimeUnixNano": str(base_ns + start_off + dur),
+            "attributes": [
+                {"key": k, "value": _otlp_attr(v)} for k, v in attrs.items()
+            ],
+            "status": {},
+        }
+
+    agent_attrs = {
+        "gen_ai.agent.id": subject,
+        "gen_ai.agent.name": f"credit-{style_id}",
+        "gen_ai.conversation.id": conversation,
+    }
+    spans = [
+        span(
+            "00000000000a0001",
+            "invoke_agent credit",
+            {
+                "gen_ai.operation.name": "invoke_agent",
+                "deployment.environment.name": "production",
+                **agent_attrs,
+            },
+            0,
+            5_000_000_000,
+        ),
+        span(
+            "00000000000a0002",
+            "chat gpt-4o",
+            {
+                "gen_ai.operation.name": "chat",
+                "gen_ai.system": "openai",
+                "gen_ai.request.model": "gpt-4o",
+                "gen_ai.usage.input_tokens": 1024,
+                "gen_ai.usage.output_tokens": 128,
+                **agent_attrs,
+            },
+            1_000_000_000,
+            800_000_000,
+        ),
+        span(
+            "00000000000a0003",
+            "execute_tool credit.record_decision",
+            {
+                "gen_ai.operation.name": "execute_tool",
+                "gen_ai.tool.name": "credit.record_decision",
+                "gen_ai.tool.server": "mcp://credit-core.internal",
+                "gen_ai.tool.protocol": "mcp",
+                **agent_attrs,
+            },
+            2_000_000_000,
+            300_000_000,
+        ),
+    ]
+    doc = {
+        "resourceSpans": [
+            {
+                "resource": {
+                    "attributes": [
+                        {
+                            "key": "service.name",
+                            "value": {"stringValue": f"credit-{style_id}"},
+                        }
+                    ]
+                },
+                "scopeSpans": [
+                    {
+                        "scope": {
+                            "name": f"opentelemetry.instrumentation.{style_id.replace('-', '_')}",
+                            "version": "1.0",
+                        },
+                        "schemaUrl": f"https://opentelemetry.io/schemas/{version}",
+                        "spans": spans,
+                    }
+                ],
+            }
+        ]
+    }
+    native_dir = proj_dir / "native"
+    native_dir.mkdir(parents=True, exist_ok=True)
+    rel = "native/otel-genai.otlp.json"
+    (proj_dir / rel).write_text(
+        json.dumps(doc, sort_keys=True, indent=2) + "\n", encoding="utf-8"
+    )
+    return rel
+
+
 def _write_project(
     root: Path, style_id: str, variant: str, index: int
 ) -> dict[str, Any]:
@@ -479,6 +597,7 @@ def _write_project(
 
     proj_dir = root / "projects" / DOMAIN / style_id / variant
     evidence = proj_dir / "evidence"
+    _write_native_export(proj_dir, style_id, variant, conv, subject)
 
     # Group curated events into one file per source adapter (mixed convention versions, SPEC §11.4).
     files: list[dict[str, str]] = []

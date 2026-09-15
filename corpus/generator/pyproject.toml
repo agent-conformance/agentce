@@ -15,9 +15,13 @@ package = false
 
 [tool.uv.sources]
 agent-conformance = { path = "../../engines/python", editable = true }
+# Test-only: the native-exports test adapts the generated OTLP exports with the otel-genai adapter to
+# confirm they map to canonical events (SPEC §11.2, §12.3). The generator itself imports neither.
+agentce-adapter-otel-genai = { path = "../../adapters/otel-genai", editable = true }
 
 [dependency-groups]
 dev = [
+  "agentce-adapter-otel-genai",
   "pytest>=8,<9",
   "mypy>=1.11,<2",
   "ruff>=0.6,<0.13",
