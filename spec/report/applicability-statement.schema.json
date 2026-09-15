@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/report/applicability-statement.schema.json",
+  "title": "AgentCE applicability statement",
+  "description": "applicability-statement.json (SPEC Appendix F): which controls apply to a subject and why, the observed versus declared decision types, drift findings, and the trust-class justifications the applicability resolver recorded so an assessor can challenge them.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["subject", "roles", "catalogs", "controls"],
+  "properties": {
+    "subject": {"type": "string"},
+    "roles": {"type": "array", "items": {"type": "string", "enum": ["deployer", "provider", "both"]}},
+    "catalogs": {"type": "array", "items": {"type": "string"}},
+    "controls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "applicable", "reason_code"],
+        "properties": {
+          "id": {"type": "string"},
+          "applicable": {"type": "boolean"},
+          "reason_code": {"type": "string"},
+          "reason_refs": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "observed_decision_types": {"type": "array", "items": {"type": "string"}},
+    "declared_decision_types": {"type": "array", "items": {"type": "string"}},
+    "drift": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "ref"],
+        "properties": {
+          "kind": {"type": "string", "enum": ["undeclared_decision_type", "undeclared_component", "undeclared_subject"]},
+          "ref": {"type": "string"}
+        }
+      }
+    },
+    "class_justifications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "class", "justification"],
+        "properties": {
+          "source": {"type": "string"},
+          "class": {"type": "string", "enum": ["self_report", "enforcement_point", "independent_system"]},
+          "justification": {"type": "string"}
+        }
+      }
+    }
+  }
+}

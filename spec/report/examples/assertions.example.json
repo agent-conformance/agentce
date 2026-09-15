@@ -1,0 +1,28 @@
+[
+  {
+    "control": "OVS-03",
+    "control_version": "2026.09",
+    "subject": "spiffe://corp/agents/claims-triage",
+    "outcome": "non-conformant",
+    "rung": 2,
+    "mode": "automated",
+    "window": {"start": "2026-06-01T00:00:00.000Z", "end": "2026-09-01T00:00:00.000Z"},
+    "expectations": [
+      {"id": "E1", "result": "passed"},
+      {"id": "E2", "result": "failed"},
+      {"id": "E3", "result": "passed"}
+    ],
+    "violations": [
+      {"focus": "agentce:event/01J9XABCDE", "path": "agentce:chainVerified", "constraint": "sh:hasValue", "message_key": "OVS-03.E2.chain_unverified"}
+    ],
+    "evidence": [
+      {"ref": "agentce:event/01J9XABCDE", "digest": "sha256:1b3b7a3f693062d23470295e11f04db6a2c2dca1e0de69867f19f2a6decef9f4", "source_class": "enforcement_point"}
+    ],
+    "population": {"applicable": 4181, "failed": 37},
+    "source_class_satisfied": true,
+    "evidence_strength": "strong",
+    "deviation": null,
+    "remediation_hint_ref": "OVS-03",
+    "crosswalk": [{"framework": "eu-ai-act", "clause": "Art. 14(1)-(3)"}]
+  }
+]

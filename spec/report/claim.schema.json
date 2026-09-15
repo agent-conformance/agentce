@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/report/claim.schema.json",
+  "title": "AgentCE conformance claim",
+  "description": "The conformance claim object (SPEC 9.1): the scoped statement of what was assessed, by whom, against what catalogs, with what methods and evidence. It is content-addressed and signed by the claimant, never by the engine.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["claim_id", "subjects", "observation_window", "catalogs", "engine", "claimant", "statement"],
+  "properties": {
+    "claim_id": {"type": "string", "description": "Content address: the digest of the claim without its signatures."},
+    "subjects": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "role"],
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "role": {"$ref": "#/$defs/role"},
+          "environments": {"type": "array", "items": {"type": "string"}},
+          "registration_ref": {"type": "string"},
+          "bundle_digests": {"type": "array", "items": {"$ref": "#/$defs/digest"}},
+          "model_versions": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "observation_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {"type": "string", "format": "date-time"},
+        "end": {"type": "string", "format": "date-time"},
+        "meets_minimum_period": {"type": "boolean", "description": "IR-09."}
+      }
+    },
+    "catalogs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "version", "digest"],
+        "properties": {
+          "id": {"type": "string"},
+          "version": {"type": "string"},
+          "digest": {"$ref": "#/$defs/digest"},
+          "newer_version_exists": {"type": "boolean"}
+        }
+      }
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["impl", "version", "spec_version"],
+      "properties": {
+        "impl": {"type": "string"},
+        "version": {"type": "string"},
+        "spec_version": {"type": "string"},
+        "implementation_report_ref": {"type": "string"},
+        "engine_unverified": {"type": "boolean", "description": "Set when the engine digest is not a published release (SPEC 8.7)."}
+      }
+    },
+    "evidence_sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["adapter", "source", "trust_class"],
+        "properties": {
+          "adapter": {"type": "string"},
+          "source": {"type": "string"},
+          "trust_class": {"$ref": "#/$defs/source_class"},
+          "coverage_ratio": {"type": "string", "description": "Exact ratio as a decimal string, or the token unknown.", "pattern": "^(unknown|0(\\.[0-9]+)?|1(\\.0+)?)$"}
+        }
+      }
+    },
+    "evaluation_methods": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "automated": {"type": "integer", "minimum": 0},
+        "semi_automated": {"type": "integer", "minimum": 0},
+        "manual": {"type": "integer", "minimum": 0},
+        "assessor_identities": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "partial_conformance": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["component", "controls_affected"],
+        "properties": {
+          "component": {"type": "string"},
+          "controls_affected": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "deviations": {"type": "array", "items": {"type": "string", "description": "Reference to an applied deviation record."}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "claimant": {"$ref": "#/$defs/party"},
+    "assessor": {"$ref": "#/$defs/party"},
+    "statement": {
+      "type": "string",
+      "const": "This report states conformance to the named catalogs as evaluated by the named engine over the named evidence. It is not a legal compliance determination."
+    },
+    "signatures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["profile", "ref"],
+        "properties": {
+          "profile": {"type": "string", "enum": ["sigstore-public", "sigstore-private", "kms"]},
+          "ref": {"type": "string"},
+          "by": {"type": "string", "enum": ["claimant", "assessor"]}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "role": {"type": "string", "enum": ["deployer", "provider", "both"]},
+    "source_class": {"type": "string", "enum": ["self_report", "enforcement_point", "independent_system"]},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "party": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["org"],
+      "properties": {
+        "org": {"type": "string"},
+        "person": {"type": "string"},
+        "assessor_independent": {"type": "boolean"}
+      }
+    }
+  }
+}

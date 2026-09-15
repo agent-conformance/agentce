@@ -1,0 +1,49 @@
+{
+  "claim_id": "sha256:9f2c1a7e4b6d80359ae1c2f40b7d5e8c1a6b4f2093c7d5e1a8b6f4c2e0d9a7b3c",
+  "subjects": [
+    {
+      "id": "spiffe://corp/agents/claims-triage",
+      "name": "Claims triage agent",
+      "role": "deployer",
+      "environments": ["prod-eu-1"],
+      "registration_ref": "eu-db:HR-2027-00417",
+      "bundle_digests": ["sha256:e80b28378013ea8d91ae3e6aa5aa31d6a548a86ddb86c33b6bc61a1ca5ce820a"],
+      "model_versions": ["vendor-llm@2026-05"]
+    }
+  ],
+  "observation_window": {
+    "start": "2026-06-01T00:00:00.000Z",
+    "end": "2026-09-01T00:00:00.000Z",
+    "meets_minimum_period": true
+  },
+  "catalogs": [
+    {"id": "eu-ai-act", "version": "2026.09", "digest": "sha256:3b7a4c2e9f1d05a6b8c4e2f10937d5c8a1e6b4f2093c7d5e1a8b6f4c2e0d9a7b", "newer_version_exists": false}
+  ],
+  "engine": {
+    "impl": "agentce-py",
+    "version": "1.0.0",
+    "spec_version": "0.5",
+    "implementation_report_ref": "conformance/reports/agentce-py-1.0.0.json"
+  },
+  "evidence_sources": [
+    {"adapter": "mcp-gateway", "source": "urn:agentce:source:agentgateway:prod-eu-1", "trust_class": "enforcement_point", "coverage_ratio": "0.998"},
+    {"adapter": "otel-genai", "source": "urn:agentce:source:otel:prod-eu-1", "trust_class": "self_report", "coverage_ratio": "unknown"}
+  ],
+  "evaluation_methods": {
+    "automated": 21,
+    "semi_automated": 3,
+    "manual": 2,
+    "assessor_identities": ["user:jdoe@assessor.example"]
+  },
+  "partial_conformance": [
+    {"component": "vendor-llm", "controls_affected": ["ACC-01", "ROB-02"]}
+  ],
+  "deviations": ["deviations/REC-04-2026Q3"],
+  "limitations": ["Coverage unknown for the otel-genai self-report source; no independent denominator."],
+  "claimant": {"org": "Acme Insurance", "person": "user:ciso@acme.example"},
+  "assessor": {"org": "Assessor LLP", "person": "user:jdoe@assessor.example", "assessor_independent": true},
+  "statement": "This report states conformance to the named catalogs as evaluated by the named engine over the named evidence. It is not a legal compliance determination.",
+  "signatures": [
+    {"profile": "sigstore-public", "ref": "claim.dsse.json", "by": "claimant"}
+  ]
+}

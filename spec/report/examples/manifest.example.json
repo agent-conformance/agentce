@@ -1,0 +1,40 @@
+{
+  "agentce_manifest_version": 1,
+  "engine": {
+    "impl": "agentce-py",
+    "version": "1.0.0",
+    "spec_version": "0.5",
+    "package_digest": "sha256:5d41402abc4b2a76b9719d911017c592aebc1b7f9e2a3c4d5e6f708192a3b4c5",
+    "release_signature_ref": "release/agentce-py-1.0.0.dsse.json"
+  },
+  "inputs": {
+    "bundle_digest": "sha256:e80b28378013ea8d91ae3e6aa5aa31d6a548a86ddb86c33b6bc61a1ca5ce820a",
+    "catalogs": [
+      {"id": "eu-ai-act", "version": "2026.09", "digest": "sha256:3b7a4c2e9f1d05a6b8c4e2f10937d5c8a1e6b4f2093c7d5e1a8b6f4c2e0d9a7b"}
+    ],
+    "applicability_profile_digest": "sha256:1f2e3d4c5b6a7988796a5b4c3d2e1f00112233445566778899aabbccddeeff00",
+    "domain_binding_digest": "sha256:aa11bb22cc33dd44ee55ff6677889900112233445566778899aabbccddeeff11",
+    "deviation_register_digest": "sha256:bb22cc33dd44ee55ff66778899001122334455667788990011223344556677aa",
+    "reference_snapshots_digest": "sha256:cc33dd44ee55ff6677889900112233445566778899aabbccddeeff0011223344",
+    "probe_corpora": [
+      {"id": "injection-basic", "version": "2026.06", "digest": "sha256:dd44ee55ff66778899001122334455667788990011223344556677889900aabb"}
+    ],
+    "manual_records_digest": "sha256:ee55ff667788990011223344556677889900112233445566778899aabbccddee",
+    "pseudonym_key_id": "corp-claims-triage-2026q3"
+  },
+  "outputs": {
+    "assertions.json": "sha256:0011223344556677889900112233445566778899aabbccddeeff001122334455",
+    "report.md": "sha256:112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00",
+    "oscal-ar.json": "sha256:2233445566778899aabbccddeeff00112233445566778899aabbccddeeff0011",
+    "results.sarif": "sha256:33445566778899aabbccddeeff00112233445566778899aabbccddeeff001122"
+  },
+  "run": {
+    "started_at": "2026-09-13T10:00:00.000Z",
+    "operator": "ci:github-actions:corp/assessments/assess.yml@refs/heads/main",
+    "host_fingerprint": "sha256:445566778899aabbccddeeff00112233445566778899aabbccddeeff00112233",
+    "invocation": ["assess", "--bundle", "./evidence", "--catalog", "eu-ai-act@2026.09"],
+    "report_language": "en"
+  },
+  "supersedes": ["sha256:5566778899aabbccddeeff00112233445566778899aabbccddeeff0011223344"],
+  "signature_ref": "manifest.dsse.json"
+}

@@ -1,0 +1,18 @@
+{
+  "subject": "spiffe://corp/agents/claims-triage",
+  "roles": ["deployer"],
+  "catalogs": ["eu-ai-act@2026.09", "overlays/insurance@2026.09"],
+  "controls": [
+    {"id": "OVS-03", "applicable": true, "reason_code": "consequential_decision_observed", "reason_refs": ["ins:ClaimDenialRecommendation"]},
+    {"id": "INC-02", "applicable": true, "reason_code": "role_deployer"},
+    {"id": "DOC-01", "applicable": false, "reason_code": "provider_only", "reason_refs": ["IR-11"]}
+  ],
+  "observed_decision_types": ["ins:ClaimStatusChange", "ins:ClaimDenialRecommendation"],
+  "declared_decision_types": ["ins:ClaimStatusChange", "ins:ClaimDenialRecommendation"],
+  "drift": [
+    {"kind": "undeclared_component", "ref": "sha256:aa11bb22cc33dd44ee55ff6677889900112233445566778899aabbccddeeff11"}
+  ],
+  "class_justifications": [
+    {"source": "urn:agentce:source:agentgateway:prod-eu-1", "class": "enforcement_point", "justification": "gateway sits on the only egress path; agent has no direct provider credentials"}
+  ]
+}
