@@ -1,0 +1,99 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "agentce": "https://agent-conformance.org/vocab/evidence/v1#",
+    "prov": "http://www.w3.org/ns/prov#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "id": "@id",
+    "SessionStart": "agentce:SessionStart",
+    "SessionEnd": "agentce:SessionEnd",
+    "BundleLoaded": "agentce:BundleLoaded",
+    "Attestation": "agentce:Attestation",
+    "ModelCall": "agentce:ModelCall",
+    "ToolCall": "agentce:ToolCall",
+    "ResourceAccess": "agentce:ResourceAccess",
+    "MemoryWrite": "agentce:MemoryWrite",
+    "MemoryRead": "agentce:MemoryRead",
+    "Instruction": "agentce:Instruction",
+    "Refusal": "agentce:Refusal",
+    "PolicyDecision": "agentce:PolicyDecision",
+    "AuthzCheck": "agentce:AuthzCheck",
+    "DelegationIssued": "agentce:DelegationIssued",
+    "Decision": "agentce:Decision",
+    "ApprovalRequested": "agentce:ApprovalRequested",
+    "ApprovalDecided": "agentce:ApprovalDecided",
+    "Override": "agentce:Override",
+    "Interrupt": "agentce:Interrupt",
+    "Outcome": "agentce:Outcome",
+    "Incident": "agentce:Incident",
+    "Notice": "agentce:Notice",
+    "Disclosure": "agentce:Disclosure",
+    "IntegrityResult": "agentce:IntegrityResult",
+    "agent": {
+      "@id": "prov:wasAssociatedWith",
+      "@type": "@id"
+    },
+    "acted_for": {
+      "@id": "prov:actedOnBehalfOf",
+      "@type": "@id",
+      "@container": "@list"
+    },
+    "used": {
+      "@id": "prov:used",
+      "@type": "@id",
+      "@container": "@set"
+    },
+    "time": {
+      "@id": "prov:atTime",
+      "@type": "xsd:dateTime"
+    },
+    "subject": {
+      "@id": "agentce:subject",
+      "@type": "@id"
+    },
+    "source_class": {
+      "@id": "agentce:sourceClass",
+      "@type": "@vocab"
+    },
+    "enforcement_point": "agentce:enforcement_point",
+    "independent_system": "agentce:independent_system",
+    "self_report": "agentce:self_report",
+    "oversight_modality": {
+      "@id": "agentce:oversightModality",
+      "@type": "@vocab"
+    },
+    "refs": {
+      "@id": "agentce:refs",
+      "@context": {
+        "authorization": {
+          "@id": "agentce:authorizedBy",
+          "@type": "@id"
+        },
+        "delegation": {
+          "@id": "agentce:delegatedVia",
+          "@type": "@id"
+        },
+        "decision": {
+          "@id": "agentce:executes",
+          "@type": "@id"
+        },
+        "request": {
+          "@id": "agentce:decides",
+          "@type": "@id"
+        },
+        "instruction": {
+          "@id": "agentce:actsOn",
+          "@type": "@id"
+        },
+        "parent": {
+          "@id": "agentce:derivedFrom",
+          "@type": "@id"
+        },
+        "origin": {
+          "@id": "agentce:derivedFrom",
+          "@type": "@id"
+        }
+      }
+    }
+  }
+}

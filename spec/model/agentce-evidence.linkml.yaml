@@ -2,8 +2,9 @@ id: https://agent-conformance.org/schema/evidence/v1
 name: agentce-evidence
 title: AgentCE evidence model
 description: >-
-  Canonical evidence events for the assessment engine. Minimal slice used to prove the generation
-  pipeline; expanded to full coverage of the evidence data model in the same item.
+  Canonical evidence events for the assessment engine (SPEC section 6). Each event is a CloudEvent
+  whose data member is a JSON-LD payload. This schema is the single source of truth from which the
+  JSON Schema, JSON-LD context, SHACL shapes, and typed bindings are generated.
 license: Apache-2.0
 version: 0.1.0
 default_prefix: agentce
@@ -11,37 +12,497 @@ default_range: string
 prefixes:
   linkml: https://w3id.org/linkml/
   agentce: https://agent-conformance.org/vocab/evidence/v1#
+  prov: http://www.w3.org/ns/prov#
   xsd: http://www.w3.org/2001/XMLSchema#
 imports:
   - linkml:types
 
+# ---------------------------------------------------------------------------------------------
+# Enumerations (SPEC section 6, Appendix F)
+# ---------------------------------------------------------------------------------------------
 enums:
   SourceClass:
-    description: Evidence trust class of the emitting system.
+    description: Evidence trust class of the emitting system (SPEC 6.4).
     permissible_values:
       enforcement_point:
+        description: Emitted by a system that could have prevented the action.
       independent_system:
+        description: Emitted by a system the agent's chain cannot transition.
       self_report:
+        description: Emitted by the agent runtime about itself.
+  EventType:
+    description: The evidence event types (SPEC 6.2.3).
+    permissible_values:
+      SessionStart: {}
+      SessionEnd: {}
+      BundleLoaded: {}
+      Attestation: {}
+      ModelCall: {}
+      ToolCall: {}
+      ResourceAccess: {}
+      MemoryWrite: {}
+      MemoryRead: {}
+      Instruction: {}
+      Refusal: {}
+      PolicyDecision: {}
+      AuthzCheck: {}
+      DelegationIssued: {}
+      Decision: {}
+      ApprovalRequested: {}
+      ApprovalDecided: {}
+      Override: {}
+      Interrupt: {}
+      Outcome: {}
+      Incident: {}
+      Notice: {}
+      Disclosure: {}
+      IntegrityResult: {}
+  PrincipalKind:
+    permissible_values: {human: {}, service: {}, agent: {}}
+  InstructionSourceClass:
+    description: Origin class of an instruction (Appendix F).
+    permissible_values:
+      user: {}
+      operator: {}
+      service: {}
+      agent_identified: {}
+      agent_unidentified: {}
+      tool_output: {}
+      retrieved: {}
+      memory_trusted: {}
+      memory_untrusted: {}
+  RefusalReasonClass:
+    permissible_values:
+      policy_conflict: {}
+      scope_exceeded: {}
+      unauthorized_principal: {}
+      untrusted_source: {}
+      budget_exceeded: {}
+  EffectClass:
+    permissible_values:
+      read: {}
+      write: {}
+      irreversible: {}
+      external_communication: {}
+      spend: {}
+      physical: {}
+  SideEffect:
+    permissible_values: {none: {}, read: {}, write: {}, external: {}, irreversible: {}}
+  IntegrityStrength:
+    permissible_values: {source_signed: {}, export_anchored: {}, export_chained: {}}
+  IntegrityStatus:
+    permissible_values:
+      verified: {}
+      verified_weak: {}
+      gap: {}
+      reordered: {}
+      unsigned: {}
+      time_suspect: {}
+      failed: {}
+  VerificationStatus:
+    permissible_values: {verified: {}, unverified: {}, failed: {}}
+  ToolProtocol:
+    permissible_values: {mcp: {}, a2a: {}, http: {}, native: {}}
+  PolicyEngine:
+    permissible_values: {opa: {}, cedar: {}, openfga: {}, governance_toolkit: {}, custom: {}}
+  PolicyDecisionOutcome:
+    permissible_values: {allow: {}, deny: {}, require_approval: {}, transform: {}}
+  ResourceOperation:
+    permissible_values: {read: {}, write: {}, delete: {}}
+  MemoryTrust:
+    permissible_values: {trusted: {}, untrusted: {}, quarantined: {}}
+  GuardVerdict:
+    permissible_values: {allow: {}, sanitize: {}, quarantine: {}, block: {}, review: {}}
+  OutputMarking:
+    permissible_values: {none: {}, watermark: {}, metadata: {}, label: {}}
+  AiRole:
+    permissible_values: {sole: {}, recommendation: {}, assist: {}}
+  OversightModality:
+    permissible_values:
+      none: {}
+      review_before: {}
+      review_after: {}
+      sampled: {}
+      dual_control: {}
+      interruptible: {}
+  EndReason:
+    permissible_values: {completed: {}, interrupted: {}, error: {}, timeout: {}}
+  ApprovalOutcome:
+    permissible_values: {approve: {}, edit: {}, reject: {}}
+  InterruptMechanism:
+    permissible_values: {stop_button: {}, kill_switch: {}, circuit_breaker: {}, manual: {}}
+  InterruptEffect:
+    permissible_values: {halted: {}, paused: {}, degraded: {}}
+  IncidentClass:
+    permissible_values:
+      death_or_health: {}
+      infrastructure_disruption: {}
+      fundamental_rights: {}
+      property_or_environment: {}
+  NoticeType:
+    permissible_values: {subject_of_ai_decision: {}, explanation: {}, adverse_action: {}}
+  DisclosureType:
+    permissible_values: {ai_interaction: {}, synthetic_marking: {}, deepfake_label: {}}
+  ComponentKind:
+    permissible_values: {skill: {}, mcp_server: {}, model: {}, prompt: {}, config: {}, policy: {}}
+  Role:
+    permissible_values: {deployer: {}, provider: {}, both: {}}
+  QuarantineReason:
+    description: Reasons an event is quarantined at ingest (Appendix F).
+    permissible_values:
+      schema_invalid: {}
+      duplicate_id: {}
+      time_order: {}
+      unknown_type: {}
+      unknown_source: {}
+      class_mismatch: {}
+      oversize: {}
+      context_mismatch: {}
 
+# ---------------------------------------------------------------------------------------------
+# Slots reused across classes, with slot_uri for the JSON-LD/graph mapping (SPEC 6.3, Appendix A)
+# ---------------------------------------------------------------------------------------------
+slots:
+  time:
+    range: datetime
+    slot_uri: prov:atTime
+    description: Source timestamp, RFC 3339 UTC, millisecond precision.
+  source_class:
+    range: SourceClass
+    slot_uri: agentce:sourceClass
+    description: Evidence trust class (copied from the envelope for the graph).
+  agent:
+    range: AgentRef
+    inlined: true
+    slot_uri: prov:wasAssociatedWith
+    description: The agent that performed the activity.
+  acted_for:
+    range: string
+    multivalued: true
+    slot_uri: prov:actedOnBehalfOf
+    description: Ordered principals from immediate delegator to root.
+  used:
+    range: string
+    multivalued: true
+    slot_uri: prov:used
+    description: Context items the activity used.
+
+# ---------------------------------------------------------------------------------------------
+# Classes
+# ---------------------------------------------------------------------------------------------
 classes:
-  EvidenceEvent:
-    description: A CloudEvent envelope carrying an AgentCE evidence payload.
+
+  # --- shared sub-structures ---
+  AgentRef:
+    description: The acting agent.
     attributes:
-      id:
-        identifier: true
-        required: true
-        description: Globally unique event id.
-      source:
-        required: true
-        description: URI of the emitting system.
-      type:
-        required: true
-        description: Event type IRI.
-      time:
-        range: datetime
-        required: true
-        description: Source timestamp (RFC 3339 UTC).
-      agentcesourceclass:
-        range: SourceClass
-        required: true
-        description: Evidence trust class.
+      id: {required: true, description: SPIFFE id or IRI.}
+      name: {}
+      bundle_digest: {description: "sha256: digest of the loaded bundle."}
+  Principal:
+    description: A human, service, or agent principal.
+    attributes:
+      id: {required: true}
+      kind: {range: PrincipalKind, required: true}
+      role: {}
+      authority_ref: {}
+      org: {}
+  ModelRef:
+    attributes:
+      provider: {}
+      name: {}
+      version_or_digest: {}
+  ToolRef:
+    attributes:
+      name: {required: true}
+      server: {}
+      protocol: {range: ToolProtocol}
+      version_or_digest: {}
+  Usage:
+    attributes:
+      input_tokens: {range: integer}
+      output_tokens: {range: integer}
+  ResourceRef:
+    attributes:
+      uri: {required: true}
+      kind: {}
+      classification: {}
+      owner: {}
+  ComponentRef:
+    attributes:
+      kind: {range: ComponentKind}
+      name: {}
+      version: {}
+      digest: {}
+      signer: {}
+  Verification:
+    attributes:
+      status: {range: VerificationStatus}
+      method: {}
+      log_ref: {}
+  IntegrityBlock:
+    description: Per-event integrity envelope (SPEC 6.6).
+    attributes:
+      hash: {required: true}
+      prev: {required: true}
+      stream: {required: true}
+      strength: {range: IntegrityStrength, required: true}
+      sig_ref: {}
+  Refs:
+    description: Typed references to other event ids; slot_uri gives the graph relation (SPEC 6.3).
+    attributes:
+      instruction: {slot_uri: agentce:actsOn, description: The instruction this activity acts on.}
+      authorization: {slot_uri: agentce:authorizedBy, description: The authorizing policy decision.}
+      delegation: {slot_uri: agentce:delegatedVia, description: The delegation used.}
+      decision: {slot_uri: agentce:executes, description: The decision this activity executes.}
+      request: {slot_uri: agentce:decides, description: The action decided (on authority events).}
+      task: {description: Cross-agent task correlation.}
+      parent: {slot_uri: agentce:derivedFrom, description: The instruction this was derived from.}
+      origin: {slot_uri: agentce:derivedFrom, description: The activity that produced the content.}
+      guard: {description: The memory guard that ruled on a write.}
+      consumer: {description: The consumer of a memory read.}
+      policy_decision: {description: A policy decision associated with a refusal.}
+      executed_by: {description: The tool call that executed a decision.}
+  DecisionOption:
+    attributes:
+      id: {required: true}
+      label: {}
+      refs: {multivalued: true}
+
+  # --- envelope ---
+  EvidenceEvent:
+    abstract: true
+    description: CloudEvent envelope carrying an AgentCE evidence payload (SPEC 6.2.1).
+    attributes:
+      specversion: {required: true, description: 'CloudEvents version; MUST be 1.0.'}
+      id: {identifier: true, required: true, description: Globally unique event id.}
+      source: {required: true, description: URI of the emitting system.}
+      type: {required: true, description: "org.agent-conformance.evidence.<EventType>.v1"}
+      time: {range: datetime, required: true}
+      subject: {required: true, description: The assessed subject system.}
+      datacontenttype: {required: true, description: 'MUST be application/ld+json.'}
+      agentcetrace: {description: W3C Trace Context trace id.}
+      agentcespan: {description: W3C Trace Context span id.}
+      agentceparent: {description: W3C Trace Context parent id.}
+      agentcetask: {description: Cross-agent task id.}
+      agentcesourceclass: {range: SourceClass, required: true, description: Evidence trust class.}
+      agentceconv: {description: Upstream convention version mapped.}
+      data: {range: Payload, inlined: true, required: true, description: JSON-LD payload.}
+
+  # --- payload base ---
+  Payload:
+    abstract: true
+    description: Common members of every event payload (SPEC 6.2.2).
+    attributes:
+      agent: {range: AgentRef, inlined: true, slot_uri: prov:wasAssociatedWith}
+      acted_for: {multivalued: true, slot_uri: prov:actedOnBehalfOf}
+      session_id: {}
+      refs: {range: Refs, inlined: true}
+      integrity: {range: IntegrityBlock, inlined: true}
+      ext: {description: 'Source-specific extras; never evaluated by rules.'}
+
+  # --- Lifecycle ---
+  SessionStartPayload:
+    is_a: Payload
+    attributes:
+      deployer: {range: Principal, inlined: true}
+      environment: {}
+      bundle_digest: {}
+      model_versions: {multivalued: true}
+      intended_purpose_ref: {}
+      registration_ref: {}
+  SessionEndPayload:
+    is_a: Payload
+    attributes:
+      end_reason: {range: EndReason}
+  BundleLoadedPayload:
+    is_a: Payload
+    attributes:
+      bundle_digest: {}
+      components: {range: ComponentRef, inlined_as_list: true, multivalued: true}
+      attestation_refs: {multivalued: true}
+  AttestationPayload:
+    is_a: Payload
+    attributes:
+      statement_type: {}
+      subject_digests: {multivalued: true}
+      signer: {}
+      verification: {range: Verification, inlined: true}
+
+  # --- Operation ---
+  ModelCallPayload:
+    is_a: Payload
+    attributes:
+      operation: {}
+      model: {range: ModelRef, inlined: true}
+      usage: {range: Usage, inlined: true}
+      input_ref: {}
+      output_ref: {}
+      output_marking: {range: OutputMarking}
+      error: {}
+  ToolCallPayload:
+    is_a: Payload
+    attributes:
+      tool: {range: ToolRef, inlined: true}
+      args_ref: {}
+      result_ref: {}
+      side_effect: {range: SideEffect}
+      effect_class: {range: EffectClass}
+      error: {}
+      used: {multivalued: true, slot_uri: prov:used}
+  ResourceAccessPayload:
+    is_a: Payload
+    attributes:
+      resource: {range: ResourceRef, inlined: true}
+      operation: {range: ResourceOperation}
+      purpose: {}
+      count: {range: integer}
+  MemoryWritePayload:
+    is_a: Payload
+    attributes:
+      store: {}
+      record_ref: {}
+      provenance_origin_ref: {}
+      provenance_origin_class: {}
+      trust: {range: MemoryTrust}
+      guard_verdict: {range: GuardVerdict}
+  MemoryReadPayload:
+    is_a: Payload
+    attributes:
+      store: {}
+      record_refs: {multivalued: true}
+      trust_min: {range: MemoryTrust}
+  InstructionPayload:
+    is_a: Payload
+    attributes:
+      instruction_id: {}
+      source_class: {range: InstructionSourceClass, slot_uri: agentce:instructionSourceClass}
+      principal: {range: Principal, inlined: true}
+      content_ref: {}
+  RefusalPayload:
+    is_a: Payload
+    attributes:
+      reason_class: {range: RefusalReasonClass}
+
+  # --- Authority ---
+  PolicyDecisionPayload:
+    is_a: Payload
+    attributes:
+      engine: {range: PolicyEngine}
+      policy_id: {}
+      policy_version: {}
+      policy_digest: {}
+      decision: {range: PolicyDecisionOutcome}
+      reasons: {multivalued: true}
+      obligations: {multivalued: true}
+      principal: {range: Principal, inlined: true}
+  AuthzCheckPayload:
+    is_a: Payload
+    attributes:
+      object: {}
+      relation: {}
+      user: {}
+      allowed: {range: boolean}
+      store_ref: {}
+  DelegationIssuedPayload:
+    is_a: Payload
+    attributes:
+      token_ref: {}
+      issuer: {}
+      subject_principal: {}
+      actor_principal: {}
+      chain: {range: Principal, inlined_as_list: true, multivalued: true}
+      scope_granted: {multivalued: true}
+      scope_parent: {multivalued: true}
+      expires: {range: datetime}
+      verification: {range: Verification, inlined: true}
+
+  # --- Decision and oversight ---
+  DecisionPayload:
+    is_a: Payload
+    attributes:
+      decision_id: {}
+      decision_type: {}
+      affects_natural_person: {range: boolean}
+      legal_or_significant_effect: {range: boolean}
+      ai_role: {range: AiRole}
+      options: {range: DecisionOption, inlined_as_list: true, multivalued: true}
+      chosen: {}
+      inputs: {multivalued: true}
+      rationale_claim_ref: {}
+      oversight_modality: {range: OversightModality, slot_uri: agentce:oversightModality}
+      person_ref: {}
+  ApprovalRequestedPayload:
+    is_a: Payload
+    attributes:
+      explanation_ref: {}
+      requested_from: {}
+      channel: {}
+      deadline: {range: datetime}
+  ApprovalDecidedPayload:
+    is_a: Payload
+    attributes:
+      actor: {range: Principal, inlined: true}
+      session_ref: {}
+      outcome: {range: ApprovalOutcome}
+      edits_ref: {}
+      latency_ms: {range: integer}
+      explanation_viewed: {range: boolean}
+  OverridePayload:
+    is_a: Payload
+    attributes:
+      actor: {range: Principal, inlined: true}
+      original: {}
+      replacement: {}
+      reason_code: {}
+  InterruptPayload:
+    is_a: Payload
+    attributes:
+      actor: {range: Principal, inlined: true}
+      mechanism: {range: InterruptMechanism}
+      effect: {range: InterruptEffect}
+
+  # --- Effect and reporting ---
+  OutcomePayload:
+    is_a: Payload
+    attributes:
+      outcome_type: {}
+      observed_at: {range: datetime}
+      adverse: {range: boolean}
+      reversed: {range: boolean}
+      person_ref: {}
+  IncidentPayload:
+    is_a: Payload
+    attributes:
+      incident_id: {}
+      incident_class: {range: IncidentClass}
+      detected_at: {range: datetime}
+      causal_assessment_at: {range: datetime}
+      provider_notified_at: {range: datetime}
+      reported_at: {range: datetime}
+      authority: {}
+      report_ref: {}
+      related_refs: {multivalued: true}
+  NoticePayload:
+    is_a: Payload
+    attributes:
+      person_ref: {}
+      notice_type: {range: NoticeType}
+      delivered_at: {range: datetime}
+      channel: {}
+      content_ref: {}
+  DisclosurePayload:
+    is_a: Payload
+    attributes:
+      disclosure_type: {range: DisclosureType}
+      delivered_at: {range: datetime}
+      mechanism: {}
+  IntegrityResultPayload:
+    is_a: Payload
+    description: Engine-computed verification outcome per stream (SPEC 6.6).
+    attributes:
+      stream: {}
+      strength: {range: IntegrityStrength}
+      status: {range: IntegrityStatus}
+      first_bad_index: {range: integer}
+      anchors: {multivalued: true}

@@ -1,0 +1,41 @@
+{
+  "specversion": "1.0",
+  "id": "ab779a551278e09c28afb32d904db38d22fb507e1445bc477ac45606126b6abc",
+  "source": "urn:agentce:source:approvals:jira",
+  "type": "org.agent-conformance.evidence.ApprovalDecided.v1",
+  "time": "2026-07-14T09:20:58.003Z",
+  "subject": "spiffe://corp/agents/claims-triage",
+  "datacontenttype": "application/ld+json",
+  "agentcetrace": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "agentcetask": "task-8812",
+  "agentcesourceclass": "independent_system",
+  "agentceconv": "oversight-jira:1.0",
+  "data": {
+    "@context": "https://agent-conformance.org/contexts/evidence/v1",
+    "@type": "ApprovalDecided",
+    "agent": {
+      "id": "spiffe://corp/agents/claims-triage"
+    },
+    "session_id": "sess-01J9X7Q2M4",
+    "refs": {
+      "request": "agentce:event/71770789558d6c331e5e901b5e1fd952e535d89e9ae07d789d39500ac94595ec"
+    },
+    "actor": {
+      "id": "agentce:principal/2da048e7a7de023cc68b9c4cc47794a172853ea558b16f6730f419af1cd63991",
+      "kind": "human",
+      "role": "claims_supervisor",
+      "authority_ref": "ref:authority/claims-supervisors@2026-05",
+      "org": "corp"
+    },
+    "session_ref": "agentce:event/fa17d22e5884757573acabdd5c8e4fec9bbc5f637fb0e2ab4d4e99061e829cc8",
+    "outcome": "approve",
+    "latency_ms": 41250,
+    "explanation_viewed": true,
+    "integrity": {
+      "hash": "5cbbf8bf32f2a278d0a79ffb09aa0e9d4f3e412b1df311705686475999449998",
+      "prev": "bbeb29dcd36ba0e3c735e7fffa8b221ce227abc8a78547a293523c8ad7e63283",
+      "stream": "urn:agentce:source:approvals:jira|spiffe://corp/agents/claims-triage",
+      "strength": "export_anchored"
+    }
+  }
+}

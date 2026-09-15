@@ -1,0 +1,23 @@
+package example;
+
+/* metamodel_version: 1.11.0 */
+/* version: 0.1.0 */
+import java.net.URI;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZonedDateTime;
+import java.util.List;
+import lombok.*;
+
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class ComponentRef  {
+
+  private String kind;
+  private String name;
+  private String version;
+  private String digest;
+  private String signer;
+
+
+}

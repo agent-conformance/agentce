@@ -1,0 +1,1879 @@
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://agent-conformance.org/vocab/evidence/v1#ApprovalDecidedPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:in ( "approve" "edit" "reject" ) ;
+            sh:maxCount 1 ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#outcome> ],
+        [ sh:datatype xsd:boolean ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#explanation_viewed> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 11 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:datatype xsd:integer ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#latency_ms> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_ref> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 10 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Principal> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#actor> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#edits_ref> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 6 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#ApprovalDecidedPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#ApprovalRequestedPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#channel> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#requested_from> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#explanation_ref> ],
+        [ sh:datatype xsd:dateTime ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#deadline> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 4 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#ApprovalRequestedPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#AttestationPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#signer> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#subject_digests> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#statement_type> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 4 ;
+            sh:path prov:wasAssociatedWith ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Verification> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#verification> ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#AttestationPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#AuthzCheckPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 10 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:datatype xsd:boolean ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#allowed> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#relation> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#store_ref> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#user> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#object> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 5 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#AuthzCheckPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#BundleLoadedPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#attestation_refs> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#bundle_digest> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#ComponentRef> ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#components> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 3 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#BundleLoadedPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#DecisionPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:boolean ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#affects_natural_person> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 10 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#person_ref> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#inputs> ],
+        [ sh:in ( "sole" "recommendation" "assist" ) ;
+            sh:maxCount 1 ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ai_role> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#decision_id> ],
+        [ sh:datatype xsd:boolean ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#legal_or_significant_effect> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 12 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#rationale_claim_ref> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 16 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 15 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:in ( "none" "review_before" "review_after" "sampled" "dual_control" "interruptible" ) ;
+            sh:maxCount 1 ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#oversightModality> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#chosen> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#decision_type> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 14 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#DecisionOption> ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#options> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 13 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 11 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#DecisionPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#DelegationIssuedPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:dateTime ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#expires> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 10 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Principal> ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#chain> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 14 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#token_ref> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#scope_granted> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#subject_principal> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#issuer> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#actor_principal> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#scope_parent> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 11 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 12 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 13 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Verification> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#verification> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 9 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#DelegationIssuedPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#DisclosurePayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#mechanism> ],
+        [ sh:datatype xsd:dateTime ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#delivered_at> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:in ( "ai_interaction" "synthetic_marking" "deepfake_label" ) ;
+            sh:maxCount 1 ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#disclosure_type> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 3 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#DisclosurePayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#EvidenceEvent> a sh:NodeShape ;
+    rdfs:comment "CloudEvent envelope carrying an AgentCE evidence payload (SPEC 6.2.1)." ;
+    sh:closed false ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:description "Evidence trust class." ;
+            sh:in ( "enforcement_point" "independent_system" "self_report" ) ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:order 11 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#agentcesourceclass> ],
+        [ sh:datatype xsd:dateTime ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#time> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Globally unique event id." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#id> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Cross-agent task id." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 10 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#agentcetask> ],
+        [ sh:datatype xsd:string ;
+            sh:description "W3C Trace Context parent id." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#agentceparent> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Upstream convention version mapped." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 12 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#agentceconv> ],
+        [ sh:datatype xsd:string ;
+            sh:description "URI of the emitting system." ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#source> ],
+        [ sh:datatype xsd:string ;
+            sh:description "CloudEvents version; MUST be 1.0." ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#specversion> ],
+        [ sh:datatype xsd:string ;
+            sh:description "The assessed subject system." ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#subject> ],
+        [ sh:datatype xsd:string ;
+            sh:description "W3C Trace Context trace id." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#agentcetrace> ],
+        [ sh:datatype xsd:string ;
+            sh:description "MUST be application/ld+json." ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#datacontenttype> ],
+        [ sh:datatype xsd:string ;
+            sh:description "W3C Trace Context span id." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#agentcespan> ],
+        [ sh:datatype xsd:string ;
+            sh:description "org.agent-conformance.evidence.<EventType>.v1" ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#type> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Payload> ;
+            sh:description "JSON-LD payload." ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 13 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#data> ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#EvidenceEvent> .
+
+<https://agent-conformance.org/vocab/evidence/v1#IncidentPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:dateTime ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#provider_notified_at> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 10 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#incident_id> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 14 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:datatype xsd:dateTime ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#reported_at> ],
+        [ sh:datatype xsd:dateTime ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#detected_at> ],
+        [ sh:datatype xsd:dateTime ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#causal_assessment_at> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 11 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:in ( "death_or_health" "infrastructure_disruption" "fundamental_rights" "property_or_environment" ) ;
+            sh:maxCount 1 ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#incident_class> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#related_refs> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#report_ref> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#authority> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 12 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 13 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 9 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#IncidentPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#InstructionPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#content_ref> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:in ( "user" "operator" "service" "agent_identified" "agent_unidentified" "tool_output" "retrieved" "memory_trusted" "memory_untrusted" ) ;
+            sh:maxCount 1 ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#instructionSourceClass> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#instruction_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Principal> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#principal> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 4 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#InstructionPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#IntegrityResultPayload> a sh:NodeShape ;
+    rdfs:comment "Engine-computed verification outcome per stream (SPEC 6.6)." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#anchors> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 10 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#stream> ],
+        [ sh:datatype xsd:integer ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#first_bad_index> ],
+        [ sh:in ( "verified" "verified_weak" "gap" "reordered" "unsigned" "time_suspect" "failed" ) ;
+            sh:maxCount 1 ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#status> ],
+        [ sh:in ( "source_signed" "export_anchored" "export_chained" ) ;
+            sh:maxCount 1 ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#strength> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 5 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#IntegrityResultPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#InterruptPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:in ( "halted" "paused" "degraded" ) ;
+            sh:maxCount 1 ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#effect> ],
+        [ sh:in ( "stop_button" "kill_switch" "circuit_breaker" "manual" ) ;
+            sh:maxCount 1 ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#mechanism> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Principal> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#actor> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 3 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#InterruptPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#MemoryReadPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:in ( "trusted" "untrusted" "quarantined" ) ;
+            sh:maxCount 1 ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#trust_min> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#store> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#record_refs> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 3 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#MemoryReadPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#MemoryWritePayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:in ( "trusted" "untrusted" "quarantined" ) ;
+            sh:maxCount 1 ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#trust> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 11 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#store> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#provenance_origin_ref> ],
+        [ sh:in ( "allow" "sanitize" "quarantine" "block" "review" ) ;
+            sh:maxCount 1 ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#guard_verdict> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 10 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#record_ref> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#provenance_origin_class> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 6 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#MemoryWritePayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#ModelCallPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#output_ref> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 12 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:in ( "none" "watermark" "metadata" "label" ) ;
+            sh:maxCount 1 ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#output_marking> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#operation> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Usage> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#usage> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 8 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 11 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 10 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#error> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#ModelRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#model> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#input_ref> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 7 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#ModelCallPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#NoticePayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:dateTime ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#delivered_at> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#content_ref> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 10 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#person_ref> ],
+        [ sh:in ( "subject_of_ai_decision" "explanation" "adverse_action" ) ;
+            sh:maxCount 1 ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#notice_type> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#channel> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 5 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#NoticePayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#OutcomePayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:boolean ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#adverse> ],
+        [ sh:datatype xsd:boolean ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#reversed> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 10 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#person_ref> ],
+        [ sh:datatype xsd:dateTime ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#observed_at> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#outcome_type> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 5 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#OutcomePayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#OverridePayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#replacement> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#original> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Principal> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#actor> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#reason_code> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 4 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#OverridePayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#PolicyDecisionPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:in ( "allow" "deny" "require_approval" "transform" ) ;
+            sh:maxCount 1 ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#decision> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#policy_version> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#obligations> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 13 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:in ( "opa" "cedar" "openfga" "governance_toolkit" "custom" ) ;
+            sh:maxCount 1 ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#engine> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 10 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 9 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#policy_digest> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#policy_id> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#reasons> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 12 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 11 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Principal> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#principal> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#PolicyDecisionPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#RefusalPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:in ( "policy_conflict" "scope_exceeded" "unauthorized_principal" "untrusted_source" "budget_exceeded" ) ;
+            sh:maxCount 1 ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#reason_class> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 1 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#RefusalPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#ResourceAccessPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#purpose> ],
+        [ sh:datatype xsd:integer ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#count> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:in ( "read" "write" "delete" ) ;
+            sh:maxCount 1 ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#operation> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#ResourceRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#resource> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 4 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#ResourceAccessPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#SessionEndPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:in ( "completed" "interrupted" "error" "timeout" ) ;
+            sh:maxCount 1 ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#end_reason> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 1 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#SessionEndPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#SessionStartPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 11 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#model_versions> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#registration_ref> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Principal> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#deployer> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#bundle_digest> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#environment> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#intended_purpose_ref> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 10 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 6 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#SessionStartPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#ToolCallPayload> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#args_ref> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 12 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path prov:used ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#result_ref> ],
+        [ sh:in ( "read" "write" "irreversible" "external_communication" "spend" "physical" ) ;
+            sh:maxCount 1 ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#effect_class> ],
+        [ sh:in ( "none" "read" "write" "external" "irreversible" ) ;
+            sh:maxCount 1 ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#side_effect> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 8 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 11 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#ToolRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#tool> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 10 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#error> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 7 ;
+            sh:path prov:wasAssociatedWith ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#ToolCallPayload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#ComponentRef> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:in ( "skill" "mcp_server" "model" "prompt" "config" "policy" ) ;
+            sh:maxCount 1 ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#kind> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#name> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#version> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#signer> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#digest> ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#ComponentRef> .
+
+<https://agent-conformance.org/vocab/evidence/v1#DecisionOption> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#label> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#id> ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#DecisionOption> .
+
+<https://agent-conformance.org/vocab/evidence/v1#ModelRef> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#version_or_digest> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#name> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#provider> ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#ModelRef> .
+
+<https://agent-conformance.org/vocab/evidence/v1#Payload> a sh:NodeShape ;
+    rdfs:comment "Common members of every event payload (SPEC 6.2.2)." ;
+    sh:closed false ;
+    sh:ignoredProperties ( <https://agent-conformance.org/vocab/evidence/v1#provider_notified_at> <https://agent-conformance.org/vocab/evidence/v1#output_marking> <https://agent-conformance.org/vocab/evidence/v1#model_versions> <https://agent-conformance.org/vocab/evidence/v1#requested_from> <https://agent-conformance.org/vocab/evidence/v1#count> <https://agent-conformance.org/vocab/evidence/v1#policy_digest> <https://agent-conformance.org/vocab/evidence/v1#actor> <https://agent-conformance.org/vocab/evidence/v1#affects_natural_person> <https://agent-conformance.org/vocab/evidence/v1#latency_ms> <https://agent-conformance.org/vocab/evidence/v1#decision_type> <https://agent-conformance.org/vocab/evidence/v1#end_reason> <https://agent-conformance.org/vocab/evidence/v1#legal_or_significant_effect> <https://agent-conformance.org/vocab/evidence/v1#ai_role> <https://agent-conformance.org/vocab/evidence/v1#side_effect> <https://agent-conformance.org/vocab/evidence/v1#related_refs> <https://agent-conformance.org/vocab/evidence/v1#delivered_at> <https://agent-conformance.org/vocab/evidence/v1#report_ref> <https://agent-conformance.org/vocab/evidence/v1#store_ref> <https://agent-conformance.org/vocab/evidence/v1#token_ref> <https://agent-conformance.org/vocab/evidence/v1#detected_at> <https://agent-conformance.org/vocab/evidence/v1#notice_type> <https://agent-conformance.org/vocab/evidence/v1#first_bad_index> <https://agent-conformance.org/vocab/evidence/v1#subject_principal> <https://agent-conformance.org/vocab/evidence/v1#purpose> <https://agent-conformance.org/vocab/evidence/v1#oversightModality> <https://agent-conformance.org/vocab/evidence/v1#reversed> <https://agent-conformance.org/vocab/evidence/v1#engine> <https://agent-conformance.org/vocab/evidence/v1#model> <https://agent-conformance.org/vocab/evidence/v1#issuer> <https://agent-conformance.org/vocab/evidence/v1#result_ref> <https://agent-conformance.org/vocab/evidence/v1#deadline> <https://agent-conformance.org/vocab/evidence/v1#principal> rdf:type <https://agent-conformance.org/vocab/evidence/v1#allowed> <https://agent-conformance.org/vocab/evidence/v1#effect> <https://agent-conformance.org/vocab/evidence/v1#obligations> <https://agent-conformance.org/vocab/evidence/v1#scope_granted> <https://agent-conformance.org/vocab/evidence/v1#authority> <https://agent-conformance.org/vocab/evidence/v1#intended_purpose_ref> <https://agent-conformance.org/vocab/evidence/v1#disclosure_type> <https://agent-conformance.org/vocab/evidence/v1#output_ref> <https://agent-conformance.org/vocab/evidence/v1#status> <https://agent-conformance.org/vocab/evidence/v1#rationale_claim_ref> <https://agent-conformance.org/vocab/evidence/v1#bundle_digest> <https://agent-conformance.org/vocab/evidence/v1#signer> <https://agent-conformance.org/vocab/evidence/v1#reason_class> <https://agent-conformance.org/vocab/evidence/v1#channel> <https://agent-conformance.org/vocab/evidence/v1#components> <https://agent-conformance.org/vocab/evidence/v1#instruction_id> <https://agent-conformance.org/vocab/evidence/v1#incident_id> <https://agent-conformance.org/vocab/evidence/v1#error> <https://agent-conformance.org/vocab/evidence/v1#record_ref> <https://agent-conformance.org/vocab/evidence/v1#decision_id> <https://agent-conformance.org/vocab/evidence/v1#explanation_viewed> prov:used <https://agent-conformance.org/vocab/evidence/v1#store> <https://agent-conformance.org/vocab/evidence/v1#options> <https://agent-conformance.org/vocab/evidence/v1#registration_ref> <https://agent-conformance.org/vocab/evidence/v1#guard_verdict> <https://agent-conformance.org/vocab/evidence/v1#person_ref> <https://agent-conformance.org/vocab/evidence/v1#operation> <https://agent-conformance.org/vocab/evidence/v1#usage> <https://agent-conformance.org/vocab/evidence/v1#reason_code> <https://agent-conformance.org/vocab/evidence/v1#reported_at> <https://agent-conformance.org/vocab/evidence/v1#environment> <https://agent-conformance.org/vocab/evidence/v1#observed_at> <https://agent-conformance.org/vocab/evidence/v1#original> <https://agent-conformance.org/vocab/evidence/v1#expires> <https://agent-conformance.org/vocab/evidence/v1#decision> <https://agent-conformance.org/vocab/evidence/v1#inputs> <https://agent-conformance.org/vocab/evidence/v1#explanation_ref> <https://agent-conformance.org/vocab/evidence/v1#relation> <https://agent-conformance.org/vocab/evidence/v1#object> <https://agent-conformance.org/vocab/evidence/v1#content_ref> <https://agent-conformance.org/vocab/evidence/v1#outcome_type> <https://agent-conformance.org/vocab/evidence/v1#outcome> <https://agent-conformance.org/vocab/evidence/v1#attestation_refs> <https://agent-conformance.org/vocab/evidence/v1#deployer> <https://agent-conformance.org/vocab/evidence/v1#subject_digests> <https://agent-conformance.org/vocab/evidence/v1#user> <https://agent-conformance.org/vocab/evidence/v1#edits_ref> <https://agent-conformance.org/vocab/evidence/v1#provenance_origin_class> <https://agent-conformance.org/vocab/evidence/v1#verification> <https://agent-conformance.org/vocab/evidence/v1#args_ref> <https://agent-conformance.org/vocab/evidence/v1#policy_version> <https://agent-conformance.org/vocab/evidence/v1#mechanism> <https://agent-conformance.org/vocab/evidence/v1#policy_id> <https://agent-conformance.org/vocab/evidence/v1#replacement> <https://agent-conformance.org/vocab/evidence/v1#statement_type> <https://agent-conformance.org/vocab/evidence/v1#actor_principal> <https://agent-conformance.org/vocab/evidence/v1#reasons> <https://agent-conformance.org/vocab/evidence/v1#chain> <https://agent-conformance.org/vocab/evidence/v1#provenance_origin_ref> <https://agent-conformance.org/vocab/evidence/v1#anchors> <https://agent-conformance.org/vocab/evidence/v1#input_ref> <https://agent-conformance.org/vocab/evidence/v1#tool> <https://agent-conformance.org/vocab/evidence/v1#incident_class> <https://agent-conformance.org/vocab/evidence/v1#stream> <https://agent-conformance.org/vocab/evidence/v1#trust_min> <https://agent-conformance.org/vocab/evidence/v1#effect_class> <https://agent-conformance.org/vocab/evidence/v1#session_ref> <https://agent-conformance.org/vocab/evidence/v1#record_refs> <https://agent-conformance.org/vocab/evidence/v1#adverse> <https://agent-conformance.org/vocab/evidence/v1#causal_assessment_at> <https://agent-conformance.org/vocab/evidence/v1#sourceClass> <https://agent-conformance.org/vocab/evidence/v1#strength> <https://agent-conformance.org/vocab/evidence/v1#chosen> <https://agent-conformance.org/vocab/evidence/v1#resource> <https://agent-conformance.org/vocab/evidence/v1#scope_parent> <https://agent-conformance.org/vocab/evidence/v1#trust> ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path prov:actedOnBehalfOf ],
+        [ sh:datatype xsd:string ;
+            sh:description "Source-specific extras; never evaluated by rules." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path prov:wasAssociatedWith ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#Payload> .
+
+<https://agent-conformance.org/vocab/evidence/v1#ResourceRef> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#classification> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#kind> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#uri> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#owner> ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#ResourceRef> .
+
+<https://agent-conformance.org/vocab/evidence/v1#ToolRef> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:in ( "mcp" "a2a" "http" "native" ) ;
+            sh:maxCount 1 ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#protocol> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#server> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#name> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#version_or_digest> ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#ToolRef> .
+
+<https://agent-conformance.org/vocab/evidence/v1#Usage> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:integer ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#input_tokens> ],
+        [ sh:datatype xsd:integer ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#output_tokens> ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#Usage> .
+
+<https://agent-conformance.org/vocab/evidence/v1#Verification> a sh:NodeShape ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#log_ref> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#method> ],
+        [ sh:in ( "verified" "unverified" "failed" ) ;
+            sh:maxCount 1 ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#status> ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#Verification> .
+
+<https://agent-conformance.org/vocab/evidence/v1#Principal> a sh:NodeShape ;
+    rdfs:comment "A human, service, or agent principal." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#role> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#org> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#authority_ref> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#id> ],
+        [ sh:in ( "human" "service" "agent" ) ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#kind> ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#Principal> .
+
+<https://agent-conformance.org/vocab/evidence/v1#AgentRef> a sh:NodeShape ;
+    rdfs:comment "The acting agent." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#name> ],
+        [ sh:datatype xsd:string ;
+            sh:description "sha256: digest of the loaded bundle." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#bundle_digest> ],
+        [ sh:datatype xsd:string ;
+            sh:description "SPIFFE id or IRI." ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#id> ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#AgentRef> .
+
+<https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> a sh:NodeShape ;
+    rdfs:comment "Per-event integrity envelope (SPEC 6.6)." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#stream> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#sig_ref> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#hash> ],
+        [ sh:in ( "source_signed" "export_anchored" "export_chained" ) ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#strength> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:minCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#prev> ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> .
+
+<https://agent-conformance.org/vocab/evidence/v1#Refs> a sh:NodeShape ;
+    rdfs:comment "Typed references to other event ids; slot_uri gives the graph relation (SPEC 6.3)." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:description "The delegation used." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#delegatedVia> ],
+        [ sh:datatype xsd:string ;
+            sh:description "The instruction this activity acts on." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#actsOn> ],
+        [ sh:datatype xsd:string ;
+            sh:description "The authorizing policy decision." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#authorizedBy> ],
+        [ sh:datatype xsd:string ;
+            sh:description "The instruction this was derived from." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#derivedFrom> ],
+        [ sh:datatype xsd:string ;
+            sh:description "The memory guard that ruled on a write." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 8 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#guard> ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tool call that executed a decision." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 11 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#executed_by> ],
+        [ sh:datatype xsd:string ;
+            sh:description "The activity that produced the content." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#derivedFrom> ],
+        [ sh:datatype xsd:string ;
+            sh:description "The action decided (on authority events)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#decides> ],
+        [ sh:datatype xsd:string ;
+            sh:description "The decision this activity executes." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#executes> ],
+        [ sh:datatype xsd:string ;
+            sh:description "A policy decision associated with a refusal." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 10 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#policy_decision> ],
+        [ sh:datatype xsd:string ;
+            sh:description "Cross-agent task correlation." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#task> ],
+        [ sh:datatype xsd:string ;
+            sh:description "The consumer of a memory read." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#consumer> ] ;
+    sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#Refs> .
+
