@@ -1,0 +1,5 @@
+{
+  "engine": "cedar",
+  "subject": "spiffe://corp/agents/credit-underwriter",
+  "source_class": "enforcement_point"
+}

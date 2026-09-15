@@ -1,0 +1,2 @@
+{"timestamp":"2026-05-04T12:00:01.000Z","id":"gov-1","convention_version":"1.0","instance":"gov-toolkit","policy_id":"gov-pol-1","policy_version":"3","policy_digest":"sha256:1f0a","decision":"permit","obligations":["log","notify_dpo"],"principal":{"id":"spiffe://corp/agents/credit-underwriter","kind":"agent"}}
+{"timestamp":"2026-05-04T12:00:02.000Z","id":"gov-2","convention_version":"1.0","instance":"gov-toolkit","policy_id":"gov-pol-2","policy_version":"3","decision":"deny"}
