@@ -42,6 +42,7 @@ class Subject:
     coverage_denominators: list[CoverageDenominator] = field(default_factory=list)
     declared_decision_types: list[str] = field(default_factory=list)
     declared_oversight: dict[str, str] = field(default_factory=dict)
+    declared_components: list[str] = field(default_factory=list)
 
     @property
     def source_ids(self) -> set[str]:
@@ -94,6 +95,11 @@ def _subject(raw: dict[str, Any]) -> Subject:
             str(t) for t in raw.get("declared_decision_types", []) or []
         ],
         declared_oversight=_str_map(raw.get("declared_oversight")),
+        declared_components=[
+            str(c["name"])
+            for c in raw.get("third_party_components", []) or []
+            if isinstance(c, dict) and "name" in c
+        ],
     )
     for entry in raw.get("evidence_sources", []) or []:
         if isinstance(entry, dict) and "source" in entry:

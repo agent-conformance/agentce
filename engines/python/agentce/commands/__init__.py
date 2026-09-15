@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from .. import ENGINE_NAME, SPEC_VERSION, __version__, no_ml
+from ..applicability import resolve as resolve_applicability
 from ..bundle import load_bundle
 from ..coverage import compute_coverage
 from ..domain import DomainBinding
@@ -232,6 +233,10 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     (out_dir / "coverage.json").write_text(
         json.dumps(coverage, sort_keys=True, indent=2), encoding="utf-8"
     )
+    # Stage 5: applicability resolution and drift (catalog controls arrive with item 1.9).
+    statements = resolve_applicability(profile_obj, ingested.accepted)
+    _write_jsonl(statements, out_dir / "applicability.jsonl")
+    drift_findings = sum(len(s["drift"]) for s in statements)
     result.data.update(
         {
             "bundle": str(bundle),
@@ -244,12 +249,13 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "streams": len(integrity_results),
             "graph_triples": graph_triples,
             "subjects": len(coverage["subjects"]),
+            "drift_findings": drift_findings,
         }
     )
     return _pending(
         result,
-        "Ingest, integrity, graph, and coverage complete; the applicability, "
-        "evaluation, and report stages land across the later work items.",
+        "Ingest, integrity, graph, coverage, and applicability complete; the "
+        "evaluation and report stages land across the later work items.",
     )
 
 
