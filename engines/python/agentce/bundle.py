@@ -38,6 +38,9 @@ class Bundle:
     manifest: dict[str, Any]
     event_files: tuple[Path, ...]
     sources: frozenset[str] | None
+    #: Declared trust class per source id, for sources whose manifest entry carries a ``class``
+    #: (SPEC §6.4). Ingest quarantines an event whose ``agentcesourceclass`` differs (``class_mismatch``).
+    source_classes: dict[str, str] | None = None
 
     @property
     def digest(self) -> str:
@@ -108,13 +111,18 @@ def load_bundle(bundle_dir: Path) -> Bundle:
             event_files.append(member)
 
     sources: frozenset[str] | None = None
+    source_classes: dict[str, str] = {}
     declared = manifest.get("sources")
     if isinstance(declared, list):
-        ids = {
-            str(item["id"])
-            for item in declared
-            if isinstance(item, dict) and "id" in item
-        }
+        ids: set[str] = set()
+        for item in declared:
+            if not isinstance(item, dict) or "id" not in item:
+                continue
+            source_id = str(item["id"])
+            ids.add(source_id)
+            declared_class = item.get("class")
+            if isinstance(declared_class, str) and declared_class:
+                source_classes[source_id] = declared_class
         if ids:
             sources = frozenset(ids)
 
@@ -123,4 +131,5 @@ def load_bundle(bundle_dir: Path) -> Bundle:
         manifest=manifest,
         event_files=tuple(sorted(event_files)),
         sources=sources,
+        source_classes=source_classes or None,
     )

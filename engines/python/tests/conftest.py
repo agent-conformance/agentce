@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -28,9 +28,14 @@ def write_bundle(
     lines: Sequence[str],
     *,
     sources: Sequence[str] | None = None,
+    source_classes: Mapping[str, str] | None = None,
     write_manifest: bool = True,
 ) -> Path:
-    """Write a bundle at ``root`` whose single events file carries ``lines`` (already serialised)."""
+    """Write a bundle at ``root`` whose single events file carries ``lines`` (already serialised).
+
+    ``sources`` lists source ids with no declared class; ``source_classes`` maps a source id to the
+    trust class its manifest entry declares (for the ``class_mismatch`` check, SPEC §6.4).
+    """
     (root / "events").mkdir(parents=True, exist_ok=True)
     events_file = root / "events" / "stream.jsonl"
     events_file.write_text("".join(line + "\n" for line in lines), encoding="utf-8")
@@ -41,8 +46,12 @@ def write_bundle(
                 {"path": "events/stream.jsonl", "sha256": sha256_hex(events_file)}
             ],
         }
-        if sources is not None:
-            manifest["sources"] = [{"id": src} for src in sources]
+        entries = [{"id": src} for src in (sources or [])]
+        entries += [
+            {"id": src, "class": cls} for src, cls in (source_classes or {}).items()
+        ]
+        if entries:
+            manifest["sources"] = entries
         (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     return root
 
@@ -61,9 +70,16 @@ def example_events() -> list[dict[str, Any]]:
 def make_bundle(tmp_path: Path) -> Callable[..., Path]:
     """Return a factory that writes a valid bundle from event objects (or raw strings)."""
 
-    def _make(items: Sequence[Any], *, sources: Sequence[str] | None = None) -> Path:
+    def _make(
+        items: Sequence[Any],
+        *,
+        sources: Sequence[str] | None = None,
+        source_classes: Mapping[str, str] | None = None,
+    ) -> Path:
         lines = [item if isinstance(item, str) else json.dumps(item) for item in items]
-        return write_bundle(tmp_path / "bundle", lines, sources=sources)
+        return write_bundle(
+            tmp_path / "bundle", lines, sources=sources, source_classes=source_classes
+        )
 
     return _make
 
