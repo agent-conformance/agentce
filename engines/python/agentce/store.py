@@ -99,6 +99,14 @@ class GraphStore:
         ).fetchall()
         return [row[0] for row in rows]
 
+    def literals(self, s: str, p: str) -> list[tuple[str, str]]:
+        """Return ``(value, datatype)`` pairs for subject ``s`` and predicate ``p``, ordered."""
+        rows = self.conn.execute(
+            "SELECT val, datatype FROM literals WHERE s = ? AND p = ? ORDER BY val, datatype",
+            (s, p),
+        ).fetchall()
+        return [(row[0], row[1]) for row in rows]
+
     def instances_of(self, cls: str) -> list[str]:
         """Every node whose type is ``cls`` or a subclass of it (via the materialised closure)."""
         rows = self.conn.execute(
