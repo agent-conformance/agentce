@@ -1,0 +1,27 @@
+{
+  "killed": 42,
+  "operators": [
+    "comparison-swap",
+    "boolean-swap",
+    "boolean-constant",
+    "integer-constant"
+  ],
+  "score": 0.7925,
+  "survived": 11,
+  "survivor_indices": [
+    0,
+    1,
+    4,
+    7,
+    9,
+    35,
+    36,
+    37,
+    41,
+    43,
+    45
+  ],
+  "target": "agentce/structural.py",
+  "tool": "engines/python/mutation.py",
+  "total": 53
+}
