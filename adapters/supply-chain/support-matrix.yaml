@@ -1,0 +1,30 @@
+# Support matrix for the supply-chain adapter (SPEC 12.3).
+#
+# BundleLoaded comes from runtime bundle-load logs and CycloneDX AIBOMs; Attestation from Sigstore and
+# in-toto statements, with the adapter's verification outcome recorded in `verification.status`
+# (verified / failed / unverified; SPEC 12.2). The `conventions` name the formats the fixtures
+# exercise. `members` lists what the adapter can populate per event type; `missing` lists members these
+# records do not supply. `check_support_matrix` proves this file stays consistent with what the adapter
+# emits. Member paths are dotted one level into nested objects (SPEC 12.3).
+adapter: supply-chain
+conventions:
+  - bundle-load:1
+  - cyclonedx:1.6
+  - in-toto:1.0
+  - sigstore:0.3
+events:
+  BundleLoaded:
+    members: [acted_for, agent.id, agent.name, attestation_refs, bundle_digest, components, session_id]
+    missing: [refs.origin]
+  Attestation:
+    members:
+      - agent.id
+      - agent.name
+      - session_id
+      - signer
+      - statement_type
+      - subject_digests
+      - verification.log_ref
+      - verification.method
+      - verification.status
+    missing: [acted_for]
