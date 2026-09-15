@@ -166,6 +166,40 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=commands.cmd_sign)
 
     p = sub.add_parser(
+        "quickstart", parents=[common], help="assess the bundled quickstart project"
+    )
+    p.add_argument("--out", help="the output directory for the report")
+    p.set_defaults(func=commands.cmd_quickstart)
+
+    p = sub.add_parser(
+        "init", parents=[common], help="write a starter applicability profile"
+    )
+    p.add_argument(
+        "--non-interactive",
+        dest="non_interactive",
+        action="store_true",
+        help="generate without prompting (required)",
+    )
+    p.add_argument(
+        "--framework", help="the agent framework, e.g. custom-loop, langgraph"
+    )
+    p.add_argument("--subject", help="the assessed subject id")
+    p.add_argument(
+        "--role",
+        choices=commands.INIT_ROLES,
+        help="the subject's role: deployer, provider, or both",
+    )
+    p.add_argument("--out", help="the output directory")
+    p.set_defaults(func=commands.cmd_init)
+
+    p = sub.add_parser("config", parents=[common], help="show engine configuration")
+    csub = p.add_subparsers(dest="config_action", metavar="<action>")
+    csub.add_parser(
+        "show", parents=[common], help="print each config value and its source"
+    )
+    p.set_defaults(func=commands.cmd_config)
+
+    p = sub.add_parser(
         "version", parents=[common], help="print engine, spec, and no_ml information"
     )
     p.set_defaults(func=commands.cmd_version)
