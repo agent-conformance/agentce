@@ -1,0 +1,38 @@
+[project]
+name = "agentce-adapters-conformance"
+version = "0.0.1"
+description = "Adapter conformance across every shipped adapter (SPEC 11.5, 12.3): byte-identical canonical events and round-trip through the engine."
+requires-python = ">=3.12"
+dependencies = [
+  "agent-conformance",
+]
+
+# `conformance.py` orchestrates one subprocess per adapter (each adapter is its own environment
+# because they share the package name `agentce_adapters`); `_probe.py` runs inside an adapter's
+# environment. uv manages only this project's environment; the scripts run in place.
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+agent-conformance = { path = "../engines/python", editable = true }
+
+[dependency-groups]
+dev = [
+  "pytest>=8,<9",
+  "mypy>=1.11,<2",
+  "ruff>=0.6,<0.13",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-p no:cacheprovider"
+
+[tool.mypy]
+python_version = "3.12"
+
+# `_probe.py` runs in each adapter's environment where `agentce_adapters` is installed; from this
+# project's environment that import is not resolvable, so mypy ignores it here.
+[[tool.mypy.overrides]]
+module = ["agentce_adapters.*"]
+ignore_missing_imports = true

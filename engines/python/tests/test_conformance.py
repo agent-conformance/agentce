@@ -153,3 +153,68 @@ def test_a_corpus_source_tree_is_generated(tmp_path: Path) -> None:
     report = run_ecs(engine_path=_ENGINE, corpus_dir=corpus, out_dir=None)
     assert report["projects"]["total"] == 1
     assert report["claim"] == "full"
+
+
+def test_run_ecs_omits_adapters_when_no_dir(tmp_path: Path) -> None:
+    corpus = tmp_path / "corpus"
+    _write_corpus(corpus, ["credit/x/known-pass"])
+    report = run_ecs(engine_path=_ENGINE, corpus_dir=corpus, out_dir=None)
+    assert "adapters" not in report
+
+
+def test_run_ecs_folds_in_adapter_conformance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import agentce.conformance as conformance
+
+    canned = {
+        "adapters": ["otel-genai"],
+        "total": 3,
+        "identical": 3,
+        "round_trip": True,
+    }
+    monkeypatch.setattr(conformance, "_adapter_conformance", lambda _dir, _out: canned)
+    corpus = tmp_path / "corpus"
+    _write_corpus(corpus, ["credit/x/known-pass"])
+    report = run_ecs(
+        engine_path=_ENGINE,
+        corpus_dir=corpus,
+        out_dir=None,
+        adapters_dir=tmp_path / "adapters",
+    )
+    assert report["adapters"] == canned
+
+
+def test_adapter_conformance_parses_probe_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    import subprocess
+
+    import agentce.conformance as conformance
+
+    payload = {"adapters": ["a"], "total": 2, "identical": 2, "round_trip": True}
+
+    def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=[], returncode=0, stdout=json.dumps(payload), stderr=""
+        )
+
+    monkeypatch.setattr(conformance.subprocess, "run", fake_run)
+    assert conformance._adapter_conformance(Path("adapters"), None) == payload
+
+
+def test_adapter_conformance_reports_failure_on_bad_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import subprocess
+
+    import agentce.conformance as conformance
+
+    def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=[], returncode=1, stdout="not json", stderr="boom"
+        )
+
+    monkeypatch.setattr(conformance.subprocess, "run", fake_run)
+    result = conformance._adapter_conformance(Path("adapters"), None)
+    assert result["round_trip"] is False
+    assert result["total"] == 0
+    assert "boom" in result["error"]
