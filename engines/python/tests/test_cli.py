@@ -214,12 +214,45 @@ def test_report_bad_format_is_usage_error() -> None:
     assert cli.main(["report", "--from", "x", "--format", "xml"]) == 3
 
 
-def test_report_validate_dir(
+def test_report_validate_empty_dir_is_invalid(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     code, env = run(["report", "--validate", str(tmp_path), "--json"], capsys)
+    assert code == 3
+    assert env["valid"] is False
+    assert env["problems"]
+
+
+def test_report_validate_after_assess(
+    make_bundle: Callable[..., Path],
+    example_events: list[dict[str, Any]],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    bundle = make_bundle(example_events)
+    profile = tmp_path / "profile.yaml"
+    profile.write_text("{}", encoding="utf-8")
+    out = tmp_path / "o"
+    assert (
+        cli.main(
+            [
+                "assess",
+                "--bundle",
+                str(bundle),
+                "--catalog",
+                "c@1",
+                "--profile",
+                str(profile),
+                "--out",
+                str(out),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    code, env = run(["report", "--validate", str(out), "--json"], capsys)
     assert code == 0
-    assert env["report_dir"] == str(tmp_path)
+    assert env["valid"] is True
 
 
 def test_collect_dry_run(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
