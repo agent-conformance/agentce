@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from . import canonical
 from .errors import InputError
 
 
@@ -40,9 +41,8 @@ class Bundle:
 
     @property
     def digest(self) -> str:
-        """The bundle digest: SHA-256 of the canonical manifest (SPEC §8.1)."""
-        canonical = json.dumps(self.manifest, sort_keys=True, separators=(",", ":"))
-        return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        """The bundle digest: SHA-256 of the RFC 8785 canonical manifest (SPEC §8.1)."""
+        return "sha256:" + canonical.sha256_hex(self.manifest)
 
 
 def _safe_member(root: Path, rel: str) -> Path:
