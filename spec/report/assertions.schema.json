@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/report/assertions.schema.json",
+  "title": "AgentCE assertions",
+  "description": "assertions.json (SPEC 9.4): one machine-readable record per (control, subject), the outcome with its evidence pointers, violations, and population counts. The array is the source of truth from which report.md/html, OSCAL, and SARIF are rendered; a translation never changes it.",
+  "type": "array",
+  "items": {"$ref": "#/$defs/assertion"},
+  "$defs": {
+    "outcome": {
+      "type": "string",
+      "enum": ["conformant", "non-conformant", "partial", "not_applicable", "not_assessed", "insufficient_evidence"]
+    },
+    "source_class": {"type": "string", "enum": ["self_report", "enforcement_point", "independent_system"]},
+    "assertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["control", "control_version", "subject", "outcome", "rung", "mode", "window", "population"],
+      "properties": {
+        "control": {"type": "string"},
+        "control_version": {"type": "string"},
+        "subject": {"type": "string"},
+        "outcome": {"$ref": "#/$defs/outcome"},
+        "rung": {"type": "integer", "minimum": 0, "maximum": 4},
+        "mode": {"type": "string", "enum": ["automated", "semi-automated", "manual"]},
+        "window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start", "end"],
+          "properties": {
+            "start": {"type": "string", "format": "date-time"},
+            "end": {"type": "string", "format": "date-time"}
+          }
+        },
+        "expectations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "result"],
+            "properties": {
+              "id": {"type": "string"},
+              "result": {"type": "string", "enum": ["passed", "failed", "not_assessed", "insufficient_evidence"]}
+            }
+          }
+        },
+        "violations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["focus", "path", "constraint", "message_key"],
+            "properties": {
+              "focus": {"type": "string"},
+              "path": {"type": "string"},
+              "constraint": {"type": "string"},
+              "message_key": {"type": "string"}
+            }
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["ref", "digest", "source_class"],
+            "properties": {
+              "ref": {"type": "string"},
+              "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+              "source_class": {"$ref": "#/$defs/source_class"}
+            }
+          }
+        },
+        "population": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["applicable", "failed"],
+          "properties": {
+            "applicable": {"type": "integer", "minimum": 0},
+            "failed": {"type": "integer", "minimum": 0}
+          }
+        },
+        "source_class_satisfied": {"type": "boolean"},
+        "evidence_strength": {"type": "string", "enum": ["strong", "partial"]},
+        "deviation": {"type": ["string", "null"]},
+        "remediation_hint_ref": {"type": "string"},
+        "crosswalk": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["framework", "clause"],
+            "properties": {
+              "framework": {"type": "string"},
+              "clause": {"type": "string"}
+            }
+          }
+        }
+      }
+    }
+  }
+}

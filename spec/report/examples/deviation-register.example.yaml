@@ -1,0 +1,12 @@
+# Deviation register example (SPEC 6.5), used to check deviation-register.schema.json. Timestamps are
+# quoted so they load as strings rather than YAML datetimes.
+deviation_register_version: 1
+deviations:
+  - control: REC-04
+    rationale: "Legacy stream rotation exceeds the declared interval during the Q3 migration."
+    compensating_control: "Daily manual export reconciliation with the system of record."
+    owner: "user:ops-lead@acme.example"
+    approver: "user:ciso@acme.example"
+    granted: "2026-07-01T00:00:00.000Z"
+    expiry: "2026-10-01T00:00:00.000Z"
+    evidence_refs: ["reference/migration-plan@2.md", "agentce:event/01J9XABCDE"]

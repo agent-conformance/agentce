@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/report/integrity-result.schema.json",
+  "title": "AgentCE integrity result",
+  "description": "An IntegrityResult (SPEC 6.6, Appendix F): the verification outcome for one integrity stream, so a report consumer sees exactly which streams were verified, at what strength, and where the record breaks. IntegrityResult is also carried as an evidence event; this schema describes the standalone verification record.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["stream", "strength", "status"],
+  "properties": {
+    "stream": {"type": "string", "description": "The integrity stream id, (source, subject)."},
+    "strength": {"type": "string", "enum": ["source_signed", "export_anchored", "export_chained"]},
+    "status": {"type": "string", "enum": ["verified", "verified_weak", "gap", "reordered", "unsigned", "time_suspect", "failed"]},
+    "first_bad_index": {"type": "integer", "minimum": 0, "description": "The index of the first event where the chain breaks, when status indicates a break."},
+    "anchors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "ref"],
+        "properties": {
+          "kind": {"type": "string", "enum": ["rfc3161", "transparency_log", "write_once"]},
+          "ref": {"type": "string"},
+          "at": {"type": "string", "format": "date-time"}
+        }
+      }
+    }
+  }
+}

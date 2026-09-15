@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/report/quarantine.schema.json",
+  "title": "AgentCE quarantine record",
+  "description": "One record of quarantine.jsonl (SPEC Appendix F): an ingested item the engine refused, with the stable reason code. The file carries one such JSON object per line; this schema validates a single record.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reason"],
+  "properties": {
+    "reason": {
+      "type": "string",
+      "enum": ["schema_invalid", "duplicate_id", "time_order", "unknown_type", "unknown_source", "class_mismatch", "oversize", "context_mismatch"]
+    },
+    "event_id": {"type": "string", "description": "The id of the offending event, when it has one."},
+    "source": {"type": "string"},
+    "stream": {"type": "string"},
+    "type": {"type": "string", "description": "The declared event type, when known."},
+    "detail": {"type": "string", "description": "Human-readable detail; the reason code is the stable part."}
+  }
+}

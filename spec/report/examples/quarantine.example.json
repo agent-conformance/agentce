@@ -1,0 +1,8 @@
+{
+  "reason": "class_mismatch",
+  "event_id": "01J9XABCDE0000000000000000",
+  "source": "urn:agentce:source:otel:prod-eu-1",
+  "stream": "urn:agentce:source:otel:prod-eu-1|spiffe://corp/agents/claims-triage",
+  "type": "PolicyDecision",
+  "detail": "event class self_report differs from the adapter's declared class enforcement_point"
+}

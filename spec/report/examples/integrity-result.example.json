@@ -1,0 +1,9 @@
+{
+  "stream": "urn:agentce:source:agentgateway:prod-eu-1|spiffe://corp/agents/claims-triage",
+  "strength": "export_anchored",
+  "status": "verified",
+  "anchors": [
+    {"kind": "rfc3161", "ref": "attestations/agentgateway-prod-eu-1/000042.tsr", "at": "2026-07-14T10:00:00.000Z"},
+    {"kind": "write_once", "ref": "s3://corp-anchors-objectlock/agentgateway-prod-eu-1/head-000042"}
+  ]
+}

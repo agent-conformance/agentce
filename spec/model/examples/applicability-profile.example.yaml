@@ -1,0 +1,28 @@
+# Applicability profile from SPEC 6.5, used to check applicability-profile.schema.json. Timestamps are
+# quoted so they load as the strings the schema expects rather than YAML datetimes.
+profile_version: 1
+observation_window: {start: "2026-06-01T00:00:00Z", end: "2026-09-01T00:00:00Z"}
+content_capture: {mode: hashes_only}
+subjects:
+  - id: spiffe://corp/agents/claims-triage
+    name: Claims triage agent
+    role: deployer
+    intended_purpose_ref: ref:purpose/claims-triage@3
+    annex_iii_category: essential_services_insurance
+    registration_ref: eu-db:HR-2027-00417
+    environments: [prod-eu-1]
+    declared_decision_types: [ins:ClaimStatusChange, ins:ClaimDenialRecommendation]
+    declared_data_classes: [personal_data, special_category]
+    declared_oversight: {ins:ClaimDenialRecommendation: review_before}
+    third_party_components:
+      - {kind: model, name: vendor-llm, controls_affected: [ACC-01, ROB-02]}
+    evidence_sources:
+      - {adapter: otel-genai, source: urn:agentce:source:otel:prod-eu-1, class: self_report, class_justification: "emitted by the agent runtime"}
+      - {adapter: mcp-gateway, source: urn:agentce:source:agentgateway:prod-eu-1, class: enforcement_point, class_justification: "gateway sits on the only egress path; agent has no direct provider credentials", manifest: reference/gw-counts.json}
+      - {adapter: openfga, source: urn:agentce:source:openfga:prod, class: enforcement_point, class_justification: "checks are evaluated server-side; agent holds no bypass credential"}
+      - {adapter: approval-gate, source: urn:agentce:source:approvals:jira, class: independent_system, class_justification: "records kept by the ticketing system; agent identities cannot transition approval states"}
+    coverage_denominators:
+      - {kind: provider_usage_export, source: urn:agentce:source:llm-vendor-usage:acct-4471, covers: [ModelCall]}
+      - {kind: egress_proxy_log, source: urn:agentce:source:egress:prod-eu-1, covers: [ToolCall, ModelCall]}
+      - {kind: admission_attestation, source: urn:agentce:source:netpolicy:prod-eu-1, covers: [ToolCall], statement: "no egress path other than the gateway"}
+catalogs: [eu-ai-act@2026.09, overlays/insurance@2026.09, org/acme@1.2]

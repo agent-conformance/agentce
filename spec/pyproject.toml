@@ -1,0 +1,12 @@
+[project]
+name = "agentce-spec"
+version = "0.1.0"
+description = "AgentCE specification example validation: worked examples checked against the published schemas."
+requires-python = ">=3.12"
+dependencies = [
+  "jsonschema>=4.21,<5",
+  "pyyaml>=6,<7",
+]
+
+[tool.uv]
+package = false

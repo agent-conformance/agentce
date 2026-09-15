@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/report/manifest.schema.json",
+  "title": "AgentCE reproducibility manifest",
+  "description": "manifest.json in the report directory (SPEC 8.4): the engine, the digests of every input, the digests of every output, and the run metadata. A verifier reruns the engine with the same inputs and compares output digests; equality proves reproducibility.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agentce_manifest_version", "engine", "inputs", "outputs", "run"],
+  "properties": {
+    "agentce_manifest_version": {"type": "integer", "minimum": 1},
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["impl", "version", "spec_version", "package_digest"],
+      "properties": {
+        "impl": {"type": "string"},
+        "version": {"type": "string"},
+        "spec_version": {"type": "string"},
+        "package_digest": {"$ref": "#/$defs/digest"},
+        "release_signature_ref": {"type": "string"}
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bundle_digest", "catalogs"],
+      "properties": {
+        "bundle_digest": {"$ref": "#/$defs/digest"},
+        "catalogs": {"type": "array", "items": {"$ref": "#/$defs/catalog_ref"}},
+        "applicability_profile_digest": {"$ref": "#/$defs/digest"},
+        "domain_binding_digest": {"$ref": "#/$defs/digest"},
+        "deviation_register_digest": {"$ref": "#/$defs/digest"},
+        "reference_snapshots_digest": {"$ref": "#/$defs/digest"},
+        "probe_corpora": {"type": "array", "items": {"$ref": "#/$defs/catalog_ref"}},
+        "manual_records_digest": {"$ref": "#/$defs/digest"},
+        "pseudonym_key_id": {"type": "string", "description": "Names, never contains, the pseudonymisation key (SPEC 6.7)."}
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "description": "Output file name to its digest.",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/digest"}
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["started_at", "operator", "invocation"],
+      "properties": {
+        "started_at": {"type": "string", "format": "date-time"},
+        "operator": {"type": "string", "description": "Invoking OS user or CI identity (SPEC 8.4)."},
+        "host_fingerprint": {"$ref": "#/$defs/digest"},
+        "invocation": {"type": "array", "items": {"type": "string"}, "description": "Command and arguments, paths only, never content."},
+        "report_language": {"type": "string", "description": "Message-key catalogue used for rendering (SPEC 9.3); no effect on assertions.json."}
+      }
+    },
+    "source_completeness": {
+      "type": "array",
+      "description": "Per-source completeness (SPEC 5.4, Appendix F).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "status"],
+        "properties": {
+          "source": {"type": "string"},
+          "status": {"type": "string", "enum": ["complete", "incomplete"]},
+          "reason": {"type": "string", "enum": ["unreachable", "rate_limited", "partial_export", "credential_error"]}
+        }
+      }
+    },
+    "supersedes": {"type": "array", "items": {"$ref": "#/$defs/digest"}},
+    "signature_ref": {"type": "string"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "catalog_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "digest"],
+      "properties": {
+        "id": {"type": "string"},
+        "version": {"type": "string"},
+        "digest": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}
