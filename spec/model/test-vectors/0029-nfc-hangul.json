@@ -1,0 +1,7 @@
+{
+  "id": "nfc-hangul",
+  "description": "Conjoining Hangul jamo compose to a syllable.",
+  "input": "가",
+  "canonical": "\"가\"",
+  "sha256": "c04fdbc8c7a508c92af13e168e01bcdb441dd488a6e3aabe2aa9a4df5546ce50"
+}

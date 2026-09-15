@@ -1,0 +1,7 @@
+{
+  "id": "esc-solidus",
+  "description": "A forward solidus is NOT escaped.",
+  "input": "a/b/c",
+  "canonical": "\"a/b/c\"",
+  "sha256": "96a51dd2414a58ec2b74a4be98c5a509810d0551063b1e77cb8bfb2f85594bc9"
+}

@@ -1,0 +1,10 @@
+{
+  "id": "nfc-in-key",
+  "description": "A decomposed object key is normalised before sorting.",
+  "input": {
+    "é": 1,
+    "b": 2
+  },
+  "canonical": "{\"b\":2,\"é\":1}",
+  "sha256": "a0eb99456171da900e7fe09ef389a596870e6477df0270aaac2658bde48903e7"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "arr-ints",
+  "description": "Integers in order.",
+  "input": [
+    1,
+    2,
+    3
+  ],
+  "canonical": "[1,2,3]",
+  "sha256": "a615eeaee21de5179de080de8c3052c8da901138406ba71c38c032845f7d54f4"
+}

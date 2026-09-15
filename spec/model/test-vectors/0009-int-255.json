@@ -1,0 +1,7 @@
+{
+  "id": "int-255",
+  "description": "A byte boundary.",
+  "input": 255,
+  "canonical": "255",
+  "sha256": "9556b82499cc0aaf86aee7f0d253e17c61b7ef73d48a295f37d98f08b04ffa7f"
+}

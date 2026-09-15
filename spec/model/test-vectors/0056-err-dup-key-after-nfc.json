@@ -1,0 +1,9 @@
+{
+  "id": "err-dup-key-after-nfc",
+  "description": "Two keys equal after NFC (precomposed and decomposed) make the object ambiguous.",
+  "input": {
+    "é": 1,
+    "é": 2
+  },
+  "error": "duplicate_key_after_nfc"
+}

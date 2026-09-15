@@ -1,0 +1,6 @@
+{
+  "id": "err-float-exp",
+  "description": "A number in exponent form parses as a float and is refused.",
+  "input": 1e+30,
+  "error": "non_integer_number"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "nfc-e-acute",
+  "description": "Decomposed e + combining acute composes to U+00E9.",
+  "input": "é",
+  "canonical": "\"é\"",
+  "sha256": "f2886017e9c7abacf804b54d64787dce2b611c9544ba21f3affdd126a6e50086"
+}

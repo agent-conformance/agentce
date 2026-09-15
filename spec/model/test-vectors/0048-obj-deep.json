@@ -1,0 +1,18 @@
+{
+  "id": "obj-deep",
+  "description": "Deeper nesting of objects and arrays.",
+  "input": {
+    "a": {
+      "b": {
+        "c": [
+          1,
+          {
+            "d": 2
+          }
+        ]
+      }
+    }
+  },
+  "canonical": "{\"a\":{\"b\":{\"c\":[1,{\"d\":2}]}}}",
+  "sha256": "01edf905eb667fd2b82bade7c18cc71fe94723269d53520571ac8f1da581aa15"
+}

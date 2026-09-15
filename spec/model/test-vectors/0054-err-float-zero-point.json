@@ -1,0 +1,6 @@
+{
+  "id": "err-float-zero-point",
+  "description": "A fractional value below one is refused.",
+  "input": 0.1,
+  "error": "non_integer_number"
+}

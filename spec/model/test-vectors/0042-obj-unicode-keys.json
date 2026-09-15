@@ -1,0 +1,11 @@
+{
+  "id": "obj-unicode-keys",
+  "description": "Unicode BMP keys sorted by code unit.",
+  "input": {
+    "é": 1,
+    "e": 2,
+    "z": 3
+  },
+  "canonical": "{\"e\":2,\"z\":3,\"é\":1}",
+  "sha256": "9fd95198b233351043c9e13cbc336297f31bc76a19d0ca2ff093cd1172fa47a1"
+}

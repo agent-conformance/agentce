@@ -1,0 +1,7 @@
+{
+  "id": "str-bmp-naive",
+  "description": "A diaeresis in the BMP.",
+  "input": "naïve",
+  "canonical": "\"naïve\"",
+  "sha256": "ec69c2a3cbd79ae0cdde0423441b146fcf07e2bf96bbd5be8a1d8ec1d65a6faf"
+}

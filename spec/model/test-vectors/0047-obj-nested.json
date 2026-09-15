@@ -1,0 +1,12 @@
+{
+  "id": "obj-nested",
+  "description": "A nested object with keys out of order.",
+  "input": {
+    "z": {
+      "y": 1
+    },
+    "a": 2
+  },
+  "canonical": "{\"a\":2,\"z\":{\"y\":1}}",
+  "sha256": "431ff12e17e588398481cabd5fa7a2cf809109476534609a460e224ab02114e6"
+}

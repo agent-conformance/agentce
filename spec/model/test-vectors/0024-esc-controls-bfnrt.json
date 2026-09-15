@@ -1,0 +1,7 @@
+{
+  "id": "esc-controls-bfnrt",
+  "description": "The five short-form control escapes.",
+  "input": "\b\t\n\f\r",
+  "canonical": "\"\\b\\t\\n\\f\\r\"",
+  "sha256": "6e62a535b04fecef3e63e0a67bc2a0657383132fed040cbe7fcb725ed72bae27"
+}

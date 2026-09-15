@@ -7,6 +7,9 @@ dependencies = [
   "linkml>=1.8,<2",
 ]
 
+[dependency-groups]
+dev = ["pytest>=8,<9"]
+
 # Run in place; uv only manages the environment.
 [tool.uv]
 package = false

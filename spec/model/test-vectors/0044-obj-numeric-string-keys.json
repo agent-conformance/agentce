@@ -1,0 +1,11 @@
+{
+  "id": "obj-numeric-string-keys",
+  "description": "Numeric-looking keys sort as strings, not numbers.",
+  "input": {
+    "10": 1,
+    "2": 2,
+    "1": 3
+  },
+  "canonical": "{\"1\":3,\"10\":1,\"2\":2}",
+  "sha256": "5e4291a72609c36fbe21976831a8fbd154d33f0dca203f915b6fa21e965acdc9"
+}

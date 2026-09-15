@@ -1,0 +1,7 @@
+{
+  "id": "int-million",
+  "description": "A larger integer.",
+  "input": 1000000,
+  "canonical": "1000000",
+  "sha256": "6cce36d9f8a9e151b100234af75cca89d55bcb94c153f51847debdf1f39cae45"
+}
