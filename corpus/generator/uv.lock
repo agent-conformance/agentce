@@ -36,6 +36,27 @@ dev = [
 ]
 
 [[package]]
+name = "agentce-adapter-otel-genai"
+version = "0.0.1"
+source = { editable = "../../adapters/otel-genai" }
+dependencies = [
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pyyaml", specifier = ">=6,<7" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "agent-conformance", editable = "../../engines/python" },
+    { name = "mypy", specifier = ">=1.11,<2" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-cov", specifier = ">=5,<7" },
+    { name = "ruff", specifier = ">=0.6,<0.13" },
+    { name = "types-pyyaml", specifier = ">=6" },
+]
+
+[[package]]
 name = "agentce-corpus-generator"
 version = "0.0.1"
 source = { virtual = "." }
@@ -45,6 +66,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "agentce-adapter-otel-genai" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
@@ -55,6 +77,7 @@ requires-dist = [{ name = "agent-conformance", editable = "../../engines/python"
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "agentce-adapter-otel-genai", editable = "../../adapters/otel-genai" },
     { name = "mypy", specifier = ">=1.11,<2" },
     { name = "pytest", specifier = ">=8,<9" },
     { name = "ruff", specifier = ">=0.6,<0.13" },
