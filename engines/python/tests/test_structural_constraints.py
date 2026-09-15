@@ -166,6 +166,42 @@ def test_qualified_min_count() -> None:
     assert _fails(body, bad, extra)
 
 
+def test_inclusive_boundaries_are_conformant() -> None:
+    # A value exactly equal to the bound satisfies min/maxInclusive (the comparison is <=, not <).
+    body = "sh:property [ sh:path agentce:n ; sh:minInclusive 10 ; sh:maxInclusive 20 ]"
+    at_min = _store()
+    at_min.add_literal(FOCUS, "agentce:n", "10", "xsd:integer")
+    assert not _fails(body, at_min)
+    at_max = _store()
+    at_max.add_literal(FOCUS, "agentce:n", "20", "xsd:integer")
+    assert not _fails(body, at_max)
+
+
+def test_datetime_inclusive_comparison() -> None:
+    body = (
+        "sh:property [ sh:path agentce:t ; "
+        'sh:minInclusive "2026-01-01T00:00:00Z" ; sh:maxInclusive "2026-12-31T00:00:00Z" ]'
+    )
+    at_bound = _store()
+    at_bound.add_literal(FOCUS, "agentce:t", "2026-01-01T00:00:00Z", "xsd:dateTime")
+    assert not _fails(body, at_bound)  # equal to the lower bound is within
+    before = _store()
+    before.add_literal(FOCUS, "agentce:t", "2025-12-31T00:00:00Z", "xsd:dateTime")
+    assert _fails(body, before)
+
+
+def test_less_than_or_equals() -> None:
+    body = "sh:property [ sh:path agentce:a ; sh:lessThanOrEquals agentce:b ]"
+    equal = _store()
+    equal.add_literal(FOCUS, "agentce:a", "2", "xsd:integer")
+    equal.add_literal(FOCUS, "agentce:b", "2", "xsd:integer")
+    assert not _fails(body, equal)  # equal satisfies lessThanOrEquals
+    greater = _store()
+    greater.add_literal(FOCUS, "agentce:a", "3", "xsd:integer")
+    greater.add_literal(FOCUS, "agentce:b", "2", "xsd:integer")
+    assert _fails(body, greater)
+
+
 def test_resolve_alternative_returns_union() -> None:
     ttl = (
         PREFIX
