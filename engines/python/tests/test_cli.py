@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -10,6 +11,9 @@ from typing import Any
 import pytest
 
 from agentce import cli
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_ENGINE = _REPO_ROOT / "engines" / "python"
 
 
 def run(
@@ -305,16 +309,65 @@ def test_catalog_lint_no_catalog_yaml(
 
 
 def test_conformance_run(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    engine = tmp_path / "e"
     corpus = tmp_path / "c"
-    engine.mkdir()
-    corpus.mkdir()
+    proj = corpus / "projects" / "credit/x/known-pass"
+    events = proj / "evidence" / "events"
+    events.mkdir(parents=True)
+    event = {
+        "specversion": "1.0",
+        "id": "d1",
+        "source": "urn:s",
+        "type": "org.agent-conformance.evidence.Decision.v1",
+        "time": "2026-05-01T09:00:00.000Z",
+        "subject": "spiffe://corp/agents/a",
+        "datacontenttype": "application/ld+json",
+        "agentcesourceclass": "self_report",
+        "data": {
+            "@type": "Decision",
+            "decision_type": "dom:CreditDecision",
+            "agent": {"id": "spiffe://corp/agents/a"},
+        },
+    }
+    stream = events / "s.jsonl"
+    stream.write_text(json.dumps(event) + "\n", encoding="utf-8")
+    (proj / "evidence" / "manifest.json").write_text(
+        json.dumps(
+            {
+                "agentce_bundle_version": 1,
+                "files": [
+                    {
+                        "path": "events/s.jsonl",
+                        "sha256": hashlib.sha256(stream.read_bytes()).hexdigest(),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (proj / "applicability.yaml").write_text(
+        'subjects:\n  - id: "spiffe://corp/agents/a"\n    role: "both"\n',
+        encoding="utf-8",
+    )
+    (proj / "domain.linkml.yaml").write_text(
+        'decision_types:\n  - id: "dom:CreditDecision"\n'
+        '    subclass_of: "agentce:ConsequentialDecision"\n    consequential: true\n',
+        encoding="utf-8",
+    )
+    (corpus / "corpus-manifest.json").write_text(
+        json.dumps(
+            {
+                "corpus_version": "test",
+                "projects": [{"id": "credit/x/known-pass", "events": 1}],
+            }
+        ),
+        encoding="utf-8",
+    )
     code, env = run(
         [
             "conformance",
             "run",
             "--engine",
-            str(engine),
+            str(_ENGINE),
             "--corpus",
             str(corpus),
             "--out",
@@ -325,6 +378,8 @@ def test_conformance_run(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> 
     )
     assert code == 0
     assert env["action"] == "run"
+    assert env["claim"] == "full"
+    assert env["no_ml"] == "pass"
     assert env["out"] == str(tmp_path / "o")
 
 

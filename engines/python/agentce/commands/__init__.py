@@ -23,6 +23,7 @@ from ..applicability import resolve as resolve_applicability
 from ..assess import assess_subjects
 from ..bundle import load_bundle
 from ..catalog import lint_catalog, load_catalog
+from ..conformance import run_ecs
 from ..coverage import compute_coverage
 from ..domain import DomainBinding
 from ..errors import InputError
@@ -392,12 +393,21 @@ def cmd_conformance(ns: argparse.Namespace) -> CommandResult:
     corpus = _require_dir(
         _opt_str(ns, "corpus"), key="corpus", what="the corpus directory"
     )
-    result.data.update({"action": "run", "engine": str(engine), "corpus": str(corpus)})
-    if (out := _opt_str(ns, "out")) is not None:
-        result.data["out"] = out
-    return _pending(
-        result, "The Engine Conformance Suite runner lands in a later work item."
+    out = _opt_str(ns, "out")
+    report = run_ecs(
+        engine_path=engine, corpus_dir=corpus, out_dir=Path(out) if out else None
     )
+    result.data.update({"action": "run", "engine": str(engine), "corpus": str(corpus)})
+    if out is not None:
+        result.data["out"] = out
+    result.data.update(report)
+    result.note(
+        f"ECS: {report['projects']['identical']}/{report['projects']['total']} identical; "
+        f"claim {report['claim']}; no_ml {report['no_ml']}"
+    )
+    if report["claim"] != "full":
+        result.add_code(int(ExitCode.FINDINGS))
+    return result
 
 
 def cmd_diff(ns: argparse.Namespace) -> CommandResult:
