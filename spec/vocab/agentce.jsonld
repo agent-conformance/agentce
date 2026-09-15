@@ -1,0 +1,486 @@
+{
+  "@context": {
+    "agentce": "https://agent-conformance.org/vocab/evidence/v1#",
+    "brick": "https://brickschema.org/schema/Brick#",
+    "csvw": "http://www.w3.org/ns/csvw#",
+    "dc": "http://purl.org/dc/elements/1.1/",
+    "dcam": "http://purl.org/dc/dcam/",
+    "dcat": "http://www.w3.org/ns/dcat#",
+    "dcmitype": "http://purl.org/dc/dcmitype/",
+    "dcterms": "http://purl.org/dc/terms/",
+    "doap": "http://usefulinc.com/ns/doap#",
+    "foaf": "http://xmlns.com/foaf/0.1/",
+    "geo": "http://www.opengis.net/ont/geosparql#",
+    "odrl": "http://www.w3.org/ns/odrl/2/",
+    "org": "http://www.w3.org/ns/org#",
+    "owl": "http://www.w3.org/2002/07/owl#",
+    "prof": "http://www.w3.org/ns/dx/prof/",
+    "prov": "http://www.w3.org/ns/prov#",
+    "qb": "http://purl.org/linked-data/cube#",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "schema": "https://schema.org/",
+    "sh": "http://www.w3.org/ns/shacl#",
+    "skos": "http://www.w3.org/2004/02/skos/core#",
+    "sosa": "http://www.w3.org/ns/sosa/",
+    "ssn": "http://www.w3.org/ns/ssn/",
+    "time": "http://www.w3.org/2006/time#",
+    "vann": "http://purl.org/vocab/vann/",
+    "void": "http://rdfs.org/ns/void#",
+    "wgs": "https://www.w3.org/2003/01/geo/wgs84_pos#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#"
+  },
+  "@graph": [
+    {
+      "@id": "https://agent-conformance.org/vocab/evidence/v1",
+      "@type": "owl:Ontology",
+      "owl:imports": {
+        "@id": "http://www.w3.org/ns/prov"
+      },
+      "rdfs:comment": "A PROV-O profile plus the glue relations AgentCE defines because no existing vocabulary carries them (SPEC 6.3).",
+      "rdfs:label": "AgentCE evidence vocabulary"
+    },
+    {
+      "@id": "agentce:Component",
+      "@type": "owl:Class",
+      "rdfs:label": "Component"
+    },
+    {
+      "@id": "agentce:reviewedBy",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "reviewed by",
+      "rdfs:range": {
+        "@id": "agentce:OversightEvent"
+      }
+    },
+    {
+      "@id": "agentce:precededBy",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Decision"
+      },
+      "rdfs:label": "preceded by",
+      "rdfs:range": {
+        "@id": "agentce:Decision"
+      }
+    },
+    {
+      "@id": "agentce:ConsequentialDecision",
+      "@type": "owl:Class",
+      "rdfs:comment": "A decision with legal or similarly significant effect on a natural person (IR-05).",
+      "rdfs:label": "Consequential decision",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Decision"
+      }
+    },
+    {
+      "@id": "agentce:Policy",
+      "@type": "owl:Class",
+      "rdfs:label": "Policy"
+    },
+    {
+      "@id": "agentce:PolicyDecision",
+      "@type": "owl:Class",
+      "rdfs:label": "Policy decision",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
+      }
+    },
+    {
+      "@id": "agentce:MemoryWrite",
+      "@type": "owl:Class",
+      "rdfs:label": "Memory write",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
+      }
+    },
+    {
+      "@id": "agentce:Refusal",
+      "@type": "owl:Class",
+      "rdfs:label": "Refusal",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
+      }
+    },
+    {
+      "@id": "agentce:overriddenBy",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "overridden by",
+      "rdfs:range": {
+        "@id": "agentce:OversightEvent"
+      }
+    },
+    {
+      "@id": "agentce:Notice",
+      "@type": "owl:Class",
+      "rdfs:label": "Notice"
+    },
+    {
+      "@id": "agentce:withinScope",
+      "@type": "owl:DatatypeProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "within scope",
+      "rdfs:range": {
+        "@id": "xsd:boolean"
+      }
+    },
+    {
+      "@id": "agentce:chainTerminus",
+      "@type": "owl:ObjectProperty",
+      "rdfs:comment": "The root principal of a materialised delegation chain.",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "chain terminus",
+      "rdfs:range": {
+        "@id": "agentce:Principal"
+      }
+    },
+    {
+      "@id": "agentce:derivedFrom",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Instruction"
+      },
+      "rdfs:label": "derived from",
+      "rdfs:range": {
+        "@id": "prov:Entity"
+      }
+    },
+    {
+      "@id": "agentce:attestedBy",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Bundle"
+      },
+      "rdfs:label": "attested by",
+      "rdfs:range": {
+        "@id": "agentce:Attestation"
+      }
+    },
+    {
+      "@id": "agentce:HumanPrincipal",
+      "@type": "owl:Class",
+      "rdfs:label": "Human principal",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Principal"
+      }
+    },
+    {
+      "@id": "agentce:ServicePrincipal",
+      "@type": "owl:Class",
+      "rdfs:label": "Service principal",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Principal"
+      }
+    },
+    {
+      "@id": "agentce:oversightModality",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Decision"
+      },
+      "rdfs:label": "oversight modality",
+      "rdfs:range": {
+        "@id": "agentce:OversightModality"
+      }
+    },
+    {
+      "@id": "agentce:resultedIn",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "resulted in",
+      "rdfs:range": {
+        "@id": "agentce:Outcome"
+      }
+    },
+    {
+      "@id": "agentce:authorizedBy",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "authorized by",
+      "rdfs:range": {
+        "@id": "agentce:PolicyDecision"
+      }
+    },
+    {
+      "@id": "agentce:chainVerified",
+      "@type": "owl:DatatypeProperty",
+      "rdfs:domain": {
+        "@id": "agentce:DelegationIssued"
+      },
+      "rdfs:label": "chain verified",
+      "rdfs:range": {
+        "@id": "xsd:boolean"
+      }
+    },
+    {
+      "@id": "agentce:DelegationIssued",
+      "@type": "owl:Class",
+      "rdfs:label": "Delegation issued",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
+      }
+    },
+    {
+      "@id": "agentce:interruptedBy",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "interrupted by",
+      "rdfs:range": {
+        "@id": "agentce:OversightEvent"
+      }
+    },
+    {
+      "@id": "agentce:Bundle",
+      "@type": "owl:Class",
+      "rdfs:label": "Bundle"
+    },
+    {
+      "@id": "agentce:OversightModality",
+      "@type": "owl:Class",
+      "rdfs:label": "Oversight modality"
+    },
+    {
+      "@id": "agentce:SourceClass",
+      "@type": "owl:Class",
+      "rdfs:label": "Source class"
+    },
+    {
+      "@id": "agentce:Outcome",
+      "@type": "owl:Class",
+      "rdfs:label": "Outcome"
+    },
+    {
+      "@id": "agentce:relatedIncident",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "related incident",
+      "rdfs:range": {
+        "@id": "agentce:Incident"
+      }
+    },
+    {
+      "@id": "agentce:MemoryRead",
+      "@type": "owl:Class",
+      "rdfs:label": "Memory read",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
+      }
+    },
+    {
+      "@id": "agentce:Activity",
+      "@type": "owl:Class",
+      "rdfs:label": "Activity",
+      "rdfs:subClassOf": {
+        "@id": "prov:Activity"
+      }
+    },
+    {
+      "@id": "agentce:Attestation",
+      "@type": "owl:Class",
+      "rdfs:label": "Attestation"
+    },
+    {
+      "@id": "agentce:Incident",
+      "@type": "owl:Class",
+      "rdfs:label": "Incident"
+    },
+    {
+      "@id": "agentce:refusedBy",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Instruction"
+      },
+      "rdfs:label": "refused by",
+      "rdfs:range": {
+        "@id": "agentce:Refusal"
+      }
+    },
+    {
+      "@id": "agentce:danglingRef",
+      "@type": "owl:DatatypeProperty",
+      "rdfs:comment": "A refs.* value that resolves to no ingested event.",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "dangling reference",
+      "rdfs:range": {
+        "@id": "xsd:string"
+      }
+    },
+    {
+      "@id": "agentce:loadedBundle",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "loaded bundle",
+      "rdfs:range": {
+        "@id": "agentce:Bundle"
+      }
+    },
+    {
+      "@id": "agentce:OversightEvent",
+      "@type": "owl:Class",
+      "rdfs:label": "Oversight event"
+    },
+    {
+      "@id": "agentce:delegatedVia",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "delegated via",
+      "rdfs:range": {
+        "@id": "agentce:DelegationIssued"
+      }
+    },
+    {
+      "@id": "agentce:executes",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:ToolCall"
+      },
+      "rdfs:label": "executes",
+      "rdfs:range": {
+        "@id": "agentce:Decision"
+      }
+    },
+    {
+      "@id": "agentce:executesConsequential",
+      "@type": "owl:DatatypeProperty",
+      "rdfs:domain": {
+        "@id": "agentce:ToolCall"
+      },
+      "rdfs:label": "executes consequential",
+      "rdfs:range": {
+        "@id": "xsd:boolean"
+      }
+    },
+    {
+      "@id": "agentce:actsOn",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "acts on",
+      "rdfs:range": {
+        "@id": "agentce:Instruction"
+      }
+    },
+    {
+      "@id": "agentce:Decision",
+      "@type": "owl:Class",
+      "rdfs:label": "Decision",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
+      }
+    },
+    {
+      "@id": "agentce:Instruction",
+      "@type": "owl:Class",
+      "rdfs:label": "Instruction",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
+      }
+    },
+    {
+      "@id": "agentce:sourceClass",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "source class",
+      "rdfs:range": {
+        "@id": "agentce:SourceClass"
+      }
+    },
+    {
+      "@id": "agentce:notifiedBy",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Decision"
+      },
+      "rdfs:label": "notified by",
+      "rdfs:range": {
+        "@id": "agentce:Notice"
+      }
+    },
+    {
+      "@id": "agentce:ModelCall",
+      "@type": "owl:Class",
+      "rdfs:label": "Model call",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
+      }
+    },
+    {
+      "@id": "agentce:ContextItem",
+      "@type": "owl:Class",
+      "rdfs:label": "Context item",
+      "rdfs:subClassOf": {
+        "@id": "prov:Entity"
+      }
+    },
+    {
+      "@id": "agentce:Principal",
+      "@type": "owl:Class",
+      "rdfs:label": "Principal",
+      "rdfs:subClassOf": {
+        "@id": "prov:Agent"
+      }
+    },
+    {
+      "@id": "agentce:oversightModalityMatchesDeclared",
+      "@type": "owl:DatatypeProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Decision"
+      },
+      "rdfs:label": "oversight modality matches declared",
+      "rdfs:range": {
+        "@id": "xsd:boolean"
+      }
+    },
+    {
+      "@id": "agentce:Agent",
+      "@type": "owl:Class",
+      "rdfs:label": "Agent",
+      "rdfs:subClassOf": {
+        "@id": "prov:SoftwareAgent"
+      }
+    },
+    {
+      "@id": "agentce:ToolCall",
+      "@type": "owl:Class",
+      "rdfs:label": "Tool call",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
+      }
+    },
+    {
+      "@id": "agentce:ResourceAccess",
+      "@type": "owl:Class",
+      "rdfs:label": "Resource access",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
+      }
+    }
+  ]
+}
