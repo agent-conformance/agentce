@@ -18,8 +18,8 @@ jobs:
       - name: Guardrails
         run: |
           set -e
-          if git ls-files | grep -E '(^|/)SPECS/|(^|/)SPEC\.md$'; then
-            echo "::error::A specification file is tracked; SPECS/ must stay out of the repository until GA." >&2; exit 1
+          if git ls-files | grep -E '(^|/)SPEC[.S]'; then
+            echo "::error::A specification source is tracked; specification sources must stay out of the repository until GA." >&2; exit 1
           fi
           test -f LICENSE || { echo "::error::LICENSE missing" >&2; exit 1; }
           test -f SECURITY.md || { echo "::error::SECURITY.md missing" >&2; exit 1; }
