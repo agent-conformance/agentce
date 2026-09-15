@@ -19,6 +19,7 @@ from typing import Any
 
 from .. import ENGINE_NAME, SPEC_VERSION, __version__, no_ml
 from ..bundle import load_bundle
+from ..coverage import compute_coverage
 from ..domain import DomainBinding
 from ..errors import InputError
 from ..exit_codes import ExitCode
@@ -26,6 +27,7 @@ from ..graph import build_graph
 from ..ingest import ingest
 from ..integrity import IntegrityStatus, verify_bundle
 from ..logsetup import get_logger
+from ..profile import Profile
 from ..quarantine import counts_by_reason, write_quarantine
 from ..result import CommandResult
 from ..store import GraphStore
@@ -224,6 +226,12 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     build_graph(ingested.accepted, domain=domain, store=graph_store)
     graph_triples = graph_store.triple_count()
     graph_store.close()
+    # Stage 4: coverage and reconciliation against independent denominators.
+    profile_obj = Profile.load(profile)
+    coverage = compute_coverage(ingested.accepted, profile_obj, loaded.root)
+    (out_dir / "coverage.json").write_text(
+        json.dumps(coverage, sort_keys=True, indent=2), encoding="utf-8"
+    )
     result.data.update(
         {
             "bundle": str(bundle),
@@ -235,11 +243,12 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "quarantined": len(ingested.quarantined),
             "streams": len(integrity_results),
             "graph_triples": graph_triples,
+            "subjects": len(coverage["subjects"]),
         }
     )
     return _pending(
         result,
-        "Ingest, integrity, and graph build complete; the coverage, applicability, "
+        "Ingest, integrity, graph, and coverage complete; the applicability, "
         "evaluation, and report stages land across the later work items.",
     )
 
