@@ -1,0 +1,18 @@
+{
+  "agentce_bundle_version": 1,
+  "domain": "dom:credit",
+  "files": [
+    {
+      "path": "events/stream.jsonl",
+      "sha256": "28ab14fa56af524ae16d32f8bc6200a7df7743d13dbcf73e04c3d0b45cbaef88"
+    }
+  ],
+  "sources": [
+    {
+      "adapter": "otel-genai",
+      "class": "self_report",
+      "class_justification": "emitted by the agent runtime",
+      "id": "urn:agentce:source:otel:prod-eu-1"
+    }
+  ]
+}

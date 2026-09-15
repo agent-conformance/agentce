@@ -90,3 +90,36 @@ def test_oversize(
     result = ingest(load_bundle(make_bundle([example_event])), max_event_bytes=10)
     assert result.quarantined[0].reason == QuarantineReason.OVERSIZE
     assert result.accepted == []
+
+
+def test_class_mismatch(
+    make_bundle: Callable[..., Any], example_event: dict[str, Any]
+) -> None:
+    # The event is enforcement_point; the manifest declares the source as self_report (SPEC §6.4).
+    source = str(example_event["source"])
+    result = _ingest(
+        make_bundle, [example_event], source_classes={source: "self_report"}
+    )
+    assert result.accepted == []
+    assert result.quarantined[0].reason == QuarantineReason.CLASS_MISMATCH
+    assert result.quarantined[0].source == source
+
+
+def test_class_match_is_accepted(
+    make_bundle: Callable[..., Any], example_event: dict[str, Any]
+) -> None:
+    source = str(example_event["source"])
+    result = _ingest(
+        make_bundle, [example_event], source_classes={source: "enforcement_point"}
+    )
+    assert len(result.accepted) == 1
+    assert result.quarantined == []
+
+
+def test_source_declared_without_a_class_is_not_class_checked(
+    make_bundle: Callable[..., Any], example_event: dict[str, Any]
+) -> None:
+    source = str(example_event["source"])
+    result = _ingest(make_bundle, [example_event], sources=[source])
+    assert len(result.accepted) == 1
+    assert result.quarantined == []

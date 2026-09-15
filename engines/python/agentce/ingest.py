@@ -3,9 +3,10 @@
 Parse every event in ``events/*.jsonl``, validate it against the JSON Schema generated from the
 LinkML model, and quarantine anything the engine refuses with a stable reason (SPEC App. F): an
 oversize line, malformed JSON or a schema violation (``schema_invalid``), an unrecognised event type
-(``unknown_type``), an event from a source the bundle does not declare (``unknown_source``), a
-repeated id (``duplicate_id``), or an out-of-order timestamp within a stream (``time_order``).
-Quarantine is an output, never a silent drop.
+(``unknown_type``), an event from a source the bundle does not declare (``unknown_source``), an event
+whose ``agentcesourceclass`` differs from the class the bundle declares for its source
+(``class_mismatch``, SPEC §6.4), a repeated id (``duplicate_id``), or an out-of-order timestamp within
+a stream (``time_order``). Quarantine is an output, never a silent drop.
 """
 
 from __future__ import annotations
@@ -130,6 +131,28 @@ def ingest(
                         )
                     )
                     continue
+
+                declared_class = (
+                    bundle.source_classes.get(source)
+                    if bundle.source_classes is not None
+                    else None
+                )
+                if declared_class is not None:
+                    event_class = str(event["agentcesourceclass"])
+                    if event_class != declared_class:
+                        result.quarantined.append(
+                            QuarantineRecord(
+                                QuarantineReason.CLASS_MISMATCH,
+                                event_id=str(event["id"]),
+                                source=source,
+                                type=type_value,
+                                detail=(
+                                    f"event class {event_class!r} differs from the "
+                                    f"declared class {declared_class!r} for this source"
+                                ),
+                            )
+                        )
+                        continue
 
                 event_id = str(event["id"])
                 if event_id in seen_ids:
