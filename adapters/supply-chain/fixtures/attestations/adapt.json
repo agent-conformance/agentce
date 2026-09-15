@@ -1,0 +1,5 @@
+{
+  "subject": "spiffe://corp/agents/credit-underwriter",
+  "source_class": "enforcement_point",
+  "trusted_keys": ["key-fulcio-1"]
+}
