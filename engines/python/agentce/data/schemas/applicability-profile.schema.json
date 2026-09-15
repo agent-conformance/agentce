@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/model/applicability-profile.schema.json",
+  "title": "AgentCE applicability profile",
+  "description": "The applicability profile (applicability.yaml) declares the subjects assessed and their risk context, selects catalogs and overlays, and declares evidence sources and coverage denominators (SPEC 6.5). It is a secondary input to assessment. Authored from the specification rather than emitted by the evidence-model generator; it is published here so consumers find every input schema under one root.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile_version", "observation_window", "subjects", "catalogs"],
+  "properties": {
+    "profile_version": {"type": "integer", "minimum": 1},
+    "observation_window": {"$ref": "#/$defs/window"},
+    "content_capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {"mode": {"type": "string", "enum": ["hashes_only", "policy_scoped", "full"]}}
+    },
+    "subjects": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/subject"}},
+    "catalogs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "description": "Catalog or overlay selector, id@version (e.g. eu-ai-act@2026.09, overlays/insurance@2026.09)."}
+    }
+  },
+  "$defs": {
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {"type": "string", "format": "date-time"},
+        "end": {"type": "string", "format": "date-time"}
+      }
+    },
+    "role": {"type": "string", "enum": ["deployer", "provider", "both"]},
+    "source_class": {"type": "string", "enum": ["self_report", "enforcement_point", "independent_system"]},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "role"],
+      "properties": {
+        "id": {"type": "string", "description": "Stable subject identifier (e.g. a SPIFFE ID)."},
+        "name": {"type": "string"},
+        "role": {"$ref": "#/$defs/role"},
+        "intended_purpose_ref": {"type": "string"},
+        "annex_iii_category": {"type": "string"},
+        "registration_ref": {"type": "string"},
+        "environments": {"type": "array", "items": {"type": "string"}},
+        "declared_decision_types": {"type": "array", "items": {"type": "string"}},
+        "declared_data_classes": {"type": "array", "items": {"type": "string"}},
+        "declared_oversight": {
+          "type": "object",
+          "description": "Decision type to its declared oversight modality.",
+          "additionalProperties": {"type": "string"}
+        },
+        "third_party_components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "name", "controls_affected"],
+            "properties": {
+              "kind": {"type": "string"},
+              "name": {"type": "string"},
+              "controls_affected": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        },
+        "evidence_sources": {"type": "array", "items": {"$ref": "#/$defs/evidence_source"}},
+        "coverage_denominators": {"type": "array", "items": {"$ref": "#/$defs/coverage_denominator"}}
+      }
+    },
+    "evidence_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter", "source", "class", "class_justification"],
+      "properties": {
+        "adapter": {"type": "string"},
+        "source": {"type": "string"},
+        "class": {"$ref": "#/$defs/source_class"},
+        "class_justification": {"type": "string", "description": "Required for every source (SPEC 6.5, trust-class justification)."},
+        "manifest": {"type": "string"}
+      }
+    },
+    "coverage_denominator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "source", "covers"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["provider_usage_export", "egress_proxy_log", "firewall_log", "system_of_record_export", "admission_attestation"]
+        },
+        "source": {"type": "string"},
+        "covers": {"type": "array", "items": {"type": "string"}},
+        "statement": {"type": "string"}
+      }
+    }
+  }
+}
