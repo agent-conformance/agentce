@@ -1,0 +1,2 @@
+{"timestamp":"2026-05-04T11:00:01.000Z","id":"cedar-1","convention_version":"4.2","instance":"cedar-authorizer","policy_id":"cedar-policy-7","decision":"Allow","reasons":["permit-rule-3"],"principal":{"id":"User::\"alice\"","kind":"human","role":"officer"}}
+{"timestamp":"2026-05-04T11:00:02.000Z","id":"cedar-2","convention_version":"4.2","instance":"cedar-authorizer","policy_id":"cedar-policy-9","decision":"Deny","principal":{"id":"User::\"alice\"","kind":"human"}}

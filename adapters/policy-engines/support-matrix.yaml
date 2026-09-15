@@ -1,0 +1,45 @@
+# Support matrix for the policy-engines adapter (SPEC 12.3).
+#
+# One sub-adapter per engine, all producing the same canonical shape: OpenFGA relationship checks
+# become `AuthzCheck`, and OPA / Cedar / governance-toolkit decisions become `PolicyDecision`. The
+# `conventions` are the engine formats the fixtures exercise. `members` lists, per event type, the
+# evidence members the adapter can populate; `missing` lists members the decision logs cannot supply
+# on their own -- notably the reference from a decision to the action it authorised, which needs an
+# enforcement-point call log (see the mcp-gateway adapter). `check_support_matrix` proves this file
+# stays exactly consistent with what the adapter emits. Member paths are dotted one level (SPEC 12.3).
+adapter: policy-engines
+conventions:
+  - cedar:4.2
+  - governance_toolkit:1.0
+  - opa:0.68
+  - openfga:1.1
+events:
+  AuthzCheck:
+    members:
+      - acted_for
+      - agent.id
+      - agent.name
+      - allowed
+      - object
+      - relation
+      - session_id
+      - store_ref
+      - user
+    missing: [refs.decision, refs.request]
+  PolicyDecision:
+    members:
+      - acted_for
+      - agent.id
+      - agent.name
+      - decision
+      - engine
+      - obligations
+      - policy_digest
+      - policy_id
+      - policy_version
+      - principal.id
+      - principal.kind
+      - principal.role
+      - reasons
+      - session_id
+    missing: [principal.authority_ref, principal.org, refs.request]
