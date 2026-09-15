@@ -1,0 +1,2 @@
+{"timestamp":"2026-05-09T09:05:00.000Z","id":"iss-1","format":"idp-issuance","convention_version":"oidc-1.0","issuer":"https://idp.corp","token_ref":"jwt://issue/9","subject_principal":"urn:example:person:credit-officer-7","actor_principal":"spiffe://corp/agents/credit-underwriter","chain":[{"id":"urn:example:person:credit-officer-7","kind":"human","role":"officer"}],"scope_granted":["session:create"],"verification":{"status":"verified"}}
+{"timestamp":"2026-05-09T09:06:00.000Z","id":"iss-2","format":"idp-issuance","convention_version":"oidc-1.0","issuer":"https://idp.corp"}

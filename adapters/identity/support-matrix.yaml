@@ -1,0 +1,31 @@
+# Support matrix for the identity adapter (SPEC 12.3, v1.1).
+#
+# IdP issuance and token-exchange logs become DelegationIssued events carrying the delegation chain,
+# the granted and parent scopes, and the token verification. The `conventions` name the log formats
+# the fixtures exercise. `members` lists what the adapter can populate; `missing` lists members these
+# logs do not supply -- a reference to a parent delegation, which the engine correlates when it runs
+# the chain-attenuation check (SPEC 12.2). `check_support_matrix` proves this file stays consistent
+# with what the adapter emits. Member paths are dotted one level into nested objects (SPEC 12.3).
+adapter: identity
+conventions:
+  - idp-issuance:oidc-1.0
+  - token-exchange:oauth-8693
+events:
+  DelegationIssued:
+    members:
+      - acted_for
+      - actor_principal
+      - agent.id
+      - agent.name
+      - chain
+      - expires
+      - issuer
+      - scope_granted
+      - scope_parent
+      - session_id
+      - subject_principal
+      - token_ref
+      - verification.log_ref
+      - verification.method
+      - verification.status
+    missing: [refs.delegation]
