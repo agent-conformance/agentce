@@ -159,6 +159,49 @@ def test_chain_verified() -> None:
     assert store.literal_values(event_iri("dl1"), "agentce:chainVerified") == ["true"]
 
 
+def test_delegation_chain_types_human_principal() -> None:
+    # acted_for is a list of principal IRIs (no kind); the human overseer's kind is declared on the
+    # DelegationIssued.chain, so the acted_for terminus resolves to a HumanPrincipal (SPEC §6.3).
+    human = "urn:example:person:officer-1"
+    delegation = {
+        "id": "dl1",
+        "source": "urn:agentce:source:idp",
+        "subject": "spiffe://corp/agents/a",
+        "time": "2026-01-01T00:00:00Z",
+        "type": "org.agent-conformance.evidence.DelegationIssued.v1",
+        "agentcesourceclass": "enforcement_point",
+        "data": {
+            "@type": "DelegationIssued",
+            "verification": {"status": "verified"},
+            "chain": [
+                {"id": "spiffe://svc", "kind": "service"},
+                {"id": human, "kind": "human"},
+            ],
+        },
+    }
+    tc = tool_call("tc1", "2026-01-01T00:01:00Z", "agentce:event/d1")
+    tc["data"]["acted_for"] = ["spiffe://svc", human]
+    store = build_graph([delegation, tc], domain=DOMAIN)
+    assert store.is_a(principal_iri(human), "agentce:HumanPrincipal")
+    assert store.objects(event_iri("tc1"), "agentce:chainTerminus") == [
+        principal_iri(human)
+    ]
+
+
+def test_delegation_chain_ignores_non_list() -> None:
+    delegation = {
+        "id": "dl1",
+        "source": "urn:agentce:source:idp",
+        "subject": "spiffe://corp/agents/a",
+        "time": "2026-01-01T00:00:00Z",
+        "type": "org.agent-conformance.evidence.DelegationIssued.v1",
+        "agentcesourceclass": "enforcement_point",
+        "data": {"@type": "DelegationIssued", "chain": "not-a-list"},
+    }
+    store = build_graph([delegation])  # a malformed chain is ignored, not fatal
+    assert store.literal_values(event_iri("dl1"), "agentce:chainVerified") == ["false"]
+
+
 def test_preceded_by_reviewed_decision() -> None:
     earlier = decision("d1", "2026-01-01T00:00:00Z")
     approval = {
