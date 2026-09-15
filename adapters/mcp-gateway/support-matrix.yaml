@@ -1,0 +1,74 @@
+# Support matrix for the mcp-gateway adapter (SPEC 12.3).
+#
+# `members` lists, per event type, the evidence members the adapter can populate from an MCP gateway
+# log; `missing` lists members the source cannot supply, which the engine cites when it explains an
+# `insufficient_evidence` outcome. Because the gateway is an enforcement point, it supplies the
+# authorization link (`refs.authorization`) and the effect classification (`side_effect`,
+# `effect_class`) that an agent self-report (see the otel-genai adapter) cannot.
+# `check_support_matrix` proves this file stays exactly consistent with what the adapter emits over
+# its fixtures. Member paths are dotted one level into nested objects (SPEC 12.3).
+adapter: mcp-gateway
+conventions:
+  - mcp:2024-11-05
+  - mcp:2025-06-18
+events:
+  ToolCall:
+    members:
+      - acted_for
+      - agent.id
+      - agent.name
+      - args_ref
+      - effect_class
+      - error
+      - refs.authorization
+      - result_ref
+      - session_id
+      - side_effect
+      - tool.name
+      - tool.protocol
+      - tool.server
+    missing: [refs.decision, refs.delegation, refs.instruction, used]
+  ResourceAccess:
+    members:
+      - acted_for
+      - agent.id
+      - agent.name
+      - operation
+      - refs.authorization
+      - resource.kind
+      - resource.uri
+      - session_id
+    missing: [count, purpose, resource.classification, resource.owner]
+  PolicyDecision:
+    members:
+      - acted_for
+      - agent.id
+      - agent.name
+      - decision
+      - engine
+      - obligations
+      - policy_id
+      - policy_version
+      - principal.id
+      - principal.kind
+      - principal.role
+      - reasons
+      - refs.request
+      - session_id
+    missing: [policy_digest, principal.authority_ref, principal.org]
+  DelegationIssued:
+    members:
+      - actor_principal
+      - agent.id
+      - agent.name
+      - chain
+      - expires
+      - issuer
+      - scope_granted
+      - scope_parent
+      - session_id
+      - subject_principal
+      - token_ref
+      - verification.method
+      - verification.status
+    missing: [acted_for, refs.delegation, verification.log_ref]
