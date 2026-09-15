@@ -362,11 +362,23 @@ def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
         what="the catalog directory",
         fix="pass the catalog directory: `agentce catalog lint <dir>`.",
     )
-    problems = lint_catalog(directory)
+    # Lint the catalog at `directory`, or every catalog beneath it (so `catalog lint spec/catalogs`
+    # lints the whole tree, not just a directory that itself holds a catalog.yaml).
+    if (directory / "catalog.yaml").is_file():
+        catalog_dirs = [directory]
+    else:
+        catalog_dirs = sorted({p.parent for p in directory.rglob("catalog.yaml")})
+    problems: list[str] = []
+    if not catalog_dirs:
+        problems.append(f"{directory}: no catalog.yaml (and none beneath it)")
+    for cat_dir in catalog_dirs:
+        prefix = "" if len(catalog_dirs) == 1 else f"{cat_dir.relative_to(directory)}: "
+        problems.extend(f"{prefix}{p}" for p in lint_catalog(cat_dir))
     result.data.update(
         {
             "action": "lint",
             "dir": str(directory),
+            "catalogs": [str(d) for d in catalog_dirs],
             "clean": not problems,
             "problems": problems,
         }
@@ -543,7 +555,7 @@ def cmd_init(ns: argparse.Namespace) -> CommandResult:
     profile = _render_starter_profile(
         subject=subject, role=role, framework=framework, adapter=adapter
     )
-    profile_path = Path(out) / "agentce" / "applicability.yaml"
+    profile_path = Path(out) / "agentce" / "applicability-profile.yaml"
     profile_path.parent.mkdir(parents=True, exist_ok=True)
     profile_path.write_text(profile, encoding="utf-8")
     result.data.update(
