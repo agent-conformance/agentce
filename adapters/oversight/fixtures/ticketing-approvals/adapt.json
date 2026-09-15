@@ -1,0 +1,5 @@
+{
+  "subject": "spiffe://corp/agents/credit-underwriter",
+  "source_class": "independent_system",
+  "class_justification": "records kept by the ticketing system; agent identities cannot transition approval states"
+}

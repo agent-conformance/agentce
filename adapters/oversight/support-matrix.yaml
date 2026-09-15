@@ -1,0 +1,66 @@
+# Support matrix for the oversight adapter (SPEC 12.3).
+#
+# Human-oversight evidence from approval gates, workflow engines, and ticketing systems (the
+# `conventions` name the origin the fixtures exercise). Approvals, overrides, and interrupts name the
+# human actor with a role and an authority reference (SPEC 12.2); a decision also carries the
+# identity-provider `session_ref`. `members` lists what the adapter can populate per event type;
+# `missing` lists members these records do not supply -- notably the reference from an oversight
+# event to the decision it concerns, which needs the agent-side decision stream to correlate.
+# `check_support_matrix` proves this file stays consistent with what the adapter emits. Member paths
+# are dotted one level into nested objects (SPEC 12.3).
+adapter: oversight
+conventions:
+  - approval_gate:3.0
+  - ticketing:2.1
+  - workflow_engine:1.4
+events:
+  ApprovalRequested:
+    members: [acted_for, agent.id, agent.name, channel, deadline, explanation_ref, requested_from, session_id]
+    missing: [refs.decision]
+  ApprovalDecided:
+    members:
+      - acted_for
+      - actor.authority_ref
+      - actor.id
+      - actor.kind
+      - actor.org
+      - actor.role
+      - agent.id
+      - agent.name
+      - edits_ref
+      - explanation_viewed
+      - latency_ms
+      - outcome
+      - session_id
+      - session_ref
+    missing: [refs.decision, refs.request]
+  Override:
+    members:
+      - acted_for
+      - actor.authority_ref
+      - actor.id
+      - actor.kind
+      - actor.role
+      - agent.id
+      - agent.name
+      - original
+      - reason_code
+      - replacement
+      - session_id
+    missing: [actor.org, refs.decision]
+  Interrupt:
+    members:
+      - acted_for
+      - actor.authority_ref
+      - actor.id
+      - actor.kind
+      - actor.role
+      - agent.id
+      - agent.name
+      - effect
+      - mechanism
+      - session_id
+    missing: [actor.org, refs.decision]
+  Notice:
+    members: [agent.id, agent.name, channel, content_ref, delivered_at, notice_type, person_ref, session_id]
+    missing: [acted_for, refs.decision]
