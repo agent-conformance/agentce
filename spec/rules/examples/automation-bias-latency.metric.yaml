@@ -1,0 +1,10 @@
+# Metric specification from SPEC 7.2, used to check metric.schema.json.
+id: automation-bias-latency
+population: {event: ApprovalDecided, where: {refs.decision.decision_type: "subClassOf agentce:ConsequentialDecision"}}
+group_by: [actor.id, refs.decision.decision_type]
+statistic: {kind: quantile, q: "0.10", field: latency_ms}
+threshold: {op: ">=", value: 15000}
+min_population: 30
+sampling: {kind: census}
+window: observation_window
+outcome_map: {pass: conformant, fail: non-conformant}

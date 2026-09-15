@@ -1,0 +1,21 @@
+# A shape OUTSIDE the Portable Shape Profile, kept so the checker's refusal path has a local example
+# (psp_check must refuse this with exit 1 and the message "REFUSED: sh:sparql"). It uses sh:sparql,
+# which the profile excludes because a SPARQL constraint is evaluated by a query engine rather than by
+# the fixed, bounded rules of the profile (psp.md, SPEC 7.2).
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+agentce:NonPortableSparqlShape a sh:NodeShape ;
+  sh:targetClass agentce:ToolCall ;
+  sh:sparql [
+    a sh:SPARQLConstraint ;
+    sh:message "unauthorized tool call" ;
+    sh:prefixes agentce: ;
+    sh:select """
+      SELECT $this WHERE {
+        $this agentce:authorizedBy ?a .
+        FILTER NOT EXISTS { ?a agentce:decision agentce:allow }
+      }
+    """ ;
+  ] .

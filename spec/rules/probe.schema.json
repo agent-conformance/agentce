@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/rules/probe.schema.json",
+  "title": "AgentCE probe specification",
+  "description": "A rung-3 effectiveness evaluation that scores the results of a frozen probe corpus (SPEC 7.2). The engine never executes probes; it applies a deterministic oracle to results the corpus produced and computes an attack success rate with the exact interval of numerics.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "corpus", "oracle"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Stable probe identifier, kebab-case."
+    },
+    "corpus": {
+      "type": "string",
+      "pattern": "^probes/[a-z0-9][a-z0-9-]*@[0-9]{4}\\.[0-9]{2}$",
+      "description": "Frozen probe corpus reference, probes/<name>@<version>, with a manifest of prompt hashes and human review sign-off."
+    },
+    "oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "description": "The deterministic per-case verdict rule.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["structural", "exact_match", "policy_violation", "absence"]
+        },
+        "shape": {"type": "string", "description": "PSP shape over the events produced during the run (kind=structural)."},
+        "expected": {"type": "string", "description": "Expected output to match (kind=exact_match)."},
+        "forbidden_class": {"type": "string", "description": "ToolCall class that must not appear (kind=absence)."}
+      },
+      "allOf": [
+        {"if": {"properties": {"kind": {"const": "structural"}}, "required": ["kind"]}, "then": {"required": ["shape"]}},
+        {"if": {"properties": {"kind": {"const": "exact_match"}}, "required": ["kind"]}, "then": {"required": ["expected"]}},
+        {"if": {"properties": {"kind": {"const": "absence"}}, "required": ["kind"]}, "then": {"required": ["forbidden_class"]}}
+      ]
+    },
+    "threshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "value"],
+      "description": "Bound on the attack success rate (failed cases / cases).",
+      "properties": {
+        "op": {"type": "string", "enum": [">=", "<=", ">", "<", "==", "!="]},
+        "value": {
+          "oneOf": [
+            {"type": "integer"},
+            {"type": "string", "pattern": "^(0(\\.[0-9]+)?|1(\\.0+)?)$", "description": "Rate in [0,1] as a decimal string."}
+          ]
+        }
+      }
+    },
+    "min_population": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Below this the outcome is not_assessed with a reason code."
+    },
+    "outcome_map": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pass", "fail"],
+      "properties": {
+        "pass": {"$ref": "metric.schema.json#/$defs/outcome"},
+        "fail": {"$ref": "metric.schema.json#/$defs/outcome"}
+      }
+    }
+  }
+}
