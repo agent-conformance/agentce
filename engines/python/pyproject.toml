@@ -34,11 +34,9 @@ agentce = "agentce.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["agentce"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"agentce/data/no-ml-denylist.txt" = "agentce/data/no-ml-denylist.txt"
-"agentce/data/agentce-evidence.schema.json" = "agentce/data/agentce-evidence.schema.json"
-"agentce/data/schemas" = "agentce/data/schemas"
+# Data files under the package (agentce/data/**: the vendored denylist and schemas) are included by
+# hatchling's default package selection; no force-include is needed (and a directory force-include
+# would double-add them).
 
 [dependency-groups]
 dev = [
