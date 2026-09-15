@@ -1,0 +1,11 @@
+{
+  "adapter": "mcp-gateway",
+  "subject": "spiffe://corp/agents/credit-underwriter",
+  "sources": [
+    "urn:mcp-gateway:mcp-gateway-prod"
+  ],
+  "counts": {
+    "PolicyDecision": 3,
+    "ToolCall": 2
+  }
+}
