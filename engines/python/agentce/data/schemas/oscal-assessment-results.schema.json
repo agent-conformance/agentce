@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/report/oscal-assessment-results.schema.json",
+  "title": "AgentCE OSCAL Assessment Results (profile)",
+  "description": "The subset of NIST OSCAL Assessment Results that AgentCE emits as oscal-ar.json (SPEC 9), so a governance platform can consume outcomes in a format it already reads. This is a bounded profile validated in Phase 1; full OSCAL conformance is completed with the standards-alignment work (item 5.5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["assessment-results"],
+  "properties": {
+    "assessment-results": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uuid", "metadata", "results"],
+      "properties": {
+        "uuid": {"type": "string"},
+        "metadata": {
+          "type": "object",
+          "required": ["title", "version", "oscal-version"],
+          "properties": {
+            "title": {"type": "string"},
+            "version": {"type": "string"},
+            "oscal-version": {"type": "string"}
+          }
+        },
+        "import-ap": {"type": "object", "properties": {"href": {"type": "string"}}},
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["uuid", "title", "findings"],
+            "properties": {
+              "uuid": {"type": "string"},
+              "title": {"type": "string"},
+              "findings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["uuid", "title", "target"],
+                  "properties": {
+                    "uuid": {"type": "string"},
+                    "title": {"type": "string"},
+                    "target": {
+                      "type": "object",
+                      "required": ["type", "target-id", "status"],
+                      "properties": {
+                        "type": {"type": "string"},
+                        "target-id": {"type": "string"},
+                        "status": {
+                          "type": "object",
+                          "required": ["state"],
+                          "properties": {"state": {"type": "string"}, "reason": {"type": "string"}}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -12,6 +12,7 @@ until then report ``status: not_implemented`` and exit ``ok``.
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 from collections.abc import Iterable
 from pathlib import Path
@@ -19,6 +20,7 @@ from typing import Any
 
 from .. import ENGINE_NAME, SPEC_VERSION, __version__, no_ml
 from ..applicability import resolve as resolve_applicability
+from ..assertions import Assertion
 from ..bundle import load_bundle
 from ..coverage import compute_coverage
 from ..domain import DomainBinding
@@ -30,6 +32,7 @@ from ..integrity import IntegrityStatus, verify_bundle
 from ..logsetup import get_logger
 from ..profile import Profile
 from ..quarantine import counts_by_reason, write_quarantine
+from ..report import validate_report, write_report
 from ..result import CommandResult
 from ..store import GraphStore
 
@@ -237,6 +240,17 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     statements = resolve_applicability(profile_obj, ingested.accepted)
     _write_jsonl(statements, out_dir / "applicability.jsonl")
     drift_findings = sum(len(s["drift"]) for s in statements)
+    # Stage 6: assertions and report artifacts. Controls (and therefore assertions) arrive with the
+    # catalog and evaluators of the later items; the report machinery and its schemas are exercised now.
+    evaluated: list[Assertion] = []
+    write_report(
+        out_dir,
+        evaluated,
+        bundle_digest=loaded.digest,
+        catalogs=catalog.split(","),
+        operator=_operator(),
+        invocation=["assess", str(bundle), str(profile)],
+    )
     result.data.update(
         {
             "bundle": str(bundle),
@@ -250,13 +264,21 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "graph_triples": graph_triples,
             "subjects": len(coverage["subjects"]),
             "drift_findings": drift_findings,
+            "assertions": len(evaluated),
         }
     )
     return _pending(
         result,
-        "Ingest, integrity, graph, coverage, and applicability complete; the "
-        "evaluation and report stages land across the later work items.",
+        "Ingest, integrity, graph, coverage, applicability, and report scaffolding "
+        "complete; catalog evaluation populates the assertions in the later work items.",
     )
+
+
+def _operator() -> str:
+    try:
+        return getpass.getuser()
+    except Exception:  # noqa: BLE001 - environments without a resolvable user
+        return "unknown"
 
 
 def cmd_report(ns: argparse.Namespace) -> CommandResult:
@@ -265,10 +287,16 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
         report_dir = _require_dir(
             _opt_str(ns, "validate"), key="validate", what="the report directory"
         )
-        result.data["report_dir"] = str(report_dir)
-        return _pending(
-            result, "Report-artifact schema validation lands in a later work item."
+        problems = validate_report(report_dir)
+        result.data.update(
+            {"report_dir": str(report_dir), "valid": not problems, "problems": problems}
         )
+        if problems:
+            result.add_code(int(ExitCode.INPUT_ERROR))
+            result.note(f"{report_dir}: {len(problems)} artifact(s) failed validation")
+        else:
+            result.note(f"{report_dir}: all artifacts valid")
+        return result
     source = _require_file(
         _opt_str(ns, "from_"), key="from", what="the assertions file"
     )
