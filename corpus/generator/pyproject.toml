@@ -1,0 +1,32 @@
+[project]
+name = "agentce-corpus-generator"
+version = "0.0.1"
+description = "Deterministic generator for the AgentCE simulated corpus (SPEC 11.2-11.4). Output is generated on demand and never committed (SPEC 11.7)."
+requires-python = ">=3.12"
+# The generator computes integrity hashes with the engine's canonical-form implementation (the RFC
+# 8785 reference, SPEC 6.7); nothing else is imported from the engine.
+dependencies = [
+  "agent-conformance",
+]
+
+# generate.py runs in place (self-contained module); uv manages only the environment.
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+agent-conformance = { path = "../../engines/python", editable = true }
+
+[dependency-groups]
+dev = [
+  "pytest>=8,<9",
+  "mypy>=1.11,<2",
+  "ruff>=0.6,<0.13",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-p no:cacheprovider"
+
+[tool.mypy]
+python_version = "3.12"
