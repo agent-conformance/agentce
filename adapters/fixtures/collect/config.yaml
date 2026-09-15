@@ -1,0 +1,23 @@
+# Collection config for the credential-leak test (phase-2 P2.3): a dry run over this config must not
+# write any of the secret values in secrets.txt into the bundle. Credentials are referenced by a
+# secret-manager path or an environment variable name; the values themselves live only in the
+# enterprise secret manager (and, for this test, in secrets.txt) and are never resolved by a dry run.
+job:
+  id: collect-credit-eu-nightly
+  principal: spiffe://corp/jobs/credit-collector
+  window:
+    start: "2026-05-01T00:00:00.000Z"
+    end: "2026-05-08T00:00:00.000Z"
+sources:
+  - id: urn:otel:credit-underwriter
+    adapter: otel-genai
+    endpoint: https://collector.internal/v1/traces
+    class: self_report
+    credential:
+      secret_ref: "vault://secret/data/otel-collector#token"
+  - id: urn:mcp-gateway:mcp-gateway-prod
+    adapter: mcp-gateway
+    endpoint: https://gateway.internal/v1/logs
+    class: enforcement_point
+    credential:
+      env: "AGENTCE_MCP_GATEWAY_TOKEN"

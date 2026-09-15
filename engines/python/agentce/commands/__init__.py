@@ -23,6 +23,7 @@ from ..applicability import resolve as resolve_applicability
 from ..assess import assess_subjects
 from ..bundle import load_bundle
 from ..catalog import lint_catalog, load_catalog
+from ..collect import EnvSecretManager, load_config, run_collect
 from ..config import resolve as resolve_config
 from ..conformance import run_ecs
 from ..coverage import compute_coverage
@@ -329,22 +330,46 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
 
 def cmd_collect(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="collect")
-    config = _require_file(
+    config_path = _require_file(
         _opt_str(ns, "config"), key="config", what="the collection config"
     )
     out = _opt_str(ns, "out")
-    if not out:
+    dry_run = _flag(ns, "dry_run")
+    if not dry_run and not out:
         raise InputError(
             "input.out_missing",
-            "an output bundle path is required.",
-            "pass --out <bundle>.",
+            "a real collection needs an output bundle path.",
+            "pass --out <bundle>, or --dry-run to plan only.",
         )
-    result.data.update(
-        {"config": str(config), "out": out, "dry_run": _flag(ns, "dry_run")}
+    config = load_config(config_path)
+    outcome = run_collect(
+        config,
+        out_dir=Path(out) if out else None,
+        dry_run=dry_run,
+        secret_manager=EnvSecretManager(),
     )
-    return _pending(
-        result, "Scheduled collection via adapters lands in a later work item."
-    )
+    result.data.update({"config": str(config_path), "dry_run": dry_run})
+    if out is not None:
+        result.data["out"] = out
+        result.data["written"] = list(outcome.written)
+    result.data.update(outcome.report)
+    if dry_run:
+        result.note(
+            f"COLLECT DRY-RUN OK: planned {len(config.sources)} source(s), offline, "
+            "no credentials resolved"
+        )
+    else:
+        incomplete = sum(
+            1
+            for s in outcome.report["sources"]
+            if s.get("completeness") == "incomplete"
+        )
+        result.note(
+            f"collected 0 of {len(config.sources)} source(s); {incomplete} incomplete"
+        )
+    if not outcome.complete:
+        result.add_code(int(ExitCode.FINDINGS))
+    return result
 
 
 def cmd_catalog(ns: argparse.Namespace) -> CommandResult:

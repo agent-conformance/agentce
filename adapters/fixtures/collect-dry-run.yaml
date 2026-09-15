@@ -1,0 +1,28 @@
+# A collection job (SPEC §5.4 B8): pull evidence from three sources via adapters. Credentials are
+# named only by reference (a secret-manager path or an environment variable) -- never by value.
+# `agentce collect --config this --dry-run` plans the job offline and resolves no credentials.
+job:
+  id: collect-credit-eu-1
+  principal: spiffe://corp/jobs/credit-collector
+  window:
+    start: "2026-05-01T00:00:00.000Z"
+    end: "2026-05-08T00:00:00.000Z"
+sources:
+  - id: urn:otel:credit-underwriter
+    adapter: otel-genai
+    endpoint: https://collector.internal/v1/traces
+    class: self_report
+    credential:
+      secret_ref: "vault://secret/data/otel-collector#token"
+  - id: urn:mcp-gateway:mcp-gateway-prod
+    adapter: mcp-gateway
+    endpoint: https://gateway.internal/v1/logs
+    class: enforcement_point
+    credential:
+      env: "AGENTCE_MCP_GATEWAY_TOKEN"
+  - id: urn:policy-engine:opa:prod
+    adapter: policy-engines
+    endpoint: https://opa.internal/v1/decisions
+    class: enforcement_point
+    credential:
+      secret_ref: "vault://secret/data/opa#token"
