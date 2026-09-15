@@ -1,0 +1,24 @@
+# No learned components: fail if any dependency tree resolves a machine-learning framework or LLM
+# client (SPEC 8.7, HR-1/HR-2). The check uses only the standard library, so it runs offline.
+name: no-ml
+
+on:
+  push:
+    branches: [main, "phase/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  no-ml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: no_ml self-test
+        run: python tools/no_ml_check.py --self-test
+      - name: no_ml denylist scan of every uv.lock
+        run: python tools/no_ml_check.py
