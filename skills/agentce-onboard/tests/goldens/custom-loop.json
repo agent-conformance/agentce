@@ -1,0 +1,62 @@
+{
+  "chokepoints": [
+    {
+      "confidence": "medium",
+      "enforcement_point_present": true,
+      "kind": "credential",
+      "line": 8,
+      "path": "agent.py"
+    },
+    {
+      "confidence": "high",
+      "enforcement_point_present": false,
+      "kind": "model_call",
+      "line": 12,
+      "path": "agent.py"
+    },
+    {
+      "confidence": "high",
+      "enforcement_point_present": false,
+      "kind": "approval",
+      "line": 14,
+      "path": "agent.py"
+    },
+    {
+      "confidence": "medium",
+      "enforcement_point_present": true,
+      "kind": "tool_call",
+      "line": 18,
+      "path": "agent.py"
+    },
+    {
+      "confidence": "high",
+      "enforcement_point_present": true,
+      "kind": "credential",
+      "line": 19,
+      "path": "agent.py"
+    },
+    {
+      "confidence": "high",
+      "enforcement_point_present": true,
+      "kind": "tool_call",
+      "line": 20,
+      "path": "agent.py"
+    },
+    {
+      "confidence": "high",
+      "enforcement_point_present": false,
+      "kind": "decision",
+      "line": 23,
+      "path": "agent.py"
+    }
+  ],
+  "counts": {
+    "approval": 1,
+    "credential": 2,
+    "decision": 1,
+    "model_call": 1,
+    "tool_call": 2
+  },
+  "repo": "tests/fixtures/custom-loop",
+  "total": 7
+}

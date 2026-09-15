@@ -1,0 +1,42 @@
+[project]
+name = "agentce-skill-onboard"
+version = "0.0.1"
+description = "The agentce-onboard skill's bundled scripts (SPEC 13.3.3): deterministic, offline checks for onboarding an agent codebase to AgentCE."
+requires-python = ">=3.12"
+dependencies = [
+  "agent-conformance",
+  "pyyaml>=6,<7",
+]
+
+# The scripts run in place (python scripts/<name>.py); uv manages only the environment. A skill is
+# never in the evaluation path (SPEC 13.3.1); its scripts are deterministic, offline, and model-free.
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+agent-conformance = { path = "../../engines/python", editable = true }
+
+[dependency-groups]
+dev = [
+  "pytest>=8,<9",
+  "mypy>=1.11,<2",
+  "ruff>=0.6,<0.13",
+  "types-pyyaml>=6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["scripts"]
+addopts = "-p no:cacheprovider"
+
+[tool.ruff]
+# The fixtures under tests/fixtures are illustrative agent snippets (scanned as text by
+# find_chokepoints, never executed); they reference framework names that are not imported.
+extend-exclude = ["tests/fixtures"]
+
+[tool.mypy]
+python_version = "3.12"
+
+[[tool.mypy.overrides]]
+module = ["jsonschema.*"]
+ignore_missing_imports = true

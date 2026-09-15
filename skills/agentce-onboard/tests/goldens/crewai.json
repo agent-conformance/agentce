@@ -1,0 +1,40 @@
+{
+  "chokepoints": [
+    {
+      "confidence": "medium",
+      "enforcement_point_present": false,
+      "kind": "tool_call",
+      "line": 7,
+      "path": "agent.py"
+    },
+    {
+      "confidence": "high",
+      "enforcement_point_present": false,
+      "kind": "memory",
+      "line": 13,
+      "path": "agent.py"
+    },
+    {
+      "confidence": "high",
+      "enforcement_point_present": false,
+      "kind": "retrieval",
+      "line": 14,
+      "path": "agent.py"
+    },
+    {
+      "confidence": "medium",
+      "enforcement_point_present": false,
+      "kind": "decision",
+      "line": 15,
+      "path": "agent.py"
+    }
+  ],
+  "counts": {
+    "decision": 1,
+    "memory": 1,
+    "retrieval": 1,
+    "tool_call": 1
+  },
+  "repo": "tests/fixtures/crewai",
+  "total": 4
+}

@@ -1,0 +1,39 @@
+{
+  "chokepoints": [
+    {
+      "confidence": "medium",
+      "enforcement_point_present": true,
+      "kind": "tool_call",
+      "line": 9,
+      "path": "agent.py"
+    },
+    {
+      "confidence": "high",
+      "enforcement_point_present": true,
+      "kind": "tool_call",
+      "line": 12,
+      "path": "agent.py"
+    },
+    {
+      "confidence": "high",
+      "enforcement_point_present": false,
+      "kind": "model_call",
+      "line": 16,
+      "path": "agent.py"
+    },
+    {
+      "confidence": "medium",
+      "enforcement_point_present": false,
+      "kind": "decision",
+      "line": 19,
+      "path": "agent.py"
+    }
+  ],
+  "counts": {
+    "decision": 1,
+    "model_call": 1,
+    "tool_call": 2
+  },
+  "repo": "tests/fixtures/openai-agents",
+  "total": 4
+}
