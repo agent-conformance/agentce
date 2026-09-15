@@ -162,6 +162,9 @@ class _Builder:
 
         self._map_decision_links(node, ptype, event)
 
+        if ptype == "DelegationIssued":
+            self._map_delegation_principals(data.get("chain"))
+
         if ptype == "Decision":
             self.decision_time[node] = str(event.get("time", ""))
             dtype = data.get("decision_type")
@@ -170,6 +173,25 @@ class _Builder:
                 # The decision's domain type is a subclass of agentce:Decision, so type the node
                 # with it too: controls target ConsequentialDecision via rdfs:subClassOf* (SPEC §7.2).
                 self.store.add_type(node, dtype)
+
+    def _map_delegation_principals(self, chain: object) -> None:
+        """Type the principals a ``DelegationIssued.chain`` declares (SPEC §6.3: ``chain`` feeds
+        ``prov:actedOnBehalfOf`` alongside ``acted_for``).
+
+        ``acted_for`` is a list of principal-id IRIs (the JSON-LD context maps it ``@type: @id``), so
+        it carries no ``kind``; the principal kinds — which is how a human overseer in the chain is
+        recognised — are declared here, on the delegation's ``chain`` Principal objects. Typing them by
+        pseudonymised IRI means an ``acted_for`` id that names the same principal resolves to a typed
+        node (a ``HumanPrincipal`` chain terminus for the OVS family), with no unbounded traversal."""
+        if not isinstance(chain, list):
+            return
+        for index, entry in enumerate(chain):
+            pid, kind = _principal_ref(entry)
+            if pid is None:
+                continue
+            p_iri = principal_iri(pid, self.key)
+            self.store.add_type(p_iri, _principal_class(kind))
+            self.store.add_literal(p_iri, "agentce:chainIndex", str(index), INTEGER)
 
     def _map_chain(self, agent_id: str, acted_for: object) -> None:
         if not isinstance(acted_for, list):
