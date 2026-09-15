@@ -1,0 +1,18 @@
+# Completed manual checklist from SPEC Appendix D, used to check checklist.schema.json. The
+# timestamp is quoted so it loads as a string, and the digests are illustrative SHA-256 values.
+checklist: TRN-03-M
+control: TRN-03
+items:
+  - id: 1
+    artifact: reference/art86-policy.md
+    question: Does the organisation's explanation policy require the AI's role, the inputs relied upon, and the human involvement to be stated to the affected person?
+    answers: ["yes", "no", "partially"]
+  - id: 2
+    artifact: report/explanations-sample.md
+    question: Do the sampled narratives fill every mandatory slot without "not reconstructable from record"?
+    answers: ["all", "some", "none"]
+completed_by: {principal: "user:jdoe@assessor.example", org: "Assessor LLP", independent: true}
+completed_at: "2026-09-13T09:00:00.000Z"
+artifact_digests:
+  reference/art86-policy.md: "sha256:3b7a4c2e9f1d05a6b8c4e2f10937d5c8a1e6b4f2093c7d5e1a8b6f4c2e0d9a7b"
+  report/explanations-sample.md: "sha256:1f2e3d4c5b6a7988796a5b4c3d2e1f00112233445566778899aabbccddeeff00"

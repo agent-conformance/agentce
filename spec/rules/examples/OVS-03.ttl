@@ -1,0 +1,22 @@
+# Portable shape for OVS-03 (SPEC Appendix B), used to check that psp_check accepts a shape written
+# entirely within the Portable Shape Profile. The engine-materialised flags (executesConsequential,
+# chainTerminus, chainVerified, oversightModalityMatchesDeclared) stand in for unbounded traversal so
+# that no zero-or-more path appears in the shape.
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+
+agentce:OVS-03-Shape a sh:NodeShape ;
+  sh:targetClass agentce:ToolCall ;
+  agentce:targetWhere [ agentce:executesConsequential true ] ;
+  sh:property [ sh:path agentce:authorizedBy ; sh:minCount 1 ;
+                sh:node agentce:EnforcementAllowShape ; sh:name "E1" ] ;
+  sh:property [ sh:path agentce:chainTerminus ; sh:class agentce:HumanPrincipal ;
+                sh:minCount 1 ; sh:name "E2a" ] ;
+  sh:property [ sh:path ( agentce:delegatedVia agentce:chainVerified ) ; sh:hasValue true ; sh:name "E2b" ] ;
+  sh:property [ sh:path ( agentce:executes agentce:oversightModalityMatchesDeclared ) ;
+                sh:hasValue true ; sh:name "E3" ] .
+
+agentce:EnforcementAllowShape a sh:NodeShape ;
+  sh:property [ sh:path agentce:sourceClass ; sh:hasValue agentce:enforcement_point ] ;
+  sh:property [ sh:path agentce:decision ; sh:in ( agentce:allow agentce:require_approval_satisfied ) ] .

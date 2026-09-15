@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/rules/metric.schema.json",
+  "title": "AgentCE metric specification",
+  "description": "A declarative rung-3 statistical evaluation with fixed numerics (SPEC 7.2). Statistics are computed with exact arithmetic per numerics.md; no floating point enters an outcome.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "population", "statistic", "threshold", "min_population", "outcome_map"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Stable metric identifier, kebab-case."
+    },
+    "population": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event"],
+      "description": "The events the metric is computed over.",
+      "properties": {
+        "event": {"type": "string", "description": "Event type name (e.g. ApprovalDecided)."},
+        "where": {
+          "type": "object",
+          "description": "Field-path to matcher equalities that filter the population.",
+          "additionalProperties": {"type": "string"}
+        }
+      }
+    },
+    "group_by": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Field paths that partition the population; the statistic is computed per group."
+    },
+    "statistic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["count", "ratio", "proportion", "quantile", "mean", "sum"]
+        },
+        "q": {
+          "type": "string",
+          "pattern": "^(0(\\.[0-9]+)?|1(\\.0+)?)$",
+          "description": "Quantile in [0,1] as a decimal string; nearest-rank per numerics.md."
+        },
+        "field": {"type": "string", "description": "Numeric field the statistic reads (integer or declared-scale decimal)."},
+        "numerator": {"type": "string"},
+        "denominator": {"type": "string"},
+        "of": {"type": "string"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "quantile"}}, "required": ["kind"]},
+          "then": {"required": ["q", "field"]}
+        }
+      ]
+    },
+    "threshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "value"],
+      "properties": {
+        "op": {"type": "string", "enum": [">=", "<=", ">", "<", "==", "!="]},
+        "value": {
+          "oneOf": [
+            {"type": "integer"},
+            {"type": "string", "pattern": "^-?[0-9]+(\\.[0-9]+)?$", "description": "Decimal as a string with declared scale."}
+          ]
+        }
+      }
+    },
+    "min_population": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Below this the outcome is not_assessed with a reason code."
+    },
+    "sampling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"type": "string", "enum": ["census", "hash_ordered_sample"]},
+        "n": {"type": "integer", "minimum": 1, "description": "Sample size for hash_ordered_sample."}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "hash_ordered_sample"}}, "required": ["kind"]},
+          "then": {"required": ["n"]}
+        }
+      ]
+    },
+    "window": {
+      "type": "string",
+      "description": "The window the metric is computed over; observation_window unless otherwise declared."
+    },
+    "outcome_map": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pass", "fail"],
+      "properties": {
+        "pass": {"$ref": "#/$defs/outcome"},
+        "fail": {"$ref": "#/$defs/outcome"}
+      }
+    }
+  },
+  "$defs": {
+    "outcome": {
+      "type": "string",
+      "enum": ["conformant", "non-conformant", "partial", "not_applicable", "not_assessed", "insufficient_evidence"]
+    }
+  }
+}
