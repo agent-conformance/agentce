@@ -1,0 +1,31 @@
+[project]
+name = "agentce-examples"
+version = "0.0.1"
+description = "Runnable agent examples per implementation style (SPEC 13.4 AX-4): each emits a bundle that agentce validate accepts with zero quarantines. The documentation's source of truth for snippets."
+requires-python = ">=3.12"
+dependencies = [
+  "agent-conformance",
+  "agentce-emit",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+agent-conformance = { path = "../engines/python", editable = true }
+agentce-emit = { path = "../engines/python-emit", editable = true }
+
+[dependency-groups]
+dev = [
+  "pytest>=8,<9",
+  "mypy>=1.11,<2",
+  "ruff>=0.6,<0.13",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-p no:cacheprovider"
+
+[tool.mypy]
+python_version = "3.12"
