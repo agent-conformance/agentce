@@ -1,0 +1,36 @@
+# Applicability profile for the quickstart project (SPEC §6.5). A small, complete credit-decisioning
+# example an adopter can assess before instrumenting anything (`agentce quickstart`). It validates
+# against spec/model/generated/json-schema/applicability-profile.schema.json.
+profile_version: 1
+observation_window:
+  start: "2026-05-01T00:00:00Z"
+  end: "2026-08-29T00:00:00Z"
+content_capture:
+  mode: hashes_only
+catalogs:
+  - "eu-ai-act@2026.09"
+subjects:
+  - id: "spiffe://corp/agents/credit-langgraph"
+    name: "Credit underwriting agent"
+    role: "both"
+    declared_decision_types:
+      - "dom:CreditDecision"
+    declared_oversight:
+      "dom:CreditDecision": "review_before"
+    evidence_sources:
+      - adapter: "otel-genai"
+        source: "urn:agentce:source:langgraph-runtime:eu-1"
+        class: "self_report"
+        class_justification: "emitted by the agent runtime; self-reported."
+      - adapter: "mcp-gateway"
+        source: "urn:agentce:source:langgraph-gateway:eu-1"
+        class: "enforcement_point"
+        class_justification: "the gateway sits on the only tool-call egress path; the agent holds no direct provider credential."
+      - adapter: "identity"
+        source: "urn:agentce:source:workload-idp:eu-1"
+        class: "enforcement_point"
+        class_justification: "delegation is minted server-side by the identity provider; the agent cannot forge it."
+      - adapter: "oversight"
+        source: "urn:agentce:source:incident-register:corp"
+        class: "independent_system"
+        class_justification: "incident records are kept by the register; agent identities cannot transition their state."
