@@ -261,7 +261,16 @@ def test_report_validate_after_assess(
 
 def test_collect_dry_run(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     cfg = tmp_path / "collect.yaml"
-    cfg.write_text("{}", encoding="utf-8")
+    cfg.write_text(
+        "job:\n"
+        "  id: job-1\n"
+        "  principal: spiffe://corp/jobs/c\n"
+        "sources:\n"
+        "  - id: urn:otel:x\n"
+        "    adapter: otel-genai\n"
+        "    credential: {secret_ref: 'vault://secret/x#token'}\n",
+        encoding="utf-8",
+    )
     code, env = run(
         [
             "collect",
@@ -276,6 +285,8 @@ def test_collect_dry_run(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> 
     )
     assert code == 0
     assert env["dry_run"] is True
+    # The dry-run bundle records the job identity and resolves no credential.
+    assert (tmp_path / "b" / "manifest.json").is_file()
 
 
 def test_catalog_no_action(capsys: pytest.CaptureFixture[str]) -> None:
