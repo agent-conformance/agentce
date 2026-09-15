@@ -10,6 +10,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
 authors = [{ name = "Agent Conformance Engine maintainers" }]
+dependencies = [
+  "jsonschema>=4.21,<5",
+]
 keywords = ["ai-agents", "conformance", "eu-ai-act", "oscal", "provenance", "shacl", "opentelemetry"]
 classifiers = [
   "Development Status :: 1 - Planning",
@@ -32,6 +35,7 @@ packages = ["agentce"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "agentce/data/no-ml-denylist.txt" = "agentce/data/no-ml-denylist.txt"
+"agentce/data/agentce-evidence.schema.json" = "agentce/data/agentce-evidence.schema.json"
 
 [dependency-groups]
 dev = [
@@ -40,6 +44,7 @@ dev = [
   "mypy>=1.11,<2",
   "ruff>=0.6,<0.13",
   "hypothesis>=6,<7",
+  "types-jsonschema>=4.21",
 ]
 
 [tool.pytest.ini_options]

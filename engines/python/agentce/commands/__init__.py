@@ -1,12 +1,12 @@
 """Command handlers for the AgentCE CLI (SPEC §8.5).
 
 Each handler takes the parsed ``argparse.Namespace`` and returns a :class:`~agentce.result.CommandResult`.
-This is the engine skeleton (work item 1.1): every command parses its arguments, validates its
-inputs (a missing or malformed input is an ``input_error``, exit code 3), emits ``--json`` output,
-and returns an exit code through the common scheme. The evaluation stages behind ``validate``,
-``verify``, ``assess``, ``report``, ``collect``, ``catalog``, ``conformance``, ``diff``, and ``sign``
-are layered on by the subsequent work items; until then those handlers report ``status:
-not_implemented`` and exit ``ok``. ``version`` is fully implemented.
+Every command parses its arguments, validates its inputs (a missing or malformed input is an
+``input_error``, exit code 3), emits ``--json`` output, and returns an exit code through the common
+scheme. ``validate`` runs the ingest-and-validation stage (SPEC §8.1); ``version`` is fully
+implemented; the remaining evaluation stages behind ``verify``, ``assess``, ``report``, ``collect``,
+``catalog``, ``conformance``, ``diff``, and ``sign`` are layered on by the subsequent work items and
+until then report ``status: not_implemented`` and exit ``ok``.
 """
 
 from __future__ import annotations
@@ -16,8 +16,12 @@ from pathlib import Path
 from typing import Any
 
 from .. import ENGINE_NAME, SPEC_VERSION, __version__, no_ml
+from ..bundle import load_bundle
 from ..errors import InputError
+from ..exit_codes import ExitCode
+from ..ingest import ingest
 from ..logsetup import get_logger
+from ..quarantine import counts_by_reason, write_quarantine
 from ..result import CommandResult
 
 _log = get_logger()
@@ -79,13 +83,34 @@ def _pending(result: CommandResult, summary: str) -> CommandResult:
 
 def cmd_validate(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="validate")
-    bundle = _require_dir(
+    bundle_dir = _require_dir(
         _opt_str(ns, "bundle"), key="bundle", what="the evidence bundle"
     )
-    result.data["bundle"] = str(bundle)
-    return _pending(
-        result, "Schema validation and quarantine reporting land in a later work item."
+    bundle = load_bundle(
+        bundle_dir
+    )  # raises InputError (exit 3) on a missing/mismatching manifest
+    ingested = ingest(bundle)
+    result.data.update(
+        {
+            "bundle": str(bundle_dir),
+            "bundle_digest": bundle.digest,
+            "accepted": len(ingested.accepted),
+            "quarantined": len(ingested.quarantined),
+            "quarantine_by_reason": counts_by_reason(ingested.quarantined),
+        }
     )
+    out = _opt_str(ns, "out")
+    if out is not None:
+        quarantine_path = Path(out) / "quarantine.jsonl"
+        write_quarantine(ingested.quarantined, quarantine_path)
+        result.data["quarantine_file"] = str(quarantine_path)
+    result.note(
+        f"validated {bundle_dir}: {len(ingested.accepted)} accepted, "
+        f"{len(ingested.quarantined)} quarantined"
+    )
+    if ingested.quarantined:
+        result.add_code(int(ExitCode.FINDINGS))
+    return result
 
 
 def cmd_verify(ns: argparse.Namespace) -> CommandResult:
@@ -145,16 +170,26 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         raise InputError(
             "input.out_missing", "an output directory is required.", "pass --out <dir>."
         )
+    # Stage 1: ingest and validate. A missing/mismatching manifest aborts with exit 3.
+    loaded = load_bundle(bundle)
+    ingested = ingest(loaded)
+    out_dir = Path(out)
+    write_quarantine(ingested.quarantined, out_dir / "quarantine.jsonl")
     result.data.update(
         {
             "bundle": str(bundle),
+            "bundle_digest": loaded.digest,
             "profile": str(profile),
             "catalogs": catalog.split(","),
             "out": out,
+            "accepted": len(ingested.accepted),
+            "quarantined": len(ingested.quarantined),
         }
     )
     return _pending(
-        result, "The assessment pipeline lands across the later work items."
+        result,
+        "Ingest complete; the integrity, graph, evaluation, and report stages land "
+        "across the later work items.",
     )
 
 
