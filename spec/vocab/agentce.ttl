@@ -1,0 +1,103 @@
+@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://agent-conformance.org/vocab/evidence/v1> a owl:Ontology ;
+  rdfs:label "AgentCE evidence vocabulary" ;
+  rdfs:comment "A PROV-O profile plus the glue relations AgentCE defines because no existing vocabulary carries them (SPEC 6.3)." ;
+  owl:imports <http://www.w3.org/ns/prov> .
+
+# ---------------------------------------------------------------------------------------------
+# Node classes (SPEC 6.3). Activities, agents, and entities are profiled onto PROV-O.
+# ---------------------------------------------------------------------------------------------
+agentce:Agent a owl:Class ; rdfs:subClassOf prov:SoftwareAgent ; rdfs:label "Agent" .
+agentce:Principal a owl:Class ; rdfs:subClassOf prov:Agent ; rdfs:label "Principal" .
+agentce:HumanPrincipal a owl:Class ; rdfs:subClassOf agentce:Principal ; rdfs:label "Human principal" .
+agentce:ServicePrincipal a owl:Class ; rdfs:subClassOf agentce:Principal ; rdfs:label "Service principal" .
+agentce:Activity a owl:Class ; rdfs:subClassOf prov:Activity ; rdfs:label "Activity" .
+agentce:ContextItem a owl:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "Context item" .
+agentce:Policy a owl:Class ; rdfs:label "Policy" .
+agentce:PolicyDecision a owl:Class ; rdfs:subClassOf agentce:Activity ; rdfs:label "Policy decision" .
+agentce:DelegationIssued a owl:Class ; rdfs:subClassOf agentce:Activity ; rdfs:label "Delegation issued" .
+agentce:Bundle a owl:Class ; rdfs:label "Bundle" .
+agentce:Component a owl:Class ; rdfs:label "Component" .
+agentce:Attestation a owl:Class ; rdfs:label "Attestation" .
+agentce:Decision a owl:Class ; rdfs:subClassOf agentce:Activity ; rdfs:label "Decision" .
+agentce:ConsequentialDecision a owl:Class ; rdfs:subClassOf agentce:Decision ;
+  rdfs:label "Consequential decision" ;
+  rdfs:comment "A decision with legal or similarly significant effect on a natural person (IR-05)." .
+agentce:OversightEvent a owl:Class ; rdfs:label "Oversight event" .
+agentce:Outcome a owl:Class ; rdfs:label "Outcome" .
+agentce:Incident a owl:Class ; rdfs:label "Incident" .
+agentce:Notice a owl:Class ; rdfs:label "Notice" .
+agentce:Instruction a owl:Class ; rdfs:subClassOf agentce:Activity ; rdfs:label "Instruction" .
+agentce:Refusal a owl:Class ; rdfs:subClassOf agentce:Activity ; rdfs:label "Refusal" .
+agentce:OversightModality a owl:Class ; rdfs:label "Oversight modality" .
+# Operation event classes are activities the shapes target.
+agentce:ToolCall a owl:Class ; rdfs:subClassOf agentce:Activity ; rdfs:label "Tool call" .
+agentce:ModelCall a owl:Class ; rdfs:subClassOf agentce:Activity ; rdfs:label "Model call" .
+agentce:ResourceAccess a owl:Class ; rdfs:subClassOf agentce:Activity ; rdfs:label "Resource access" .
+agentce:MemoryRead a owl:Class ; rdfs:subClassOf agentce:Activity ; rdfs:label "Memory read" .
+agentce:MemoryWrite a owl:Class ; rdfs:subClassOf agentce:Activity ; rdfs:label "Memory write" .
+
+# ---------------------------------------------------------------------------------------------
+# Glue relations (SPEC 6.3). Reused PROV-O relations (prov:wasAssociatedWith, prov:actedOnBehalfOf,
+# prov:used, prov:wasGeneratedBy, prov:wasInformedBy) are not redefined here.
+# ---------------------------------------------------------------------------------------------
+agentce:authorizedBy a owl:ObjectProperty ; rdfs:label "authorized by" ;
+  rdfs:domain agentce:Activity ; rdfs:range agentce:PolicyDecision .
+agentce:delegatedVia a owl:ObjectProperty ; rdfs:label "delegated via" ;
+  rdfs:domain agentce:Activity ; rdfs:range agentce:DelegationIssued .
+agentce:chainVerified a owl:DatatypeProperty ; rdfs:label "chain verified" ;
+  rdfs:domain agentce:DelegationIssued ; rdfs:range xsd:boolean .
+agentce:executes a owl:ObjectProperty ; rdfs:label "executes" ;
+  rdfs:domain agentce:ToolCall ; rdfs:range agentce:Decision .
+agentce:oversightModality a owl:ObjectProperty ; rdfs:label "oversight modality" ;
+  rdfs:domain agentce:Decision ; rdfs:range agentce:OversightModality .
+agentce:reviewedBy a owl:ObjectProperty ; rdfs:label "reviewed by" ;
+  rdfs:domain agentce:Activity ; rdfs:range agentce:OversightEvent .
+agentce:overriddenBy a owl:ObjectProperty ; rdfs:label "overridden by" ;
+  rdfs:domain agentce:Activity ; rdfs:range agentce:OversightEvent .
+agentce:interruptedBy a owl:ObjectProperty ; rdfs:label "interrupted by" ;
+  rdfs:domain agentce:Activity ; rdfs:range agentce:OversightEvent .
+agentce:loadedBundle a owl:ObjectProperty ; rdfs:label "loaded bundle" ;
+  rdfs:domain agentce:Activity ; rdfs:range agentce:Bundle .
+agentce:attestedBy a owl:ObjectProperty ; rdfs:label "attested by" ;
+  rdfs:domain agentce:Bundle ; rdfs:range agentce:Attestation .
+agentce:resultedIn a owl:ObjectProperty ; rdfs:label "resulted in" ;
+  rdfs:domain agentce:Activity ; rdfs:range agentce:Outcome .
+agentce:notifiedBy a owl:ObjectProperty ; rdfs:label "notified by" ;
+  rdfs:domain agentce:Decision ; rdfs:range agentce:Notice .
+agentce:relatedIncident a owl:ObjectProperty ; rdfs:label "related incident" ;
+  rdfs:domain agentce:Activity ; rdfs:range agentce:Incident .
+agentce:sourceClass a owl:ObjectProperty ; rdfs:label "source class" ;
+  rdfs:domain agentce:Activity ; rdfs:range agentce:SourceClass .
+agentce:SourceClass a owl:Class ; rdfs:label "Source class" .
+agentce:precededBy a owl:ObjectProperty ; rdfs:label "preceded by" ;
+  rdfs:domain agentce:Decision ; rdfs:range agentce:Decision .
+agentce:actsOn a owl:ObjectProperty ; rdfs:label "acts on" ;
+  rdfs:domain agentce:Activity ; rdfs:range agentce:Instruction .
+agentce:derivedFrom a owl:ObjectProperty ; rdfs:label "derived from" ;
+  rdfs:domain agentce:Instruction ; rdfs:range prov:Entity .
+agentce:withinScope a owl:DatatypeProperty ; rdfs:label "within scope" ;
+  rdfs:domain agentce:Activity ; rdfs:range xsd:boolean .
+agentce:refusedBy a owl:ObjectProperty ; rdfs:label "refused by" ;
+  rdfs:domain agentce:Instruction ; rdfs:range agentce:Refusal .
+
+# ---------------------------------------------------------------------------------------------
+# Engine-materialised edges (SPEC 7.2 B3, Appendix B): computed by the graph builder so that
+# shapes never traverse unbounded paths.
+# ---------------------------------------------------------------------------------------------
+agentce:chainTerminus a owl:ObjectProperty ; rdfs:label "chain terminus" ;
+  rdfs:domain agentce:Activity ; rdfs:range agentce:Principal ;
+  rdfs:comment "The root principal of a materialised delegation chain." .
+agentce:executesConsequential a owl:DatatypeProperty ; rdfs:label "executes consequential" ;
+  rdfs:domain agentce:ToolCall ; rdfs:range xsd:boolean .
+agentce:oversightModalityMatchesDeclared a owl:DatatypeProperty ; rdfs:label "oversight modality matches declared" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean .
+agentce:danglingRef a owl:DatatypeProperty ; rdfs:label "dangling reference" ;
+  rdfs:domain agentce:Activity ; rdfs:range xsd:string ;
+  rdfs:comment "A refs.* value that resolves to no ingested event." .
