@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -67,11 +67,53 @@ def test_validate_bundle_not_a_directory(
     assert env["error"]["key"] == "input.bundle_not_a_directory"
 
 
-def test_validate_pending(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    code, env = run(["validate", "--bundle", str(tmp_path), "--json"], capsys)
+def test_validate_good_bundle(
+    make_bundle: Callable[..., Path],
+    example_events: list[dict[str, Any]],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    bundle = make_bundle(example_events)
+    code, env = run(["validate", "--bundle", str(bundle), "--json"], capsys)
     assert code == 0
-    assert env["status"] == "not_implemented"
-    assert env["bundle"] == str(tmp_path)
+    assert env["accepted"] == 2
+    assert env["quarantined"] == 0
+    assert env["bundle_digest"].startswith("sha256:")
+
+
+def test_validate_quarantine_exits_one(
+    make_bundle: Callable[..., Path],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    bundle = make_bundle(["{not json"])
+    code, env = run(["validate", "--bundle", str(bundle), "--json"], capsys)
+    assert code == 1
+    assert env["quarantined"] == 1
+    assert env["quarantine_by_reason"] == {"schema_invalid": 1}
+
+
+def test_validate_missing_manifest_exits_three(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    empty = tmp_path / "no_manifest"
+    empty.mkdir()
+    code, env = run(["validate", "--bundle", str(empty), "--json"], capsys)
+    assert code == 3
+    assert env["error"]["key"] == "input.bundle_manifest_missing"
+
+
+def test_validate_writes_quarantine_file(
+    make_bundle: Callable[..., Path],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    bundle = make_bundle(["{not json"])
+    out = tmp_path / "out"
+    code, env = run(
+        ["validate", "--bundle", str(bundle), "--out", str(out), "--json"], capsys
+    )
+    assert code == 1
+    assert (out / "quarantine.jsonl").is_file()
+    assert env["quarantine_file"] == str(out / "quarantine.jsonl")
 
 
 def test_verify_requires_exactly_one_target(capsys: pytest.CaptureFixture[str]) -> None:
@@ -106,27 +148,36 @@ def test_assess_missing_profile(
     assert env["error"]["key"] == "input.profile_missing"
 
 
-def test_assess_pending(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_assess_ingests_then_pending(
+    make_bundle: Callable[..., Path],
+    example_events: list[dict[str, Any]],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    bundle = make_bundle(example_events)
     profile = tmp_path / "profile.yaml"
     profile.write_text("{}", encoding="utf-8")
+    out = tmp_path / "o"
     code, env = run(
         [
             "assess",
             "--bundle",
-            str(tmp_path),
+            str(bundle),
             "--catalog",
             "a@1,b@2",
             "--profile",
             str(profile),
             "--out",
-            str(tmp_path / "o"),
+            str(out),
             "--json",
         ],
         capsys,
     )
     assert code == 0
     assert env["catalogs"] == ["a@1", "b@2"]
+    assert env["accepted"] == 2
     assert env["status"] == "not_implemented"
+    assert (out / "quarantine.jsonl").is_file()
 
 
 def test_report_from(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -263,9 +314,12 @@ def test_sign_bad_role_is_usage_error() -> None:
 
 
 def test_human_output_without_json(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    make_bundle: Callable[..., Path],
+    example_events: list[dict[str, Any]],
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    code = cli.main(["validate", "--bundle", str(tmp_path)])
+    bundle = make_bundle(example_events)
+    code = cli.main(["validate", "--bundle", str(bundle)])
     out = capsys.readouterr().out
     assert code == 0
-    assert "later work item" in out
+    assert "accepted" in out

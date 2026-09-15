@@ -71,6 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("validate", parents=[common], help="schema-validate a bundle")
     p.add_argument("--bundle", help="the evidence bundle directory")
+    p.add_argument("--out", help="write quarantine.jsonl to this directory")
     p.set_defaults(func=commands.cmd_validate)
 
     p = sub.add_parser(
