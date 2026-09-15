@@ -427,19 +427,16 @@ def cmd_conformance(ns: argparse.Namespace) -> CommandResult:
         f"ECS: {report['projects']['identical']}/{report['projects']['total']} identical; "
         f"claim {report['claim']}; no_ml {report['no_ml']}"
     )
-    adapter_report = report.get("adapters")
-    if isinstance(adapter_report, dict):
+    adapters_claim = report.get("adapters")
+    detail = report.get("adapter_conformance")
+    if isinstance(adapters_claim, str) and isinstance(detail, dict):
         result.note(
-            f"adapters: {adapter_report['identical']}/{adapter_report['total']} identical; "
-            f"round_trip {adapter_report['round_trip']}"
+            f"adapters: {detail.get('identical')}/{detail.get('total')} identical; "
+            f"round_trip {detail.get('round_trip')}; claim {adapters_claim}"
         )
     if report["claim"] != "full":
         result.add_code(int(ExitCode.FINDINGS))
-    if isinstance(adapter_report, dict) and not (
-        adapter_report["total"] > 0
-        and adapter_report["identical"] == adapter_report["total"]
-        and adapter_report["round_trip"]
-    ):
+    if adapters_claim is not None and adapters_claim != "full":
         result.add_code(int(ExitCode.FINDINGS))
     return result
 

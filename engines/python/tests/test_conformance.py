@@ -182,7 +182,30 @@ def test_run_ecs_folds_in_adapter_conformance(
         out_dir=None,
         adapters_dir=tmp_path / "adapters",
     )
-    assert report["adapters"] == canned
+    # The report carries the adapter claim string plus the detail under adapter_conformance.
+    assert report["adapters"] == "full"
+    assert report["adapter_conformance"] == canned
+
+
+def test_adapter_claim_scheme() -> None:
+    import agentce.conformance as conformance
+
+    assert (
+        conformance._adapter_claim({"total": 3, "identical": 3, "round_trip": True})
+        == "full"
+    )
+    assert (
+        conformance._adapter_claim({"total": 3, "identical": 3, "round_trip": False})
+        == "partial"
+    )
+    assert (
+        conformance._adapter_claim({"total": 3, "identical": 1, "round_trip": True})
+        == "partial"
+    )
+    assert (
+        conformance._adapter_claim({"total": 0, "identical": 0, "round_trip": False})
+        == "none"
+    )
 
 
 def test_adapter_conformance_parses_probe_json(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -150,6 +150,17 @@ def _adapter_conformance(adapters_dir: Path, out_dir: Path | None) -> dict[str, 
     return parsed
 
 
+def _adapter_claim(detail: dict[str, Any]) -> str:
+    """The adapter-conformance claim, mirroring the ECS claim scheme (SPEC §11.5)."""
+    total = int(detail.get("total", 0))
+    identical = int(detail.get("identical", 0))
+    if total > 0 and identical == total and bool(detail.get("round_trip")):
+        return "full"
+    if identical > 0:
+        return "partial"
+    return "none"
+
+
 def run_ecs(
     *,
     engine_path: Path,
@@ -214,7 +225,9 @@ def run_ecs(
         "failures": failures,
     }
     if adapters_dir is not None:
-        report["adapters"] = _adapter_conformance(adapters_dir, out_dir)
+        detail = _adapter_conformance(adapters_dir, out_dir)
+        report["adapter_conformance"] = detail
+        report["adapters"] = _adapter_claim(detail)
     if out_dir is not None:
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / "implementation-report.json").write_text(
