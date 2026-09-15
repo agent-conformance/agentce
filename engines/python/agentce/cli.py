@@ -90,6 +90,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--profile", help="the applicability profile file")
     p.add_argument("--deviations", help="the deviation register file")
     p.add_argument("--domain", help="the domain ontology binding file")
+    p.add_argument(
+        "--catalog-dir",
+        dest="catalog_dir",
+        action="append",
+        help="a catalog directory to evaluate (repeatable)",
+    )
     p.add_argument("--manual", help="the manual-records directory")
     p.add_argument("--probes", help="the probe-results directory")
     p.add_argument("--out", help="the output directory")

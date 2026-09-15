@@ -20,8 +20,9 @@ from typing import Any
 
 from .. import ENGINE_NAME, SPEC_VERSION, __version__, no_ml
 from ..applicability import resolve as resolve_applicability
-from ..assertions import Assertion
+from ..assess import assess_subjects
 from ..bundle import load_bundle
+from ..catalog import lint_catalog, load_catalog
 from ..coverage import compute_coverage
 from ..domain import DomainBinding
 from ..errors import InputError
@@ -240,9 +241,14 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     statements = resolve_applicability(profile_obj, ingested.accepted)
     _write_jsonl(statements, out_dir / "applicability.jsonl")
     drift_findings = sum(len(s["drift"]) for s in statements)
-    # Stage 6: assertions and report artifacts. Controls (and therefore assertions) arrive with the
-    # catalog and evaluators of the later items; the report machinery and its schemas are exercised now.
-    evaluated: list[Assertion] = []
+    # Stage 6: catalog evaluation and report artifacts. Each --catalog-dir catalog is evaluated
+    # against every subject to produce assertions; the report artifacts are rendered from them.
+    catalog_dirs = [d for d in (getattr(ns, "catalog_dir", None) or [])]
+    catalogs = [
+        load_catalog(_require_dir(d, key="catalog-dir", what="the catalog directory"))
+        for d in catalog_dirs
+    ]
+    evaluated = assess_subjects(ingested.accepted, profile_obj, catalogs, domain)
     write_report(
         out_dir,
         evaluated,
@@ -251,6 +257,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         operator=_operator(),
         invocation=["assess", str(bundle), str(profile)],
     )
+    non_conformant = sum(1 for a in evaluated if a.outcome == "non-conformant")
     result.data.update(
         {
             "bundle": str(bundle),
@@ -267,11 +274,18 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "assertions": len(evaluated),
         }
     )
-    return _pending(
-        result,
-        "Ingest, integrity, graph, coverage, applicability, and report scaffolding "
-        "complete; catalog evaluation populates the assertions in the later work items.",
+    if non_conformant:
+        result.add_code(int(ExitCode.FINDINGS))
+    if not catalogs:
+        return _pending(
+            result,
+            "Ingest through report complete; pass --catalog-dir to evaluate controls "
+            "and populate assertions.",
+        )
+    result.note(
+        f"assessed {len(evaluated)} (control, subject) pairs; {non_conformant} non-conformant"
     )
+    return result
 
 
 def _operator() -> str:
@@ -346,8 +360,23 @@ def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
         what="the catalog directory",
         fix="pass the catalog directory: `agentce catalog lint <dir>`.",
     )
-    result.data.update({"action": "lint", "dir": str(directory)})
-    return _pending(result, "Catalog linting lands with the base catalog work item.")
+    problems = lint_catalog(directory)
+    result.data.update(
+        {
+            "action": "lint",
+            "dir": str(directory),
+            "clean": not problems,
+            "problems": problems,
+        }
+    )
+    if problems:
+        result.add_code(int(ExitCode.FINDINGS))
+        result.note(f"CATALOG FAILED: {directory}: {len(problems)} problem(s)")
+        for problem in problems:
+            result.note(f"  {problem}")
+    else:
+        result.note(f"CATALOG OK: {directory}")
+    return result
 
 
 def cmd_conformance(ns: argparse.Namespace) -> CommandResult:

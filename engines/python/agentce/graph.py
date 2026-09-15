@@ -68,6 +68,24 @@ def _closure(subclass: dict[str, str], classes: set[str]) -> set[tuple[str, str]
     return pairs
 
 
+def _principal_ref(entry: Any) -> tuple[str | None, str | None]:
+    """A principal in ``acted_for`` is a bare id string or ``{id, kind}`` (SPEC §5.3)."""
+    if isinstance(entry, str):
+        return entry, None
+    if isinstance(entry, dict) and isinstance(entry.get("id"), str):
+        kind = entry.get("kind")
+        return str(entry["id"]), str(kind) if isinstance(kind, str) else None
+    return None, None
+
+
+def _principal_class(kind: str | None) -> str:
+    if kind == "human":
+        return "agentce:HumanPrincipal"
+    if kind == "service":
+        return "agentce:ServicePrincipal"
+    return "agentce:Principal"
+
+
 def _data(event: dict[str, Any]) -> dict[str, Any]:
     data = event.get("data")
     return data if isinstance(data, dict) else {}
@@ -156,12 +174,14 @@ class _Builder:
     def _map_chain(self, agent_id: str, acted_for: object) -> None:
         if not isinstance(acted_for, list):
             return
-        for index, principal in enumerate(acted_for):
-            if isinstance(principal, str):
-                p_iri = principal_iri(principal, self.key)
-                self.store.add_type(p_iri, "agentce:Principal")
-                self.store.add_edge(agent_id, "prov:actedOnBehalfOf", p_iri)
-                self.store.add_literal(p_iri, "agentce:chainIndex", str(index), INTEGER)
+        for index, entry in enumerate(acted_for):
+            pid, kind = _principal_ref(entry)
+            if pid is None:
+                continue
+            p_iri = principal_iri(pid, self.key)
+            self.store.add_type(p_iri, _principal_class(kind))
+            self.store.add_edge(agent_id, "prov:actedOnBehalfOf", p_iri)
+            self.store.add_literal(p_iri, "agentce:chainIndex", str(index), INTEGER)
 
     def _map_decision_links(self, node: str, ptype: str, event: dict[str, Any]) -> None:
         refs = _refs(event)
@@ -254,10 +274,12 @@ class _Builder:
 
     def _chain_terminus(self, node: str, data: dict[str, Any]) -> None:
         acted_for = data.get("acted_for")
-        if isinstance(acted_for, list) and acted_for and isinstance(acted_for[-1], str):
-            self.store.add_edge(
-                node, "agentce:chainTerminus", principal_iri(acted_for[-1], self.key)
-            )
+        if isinstance(acted_for, list) and acted_for:
+            pid, _kind = _principal_ref(acted_for[-1])
+            if pid is not None:
+                self.store.add_edge(
+                    node, "agentce:chainTerminus", principal_iri(pid, self.key)
+                )
 
     def _preceded_by(self) -> None:
         by_type: dict[str, list[str]] = {}

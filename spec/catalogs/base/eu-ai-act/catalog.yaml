@@ -1,0 +1,14 @@
+# EU AI Act base catalog (SPEC 7.3). The Phase 1 subset covers the families REC, OVS, INT, INC as
+# rung-2 structural controls; the statistical, manual, and remaining families are added in later
+# phases. Each control lives in controls/ and references a Portable Shape Profile shape in shapes/.
+id: eu-ai-act
+version: "2026.09"
+title: EU AI Act base catalog
+families: [REC, OVS, INT, INC]
+precision_policy:
+  demote_below: "0.98"   # a rung-2 rule below this precision on the corpus is demoted (SPEC 11.6)
+controls:
+  - controls/OVS-03.yaml
+  - controls/REC-04.yaml
+  - controls/INT-01.yaml
+  - controls/INC-02.yaml

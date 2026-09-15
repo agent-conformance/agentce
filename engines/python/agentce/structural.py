@@ -277,7 +277,8 @@ def evaluate_shape(
     return applicable, failing, violations
 
 
-def _within_tolerance(applicable: int, failed: int, tolerance: dict[str, Any]) -> bool:
+def within_tolerance(applicable: int, failed: int, tolerance: dict[str, Any]) -> bool:
+    """Whether ``failed`` failures out of ``applicable`` are within the control's tolerance (§9.2)."""
     kind = tolerance.get("kind", "count")
     if kind == "ratio" and applicable > 0:
         return Fraction(failed, applicable) <= Fraction(str(tolerance.get("max", "0")))
@@ -295,7 +296,7 @@ def evaluate_control(
     """Evaluate one control's shape and apply its tolerance to reach a structural outcome."""
     applicable, failing, violations = evaluate_shape(store, shape, shapes, control_id)
     tolerance = tolerance or {"kind": "count", "max": 0}
-    conformant = _within_tolerance(len(applicable), len(failing), tolerance)
+    conformant = within_tolerance(len(applicable), len(failing), tolerance)
     outcome = "conformant" if conformant else "non-conformant"
     return ControlOutcome(
         control_id,
