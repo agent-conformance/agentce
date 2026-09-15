@@ -44,6 +44,7 @@ These mirror the CI workflows; keep them in sync.
 - `docs/` — documentation, including architecture decision records.
 - `governance/` — charters, versioning and support policy, security and vulnerability policy.
 - `tools/` — repository-level checks (dependency denylist, license headers).
+- `website/` — the public site (agent-conformance.org): the landing page, documentation, and the canonical JSON-LD context, vocabulary, and JSON Schemas served at their IRIs.
 
 ## Commit rules
 
@@ -76,7 +77,8 @@ These mirror the CI workflows; keep them in sync.
 
 ## What not to add
 
-- Design documents, roadmaps, or marketing content.
+- Design documents, roadmaps, or marketing fluff. The standard's public site — its landing and
+  documentation — is project infrastructure, not marketing, and lives in `website/`.
 - Controls or rules that can only be satisfied by one vendor's product.
 - Secrets, credentials, or personal data in code, fixtures, or logs.
 - Files outside the repository map above.
