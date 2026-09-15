@@ -1,0 +1,70 @@
+# No learned components: machine-learning frameworks and LLM/embedding client packages that MUST NOT
+# appear in any engine or evaluation-path dependency tree (SPEC 8.7, hard requirements HR-1/HR-2). A
+# fork that adds one cannot obtain no_ml: pass and therefore cannot claim conformance (SPEC 14.5).
+#
+# Entries are distribution names. no_ml_check compares each locked package against this list by exact
+# PEP 503 normalised name (lowercase, runs of - _ . collapsed to a single -), never as a substring, so
+# packages whose names merely contain "ml" -- such as linkml, pyyaml, or html5lib -- are unaffected.
+# Blank lines and lines beginning with # are ignored.
+
+# Deep-learning frameworks
+torch
+torchvision
+torchaudio
+tensorflow
+tensorflow-cpu
+tensorflow-gpu
+keras
+jax
+jaxlib
+flax
+mxnet
+paddlepaddle
+
+# Classical ML and gradient boosting
+scikit-learn
+sklearn
+xgboost
+lightgbm
+catboost
+
+# Model runtimes and inference servers
+onnx
+onnxruntime
+onnxruntime-gpu
+ctransformers
+llama-cpp-python
+vllm
+ollama
+
+# NLP / embeddings toolkits
+transformers
+tokenizers
+sentence-transformers
+huggingface-hub
+spacy
+nltk
+gensim
+fasttext
+
+# LLM and embedding API clients
+openai
+anthropic
+cohere
+mistralai
+google-generativeai
+vertexai
+replicate
+together
+groq
+litellm
+
+# Agent / RAG orchestration frameworks that embed model clients
+langchain
+langchain-core
+langchain-community
+llama-index
+llama-index-core
+haystack-ai
+guidance
+dspy
