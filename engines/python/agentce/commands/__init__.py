@@ -19,13 +19,16 @@ from typing import Any
 
 from .. import ENGINE_NAME, SPEC_VERSION, __version__, no_ml
 from ..bundle import load_bundle
+from ..domain import DomainBinding
 from ..errors import InputError
 from ..exit_codes import ExitCode
+from ..graph import build_graph
 from ..ingest import ingest
 from ..integrity import IntegrityStatus, verify_bundle
 from ..logsetup import get_logger
 from ..quarantine import counts_by_reason, write_quarantine
 from ..result import CommandResult
+from ..store import GraphStore
 
 _log = get_logger()
 
@@ -206,6 +209,21 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     # Stage 2: integrity verification, one IntegrityResult per stream.
     integrity_results = verify_bundle(ingested.accepted, loaded.manifest, loaded.root)
     _write_jsonl((r.to_json() for r in integrity_results), out_dir / "integrity.jsonl")
+    # Stage 3: build the provenance graph into the on-disk store (ADR-0001).
+    domain_path = _opt_str(ns, "domain")
+    domain = (
+        DomainBinding.load(
+            _require_file(domain_path, key="domain", what="the domain binding")
+        )
+        if domain_path is not None
+        else DomainBinding.empty()
+    )
+    graph_path = out_dir / "graph.sqlite"
+    graph_path.unlink(missing_ok=True)
+    graph_store = GraphStore(graph_path)
+    build_graph(ingested.accepted, domain=domain, store=graph_store)
+    graph_triples = graph_store.triple_count()
+    graph_store.close()
     result.data.update(
         {
             "bundle": str(bundle),
@@ -216,12 +234,13 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "accepted": len(ingested.accepted),
             "quarantined": len(ingested.quarantined),
             "streams": len(integrity_results),
+            "graph_triples": graph_triples,
         }
     )
     return _pending(
         result,
-        "Ingest and integrity complete; the graph, evaluation, and report stages land "
-        "across the later work items.",
+        "Ingest, integrity, and graph build complete; the coverage, applicability, "
+        "evaluation, and report stages land across the later work items.",
     )
 
 
