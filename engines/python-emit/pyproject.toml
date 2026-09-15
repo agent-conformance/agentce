@@ -5,12 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "agentce-emit"
 version = "0.0.1"
-description = "Evidence emitter library for the Agent Conformance Engine (canonical CloudEvents + JSON-LD). Placeholder release."
+description = "Evidence emitter for the Agent Conformance Engine: one-line agent-side emission of canonical CloudEvents + JSON-LD evidence (SPEC 13.1, 13.4). Standard library only."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
 authors = [{ name = "Agent Conformance Engine maintainers" }]
-classifiers = ["Development Status :: 1 - Planning"]
+classifiers = ["Development Status :: 2 - Pre-Alpha"]
 
 [project.urls]
 Homepage = "https://agent-conformance.org"
@@ -18,3 +18,23 @@ Repository = "https://github.com/agent-conformance/agentce"
 
 [tool.hatch.build.targets.wheel]
 packages = ["agentce_emit"]
+
+# The engine is a test-only dependency: the one-line-emit test validates the emitted bundle with
+# `agentce validate`. The emitter itself has no runtime dependency (standard library only).
+[tool.uv.sources]
+agent-conformance = { path = "../python", editable = true }
+
+[dependency-groups]
+dev = [
+  "agent-conformance",
+  "pytest>=8,<9",
+  "mypy>=1.11,<2",
+  "ruff>=0.6,<0.13",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"
+
+[tool.mypy]
+python_version = "3.12"
