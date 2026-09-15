@@ -1,0 +1,67 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {"key": "service.name", "value": {"stringValue": "credit-gateway"}}
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {"name": "opentelemetry.instrumentation.gateway", "version": "2.0.0"},
+          "schemaUrl": "https://opentelemetry.io/schemas/1.36.0",
+          "spans": [
+            {
+              "traceId": "cafef00d00000000cafef00d00000000",
+              "spanId": "f100000000000001",
+              "name": "chat gpt-4o",
+              "startTimeUnixNano": "1734400000000000000",
+              "endTimeUnixNano": "1734400000500000000",
+              "attributes": [
+                {"key": "gen_ai.operation.name", "value": {"stringValue": "chat"}},
+                {"key": "gen_ai.system", "value": {"stringValue": "openai"}},
+                {"key": "gen_ai.request.model", "value": {"stringValue": "gpt-4o"}},
+                {"key": "gen_ai.usage.input_tokens", "value": {"intValue": "10"}}
+              ],
+              "status": {"code": 2, "message": "rate limited"}
+            },
+            {
+              "traceId": "cafef00d00000000cafef00d00000000",
+              "spanId": "f200000000000002",
+              "name": "execute_tool wire_transfer",
+              "startTimeUnixNano": "1734400001000000000",
+              "endTimeUnixNano": "1734400001100000000",
+              "attributes": [
+                {"key": "gen_ai.operation.name", "value": {"stringValue": "execute_tool"}},
+                {"key": "gen_ai.tool.name", "value": {"stringValue": "wire_transfer"}}
+              ],
+              "status": {"code": 2, "message": "policy denied"}
+            },
+            {
+              "traceId": "cafef00d00000000cafef00d00000000",
+              "spanId": "f300000000000003",
+              "name": "rerank",
+              "startTimeUnixNano": "1734400002000000000",
+              "endTimeUnixNano": "1734400002100000000",
+              "attributes": [
+                {"key": "gen_ai.operation.name", "value": {"stringValue": "rerank"}}
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "cafef00d00000000cafef00d00000000",
+              "spanId": "f400000000000004",
+              "name": "http POST /internal",
+              "startTimeUnixNano": "1734400003000000000",
+              "endTimeUnixNano": "1734400003100000000",
+              "attributes": [
+                {"key": "http.request.method", "value": {"stringValue": "POST"}}
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

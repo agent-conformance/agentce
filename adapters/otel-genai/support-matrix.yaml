@@ -1,0 +1,57 @@
+# Support matrix for the otel-genai adapter (SPEC 12.3).
+#
+# `members` lists, per event type, the evidence members the adapter can populate from an OpenTelemetry
+# GenAI or OpenInference export; `missing` lists members the source cannot supply, which the engine
+# cites when it explains an `insufficient_evidence` outcome (e.g. "adapter otel-genai cannot supply
+# refs.authorization; add an enforcement-point source"). `check_support_matrix` proves this file stays
+# exactly consistent with what the adapter emits over its fixtures: `members` equals the members the
+# fixtures demonstrate, nothing under `missing` is ever populated, and `conventions` are those the
+# fixtures exercise. Member paths are dotted one level into nested objects (SPEC 12.3).
+adapter: otel-genai
+conventions:
+  - otel-genai:1.21
+  - otel-genai:1.36
+  - openinference:0.1.14
+events:
+  SessionStart:
+    members: [agent.id, agent.name, environment, session_id]
+    missing: [bundle_digest, deployer, intended_purpose_ref, model_versions, registration_ref]
+  SessionEnd:
+    members: [agent.id, agent.name, end_reason, session_id]
+    missing: [acted_for]
+  ModelCall:
+    members:
+      - agent.id
+      - agent.name
+      - error
+      - input_ref
+      - model.name
+      - model.provider
+      - model.version_or_digest
+      - operation
+      - output_ref
+      - session_id
+      - usage.input_tokens
+      - usage.output_tokens
+    missing: [acted_for, output_marking, refs.authorization, refs.instruction]
+  ToolCall:
+    members:
+      - agent.id
+      - agent.name
+      - args_ref
+      - error
+      - result_ref
+      - session_id
+      - tool.name
+      - tool.protocol
+      - tool.server
+    missing: [acted_for, effect_class, refs.authorization, refs.delegation, side_effect, used]
+  ResourceAccess:
+    members: [agent.id, agent.name, count, operation, resource.kind, resource.uri, session_id]
+    missing: [purpose, resource.classification, resource.owner]
+  MemoryWrite:
+    members: [agent.id, agent.name, record_ref, session_id, store, trust]
+    missing: [guard_verdict, provenance_origin_class, provenance_origin_ref, refs.guard, refs.origin]
+  MemoryRead:
+    members: [agent.id, agent.name, record_refs, session_id, store, trust_min]
+    missing: [refs.consumer]
