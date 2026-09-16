@@ -1,0 +1,103 @@
+# NIST AI Risk Management Framework 1.0 crosswalk: the subcategories whose intent AgentCE's runtime
+# evidence can help substantiate, mapped to AgentCE schema elements, correctness-ladder rungs, and
+# base-catalog control ids.
+#
+# Subcategory identifiers only (e.g. MEASURE 2.7); the framework's text is not reproduced and the
+# `obligation` field is AgentCE's own statement of what its evidence can show. The AI RMF is a
+# voluntary framework and AgentCE maps most naturally to its MEASURE and MANAGE functions (operation,
+# measurement, and monitoring); GOVERN and MAP are organisational and are mapped where a record
+# substantiates them. Every reference carries `verified_against_text: false` until a reviewer confirms
+# the mapping against the source (SPEC 7.3).
+framework: nist-ai-rmf
+title: "NIST AI Risk Management Framework (AI RMF 1.0)"
+version: "1.0"
+source:
+  publisher: NIST
+  identifier: "NIST AI 100-1"
+obligations:
+  - ref: "GOVERN 1.4"
+    obligation: The risk-management process is operational -- findings feed a register and a run-cadence check confirms the process runs.
+    schema_elements: [Incident, Outcome]
+    rungs: []
+    process: true
+    controls: []
+    verified_against_text: false
+  - ref: "GOVERN 4.2"
+    obligation: Accountability is evidenced by recording the acting agent and a source timestamp on every consequential decision.
+    schema_elements: [Decision]
+    rungs: [2]
+    controls: [REC-04]
+    verified_against_text: false
+  - ref: "MAP 5.1"
+    obligation: Likelihood and magnitude of impact are grounded in observed decision types and outcomes rather than asserted.
+    schema_elements: [Decision, Outcome]
+    rungs: [2, 3]
+    controls: []
+    verified_against_text: false
+  - ref: "MEASURE 2.3"
+    obligation: System performance is monitored in deployment; anomalies and unexpected performance surface as incidents and outcomes.
+    schema_elements: [Outcome, Incident]
+    rungs: [3]
+    controls: [INC-01]
+    verified_against_text: false
+  - ref: "MEASURE 2.6"
+    obligation: Safety is evidenced by an interrupt or stop mechanism whose enforcement point appears in the record.
+    schema_elements: [Interrupt, PolicyDecision]
+    rungs: [2]
+    controls: [OVS-08]
+    verified_against_text: false
+  - ref: "MEASURE 2.7"
+    obligation: Security and resilience are evidenced -- consequential decisions do not consume untrusted memory, and integrity of inputs is attested.
+    schema_elements: [MemoryWrite, MemoryRead, Attestation, PolicyDecision]
+    rungs: [2, 3]
+    controls: [ROB-02]
+    verified_against_text: false
+  - ref: "MEASURE 2.8"
+    obligation: Transparency and accountability are evidenced by records that reconstruct the main elements of a decision from graph facts.
+    schema_elements: [Decision, Notice]
+    rungs: [2, 4]
+    controls: [TRN-03]
+    verified_against_text: false
+  - ref: "MEASURE 2.10"
+    obligation: Privacy is evidenced by attributed resource access tied to the decision that consumed it.
+    schema_elements: [ResourceAccess, Decision]
+    rungs: [2]
+    controls: []
+    verified_against_text: false
+  - ref: "MEASURE 2.11"
+    obligation: Fairness and bias are examined in operation by declared group and decision type where the record carries the class.
+    schema_elements: [ResourceAccess, Decision]
+    rungs: [3]
+    controls: []
+    verified_against_text: false
+  - ref: "MEASURE 3.1"
+    obligation: Mechanisms to track identified risks are evidenced by incident records that carry timing and severity.
+    schema_elements: [Incident, Notice]
+    rungs: [2]
+    controls: [INC-02]
+    verified_against_text: false
+  - ref: "MEASURE 4.1"
+    obligation: Measurement is grounded in context of use -- the observed subjects and window match the declared assessment scope.
+    schema_elements: [SessionStart, SessionEnd]
+    rungs: [2]
+    controls: []
+    verified_against_text: false
+  - ref: "MANAGE 2.3"
+    obligation: Mechanisms to supersede, disengage, or deactivate a system are evidenced by observed interrupts with a human actor.
+    schema_elements: [Interrupt, Override]
+    rungs: [2, 3]
+    controls: [OVS-08]
+    verified_against_text: false
+  - ref: "MANAGE 4.1"
+    obligation: Post-deployment monitoring is active and systematic; missed-run detection and trend artifacts evidence the cadence.
+    schema_elements: [Incident, Outcome]
+    rungs: [3]
+    process: true
+    controls: []
+    verified_against_text: false
+  - ref: "MANAGE 4.3"
+    obligation: Incidents and near-misses are communicated with the timing the role requires.
+    schema_elements: [Incident, Notice]
+    rungs: [2]
+    controls: [INC-02]
+    verified_against_text: false
