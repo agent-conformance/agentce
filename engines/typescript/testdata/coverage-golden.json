@@ -1,0 +1,84 @@
+{
+  "subjects": {
+    "cov-A": {
+      "coverage_status": "unknown",
+      "event_types": {
+        "Decision": {
+          "denominators": [],
+          "expected": null,
+          "observed": 1,
+          "ratio": null,
+          "status": "unknown"
+        },
+        "ToolCall": {
+          "denominators": [
+            "egress-1"
+          ],
+          "expected": 3,
+          "observed": 1,
+          "ratio": "0.3333",
+          "status": "below_threshold"
+        }
+      },
+      "has_independent_denominator": true
+    },
+    "cov-B": {
+      "coverage_status": "gap",
+      "event_types": {
+        "ToolCall": {
+          "denominators": [
+            "egress-2"
+          ],
+          "expected": 3,
+          "observed": 2,
+          "ratio": "0.6667",
+          "status": "below_threshold"
+        }
+      },
+      "has_independent_denominator": true
+    },
+    "cov-C": {
+      "coverage_status": "ok",
+      "event_types": {
+        "ToolCall": {
+          "denominators": [
+            "egress-3"
+          ],
+          "expected": 2,
+          "observed": 2,
+          "ratio": "1.0000",
+          "status": "covered"
+        }
+      },
+      "has_independent_denominator": true
+    },
+    "cov-D": {
+      "coverage_status": "unknown",
+      "event_types": {
+        "Decision": {
+          "denominators": [],
+          "expected": null,
+          "observed": 1,
+          "ratio": null,
+          "status": "unknown"
+        }
+      },
+      "has_independent_denominator": false
+    },
+    "cov-E": {
+      "coverage_status": "ok",
+      "event_types": {
+        "Decision": {
+          "denominators": [
+            "prov-1"
+          ],
+          "expected": 4,
+          "observed": 4,
+          "ratio": "1.0000",
+          "status": "covered"
+        }
+      },
+      "has_independent_denominator": true
+    }
+  }
+}
