@@ -104,6 +104,11 @@ def compute_readiness(
     for subject, entry in sorted((coverage.get("subjects") or {}).items()):
         if entry.get("coverage_status") == "gap":
             reasons.append(f"coverage shortfall for subject {subject}")
+        for event_type, detail in sorted((entry.get("event_types") or {}).items()):
+            # A declared source below the coverage threshold is a shortfall even when another event
+            # type has unknown coverage and masks it in the subject-level roll-up (SPEC §13.3.4).
+            if detail.get("status") == "below_threshold":
+                reasons.append(f"coverage shortfall for {subject} {event_type}")
 
     for statement in _load_jsonl(report_dir / "applicability.jsonl"):
         for drift in statement.get("drift", []) or []:

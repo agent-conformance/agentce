@@ -81,6 +81,24 @@ def test_unknown_coverage_is_not_a_blocker(tmp_path: Path) -> None:
     assert compute_readiness(report, severities=_SEVERITIES)["verdict"] == READY
 
 
+def test_below_threshold_event_type_is_not_ready(tmp_path: Path) -> None:
+    # A below-threshold event type is a shortfall even when the subject roll-up is 'unknown'.
+    report = _report(
+        tmp_path,
+        coverage={
+            "subjects": {
+                "s": {
+                    "coverage_status": "unknown",
+                    "event_types": {"ToolCall": {"status": "below_threshold"}},
+                }
+            }
+        },
+    )
+    verdict = compute_readiness(report, severities=_SEVERITIES)
+    assert verdict["verdict"] == NOT_READY
+    assert any("shortfall" in r for r in verdict["reasons"])
+
+
 def test_applicability_drift_is_not_ready(tmp_path: Path) -> None:
     report = _report(
         tmp_path,
