@@ -1,0 +1,19 @@
+[project]
+name = "agentce-techniques"
+version = "0.0.1"
+description = "AgentCE techniques library (SPEC 7.6): implementation patterns per control per framework, and the coverage check."
+requires-python = ">=3.12"
+dependencies = [
+  "pyyaml>=6,<7",
+]
+
+# The check runs in place (python check_techniques.py); uv manages only the environment.
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+  "mypy>=1.11,<2",
+  "types-pyyaml>=6,<7",
+  "ruff>=0.6,<1",
+]
