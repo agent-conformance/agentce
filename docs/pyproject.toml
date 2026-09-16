@@ -1,0 +1,31 @@
+[project]
+name = "agentce-docs"
+version = "0.0.1"
+description = "AgentCE documentation build and offline link check (SPEC §13.4): generates the CLI, adapter, and catalog-family reference from the sources and renders the living report example from the vendored quickstart project."
+requires-python = ">=3.12"
+dependencies = [
+  "agent-conformance",
+]
+
+# build.py runs in place (python build.py --check-links); uv manages only the environment.
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+agent-conformance = { path = "../engines/python", editable = true }
+
+[dependency-groups]
+dev = [
+  "pytest>=8,<9",
+  "mypy>=1.11,<2",
+  "ruff>=0.6,<0.13",
+  "types-pyyaml>=6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-p no:cacheprovider"
+
+[tool.mypy]
+python_version = "3.12"

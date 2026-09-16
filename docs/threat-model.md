@@ -63,10 +63,10 @@ service.
 | 4 | Self-approval through agent-held credentials | A1 | `independent_system` requires that no principal in the agent's delegation chain can create or transition the record; the human-actor rule requires a distinct human approver | SPEC §6.4, §10.4; OVS-03 expectation E2, CND-02 |
 | 5 | Enforcement-point bypass (direct provider calls) | A1 | Coverage denominators independent of both the agent and the enforcement point (egress proxy, firewall, admission attestation); unreconciled coverage is `unknown` and yields `insufficient_evidence` on INT/REC controls | SPEC §6.5; `coverage.json`; INT and REC families |
 | 6 | Export-host chain recomputation | A2 | `export_anchored` anchors each stream head out-of-band to a write-once location; an `export_chained` enforcement-point stream is capped at `verified_weak` and its rung-2 outcomes at `partial` | SPEC §6.6; `IntegrityResult.strength`; integrity strength rules |
-| 7 | Modified engines | A3 | The manifest records the engine package digest; a report from an engine whose digest is not a published release is marked `engine_unverified`; verifiers rerun with the signed release | SPEC §8.7, §8.4; `manifest.json`, claim `engine_unverified` |
+| 7 | Modified engines | A3 | The manifest records the engine package digest; a report from an engine whose digest is not a published release is marked `engine_unverified`; verifiers rerun with the signed release and check its signatures with `agentce verify --release` | SPEC §8.7, §8.4; `manifest.json`, claim `engine_unverified`; [verification](verification.md) |
 | 8 | Shape-satisfying-but-meaningless records | A1 | Minimum evidence and source class plus corroboration: a well-formed self-report alone cannot satisfy a high-severity control; the shape reads engine-materialised edges from enforcement-point facts | SPEC §7.1 `minimum_evidence`, IR-02/IR-03; §10.4 |
 | 9 | Collusion between source and assessor | A3 | Independent verifier reruns from the reproducibility manifest; `assessor_independent` recorded in the claim; coverage denominators independent of the source | SPEC §8.4; claim `assessor_independent`; ECS reproducibility |
-| 10 | Catalog or corpus substitution | A3 | Catalogs, overlays, probe corpora, and fixtures carry Sigstore signatures verified offline before use; unverified use requires `--allow-unverified-catalog` and is recorded as a limitation; digests in the manifest | SPEC §8.7; `manifest.json` input digests |
+| 10 | Catalog or corpus substitution | A3 | Catalogs, overlays, probe corpora, and fixtures carry a detached signature verified offline against the vendored trust root before use (`agentce verify --catalog`); unverified use requires `--allow-unverified-catalog` and is recorded as a limitation; digests in the manifest | SPEC §8.7; `agentce verify --catalog`; [verification](verification.md); `manifest.json` input digests |
 | 11 | Instruction-provenance laundering | A1 | Ingress instruction attestation records the channel `source_class` at entry; an agent-side `source_class` that disagrees is a finding `CND.instruction_relabelled`; high-severity instruction controls require corroboration | SPEC §7.7.5; CND-04, CND-05 |
 | 12 | Pseudonym re-identification by dictionary | A2 | `person_ref` values are keyed pseudonyms (HMAC-SHA-256 with a per-subject key held outside the bundle and supplied by reference); the manifest names, but never contains, the key | SPEC §6.7, IR-12; `manifest.json` `pseudonym_key_id` |
 
@@ -76,7 +76,8 @@ service.
   denominator** per subject; a deployment that declares neither is limited to design-level (`partial`)
   outcomes, and the report says so.
 - Offline signature verification depends on a **vendored trust root**; a stale root is a warning recorded
-  in the manifest, never a silent network call (SPEC §8.7).
+  in the manifest, never a silent network call (SPEC §8.7). The [verification procedure](verification.md)
+  gives the trust roots and the per-profile checks.
 - The engine treats evidence content as data, never code (no template expansion, no native
   deserialisation, per-event and per-file size limits), so a crafted payload cannot execute; this is a
   standing invariant checked by the input-handling tests rather than a per-threat control.
