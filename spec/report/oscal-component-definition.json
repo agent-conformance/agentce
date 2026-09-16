@@ -1,0 +1,306 @@
+{
+  "component-definition": {
+    "uuid": "c14eb4c3-19f1-50b6-940c-7dc84872139d",
+    "metadata": {
+      "title": "AgentCE Agent Conformance Engine — OSCAL component definition",
+      "last-modified": "2026-09-16T00:00:00Z",
+      "version": "2026.09",
+      "oscal-version": "1.1.2",
+      "roles": [
+        {
+          "id": "assessor",
+          "title": "Conformance assessor"
+        }
+      ],
+      "parties": [
+        {
+          "uuid": "2a297f5c-1119-5d7f-9add-514a305d37af",
+          "type": "organization",
+          "name": "AgentCE",
+          "links": [
+            {
+              "href": "https://agent-conformance.org",
+              "rel": "homepage"
+            }
+          ]
+        }
+      ],
+      "responsible-parties": [
+        {
+          "role-id": "assessor",
+          "party-uuids": [
+            "2a297f5c-1119-5d7f-9add-514a305d37af"
+          ]
+        }
+      ]
+    },
+    "components": [
+      {
+        "uuid": "d135dacf-8dc1-5811-8205-ee01e3e262ee",
+        "type": "validation",
+        "title": "AgentCE assessment engine",
+        "description": "A deterministic, model-free engine that assesses recorded agent evidence against an executable control catalog and emits assertions, an OSCAL assessment result, SARIF, and evidence packs (SPEC §5, §9).",
+        "props": [
+          {
+            "name": "version",
+            "value": "2026.09"
+          }
+        ],
+        "control-implementations": [
+          {
+            "uuid": "f3574e81-3e07-5ad5-910a-589c862a6897",
+            "source": "https://agent-conformance.org/catalogs/base/eu-ai-act",
+            "description": "The controls of the EU AI Act base catalog that the engine evaluates. Each implemented requirement names one catalog control; obligation crosswalks to regulatory and standards clauses live beside the catalog under crosswalk/.",
+            "implemented-requirements": [
+              {
+                "uuid": "1d982cfe-6e91-501a-82c6-c9611ee8832b",
+                "control-id": "DAT-01",
+                "description": "AgentCE evaluates control DAT-01 (Consequential decisions record the data they consumed) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "370f0784-6a42-505a-840d-059e75142f11",
+                "control-id": "DAT-02",
+                "description": "AgentCE evaluates control DAT-02 (Input data quality and representativeness are measured) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "8f6c3525-623e-5f09-970b-a62d13c01c22",
+                "control-id": "DAT-03",
+                "description": "AgentCE evaluates control DAT-03 (Outcome parity across declared groups is within thresholds) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "6b86f3e4-c2e8-5738-adb7-5b99fa0683ab",
+                "control-id": "DAT-04",
+                "description": "AgentCE evaluates control DAT-04 (Data-governance measures are documented and reviewed) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "1977a118-07e3-55b2-bd5a-57c3611a3939",
+                "control-id": "DOC-01",
+                "description": "AgentCE evaluates control DOC-01 (Operating components match the declared documentation) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "8f7e29d1-03a4-5099-b5d9-964fb49b66c1",
+                "control-id": "DOC-02",
+                "description": "AgentCE evaluates control DOC-02 (Consequential decisions are documented with a time of record) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "6f2aee9e-ea86-5361-9985-5200f6aba7e4",
+                "control-id": "DOC-03",
+                "description": "AgentCE evaluates control DOC-03 (Declared egress paths match the observed enforcement point) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "2e8e9974-0a84-5ea2-bd04-9fcb90aa289e",
+                "control-id": "DOC-04",
+                "description": "AgentCE evaluates control DOC-04 (Configuration drift from the declared snapshot is bounded) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "702a20c7-9bae-5c34-8dfb-760d2d721000",
+                "control-id": "DOC-05",
+                "description": "AgentCE evaluates control DOC-05 (Technical documentation is complete and current) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "8abca79b-1b20-58f5-b0bb-e830933d668c",
+                "control-id": "INC-01",
+                "description": "AgentCE evaluates control INC-01 (Adverse outcomes are linked to their consequential decision) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "71236e84-ea74-5d36-b65e-813c745ea468",
+                "control-id": "INC-02",
+                "description": "AgentCE evaluates control INC-02 (Serious incidents are recorded with an accountable actor (by role)) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "1288fa86-9936-54a3-83e1-54a3e8c515c5",
+                "control-id": "INC-03",
+                "description": "AgentCE evaluates control INC-03 (Incident-triggering decisions carry an oversight review) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "2dbd8df0-4966-5859-9a50-dcfa6b4915ed",
+                "control-id": "INC-04",
+                "description": "AgentCE evaluates control INC-04 (Incident-linked records carry no dangling references) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "12aacddc-e4e3-565f-809b-0ad10a1f8ebf",
+                "control-id": "INT-01",
+                "description": "AgentCE evaluates control INT-01 (Consequential tool calls are captured by an enforcement point) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "778bc89a-d936-5aa8-96a6-56fc866cdab3",
+                "control-id": "INT-02",
+                "description": "AgentCE evaluates control INT-02 (Delegation chains for consequential actions are verified) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "955c1674-d6d0-5ab8-a013-571cae1c640b",
+                "control-id": "INT-03",
+                "description": "AgentCE evaluates control INT-03 (Consequential tool-call records carry no dangling references) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "b7102e77-ef4d-542b-8f7d-e5ad75d1fa23",
+                "control-id": "INT-04",
+                "description": "AgentCE evaluates control INT-04 (Consequential tool calls carry a corroborated source class) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "2ee0dfe6-bab5-50d6-ac08-bc781157c170",
+                "control-id": "OVS-01",
+                "description": "AgentCE evaluates control OVS-01 (Every consequential decision is reviewed by an oversight activity) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "e4b4aa92-5d74-5f78-a3e6-9c9ede0fdecf",
+                "control-id": "OVS-02",
+                "description": "AgentCE evaluates control OVS-02 (Observed oversight modality matches the declared modality) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "246635f5-f4af-5e61-9d3c-d395f004da5d",
+                "control-id": "OVS-03",
+                "description": "AgentCE evaluates control OVS-03 (Consequential tool calls run under verified human oversight) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "557ca68a-afba-50fe-8657-261fb60c6773",
+                "control-id": "OVS-04",
+                "description": "AgentCE evaluates control OVS-04 (Consequential tool calls run over a verified delegation chain) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "f650d015-a032-5f60-90f7-e35c18305f8f",
+                "control-id": "OVS-05",
+                "description": "AgentCE evaluates control OVS-05 (Consequential decisions record the authorisation that gated them) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "44b4ebc5-7477-5f1a-b612-2763dd385713",
+                "control-id": "OVS-06",
+                "description": "AgentCE evaluates control OVS-06 (Consequential tool calls execute through an enforcement point) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "341e1200-ce8c-5d46-95d0-cebb660a863a",
+                "control-id": "OVS-07",
+                "description": "AgentCE evaluates control OVS-07 (Overrides and interrupts are effective and recorded) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "ae4063c2-8dd3-5f71-be53-faf4551df69c",
+                "control-id": "OVS-08",
+                "description": "AgentCE evaluates control OVS-08 (Oversight coverage of consequential decisions is complete) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "7998de0e-7380-581a-aa56-4264b903d6e8",
+                "control-id": "OVS-09",
+                "description": "AgentCE evaluates control OVS-09 (Human overseers are competent and able to intervene) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "a0af6463-b1ec-57b4-b0c2-5111cd1bbce3",
+                "control-id": "REC-01",
+                "description": "AgentCE evaluates control REC-01 (Every consequential decision records the acting agent) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "a9acebed-c814-5faa-b273-d593aa91941e",
+                "control-id": "REC-02",
+                "description": "AgentCE evaluates control REC-02 (Every consequential decision is timestamped) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "d12de324-7625-5d81-8072-0c1521bcdb2b",
+                "control-id": "REC-03",
+                "description": "AgentCE evaluates control REC-03 (Every consequential decision records the inputs it used) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "b25c87da-6fa6-5aeb-99e5-4ebf08e836d0",
+                "control-id": "REC-04",
+                "description": "AgentCE evaluates control REC-04 (Consequential decisions are recorded with actor and time) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "bb3d07f1-f078-5d4c-adde-a50fab002e0a",
+                "control-id": "REC-05",
+                "description": "AgentCE evaluates control REC-05 (Every consequential decision records the authority it acted under) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "b289461c-388c-5faf-8626-d1f6f6fe8912",
+                "control-id": "REC-06",
+                "description": "AgentCE evaluates control REC-06 (Consequential tool calls carry no dangling evidence references) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "4616dc3d-a112-5625-9277-2c163e9db9d8",
+                "control-id": "ROB-01",
+                "description": "AgentCE evaluates control ROB-01 (Consequential actions traverse a trusted, corroborated source) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "dd050e20-61ac-5f6c-8637-c396bf605b6d",
+                "control-id": "ROB-02",
+                "description": "AgentCE evaluates control ROB-02 (No untrusted content influences consequential decisions) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "6aadd732-009f-5890-ba33-9efd61c2ba29",
+                "control-id": "ROB-03",
+                "description": "AgentCE evaluates control ROB-03 (Consequential tool calls carry no dangling references) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "59cf221f-c879-5114-9c3f-435e2429b864",
+                "control-id": "ROB-04",
+                "description": "AgentCE evaluates control ROB-04 (Consequential tool calls run over a verified delegation chain) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "49c5e42f-4588-57a5-8158-424eaa285a3d",
+                "control-id": "ROB-05",
+                "description": "AgentCE evaluates control ROB-05 (Adversarial-probe resilience is measured within thresholds) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "2a39b95f-020b-5f86-8bd8-26d55ca0cba9",
+                "control-id": "ROB-06",
+                "description": "AgentCE evaluates control ROB-06 (Resource-exhaustion resistance is measured within budgets) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "3585aa7a-dda2-5a7c-95e8-920cf338b86e",
+                "control-id": "ROB-07",
+                "description": "AgentCE evaluates control ROB-07 (Cyber-incident detection and response are exercised) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "292a172e-dbf6-5ef5-947c-781f85172916",
+                "control-id": "RSK-01",
+                "description": "AgentCE evaluates control RSK-01 (Consequential decisions record the authorisation gate they cleared) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "e07671ef-e786-5b20-9733-fe419751c8e7",
+                "control-id": "RSK-02",
+                "description": "AgentCE evaluates control RSK-02 (Consequential decisions are subject to a risk-review activity) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "6d500dc1-f8e3-5614-a852-f1c365f9f898",
+                "control-id": "RSK-03",
+                "description": "AgentCE evaluates control RSK-03 (Residual-risk indicators are measured within thresholds) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "8544e4e5-9078-5907-ad28-4352330c349a",
+                "control-id": "RSK-04",
+                "description": "AgentCE evaluates control RSK-04 (A fundamental-rights impact assessment is recorded) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "c22cd533-8409-5376-a26f-3cbd224b467d",
+                "control-id": "RSK-05",
+                "description": "AgentCE evaluates control RSK-05 (Registration and applicability declarations are current) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "58fd9328-1a2f-5b90-84f1-c0af0db81c03",
+                "control-id": "TRN-01",
+                "description": "AgentCE evaluates control TRN-01 (Affected persons are notified for every consequential decision) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "f3d22db6-12e6-5a6f-b194-70b0c6d631dd",
+                "control-id": "TRN-02",
+                "description": "AgentCE evaluates control TRN-02 (Every consequential decision records the agent that made it) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "38ec602a-c179-501f-b076-946f438d5917",
+                "control-id": "TRN-03",
+                "description": "AgentCE evaluates control TRN-03 (Affected persons informed and explanation reconstructable) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "3c04fb83-0b20-58be-8412-39671adc2325",
+                "control-id": "TRN-04",
+                "description": "AgentCE evaluates control TRN-04 (Consequential decisions are timestamped for explanation) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              },
+              {
+                "uuid": "b04a27bb-8f84-5365-bf74-98598062d042",
+                "control-id": "TRN-05",
+                "description": "AgentCE evaluates control TRN-05 (AI-interaction disclosure is present where required) against recorded evidence and reports a per-control OSCAL finding with the outcome and evidence pointers."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

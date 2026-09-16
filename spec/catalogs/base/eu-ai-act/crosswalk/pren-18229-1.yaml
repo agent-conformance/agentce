@@ -1,0 +1,38 @@
+# prEN 18229-1 crosswalk PLACEHOLDER: a harmonised standard drafted under standardisation request
+# M/613 (trustworthiness part 1 -- logging, transparency, and human oversight, scoped to operationalise
+# EU AI Act Arts. 12-14). The standard is not yet published, so no clause identifiers exist to cite.
+# This file reserves the mapping and records the anticipated scope areas AgentCE already substantiates
+# through the EU AI Act base catalog; the clause-level mapping is authored when the standard publishes.
+#
+# Clause references only (there are none yet); no source text is reproduced. Every row carries
+# `status: placeholder` and `verified_against_text: false` until the standard publishes and a reviewer
+# authors and verifies the clause mapping (SPEC 7.3).
+framework: pren-18229-1
+title: "prEN 18229-1 — AI trustworthiness, part 1: logging, transparency, human oversight (draft)"
+version: "draft"
+status: placeholder
+source:
+  publisher: CEN/CENELEC
+  identifier: "prEN 18229-1 (M/613, draft)"
+obligations:
+  - ref: "(pending publication) logging"
+    obligation: Anticipated -- lifetime event recording with actor and source timestamp; maps to the REC record-keeping family already shipped for Art. 12.
+    schema_elements: [SessionStart, SessionEnd, Decision, IntegrityResult]
+    rungs: [0, 1, 2]
+    controls: [REC-01, REC-04]
+    status: placeholder
+    verified_against_text: false
+  - ref: "(pending publication) transparency"
+    obligation: Anticipated -- disclosure of AI interaction and reconstructable decision elements; maps to the TRN transparency family already shipped for Arts. 13, 50, 86.
+    schema_elements: [Disclosure, Notice, Decision]
+    rungs: [2, 4]
+    controls: [TRN-03]
+    status: placeholder
+    verified_against_text: false
+  - ref: "(pending publication) human-oversight"
+    obligation: Anticipated -- declared oversight modality equals observed, with human principals on overrides and a stop mechanism; maps to the OVS family already shipped for Art. 14.
+    schema_elements: [Decision, ApprovalDecided, Override, Interrupt]
+    rungs: [2, 3]
+    controls: [OVS-03, OVS-08]
+    status: placeholder
+    verified_against_text: false
