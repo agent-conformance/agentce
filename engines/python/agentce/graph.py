@@ -54,6 +54,12 @@ _GENERIC_REFS: dict[str, str] = {
     "origin": "agentce:derivedFrom",
 }
 
+#: Instruction source classes an agent may act on without corroboration (SPEC §7.7, Appendix F). Any
+#: other declared class is untrusted for the Conduct overlay's provenance and isolation controls.
+_TRUSTED_INSTRUCTION: frozenset[str] = frozenset(
+    {"user", "operator", "service", "agent_identified", "memory_trusted"}
+)
+
 
 def _closure(subclass: dict[str, str], classes: set[str]) -> set[tuple[str, str]]:
     nodes = set(classes) | set(subclass) | set(subclass.values())
@@ -105,6 +111,9 @@ class _Builder:
         self.decision_type: dict[str, str] = {}  # decision event IRI -> decision_type
         self.decision_time: dict[str, str] = {}
         self.decision_reviewed: set[str] = set()
+        self.instruction_untrusted: dict[
+            str, bool
+        ] = {}  # Instruction IRI -> untrusted flag
 
     def build(self, events: list[dict[str, Any]]) -> GraphStore:
         used_classes: set[str] = set(BASE_SUBCLASS) | {
@@ -161,6 +170,7 @@ class _Builder:
                 self.store.add_edge(node, predicate, value)
 
         self._map_decision_links(node, ptype, event)
+        self._map_conduct(node, ptype, data)
 
         if ptype == "DelegationIssued":
             self._map_delegation_principals(data.get("chain"))
@@ -227,6 +237,53 @@ class _Builder:
             if isinstance(instruction, str):
                 self.store.add_edge(instruction, "agentce:refusedBy", node)
 
+    def _map_conduct(self, node: str, ptype: str, data: dict[str, Any]) -> None:
+        """Materialise the Conduct-overlay flags (SPEC §7.7): whether an action stayed within its
+        declared task scope and budget, and whether an instruction's source class is untrusted. The
+        engine takes an enforcement point's scope and budget determinations from the record and
+        defaults to conformant when a stream declares neither, so the flags are inert for the base
+        catalog, which never reads them."""
+        if ptype in ("ToolCall", "ResourceAccess"):
+            within_scope = data.get("within_scope", True)
+            within_budget = data.get("within_budget", True)
+            self.store.add_literal(
+                node, "agentce:withinScope", "true" if within_scope else "false", BOOL
+            )
+            self.store.add_literal(
+                node, "agentce:withinBudget", "true" if within_budget else "false", BOOL
+            )
+        if ptype == "Instruction":
+            source_class = data.get("source_class")
+            untrusted = (
+                isinstance(source_class, str)
+                and source_class not in _TRUSTED_INSTRUCTION
+            )
+            self.instruction_untrusted[node] = untrusted
+            self.store.add_literal(
+                node,
+                "agentce:instructionUntrusted",
+                "true" if untrusted else "false",
+                BOOL,
+            )
+
+    def _acts_on_untrusted(self, events: list[dict[str, Any]]) -> None:
+        """Flag every ToolCall/Decision that acts on an untrusted instruction (SPEC §7.7, CND-05).
+        Runs after every event is mapped so the acting event may precede its instruction."""
+        for event in events:
+            ptype = self._ptype(event)
+            if ptype not in ("ToolCall", "Decision"):
+                continue
+            instruction = _refs(event).get("instruction")
+            untrusted = isinstance(instruction, str) and self.instruction_untrusted.get(
+                instruction, False
+            )
+            self.store.add_literal(
+                event_iri(str(event["id"])),
+                "agentce:actsOnUntrusted",
+                "true" if untrusted else "false",
+                BOOL,
+            )
+
     # --- materialised (glue) edges (SPEC §7.2) ---
 
     def _materialise(self, events: list[dict[str, Any]]) -> None:
@@ -242,6 +299,7 @@ class _Builder:
             if ptype == "Decision":
                 self._oversight_matches(node, data)
             self._chain_terminus(node, data)
+        self._acts_on_untrusted(events)
         self._preceded_by()
 
     def _dangling(self, node: str, event: dict[str, Any]) -> None:
