@@ -25,6 +25,7 @@
   },
   "keywords": ["ai-agents", "conformance", "eu-ai-act", "oscal", "provenance", "shacl", "opentelemetry"],
   "dependencies": {
+    "ajv": "8.17.1",
     "js-yaml": "4.1.0"
   },
   "devDependencies": {

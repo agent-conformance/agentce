@@ -1,0 +1,3106 @@
+{
+    "$defs": {
+        "AgentRef": {
+            "additionalProperties": false,
+            "description": "The acting agent.",
+            "properties": {
+                "bundle_digest": {
+                    "description": "sha256: digest of the loaded bundle.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "id": {
+                    "description": "SPIFFE id or IRI.",
+                    "type": "string"
+                },
+                "name": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "required": [
+                "id"
+            ],
+            "title": "AgentRef",
+            "type": "object"
+        },
+        "AiRole": {
+            "description": "",
+            "enum": [
+                "sole",
+                "recommendation",
+                "assist"
+            ],
+            "title": "AiRole",
+            "type": "string"
+        },
+        "ApprovalDecidedPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "actor": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Principal"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "edits_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "explanation_viewed": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "latency_ms": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ]
+                },
+                "outcome": {
+                    "$ref": "#/$defs/ApprovalOutcome"
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "session_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "ApprovalDecidedPayload",
+            "type": "object"
+        },
+        "ApprovalOutcome": {
+            "description": "",
+            "enum": [
+                "approve",
+                "edit",
+                "reject"
+            ],
+            "title": "ApprovalOutcome",
+            "type": "string"
+        },
+        "ApprovalRequestedPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "channel": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "deadline": {
+                    "format": "date-time",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "explanation_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "requested_from": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "ApprovalRequestedPayload",
+            "type": "object"
+        },
+        "AttestationPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "signer": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "statement_type": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "subject_digests": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "verification": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Verification"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                }
+            },
+            "title": "AttestationPayload",
+            "type": "object"
+        },
+        "AuthzCheckPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "allowed": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "object": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "relation": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "store_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "user": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "AuthzCheckPayload",
+            "type": "object"
+        },
+        "BundleLoadedPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "attestation_refs": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "bundle_digest": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "components": {
+                    "items": {
+                        "$ref": "#/$defs/ComponentRef"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "BundleLoadedPayload",
+            "type": "object"
+        },
+        "ComponentKind": {
+            "description": "",
+            "enum": [
+                "skill",
+                "mcp_server",
+                "model",
+                "prompt",
+                "config",
+                "policy"
+            ],
+            "title": "ComponentKind",
+            "type": "string"
+        },
+        "ComponentRef": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "digest": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "kind": {
+                    "$ref": "#/$defs/ComponentKind"
+                },
+                "name": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "signer": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "version": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "ComponentRef",
+            "type": "object"
+        },
+        "DecisionOption": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "refs": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                }
+            },
+            "required": [
+                "id"
+            ],
+            "title": "DecisionOption",
+            "type": "object"
+        },
+        "DecisionPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "affects_natural_person": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "ai_role": {
+                    "$ref": "#/$defs/AiRole"
+                },
+                "chosen": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "decision_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "decision_type": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "inputs": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "legal_or_significant_effect": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "options": {
+                    "items": {
+                        "$ref": "#/$defs/DecisionOption"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "oversight_modality": {
+                    "$ref": "#/$defs/OversightModality"
+                },
+                "person_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "rationale_claim_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "DecisionPayload",
+            "type": "object"
+        },
+        "DelegationIssuedPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "actor_principal": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "chain": {
+                    "items": {
+                        "$ref": "#/$defs/Principal"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "expires": {
+                    "format": "date-time",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "issuer": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "scope_granted": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "scope_parent": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "subject_principal": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "token_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "verification": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Verification"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                }
+            },
+            "title": "DelegationIssuedPayload",
+            "type": "object"
+        },
+        "DisclosurePayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "delivered_at": {
+                    "format": "date-time",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "disclosure_type": {
+                    "$ref": "#/$defs/DisclosureType"
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "mechanism": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "DisclosurePayload",
+            "type": "object"
+        },
+        "DisclosureType": {
+            "description": "",
+            "enum": [
+                "ai_interaction",
+                "synthetic_marking",
+                "deepfake_label"
+            ],
+            "title": "DisclosureType",
+            "type": "string"
+        },
+        "EffectClass": {
+            "description": "",
+            "enum": [
+                "read",
+                "write",
+                "irreversible",
+                "external_communication",
+                "spend",
+                "physical"
+            ],
+            "title": "EffectClass",
+            "type": "string"
+        },
+        "EndReason": {
+            "description": "",
+            "enum": [
+                "completed",
+                "interrupted",
+                "error",
+                "timeout"
+            ],
+            "title": "EndReason",
+            "type": "string"
+        },
+        "EventType": {
+            "description": "The evidence event types (SPEC 6.2.3).",
+            "enum": [
+                "SessionStart",
+                "SessionEnd",
+                "BundleLoaded",
+                "Attestation",
+                "ModelCall",
+                "ToolCall",
+                "ResourceAccess",
+                "MemoryWrite",
+                "MemoryRead",
+                "Instruction",
+                "Refusal",
+                "PolicyDecision",
+                "AuthzCheck",
+                "DelegationIssued",
+                "Decision",
+                "ApprovalRequested",
+                "ApprovalDecided",
+                "Override",
+                "Interrupt",
+                "Outcome",
+                "Incident",
+                "Notice",
+                "Disclosure",
+                "IntegrityResult"
+            ],
+            "title": "EventType",
+            "type": "string"
+        },
+        "EvidenceEvent": {
+            "additionalProperties": false,
+            "description": "CloudEvent envelope carrying an AgentCE evidence payload (SPEC 6.2.1).",
+            "properties": {
+                "agentceconv": {
+                    "description": "Upstream convention version mapped.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "agentceparent": {
+                    "description": "W3C Trace Context parent id.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "agentcesourceclass": {
+                    "$ref": "#/$defs/SourceClass",
+                    "description": "Evidence trust class."
+                },
+                "agentcespan": {
+                    "description": "W3C Trace Context span id.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "agentcetask": {
+                    "description": "Cross-agent task id.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "agentcetrace": {
+                    "description": "W3C Trace Context trace id.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "data": {
+                    "$ref": "#/$defs/Payload",
+                    "description": "JSON-LD payload."
+                },
+                "datacontenttype": {
+                    "description": "MUST be application/ld+json.",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "Globally unique event id.",
+                    "type": "string"
+                },
+                "source": {
+                    "description": "URI of the emitting system.",
+                    "type": "string"
+                },
+                "specversion": {
+                    "description": "CloudEvents version; MUST be 1.0.",
+                    "type": "string"
+                },
+                "subject": {
+                    "description": "The assessed subject system.",
+                    "type": "string"
+                },
+                "time": {
+                    "format": "date-time",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "org.agent-conformance.evidence.<EventType>.v1",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "specversion",
+                "id",
+                "source",
+                "type",
+                "time",
+                "subject",
+                "datacontenttype",
+                "agentcesourceclass",
+                "data"
+            ],
+            "title": "EvidenceEvent",
+            "type": "object"
+        },
+        "GuardVerdict": {
+            "description": "",
+            "enum": [
+                "allow",
+                "sanitize",
+                "quarantine",
+                "block",
+                "review"
+            ],
+            "title": "GuardVerdict",
+            "type": "string"
+        },
+        "IncidentClass": {
+            "description": "",
+            "enum": [
+                "death_or_health",
+                "infrastructure_disruption",
+                "fundamental_rights",
+                "property_or_environment"
+            ],
+            "title": "IncidentClass",
+            "type": "string"
+        },
+        "IncidentPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "authority": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "causal_assessment_at": {
+                    "format": "date-time",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "detected_at": {
+                    "format": "date-time",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "incident_class": {
+                    "$ref": "#/$defs/IncidentClass"
+                },
+                "incident_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "provider_notified_at": {
+                    "format": "date-time",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "related_refs": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "report_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "reported_at": {
+                    "format": "date-time",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "IncidentPayload",
+            "type": "object"
+        },
+        "InstructionPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "content_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "instruction_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "principal": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Principal"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "source_class": {
+                    "$ref": "#/$defs/InstructionSourceClass"
+                }
+            },
+            "title": "InstructionPayload",
+            "type": "object"
+        },
+        "InstructionSourceClass": {
+            "description": "Origin class of an instruction (Appendix F).",
+            "enum": [
+                "user",
+                "operator",
+                "service",
+                "agent_identified",
+                "agent_unidentified",
+                "tool_output",
+                "retrieved",
+                "memory_trusted",
+                "memory_untrusted"
+            ],
+            "title": "InstructionSourceClass",
+            "type": "string"
+        },
+        "IntegrityBlock": {
+            "additionalProperties": false,
+            "description": "Per-event integrity envelope (SPEC 6.6).",
+            "properties": {
+                "hash": {
+                    "type": "string"
+                },
+                "prev": {
+                    "type": "string"
+                },
+                "sig_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "stream": {
+                    "type": "string"
+                },
+                "strength": {
+                    "$ref": "#/$defs/IntegrityStrength"
+                }
+            },
+            "required": [
+                "hash",
+                "prev",
+                "stream",
+                "strength"
+            ],
+            "title": "IntegrityBlock",
+            "type": "object"
+        },
+        "IntegrityResultPayload": {
+            "additionalProperties": false,
+            "description": "Engine-computed verification outcome per stream (SPEC 6.6).",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "anchors": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "first_bad_index": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "status": {
+                    "$ref": "#/$defs/IntegrityStatus"
+                },
+                "stream": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "strength": {
+                    "$ref": "#/$defs/IntegrityStrength"
+                }
+            },
+            "title": "IntegrityResultPayload",
+            "type": "object"
+        },
+        "IntegrityStatus": {
+            "description": "",
+            "enum": [
+                "verified",
+                "verified_weak",
+                "gap",
+                "reordered",
+                "unsigned",
+                "time_suspect",
+                "failed"
+            ],
+            "title": "IntegrityStatus",
+            "type": "string"
+        },
+        "IntegrityStrength": {
+            "description": "",
+            "enum": [
+                "source_signed",
+                "export_anchored",
+                "export_chained"
+            ],
+            "title": "IntegrityStrength",
+            "type": "string"
+        },
+        "InterruptEffect": {
+            "description": "",
+            "enum": [
+                "halted",
+                "paused",
+                "degraded"
+            ],
+            "title": "InterruptEffect",
+            "type": "string"
+        },
+        "InterruptMechanism": {
+            "description": "",
+            "enum": [
+                "stop_button",
+                "kill_switch",
+                "circuit_breaker",
+                "manual"
+            ],
+            "title": "InterruptMechanism",
+            "type": "string"
+        },
+        "InterruptPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "actor": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Principal"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "effect": {
+                    "$ref": "#/$defs/InterruptEffect"
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "mechanism": {
+                    "$ref": "#/$defs/InterruptMechanism"
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "InterruptPayload",
+            "type": "object"
+        },
+        "MemoryReadPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "record_refs": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "store": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "trust_min": {
+                    "$ref": "#/$defs/MemoryTrust"
+                }
+            },
+            "title": "MemoryReadPayload",
+            "type": "object"
+        },
+        "MemoryTrust": {
+            "description": "",
+            "enum": [
+                "trusted",
+                "untrusted",
+                "quarantined"
+            ],
+            "title": "MemoryTrust",
+            "type": "string"
+        },
+        "MemoryWritePayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "guard_verdict": {
+                    "$ref": "#/$defs/GuardVerdict"
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "provenance_origin_class": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "provenance_origin_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "record_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "store": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "trust": {
+                    "$ref": "#/$defs/MemoryTrust"
+                }
+            },
+            "title": "MemoryWritePayload",
+            "type": "object"
+        },
+        "ModelCallPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "error": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "input_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "model": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/ModelRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "operation": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "output_marking": {
+                    "$ref": "#/$defs/OutputMarking"
+                },
+                "output_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "usage": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Usage"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                }
+            },
+            "title": "ModelCallPayload",
+            "type": "object"
+        },
+        "ModelRef": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "name": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "provider": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "version_or_digest": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "ModelRef",
+            "type": "object"
+        },
+        "NoticePayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "channel": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "content_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "delivered_at": {
+                    "format": "date-time",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "notice_type": {
+                    "$ref": "#/$defs/NoticeType"
+                },
+                "person_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "NoticePayload",
+            "type": "object"
+        },
+        "NoticeType": {
+            "description": "",
+            "enum": [
+                "subject_of_ai_decision",
+                "explanation",
+                "adverse_action"
+            ],
+            "title": "NoticeType",
+            "type": "string"
+        },
+        "OutcomePayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "adverse": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "observed_at": {
+                    "format": "date-time",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "outcome_type": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "person_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "reversed": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "OutcomePayload",
+            "type": "object"
+        },
+        "OutputMarking": {
+            "description": "",
+            "enum": [
+                "none",
+                "watermark",
+                "metadata",
+                "label"
+            ],
+            "title": "OutputMarking",
+            "type": "string"
+        },
+        "OverridePayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "actor": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Principal"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "original": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "reason_code": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "replacement": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "OverridePayload",
+            "type": "object"
+        },
+        "OversightModality": {
+            "description": "",
+            "enum": [
+                "none",
+                "review_before",
+                "review_after",
+                "sampled",
+                "dual_control",
+                "interruptible"
+            ],
+            "title": "OversightModality",
+            "type": "string"
+        },
+        "Payload": {
+            "additionalProperties": false,
+            "description": "Common members of every event payload (SPEC 6.2.2).",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "Payload",
+            "type": "object"
+        },
+        "PolicyDecisionOutcome": {
+            "description": "",
+            "enum": [
+                "allow",
+                "deny",
+                "require_approval",
+                "transform"
+            ],
+            "title": "PolicyDecisionOutcome",
+            "type": "string"
+        },
+        "PolicyDecisionPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "decision": {
+                    "$ref": "#/$defs/PolicyDecisionOutcome"
+                },
+                "engine": {
+                    "$ref": "#/$defs/PolicyEngine"
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "obligations": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "policy_digest": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "policy_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "policy_version": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "principal": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Principal"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "reasons": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "PolicyDecisionPayload",
+            "type": "object"
+        },
+        "PolicyEngine": {
+            "description": "",
+            "enum": [
+                "opa",
+                "cedar",
+                "openfga",
+                "governance_toolkit",
+                "custom"
+            ],
+            "title": "PolicyEngine",
+            "type": "string"
+        },
+        "Principal": {
+            "additionalProperties": false,
+            "description": "A human, service, or agent principal.",
+            "properties": {
+                "authority_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "$ref": "#/$defs/PrincipalKind"
+                },
+                "org": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "role": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "required": [
+                "id",
+                "kind"
+            ],
+            "title": "Principal",
+            "type": "object"
+        },
+        "PrincipalKind": {
+            "description": "",
+            "enum": [
+                "human",
+                "service",
+                "agent"
+            ],
+            "title": "PrincipalKind",
+            "type": "string"
+        },
+        "QuarantineReason": {
+            "description": "Reasons an event is quarantined at ingest (Appendix F).",
+            "enum": [
+                "schema_invalid",
+                "duplicate_id",
+                "time_order",
+                "unknown_type",
+                "unknown_source",
+                "class_mismatch",
+                "oversize",
+                "context_mismatch"
+            ],
+            "title": "QuarantineReason",
+            "type": "string"
+        },
+        "Refs": {
+            "additionalProperties": false,
+            "description": "Typed references to other event ids; slot_uri gives the graph relation (SPEC 6.3).",
+            "properties": {
+                "authorization": {
+                    "description": "The authorizing policy decision.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "consumer": {
+                    "description": "The consumer of a memory read.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "decision": {
+                    "description": "The decision this activity executes.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "delegation": {
+                    "description": "The delegation used.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "executed_by": {
+                    "description": "The tool call that executed a decision.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "guard": {
+                    "description": "The memory guard that ruled on a write.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "instruction": {
+                    "description": "The instruction this activity acts on.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "origin": {
+                    "description": "The activity that produced the content.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "parent": {
+                    "description": "The instruction this was derived from.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "policy_decision": {
+                    "description": "A policy decision associated with a refusal.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "request": {
+                    "description": "The action decided (on authority events).",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "task": {
+                    "description": "Cross-agent task correlation.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "Refs",
+            "type": "object"
+        },
+        "RefusalPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "reason_class": {
+                    "$ref": "#/$defs/RefusalReasonClass"
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "RefusalPayload",
+            "type": "object"
+        },
+        "RefusalReasonClass": {
+            "description": "",
+            "enum": [
+                "policy_conflict",
+                "scope_exceeded",
+                "unauthorized_principal",
+                "untrusted_source",
+                "budget_exceeded"
+            ],
+            "title": "RefusalReasonClass",
+            "type": "string"
+        },
+        "ResourceAccessPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "count": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "operation": {
+                    "$ref": "#/$defs/ResourceOperation"
+                },
+                "purpose": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "resource": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/ResourceRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "ResourceAccessPayload",
+            "type": "object"
+        },
+        "ResourceOperation": {
+            "description": "",
+            "enum": [
+                "read",
+                "write",
+                "delete"
+            ],
+            "title": "ResourceOperation",
+            "type": "string"
+        },
+        "ResourceRef": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "classification": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "kind": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "owner": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "uri": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "uri"
+            ],
+            "title": "ResourceRef",
+            "type": "object"
+        },
+        "Role": {
+            "description": "",
+            "enum": [
+                "deployer",
+                "provider",
+                "both"
+            ],
+            "title": "Role",
+            "type": "string"
+        },
+        "SessionEndPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "end_reason": {
+                    "$ref": "#/$defs/EndReason"
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "SessionEndPayload",
+            "type": "object"
+        },
+        "SessionStartPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "bundle_digest": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "deployer": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Principal"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "environment": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "intended_purpose_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "model_versions": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "registration_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "title": "SessionStartPayload",
+            "type": "object"
+        },
+        "SideEffect": {
+            "description": "",
+            "enum": [
+                "none",
+                "read",
+                "write",
+                "external",
+                "irreversible"
+            ],
+            "title": "SideEffect",
+            "type": "string"
+        },
+        "SourceClass": {
+            "description": "Evidence trust class of the emitting system (SPEC 6.4).",
+            "enum": [
+                "enforcement_point",
+                "independent_system",
+                "self_report"
+            ],
+            "title": "SourceClass",
+            "type": "string"
+        },
+        "ToolCallPayload": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "acted_for": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "agent": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AgentRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "args_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "effect_class": {
+                    "$ref": "#/$defs/EffectClass"
+                },
+                "error": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "ext": {
+                    "description": "Source-specific extras; never evaluated by rules.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "integrity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IntegrityBlock"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "refs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Refs"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "result_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "side_effect": {
+                    "$ref": "#/$defs/SideEffect"
+                },
+                "tool": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/ToolRef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "used": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                }
+            },
+            "title": "ToolCallPayload",
+            "type": "object"
+        },
+        "ToolProtocol": {
+            "description": "",
+            "enum": [
+                "mcp",
+                "a2a",
+                "http",
+                "native"
+            ],
+            "title": "ToolProtocol",
+            "type": "string"
+        },
+        "ToolRef": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "protocol": {
+                    "$ref": "#/$defs/ToolProtocol"
+                },
+                "server": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "version_or_digest": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "required": [
+                "name"
+            ],
+            "title": "ToolRef",
+            "type": "object"
+        },
+        "Usage": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "input_tokens": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ]
+                },
+                "output_tokens": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ]
+                }
+            },
+            "title": "Usage",
+            "type": "object"
+        },
+        "Verification": {
+            "additionalProperties": false,
+            "description": "",
+            "properties": {
+                "log_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "method": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "status": {
+                    "$ref": "#/$defs/VerificationStatus"
+                }
+            },
+            "title": "Verification",
+            "type": "object"
+        },
+        "VerificationStatus": {
+            "description": "",
+            "enum": [
+                "verified",
+                "unverified",
+                "failed"
+            ],
+            "title": "VerificationStatus",
+            "type": "string"
+        }
+    },
+    "$id": "https://agent-conformance.org/schema/evidence/v1",
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "additionalProperties": true,
+    "metamodel_version": "1.11.0",
+    "title": "agentce-evidence",
+    "type": "object",
+    "version": "0.1.0"
+}
