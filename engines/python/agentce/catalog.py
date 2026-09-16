@@ -142,8 +142,12 @@ def _outcome_matches(expected: str, applicable: int, outcome: str) -> bool:
     return True  # insufficient_evidence / not_assessed are not re-derived structurally here
 
 
-def lint_catalog(directory: Path) -> list[str]:
-    """Return a list of problems; an empty list means the catalog is clean."""
+def lint_catalog(directory: Path, *, require_verification_flags: bool = False) -> list[str]:
+    """Return a list of problems; an empty list means the catalog is clean.
+
+    With ``require_verification_flags`` (SPEC §7.3 B14), every crosswalk entry must carry a
+    ``verified_against_text`` flag, so an unverified clause reference is never silently trusted;
+    verification of the reference itself is a human action, but the flag must be present."""
     problems: list[str] = []
     if not (directory / "catalog.yaml").is_file():
         return [f"{directory}: no catalog.yaml"]
@@ -162,6 +166,13 @@ def lint_catalog(directory: Path) -> list[str]:
             problems.append(f"{control_file.name}: schema: {exc.message}")
             continue
         control = _control_from_dict(data)
+        if require_verification_flags:
+            for entry in data.get("crosswalk", []):
+                if "verified_against_text" not in entry:
+                    problems.append(
+                        f"{control.id}: crosswalk entry {entry.get('framework')}/"
+                        f"{entry.get('clause')} lacks a verified_against_text flag"
+                    )
         shape = catalog.shape_for(control)
         if control.rung == 2 and shape is None:
             problems.append(f"{control.id}: rung-2 control has no usable shape")
