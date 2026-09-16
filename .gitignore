@@ -22,3 +22,6 @@ node_modules/
 .DS_Store
 .idea/
 .vscode/
+
+# Performance harness output (conformance/perf.py --run)
+conformance/perf-results.json
