@@ -1,0 +1,264 @@
+{
+  "events": [
+    {
+      "specversion": "1.0",
+      "id": "c1",
+      "source": "src-1",
+      "type": "org.agent-conformance.evidence.Decision.v1",
+      "time": "2026-01-01T00:00:00.000Z",
+      "subject": "subj-A",
+      "datacontenttype": "application/ld+json",
+      "agentcesourceclass": "self_report",
+      "data": {
+        "@context": "https://agent-conformance.org/contexts/evidence/v1",
+        "@type": "Decision",
+        "integrity": {
+          "hash": "dca547539ece602e5e831cdb6a26c8c7c9cb56c063ee659ca94d40756d37cb12",
+          "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+          "stream": "s-chained",
+          "strength": "export_chained"
+        }
+      }
+    },
+    {
+      "specversion": "1.0",
+      "id": "c2",
+      "source": "src-1",
+      "type": "org.agent-conformance.evidence.Decision.v1",
+      "time": "2026-01-01T00:00:01.000Z",
+      "subject": "subj-A",
+      "datacontenttype": "application/ld+json",
+      "agentcesourceclass": "self_report",
+      "data": {
+        "@context": "https://agent-conformance.org/contexts/evidence/v1",
+        "@type": "Decision",
+        "integrity": {
+          "hash": "2e7f67de3e65b96a5d5cfc5bd5942c1a1f559ce13db9c961f4a8d609870591c4",
+          "prev": "dca547539ece602e5e831cdb6a26c8c7c9cb56c063ee659ca94d40756d37cb12",
+          "stream": "s-chained",
+          "strength": "export_chained"
+        }
+      }
+    },
+    {
+      "specversion": "1.0",
+      "id": "a1",
+      "source": "src-1",
+      "type": "org.agent-conformance.evidence.Decision.v1",
+      "time": "2026-01-01T00:00:00.000Z",
+      "subject": "subj-A",
+      "datacontenttype": "application/ld+json",
+      "agentcesourceclass": "self_report",
+      "data": {
+        "@context": "https://agent-conformance.org/contexts/evidence/v1",
+        "@type": "Decision",
+        "integrity": {
+          "hash": "b972d8cdd8a743f5a2d6bd27612d95c0d6d426b129eeb5458dfb85dba5d4456b",
+          "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+          "stream": "s-anchored",
+          "strength": "export_anchored"
+        }
+      }
+    },
+    {
+      "specversion": "1.0",
+      "id": "a2",
+      "source": "src-1",
+      "type": "org.agent-conformance.evidence.Decision.v1",
+      "time": "2026-01-01T00:00:01.000Z",
+      "subject": "subj-A",
+      "datacontenttype": "application/ld+json",
+      "agentcesourceclass": "self_report",
+      "data": {
+        "@context": "https://agent-conformance.org/contexts/evidence/v1",
+        "@type": "Decision",
+        "integrity": {
+          "hash": "657bb2fec2619843b9a2c50fdd43a071b27ba99823ea7f18d83b2e66ed227401",
+          "prev": "b972d8cdd8a743f5a2d6bd27612d95c0d6d426b129eeb5458dfb85dba5d4456b",
+          "stream": "s-anchored",
+          "strength": "export_anchored"
+        }
+      }
+    },
+    {
+      "specversion": "1.0",
+      "id": "f1",
+      "source": "src-1",
+      "type": "org.agent-conformance.evidence.Decision.v1",
+      "time": "2026-01-01T00:00:00.000Z",
+      "subject": "subj-A",
+      "datacontenttype": "application/ld+json",
+      "agentcesourceclass": "self_report",
+      "data": {
+        "@context": "https://agent-conformance.org/contexts/evidence/v1",
+        "@type": "Decision",
+        "integrity": {
+          "hash": "d10f529ec825ae029c06625ba8f59a29ceb85bef67b17cf7886752be8bcbfedb",
+          "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+          "stream": "s-failed",
+          "strength": "export_chained"
+        }
+      }
+    },
+    {
+      "specversion": "1.0",
+      "id": "f2",
+      "source": "src-1",
+      "type": "org.agent-conformance.evidence.Decision.v1",
+      "time": "2026-01-01T00:00:01.000Z",
+      "subject": "subj-A",
+      "datacontenttype": "application/ld+json",
+      "agentcesourceclass": "self_report",
+      "data": {
+        "@context": "https://agent-conformance.org/contexts/evidence/v1",
+        "@type": "Decision",
+        "integrity": {
+          "hash": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+          "prev": "d10f529ec825ae029c06625ba8f59a29ceb85bef67b17cf7886752be8bcbfedb",
+          "stream": "s-failed",
+          "strength": "export_chained"
+        }
+      }
+    },
+    {
+      "specversion": "1.0",
+      "id": "g1",
+      "source": "src-1",
+      "type": "org.agent-conformance.evidence.Decision.v1",
+      "time": "2026-01-01T00:00:00.000Z",
+      "subject": "subj-A",
+      "datacontenttype": "application/ld+json",
+      "agentcesourceclass": "self_report",
+      "data": {
+        "@context": "https://agent-conformance.org/contexts/evidence/v1",
+        "@type": "Decision",
+        "integrity": {
+          "hash": "505a992f4393eb9e6a105760255bda602314cd5754823b7575be1e78ca0ac177",
+          "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+          "stream": "s-gap",
+          "strength": "export_chained"
+        }
+      }
+    },
+    {
+      "specversion": "1.0",
+      "id": "g2",
+      "source": "src-1",
+      "type": "org.agent-conformance.evidence.Decision.v1",
+      "time": "2026-01-01T00:00:01.000Z",
+      "subject": "subj-A",
+      "datacontenttype": "application/ld+json",
+      "agentcesourceclass": "self_report",
+      "data": {
+        "@context": "https://agent-conformance.org/contexts/evidence/v1",
+        "@type": "Decision",
+        "integrity": {
+          "hash": "c6c2b116752ecffeb0e4ba84fd99af663ebe47e77c691733544e28e5e9a4fdf1",
+          "prev": "abcdef01abcdef01abcdef01abcdef01abcdef01abcdef01abcdef01abcdef01",
+          "stream": "s-gap",
+          "strength": "export_chained"
+        }
+      }
+    },
+    {
+      "specversion": "1.0",
+      "id": "r1",
+      "source": "src-1",
+      "type": "org.agent-conformance.evidence.Decision.v1",
+      "time": "2026-01-01T00:00:00.000Z",
+      "subject": "subj-A",
+      "datacontenttype": "application/ld+json",
+      "agentcesourceclass": "self_report",
+      "data": {
+        "@context": "https://agent-conformance.org/contexts/evidence/v1",
+        "@type": "Decision",
+        "integrity": {
+          "hash": "05cd9bee550bd14de8236891a2cc4cd00a10890728f9ad5d7a7c7e127284fa62",
+          "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+          "stream": "s-reordered",
+          "strength": "export_chained"
+        }
+      }
+    },
+    {
+      "specversion": "1.0",
+      "id": "r2",
+      "source": "src-1",
+      "type": "org.agent-conformance.evidence.Decision.v1",
+      "time": "2026-01-01T00:00:01.000Z",
+      "subject": "subj-A",
+      "datacontenttype": "application/ld+json",
+      "agentcesourceclass": "self_report",
+      "data": {
+        "@context": "https://agent-conformance.org/contexts/evidence/v1",
+        "@type": "Decision",
+        "integrity": {
+          "hash": "5fd224e000cb0a960b56fda1cd68d17361a339a91ff15ec062e1a2fd3d58995e",
+          "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+          "stream": "s-reordered",
+          "strength": "export_chained"
+        }
+      }
+    },
+    {
+      "specversion": "1.0",
+      "id": "s1",
+      "source": "src-1",
+      "type": "org.agent-conformance.evidence.Decision.v1",
+      "time": "2026-01-01T00:00:00.000Z",
+      "subject": "subj-A",
+      "datacontenttype": "application/ld+json",
+      "agentcesourceclass": "self_report",
+      "data": {
+        "@context": "https://agent-conformance.org/contexts/evidence/v1",
+        "@type": "Decision",
+        "integrity": {
+          "hash": "0c7cf0172f66cccf66548fb0630da155ec14715efbd7e4145d541d16f522a6b7",
+          "prev": "0000000000000000000000000000000000000000000000000000000000000000",
+          "stream": "s-suspect",
+          "strength": "export_anchored"
+        }
+      }
+    },
+    {
+      "specversion": "1.0",
+      "id": "s2",
+      "source": "src-1",
+      "type": "org.agent-conformance.evidence.Decision.v1",
+      "time": "2026-06-01T00:00:00.000Z",
+      "subject": "subj-A",
+      "datacontenttype": "application/ld+json",
+      "agentcesourceclass": "self_report",
+      "data": {
+        "@context": "https://agent-conformance.org/contexts/evidence/v1",
+        "@type": "Decision",
+        "integrity": {
+          "hash": "02385ebc0d79bbf644e2c08d7a2da4dd20c930a635d929f2d98f76cb7bd48ea0",
+          "prev": "0c7cf0172f66cccf66548fb0630da155ec14715efbd7e4145d541d16f522a6b7",
+          "stream": "s-suspect",
+          "strength": "export_anchored"
+        }
+      }
+    }
+  ],
+  "manifest": {
+    "streams": [
+      {
+        "stream": "s-anchored",
+        "anchors": [
+          {
+            "at": "2026-02-01T00:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "stream": "s-suspect",
+        "anchors": [
+          {
+            "at": "2026-03-01T00:00:00.000Z"
+          }
+        ]
+      }
+    ]
+  }
+}
