@@ -1,0 +1,34 @@
+{
+  "description": "Representative credit-domain decisions for the golden explanation narratives (P3.3). Frozen: the renderer must reproduce golden.md byte-for-byte.",
+  "domain": {
+    "decision_types": [
+      {"id": "credit:LoanApproval", "consequential": true},
+      {"id": "credit:AddressChange", "consequential": false}
+    ]
+  },
+  "events": [
+    {"id": "dec-approve", "time": "2026-06-01T09:00:00.000Z", "data": {
+      "@type": "Decision", "decision_type": "credit:LoanApproval", "ai_role": "decides",
+      "options": [{"id": "approve", "label": "Approve the loan"}, {"id": "deny", "label": "Deny the loan"}],
+      "chosen": "approve", "agent": {"id": "spiffe://corp/agents/claims-triage"},
+      "used": ["ci:application-form", "ci:credit-score"],
+      "acted_for": [{"id": "human:loan-officer", "kind": "human"}]}},
+    {"id": "dec-partial", "time": "2026-06-01T10:00:00.000Z", "data": {
+      "@type": "Decision", "decision_type": "credit:LoanApproval", "ai_role": "recommends",
+      "options": [{"id": "approve", "label": "Approve the loan"}, {"id": "deny", "label": "Deny the loan"}],
+      "agent": {"id": "spiffe://corp/agents/claims-triage"},
+      "used": ["ci:application-form"]}},
+    {"id": "dec-review", "time": "2026-06-01T11:00:00.000Z", "data": {
+      "@type": "Decision", "decision_type": "credit:LoanApproval", "ai_role": "assists",
+      "options": [{"id": "escalate", "label": "Escalate to a human"}, {"id": "auto", "label": "Auto-approve"}],
+      "chosen": "escalate", "agent": {"id": "spiffe://corp/agents/claims-triage"},
+      "used": ["ci:application-form"]}},
+    {"id": "appr-review", "time": "2026-06-01T11:05:00.000Z", "data": {
+      "@type": "ApprovalDecided", "agent": {"id": "human:supervisor"},
+      "refs": {"decision": "agentce:event/dec-review"}}},
+    {"id": "dec-address", "time": "2026-06-01T12:00:00.000Z", "data": {
+      "@type": "Decision", "decision_type": "credit:AddressChange", "ai_role": "decides",
+      "options": [{"id": "apply", "label": "Apply change"}], "chosen": "apply",
+      "agent": {"id": "spiffe://corp/agents/claims-triage"}}}
+  ]
+}
