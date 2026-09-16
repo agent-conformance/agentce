@@ -1,0 +1,7 @@
+# Every alias domain redirects (301) to the canonical host, agent-conformance.org, which is the only
+# origin the specification's IRIs use. Cloudflare Pages redirects format.
+https://agent-conformance.dev/* https://agent-conformance.org/:splat 301
+https://agent-conformance.com/* https://agent-conformance.org/:splat 301
+https://agentce.dev/* https://agent-conformance.org/:splat 301
+https://agentce.org/* https://agent-conformance.org/:splat 301
+https://www.agent-conformance.org/* https://agent-conformance.org/:splat 301
