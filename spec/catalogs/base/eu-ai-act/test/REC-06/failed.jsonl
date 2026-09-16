@@ -1,0 +1,1 @@
+{"id":"tc1","source":"urn:src:enforcement_point","subject":"spiffe://corp/agents/a","type":"org.agent-conformance.evidence.ToolCall.v1","agentcesourceclass":"enforcement_point","data":{"@type":"ToolCall","agent":{"id":"spiffe://corp/agents/a"},"refs":{"decision":"agentce:event/missing"}},"time":"2026-01-01T00:00:00Z"}
