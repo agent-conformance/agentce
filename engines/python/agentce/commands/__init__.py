@@ -290,6 +290,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         operator=_operator(),
         invocation=["assess", str(bundle), str(profile)],
         supersedes=supersedes,
+        report_language=_opt_str(ns, "report_language") or "en",
     )
     if state is not None:
         state.record(loaded.digest, out_dir / "manifest.json", new_window_end)
@@ -363,11 +364,12 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
     assertions = [Assertion.from_json(a) for a in json.loads(source.read_text("utf-8"))]
     counts = aggregate(assertions)
     catalogs = [c for c in (_opt_str(ns, "catalog") or "").split(",") if c] or None
+    language = _opt_str(ns, "language") or "en"
     rendering: str
     if fmt == "md":
-        rendering = render_report_md(assertions, counts)
+        rendering = render_report_md(assertions, counts, language=language)
     elif fmt == "html":
-        rendering = render_report_html(assertions, counts)
+        rendering = render_report_html(assertions, counts, language=language)
     elif fmt == "oscal":
         rendering = json.dumps(render_oscal(assertions), sort_keys=True, indent=2)
     elif fmt == "sarif":
