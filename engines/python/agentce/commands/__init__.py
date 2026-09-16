@@ -32,8 +32,9 @@ from ..config import resolve as resolve_config
 from ..conformance import run_ecs
 from ..coverage import compute_coverage
 from ..coverage_matrix import MATRIX_FILE, check_matrix, write_matrix
+from ..error_catalogue import MESSAGE_KEYS, render_errors_md
 from ..domain import DomainBinding
-from ..errors import InputError
+from ..errors import AgentceError, InputError
 from ..exit_codes import ExitCode
 from ..graph import build_graph
 from ..ingest import ingest
@@ -680,6 +681,110 @@ def cmd_readiness(ns: argparse.Namespace) -> CommandResult:
     result.data["report"] = str(out)
     if verdict["verdict"] == readiness.NOT_READY:
         result.add_code(int(ExitCode.FINDINGS))
+    return result
+
+
+def _doctor_problem(key: str, problem: str, fix: str | None = None) -> dict[str, str]:
+    entry = MESSAGE_KEYS.get(key)
+    return {"key": key, "problem": problem, "fix": fix or (entry.fix if entry else "")}
+
+
+def cmd_doctor(ns: argparse.Namespace) -> CommandResult:
+    """Diagnose a project's declarations, sources, and bundle, naming the exact fix for each problem
+    (SPEC §13.4 AX-5). With ``--write-errors`` it regenerates the message-key catalogue instead."""
+    result = CommandResult(command="doctor")
+    write_errors = _opt_str(ns, "write_errors")
+    if write_errors:
+        path = Path(write_errors)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(render_errors_md(), encoding="utf-8")
+        result.data.update({"errors_md": str(path)})
+        result.note(f"wrote {path}")
+        return result
+
+    project = _require_dir(
+        _opt_str(ns, "project"),
+        key="project",
+        what="the project directory",
+        fix="pass --project <dir> (a project from agentce quickstart or agentce init).",
+    )
+    problems: list[dict[str, str]] = []
+    declared_sources: set[str] = set()
+
+    profile_path = project / "applicability.yaml"
+    if not profile_path.is_file():
+        problems.append(
+            _doctor_problem(
+                "input.profile_missing", f"no applicability.yaml in {project}"
+            )
+        )
+    else:
+        from ..tools.validate_profile import validate_profile
+
+        profile_data = yaml.safe_load(profile_path.read_text("utf-8")) or {}
+        for problem in validate_profile(profile_data):
+            problems.append(
+                _doctor_problem(
+                    "schema_invalid",
+                    problem,
+                    "correct the profile to match applicability-profile.schema.json.",
+                )
+            )
+        declared_sources = {
+            str(source.get("source"))
+            for subject in profile_data.get("subjects", [])
+            for source in subject.get("evidence_sources", [])
+            if source.get("source")
+        }
+
+    bundle_dir = project / "evidence"
+    if not bundle_dir.is_dir():
+        problems.append(
+            _doctor_problem(
+                "input.bundle_manifest_missing", f"no evidence bundle at {bundle_dir}"
+            )
+        )
+    else:
+        try:
+            bundle = load_bundle(bundle_dir)
+            manifest_sources = {
+                str(source.get("id")) for source in bundle.manifest.get("sources", [])
+            }
+            for source in sorted(declared_sources - manifest_sources):
+                problems.append(
+                    _doctor_problem(
+                        "unknown_source",
+                        f"source {source} is declared but not in the bundle manifest",
+                        "add the source's stream and manifest entry, or remove the declaration.",
+                    )
+                )
+        except AgentceError as err:
+            problems.append(_doctor_problem(err.key, err.cause, err.fix))
+
+    if not (project / "domain.linkml.yaml").is_file():
+        problems.append(
+            _doctor_problem(
+                "input.catalog_not_found",
+                f"no domain binding at {project}/domain.linkml.yaml",
+                "add a domain.linkml.yaml binding (see agentce init).",
+            )
+        )
+
+    result.data.update(
+        {
+            "project": str(project),
+            "doctor": "ok" if not problems else "problems",
+            "healthy": not problems,
+            "problems": sorted(problems, key=lambda p: (p["key"], p["problem"])),
+        }
+    )
+    if problems:
+        result.add_code(int(ExitCode.FINDINGS))
+        result.note(f"{project}: {len(problems)} problem(s)")
+        for issue in problems:
+            result.note(f"  [{issue['key']}] {issue['problem']} -> {issue['fix']}")
+    else:
+        result.note(f"{project}: healthy")
     return result
 
 

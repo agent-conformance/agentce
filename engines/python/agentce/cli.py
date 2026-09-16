@@ -220,6 +220,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=commands.cmd_readiness)
 
     p = sub.add_parser(
+        "doctor",
+        parents=[common],
+        help="diagnose a project and name the exact fix (SPEC 13.4)",
+    )
+    p.add_argument("--project", help="the project directory to diagnose")
+    p.add_argument(
+        "--write-errors",
+        dest="write_errors",
+        help="regenerate the message-key catalogue at this path instead of diagnosing",
+    )
+    p.set_defaults(func=commands.cmd_doctor)
+
+    p = sub.add_parser(
         "quickstart", parents=[common], help="assess the bundled quickstart project"
     )
     p.add_argument("--out", help="the output directory for the report")
