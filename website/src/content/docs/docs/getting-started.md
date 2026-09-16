@@ -1,22 +1,38 @@
 ---
 title: Getting Started
-description: Install the Agent Conformance engine and run your first assessment.
+description: Install an Agent Conformance engine and run your first assessment over the bundled example.
 ---
 
-Agent Conformance assesses how an AI agent behaves against a shared, executable specification. The
-engine is deterministic and read-only over its inputs: it collects evidence about an agent, evaluates
-that evidence against a control catalog, and produces a report you can reproduce and verify.
+Agent Conformance assesses how an AI-agent deployment behaves against a shared, executable
+specification. The engine is deterministic, read-only, and model-free: it collects evidence about an
+agent, evaluates that evidence against a control catalog, and writes a report you can reproduce and
+verify. No learned component decides an outcome.
 
-This page is the entry point to the documentation. The remaining guides — concepts, the specification,
-running assessments, CI integration, and contributing — are being written as part of the site build.
+:::note
+This is pre-general-availability documentation. The commands below are stable; some links point to the
+specification and reference material that ship alongside the engine.
+:::
 
-## What you need
+## Run the bundled example
 
-- A recent release of the engine for your language (Python, TypeScript, or Java).
-- Evidence from an agent run, or one of the bundled example projects.
+The fastest way to see a full assessment is the quickstart, which runs the vendored
+`corpus/quickstart` project — a small credit-decisioning agent with complete enforcement-point
+evidence — against the base EU AI Act catalog and writes a report:
+
+```bash
+uv run --project engines/python agentce quickstart --out ./out
+```
+
+Every base-catalog control is conformant on this project, each citing the evidence that supports it.
+The run writes, into `./out`:
+
+- `assertions.json` — one machine-readable verdict per control and subject; the source of truth.
+- `report.md` and `report.html` — the human-readable report.
+- `results.sarif` and `oscal-ar.json` — SARIF and OSCAL Assessment Results renderings.
+- `coverage.json`, `integrity.jsonl`, `quarantine.jsonl` — coverage, integrity, and quarantine detail.
 
 ## Next steps
 
-Once the engine is installed, a first assessment runs from a single command over a bundled example and
-prints a report in a few minutes. The [specification](https://agent-conformance.org) defines the
-evidence model, the control catalog, and the report formats the engine produces.
+- [Concepts](/docs/concepts/) — the mental model: subjects, evidence, controls, and verdicts.
+- [Running Assessments](/docs/running-assessments/) — the full command-line workflow for your own agent.
+- [CI Integration](/docs/ci-integration/) — assess an agent on every change, offline.
