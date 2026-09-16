@@ -41,6 +41,14 @@ class EvidencePointer:
             "source_class": self.source_class,
         }
 
+    @classmethod
+    def from_json(cls, data: dict[str, Any]) -> EvidencePointer:
+        return cls(
+            ref=str(data.get("ref", "")),
+            digest=str(data.get("digest", "")),
+            source_class=str(data.get("source_class", "")),
+        )
+
 
 @dataclass
 class Assertion:
@@ -89,6 +97,33 @@ class Assertion:
         if self.crosswalk:
             record["crosswalk"] = self.crosswalk
         return record
+
+    @classmethod
+    def from_json(cls, data: dict[str, Any]) -> Assertion:
+        """Reconstruct an assertion from its JSON form (the inverse of ``to_json``), for re-rendering
+        a report from a committed ``assertions.json`` (SPEC §9.4)."""
+        window = data.get("window", {})
+        population = data.get("population", {})
+        return cls(
+            control=str(data.get("control", "")),
+            control_version=str(data.get("control_version", "")),
+            subject=str(data.get("subject", "")),
+            outcome=str(data.get("outcome", "")),
+            rung=int(data.get("rung", 0)),
+            mode=str(data.get("mode", "")),
+            window=(str(window.get("start", "")), str(window.get("end", ""))),
+            population=(
+                int(population.get("applicable", 0)),
+                int(population.get("failed", 0)),
+            ),
+            expectations=list(data.get("expectations", [])),
+            violations=list(data.get("violations", [])),
+            evidence=[EvidencePointer.from_json(e) for e in data.get("evidence", [])],
+            source_class_satisfied=data.get("source_class_satisfied"),
+            evidence_strength=data.get("evidence_strength"),
+            deviation=data.get("deviation"),
+            crosswalk=list(data.get("crosswalk", [])),
+        )
 
 
 def aggregate(assertions: list[Assertion]) -> dict[str, int]:

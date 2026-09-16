@@ -41,14 +41,24 @@ from ..integrity import IntegrityStatus, verify_bundle
 from ..logsetup import get_logger
 from ..profile import Profile
 from ..quarantine import counts_by_reason, write_quarantine
-from ..report import validate_report, write_report
+from ..assertions import Assertion, aggregate
+from ..report import (
+    render_evidence_pack,
+    render_oscal,
+    render_public_statement,
+    render_report_html,
+    render_report_md,
+    render_sarif,
+    validate_report,
+    write_report,
+)
 from ..state import StateDir, window_end
 from ..result import CommandResult
 from ..store import GraphStore
 
 _log = get_logger()
 
-REPORT_FORMATS = ("md", "html", "oscal", "sarif", "public")
+REPORT_FORMATS = ("md", "html", "oscal", "sarif", "public", "pack")
 SIGN_ROLES = ("claimant", "assessor")
 SIGN_PROFILES = ("sigstore-public", "sigstore-private", "kms")
 
@@ -350,8 +360,37 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
             f"unknown report format {fmt!r}.",
             f"choose one of: {', '.join(REPORT_FORMATS)}.",
         )
-    result.data.update({"from": str(source), "format": fmt})
-    return _pending(result, "Report rendering lands in a later work item.")
+    assertions = [Assertion.from_json(a) for a in json.loads(source.read_text("utf-8"))]
+    counts = aggregate(assertions)
+    catalogs = [c for c in (_opt_str(ns, "catalog") or "").split(",") if c] or None
+    rendering: str
+    if fmt == "md":
+        rendering = render_report_md(assertions, counts)
+    elif fmt == "html":
+        rendering = render_report_html(assertions, counts)
+    elif fmt == "oscal":
+        rendering = json.dumps(render_oscal(assertions), sort_keys=True, indent=2)
+    elif fmt == "sarif":
+        rendering = json.dumps(render_sarif(assertions), sort_keys=True, indent=2)
+    elif fmt == "public":
+        rendering = render_public_statement(assertions, catalogs=catalogs)
+    else:  # pack
+        role = _opt_str(ns, "role")
+        by_subject: dict[str, list[Assertion]] = {}
+        for assertion in assertions:
+            by_subject.setdefault(assertion.subject, []).append(assertion)
+        packs = {
+            subject: render_evidence_pack(subject, subject_assertions, role=role)
+            for subject, subject_assertions in sorted(by_subject.items())
+        }
+        rendering = json.dumps(packs, sort_keys=True, indent=2)
+    result.data.update({"from": str(source), "format": fmt, "rendering": rendering})
+    out = _opt_str(ns, "out")
+    if out is not None:
+        Path(out).write_text(rendering, encoding="utf-8")
+        result.data["out"] = out
+    result.note(rendering)
+    return result
 
 
 def cmd_collect(ns: argparse.Namespace) -> CommandResult:
