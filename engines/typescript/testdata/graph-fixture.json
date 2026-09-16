@@ -1,0 +1,29 @@
+{
+  "domain": {"decision_types": [
+    {"id": "credit:LoanApproval", "subclass_of": "credit:CreditDecision", "consequential": true, "required_oversight_modality": "human_in_the_loop"},
+    {"id": "credit:CreditDecision", "subclass_of": "agentce:ConsequentialDecision"}
+  ]},
+  "events": [
+    {"id": "del-1", "time": "2026-06-01T08:00:00.000Z", "agentcesourceclass": "enforcement_point",
+     "data": {"@type": "DelegationIssued", "agent": {"id": "spiffe://corp/agent-a"},
+       "chain": [{"id": "human:ceo", "kind": "human"}, {"id": "svc:runner", "kind": "service"}],
+       "verification": {"status": "verified"}}},
+    {"id": "dec-1", "time": "2026-06-01T09:00:00.000Z", "agentcesourceclass": "self_report",
+     "data": {"@type": "Decision", "decision_type": "credit:LoanApproval",
+       "agent": {"id": "spiffe://corp/agent-a"}, "acted_for": [{"id": "human:officer", "kind": "human"}],
+       "used": ["ci:app", "ci:score"], "oversight_modality": "human_in_the_loop",
+       "refs": {"authorization": "agentce:event/del-1", "parent": "agentce:event/missing-x"}}},
+    {"id": "dec-2", "time": "2026-06-01T10:00:00.000Z",
+     "data": {"@type": "Decision", "decision_type": "credit:LoanApproval",
+       "agent": {"id": "spiffe://corp/agent-a"}, "acted_for": [{"id": "human:officer", "kind": "human"}],
+       "oversight_modality": "human_on_the_loop"}},
+    {"id": "appr-1", "time": "2026-06-01T09:30:00.000Z",
+     "data": {"@type": "ApprovalDecided", "agent": {"id": "human:reviewer"},
+       "refs": {"decision": "agentce:event/dec-1"}}},
+    {"id": "tc-1", "time": "2026-06-01T09:05:00.000Z",
+     "data": {"@type": "ToolCall", "effect_class": "spend", "agent": {"id": "spiffe://corp/agent-a"},
+       "refs": {"decision": "agentce:event/dec-1"}}},
+    {"id": "out-1", "time": "2026-06-01T09:10:00.000Z",
+     "data": {"@type": "Outcome", "refs": {"decision": "agentce:event/dec-1"}}}
+  ]
+}
