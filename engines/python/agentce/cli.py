@@ -197,6 +197,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--profile", choices=commands.SIGN_PROFILES, help="the signing profile"
     )
     p.add_argument(
+        "--key", help="operator Ed25519 private key (PEM) for the kms profile"
+    )
+    p.add_argument(
         "--dry-run", dest="dry_run", action="store_true", help="plan only; sign nothing"
     )
     p.set_defaults(func=commands.cmd_sign)
