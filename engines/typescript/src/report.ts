@@ -15,7 +15,7 @@ import { arch, platform } from "node:os";
 import { dirname, join } from "node:path";
 import { type Assertion, aggregate, assertionToJson, checkDc5 } from "./assertions";
 import { canonicalize } from "./canonical";
-import { byteCompare } from "./util";
+import { byteCompare, sortKeysDeep } from "./util";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
 const ZERO_DIGEST = `sha256:${"0".repeat(64)}`;
@@ -89,14 +89,7 @@ export function renderReportHtml(assertions: Assertion[], counts: Record<string,
     .sort(bySubjectControl)
     .map((a) => `<tr><td>${a.control}</td><td>${a.subject}</td><td>${a.outcome}</td></tr>`)
     .join("");
-  return (
-    '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
-    "<title>AgentCE conformance report</title></head><body>" +
-    "<h1>AgentCE conformance report</h1>" +
-    `<h2>Outcome summary</h2><ul>${summary}</ul>` +
-    `<h2>Assertions</h2><table><tr><th>Control</th><th>Subject</th><th>Outcome</th></tr>${rows}</table>` +
-    "</body></html>\n"
-  );
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>AgentCE conformance report</title></head><body><h1>AgentCE conformance report</h1><h2>Outcome summary</h2><ul>${summary}</ul><h2>Assertions</h2><table><tr><th>Control</th><th>Subject</th><th>Outcome</th></tr>${rows}</table></body></html>\n`;
 }
 
 export function renderOscal(assertions: Assertion[]): Record<string, unknown> {
@@ -200,21 +193,6 @@ export function buildManifest(options: ManifestOptions): Record<string, unknown>
     manifest.supersedes = options.supersedes;
   }
   return manifest;
-}
-
-/** Recursively sort object keys, matching Python's `json.dumps(sort_keys=True)`. */
-function sortKeysDeep(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(sortKeysDeep);
-  }
-  if (value !== null && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const key of Object.keys(value as Record<string, unknown>).sort(byteCompare)) {
-      out[key] = sortKeysDeep((value as Record<string, unknown>)[key]);
-    }
-    return out;
-  }
-  return value;
 }
 
 export interface WriteReportOptions {
