@@ -1,0 +1,4 @@
+checklist: DOC-05-M
+control: DOC-05
+items:
+  - {id: Q1, artifact: "technical documentation", question: "Is the Annex IV technical documentation complete and current for the operating configuration in the window?", answers: [yes, no, not_applicable]}
