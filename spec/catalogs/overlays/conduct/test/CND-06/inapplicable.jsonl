@@ -1,0 +1,1 @@
+{"id":"i1","source":"urn:src:enforcement_point","subject":"spiffe://corp/agents/a","type":"org.agent-conformance.evidence.Instruction.v1","agentcesourceclass":"enforcement_point","data":{"@type":"Instruction","source_class":"user"},"time":"2026-01-01T00:00:00Z"}
