@@ -13,7 +13,9 @@ the Conduct overlay (``--catalog-dir`` loads both), so it never perturbs the two
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
+import io
 import json
 import subprocess
 import sys
@@ -112,7 +114,10 @@ def _events(variant: str) -> list[dict]:
                 "rf1",
                 "Refusal",
                 "enforcement_point",
-                {"reason_class": "budget_exceeded", "refs": {"request": "agentce:event/tc1"}},
+                {
+                    "reason_class": "budget_exceeded",
+                    "refs": {"request": "agentce:event/tc1"},
+                },
             )
         )
     elif variant == "tool-output-instruction":
@@ -304,7 +309,9 @@ def main(argv: list[str] | None = None) -> int:
         "--json", action="store_true", help="emit machine-readable JSON"
     )
     parser.parse_args(argv)
-    result = evaluate()
+    # Keep stdout clean for the JSON: assess_one prints a human line per project as it runs.
+    with contextlib.redirect_stdout(io.StringIO()):
+        result = evaluate()
     print(json.dumps(result, sort_keys=True))
     ok = (
         result["readiness_match"]
