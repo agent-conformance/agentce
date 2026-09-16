@@ -37,6 +37,7 @@ from ..logsetup import get_logger
 from ..profile import Profile
 from ..quarantine import counts_by_reason, write_quarantine
 from ..report import validate_report, write_report
+from ..state import StateDir, window_end
 from ..result import CommandResult
 from ..store import GraphStore
 
@@ -252,6 +253,20 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         for d in catalog_dirs
     ]
     evaluated = assess_subjects(ingested.accepted, profile_obj, catalogs, domain)
+    # Stage 6a: incremental state (SPEC §5.4 B7, HR-10). With --state the engine detects a changed
+    # bundle (late-arriving evidence lands here), supersedes the prior report, and counts late events.
+    state_arg = _opt_str(ns, "state")
+    state: StateDir | None = None
+    supersedes: list[str] = []
+    late_events: dict[str, int] = {}
+    new_window_end = window_end(profile_obj, ingested.accepted)
+    if state_arg is not None:
+        state = StateDir.load(
+            Path(state_arg)
+        )  # incompatible state_version aborts with exit 3
+        supersedes, late_events = state.plan(
+            loaded.digest, ingested.accepted, new_window_end
+        )
     write_report(
         out_dir,
         evaluated,
@@ -259,7 +274,10 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         catalogs=catalog.split(","),
         operator=_operator(),
         invocation=["assess", str(bundle), str(profile)],
+        supersedes=supersedes,
     )
+    if state is not None:
+        state.record(loaded.digest, out_dir / "manifest.json", new_window_end)
     non_conformant = sum(1 for a in evaluated if a.outcome == "non-conformant")
     result.data.update(
         {
@@ -277,6 +295,9 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "assertions": len(evaluated),
         }
     )
+    if state is not None:
+        result.data["supersedes"] = supersedes
+        result.data["late_events"] = late_events
     if non_conformant:
         result.add_code(int(ExitCode.FINDINGS))
     if not catalogs:
