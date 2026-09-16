@@ -11,13 +11,14 @@ evaluation:
   min_source_class: self_report
   minimum_evidence:
     - {event: Decision, class: self_report}
+    - {event: PolicyDecision, class: any}
   shape: shapes/OVS-05.ttl
 expectations:
   - {id: S1, text: "Consequential decisions record the authorisation that gated them."}
-severity: high
+severity: medium
 evidence_strength: strong
 tolerance: {kind: count, max: 0}
-tolerance_rationale: "A single OVS-05 exception is a control failure."
+tolerance_rationale: "OVS-05 is a structural expectation with no tolerated exceptions."
 false_positive_modes:
   - "A condition declared as an accepted deviation in the applicability profile."
 techniques:

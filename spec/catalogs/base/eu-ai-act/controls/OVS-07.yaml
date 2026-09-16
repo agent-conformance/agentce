@@ -11,6 +11,7 @@ evaluation:
   min_source_class: self_report
   minimum_evidence:
     - {event: Decision, class: self_report}
+    - {event: ApprovalDecided, class: any}
   shape: shapes/OVS-07.ttl
 expectations:
   - {id: S1, text: "Overrides and interrupts are effective and recorded."}

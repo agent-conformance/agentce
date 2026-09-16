@@ -11,13 +11,14 @@ evaluation:
   min_source_class: self_report
   minimum_evidence:
     - {event: Decision, class: self_report}
+    - {event: PolicyDecision, class: any}
   shape: shapes/RSK-01.ttl
 expectations:
   - {id: S1, text: "Consequential decisions record the authorisation gate they cleared."}
-severity: high
+severity: medium
 evidence_strength: strong
 tolerance: {kind: count, max: 0}
-tolerance_rationale: "A single RSK-01 exception is a control failure."
+tolerance_rationale: "RSK-01 is a structural expectation with no tolerated exceptions."
 false_positive_modes:
   - "A condition declared as an accepted deviation in the applicability profile."
 techniques:
