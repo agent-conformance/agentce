@@ -17,9 +17,10 @@
   "packageManager": "pnpm@12.4.1",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "astro build && node ./scripts/build-iris.mjs",
     "preview": "astro preview",
-    "check": "astro check"
+    "check": "astro check",
+    "check:iri": "node ./scripts/check-iris.mjs"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.42.1",

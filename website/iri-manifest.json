@@ -1,0 +1,92 @@
+[
+  {
+    "path": "/contexts/evidence/v1",
+    "source": "spec/model/generated/jsonld-context.json",
+    "content_type": "application/ld+json"
+  },
+  {
+    "path": "/vocab/evidence/v1",
+    "source": "spec/vocab/agentce.ttl",
+    "content_type": "text/turtle"
+  },
+  {
+    "path": "/schema/evidence/v1",
+    "source": "spec/model/generated/json-schema/agentce-evidence.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
+    "path": "/spec/model/applicability-profile.schema.json",
+    "source": "spec/model/generated/json-schema/applicability-profile.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
+    "path": "/spec/report/applicability-statement.schema.json",
+    "source": "spec/report/applicability-statement.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
+    "path": "/spec/report/assertions.schema.json",
+    "source": "spec/report/assertions.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
+    "path": "/spec/report/claim.schema.json",
+    "source": "spec/report/claim.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
+    "path": "/spec/report/deviation-register.schema.json",
+    "source": "spec/report/deviation-register.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
+    "path": "/spec/report/integrity-result.schema.json",
+    "source": "spec/report/integrity-result.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
+    "path": "/spec/report/manifest.schema.json",
+    "source": "spec/report/manifest.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
+    "path": "/spec/report/oscal-assessment-results.schema.json",
+    "source": "spec/report/oscal-assessment-results.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
+    "path": "/spec/report/oscal-component-definition.schema.json",
+    "source": "spec/report/oscal-component-definition.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
+    "path": "/spec/report/quarantine.schema.json",
+    "source": "spec/report/quarantine.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
+    "path": "/spec/report/results-sarif.schema.json",
+    "source": "spec/report/results-sarif.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
+    "path": "/spec/rules/checklist.schema.json",
+    "source": "spec/rules/checklist.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
+    "path": "/spec/rules/control.schema.json",
+    "source": "spec/rules/control.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
+    "path": "/spec/rules/metric.schema.json",
+    "source": "spec/rules/metric.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
+    "path": "/spec/rules/probe.schema.json",
+    "source": "spec/rules/probe.schema.json",
+    "content_type": "application/schema+json"
+  }
+]
