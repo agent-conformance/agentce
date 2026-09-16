@@ -1,0 +1,114 @@
+[
+  {
+    "subject": "agent-A",
+    "roles": [
+      "deployer",
+      "provider"
+    ],
+    "catalogs": [
+      "base/eu-ai-act"
+    ],
+    "controls": [
+      {
+        "id": "CTRL-1",
+        "applicable": true,
+        "reason_code": "role_match",
+        "reason_refs": [
+          "deployer"
+        ]
+      },
+      {
+        "id": "CTRL-2",
+        "applicable": true,
+        "reason_code": "role_match",
+        "reason_refs": [
+          "provider"
+        ]
+      },
+      {
+        "id": "CTRL-3",
+        "applicable": true,
+        "reason_code": "role_match",
+        "reason_refs": [
+          "deployer",
+          "provider"
+        ]
+      }
+    ],
+    "observed_decision_types": [
+      "credit_decision",
+      "refund_decision"
+    ],
+    "declared_decision_types": [
+      "credit_decision"
+    ],
+    "drift": [
+      {
+        "kind": "undeclared_decision_type",
+        "ref": "refund_decision"
+      },
+      {
+        "kind": "undeclared_component",
+        "ref": "lib-y"
+      },
+      {
+        "kind": "undeclared_component",
+        "ref": "lib-z"
+      },
+      {
+        "kind": "undeclared_subject",
+        "ref": "agent-C"
+      }
+    ],
+    "class_justifications": [
+      {
+        "source": "src-1",
+        "class": "instrumented",
+        "justification": "declared for src-1 in the applicability profile of agent-A"
+      }
+    ]
+  },
+  {
+    "subject": "agent-B",
+    "roles": [
+      "deployer"
+    ],
+    "catalogs": [
+      "base/eu-ai-act"
+    ],
+    "controls": [
+      {
+        "id": "CTRL-1",
+        "applicable": true,
+        "reason_code": "role_match",
+        "reason_refs": [
+          "deployer"
+        ]
+      },
+      {
+        "id": "CTRL-2",
+        "applicable": false,
+        "reason_code": "role_mismatch",
+        "reason_refs": []
+      },
+      {
+        "id": "CTRL-3",
+        "applicable": true,
+        "reason_code": "role_match",
+        "reason_refs": [
+          "deployer"
+        ]
+      }
+    ],
+    "observed_decision_types": [],
+    "declared_decision_types": [],
+    "drift": [],
+    "class_justifications": [
+      {
+        "source": "src-2",
+        "class": "self_report",
+        "justification": "declared for src-2 in the applicability profile of agent-B"
+      }
+    ]
+  }
+]
