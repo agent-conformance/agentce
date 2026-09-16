@@ -1,0 +1,4 @@
+checklist: DAT-04-M
+control: DAT-04
+items:
+  - {id: Q1, artifact: "data-governance policy", question: "Is a current data-governance policy recorded covering provenance, quality, and representativeness for every input dataset?", answers: [yes, no, not_applicable]}
