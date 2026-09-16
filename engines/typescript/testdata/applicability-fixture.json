@@ -1,0 +1,127 @@
+{
+  "profile": {
+    "profile_version": 1,
+    "observation_window": {
+      "start": "2026-01-01T00:00:00Z",
+      "end": "2026-02-01T00:00:00Z"
+    },
+    "catalogs": [
+      "base/eu-ai-act"
+    ],
+    "subjects": [
+      {
+        "id": "agent-A",
+        "name": "Agent A",
+        "role": "both",
+        "declared_decision_types": [
+          "credit_decision"
+        ],
+        "declared_oversight": {
+          "credit_decision": "human_in_the_loop"
+        },
+        "evidence_sources": [
+          {
+            "adapter": "otel-genai",
+            "source": "src-1",
+            "class": "instrumented"
+          }
+        ],
+        "coverage_denominators": [
+          {
+            "kind": "router",
+            "source": "router-1",
+            "covers": [
+              "ToolCall"
+            ]
+          }
+        ],
+        "third_party_components": [
+          {
+            "name": "lib-x"
+          }
+        ]
+      },
+      {
+        "id": "agent-B",
+        "role": "deployer",
+        "evidence_sources": [
+          {
+            "adapter": "otel-genai",
+            "source": "src-2",
+            "class": "self_report"
+          }
+        ]
+      }
+    ]
+  },
+  "events": [
+    {
+      "id": "d1",
+      "subject": "agent-A",
+      "data": {
+        "@type": "Decision",
+        "decision_type": "credit_decision"
+      }
+    },
+    {
+      "id": "d2",
+      "subject": "agent-A",
+      "data": {
+        "@type": "Decision",
+        "decision_type": "refund_decision"
+      }
+    },
+    {
+      "id": "c1",
+      "subject": "agent-A",
+      "data": {
+        "@type": "Component",
+        "name": "lib-y"
+      }
+    },
+    {
+      "id": "b1",
+      "subject": "agent-A",
+      "data": {
+        "@type": "BundleLoaded",
+        "components": [
+          "lib-x",
+          {
+            "name": "lib-z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "d3",
+      "subject": "agent-C",
+      "data": {
+        "@type": "Decision",
+        "decision_type": "credit_decision"
+      }
+    }
+  ],
+  "controls": [
+    {
+      "id": "CTRL-2",
+      "appliesToRoles": [
+        "provider"
+      ],
+      "family": ""
+    },
+    {
+      "id": "CTRL-1",
+      "appliesToRoles": [
+        "deployer"
+      ],
+      "family": ""
+    },
+    {
+      "id": "CTRL-3",
+      "appliesToRoles": [
+        "both"
+      ],
+      "family": ""
+    }
+  ]
+}
