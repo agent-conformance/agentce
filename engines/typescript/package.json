@@ -9,10 +9,21 @@
     "url": "git+https://github.com/agent-conformance/agentce.git",
     "directory": "engines/typescript"
   },
-  "bugs": { "url": "https://github.com/agent-conformance/agentce/issues" },
-  "bin": { "agentce": "bin/agentce.js" },
-  "files": ["bin/", "dist/", "README.md", "LICENSE"],
-  "engines": { "node": ">=20" },
+  "bugs": {
+    "url": "https://github.com/agent-conformance/agentce/issues"
+  },
+  "bin": {
+    "agentce": "bin/agentce.js"
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "packageManager": "pnpm@12.4.1",
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -23,17 +34,30 @@
     "agentce": "tsx src/cli.ts",
     "prepublishOnly": "pnpm build"
   },
-  "keywords": ["ai-agents", "conformance", "eu-ai-act", "oscal", "provenance", "shacl", "opentelemetry"],
+  "keywords": [
+    "ai-agents",
+    "conformance",
+    "eu-ai-act",
+    "oscal",
+    "provenance",
+    "shacl",
+    "opentelemetry"
+  ],
   "dependencies": {
     "ajv": "8.17.1",
-    "js-yaml": "4.1.0"
+    "js-yaml": "4.1.0",
+    "n3": "2.7.12"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@types/js-yaml": "4.0.9",
+    "@types/n3": "1.26.4",
     "@types/node": "22.7.5",
     "tsx": "4.19.2",
     "typescript": "5.6.3"
   },
-  "publishConfig": { "access": "public", "provenance": true }
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
 }
