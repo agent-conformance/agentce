@@ -1,0 +1,62 @@
+{
+  "id": "prompt-injection-resistance",
+  "version": "2026.09",
+  "description": "Synthetic prompt-injection resistance probe corpus (SPEC 7.2). Frozen; hashes and sign-off recorded. Never regenerated in place.",
+  "sign_off": {
+    "reviewer": "AgentCE corpus maintainer",
+    "date": "2026-09-15",
+    "note": "Synthetic cases authored for conformance; no real prompts or PII."
+  },
+  "cases": [
+    {
+      "id": "safe-00",
+      "file": "cases/safe-00.json",
+      "prompt_sha256": "0862e1f64b96105adbfeb373a63f42a289b52ec73190918f9211d4a9946ca739"
+    },
+    {
+      "id": "safe-01",
+      "file": "cases/safe-01.json",
+      "prompt_sha256": "d773ee382cfaaa0a7fd293b579c6f238f3a15baaa9e95a19e337d7d11ff5fe41"
+    },
+    {
+      "id": "safe-02",
+      "file": "cases/safe-02.json",
+      "prompt_sha256": "1b3ee1d406e593f74d1a32da1f5be56e81219e844473446c4afc1da7307e7d8f"
+    },
+    {
+      "id": "safe-03",
+      "file": "cases/safe-03.json",
+      "prompt_sha256": "61439c1bd6dfd60b299123bad12f6792fb97b2830a4eeb2cf0c2461b94410c70"
+    },
+    {
+      "id": "safe-04",
+      "file": "cases/safe-04.json",
+      "prompt_sha256": "0166cf3bc7c5b049b2f8a25b80d32523b2fca8bd3ef9dc63cffb868142bdf622"
+    },
+    {
+      "id": "safe-05",
+      "file": "cases/safe-05.json",
+      "prompt_sha256": "4a634713a82869b3aec09f06ede0351146beea7cdae724a4507feaf2538a7ce7"
+    },
+    {
+      "id": "safe-06",
+      "file": "cases/safe-06.json",
+      "prompt_sha256": "32e9416b404cfb9939694f42103aa90bbb7208dff5a44c4b5ef497e573fa5b64"
+    },
+    {
+      "id": "safe-07",
+      "file": "cases/safe-07.json",
+      "prompt_sha256": "d4d60c828d7995ab5f4c8938167c43f3c4894c4a31c5926d1a4a878866513c71"
+    },
+    {
+      "id": "attack-00",
+      "file": "cases/attack-00.json",
+      "prompt_sha256": "8fa01ad53ebc9d2fb52daaf569dedb9f39b10ad0d4d3e595c31202bd770caab7"
+    },
+    {
+      "id": "attack-01",
+      "file": "cases/attack-01.json",
+      "prompt_sha256": "085e1d7cd1e130c73d19d00db194cd2ba5ae3e3c02cc52f6be51afc9a5732da3"
+    }
+  ]
+}
