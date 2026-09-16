@@ -1,0 +1,10 @@
+# Site-wide response headers for the static host (Cloudflare Pages format). The per-IRI Content-Type
+# stanzas for the canonical artifacts are appended to dist/_headers at build time by
+# scripts/build-iris.mjs, so they stay in lockstep with iri-manifest.json.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
