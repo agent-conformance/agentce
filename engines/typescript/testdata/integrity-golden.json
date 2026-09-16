@@ -1,0 +1,46 @@
+[
+  {
+    "stream": "s-anchored",
+    "strength": "export_anchored",
+    "status": "verified",
+    "anchors": [
+      {
+        "at": "2026-02-01T00:00:00.000Z"
+      }
+    ]
+  },
+  {
+    "stream": "s-chained",
+    "strength": "export_chained",
+    "status": "verified_weak"
+  },
+  {
+    "stream": "s-failed",
+    "strength": "export_chained",
+    "status": "failed",
+    "first_bad_index": 1
+  },
+  {
+    "stream": "s-gap",
+    "strength": "export_chained",
+    "status": "gap",
+    "first_bad_index": 1
+  },
+  {
+    "stream": "s-reordered",
+    "strength": "export_chained",
+    "status": "reordered",
+    "first_bad_index": 1
+  },
+  {
+    "stream": "s-suspect",
+    "strength": "export_anchored",
+    "status": "time_suspect",
+    "first_bad_index": 1,
+    "anchors": [
+      {
+        "at": "2026-03-01T00:00:00.000Z"
+      }
+    ]
+  }
+]
