@@ -238,20 +238,9 @@ class _Builder:
                 self.store.add_edge(instruction, "agentce:refusedBy", node)
 
     def _map_conduct(self, node: str, ptype: str, data: dict[str, Any]) -> None:
-        """Materialise the Conduct-overlay flags (SPEC §7.7): whether an action stayed within its
-        declared task scope and budget, and whether an instruction's source class is untrusted. The
-        engine takes an enforcement point's scope and budget determinations from the record and
-        defaults to conformant when a stream declares neither, so the flags are inert for the base
-        catalog, which never reads them."""
-        if ptype in ("ToolCall", "ResourceAccess"):
-            within_scope = data.get("within_scope", True)
-            within_budget = data.get("within_budget", True)
-            self.store.add_literal(
-                node, "agentce:withinScope", "true" if within_scope else "false", BOOL
-            )
-            self.store.add_literal(
-                node, "agentce:withinBudget", "true" if within_budget else "false", BOOL
-            )
+        """Materialise the Conduct-overlay instruction-trust flag (SPEC §7.7): whether an
+        instruction's declared source class is untrusted (Appendix F). Scope and budget are computed
+        from the enforcement point's records in a second pass (:meth:`_conduct_scope_budget`)."""
         if ptype == "Instruction":
             source_class = data.get("source_class")
             untrusted = (
@@ -263,6 +252,43 @@ class _Builder:
                 node,
                 "agentce:instructionUntrusted",
                 "true" if untrusted else "false",
+                BOOL,
+            )
+
+    def _conduct_scope_budget(self, events: list[dict[str, Any]]) -> None:
+        """Compute the Conduct within-scope and within-budget flags (SPEC §7.7, CND-01/CND-07) from
+        the enforcement point's records: an action is out of scope when a ``PolicyDecision`` denies
+        its request, and over budget when a ``Refusal`` with reason class ``budget_exceeded`` names
+        it; both default to conformant, so the flags are inert for a bundle that records neither."""
+        denied: set[str] = set()
+        over_budget: set[str] = set()
+        for event in events:
+            ptype = self._ptype(event)
+            data, refs = _data(event), _refs(event)
+            request = refs.get("request")
+            if (
+                ptype == "PolicyDecision"
+                and data.get("decision") == "deny"
+                and isinstance(request, str)
+            ):
+                denied.add(request)
+            if (
+                ptype == "Refusal"
+                and data.get("reason_class") == "budget_exceeded"
+                and isinstance(request, str)
+            ):
+                over_budget.add(request)
+        for event in events:
+            if self._ptype(event) not in ("ToolCall", "ResourceAccess"):
+                continue
+            node = event_iri(str(event["id"]))
+            self.store.add_literal(
+                node, "agentce:withinScope", "false" if node in denied else "true", BOOL
+            )
+            self.store.add_literal(
+                node,
+                "agentce:withinBudget",
+                "false" if node in over_budget else "true",
                 BOOL,
             )
 
@@ -300,6 +326,7 @@ class _Builder:
                 self._oversight_matches(node, data)
             self._chain_terminus(node, data)
         self._acts_on_untrusted(events)
+        self._conduct_scope_budget(events)
         self._preceded_by()
 
     def _dangling(self, node: str, event: dict[str, Any]) -> None:
