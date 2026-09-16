@@ -11,6 +11,7 @@ emitted artifact against its vendored schema.
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 import platform
 import uuid
@@ -20,7 +21,7 @@ from typing import Any
 
 import jsonschema
 
-from . import ENGINE_NAME, SPEC_VERSION, __version__, canonical
+from . import ENGINE_NAME, SPEC_VERSION, __version__, canonical, messages
 from .assertions import Assertion, aggregate, check_dc5
 
 _ZERO_DIGEST = "sha256:" + "0" * 64
@@ -63,33 +64,86 @@ def _safe(name: str) -> str:
     return "".join(c if c.isalnum() or c in "-._" else "_" for c in name)
 
 
-def render_report_md(assertions: list[Assertion], counts: dict[str, int]) -> str:
-    lines = ["# AgentCE conformance report", "", "## Outcome summary", ""]
-    lines += [f"- {outcome}: {count}" for outcome, count in counts.items()]
-    lines += ["", "## Assertions", ""]
+def _outcome_label(catalogue: dict[str, str], outcome: str) -> str:
+    return catalogue.get(f"outcome.{outcome}", outcome)
+
+
+def render_report_md(
+    assertions: list[Assertion],
+    counts: dict[str, int],
+    *,
+    language: str = messages.DEFAULT_LANGUAGE,
+) -> str:
+    cat = messages.catalogue(language)
+    lines = [f"# {cat['report.title']}", "", f"## {cat['report.summary_heading']}", ""]
+    lines += [
+        f"- {_outcome_label(cat, outcome)}: {count}"
+        for outcome, count in counts.items()
+    ]
+    lines += ["", f"## {cat['report.assertions_heading']}", ""]
     if not assertions:
-        lines.append("_No controls were evaluated._")
+        lines.append(f"_{cat['report.no_controls']}_")
     for a in sorted(assertions, key=lambda x: (x.subject, x.control)):
         lines.append(
-            f"- `{a.control}` @ `{a.subject}` -> **{a.outcome}** "
+            f"- `{a.control}` @ `{a.subject}` -> **{_outcome_label(cat, a.outcome)}** "
             f"(rung {a.rung}, {a.mode}; {a.population[1]}/{a.population[0]} failed)"
         )
     return "\n".join(lines) + "\n"
 
 
-def render_report_html(assertions: list[Assertion], counts: dict[str, int]) -> str:
-    summary = "".join(f"<li>{o}: {c}</li>" for o, c in counts.items())
+#: A self-contained stylesheet (no external references) with a print rule for A4 and Letter (§9.3).
+_HTML_STYLE = (
+    "body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}"
+    "h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}"
+    "table{border-collapse:collapse;width:100%}"
+    "th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}"
+    "th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}"
+    "@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}"
+    "@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}"
+    "table{page-break-inside:auto}tr{page-break-inside:avoid}}"
+)
+
+
+def render_report_html(
+    assertions: list[Assertion],
+    counts: dict[str, int],
+    *,
+    language: str = messages.DEFAULT_LANGUAGE,
+) -> str:
+    """Render a self-contained, escaped, WCAG 2.2 AA report page (SPEC §9.3): a strict CSP meta tag,
+    no external references, one ``h1``, a ``main`` landmark, a print stylesheet, and every string that
+    originates in evidence or declarations rendered as escaped text, never as markup."""
+    cat = messages.catalogue(language)
+    title = html.escape(cat["report.title"])
+    summary = "".join(
+        f"<li>{html.escape(_outcome_label(cat, o))}: {c}</li>"
+        for o, c in counts.items()
+    )
     rows = "".join(
-        f"<tr><td>{a.control}</td><td>{a.subject}</td><td>{a.outcome}</td></tr>"
+        f"<tr><td>{html.escape(a.control)}</td><td>{html.escape(a.subject)}</td>"
+        f"<td>{html.escape(_outcome_label(cat, a.outcome))}</td></tr>"
         for a in sorted(assertions, key=lambda x: (x.subject, x.control))
     )
+    body_rows = rows or (
+        f'<tr><td colspan="3">{html.escape(cat["report.no_controls"])}</td></tr>'
+    )
     return (
-        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
-        "<title>AgentCE conformance report</title></head><body>"
-        "<h1>AgentCE conformance report</h1>"
-        f"<h2>Outcome summary</h2><ul>{summary}</ul>"
-        f"<h2>Assertions</h2><table><tr><th>Control</th><th>Subject</th><th>Outcome</th></tr>{rows}</table>"
-        "</body></html>\n"
+        f'<!doctype html><html lang="{html.escape(language)}"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<meta http-equiv="Content-Security-Policy" '
+        "content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\">"
+        f"<title>{title}</title><style>{_HTML_STYLE}</style></head><body>"
+        f"<main><h1>{title}</h1>"
+        f'<section aria-labelledby="summary"><h2 id="summary">'
+        f"{html.escape(cat['report.summary_heading'])}</h2><ul>{summary}</ul></section>"
+        f'<section aria-labelledby="assertions"><h2 id="assertions">'
+        f"{html.escape(cat['report.assertions_heading'])}</h2>"
+        f"<table><caption>{html.escape(cat['report.assertions_heading'])}</caption>"
+        '<thead><tr><th scope="col">Control</th><th scope="col">Subject</th>'
+        '<th scope="col">Outcome</th></tr></thead>'
+        f"<tbody>{body_rows}</tbody></table></section>"
+        f"<footer><p>{html.escape(cat['report.affected_persons'])}</p></footer>"
+        "</main></body></html>\n"
     )
 
 
@@ -261,6 +315,7 @@ def build_manifest(
     operator: str,
     invocation: list[str],
     supersedes: list[str],
+    report_language: str = messages.DEFAULT_LANGUAGE,
 ) -> dict[str, Any]:
     package_digest = _package_digest()
     host = hashlib.sha256(
@@ -287,6 +342,7 @@ def build_manifest(
             "operator": operator,
             "host_fingerprint": "sha256:" + host,
             "invocation": invocation,
+            "report_language": report_language,
         },
     }
     if supersedes:
@@ -309,6 +365,7 @@ def write_report(
     operator: str = "unknown",
     invocation: list[str] | None = None,
     supersedes: list[str] | None = None,
+    report_language: str = messages.DEFAULT_LANGUAGE,
 ) -> dict[str, Any]:
     """Write every report artifact for ``assertions`` and return the reproducibility manifest."""
     check_dc5(
@@ -329,8 +386,12 @@ def write_report(
 
     counts = aggregate(assertions)
     write_json("assertions.json", [a.to_json() for a in assertions])
-    write_text("report.md", render_report_md(assertions, counts))
-    write_text("report.html", render_report_html(assertions, counts))
+    write_text(
+        "report.md", render_report_md(assertions, counts, language=report_language)
+    )
+    write_text(
+        "report.html", render_report_html(assertions, counts, language=report_language)
+    )
     write_json("oscal-ar.json", render_oscal(assertions))
     write_json("results.sarif", render_sarif(assertions))
 
@@ -353,6 +414,7 @@ def write_report(
         operator=operator,
         invocation=invocation or [],
         supersedes=supersedes or [],
+        report_language=report_language,
     )
     (out_dir / "manifest.json").write_text(
         json.dumps(manifest, sort_keys=True, indent=2), encoding="utf-8"

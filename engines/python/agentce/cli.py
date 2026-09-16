@@ -100,6 +100,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--probes", help="the probe-results directory")
     p.add_argument("--out", help="the output directory")
     p.add_argument("--state", help="the incremental state directory")
+    p.add_argument(
+        "--report-language",
+        dest="report_language",
+        help="message-key catalogue for the report; does not affect assertions.json (SPEC 9.3)",
+    )
     p.set_defaults(func=commands.cmd_assess)
 
     p = sub.add_parser(
@@ -114,6 +119,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--catalog", help="catalog labels for the public statement, comma-separated"
+    )
+    p.add_argument(
+        "--language", help="message-key catalogue for md/html rendering (SPEC 9.3)"
     )
     p.add_argument("--out", help="write the rendering to this file")
     p.add_argument("--validate", help="validate every artifact in a report directory")
