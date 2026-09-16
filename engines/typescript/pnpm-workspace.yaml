@@ -1,0 +1,5 @@
+# Biome and esbuild (tsx's bundler) fetch a platform-native binary in a postinstall step;
+# pnpm blocks dependency build scripts by default, so allow these two.
+onlyBuiltDependencies:
+  - "@biomejs/biome"
+  - esbuild
