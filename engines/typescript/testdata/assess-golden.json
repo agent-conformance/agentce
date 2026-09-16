@@ -1,0 +1,337 @@
+{
+  "empty": [
+    {
+      "control": "INC-02",
+      "control_version": "2026.09",
+      "mode": "automated",
+      "outcome": "not_applicable",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "rung": 2,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "1970-01-01T00:00:00Z",
+        "start": "1970-01-01T00:00:00Z"
+      }
+    },
+    {
+      "control": "INT-01",
+      "control_version": "2026.09",
+      "mode": "automated",
+      "outcome": "not_applicable",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "rung": 2,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "1970-01-01T00:00:00Z",
+        "start": "1970-01-01T00:00:00Z"
+      }
+    },
+    {
+      "control": "OVS-03",
+      "control_version": "2026.09",
+      "mode": "automated",
+      "outcome": "not_applicable",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "rung": 2,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "1970-01-01T00:00:00Z",
+        "start": "1970-01-01T00:00:00Z"
+      }
+    },
+    {
+      "control": "REC-04",
+      "control_version": "2026.09",
+      "mode": "automated",
+      "outcome": "not_applicable",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "rung": 2,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "1970-01-01T00:00:00Z",
+        "start": "1970-01-01T00:00:00Z"
+      }
+    }
+  ],
+  "ovs-failed": [
+    {
+      "control": "INC-02",
+      "control_version": "2026.09",
+      "mode": "automated",
+      "outcome": "not_applicable",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "rung": 2,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "2026-01-01T00:00:02Z",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    },
+    {
+      "control": "INT-01",
+      "control_version": "2026.09",
+      "evidence": [
+        {
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "ref": "agentce:event/tc1",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "evidence_strength": "strong",
+      "mode": "automated",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "rung": 2,
+      "source_class_satisfied": true,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "2026-01-01T00:00:02Z",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    },
+    {
+      "control": "OVS-03",
+      "control_version": "2026.09",
+      "evidence": [
+        {
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "ref": "agentce:event/tc1",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "evidence_strength": "strong",
+      "mode": "automated",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "rung": 2,
+      "source_class_satisfied": true,
+      "subject": "spiffe://corp/agents/a",
+      "violations": [
+        {
+          "constraint": "sh:hasValue",
+          "focus": "agentce:event/tc1",
+          "message_key": "OVS-03.E3",
+          "path": "(agentce:executes agentce:oversightModalityMatchesDeclared)"
+        }
+      ],
+      "window": {
+        "end": "2026-01-01T00:00:02Z",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    },
+    {
+      "control": "REC-04",
+      "control_version": "2026.09",
+      "evidence": [
+        {
+          "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
+          "ref": "agentce:event/d1",
+          "source_class": "self_report"
+        }
+      ],
+      "evidence_strength": "strong",
+      "mode": "automated",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "rung": 2,
+      "source_class_satisfied": true,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "2026-01-01T00:00:02Z",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    }
+  ],
+  "ovs-passed": [
+    {
+      "control": "INC-02",
+      "control_version": "2026.09",
+      "mode": "automated",
+      "outcome": "not_applicable",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "rung": 2,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "2026-01-01T00:00:02Z",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    },
+    {
+      "control": "INT-01",
+      "control_version": "2026.09",
+      "evidence": [
+        {
+          "digest": "sha256:fae347a9e72202695945c16b507d0d23cc41477cf230fa5f98cad5b6447809f2",
+          "ref": "agentce:event/tc1",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "evidence_strength": "strong",
+      "mode": "automated",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "rung": 2,
+      "source_class_satisfied": true,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "2026-01-01T00:00:02Z",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    },
+    {
+      "control": "OVS-03",
+      "control_version": "2026.09",
+      "evidence": [
+        {
+          "digest": "sha256:fae347a9e72202695945c16b507d0d23cc41477cf230fa5f98cad5b6447809f2",
+          "ref": "agentce:event/tc1",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "evidence_strength": "strong",
+      "mode": "automated",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "rung": 2,
+      "source_class_satisfied": true,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "2026-01-01T00:00:02Z",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    },
+    {
+      "control": "REC-04",
+      "control_version": "2026.09",
+      "evidence": [
+        {
+          "digest": "sha256:d4a9f7dd9e7227f646c01d480a0fdbdf12213d627286826d3dcb8a13a8dff9d4",
+          "ref": "agentce:event/d1",
+          "source_class": "self_report"
+        }
+      ],
+      "evidence_strength": "strong",
+      "mode": "automated",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "rung": 2,
+      "source_class_satisfied": true,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "2026-01-01T00:00:02Z",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    }
+  ],
+  "rec-passed": [
+    {
+      "control": "INC-02",
+      "control_version": "2026.09",
+      "mode": "automated",
+      "outcome": "not_applicable",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "rung": 2,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "2026-01-01T00:00:00Z",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    },
+    {
+      "control": "INT-01",
+      "control_version": "2026.09",
+      "mode": "automated",
+      "outcome": "not_applicable",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "rung": 2,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "2026-01-01T00:00:00Z",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    },
+    {
+      "control": "OVS-03",
+      "control_version": "2026.09",
+      "mode": "automated",
+      "outcome": "not_applicable",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "rung": 2,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "2026-01-01T00:00:00Z",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    },
+    {
+      "control": "REC-04",
+      "control_version": "2026.09",
+      "evidence": [
+        {
+          "digest": "sha256:f56466bad88f6ad62c52aed5aa73e39693224c23ff2ebf6c2585dbcf04a052e2",
+          "ref": "agentce:event/d1",
+          "source_class": "self_report"
+        }
+      ],
+      "evidence_strength": "strong",
+      "mode": "automated",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "rung": 2,
+      "source_class_satisfied": true,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "2026-01-01T00:00:00Z",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    }
+  ]
+}
