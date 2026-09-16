@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/report/deviation-register.schema.json",
+  "title": "AgentCE deviation register",
+  "description": "deviations.yaml (SPEC 6.5): accepted or temporary departures from a control, each with a rationale, a compensating control, an owner, an approver, an expiry, and evidence references. A deviation yields the outcome partial, never conformant, and is validated further by deviation_lint (SPEC Appendix F); it is not a way to absorb operational noise (that is tolerance, SPEC 9.2).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["deviations"],
+  "properties": {
+    "deviation_register_version": {"type": "integer", "minimum": 1},
+    "deviations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["control", "rationale", "compensating_control", "owner", "approver", "expiry"],
+        "properties": {
+          "control": {"type": "string", "description": "The control this deviation applies to."},
+          "rationale": {"type": "string"},
+          "compensating_control": {"type": "string"},
+          "owner": {"type": "string", "description": "The accountable party; deviation_lint refuses approver == owner."},
+          "approver": {"type": "string"},
+          "granted": {"type": "string", "format": "date-time"},
+          "expiry": {"type": "string", "format": "date-time", "description": "deviation_lint refuses an expired or over-long deviation."},
+          "evidence_refs": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}
