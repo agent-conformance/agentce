@@ -1,0 +1,117 @@
+---
+// Landing page (/). This is a grounded placeholder that item 6.2 expands into the full hero,
+// value narrative, feature sections, and call to action. It already establishes the layout, the
+// design tokens, and the core message so the scaffold builds and reads correctly.
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Agent Conformance — a standard for how AI agents behave">
+  <section class="hero">
+    <p class="eyebrow">The open conformance standard for AI agents</p>
+    <h1>Prove how your agents behave — the same way, across every vendor.</h1>
+    <p class="lede">
+      Agent Conformance is a deterministic, model-free assessment standard. One executable
+      specification, conforming engines in several languages, and byte-identical evidence you can
+      verify — so a claim about an agent means the same thing no matter who makes it.
+    </p>
+    <div class="actions">
+      <a class="button primary" href="/docs/getting-started/">Get started</a>
+      <a class="button" href="https://github.com/agent-conformance/agentce">View on GitHub</a>
+    </div>
+  </section>
+
+  <section class="pillars" aria-label="What the standard gives you">
+    <ul>
+      <li>
+        <h2>Deterministic</h2>
+        <p>No learned component decides an outcome. The same inputs always produce the same result.</p>
+      </li>
+      <li>
+        <h2>Vendor-neutral</h2>
+        <p>One specification and control catalog, comparable across agents and frameworks.</p>
+      </li>
+      <li>
+        <h2>Verifiable</h2>
+        <p>Reports carry a canonical form and signatures, so evidence reproduces and checks out.</p>
+      </li>
+    </ul>
+  </section>
+
+  <style>
+    .hero {
+      max-width: var(--measure);
+      margin: 0 auto;
+      padding: 5rem 1.5rem 3rem;
+    }
+    .eyebrow {
+      color: var(--accent-strong);
+      font-weight: 600;
+      font-size: 0.9rem;
+      letter-spacing: 0.02em;
+      margin: 0 0 1rem;
+    }
+    .hero h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 5vw, 3.4rem);
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin: 0 0 1.25rem;
+      max-width: 20ch;
+    }
+    .lede {
+      font-size: clamp(1.05rem, 2vw, 1.25rem);
+      color: var(--text-muted);
+      max-width: 62ch;
+      margin: 0 0 2rem;
+    }
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .button {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.7rem 1.3rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-contrast);
+    }
+    .button:hover {
+      border-color: var(--accent-strong);
+    }
+    .button.primary:hover {
+      background: var(--accent-strong);
+    }
+    .pillars {
+      max-width: var(--measure);
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+      border-top: 1px solid var(--border);
+    }
+    .pillars ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 1.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    }
+    .pillars h2 {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      margin: 0 0 0.4rem;
+    }
+    .pillars p {
+      margin: 0;
+      color: var(--text-muted);
+    }
+  </style>
+</BaseLayout>

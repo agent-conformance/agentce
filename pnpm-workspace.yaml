@@ -1,0 +1,11 @@
+# The public website is the only pnpm workspace member registered at the repository root. Each
+# language engine keeps its own self-contained workspace (its own pnpm-workspace.yaml and lockfile),
+# so this root manifest never globs them in and cannot disturb their `--frozen-lockfile` installs:
+# pnpm resolves a package against its nearest workspace manifest, and the engines each ship one.
+packages:
+  - website
+# Astro's bundler (esbuild) and Starlight's image pipeline (sharp) fetch a platform-native binary in a
+# postinstall step; pnpm blocks dependency build scripts by default, so allow exactly these to run.
+allowBuilds:
+  esbuild: true
+  sharp: true

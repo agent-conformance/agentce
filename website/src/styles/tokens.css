@@ -1,0 +1,122 @@
+/* Design tokens for agent-conformance.org — the single source of the site's visual identity.
+ *
+ * The accent palette (the "verification teal") is declared ONLY in this file, in both a light and a
+ * dark form, and every other stylesheet and component references it through var(--accent*). Starlight
+ * theme variables (--sl-*) are re-pointed here so the documentation and the landing share one palette.
+ *
+ * Self-hosted fonts (no external font CDN, matching the project's offline posture): a geometric display
+ * face for headings, a humanist sans for body text, and a monospace for code and evidence samples.
+ */
+@import '@fontsource-variable/space-grotesk';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+:root {
+  /* Neutral scale (slate), light theme. */
+  --bg: #ffffff;
+  --bg-subtle: #f8fafc;
+  --bg-raised: #ffffff;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --text-faint: #64748b;
+
+  /* Verification teal — the accent, declared here and nowhere else. */
+  --accent: #0d9488;
+  --accent-strong: #0f766e;
+  --accent-soft: #f0fdfa;
+  --accent-border: #99f6e4;
+  --accent-contrast: #ffffff;
+
+  /* Semantic outcome colours (pass / warn / fail), light theme. */
+  --pass: #15803d;
+  --warn: #b45309;
+  --fail: #b91c1c;
+
+  /* Typography. */
+  --font-display: 'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Layout. */
+  --measure: 1120px;
+  --radius: 10px;
+  --radius-sm: 6px;
+
+  /* Starlight overrides so the docs inherit the same identity. */
+  --sl-font: var(--font-body);
+  --sl-font-mono: var(--font-mono);
+  --sl-color-accent-low: var(--accent-soft);
+  --sl-color-accent: var(--accent);
+  --sl-color-accent-high: var(--accent-strong);
+  --sl-color-text-accent: var(--accent-strong);
+}
+
+/* Dark theme values — applied both when the visitor's system prefers dark (and no explicit light
+ * choice is set) and when a dark choice is stored (Starlight writes data-theme on <html>). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0b1120;
+    --bg-subtle: #0f172a;
+    --bg-raised: #111a2e;
+    --border: #1e293b;
+    --border-strong: #334155;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --text-faint: #64748b;
+
+    --accent: #2dd4bf;
+    --accent-strong: #5eead4;
+    --accent-soft: #042f2e;
+    --accent-border: #115e59;
+    --accent-contrast: #042f2e;
+
+    --pass: #4ade80;
+    --warn: #fbbf24;
+    --fail: #f87171;
+
+    --sl-color-accent-low: var(--accent-soft);
+    --sl-color-accent: var(--accent);
+    --sl-color-accent-high: var(--accent-strong);
+    --sl-color-text-accent: var(--accent);
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #0b1120;
+  --bg-subtle: #0f172a;
+  --bg-raised: #111a2e;
+  --border: #1e293b;
+  --border-strong: #334155;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-faint: #64748b;
+
+  --accent: #2dd4bf;
+  --accent-strong: #5eead4;
+  --accent-soft: #042f2e;
+  --accent-border: #115e59;
+  --accent-contrast: #042f2e;
+
+  --pass: #4ade80;
+  --warn: #fbbf24;
+  --fail: #f87171;
+
+  --sl-color-accent-low: var(--accent-soft);
+  --sl-color-accent: var(--accent);
+  --sl-color-accent-high: var(--accent-strong);
+  --sl-color-text-accent: var(--accent);
+}
+
+/* Respect a reduced-motion preference everywhere. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

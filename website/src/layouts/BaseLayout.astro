@@ -1,0 +1,175 @@
+---
+// The base layout for custom (non-documentation) pages such as the landing page. It provides the
+// document shell — language, viewport, canonical and Open Graph metadata, the shared design tokens,
+// and a header/footer — while the page supplies the <main> content through the default slot.
+//
+// The theme (light/dark) is kept in sync with the Starlight documentation: both read the same
+// `starlight-theme` value and set `data-theme` on <html>, so a visitor's choice carries across the
+// landing page and the docs. When nothing is stored, the palette follows the system preference.
+import '../styles/tokens.css';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const {
+  title,
+  description = 'A deterministic, model-free, vendor-neutral standard for assessing how AI agents behave, with reproducible evidence.',
+} = Astro.props;
+
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={canonicalURL} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalURL} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta name="twitter:card" content="summary" />
+    <script is:inline>
+      (() => {
+        try {
+          const t = localStorage.getItem('starlight-theme');
+          if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+        } catch (e) {
+          /* localStorage may be unavailable; fall back to the system preference. */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="bar">
+        <a class="brand" href="/">
+          <span class="mark" aria-hidden="true"></span>
+          Agent&nbsp;Conformance
+        </a>
+        <nav class="nav" aria-label="Primary">
+          <a href="/docs/getting-started/">Documentation</a>
+          <a href="https://github.com/agent-conformance/agentce">GitHub</a>
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <div class="bar">
+        <p>An open standard for agent conformance. Apache-2.0 licensed.</p>
+        <nav class="nav" aria-label="Footer">
+          <a href="/docs/getting-started/">Docs</a>
+          <a href="https://github.com/agent-conformance/agentce">Source</a>
+          <a href="https://github.com/agent-conformance/agentce/blob/main/LICENSE">License</a>
+        </nav>
+      </div>
+    </footer>
+
+    <style>
+      :global(html) {
+        box-sizing: border-box;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-body);
+        line-height: 1.6;
+        -webkit-text-size-adjust: 100%;
+      }
+      :global(*),
+      :global(*::before),
+      :global(*::after) {
+        box-sizing: inherit;
+      }
+      :global(body) {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      :global(a) {
+        color: var(--accent-strong);
+      }
+      .skip-link {
+        position: absolute;
+        left: -999px;
+        top: 0;
+        background: var(--accent);
+        color: var(--accent-contrast);
+        padding: 0.5rem 1rem;
+        border-radius: var(--radius-sm);
+        z-index: 10;
+      }
+      .skip-link:focus {
+        left: 1rem;
+      }
+      .bar {
+        max-width: var(--measure);
+        margin: 0 auto;
+        padding: 1rem 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+      .site-header {
+        border-bottom: 1px solid var(--border);
+        background: color-mix(in srgb, var(--bg) 88%, transparent);
+        position: sticky;
+        top: 0;
+        backdrop-filter: blur(8px);
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 1.05rem;
+        color: var(--text);
+        text-decoration: none;
+      }
+      .mark {
+        width: 1.1rem;
+        height: 1.1rem;
+        border-radius: 4px;
+        background: var(--accent);
+        box-shadow: inset 0 0 0 3px var(--accent-contrast), 0 0 0 1px var(--accent-strong);
+      }
+      .nav {
+        display: flex;
+        gap: 1.25rem;
+        align-items: center;
+      }
+      .nav a {
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 0.95rem;
+      }
+      .nav a:hover {
+        color: var(--accent-strong);
+      }
+      main {
+        flex: 1;
+      }
+      .site-footer {
+        border-top: 1px solid var(--border);
+        background: var(--bg-subtle);
+        margin-top: 4rem;
+      }
+      .site-footer p {
+        margin: 0;
+        color: var(--text-faint);
+        font-size: 0.9rem;
+      }
+    </style>
+  </body>
+</html>
