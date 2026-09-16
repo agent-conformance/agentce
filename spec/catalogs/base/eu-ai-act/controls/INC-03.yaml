@@ -11,6 +11,7 @@ evaluation:
   min_source_class: self_report
   minimum_evidence:
     - {event: Decision, class: self_report}
+    - {event: ApprovalDecided, class: any}
   shape: shapes/INC-03.ttl
 expectations:
   - {id: S1, text: "Incident-triggering decisions carry an oversight review."}

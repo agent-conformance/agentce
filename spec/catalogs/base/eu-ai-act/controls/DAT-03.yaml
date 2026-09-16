@@ -11,6 +11,7 @@ evaluation:
   min_source_class: self_report
   minimum_evidence:
     - {event: Decision, class: self_report}
+    - {event: ApprovalDecided, class: any}
   shape: shapes/DAT-03.ttl
 expectations:
   - {id: S1, text: "Outcome parity across declared groups is within thresholds."}

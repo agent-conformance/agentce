@@ -11,6 +11,7 @@ evaluation:
   min_source_class: self_report
   minimum_evidence:
     - {event: Decision, class: self_report}
+    - {event: ApprovalDecided, class: any}
   shape: shapes/ROB-07.ttl
 expectations:
   - {id: S1, text: "Cyber-incident detection and response are exercised."}
