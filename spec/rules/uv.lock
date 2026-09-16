@@ -3,6 +3,35 @@ revision = 3
 requires-python = ">=3.12"
 
 [[package]]
+name = "agent-conformance"
+version = "0.0.1"
+source = { editable = "../../engines/python" }
+dependencies = [
+    { name = "jsonschema" },
+    { name = "pyyaml" },
+    { name = "rdflib" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jsonschema", specifier = ">=4.21,<5" },
+    { name = "pyyaml", specifier = ">=6,<7" },
+    { name = "rdflib", specifier = ">=7,<8" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6,<7" },
+    { name = "mypy", specifier = ">=1.11,<2" },
+    { name = "pyshacl", specifier = ">=0.26,<0.31" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-cov", specifier = ">=5,<7" },
+    { name = "ruff", specifier = ">=0.6,<0.13" },
+    { name = "types-jsonschema", specifier = ">=4.21" },
+    { name = "types-pyyaml", specifier = ">=6" },
+]
+
+[[package]]
 name = "agentce-rules"
 version = "0.1.0"
 source = { virtual = "." }
@@ -14,6 +43,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "agent-conformance" },
     { name = "pytest" },
 ]
 
@@ -25,7 +55,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8,<9" }]
+dev = [
+    { name = "agent-conformance", editable = "../../engines/python" },
+    { name = "pytest", specifier = ">=8,<9" },
+]
 
 [[package]]
 name = "attrs"
