@@ -24,8 +24,12 @@
     "prepublishOnly": "pnpm build"
   },
   "keywords": ["ai-agents", "conformance", "eu-ai-act", "oscal", "provenance", "shacl", "opentelemetry"],
+  "dependencies": {
+    "js-yaml": "4.1.0"
+  },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
+    "@types/js-yaml": "4.0.9",
     "@types/node": "22.7.5",
     "tsx": "4.19.2",
     "typescript": "5.6.3"
