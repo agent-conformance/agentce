@@ -8,6 +8,8 @@ at general availability.
 ## Start here
 
 - [Quickstart](quickstart.md) — run the vendored project end to end with no configuration.
+- Per-engine quickstart on a fresh machine: [Python](quickstart-python.md) ·
+  [TypeScript](quickstart-typescript.md) · [Java](quickstart-java.md).
 - [Integrate a source](integrate.md) — emit or export the evidence the engine reads.
 - [Living report example](example-report.md) — the report the quickstart project renders.
 
