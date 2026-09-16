@@ -1,0 +1,83 @@
+# Fresh-machine proof (SPEC §13.4 AX-1, §14.4): on a clean runner with only the language toolchain,
+# each engine runs the vendored quickstart project end to end within five minutes, and the engine
+# container image builds. Dispatched under the pre-GA guardrails (not run on every push); every action
+# is pinned by commit SHA (AGENTS.md quality gates). No image is pushed.
+name: quickstart
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: quickstart (python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Quickstart on a clean machine
+        working-directory: engines/python
+        run: uv run agentce quickstart --out "$RUNNER_TEMP/report"
+
+  typescript:
+    name: quickstart (typescript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - name: Build the TypeScript engine
+        working-directory: engines/typescript
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm build
+      - name: Assess the quickstart project
+        run: |
+          node engines/typescript/bin/agentce.js assess \
+            --bundle corpus/quickstart/evidence \
+            --profile corpus/quickstart/applicability.yaml \
+            --domain corpus/quickstart/domain.linkml.yaml \
+            --catalog eu-ai-act@2026.09 \
+            --catalog-dir spec/catalogs/base/eu-ai-act \
+            --out "$RUNNER_TEMP/report"
+
+  java:
+    name: quickstart (java)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Build the Java engine
+        working-directory: engines/java
+        run: ./gradlew --no-daemon --quiet installDist
+      - name: Assess the quickstart project
+        run: |
+          engines/java/build/install/agentce/bin/agentce assess \
+            --bundle corpus/quickstart/evidence \
+            --profile corpus/quickstart/applicability.yaml \
+            --domain corpus/quickstart/domain.linkml.yaml \
+            --catalog eu-ai-act@2026.09 \
+            --catalog-dir spec/catalogs/base/eu-ai-act \
+            --out "$RUNNER_TEMP/report"
+
+  image:
+    name: container image build (no push)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build the engine image without pushing
+        run: docker build -f engines/python/Dockerfile -t agentce/agentce:dev .
