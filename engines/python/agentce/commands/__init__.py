@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import hashlib
 import json
 import re
 from collections.abc import Iterable
@@ -56,6 +57,8 @@ from ..report import (
 from ..state import StateDir, window_end
 from ..result import CommandResult
 from ..store import GraphStore
+from .. import signing
+from ..canonical import canonicalize
 
 _log = get_logger()
 
@@ -196,16 +199,134 @@ def cmd_verify(ns: argparse.Namespace) -> CommandResult:
             result.add_code(int(ExitCode.FINDINGS))
         return result
     if catalog is not None:
-        result.data["catalog"] = str(
-            _require_dir(catalog, key="catalog", what="the catalog directory")
+        catalog_dir = _require_dir(catalog, key="catalog", what="the catalog directory")
+        return _verify_catalog(result, catalog_dir)
+    release_path = Path(release)  # type: ignore[arg-type]
+    if not release_path.exists():
+        raise InputError(
+            "input.release_missing",
+            f"the release artifact {release!r} does not exist.",
+            "pass --release <bundle-dir-or-envelope>.",
         )
-    else:
-        result.data["release"] = str(
-            _require_file(release, key="release", what="the release artifact")
-        )
-    return _pending(
-        result, "Catalog and release signature verification land in a later work item."
+    return _verify_release(result, release_path)
+
+
+def _verify_catalog(result: CommandResult, catalog_dir: Path) -> CommandResult:
+    """Verify a catalog directory's signature offline against the vendored trust root (SPEC §8.7)."""
+    recomputed = signing.digest_tree(
+        catalog_dir, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME})
     )
+    result.data.update({"catalog": str(catalog_dir), "digest": recomputed})
+    sig_path = catalog_dir / signing.CATALOG_SIGNATURE_NAME
+    if not sig_path.is_file():
+        result.data["verified"] = False
+        result.data["reason"] = (
+            f"unsigned: {signing.CATALOG_SIGNATURE_NAME} is absent; the engine refuses an "
+            "unverifiable catalog (SPEC §8.7)."
+        )
+        result.note(f"catalog {catalog_dir.name}: unsigned")
+        result.add_code(int(ExitCode.INPUT_ERROR))
+        return result
+    try:
+        envelope = json.loads(sig_path.read_text("utf-8"))
+        verified = signing.verify_envelope(envelope, signing.vendored_trust())
+        statement = json.loads(verified.payload)
+        signed_digest = _statement_subject_digest(statement)
+        if signed_digest != recomputed:
+            raise signing.VerificationError(
+                "the signature covers a different catalog digest than the directory content"
+            )
+    except (signing.VerificationError, ValueError, KeyError, IndexError) as exc:
+        result.data["verified"] = False
+        result.data["reason"] = str(exc)
+        result.note(f"catalog {catalog_dir.name}: verification failed — {exc}")
+        result.add_code(int(ExitCode.INPUT_ERROR))
+        return result
+    result.data.update(
+        {
+            "verified": True,
+            "signer": verified.identity,
+            "keyid": verified.keyid,
+            "keyless": verified.keyless,
+        }
+    )
+    result.note(f"verified catalog {catalog_dir.name}: signer {verified.identity}")
+    return result
+
+
+def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
+    """Verify a release bundle (or a single DSSE envelope) offline against the vendored trust root."""
+    trust = signing.vendored_trust()
+    if release_path.is_file():
+        envelope = json.loads(release_path.read_text("utf-8"))
+        verified = signing.verify_envelope(envelope, trust)
+        result.data.update(
+            {
+                "release": str(release_path),
+                "verified": True,
+                "signer": verified.identity,
+                "keyid": verified.keyid,
+            }
+        )
+        result.note(f"verified {release_path.name}: signer {verified.identity}")
+        return result
+    manifest_path = release_path / "release-manifest.json"
+    signatures_path = release_path / "signatures.json"
+    if not manifest_path.is_file() or not signatures_path.is_file():
+        raise InputError(
+            "input.release_bundle",
+            f"{release_path} is not a release bundle (release-manifest.json/signatures.json).",
+            "pass the --out directory produced by the release tooling.",
+        )
+    manifest = json.loads(manifest_path.read_text("utf-8"))
+    manifest_digest = signing.sha256_prefixed(canonicalize(manifest))
+    problems: list[str] = []
+    for artifact in manifest.get("artifacts", []):
+        artifact_file = release_path / artifact["name"]
+        if not artifact_file.is_file():
+            problems.append(f"missing artifact {artifact['name']}")
+            continue
+        actual = signing.sha256_prefixed(artifact_file.read_bytes())
+        if actual != artifact.get("digest"):
+            problems.append(f"digest mismatch for {artifact['name']}")
+    signers: list[dict[str, Any]] = []
+    for entry in json.loads(signatures_path.read_text("utf-8")):
+        try:
+            verified = signing.verify_envelope(entry["envelope"], trust)
+            if (
+                _statement_subject_digest(json.loads(verified.payload))
+                != manifest_digest
+            ):
+                raise signing.VerificationError(
+                    "signature does not cover the release manifest"
+                )
+            signers.append(
+                {"profile": entry.get("profile"), "identity": verified.identity}
+            )
+        except (signing.VerificationError, ValueError, KeyError) as exc:
+            problems.append(f"signature ({entry.get('profile')}): {exc}")
+    ok = not problems
+    result.data.update(
+        {
+            "release": str(release_path),
+            "verified": ok,
+            "manifest_digest": manifest_digest,
+            "signers": signers,
+        }
+    )
+    if not ok:
+        result.data["reason"] = "; ".join(problems)
+        result.note(f"release {release_path.name}: verification failed")
+        result.add_code(int(ExitCode.INPUT_ERROR))
+    else:
+        result.note(f"verified release {release_path.name}: {len(signers)} signatures")
+    return result
+
+
+def _statement_subject_digest(statement: dict[str, Any]) -> str:
+    """Return the ``sha256:`` digest of an in-toto Statement's single subject."""
+    digest = statement["subject"][0]["digest"]
+    return "sha256:" + digest["sha256"]
 
 
 def cmd_assess(ns: argparse.Namespace) -> CommandResult:
@@ -608,15 +729,137 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
             f"unknown signing profile {profile!r}.",
             f"choose one of: {', '.join(SIGN_PROFILES)}.",
         )
+    dry_run = _flag(ns, "dry_run")
     result.data.update(
         {
             "report_dir": str(report_dir),
             "as": role,
             "profile": profile,
-            "dry_run": _flag(ns, "dry_run"),
+            "dry_run": dry_run,
         }
     )
-    return _pending(result, "Signing lands with the release-tooling work item.")
+
+    # The engine refuses to sign a report that is not ready to publish (SPEC §8.5).
+    verdict = readiness.compute_readiness(
+        report_dir, severities=_readiness_severities(ns)
+    )
+    result.data["readiness"] = verdict["verdict"]
+    if verdict["verdict"] == readiness.NOT_READY:
+        raise InputError(
+            "sign.not_ready",
+            f"the report is {verdict['verdict']}: {'; '.join(verdict['reasons'])}.",
+            "resolve the blocking reasons (agentce readiness <report-dir>) before signing.",
+        )
+
+    if dry_run:
+        result.note(f"dry run: would sign the claim as {role} ({profile})")
+        return result
+
+    claim_path = report_dir / "claim.json"
+    if not claim_path.is_file():
+        raise InputError(
+            "sign.no_claim",
+            "the report directory has no claim.json to sign.",
+            "produce the report first: `agentce assess … --out <report-dir>`.",
+        )
+    claim = json.loads(claim_path.read_text("utf-8"))
+
+    signer = _sign_signer(ns, profile)
+    subjects = _sign_subjects(report_dir, claim)
+    statement = {
+        "_type": signing.INTOTO_STATEMENT_TYPE,
+        "subject": subjects,
+        "predicateType": "https://agent-conformance.org/attestation/claim/v1",
+        "predicate": {
+            "role": role,
+            "profile": profile,
+            "statement": (
+                "This report states conformance to the named catalogs as evaluated by the named "
+                "engine over the named evidence. It is not a legal compliance determination."
+            ),
+        },
+    }
+    envelope = signing.sign_statement(statement, signer)
+    record = {"role": role, "profile": profile, **envelope}
+    claim.setdefault("signatures", []).append(record)
+    claim_path.write_text(
+        json.dumps(claim, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    sig_dir = report_dir / "signatures"
+    sig_dir.mkdir(exist_ok=True)
+    detached = sig_dir / f"{role}-{profile}.dsse.json"
+    detached.write_text(
+        json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    result.data.update(
+        {
+            "signature": str(detached),
+            "keyid": signer.keyid,
+            "signatures": len(claim["signatures"]),
+        }
+    )
+    result.note(f"signed {claim_path.name} as {role} ({profile})")
+    return result
+
+
+def _sign_subjects(report_dir: Path, claim: dict[str, Any]) -> list[dict[str, Any]]:
+    """The in-toto subjects a claim signature covers: the claim body and the manifest, by digest."""
+    body = {k: v for k, v in claim.items() if k != "signatures"}
+    subjects = [
+        {
+            "name": "claim.json",
+            "digest": {"sha256": hashlib.sha256(canonicalize(body)).hexdigest()},
+        }
+    ]
+    manifest_path = report_dir / "manifest.json"
+    if manifest_path.is_file():
+        subjects.append(
+            {
+                "name": "manifest.json",
+                "digest": {
+                    "sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+                },
+            }
+        )
+    return subjects
+
+
+def _sign_signer(ns: argparse.Namespace, profile: str) -> signing.Signer:
+    """Resolve the operator's signing key for ``agentce sign`` (SPEC §9.1).
+
+    ``kms`` signs with an operator-held key passed as ``--key`` (Ed25519 PEM); the engine holds no
+    signing identity of its own. The keyless ``sigstore-*`` profiles obtain a short-lived certificate
+    from a Fulcio instance, which needs network and is exercised by the release tooling; ``agentce
+    sign`` reports the requirement rather than pretending to reach it offline.
+    """
+    key_path = _opt_str(ns, "key")
+    if profile == "kms":
+        if not key_path:
+            raise InputError(
+                "sign.kms_key_missing",
+                "the kms profile signs with an operator-held key.",
+                "pass --key <ed25519-private-key.pem>.",
+            )
+        from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+        key_file = _require_file(key_path, key="key", what="the signing key")
+        loaded = load_pem_private_key(key_file.read_bytes(), password=None)
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        if not isinstance(loaded, Ed25519PrivateKey):
+            raise InputError(
+                "sign.key_algorithm",
+                "the signing key is not an Ed25519 private key.",
+                "supply an Ed25519 key (the algorithm the engine signs with, SPEC §8.7).",
+            )
+        return signing.KmsSigner(private_key=loaded)
+    raise InputError(
+        "sign.keyless_offline",
+        f"the {profile} profile is keyless and obtains a certificate from a Fulcio instance "
+        "(network); the engine does not sign it offline.",
+        "use --profile kms --key <file> offline, or run keyless signing where the Fulcio and "
+        "Rekor endpoints are reachable.",
+    )
 
 
 def _readiness_severities(ns: argparse.Namespace) -> dict[str, str]:

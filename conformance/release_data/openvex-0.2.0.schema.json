@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/schema/openvex-0.2.0.schema.json",
+  "title": "OpenVEX 0.2.0 structural schema",
+  "description": "A self-contained structural schema for an OpenVEX 0.2.0 document (https://github.com/openvex/spec), covering the required document fields and per-statement fields the AgentCE release VEX emits. It enforces the @context constant, the status vocabulary, and the justification requirement for a not_affected statement. Kept vendored so verification stays offline and deterministic (SPEC §8.7).",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["@context", "@id", "author", "timestamp", "version", "statements"],
+  "properties": {
+    "@context": {"const": "https://openvex.dev/ns/v0.2.0"},
+    "@id": {"type": "string", "minLength": 1},
+    "author": {"type": "string", "minLength": 1},
+    "role": {"type": "string"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "version": {"type": "integer", "minimum": 1},
+    "tooling": {"type": "string"},
+    "statements": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/statement"}
+    }
+  },
+  "$defs": {
+    "statement": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["vulnerability", "products", "status"],
+      "properties": {
+        "vulnerability": {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": {"type": "string", "minLength": 1},
+            "description": {"type": "string"}
+          }
+        },
+        "products": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["@id"],
+            "properties": {"@id": {"type": "string", "minLength": 1}}
+          }
+        },
+        "status": {
+          "enum": ["not_affected", "affected", "fixed", "under_investigation"]
+        },
+        "justification": {
+          "enum": [
+            "component_not_present",
+            "vulnerable_code_not_present",
+            "vulnerable_code_not_in_execute_path",
+            "vulnerable_code_cannot_be_controlled_by_adversary",
+            "inline_mitigations_already_exist"
+          ]
+        },
+        "impact_statement": {"type": "string"},
+        "action_statement": {"type": "string"},
+        "timestamp": {"type": "string", "format": "date-time"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "not_affected"}}},
+          "then": {"required": ["justification"]}
+        },
+        {
+          "if": {"properties": {"status": {"const": "affected"}}},
+          "then": {"required": ["action_statement"]}
+        }
+      ]
+    }
+  }
+}
