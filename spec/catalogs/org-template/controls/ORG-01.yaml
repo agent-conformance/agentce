@@ -1,0 +1,25 @@
+id: ORG-01
+version: "2026.09"
+title: Organisation-specific bounded threshold (template)
+crosswalk:
+  - {framework: eu-ai-act, clause: "Art. 9", relation: supports, verified_against_text: false}
+applicability:
+  applies_to_roles: [deployer, provider]
+evaluation:
+  mode: manual
+  rung: 3
+  min_source_class: independent_system
+  minimum_evidence:
+    - {event: Decision, class: independent_system}
+expectations:
+  - {id: S1, text: "The organisation-defined threshold holds; replace this control with your own bounded thresholds."}
+severity: medium
+evidence_strength: partial
+tolerance: {kind: count, max: 0}
+tolerance_rationale: "Template control; an organisation sets its own bounded tolerance."
+false_positive_modes:
+  - "A declared, bounded exemption approved by the organisation."
+techniques:
+  - "techniques/org-threshold-attestation"
+test_cases:
+  - {id: pending, expected: not_assessed, fixture: test/ORG-01-pending.jsonl}

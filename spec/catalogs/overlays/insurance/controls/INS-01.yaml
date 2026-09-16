@@ -1,0 +1,25 @@
+id: INS-01
+version: "2026.09"
+title: Adverse-action notices are issued within the sector window
+crosswalk:
+  - {framework: eu-ai-act, clause: "Art. 26(11)", relation: supports, verified_against_text: false}
+applicability:
+  applies_to_roles: [deployer, provider]
+evaluation:
+  mode: manual
+  rung: 3
+  min_source_class: independent_system
+  minimum_evidence:
+    - {event: Decision, class: independent_system}
+expectations:
+  - {id: S1, text: "Adverse-action notices are issued within the sector window."}
+severity: high
+evidence_strength: partial
+tolerance: {kind: count, max: 0}
+tolerance_rationale: "INS-01 is a sector obligation with no tolerated exceptions."
+false_positive_modes:
+  - "A bounded, declared exemption recorded in the applicability profile."
+techniques:
+  - "techniques/sector-threshold-attestation"
+test_cases:
+  - {id: pending, expected: not_assessed, fixture: test/INS-01-pending.jsonl}

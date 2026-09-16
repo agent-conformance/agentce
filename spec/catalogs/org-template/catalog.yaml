@@ -1,0 +1,9 @@
+# Organisation overlay template (SPEC §7.3): copy this directory and replace ORG-01 with your
+# own bounded-threshold controls. An overlay may tighten a base control but never weaken it.
+id: org-template
+version: "2026.09"
+title: Organisation overlay template
+kind: overlay
+families: [ORG]
+controls:
+  - controls/ORG-01.yaml

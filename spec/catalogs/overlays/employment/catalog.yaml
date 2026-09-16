@@ -1,0 +1,8 @@
+# Employment sector overlay (SPEC §7.3): bounded-threshold controls layered on the base catalog.
+id: employment
+version: "2026.09"
+title: Employment overlay
+kind: overlay
+families: [EMP]
+controls:
+  - controls/EMP-01.yaml
