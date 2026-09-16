@@ -142,7 +142,9 @@ def _outcome_matches(expected: str, applicable: int, outcome: str) -> bool:
     return True  # insufficient_evidence / not_assessed are not re-derived structurally here
 
 
-def lint_catalog(directory: Path, *, require_verification_flags: bool = False) -> list[str]:
+def lint_catalog(
+    directory: Path, *, require_verification_flags: bool = False
+) -> list[str]:
     """Return a list of problems; an empty list means the catalog is clean.
 
     With ``require_verification_flags`` (SPEC §7.3 B14), every crosswalk entry must carry a
