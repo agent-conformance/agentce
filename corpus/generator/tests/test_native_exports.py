@@ -28,7 +28,7 @@ NON_OTEL_STYLES = [
 
 
 def _project(tmp_path: Path, style: str, index: int) -> Path:
-    generate._write_project(tmp_path, style, "known-pass", index)
+    generate._write_project(tmp_path, generate.CREDIT, style, "known-pass", index)
     return tmp_path / "projects" / generate.DOMAIN / style / "known-pass"
 
 

@@ -124,3 +124,45 @@ def test_benign_events_are_quarantined(corpus_dir: Path, tmp_path: Path) -> None
     ]
     reasons = {q["reason"] for q in quarantine}
     assert {"duplicate_id", "unknown_type"} <= reasons
+
+
+@pytest.fixture(scope="module")
+def full_corpus(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Path]:
+    original = generate.FILLER_EVENTS
+    generate.FILLER_EVENTS = 40
+    try:
+        out = tmp_path_factory.mktemp("corpus-full")
+        generate.build_corpus(out, "full")
+        yield out
+    finally:
+        generate.FILLER_EVENTS = original
+
+
+def test_full_new_project_types_match_engine(full_corpus: Path, tmp_path: Path) -> None:
+    # The full set's novel project types — the two added variants and the multi-agent bundles — must
+    # match their authored ground truth under the engine (the held-out and adversarial subsets are
+    # proven by conformance/tests/test_held_out.py).
+    targets = [
+        "credit/langgraph/minor-only",
+        "hiring/custom-loop/dual-clean",
+        "multi-agent/credit/clean-and-faulty",
+        "multi-agent/benefits/both-clean",
+    ]
+    mismatches: list[str] = []
+    for pid in targets:
+        report = _assess(full_corpus, pid, tmp_path / pid.replace("/", "_"))
+        exp_payload = json.loads(
+            (full_corpus / "projects" / pid / "expected" / "outcomes.json").read_text()
+        )
+        exp = {
+            (o["subject"], o["control"]): o["outcome"] for o in exp_payload["outcomes"]
+        }
+        assertions = json.loads((report / "assertions.json").read_text())
+        got = {
+            (a["subject"], a["control"]): a["outcome"]
+            for a in assertions
+            if (a["subject"], a["control"]) in exp
+        }
+        if got != exp:
+            mismatches.append(f"{pid}: expected {exp}, got {got}")
+    assert not mismatches, "\n".join(mismatches)

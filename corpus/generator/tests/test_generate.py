@@ -93,6 +93,41 @@ def test_deterministic_bytes(tmp_path: Path) -> None:
     assert tree_hash(tmp_path / "a") == tree_hash(tmp_path / "b")
 
 
+def _tree_hash(root: Path) -> str:
+    h = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            h.update(path.relative_to(root).as_posix().encode())
+            h.update(path.read_bytes())
+    return h.hexdigest()
+
+
+def test_full_set_is_deterministic(tmp_path: Path) -> None:
+    manifest_a = generate.build_corpus(tmp_path / "fa", "full")
+    manifest_b = generate.build_corpus(tmp_path / "fb", "full")
+    assert manifest_a["digest"] == manifest_b["digest"]
+    assert _tree_hash(tmp_path / "fa") == _tree_hash(tmp_path / "fb")
+
+
+def test_full_set_structure(tmp_path: Path) -> None:
+    _out, manifest = tmp_path / "f", generate.build_corpus(tmp_path / "f", "full")
+    projects = manifest["projects"]
+    ids = [p["id"] for p in projects]
+    assert ids == sorted(ids) and len(set(ids)) == len(
+        ids
+    )  # unique, deterministic order
+    assert len(projects) == 150
+    groups = {p["id"]: p["group"] for p in projects}
+    from collections import Counter
+
+    counts = Counter(groups.values())
+    assert counts == {"core": 126, "held-out": 9, "adversarial": 9, "multi-agent": 6}
+    # three domains, each crossed with six styles and the seven full variants
+    core = [p for p in projects if p["group"] == "core"]
+    assert {p["domain"] for p in core} == {"credit", "hiring", "benefits"}
+    assert {p["variant"] for p in core} == set(generate.FULL_VARIANTS)
+
+
 def test_project_layout_is_complete(tmp_path: Path) -> None:
     out, manifest = _build(tmp_path)
     for project in manifest["projects"]:
