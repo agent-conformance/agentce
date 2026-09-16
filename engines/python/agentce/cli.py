@@ -131,6 +131,17 @@ def build_parser() -> argparse.ArgumentParser:
         "lint", parents=[common], help="validate controls, shapes, and test cases"
     )
     lint.add_argument("dir", nargs="?", help="the catalog directory")
+    matrix = csub.add_parser(
+        "coverage-matrix",
+        parents=[common],
+        help="regenerate the automation coverage matrix (SPEC 7.5)",
+    )
+    matrix.add_argument("dir", nargs="?", help="the catalog directory")
+    matrix.add_argument(
+        "--check",
+        action="store_true",
+        help="fail if the committed matrix differs from the regenerated one",
+    )
     p.set_defaults(func=commands.cmd_catalog)
 
     p = sub.add_parser("conformance", parents=[common], help="engine conformance suite")

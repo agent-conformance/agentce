@@ -31,6 +31,7 @@ from ..collect import EnvSecretManager, load_config, run_collect
 from ..config import resolve as resolve_config
 from ..conformance import run_ecs
 from ..coverage import compute_coverage
+from ..coverage_matrix import MATRIX_FILE, check_matrix, write_matrix
 from ..domain import DomainBinding
 from ..errors import InputError
 from ..exit_codes import ExitCode
@@ -400,11 +401,13 @@ def cmd_collect(ns: argparse.Namespace) -> CommandResult:
 def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="catalog")
     action = _opt_str(ns, "catalog_action")
+    if action == "coverage-matrix":
+        return _cmd_coverage_matrix(ns)
     if action != "lint":
         raise InputError(
             "input.catalog_action",
-            "the only catalog action is `lint`.",
-            "run `agentce catalog lint <dir>`.",
+            "the catalog actions are `lint` and `coverage-matrix`.",
+            "run `agentce catalog lint <dir>` or `agentce catalog coverage-matrix <dir>`.",
         )
     directory = _require_dir(
         _opt_str(ns, "dir"),
@@ -440,6 +443,33 @@ def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
             result.note(f"  {problem}")
     else:
         result.note(f"CATALOG OK: {directory}")
+    return result
+
+
+def _cmd_coverage_matrix(ns: argparse.Namespace) -> CommandResult:
+    result = CommandResult(command="catalog")
+    directory = _require_dir(
+        _opt_str(ns, "dir"),
+        key="dir",
+        what="the catalog directory",
+        fix="pass the catalog directory: `agentce catalog coverage-matrix <dir>`.",
+    )
+    if _flag(ns, "check"):
+        ok, message = check_matrix(directory)
+        result.data.update(
+            {"action": "coverage-matrix", "dir": str(directory), "matrix_ok": ok}
+        )
+        if ok:
+            result.note(f"MATRIX OK: {directory}")
+        else:
+            result.add_code(int(ExitCode.FINDINGS))
+            result.note(f"MATRIX FAILED: {message}")
+        return result
+    written = write_matrix(directory)
+    result.data.update(
+        {"action": "coverage-matrix", "dir": str(directory), "written": str(written)}
+    )
+    result.note(f"wrote {MATRIX_FILE} for {directory}")
     return result
 
 
