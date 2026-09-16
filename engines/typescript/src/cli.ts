@@ -4,10 +4,11 @@
  * verb is implemented it returns a stable `input_error` envelope rather than a guess.
  */
 
-import { statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { runEcs } from "./conformance";
 import { AgentceError, InputError } from "./errors";
 import { ExitCode } from "./exitCodes";
+import { computeVectorFile } from "./numerics";
 import { CommandResult } from "./result";
 import { sortKeysDeep } from "./util";
 import { engineVersion } from "./version";
@@ -109,6 +110,19 @@ export function main(argv: string[]): number {
   const command = argv[0];
   if (command === "--version" || command === "-V" || command === "version") {
     console.log(`agentce ${engineVersion()}`);
+    return 0;
+  }
+
+  // The numerics verb is a plain computation seam for the two-engine vector check (P3.1): it reads a
+  // `numerics-vectors` case file and prints {caseName: result} as plain JSON, not the envelope.
+  if (command === "numerics") {
+    const casefile = argv[1];
+    if (casefile === undefined) {
+      console.error("numerics: a case file path is required");
+      return ExitCode.INPUT_ERROR;
+    }
+    const data = JSON.parse(readFileSync(casefile, "utf-8"));
+    console.log(JSON.stringify(computeVectorFile(data)));
     return 0;
   }
 
