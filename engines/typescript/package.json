@@ -1,7 +1,7 @@
 {
   "name": "@agent-conformance/cli",
   "version": "0.0.1",
-  "description": "Agent Conformance Engine (AgentCE) command-line interface. Placeholder release; the engine is under development.",
+  "description": "Agent Conformance Engine (AgentCE) reference engine and command-line interface (TypeScript).",
   "license": "Apache-2.0",
   "homepage": "https://agent-conformance.org",
   "repository": {
@@ -11,8 +11,24 @@
   },
   "bugs": { "url": "https://github.com/agent-conformance/agentce/issues" },
   "bin": { "agentce": "bin/agentce.js" },
-  "files": ["bin/", "README.md", "LICENSE"],
+  "files": ["bin/", "dist/", "README.md", "LICENSE"],
   "engines": { "node": ">=20" },
+  "packageManager": "pnpm@12.4.1",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "biome check src bin",
+    "format": "biome format --write src",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "agentce": "tsx src/cli.ts",
+    "prepublishOnly": "pnpm build"
+  },
   "keywords": ["ai-agents", "conformance", "eu-ai-act", "oscal", "provenance", "shacl", "opentelemetry"],
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@types/node": "22.7.5",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3"
+  },
   "publishConfig": { "access": "public", "provenance": true }
 }
