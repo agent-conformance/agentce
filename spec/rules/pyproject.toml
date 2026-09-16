@@ -10,8 +10,11 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8,<9"]
+dev = ["pytest>=8,<9", "agent-conformance"]
 
 [tool.uv]
 package = false
-default-groups = []
+default-groups = ["dev"]
+
+[tool.uv.sources]
+agent-conformance = { path = "../../engines/python", editable = true }
