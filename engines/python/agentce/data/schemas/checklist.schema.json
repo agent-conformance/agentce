@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/rules/checklist.schema.json",
+  "title": "AgentCE manual checklist",
+  "description": "A deterministic checklist for a manual or semi-automated control (SPEC 7.2, Appendix D). Each item names the artifact to inspect, a closed question, and the allowed answers. A completed checklist also records the assessor identity, the date, and the digests of the artifacts inspected; the engine treats a completed checklist as evidence of class independent_system.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["checklist", "control", "items"],
+  "properties": {
+    "checklist": {
+      "type": "string",
+      "pattern": "^[A-Z]{2,4}-[0-9]{2}-M$",
+      "description": "Checklist identifier: the control id with the -M manual suffix (e.g. TRN-03-M)."
+    },
+    "control": {
+      "type": "string",
+      "pattern": "^[A-Z]{2,4}-[0-9]{2}$",
+      "description": "The control this checklist evaluates."
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "artifact", "question", "answers"],
+        "properties": {
+          "id": {
+            "oneOf": [{"type": "integer"}, {"type": "string"}],
+            "description": "Item identifier, unique within the checklist."
+          },
+          "artifact": {"type": "string", "description": "Reference-snapshot path or evidence pointer to inspect."},
+          "question": {"type": "string", "description": "A closed question with a fixed answer set."},
+          "answers": {
+            "type": "array",
+            "minItems": 2,
+            "items": {"type": "string"},
+            "description": "The allowed answers to the question."
+          }
+        }
+      }
+    },
+    "completed_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["principal", "org", "independent"],
+      "description": "Present only on a completed checklist.",
+      "properties": {
+        "principal": {"type": "string"},
+        "org": {"type": "string"},
+        "independent": {"type": "boolean"}
+      }
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC 3339 UTC timestamp of completion; present only on a completed checklist."
+    },
+    "artifact_digests": {
+      "type": "object",
+      "description": "Artifact path to its inspected digest (algorithm-prefixed).",
+      "additionalProperties": {"type": "string", "pattern": "^[a-z0-9-]+:[0-9a-fA-F]+$"}
+    }
+  }
+}

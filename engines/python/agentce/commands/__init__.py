@@ -14,11 +14,15 @@ from __future__ import annotations
 import argparse
 import getpass
 import json
+import re
 from collections.abc import Iterable
+from datetime import date
 from pathlib import Path
 from typing import Any
 
-from .. import ENGINE_NAME, SPEC_VERSION, __version__, no_ml
+import yaml
+
+from .. import ENGINE_NAME, SPEC_VERSION, __version__, no_ml, readiness
 from ..applicability import resolve as resolve_applicability
 from ..assess import assess_subjects
 from ..bundle import load_bundle
@@ -537,6 +541,71 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
         }
     )
     return _pending(result, "Signing lands with the release-tooling work item.")
+
+
+def _readiness_severities(ns: argparse.Namespace) -> dict[str, str]:
+    dirs = list(getattr(ns, "catalog_dir", None) or [])
+    if not dirs:
+        base = _repo_root() / "spec" / "catalogs" / "base"
+        dirs = [str(p.parent) for p in sorted(base.glob("*/catalog.yaml"))]
+    severities: dict[str, str] = {}
+    for directory in dirs:
+        catalog = load_catalog(
+            _require_dir(directory, key="catalog-dir", what="a catalog directory")
+        )
+        for control in catalog.controls:
+            severities[control.id] = control.severity
+    return severities
+
+
+def cmd_readiness(ns: argparse.Namespace) -> CommandResult:
+    """Compute the report-readiness verdict (SPEC §13.3.4 stage 4). Exit 0 for READY and READY WITH
+    LIMITATIONS, 1 for NOT READY; the verdict logic lives in the engine, never in a skill."""
+    result = CommandResult(command="readiness")
+    report_dir = _require_dir(
+        _opt_str(ns, "report_dir"),
+        key="report_dir",
+        what="the report directory",
+        fix="pass the report directory: `agentce readiness <report-dir>`.",
+    )
+    gaps: set[str] = set()
+    gaps_path = _opt_str(ns, "gaps")
+    if gaps_path:
+        text = _require_file(gaps_path, key="gaps", what="the gaps file").read_text(
+            "utf-8"
+        )
+        gaps = set(re.findall(r"\b[A-Z]{2,4}-[0-9]{2}\b", text))
+    deviations: list[dict[str, Any]] = []
+    dev_path = _opt_str(ns, "deviations")
+    if dev_path:
+        loaded = yaml.safe_load(
+            _require_file(
+                dev_path, key="deviations", what="the deviation register"
+            ).read_text("utf-8")
+        )
+        deviations = list((loaded or {}).get("deviations", []))
+    verdict = readiness.compute_readiness(
+        report_dir,
+        severities=_readiness_severities(ns),
+        deviations=deviations,
+        gaps=gaps,
+    )
+    result.data.update(verdict)
+    out = report_dir / f"report-readiness-{date.today().isoformat()}.md"
+    lines = [f"# Report readiness — {verdict['verdict']}", ""]
+    if verdict["reasons"]:
+        lines += ["## Blocking reasons", *[f"- {r}" for r in verdict["reasons"]], ""]
+    if verdict["limitations"]:
+        lines += [
+            "## Limitations",
+            *[f"- {limit}" for limit in verdict["limitations"]],
+            "",
+        ]
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    result.data["report"] = str(out)
+    if verdict["verdict"] == readiness.NOT_READY:
+        result.add_code(int(ExitCode.FINDINGS))
+    return result
 
 
 def _repo_root() -> Path:

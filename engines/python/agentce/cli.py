@@ -170,6 +170,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=commands.cmd_sign)
 
     p = sub.add_parser(
+        "readiness",
+        parents=[common],
+        help="compute the report-readiness verdict (SPEC 13.3.4)",
+    )
+    p.add_argument("report_dir", nargs="?", help="the report directory")
+    p.add_argument(
+        "--gaps", help="a gaps file listing accepted high-severity evidence gaps"
+    )
+    p.add_argument("--deviations", help="a deviation register to validate")
+    p.add_argument(
+        "--catalog-dir",
+        dest="catalog_dir",
+        action="append",
+        help="a catalog directory whose control severities the verdict reads (repeatable)",
+    )
+    p.set_defaults(func=commands.cmd_readiness)
+
+    p = sub.add_parser(
         "quickstart", parents=[common], help="assess the bundled quickstart project"
     )
     p.add_argument("--out", help="the output directory for the report")
