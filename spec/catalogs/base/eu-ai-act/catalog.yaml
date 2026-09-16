@@ -5,6 +5,13 @@
 id: eu-ai-act
 version: "2026.09"
 title: EU AI Act base catalog
+# Provenance (SPEC 14.5 CP-3): the catalog's origin and a content digest over every catalog file
+# except the detached signature and this file. `agentce catalog lint --require-provenance` recomputes
+# the digest, so a rebranded catalog whose rules differ shows its origin or fails validation.
+provenance:
+  source: https://agent-conformance.org/catalogs/base/eu-ai-act
+  version: "2026.09"
+  digest: sha256:a5105b15e563d3d448fa5927a718df50d6a4d5aae79bae3419a53702e8a4a0a9
 families: [REC, OVS, ROB, DAT, DOC, RSK, TRN, INC, INT]
 precision_policy:
   demote_below: "0.98"   # a rung-2 rule below this precision on the corpus is demoted (SPEC 11.6)

@@ -27,6 +27,17 @@ Generated from the sources, so the documentation and the code never disagree.
 - [Error catalogue](errors.md) — every message key with its cause and exact fix.
 - [Architecture decisions](adr/) — the record of every choice the specification leaves open.
 
+## Governance and conformance
+
+- [Governance](../governance/README.md) — working groups, the change and RFC process, and the policies
+  below.
+- [Conformance program](../governance/CONFORMANCE-PROGRAM.md) — what a conformance claim is and how an
+  implementation is listed.
+- [Versioning](../governance/VERSIONING.md) · [Support and deprecation](../governance/SUPPORT.md) ·
+  [Security process](../governance/SECURITY-PROCESS.md).
+- [Implementation-report registry](../conformance/reports/README.md) — the verified reports that back
+  every conformance claim.
+
 ## Building the documentation
 
 `cd docs && python build.py` regenerates the reference pages and the living report example from the

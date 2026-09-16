@@ -152,6 +152,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="require a verified_against_text flag on every crosswalk entry (SPEC 7.3 B14)",
     )
+    lint.add_argument(
+        "--require-provenance",
+        dest="require_provenance",
+        action="store_true",
+        help="require a provenance block (source, version, digest) on the catalog (SPEC 14.5 CP-3)",
+    )
     matrix = csub.add_parser(
         "coverage-matrix",
         parents=[common],

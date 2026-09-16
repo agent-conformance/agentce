@@ -588,11 +588,16 @@ def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
     if not catalog_dirs:
         problems.append(f"{directory}: no catalog.yaml (and none beneath it)")
     require_flags = _flag(ns, "require_verification_flags")
+    require_prov = _flag(ns, "require_provenance")
     for cat_dir in catalog_dirs:
         prefix = "" if len(catalog_dirs) == 1 else f"{cat_dir.relative_to(directory)}: "
         problems.extend(
             f"{prefix}{p}"
-            for p in lint_catalog(cat_dir, require_verification_flags=require_flags)
+            for p in lint_catalog(
+                cat_dir,
+                require_verification_flags=require_flags,
+                require_provenance=require_prov,
+            )
         )
     result.data.update(
         {
