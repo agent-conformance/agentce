@@ -1,0 +1,212 @@
+{
+  "profile": {
+    "subjects": [
+      {
+        "id": "cov-A",
+        "coverage_denominators": [
+          {
+            "kind": "egress",
+            "source": "egress-1",
+            "covers": [
+              "ToolCall"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cov-B",
+        "coverage_denominators": [
+          {
+            "kind": "egress",
+            "source": "egress-2",
+            "covers": [
+              "ToolCall"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cov-C",
+        "coverage_denominators": [
+          {
+            "kind": "egress",
+            "source": "egress-3",
+            "covers": [
+              "ToolCall"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cov-D"
+      },
+      {
+        "id": "cov-E",
+        "coverage_denominators": [
+          {
+            "kind": "provider",
+            "source": "prov-1",
+            "covers": [
+              "Decision"
+            ],
+            "manifest": "reference/prov-counts.json"
+          }
+        ]
+      }
+    ]
+  },
+  "events": [
+    {
+      "id": "a-den-0",
+      "source": "egress-1",
+      "subject": "cov-A",
+      "data": {
+        "@type": "ToolCall"
+      }
+    },
+    {
+      "id": "a-den-1",
+      "source": "egress-1",
+      "subject": "cov-A",
+      "data": {
+        "@type": "ToolCall"
+      }
+    },
+    {
+      "id": "a-den-2",
+      "source": "egress-1",
+      "subject": "cov-A",
+      "data": {
+        "@type": "ToolCall"
+      }
+    },
+    {
+      "id": "a-obs-0",
+      "source": "agent-1",
+      "subject": "cov-A",
+      "data": {
+        "@type": "ToolCall"
+      }
+    },
+    {
+      "id": "a-dec-0",
+      "source": "agent-1",
+      "subject": "cov-A",
+      "data": {
+        "@type": "Decision"
+      }
+    },
+    {
+      "id": "b-den-0",
+      "source": "egress-2",
+      "subject": "cov-B",
+      "data": {
+        "@type": "ToolCall"
+      }
+    },
+    {
+      "id": "b-den-1",
+      "source": "egress-2",
+      "subject": "cov-B",
+      "data": {
+        "@type": "ToolCall"
+      }
+    },
+    {
+      "id": "b-den-2",
+      "source": "egress-2",
+      "subject": "cov-B",
+      "data": {
+        "@type": "ToolCall"
+      }
+    },
+    {
+      "id": "b-obs-0",
+      "source": "agent-2",
+      "subject": "cov-B",
+      "data": {
+        "@type": "ToolCall"
+      }
+    },
+    {
+      "id": "b-obs-1",
+      "source": "agent-2",
+      "subject": "cov-B",
+      "data": {
+        "@type": "ToolCall"
+      }
+    },
+    {
+      "id": "c-den-0",
+      "source": "egress-3",
+      "subject": "cov-C",
+      "data": {
+        "@type": "ToolCall"
+      }
+    },
+    {
+      "id": "c-den-1",
+      "source": "egress-3",
+      "subject": "cov-C",
+      "data": {
+        "@type": "ToolCall"
+      }
+    },
+    {
+      "id": "c-obs-0",
+      "source": "agent-3",
+      "subject": "cov-C",
+      "data": {
+        "@type": "ToolCall"
+      }
+    },
+    {
+      "id": "c-obs-1",
+      "source": "agent-3",
+      "subject": "cov-C",
+      "data": {
+        "@type": "ToolCall"
+      }
+    },
+    {
+      "id": "d-dec-0",
+      "source": "agent-4",
+      "subject": "cov-D",
+      "data": {
+        "@type": "Decision"
+      }
+    },
+    {
+      "id": "e-obs-0",
+      "source": "agent-5",
+      "subject": "cov-E",
+      "data": {
+        "@type": "Decision"
+      }
+    },
+    {
+      "id": "e-obs-1",
+      "source": "agent-5",
+      "subject": "cov-E",
+      "data": {
+        "@type": "Decision"
+      }
+    },
+    {
+      "id": "e-obs-2",
+      "source": "agent-5",
+      "subject": "cov-E",
+      "data": {
+        "@type": "Decision"
+      }
+    },
+    {
+      "id": "e-obs-3",
+      "source": "agent-5",
+      "subject": "cov-E",
+      "data": {
+        "@type": "Decision"
+      }
+    }
+  ]
+}
