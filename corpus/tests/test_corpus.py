@@ -2,10 +2,14 @@
 
 The generator authors each project's ground truth to what the reference engine produces; these tests
 prove it. They generate the corpus (with a small filler for speed), run every project end to end
-through the engine via :func:`corpus.assess_one.assess_project`, and check that the assertions match
-``expected/outcomes.json`` exactly — so the precision/recall gate sees every seeded fault detected
-(recall 1.0) and no known-pass control flagged (false-positive rate 0.0). A few targeted checks cover
-the integrity-tamper detection and the coverage shortfall the corresponding variants seed.
+through the engine via :func:`corpus.assess_one.assess_project`, and check that every authored
+control in ``expected/outcomes.json`` evaluates to its authored outcome — so the precision/recall
+gate sees every seeded fault detected (recall 1.0) and no known-pass control flagged (false-positive
+rate 0.0). The v1 scenarios author the base families they exercise (REC, OVS, INT, INC); the later
+catalog families (ROB, DAT, DOC, RSK, TRN) also emit assertions over these bundles but were not
+authored into the v1 scenarios, so each of those controls is proved by its own catalog test fixtures
+(``agentce catalog lint``) rather than here. A few targeted checks cover the integrity-tamper
+detection and the coverage shortfall the corresponding variants seed.
 """
 
 from __future__ import annotations
@@ -71,8 +75,11 @@ def test_every_project_matches_authored_ground_truth(
         )
         got = _outcomes(report, project["subject"])
         want = _expected(corpus_dir, project["id"])
-        if got != want:
-            mismatches.append(f"{project['id']}: expected {want}, got {got}")
+        wrong = {c: (v, got.get(c)) for c, v in want.items() if got.get(c) != v}
+        if wrong:
+            mismatches.append(
+                f"{project['id']}: authored controls mis-evaluated {wrong}"
+            )
     assert not mismatches, "\n".join(mismatches)
 
 
