@@ -1,0 +1,114 @@
+C	agentce:Activity	agentce:Activity
+C	agentce:Activity	prov:Activity
+C	agentce:Agent	agentce:Agent
+C	agentce:Agent	prov:Agent
+C	agentce:Agent	prov:SoftwareAgent
+C	agentce:ApprovalDecided	agentce:ApprovalDecided
+C	agentce:ConsequentialDecision	agentce:Activity
+C	agentce:ConsequentialDecision	agentce:ConsequentialDecision
+C	agentce:ConsequentialDecision	agentce:Decision
+C	agentce:ConsequentialDecision	prov:Activity
+C	agentce:ContextItem	agentce:ContextItem
+C	agentce:ContextItem	prov:Entity
+C	agentce:Decision	agentce:Activity
+C	agentce:Decision	agentce:Decision
+C	agentce:Decision	prov:Activity
+C	agentce:DelegationIssued	agentce:Activity
+C	agentce:DelegationIssued	agentce:DelegationIssued
+C	agentce:DelegationIssued	prov:Activity
+C	agentce:HumanPrincipal	agentce:HumanPrincipal
+C	agentce:HumanPrincipal	agentce:Principal
+C	agentce:HumanPrincipal	prov:Agent
+C	agentce:Instruction	agentce:Activity
+C	agentce:Instruction	agentce:Instruction
+C	agentce:Instruction	prov:Activity
+C	agentce:MemoryRead	agentce:Activity
+C	agentce:MemoryRead	agentce:MemoryRead
+C	agentce:MemoryRead	prov:Activity
+C	agentce:MemoryWrite	agentce:Activity
+C	agentce:MemoryWrite	agentce:MemoryWrite
+C	agentce:MemoryWrite	prov:Activity
+C	agentce:ModelCall	agentce:Activity
+C	agentce:ModelCall	agentce:ModelCall
+C	agentce:ModelCall	prov:Activity
+C	agentce:Outcome	agentce:Outcome
+C	agentce:PolicyDecision	agentce:Activity
+C	agentce:PolicyDecision	agentce:PolicyDecision
+C	agentce:PolicyDecision	prov:Activity
+C	agentce:Principal	agentce:Principal
+C	agentce:Principal	prov:Agent
+C	agentce:Refusal	agentce:Activity
+C	agentce:Refusal	agentce:Refusal
+C	agentce:Refusal	prov:Activity
+C	agentce:ResourceAccess	agentce:Activity
+C	agentce:ResourceAccess	agentce:ResourceAccess
+C	agentce:ResourceAccess	prov:Activity
+C	agentce:ServicePrincipal	agentce:Principal
+C	agentce:ServicePrincipal	agentce:ServicePrincipal
+C	agentce:ServicePrincipal	prov:Agent
+C	agentce:ToolCall	agentce:Activity
+C	agentce:ToolCall	agentce:ToolCall
+C	agentce:ToolCall	prov:Activity
+C	credit:CreditDecision	agentce:Activity
+C	credit:CreditDecision	agentce:ConsequentialDecision
+C	credit:CreditDecision	agentce:Decision
+C	credit:CreditDecision	credit:CreditDecision
+C	credit:CreditDecision	prov:Activity
+C	credit:LoanApproval	agentce:Activity
+C	credit:LoanApproval	agentce:ConsequentialDecision
+C	credit:LoanApproval	agentce:Decision
+C	credit:LoanApproval	credit:CreditDecision
+C	credit:LoanApproval	credit:LoanApproval
+C	credit:LoanApproval	prov:Activity
+C	prov:Activity	prov:Activity
+C	prov:Agent	prov:Agent
+C	prov:Entity	prov:Entity
+C	prov:SoftwareAgent	prov:Agent
+C	prov:SoftwareAgent	prov:SoftwareAgent
+E	agentce:event/appr-1	prov:wasAssociatedWith	human:reviewer
+E	agentce:event/appr-1	rdf:type	agentce:ApprovalDecided
+E	agentce:event/dec-1	agentce:authorizedBy	agentce:event/del-1
+E	agentce:event/dec-1	agentce:chainTerminus	agentce:principal/4f9618842a3b141eae7bfb7cd81ee43b2ba78b2eef1a7c1d0c13c7ea559ab534
+E	agentce:event/dec-1	agentce:derivedFrom	agentce:event/missing-x
+E	agentce:event/dec-1	agentce:resultedIn	agentce:event/out-1
+E	agentce:event/dec-1	agentce:reviewedBy	agentce:event/appr-1
+E	agentce:event/dec-1	agentce:sourceClass	agentce:self_report
+E	agentce:event/dec-1	prov:used	ci:app
+E	agentce:event/dec-1	prov:used	ci:score
+E	agentce:event/dec-1	prov:wasAssociatedWith	spiffe://corp/agent-a
+E	agentce:event/dec-1	rdf:type	agentce:Decision
+E	agentce:event/dec-1	rdf:type	credit:LoanApproval
+E	agentce:event/dec-2	agentce:chainTerminus	agentce:principal/4f9618842a3b141eae7bfb7cd81ee43b2ba78b2eef1a7c1d0c13c7ea559ab534
+E	agentce:event/dec-2	agentce:precededBy	agentce:event/dec-1
+E	agentce:event/dec-2	prov:wasAssociatedWith	spiffe://corp/agent-a
+E	agentce:event/dec-2	rdf:type	agentce:Decision
+E	agentce:event/dec-2	rdf:type	credit:LoanApproval
+E	agentce:event/del-1	agentce:sourceClass	agentce:enforcement_point
+E	agentce:event/del-1	prov:wasAssociatedWith	spiffe://corp/agent-a
+E	agentce:event/del-1	rdf:type	agentce:DelegationIssued
+E	agentce:event/out-1	rdf:type	agentce:Outcome
+E	agentce:event/tc-1	agentce:executes	agentce:event/dec-1
+E	agentce:event/tc-1	prov:wasAssociatedWith	spiffe://corp/agent-a
+E	agentce:event/tc-1	rdf:type	agentce:ToolCall
+E	agentce:principal/4f9618842a3b141eae7bfb7cd81ee43b2ba78b2eef1a7c1d0c13c7ea559ab534	rdf:type	agentce:HumanPrincipal
+E	agentce:principal/ae09877c4f2f6fab64bf06beb9aa698fba9fe36828b1b24970b101a580e068c8	rdf:type	agentce:HumanPrincipal
+E	agentce:principal/c1720bfb8860a844bf4f1090db260fb5a51e365674ba2a268548680eb4145f36	rdf:type	agentce:ServicePrincipal
+E	ci:app	rdf:type	agentce:ContextItem
+E	ci:score	rdf:type	agentce:ContextItem
+E	human:reviewer	rdf:type	agentce:Agent
+E	spiffe://corp/agent-a	prov:actedOnBehalfOf	agentce:principal/4f9618842a3b141eae7bfb7cd81ee43b2ba78b2eef1a7c1d0c13c7ea559ab534
+E	spiffe://corp/agent-a	rdf:type	agentce:Agent
+L	agentce:event/appr-1	prov:atTime	2026-06-01T09:30:00.000Z	xsd:dateTime
+L	agentce:event/dec-1	agentce:danglingRef	agentce:event/missing-x	xsd:string
+L	agentce:event/dec-1	agentce:oversightModalityMatchesDeclared	true	xsd:boolean
+L	agentce:event/dec-1	prov:atTime	2026-06-01T09:00:00.000Z	xsd:dateTime
+L	agentce:event/dec-2	agentce:oversightModalityMatchesDeclared	false	xsd:boolean
+L	agentce:event/dec-2	prov:atTime	2026-06-01T10:00:00.000Z	xsd:dateTime
+L	agentce:event/del-1	agentce:chainVerified	true	xsd:boolean
+L	agentce:event/del-1	prov:atTime	2026-06-01T08:00:00.000Z	xsd:dateTime
+L	agentce:event/out-1	prov:atTime	2026-06-01T09:10:00.000Z	xsd:dateTime
+L	agentce:event/tc-1	agentce:executesConsequential	true	xsd:boolean
+L	agentce:event/tc-1	prov:atTime	2026-06-01T09:05:00.000Z	xsd:dateTime
+L	agentce:principal/4f9618842a3b141eae7bfb7cd81ee43b2ba78b2eef1a7c1d0c13c7ea559ab534	agentce:chainIndex	0	xsd:integer
+L	agentce:principal/ae09877c4f2f6fab64bf06beb9aa698fba9fe36828b1b24970b101a580e068c8	agentce:chainIndex	0	xsd:integer
+L	agentce:principal/c1720bfb8860a844bf4f1090db260fb5a51e365674ba2a268548680eb4145f36	agentce:chainIndex	1	xsd:integer

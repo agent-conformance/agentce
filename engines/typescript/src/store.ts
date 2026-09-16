@@ -117,6 +117,29 @@ export class GraphStore {
     return false;
   }
 
+  /** Every triple as a sorted line list, for byte-identity checks against the reference engine. */
+  dumpTriples(): string[] {
+    const lines: string[] = [];
+    for (const [key, objects] of this.spo) {
+      const [s, p] = key.split(SEP);
+      for (const o of objects) {
+        lines.push(`E\t${s}\t${p}\t${o}`);
+      }
+    }
+    for (const [key, entries] of this.lit) {
+      const [s, p] = key.split(SEP);
+      for (const entry of entries) {
+        const [val, datatype] = entry.split(SEP);
+        lines.push(`L\t${s}\t${p}\t${val}\t${datatype}`);
+      }
+    }
+    for (const pair of this.closure) {
+      const [descendant, ancestor] = pair.split(SEP);
+      lines.push(`C\t${descendant}\t${ancestor}`);
+    }
+    return lines.sort(byteCompare);
+  }
+
   edgeCount(): number {
     return this.edges;
   }
