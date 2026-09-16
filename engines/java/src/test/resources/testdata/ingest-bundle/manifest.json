@@ -1,0 +1,9 @@
+{
+  "bundle_format": "1.0",
+  "files": [
+    {
+      "path": "events/log.jsonl",
+      "sha256": "sha256:07ce4503901bfde203e7e5b924e8936bafba0c9d8fc1fea1112d3d59b5270859"
+    }
+  ]
+}

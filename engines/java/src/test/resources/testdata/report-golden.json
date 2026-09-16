@@ -1,0 +1,2291 @@
+{
+  "md": "# AgentCE conformance report\n\n## Outcome summary\n\n- conformant: 22\n- non-conformant: 2\n- partial: 0\n- not applicable: 1\n- not assessed: 5\n- insufficient evidence: 19\n\n## Assertions\n\n- `DAT-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-02` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n- `DAT-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n- `DAT-04` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n- `DOC-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `DOC-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `DOC-03` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `DOC-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, semi-automated; 0/1 failed)\n- `DOC-05` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n- `INC-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `INC-02` @ `spiffe://corp/agents/a` -> **not applicable** (rung 2, automated; 0/0 failed)\n- `INC-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `INC-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `INT-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `INT-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `INT-03` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `INT-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `OVS-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `OVS-02` @ `spiffe://corp/agents/a` -> **non-conformant** (rung 2, automated; 1/1 failed)\n- `OVS-03` @ `spiffe://corp/agents/a` -> **non-conformant** (rung 2, automated; 1/1 failed)\n- `OVS-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `OVS-05` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `OVS-06` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `OVS-07` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n- `OVS-08` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n- `OVS-09` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n- `REC-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `REC-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `REC-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `REC-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `REC-05` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `REC-06` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `ROB-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `ROB-02` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `ROB-03` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `ROB-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `ROB-05` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, semi-automated; 0/1 failed)\n- `ROB-06` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, semi-automated; 0/1 failed)\n- `ROB-07` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n- `RSK-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `RSK-02` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `RSK-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n- `RSK-04` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n- `RSK-05` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n- `TRN-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `TRN-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `TRN-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n- `TRN-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `TRN-05` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n",
+  "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 22</li><li>non-conformant: 2</li><li>partial: 0</li><li>not applicable: 1</li><li>not assessed: 5</li><li>insufficient evidence: 19</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Outcome</th></tr></thead><tbody><tr><td>DAT-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>DAT-02</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>DAT-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>DAT-04</td><td>spiffe://corp/agents/a</td><td>not assessed</td></tr><tr><td>DOC-01</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>DOC-02</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>DOC-03</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>DOC-04</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>DOC-05</td><td>spiffe://corp/agents/a</td><td>not assessed</td></tr><tr><td>INC-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>INC-02</td><td>spiffe://corp/agents/a</td><td>not applicable</td></tr><tr><td>INC-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>INC-04</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>INT-01</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>INT-02</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>INT-03</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>INT-04</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>OVS-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>OVS-02</td><td>spiffe://corp/agents/a</td><td>non-conformant</td></tr><tr><td>OVS-03</td><td>spiffe://corp/agents/a</td><td>non-conformant</td></tr><tr><td>OVS-04</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>OVS-05</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>OVS-06</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>OVS-07</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>OVS-08</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>OVS-09</td><td>spiffe://corp/agents/a</td><td>not assessed</td></tr><tr><td>REC-01</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>REC-02</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>REC-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>REC-04</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>REC-05</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>REC-06</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>ROB-01</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>ROB-02</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>ROB-03</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>ROB-04</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>ROB-05</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>ROB-06</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>ROB-07</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>RSK-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>RSK-02</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>RSK-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>RSK-04</td><td>spiffe://corp/agents/a</td><td>not assessed</td></tr><tr><td>RSK-05</td><td>spiffe://corp/agents/a</td><td>not assessed</td></tr><tr><td>TRN-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>TRN-02</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>TRN-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>TRN-04</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>TRN-05</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr></tbody></table></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n",
+  "oscal": {
+    "assessment-results": {
+      "uuid": "22fe7070-f169-5c2d-bff8-cc0225de1811",
+      "metadata": {
+        "title": "AgentCE Assessment Results",
+        "version": "0.0.1",
+        "oscal-version": "1.1.2"
+      },
+      "results": [
+        {
+          "uuid": "2736afa7-2f66-580a-8ade-4df53595c705",
+          "title": "AgentCE structural assessment",
+          "findings": [
+            {
+              "uuid": "f291c4f4-b5a0-568d-bc8a-4564695962bc",
+              "title": "DAT-01 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "DAT-01",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "68db0af0-9a88-51d9-b126-9d1262a958a5",
+              "title": "DAT-02 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "DAT-02",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "2eae3a24-b20c-503b-8f3c-1f887718b970",
+              "title": "DAT-03 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "DAT-03",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "26663e80-f4b0-5be2-b4e4-9852300bbdfc",
+              "title": "DAT-04 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "DAT-04",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "not_assessed"
+                }
+              }
+            },
+            {
+              "uuid": "8d2290d7-5c90-564d-a47e-5179a8ec0606",
+              "title": "DOC-01 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "DOC-01",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "1469dab7-0808-5287-b446-7b1e4b249f73",
+              "title": "DOC-02 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "DOC-02",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "04b33a10-4980-5631-b7bf-34a7e5d96415",
+              "title": "DOC-03 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "DOC-03",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "989ca2fd-f905-5926-b567-d7ce56bca74a",
+              "title": "DOC-04 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "DOC-04",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "2a7516e2-ec33-5553-a42c-131434b83a65",
+              "title": "DOC-05 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "DOC-05",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "not_assessed"
+                }
+              }
+            },
+            {
+              "uuid": "727bca02-b025-5a6c-9203-9527927178d0",
+              "title": "INC-01 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "INC-01",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "7ed0ceaa-0e81-511f-b2c9-0c06720bcd1d",
+              "title": "INC-02 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "INC-02",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "not_applicable"
+                }
+              }
+            },
+            {
+              "uuid": "f3d7819b-0c49-5c8a-a246-e6073b95b9ea",
+              "title": "INC-03 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "INC-03",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "3a2c0fa1-1d07-5bd7-9de0-e7452e9f76ba",
+              "title": "INC-04 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "INC-04",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "280002e2-dafc-532a-88c6-4faffe3f3607",
+              "title": "INT-01 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "INT-01",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "3ebd7c95-36c2-5869-ab96-1d92f30a649b",
+              "title": "INT-02 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "INT-02",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "9bb9323d-58d8-58d6-8329-8370cc11a76b",
+              "title": "INT-03 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "INT-03",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "7ab136dc-e92b-59e2-9e4b-847a75054247",
+              "title": "INT-04 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "INT-04",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "3df5350a-6728-5906-9691-8b5e7c10edce",
+              "title": "OVS-01 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "OVS-01",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "9c167b02-05e4-549e-807f-393312a5eea1",
+              "title": "OVS-02 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "OVS-02",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "non-conformant"
+                }
+              }
+            },
+            {
+              "uuid": "3df9f50b-d2cb-537d-842a-34f484a505f6",
+              "title": "OVS-03 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "OVS-03",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "non-conformant"
+                }
+              }
+            },
+            {
+              "uuid": "935671e4-d9d3-5f38-8aa0-f43c4a80a233",
+              "title": "OVS-04 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "OVS-04",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "d77e1c45-c6ce-5379-b37c-c041c6fa3b2e",
+              "title": "OVS-05 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "OVS-05",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "4a1f0c14-7059-57a8-a5af-5d2532964fd7",
+              "title": "OVS-06 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "OVS-06",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "e3adf9c1-3658-517d-b671-5155f4fc1b96",
+              "title": "OVS-07 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "OVS-07",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "3771ae77-51f4-5bc9-88b4-a55f00fe1a2b",
+              "title": "OVS-08 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "OVS-08",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "bcf988ca-15a4-5a8c-bb55-d253d7bd5718",
+              "title": "OVS-09 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "OVS-09",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "not_assessed"
+                }
+              }
+            },
+            {
+              "uuid": "165b0d38-7ca3-596a-9c54-1e2636e22c5f",
+              "title": "REC-01 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "REC-01",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "da4addaf-49ac-5b09-a659-c4a9ef08afc9",
+              "title": "REC-02 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "REC-02",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "03e4e177-53a7-51f0-a8d9-b83108053929",
+              "title": "REC-03 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "REC-03",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "3951879a-6d28-5a87-8d32-129d6f624640",
+              "title": "REC-04 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "REC-04",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "8d0b359a-6ade-5d89-94d9-9afa8c1fb50d",
+              "title": "REC-05 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "REC-05",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "856bc7ce-9db9-5648-94e5-0d0841dd580c",
+              "title": "REC-06 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "REC-06",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "ea6fbf70-8ce8-5d7d-a0ae-fe901080728f",
+              "title": "ROB-01 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "ROB-01",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "75fc8f85-83cd-5749-bb44-d4f0ea1c38ca",
+              "title": "ROB-02 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "ROB-02",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "a2425e20-e43a-5a0c-8283-979682b8b606",
+              "title": "ROB-03 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "ROB-03",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "005836fb-5a1f-53a5-872a-434753691edd",
+              "title": "ROB-04 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "ROB-04",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "51d42a23-b72d-51cd-8c6a-87d0711e430a",
+              "title": "ROB-05 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "ROB-05",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "77150ef3-1d08-54e0-ba61-ffe24524e9fc",
+              "title": "ROB-06 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "ROB-06",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "ee516369-2839-501c-87cf-8472ae843fe0",
+              "title": "ROB-07 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "ROB-07",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "26b751d1-8f4c-5e40-b743-11a90e16aa74",
+              "title": "RSK-01 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "RSK-01",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "cda21e5f-6a50-5daf-9119-fe69bb7d5e3c",
+              "title": "RSK-02 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "RSK-02",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "5e8f68aa-c57a-512c-8d3d-83a87b64c2ce",
+              "title": "RSK-03 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "RSK-03",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "af17ccd9-8db0-5ed1-82b9-63092b99eff9",
+              "title": "RSK-04 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "RSK-04",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "not_assessed"
+                }
+              }
+            },
+            {
+              "uuid": "5398014a-377a-5474-9050-fc615e5dbcd9",
+              "title": "RSK-05 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "RSK-05",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "not_assessed"
+                }
+              }
+            },
+            {
+              "uuid": "dad5dc7a-1aac-5ebc-b9f1-6da2b438f197",
+              "title": "TRN-01 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "TRN-01",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "e0e7025f-7297-51f8-8f90-b8481bd681fa",
+              "title": "TRN-02 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "TRN-02",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "95259578-f1f8-5159-ab77-4cf54cf5e729",
+              "title": "TRN-03 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "TRN-03",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            },
+            {
+              "uuid": "068b01a4-95c9-5aff-9d40-d39477b63607",
+              "title": "TRN-04 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "TRN-04",
+                "status": {
+                  "state": "satisfied",
+                  "reason": "conformant"
+                }
+              }
+            },
+            {
+              "uuid": "d5262c45-f08f-5c4f-9499-7a303ccc8b10",
+              "title": "TRN-05 for spiffe://corp/agents/a",
+              "target": {
+                "type": "objective-id",
+                "target-id": "TRN-05",
+                "status": {
+                  "state": "not-satisfied",
+                  "reason": "insufficient_evidence"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "sarif": {
+    "version": "2.1.0",
+    "runs": [
+      {
+        "tool": {
+          "driver": {
+            "name": "agentce-py",
+            "version": "0.0.1",
+            "rules": [
+              {
+                "id": "DAT-01"
+              },
+              {
+                "id": "DAT-02"
+              },
+              {
+                "id": "DAT-03"
+              },
+              {
+                "id": "DAT-04"
+              },
+              {
+                "id": "DOC-01"
+              },
+              {
+                "id": "DOC-02"
+              },
+              {
+                "id": "DOC-03"
+              },
+              {
+                "id": "DOC-04"
+              },
+              {
+                "id": "DOC-05"
+              },
+              {
+                "id": "INC-01"
+              },
+              {
+                "id": "INC-02"
+              },
+              {
+                "id": "INC-03"
+              },
+              {
+                "id": "INC-04"
+              },
+              {
+                "id": "INT-01"
+              },
+              {
+                "id": "INT-02"
+              },
+              {
+                "id": "INT-03"
+              },
+              {
+                "id": "INT-04"
+              },
+              {
+                "id": "OVS-01"
+              },
+              {
+                "id": "OVS-02"
+              },
+              {
+                "id": "OVS-03"
+              },
+              {
+                "id": "OVS-04"
+              },
+              {
+                "id": "OVS-05"
+              },
+              {
+                "id": "OVS-06"
+              },
+              {
+                "id": "OVS-07"
+              },
+              {
+                "id": "OVS-08"
+              },
+              {
+                "id": "OVS-09"
+              },
+              {
+                "id": "REC-01"
+              },
+              {
+                "id": "REC-02"
+              },
+              {
+                "id": "REC-03"
+              },
+              {
+                "id": "REC-04"
+              },
+              {
+                "id": "REC-05"
+              },
+              {
+                "id": "REC-06"
+              },
+              {
+                "id": "ROB-01"
+              },
+              {
+                "id": "ROB-02"
+              },
+              {
+                "id": "ROB-03"
+              },
+              {
+                "id": "ROB-04"
+              },
+              {
+                "id": "ROB-05"
+              },
+              {
+                "id": "ROB-06"
+              },
+              {
+                "id": "ROB-07"
+              },
+              {
+                "id": "RSK-01"
+              },
+              {
+                "id": "RSK-02"
+              },
+              {
+                "id": "RSK-03"
+              },
+              {
+                "id": "RSK-04"
+              },
+              {
+                "id": "RSK-05"
+              },
+              {
+                "id": "TRN-01"
+              },
+              {
+                "id": "TRN-02"
+              },
+              {
+                "id": "TRN-03"
+              },
+              {
+                "id": "TRN-04"
+              },
+              {
+                "id": "TRN-05"
+              }
+            ]
+          }
+        },
+        "results": [
+          {
+            "ruleId": "DAT-01",
+            "level": "warning",
+            "message": {
+              "text": "DAT-01 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "DAT-02",
+            "level": "warning",
+            "message": {
+              "text": "DAT-02 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "DAT-03",
+            "level": "warning",
+            "message": {
+              "text": "DAT-03 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "INC-01",
+            "level": "warning",
+            "message": {
+              "text": "INC-01 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "INC-03",
+            "level": "warning",
+            "message": {
+              "text": "INC-03 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "OVS-01",
+            "level": "warning",
+            "message": {
+              "text": "OVS-01 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "OVS-02",
+            "level": "error",
+            "message": {
+              "text": "OVS-02 on spiffe://corp/agents/a: non-conformant"
+            }
+          },
+          {
+            "ruleId": "OVS-03",
+            "level": "error",
+            "message": {
+              "text": "OVS-03 on spiffe://corp/agents/a: non-conformant"
+            }
+          },
+          {
+            "ruleId": "OVS-05",
+            "level": "warning",
+            "message": {
+              "text": "OVS-05 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "OVS-07",
+            "level": "warning",
+            "message": {
+              "text": "OVS-07 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "OVS-08",
+            "level": "warning",
+            "message": {
+              "text": "OVS-08 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "REC-03",
+            "level": "warning",
+            "message": {
+              "text": "REC-03 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "REC-05",
+            "level": "warning",
+            "message": {
+              "text": "REC-05 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "ROB-02",
+            "level": "warning",
+            "message": {
+              "text": "ROB-02 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "ROB-07",
+            "level": "warning",
+            "message": {
+              "text": "ROB-07 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "RSK-01",
+            "level": "warning",
+            "message": {
+              "text": "RSK-01 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "RSK-02",
+            "level": "warning",
+            "message": {
+              "text": "RSK-02 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "RSK-03",
+            "level": "warning",
+            "message": {
+              "text": "RSK-03 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "TRN-01",
+            "level": "warning",
+            "message": {
+              "text": "TRN-01 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "TRN-03",
+            "level": "warning",
+            "message": {
+              "text": "TRN-03 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          },
+          {
+            "ruleId": "TRN-05",
+            "level": "warning",
+            "message": {
+              "text": "TRN-05 on spiffe://corp/agents/a: insufficient_evidence"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "pack": {
+    "subject": "spiffe://corp/agents/a",
+    "assertions": [
+      {
+        "control": "DAT-01",
+        "outcome": "insufficient_evidence",
+        "mode": "automated",
+        "evidence": []
+      },
+      {
+        "control": "DAT-02",
+        "outcome": "insufficient_evidence",
+        "mode": "semi-automated",
+        "evidence": []
+      },
+      {
+        "control": "DAT-03",
+        "outcome": "insufficient_evidence",
+        "mode": "semi-automated",
+        "evidence": []
+      },
+      {
+        "control": "DAT-04",
+        "outcome": "not_assessed",
+        "mode": "manual",
+        "evidence": []
+      },
+      {
+        "control": "DOC-01",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/d1"
+        ]
+      },
+      {
+        "control": "DOC-02",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/d1"
+        ]
+      },
+      {
+        "control": "DOC-03",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/tc1"
+        ]
+      },
+      {
+        "control": "DOC-04",
+        "outcome": "conformant",
+        "mode": "semi-automated",
+        "evidence": [
+          "agentce:event/d1"
+        ]
+      },
+      {
+        "control": "DOC-05",
+        "outcome": "not_assessed",
+        "mode": "manual",
+        "evidence": []
+      },
+      {
+        "control": "INC-01",
+        "outcome": "insufficient_evidence",
+        "mode": "automated",
+        "evidence": []
+      },
+      {
+        "control": "INC-02",
+        "outcome": "not_applicable",
+        "mode": "automated",
+        "evidence": []
+      },
+      {
+        "control": "INC-03",
+        "outcome": "insufficient_evidence",
+        "mode": "automated",
+        "evidence": []
+      },
+      {
+        "control": "INC-04",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/tc1"
+        ]
+      },
+      {
+        "control": "INT-01",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/tc1"
+        ]
+      },
+      {
+        "control": "INT-02",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/dl1"
+        ]
+      },
+      {
+        "control": "INT-03",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/tc1"
+        ]
+      },
+      {
+        "control": "INT-04",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/tc1"
+        ]
+      },
+      {
+        "control": "OVS-01",
+        "outcome": "insufficient_evidence",
+        "mode": "automated",
+        "evidence": []
+      },
+      {
+        "control": "OVS-02",
+        "outcome": "non-conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/d1"
+        ]
+      },
+      {
+        "control": "OVS-03",
+        "outcome": "non-conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/tc1"
+        ]
+      },
+      {
+        "control": "OVS-04",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/tc1"
+        ]
+      },
+      {
+        "control": "OVS-05",
+        "outcome": "insufficient_evidence",
+        "mode": "automated",
+        "evidence": []
+      },
+      {
+        "control": "OVS-06",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/tc1"
+        ]
+      },
+      {
+        "control": "OVS-07",
+        "outcome": "insufficient_evidence",
+        "mode": "semi-automated",
+        "evidence": []
+      },
+      {
+        "control": "OVS-08",
+        "outcome": "insufficient_evidence",
+        "mode": "semi-automated",
+        "evidence": []
+      },
+      {
+        "control": "OVS-09",
+        "outcome": "not_assessed",
+        "mode": "manual",
+        "evidence": []
+      },
+      {
+        "control": "REC-01",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/d1"
+        ]
+      },
+      {
+        "control": "REC-02",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/d1"
+        ]
+      },
+      {
+        "control": "REC-03",
+        "outcome": "insufficient_evidence",
+        "mode": "automated",
+        "evidence": []
+      },
+      {
+        "control": "REC-04",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/d1"
+        ]
+      },
+      {
+        "control": "REC-05",
+        "outcome": "insufficient_evidence",
+        "mode": "automated",
+        "evidence": []
+      },
+      {
+        "control": "REC-06",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/tc1"
+        ]
+      },
+      {
+        "control": "ROB-01",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/tc1"
+        ]
+      },
+      {
+        "control": "ROB-02",
+        "outcome": "insufficient_evidence",
+        "mode": "automated",
+        "evidence": []
+      },
+      {
+        "control": "ROB-03",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/tc1"
+        ]
+      },
+      {
+        "control": "ROB-04",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/tc1"
+        ]
+      },
+      {
+        "control": "ROB-05",
+        "outcome": "conformant",
+        "mode": "semi-automated",
+        "evidence": [
+          "agentce:event/tc1"
+        ]
+      },
+      {
+        "control": "ROB-06",
+        "outcome": "conformant",
+        "mode": "semi-automated",
+        "evidence": [
+          "agentce:event/tc1"
+        ]
+      },
+      {
+        "control": "ROB-07",
+        "outcome": "insufficient_evidence",
+        "mode": "semi-automated",
+        "evidence": []
+      },
+      {
+        "control": "RSK-01",
+        "outcome": "insufficient_evidence",
+        "mode": "automated",
+        "evidence": []
+      },
+      {
+        "control": "RSK-02",
+        "outcome": "insufficient_evidence",
+        "mode": "automated",
+        "evidence": []
+      },
+      {
+        "control": "RSK-03",
+        "outcome": "insufficient_evidence",
+        "mode": "semi-automated",
+        "evidence": []
+      },
+      {
+        "control": "RSK-04",
+        "outcome": "not_assessed",
+        "mode": "manual",
+        "evidence": []
+      },
+      {
+        "control": "RSK-05",
+        "outcome": "not_assessed",
+        "mode": "manual",
+        "evidence": []
+      },
+      {
+        "control": "TRN-01",
+        "outcome": "insufficient_evidence",
+        "mode": "automated",
+        "evidence": []
+      },
+      {
+        "control": "TRN-02",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/d1"
+        ]
+      },
+      {
+        "control": "TRN-03",
+        "outcome": "insufficient_evidence",
+        "mode": "semi-automated",
+        "evidence": []
+      },
+      {
+        "control": "TRN-04",
+        "outcome": "conformant",
+        "mode": "automated",
+        "evidence": [
+          "agentce:event/d1"
+        ]
+      },
+      {
+        "control": "TRN-05",
+        "outcome": "insufficient_evidence",
+        "mode": "semi-automated",
+        "evidence": []
+      }
+    ],
+    "evidence": [
+      "agentce:event/d1",
+      "agentce:event/dl1",
+      "agentce:event/tc1"
+    ]
+  },
+  "assertions": [
+    {
+      "control": "DAT-01",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "DAT-02",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "semi-automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "DAT-03",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "semi-automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "DAT-04",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "not_assessed",
+      "rung": 3,
+      "mode": "manual",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      }
+    },
+    {
+      "control": "DOC-01",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/d1",
+          "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
+          "source_class": "self_report"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "DOC-02",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/d1",
+          "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
+          "source_class": "self_report"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "DOC-03",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/tc1",
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "DOC-04",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "semi-automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/d1",
+          "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
+          "source_class": "self_report"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "DOC-05",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "not_assessed",
+      "rung": 3,
+      "mode": "manual",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      }
+    },
+    {
+      "control": "INC-01",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "INC-02",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "not_applicable",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      }
+    },
+    {
+      "control": "INC-03",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "INC-04",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/tc1",
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "INT-01",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/tc1",
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "INT-02",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/dl1",
+          "digest": "sha256:00b9493911e572ff8cdc6dc7303bd4c36e0b4e1366bbcf6fc80a22424f82dd5d",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "INT-03",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/tc1",
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "INT-04",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/tc1",
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "OVS-01",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "OVS-02",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "non-conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:oversightModalityMatchesDeclared",
+          "constraint": "sh:hasValue",
+          "message_key": "OVS-02.S1"
+        }
+      ],
+      "evidence": [
+        {
+          "ref": "agentce:event/d1",
+          "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
+          "source_class": "self_report"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "OVS-03",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "non-conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "(agentce:executes agentce:oversightModalityMatchesDeclared)",
+          "constraint": "sh:hasValue",
+          "message_key": "OVS-03.E3"
+        }
+      ],
+      "evidence": [
+        {
+          "ref": "agentce:event/tc1",
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "OVS-04",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/tc1",
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "OVS-05",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "OVS-06",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/tc1",
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "OVS-07",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "semi-automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "OVS-08",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "semi-automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "OVS-09",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "not_assessed",
+      "rung": 3,
+      "mode": "manual",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      }
+    },
+    {
+      "control": "REC-01",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/d1",
+          "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
+          "source_class": "self_report"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "REC-02",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/d1",
+          "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
+          "source_class": "self_report"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "REC-03",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "REC-04",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/d1",
+          "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
+          "source_class": "self_report"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "REC-05",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "REC-06",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/tc1",
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "ROB-01",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/tc1",
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "ROB-02",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "ROB-03",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/tc1",
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "ROB-04",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/tc1",
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "ROB-05",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "semi-automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/tc1",
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "ROB-06",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "semi-automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/tc1",
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "ROB-07",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "semi-automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "RSK-01",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "RSK-02",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "RSK-03",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "semi-automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "RSK-04",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "not_assessed",
+      "rung": 3,
+      "mode": "manual",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      }
+    },
+    {
+      "control": "RSK-05",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "not_assessed",
+      "rung": 3,
+      "mode": "manual",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      }
+    },
+    {
+      "control": "TRN-01",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "TRN-02",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/d1",
+          "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
+          "source_class": "self_report"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "TRN-03",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "semi-automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    },
+    {
+      "control": "TRN-04",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "conformant",
+      "rung": 2,
+      "mode": "automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "evidence": [
+        {
+          "ref": "agentce:event/d1",
+          "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
+          "source_class": "self_report"
+        }
+      ],
+      "source_class_satisfied": true,
+      "evidence_strength": "strong"
+    },
+    {
+      "control": "TRN-05",
+      "control_version": "2026.09",
+      "subject": "spiffe://corp/agents/a",
+      "outcome": "insufficient_evidence",
+      "rung": 2,
+      "mode": "semi-automated",
+      "window": {
+        "start": "2026-01-01T00:00:00Z",
+        "end": "2026-01-01T00:00:02Z"
+      },
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      }
+    }
+  ]
+}

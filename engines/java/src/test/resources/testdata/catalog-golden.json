@@ -1,0 +1,1586 @@
+{
+  "DAT-01": {
+    "passed": {
+      "control": "DAT-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "DAT-01",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "prov:used",
+          "constraint": "sh:minCount",
+          "message_key": "DAT-01.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "DAT-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "DAT-02": {
+    "passed": {
+      "control": "DAT-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "DAT-02",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "prov:used",
+          "constraint": "sh:minCount",
+          "message_key": "DAT-02.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "DAT-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "DAT-03": {
+    "passed": {
+      "control": "DAT-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "DAT-03",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 2,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:reviewedBy",
+          "constraint": "sh:minCount",
+          "message_key": "DAT-03.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "DAT-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "DOC-01": {
+    "passed": {
+      "control": "DOC-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "DOC-01",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "prov:wasAssociatedWith",
+          "constraint": "sh:minCount",
+          "message_key": "DOC-01.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "DOC-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "DOC-02": {
+    "passed": {
+      "control": "DOC-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "DOC-02",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "prov:atTime",
+          "constraint": "sh:minCount",
+          "message_key": "DOC-02.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "DOC-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "DOC-03": {
+    "passed": {
+      "control": "DOC-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "DOC-03",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:sourceClass",
+          "constraint": "sh:hasValue",
+          "message_key": "DOC-03.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "DOC-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "DOC-04": {
+    "passed": {
+      "control": "DOC-04",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "DOC-04",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "prov:wasAssociatedWith",
+          "constraint": "sh:minCount",
+          "message_key": "DOC-04.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "DOC-04",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "INC-01": {
+    "passed": {
+      "control": "INC-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "INC-01",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 2,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:resultedIn",
+          "constraint": "sh:minCount",
+          "message_key": "INC-01.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "INC-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "INC-02": {
+    "passed": {
+      "control": "INC-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "INC-02",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/inc1",
+          "path": "prov:wasAssociatedWith",
+          "constraint": "sh:minCount",
+          "message_key": "INC-02.N1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "INC-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "INC-03": {
+    "passed": {
+      "control": "INC-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "INC-03",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 2,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:reviewedBy",
+          "constraint": "sh:minCount",
+          "message_key": "INC-03.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "INC-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "INC-04": {
+    "passed": {
+      "control": "INC-04",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "INC-04",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:danglingRef",
+          "constraint": "sh:maxCount",
+          "message_key": "INC-04.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "INC-04",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "INT-01": {
+    "passed": {
+      "control": "INT-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "INT-01",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:sourceClass",
+          "constraint": "sh:hasValue",
+          "message_key": "INT-01.I1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "INT-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "INT-02": {
+    "passed": {
+      "control": "INT-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "INT-02",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/del1",
+          "path": "agentce:chainVerified",
+          "constraint": "sh:hasValue",
+          "message_key": "INT-02.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "INT-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "INT-03": {
+    "passed": {
+      "control": "INT-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "INT-03",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:danglingRef",
+          "constraint": "sh:maxCount",
+          "message_key": "INT-03.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "INT-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "INT-04": {
+    "passed": {
+      "control": "INT-04",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "INT-04",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:sourceClass",
+          "constraint": "sh:in",
+          "message_key": "INT-04.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "INT-04",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "OVS-01": {
+    "passed": {
+      "control": "OVS-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "OVS-01",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 2,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:reviewedBy",
+          "constraint": "sh:minCount",
+          "message_key": "OVS-01.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "OVS-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "OVS-02": {
+    "passed": {
+      "control": "OVS-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "OVS-02",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:oversightModalityMatchesDeclared",
+          "constraint": "sh:hasValue",
+          "message_key": "OVS-02.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "OVS-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "OVS-03": {
+    "passed": {
+      "control": "OVS-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "OVS-03",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "(agentce:executes agentce:oversightModalityMatchesDeclared)",
+          "constraint": "sh:hasValue",
+          "message_key": "OVS-03.E3"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "OVS-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "OVS-04": {
+    "passed": {
+      "control": "OVS-04",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "OVS-04",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "(agentce:delegatedVia agentce:chainVerified)",
+          "constraint": "sh:hasValue",
+          "message_key": "OVS-04.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "OVS-04",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "OVS-05": {
+    "passed": {
+      "control": "OVS-05",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "OVS-05",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:authorizedBy",
+          "constraint": "sh:minCount",
+          "message_key": "OVS-05.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "OVS-05",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "OVS-06": {
+    "passed": {
+      "control": "OVS-06",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "OVS-06",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:sourceClass",
+          "constraint": "sh:hasValue",
+          "message_key": "OVS-06.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "OVS-06",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "OVS-07": {
+    "passed": {
+      "control": "OVS-07",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "OVS-07",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 2,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:reviewedBy",
+          "constraint": "sh:minCount",
+          "message_key": "OVS-07.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "OVS-07",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "OVS-08": {
+    "passed": {
+      "control": "OVS-08",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "OVS-08",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 2,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:reviewedBy",
+          "constraint": "sh:minCount",
+          "message_key": "OVS-08.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "OVS-08",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "REC-01": {
+    "passed": {
+      "control": "REC-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "REC-01",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "prov:wasAssociatedWith",
+          "constraint": "sh:minCount",
+          "message_key": "REC-01.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "REC-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "REC-02": {
+    "passed": {
+      "control": "REC-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "REC-02",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "prov:atTime",
+          "constraint": "sh:minCount",
+          "message_key": "REC-02.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "REC-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "REC-03": {
+    "passed": {
+      "control": "REC-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "REC-03",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "prov:used",
+          "constraint": "sh:minCount",
+          "message_key": "REC-03.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "REC-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "REC-04": {
+    "passed": {
+      "control": "REC-04",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "REC-04",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "prov:wasAssociatedWith",
+          "constraint": "sh:minCount",
+          "message_key": "REC-04.R1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "REC-04",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "REC-05": {
+    "passed": {
+      "control": "REC-05",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "REC-05",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:authorizedBy",
+          "constraint": "sh:minCount",
+          "message_key": "REC-05.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "REC-05",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "REC-06": {
+    "passed": {
+      "control": "REC-06",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "REC-06",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:danglingRef",
+          "constraint": "sh:maxCount",
+          "message_key": "REC-06.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "REC-06",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "ROB-01": {
+    "passed": {
+      "control": "ROB-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "ROB-01",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:sourceClass",
+          "constraint": "sh:in",
+          "message_key": "ROB-01.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "ROB-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "ROB-02": {
+    "passed": {
+      "control": "ROB-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "ROB-02",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "prov:used",
+          "constraint": "sh:minCount",
+          "message_key": "ROB-02.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "ROB-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "ROB-03": {
+    "passed": {
+      "control": "ROB-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "ROB-03",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:danglingRef",
+          "constraint": "sh:maxCount",
+          "message_key": "ROB-03.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "ROB-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "ROB-04": {
+    "passed": {
+      "control": "ROB-04",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "ROB-04",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "(agentce:delegatedVia agentce:chainVerified)",
+          "constraint": "sh:hasValue",
+          "message_key": "ROB-04.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "ROB-04",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "ROB-05": {
+    "passed": {
+      "control": "ROB-05",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "ROB-05",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:sourceClass",
+          "constraint": "sh:hasValue",
+          "message_key": "ROB-05.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "ROB-05",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "ROB-06": {
+    "passed": {
+      "control": "ROB-06",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "ROB-06",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:sourceClass",
+          "constraint": "sh:hasValue",
+          "message_key": "ROB-06.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "ROB-06",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "ROB-07": {
+    "passed": {
+      "control": "ROB-07",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "ROB-07",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 2,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:reviewedBy",
+          "constraint": "sh:minCount",
+          "message_key": "ROB-07.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "ROB-07",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "RSK-01": {
+    "passed": {
+      "control": "RSK-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "RSK-01",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:authorizedBy",
+          "constraint": "sh:minCount",
+          "message_key": "RSK-01.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "RSK-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "RSK-02": {
+    "passed": {
+      "control": "RSK-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "RSK-02",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 2,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:reviewedBy",
+          "constraint": "sh:minCount",
+          "message_key": "RSK-02.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "RSK-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "RSK-03": {
+    "passed": {
+      "control": "RSK-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "RSK-03",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 2,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:reviewedBy",
+          "constraint": "sh:minCount",
+          "message_key": "RSK-03.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "RSK-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "TRN-01": {
+    "passed": {
+      "control": "TRN-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "TRN-01",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 2,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:notifiedBy",
+          "constraint": "sh:minCount",
+          "message_key": "TRN-01.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "TRN-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "TRN-02": {
+    "passed": {
+      "control": "TRN-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "TRN-02",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "prov:wasAssociatedWith",
+          "constraint": "sh:minCount",
+          "message_key": "TRN-02.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "TRN-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "TRN-03": {
+    "passed": {
+      "control": "TRN-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "TRN-03",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 2,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:notifiedBy",
+          "constraint": "sh:minCount",
+          "message_key": "TRN-03.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "TRN-03",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "TRN-04": {
+    "passed": {
+      "control": "TRN-04",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "TRN-04",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "prov:atTime",
+          "constraint": "sh:minCount",
+          "message_key": "TRN-04.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "TRN-04",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "TRN-05": {
+    "passed": {
+      "control": "TRN-05",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "TRN-05",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 2,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:notifiedBy",
+          "constraint": "sh:minCount",
+          "message_key": "TRN-05.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "TRN-05",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  }
+}
