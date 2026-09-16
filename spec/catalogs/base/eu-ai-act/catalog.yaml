@@ -1,14 +1,60 @@
-# EU AI Act base catalog (SPEC 7.3). The Phase 1 subset covers the families REC, OVS, INT, INC as
-# rung-2 structural controls; the statistical, manual, and remaining families are added in later
-# phases. Each control lives in controls/ and references a Portable Shape Profile shape in shapes/.
+# EU AI Act base catalog (SPEC §7.3). Families REC, OVS, ROB, DAT, DOC, RSK, TRN, INC, INT.
+# Automated controls are rung-2 structural checks over graph-materialised predicates; semi-
+# automated controls add a manual checklist (SPEC §7.5); manual controls are evaluated from a
+# completed checklist and are never reported assessed without one.
 id: eu-ai-act
 version: "2026.09"
 title: EU AI Act base catalog
-families: [REC, OVS, INT, INC]
+families: [REC, OVS, ROB, DAT, DOC, RSK, TRN, INC, INT]
 precision_policy:
   demote_below: "0.98"   # a rung-2 rule below this precision on the corpus is demoted (SPEC 11.6)
 controls:
-  - controls/OVS-03.yaml
-  - controls/REC-04.yaml
-  - controls/INT-01.yaml
+  - controls/DAT-01.yaml
+  - controls/DAT-02.yaml
+  - controls/DAT-03.yaml
+  - controls/DAT-04.yaml
+  - controls/DOC-01.yaml
+  - controls/DOC-02.yaml
+  - controls/DOC-03.yaml
+  - controls/DOC-04.yaml
+  - controls/DOC-05.yaml
+  - controls/INC-01.yaml
   - controls/INC-02.yaml
+  - controls/INC-03.yaml
+  - controls/INC-04.yaml
+  - controls/INT-01.yaml
+  - controls/INT-02.yaml
+  - controls/INT-03.yaml
+  - controls/INT-04.yaml
+  - controls/OVS-01.yaml
+  - controls/OVS-02.yaml
+  - controls/OVS-03.yaml
+  - controls/OVS-04.yaml
+  - controls/OVS-05.yaml
+  - controls/OVS-06.yaml
+  - controls/OVS-07.yaml
+  - controls/OVS-08.yaml
+  - controls/OVS-09.yaml
+  - controls/REC-01.yaml
+  - controls/REC-02.yaml
+  - controls/REC-03.yaml
+  - controls/REC-04.yaml
+  - controls/REC-05.yaml
+  - controls/REC-06.yaml
+  - controls/ROB-01.yaml
+  - controls/ROB-02.yaml
+  - controls/ROB-03.yaml
+  - controls/ROB-04.yaml
+  - controls/ROB-05.yaml
+  - controls/ROB-06.yaml
+  - controls/ROB-07.yaml
+  - controls/RSK-01.yaml
+  - controls/RSK-02.yaml
+  - controls/RSK-03.yaml
+  - controls/RSK-04.yaml
+  - controls/RSK-05.yaml
+  - controls/TRN-01.yaml
+  - controls/TRN-02.yaml
+  - controls/TRN-03.yaml
+  - controls/TRN-04.yaml
+  - controls/TRN-05.yaml

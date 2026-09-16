@@ -1,0 +1,29 @@
+id: INT-04
+version: "2026.09"
+title: Consequential tool calls carry a corroborated source class
+crosswalk:
+  - {framework: eu-ai-act, clause: "engine integrity", relation: implements, verified_against_text: false}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: enforcement_point
+  minimum_evidence:
+    - {event: ToolCall, class: any}
+    - {event: Decision, class: self_report}
+  shape: shapes/INT-04.ttl
+expectations:
+  - {id: S1, text: "Consequential tool calls carry a corroborated source class."}
+severity: high
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+tolerance_rationale: "A single INT-04 exception is a control failure."
+false_positive_modes:
+  - "A condition declared as an accepted deviation in the applicability profile."
+techniques:
+  - "techniques/int-evidence-at-source"
+test_cases:
+  - {id: pass, expected: passed, fixture: test/INT-04/passed.jsonl}
+  - {id: fail, expected: failed, fixture: test/INT-04/failed.jsonl}
+  - {id: na, expected: inapplicable, fixture: test/INT-04/inapplicable.jsonl}

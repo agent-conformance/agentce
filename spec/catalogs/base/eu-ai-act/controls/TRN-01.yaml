@@ -1,0 +1,28 @@
+id: TRN-01
+version: "2026.09"
+title: Affected persons are notified for every consequential decision
+crosswalk:
+  - {framework: eu-ai-act, clause: "Art. 26(11) / 86", relation: implements, verified_against_text: false}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: self_report
+  minimum_evidence:
+    - {event: Decision, class: self_report}
+  shape: shapes/TRN-01.ttl
+expectations:
+  - {id: S1, text: "Affected persons are notified for every consequential decision."}
+severity: high
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+tolerance_rationale: "A single TRN-01 exception is a control failure."
+false_positive_modes:
+  - "A condition declared as an accepted deviation in the applicability profile."
+techniques:
+  - "techniques/trn-evidence-at-source"
+test_cases:
+  - {id: pass, expected: passed, fixture: test/TRN-01/passed.jsonl}
+  - {id: fail, expected: failed, fixture: test/TRN-01/failed.jsonl}
+  - {id: na, expected: inapplicable, fixture: test/TRN-01/inapplicable.jsonl}
