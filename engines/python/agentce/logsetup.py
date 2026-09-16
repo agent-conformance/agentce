@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 from datetime import datetime, timezone
 from typing import Any
 
@@ -67,14 +68,15 @@ def configure(*, debug: bool = False, quiet: bool = False) -> logging.Logger:
     logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(level)
     logger.propagate = False
-    handler: logging.Handler
-    if logger.handlers:
-        handler = logger.handlers[0]
-    else:
-        handler = logging.StreamHandler()
-        logger.addHandler(handler)
+    # Replace any existing handler with a fresh one bound to the current stderr, so the logger never
+    # writes to a stream captured by an earlier call (which under a test harness is closed and would
+    # raise a logging error), and so repeated calls never accumulate duplicate handlers.
+    for existing in list(logger.handlers):
+        logger.removeHandler(existing)
+    handler: logging.Handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(level)
     handler.setFormatter(JsonFormatter())
+    logger.addHandler(handler)
     return logger
 
 
