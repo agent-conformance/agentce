@@ -1,0 +1,39 @@
+{
+  "manifest_bytes": "{\"agentce_manifest_version\": 1, \"name\": \"one\"}\n",
+  "bundle_a": "sha256:aaa",
+  "bundle_b": "sha256:bbb",
+  "window_a": "2026-02-01T00:00:00.000Z",
+  "window_b": "2026-03-31T00:00:00.000Z",
+  "events_b": [
+    {
+      "source": "s1",
+      "subject": "x",
+      "time": "2026-01-15T00:00:00.000Z",
+      "data": {
+        "@type": "ToolCall",
+        "integrity": {
+          "stream": "strm-a"
+        }
+      }
+    },
+    {
+      "source": "s1",
+      "subject": "x",
+      "time": "2026-03-01T00:00:00.000Z",
+      "data": {
+        "@type": "ToolCall",
+        "integrity": {
+          "stream": "strm-a"
+        }
+      }
+    }
+  ],
+  "manifest_digest": "sha256:1cd25f4bcc24f2c851daa410b7d14eaeafc4ca380b9cbd5e7473b401e4b3f7a1",
+  "state_json_after_record": "{\n  \"bundle_digests\": [\n    \"sha256:aaa\"\n  ],\n  \"last_report_digest\": \"sha256:1cd25f4bcc24f2c851daa410b7d14eaeafc4ca380b9cbd5e7473b401e4b3f7a1\",\n  \"last_window_end\": \"2026-02-01T00:00:00.000Z\",\n  \"state_version\": 1\n}\n",
+  "supersedes": [
+    "sha256:1cd25f4bcc24f2c851daa410b7d14eaeafc4ca380b9cbd5e7473b401e4b3f7a1"
+  ],
+  "late_events": {
+    "strm-a": 1
+  }
+}
