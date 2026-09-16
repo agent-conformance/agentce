@@ -138,6 +138,12 @@ def build_parser() -> argparse.ArgumentParser:
         "lint", parents=[common], help="validate controls, shapes, and test cases"
     )
     lint.add_argument("dir", nargs="?", help="the catalog directory")
+    lint.add_argument(
+        "--require-verification-flags",
+        dest="require_verification_flags",
+        action="store_true",
+        help="require a verified_against_text flag on every crosswalk entry (SPEC 7.3 B14)",
+    )
     matrix = csub.add_parser(
         "coverage-matrix",
         parents=[common],
