@@ -1,0 +1,236 @@
+{
+  "assertions": [
+    {
+      "control": "INC-02",
+      "control_version": "2026.09",
+      "mode": "automated",
+      "outcome": "not_applicable",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "rung": 2,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "2026-01-01T00:00:02Z",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    },
+    {
+      "control": "INT-01",
+      "control_version": "2026.09",
+      "evidence": [
+        {
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "ref": "agentce:event/tc1",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "evidence_strength": "strong",
+      "mode": "automated",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "rung": 2,
+      "source_class_satisfied": true,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "2026-01-01T00:00:02Z",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    },
+    {
+      "control": "OVS-03",
+      "control_version": "2026.09",
+      "evidence": [
+        {
+          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
+          "ref": "agentce:event/tc1",
+          "source_class": "enforcement_point"
+        }
+      ],
+      "evidence_strength": "strong",
+      "mode": "automated",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "rung": 2,
+      "source_class_satisfied": true,
+      "subject": "spiffe://corp/agents/a",
+      "violations": [
+        {
+          "constraint": "sh:hasValue",
+          "focus": "agentce:event/tc1",
+          "message_key": "OVS-03.E3",
+          "path": "(agentce:executes agentce:oversightModalityMatchesDeclared)"
+        }
+      ],
+      "window": {
+        "end": "2026-01-01T00:00:02Z",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    },
+    {
+      "control": "REC-04",
+      "control_version": "2026.09",
+      "evidence": [
+        {
+          "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
+          "ref": "agentce:event/d1",
+          "source_class": "self_report"
+        }
+      ],
+      "evidence_strength": "strong",
+      "mode": "automated",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "rung": 2,
+      "source_class_satisfied": true,
+      "subject": "spiffe://corp/agents/a",
+      "window": {
+        "end": "2026-01-01T00:00:02Z",
+        "start": "2026-01-01T00:00:00Z"
+      }
+    }
+  ],
+  "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>AgentCE conformance report</title></head><body><h1>AgentCE conformance report</h1><h2>Outcome summary</h2><ul><li>conformant: 2</li><li>non-conformant: 1</li><li>partial: 0</li><li>not_applicable: 1</li><li>not_assessed: 0</li><li>insufficient_evidence: 0</li></ul><h2>Assertions</h2><table><tr><th>Control</th><th>Subject</th><th>Outcome</th></tr><tr><td>INC-02</td><td>spiffe://corp/agents/a</td><td>not_applicable</td></tr><tr><td>INT-01</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>OVS-03</td><td>spiffe://corp/agents/a</td><td>non-conformant</td></tr><tr><td>REC-04</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr></table></body></html>\n",
+  "md": "# AgentCE conformance report\n\n## Outcome summary\n\n- conformant: 2\n- non-conformant: 1\n- partial: 0\n- not_applicable: 1\n- not_assessed: 0\n- insufficient_evidence: 0\n\n## Assertions\n\n- `INC-02` @ `spiffe://corp/agents/a` -> **not_applicable** (rung 2, automated; 0/0 failed)\n- `INT-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `OVS-03` @ `spiffe://corp/agents/a` -> **non-conformant** (rung 2, automated; 1/1 failed)\n- `REC-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n",
+  "oscal": {
+    "assessment-results": {
+      "metadata": {
+        "oscal-version": "1.1.2",
+        "title": "AgentCE Assessment Results",
+        "version": "0.0.1"
+      },
+      "results": [
+        {
+          "findings": [
+            {
+              "target": {
+                "status": {
+                  "reason": "not_applicable",
+                  "state": "not-satisfied"
+                },
+                "target-id": "INC-02",
+                "type": "objective-id"
+              },
+              "title": "INC-02 for spiffe://corp/agents/a",
+              "uuid": "7ed0ceaa-0e81-511f-b2c9-0c06720bcd1d"
+            },
+            {
+              "target": {
+                "status": {
+                  "reason": "conformant",
+                  "state": "satisfied"
+                },
+                "target-id": "INT-01",
+                "type": "objective-id"
+              },
+              "title": "INT-01 for spiffe://corp/agents/a",
+              "uuid": "280002e2-dafc-532a-88c6-4faffe3f3607"
+            },
+            {
+              "target": {
+                "status": {
+                  "reason": "non-conformant",
+                  "state": "not-satisfied"
+                },
+                "target-id": "OVS-03",
+                "type": "objective-id"
+              },
+              "title": "OVS-03 for spiffe://corp/agents/a",
+              "uuid": "3df9f50b-d2cb-537d-842a-34f484a505f6"
+            },
+            {
+              "target": {
+                "status": {
+                  "reason": "conformant",
+                  "state": "satisfied"
+                },
+                "target-id": "REC-04",
+                "type": "objective-id"
+              },
+              "title": "REC-04 for spiffe://corp/agents/a",
+              "uuid": "3951879a-6d28-5a87-8d32-129d6f624640"
+            }
+          ],
+          "title": "AgentCE structural assessment",
+          "uuid": "2736afa7-2f66-580a-8ade-4df53595c705"
+        }
+      ],
+      "uuid": "22fe7070-f169-5c2d-bff8-cc0225de1811"
+    }
+  },
+  "pack": {
+    "assertions": [
+      {
+        "control": "INC-02",
+        "mode": "automated",
+        "outcome": "not_applicable"
+      },
+      {
+        "control": "INT-01",
+        "mode": "automated",
+        "outcome": "conformant"
+      },
+      {
+        "control": "OVS-03",
+        "mode": "automated",
+        "outcome": "non-conformant"
+      },
+      {
+        "control": "REC-04",
+        "mode": "automated",
+        "outcome": "conformant"
+      }
+    ],
+    "evidence": [
+      "agentce:event/d1",
+      "agentce:event/tc1"
+    ],
+    "subject": "spiffe://corp/agents/a"
+  },
+  "sarif": {
+    "runs": [
+      {
+        "results": [
+          {
+            "level": "error",
+            "message": {
+              "text": "OVS-03 on spiffe://corp/agents/a: non-conformant"
+            },
+            "ruleId": "OVS-03"
+          }
+        ],
+        "tool": {
+          "driver": {
+            "name": "agentce-ts",
+            "rules": [
+              {
+                "id": "INC-02"
+              },
+              {
+                "id": "INT-01"
+              },
+              {
+                "id": "OVS-03"
+              },
+              {
+                "id": "REC-04"
+              }
+            ],
+            "version": "0.0.1"
+          }
+        }
+      }
+    ],
+    "version": "2.1.0"
+  }
+}
