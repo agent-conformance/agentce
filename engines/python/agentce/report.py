@@ -156,15 +156,101 @@ def render_sarif(assertions: list[Assertion]) -> dict[str, Any]:
     }
 
 
-def render_evidence_pack(subject: str, assertions: list[Assertion]) -> dict[str, Any]:
-    return {
+def render_evidence_pack(
+    subject: str, assertions: list[Assertion], *, role: str | None = None
+) -> dict[str, Any]:
+    """Render a subject's evidence pack. When ``role`` is given, the pack is the provider or deployer
+    variant: it names the role and carries every assertion for that subject with its evidence
+    pointers, so the pack is complete for the role's controls (SPEC §9.4, A4)."""
+    pack: dict[str, Any] = {
         "subject": subject,
         "assertions": [
-            {"control": a.control, "outcome": a.outcome, "mode": a.mode}
+            {
+                "control": a.control,
+                "outcome": a.outcome,
+                "mode": a.mode,
+                "evidence": sorted({e.ref for e in a.evidence}),
+            }
             for a in assertions
         ],
         "evidence": sorted({e.ref for a in assertions for e in a.evidence}),
     }
+    if role is not None:
+        pack["role"] = role
+    return pack
+
+
+_NON_DETERMINATION = (
+    "This statement reports conformance to the named catalog as evaluated by the Agent Conformance "
+    "Engine over the named evidence and observation window. It is not a legal compliance "
+    "determination."
+)
+_CONDUCT_LINE = (
+    "Over the observation window, the named subjects acted within their declared boundaries and on "
+    "authorised instructions as evidenced by the Conduct overlay controls listed."
+)
+_STATEMENT_OUTCOMES = (
+    "conformant",
+    "non-conformant",
+    "partial",
+    "not_applicable",
+    "not_assessed",
+    "insufficient_evidence",
+)
+
+
+def render_public_statement(
+    assertions: list[Assertion],
+    *,
+    catalogs: list[str] | None = None,
+    statement_date: str | None = None,
+    deviations: list[str] | None = None,
+) -> str:
+    """Render the optional public conformance statement (SPEC §9.5): scope, catalog and date, a
+    six-outcome summary per family, accepted deviations by control id only, the Conduct line when the
+    overlay is present, how affected persons raise concerns, and the fixed non-determination line."""
+    subjects = sorted({a.subject for a in assertions})
+    families: dict[str, dict[str, int]] = {}
+    for assertion in assertions:
+        family = assertion.control.split("-", 1)[0]
+        row = families.setdefault(family, dict.fromkeys(_STATEMENT_OUTCOMES, 0))
+        if assertion.outcome in row:
+            row[assertion.outcome] += 1
+    lines = ["# Public conformance statement", ""]
+    lines.append("## Scope")
+    lines.append("Subjects: " + ", ".join(subjects) if subjects else "Subjects: (none)")
+    lines.append(
+        f"Catalogs: {', '.join(catalogs)}" if catalogs else "Catalogs: (unspecified)"
+    )
+    lines.append(f"Date: {statement_date}" if statement_date else "Date: (unspecified)")
+    lines += [
+        "",
+        "## Outcomes by family",
+        "",
+        "| Family | " + " | ".join(_STATEMENT_OUTCOMES) + " |",
+    ]
+    lines.append("|---|" + "|".join("---" for _ in _STATEMENT_OUTCOMES) + "|")
+    for family in sorted(families):
+        row = families[family]
+        lines.append(
+            f"| {family} | "
+            + " | ".join(str(row[o]) for o in _STATEMENT_OUTCOMES)
+            + " |"
+        )
+    lines += ["", "## Accepted deviations"]
+    lines.append(", ".join(sorted(deviations)) if deviations else "None.")
+    if "CND" in families:
+        lines += ["", "## Conduct", _CONDUCT_LINE]
+    lines += [
+        "",
+        "## Affected persons",
+        "Affected persons may obtain an explanation of a decision and raise concerns through the "
+        "deployer's published contact channel (EU AI Act Arts. 26(11), 85, 86).",
+        "",
+        "## Basis",
+        _NON_DETERMINATION,
+    ]
+    return "\n".join(lines) + "\n"
 
 
 def build_manifest(

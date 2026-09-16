@@ -109,6 +109,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--format", choices=commands.REPORT_FORMATS, help="the output format"
     )
+    p.add_argument(
+        "--role", choices=("provider", "deployer"), help="evidence-pack role variant"
+    )
+    p.add_argument(
+        "--catalog", help="catalog labels for the public statement, comma-separated"
+    )
+    p.add_argument("--out", help="write the rendering to this file")
     p.add_argument("--validate", help="validate every artifact in a report directory")
     p.set_defaults(func=commands.cmd_report)
 
