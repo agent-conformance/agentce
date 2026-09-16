@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from fractions import Fraction
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -130,6 +131,42 @@ def _load_events(path: Path) -> list[dict[str, Any]]:
         if line:
             events.append(json.loads(line))
     return events
+
+
+_SEVERITY_RANK = {"low": 1, "medium": 2, "high": 3}
+
+
+def _tolerance_value(tolerance: dict[str, Any]) -> Fraction:
+    """A comparable 'how much is tolerated' value: a count of N or a ratio in [0,1) as a Fraction."""
+    try:
+        return Fraction(str(tolerance.get("max", 0)))
+    except (ValueError, ZeroDivisionError):
+        return Fraction(0)
+
+
+def overlay_weakens_base(
+    base_controls: list[ControlSpec], overlay_controls: list[ControlSpec]
+) -> list[str]:
+    """Return the ways an overlay weakens the base catalog (SPEC §7.3): an overlay may add controls
+    or tighten thresholds, but a control that re-uses a base control's id must not lower its severity
+    or loosen its tolerance. An empty list means the overlay only tightens or adds."""
+    base_by_id = {control.id: control for control in base_controls}
+    problems: list[str] = []
+    for overlay in overlay_controls:
+        base = base_by_id.get(overlay.id)
+        if base is None:
+            continue  # a new control the overlay adds, not a redefinition
+        if _SEVERITY_RANK.get(overlay.severity, 0) < _SEVERITY_RANK.get(
+            base.severity, 0
+        ):
+            problems.append(
+                f"{overlay.id}: overlay lowers severity from {base.severity} to {overlay.severity}"
+            )
+        if _tolerance_value(overlay.tolerance) > _tolerance_value(base.tolerance):
+            problems.append(
+                f"{overlay.id}: overlay loosens tolerance beyond the base control"
+            )
+    return problems
 
 
 def _outcome_matches(expected: str, applicable: int, outcome: str) -> bool:
