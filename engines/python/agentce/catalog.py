@@ -20,12 +20,47 @@ from typing import Any
 import jsonschema
 import yaml
 
+from . import signing
 from .domain import DomainBinding
 from .graph import build_graph
 from .psp import Shape, load_shapes
 from .structural import evaluate_control
 
 _EXPECTED_TO_CHECK = {"passed", "failed", "inapplicable"}
+
+#: Files left out of the provenance digest: the detached signature and ``catalog.yaml`` itself (which
+#: carries the provenance block), so the digest covers the catalog's rules and is non-circular.
+_PROVENANCE_EXCLUDE = frozenset({signing.CATALOG_SIGNATURE_NAME, "catalog.yaml"})
+
+
+def catalog_provenance_digest(directory: Path) -> str:
+    """The content digest a catalog's provenance block must carry (SPEC §14.5 CP-3).
+
+    Content-addresses every catalog file except the detached signature and ``catalog.yaml`` (which
+    holds the provenance block), so a rebranded catalog whose rules or shapes differ fails validation.
+    """
+    return signing.digest_tree(directory, exclude=_PROVENANCE_EXCLUDE)
+
+
+def _provenance_problems(directory: Path, meta: dict[str, Any]) -> list[str]:
+    """Problems with the catalog's ``provenance`` block (SPEC §14.5 CP-3)."""
+    provenance = meta.get("provenance")
+    if not isinstance(provenance, dict):
+        return ["catalog.yaml: missing provenance block (SPEC §14.5 CP-3)"]
+    problems: list[str] = []
+    source = provenance.get("source")
+    if not isinstance(source, str) or not source.strip():
+        problems.append("catalog.yaml: provenance.source is missing")
+    if str(provenance.get("version")) != str(meta.get("version", "")):
+        problems.append(
+            "catalog.yaml: provenance.version does not match the catalog version"
+        )
+    expected = catalog_provenance_digest(directory)
+    if provenance.get("digest") != expected:
+        problems.append(
+            f"catalog.yaml: provenance.digest does not match the catalog content (expected {expected})"
+        )
+    return problems
 
 
 @dataclass
@@ -180,13 +215,19 @@ def _outcome_matches(expected: str, applicable: int, outcome: str) -> bool:
 
 
 def lint_catalog(
-    directory: Path, *, require_verification_flags: bool = False
+    directory: Path,
+    *,
+    require_verification_flags: bool = False,
+    require_provenance: bool = False,
 ) -> list[str]:
     """Return a list of problems; an empty list means the catalog is clean.
 
     With ``require_verification_flags`` (SPEC §7.3 B14), every crosswalk entry must carry a
     ``verified_against_text`` flag, so an unverified clause reference is never silently trusted;
-    verification of the reference itself is a human action, but the flag must be present."""
+    verification of the reference itself is a human action, but the flag must be present. With
+    ``require_provenance`` (SPEC §14.5 CP-3), ``catalog.yaml`` must carry a ``provenance`` block
+    (``source``, ``version``, ``digest``) whose digest matches the catalog content, so a rebranded
+    catalog either shows its origin or fails validation."""
     problems: list[str] = []
     if not (directory / "catalog.yaml").is_file():
         return [f"{directory}: no catalog.yaml"]
@@ -195,6 +236,13 @@ def lint_catalog(
         catalog = load_catalog(directory)
     except (yaml.YAMLError, OSError) as exc:
         return [f"{directory}: cannot load catalog ({exc})"]
+
+    if require_provenance:
+        meta = (
+            yaml.safe_load((directory / "catalog.yaml").read_text(encoding="utf-8"))
+            or {}
+        )
+        problems.extend(_provenance_problems(directory, meta))
 
     domain = _load_test_domain(directory)
     for control_file in sorted((directory / "controls").glob("*.yaml")):
