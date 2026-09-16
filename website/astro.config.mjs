@@ -24,7 +24,14 @@ export default defineConfig({
       sidebar: [
         {
           label: 'Documentation',
-          items: [{ label: 'Getting Started', slug: 'docs/getting-started' }],
+          items: [
+            { label: 'Getting Started', slug: 'docs/getting-started' },
+            { label: 'What is agent conformance?', slug: 'docs/concepts' },
+            { label: 'The Conformance Spec', slug: 'docs/specification' },
+            { label: 'Running Assessments', slug: 'docs/running-assessments' },
+            { label: 'CI Integration', slug: 'docs/ci-integration' },
+            { label: 'Contributing', slug: 'docs/contributing' },
+          ],
         },
       ],
     }),
