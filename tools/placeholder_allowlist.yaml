@@ -1,0 +1,282 @@
+# Placeholder-sweep allowlist (see ADR-0011). tools/placeholder_sweep.py scans every tracked file
+# for stub and placeholder markers; every hit must appear here with an exact count, a class, and a
+# justification, or the sweep fails.
+#
+#   class: legitimate  A permanent, honest placeholder: a catalog entry labelled status: placeholder,
+#                      illustrative user-fill-in scaffolding, a named test double, or a genesis
+#                      all-zero hash-chain pointer in a fixture. These stay.
+#   class: debt        A known defect awaiting its fix. A debt entry is removed by the change that
+#                      fixes it; the debt total may only fall, and the extended end-to-end gate
+#                      requires it to reach zero.
+#
+# count is the exact number of occurrences expected. Change the content and the count moves, so the
+# sweep fails until this file is updated in step -- that is the point: the allowlist stays honest.
+# The scanner excludes its own source, this allowlist, and its self-test fixtures, which necessarily
+# name every pattern.
+version: 1
+allow:
+  - path: .github/pull_request_template.md
+    pattern: empty-md-section
+    count: 1
+    class: legitimate
+    justification: "PR template: the ADRs section is a blank form field an author fills in per pull request."
+
+  - path: .github/workflows/ci.yml
+    pattern: placeholder
+    count: 4
+    class: legitimate
+    justification: "Job names that build the pre-GA placeholder distribution packages (python-placeholders, node-placeholders)."
+
+  - path: SECURITY.md
+    pattern: placeholder
+    count: 1
+    class: legitimate
+    justification: "States that the pre-GA 0.0.x packages are placeholders that contain no functionality."
+
+  - path: adapters/mcp-gateway/tests/test_adapter.py
+    pattern: zero-digest
+    count: 2
+    class: legitimate
+    justification: "Synthetic all-zero MCP tool-call id in the adapter test's expected output."
+
+  - path: conformance/release.py
+    pattern: stub
+    count: 4
+    class: legitimate
+    justification: "StubRegistry: a deliberate test double that proves the release dry-run never publishes."
+
+  - path: conformance/release_dryrun.py
+    pattern: stub
+    count: 1
+    class: legitimate
+    justification: "Describes the release dry-run's stub registry (proves no publish happens)."
+
+  - path: corpus/quickstart/evidence/events/_benign-quarantine.jsonl
+    pattern: zero-digest
+    count: 2
+    class: legitimate
+    justification: "Genesis all-zero prev pointer in the corpus evidence hash chain (no predecessor block)."
+
+  - path: corpus/quickstart/evidence/events/urn-agentce-source-incident-register-corp.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Genesis all-zero prev pointer in the corpus evidence hash chain (no predecessor block)."
+
+  - path: corpus/quickstart/evidence/events/urn-agentce-source-langgraph-gateway-eu-1.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Genesis all-zero prev pointer in the corpus evidence hash chain (no predecessor block)."
+
+  - path: corpus/quickstart/evidence/events/urn-agentce-source-langgraph-runtime-eu-1.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Genesis all-zero prev pointer in the corpus evidence hash chain (no predecessor block)."
+
+  - path: corpus/quickstart/evidence/events/urn-agentce-source-workload-idp-eu-1.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Genesis all-zero prev pointer in the corpus evidence hash chain (no predecessor block)."
+
+  - path: docs/adr/0000-template.md
+    pattern: empty-md-section
+    count: 4
+    class: legitimate
+    justification: "ADR template: the section headings are filled in when an actual ADR is authored from it."
+
+  - path: docs/quickstart.md
+    pattern: todo
+    count: 1
+    class: legitimate
+    justification: "Documents the TODO markers the init command writes into the starter profile for the user to replace."
+
+  - path: docs/verification.md
+    pattern: stub
+    count: 1
+    class: legitimate
+    justification: "Describes the release dry-run's stub registry (records that no publish call was ever made)."
+
+  - path: engines/java/src/main/java/org/agentce/Cli.java
+    pattern: not-implemented
+    count: 2
+    class: debt
+    justification: "The Java engine's non-core commands are not yet implemented; built in the engine-parity work (removes this entry)."
+
+  - path: engines/java/src/test/resources/testdata/ingest-bundle/events/log.jsonl
+    pattern: zero-digest
+    count: 2
+    class: legitimate
+    justification: "Genesis all-zero prev pointer in the integrity test fixture's hash chain (no predecessor block)."
+
+  - path: engines/java/src/test/resources/testdata/integrity-fixture.json
+    pattern: zero-digest
+    count: 7
+    class: legitimate
+    justification: "Genesis all-zero prev pointers in the integrity test fixture's hash chains (no predecessor block)."
+
+  - path: engines/python/README.md
+    pattern: placeholder
+    count: 1
+    class: legitimate
+    justification: "Describes the pre-GA placeholder distribution package."
+
+  - path: engines/python/agentce/commands/__init__.py
+    pattern: todo
+    count: 6
+    class: legitimate
+    justification: "The init command emits a starter applicability profile whose TODO markers the user fills in; product scaffolding, not unfinished work."
+
+  - path: engines/python/agentce/signing.py
+    pattern: not-implemented
+    count: 2
+    class: legitimate
+    justification: "The abstract Signer base class raises NotImplementedError for sign() and keyid; concrete subclasses provide them."
+
+  - path: engines/typescript-emit/README.md
+    pattern: placeholder
+    count: 1
+    class: legitimate
+    justification: "Describes the pre-GA placeholder distribution package."
+
+  - path: engines/typescript-emit/package.json
+    pattern: placeholder
+    count: 1
+    class: legitimate
+    justification: "The pre-GA placeholder distribution package's description field."
+
+  - path: engines/typescript/README.md
+    pattern: placeholder
+    count: 1
+    class: legitimate
+    justification: "Describes the pre-GA placeholder distribution package."
+
+  - path: engines/typescript/src/cli.ts
+    pattern: not-implemented
+    count: 2
+    class: debt
+    justification: "The TypeScript engine's non-core commands are not yet implemented; built in the engine-parity work (removes this entry)."
+
+  - path: engines/typescript/testdata/ingest-bundle/events/log.jsonl
+    pattern: zero-digest
+    count: 2
+    class: legitimate
+    justification: "Genesis all-zero prev pointer in the integrity test fixture's hash chain (no predecessor block)."
+
+  - path: engines/typescript/testdata/integrity-fixture.json
+    pattern: zero-digest
+    count: 7
+    class: legitimate
+    justification: "Genesis all-zero prev pointers in the integrity test fixture's hash chains (no predecessor block)."
+
+  - path: spec/catalogs/base/eu-ai-act/crosswalk/README.md
+    pattern: placeholder
+    count: 4
+    class: legitimate
+    justification: "Explains the placeholder crosswalk files for standards that are not yet published."
+
+  - path: spec/catalogs/base/eu-ai-act/crosswalk/iso-iec-24970.yaml
+    pattern: placeholder
+    count: 6
+    class: legitimate
+    justification: "Honest status: placeholder rows for ISO/IEC 24970 (draft; no clause identifiers exist to cite yet)."
+
+  - path: spec/catalogs/base/eu-ai-act/crosswalk/pren-18229-1.yaml
+    pattern: placeholder
+    count: 6
+    class: legitimate
+    justification: "Honest status: placeholder rows for prEN 18229-1 (draft; no clause identifiers exist to cite yet)."
+
+  - path: tools/pyproject.toml
+    pattern: placeholder
+    count: 2
+    class: legitimate
+    justification: "The tools package's own description and module list name the placeholder sweep."
+
+  - path: website/src/content/docs/docs/running-assessments.md
+    pattern: todo
+    count: 1
+    class: legitimate
+    justification: "Documents the TODO markers the init command writes into the starter profile for the user to replace."
+
+  # The sweep's own workflow and ADR necessarily name the patterns they run and document; the module,
+  # allowlist, and fixtures are excluded from the scan, but the workflow and ADR are scanned like any
+  # other tracked file, so their mentions are accounted for here.
+  - path: .github/workflows/placeholder-sweep.yml
+    pattern: placeholder
+    count: 9
+    class: legitimate
+    justification: "The workflow that runs the placeholder sweep names it, its module, and its allowlist."
+  - path: .github/workflows/placeholder-sweep.yml
+    pattern: stub
+    count: 1
+    class: legitimate
+    justification: "The workflow comment says it scans for stub and placeholder markers."
+
+  - path: docs/adr/0011-placeholder-sweep.md
+    pattern: changeme
+    count: 1
+    class: legitimate
+    justification: "ADR-0011 enumerates the placeholder patterns the sweep scans for."
+  - path: docs/adr/0011-placeholder-sweep.md
+    pattern: coming-soon
+    count: 1
+    class: legitimate
+    justification: "ADR-0011 enumerates the placeholder patterns the sweep scans for."
+  - path: docs/adr/0011-placeholder-sweep.md
+    pattern: dummy
+    count: 1
+    class: legitimate
+    justification: "ADR-0011 enumerates the placeholder patterns the sweep scans for."
+  - path: docs/adr/0011-placeholder-sweep.md
+    pattern: fixme
+    count: 1
+    class: legitimate
+    justification: "ADR-0011 enumerates the placeholder patterns the sweep scans for."
+  - path: docs/adr/0011-placeholder-sweep.md
+    pattern: hack
+    count: 1
+    class: legitimate
+    justification: "ADR-0011 enumerates the placeholder patterns the sweep scans for."
+  - path: docs/adr/0011-placeholder-sweep.md
+    pattern: lorem-ipsum
+    count: 1
+    class: legitimate
+    justification: "ADR-0011 enumerates the placeholder patterns the sweep scans for."
+  - path: docs/adr/0011-placeholder-sweep.md
+    pattern: not-implemented
+    count: 2
+    class: legitimate
+    justification: "ADR-0011 describes the 'not (yet) implemented' family and the engine-command debt."
+  - path: docs/adr/0011-placeholder-sweep.md
+    pattern: placeholder
+    count: 19
+    class: legitimate
+    justification: "ADR-0011 is the design record for the placeholder sweep and uses the word throughout."
+  - path: docs/adr/0011-placeholder-sweep.md
+    pattern: stub
+    count: 1
+    class: legitimate
+    justification: "ADR-0011 enumerates the placeholder patterns the sweep scans for."
+  - path: docs/adr/0011-placeholder-sweep.md
+    pattern: tbd
+    count: 1
+    class: legitimate
+    justification: "ADR-0011 enumerates the placeholder patterns the sweep scans for."
+  - path: docs/adr/0011-placeholder-sweep.md
+    pattern: todo
+    count: 2
+    class: legitimate
+    justification: "ADR-0011 enumerates the placeholder patterns the sweep scans for."
+  - path: docs/adr/0011-placeholder-sweep.md
+    pattern: under-construction
+    count: 1
+    class: legitimate
+    justification: "ADR-0011 enumerates the placeholder patterns the sweep scans for."
+  - path: docs/adr/0011-placeholder-sweep.md
+    pattern: xxx
+    count: 1
+    class: legitimate
+    justification: "ADR-0011 enumerates the placeholder patterns the sweep scans for."

@@ -1,0 +1,12 @@
+version: 1
+allow:
+  - path: sample.py
+    pattern: todo
+    count: 1
+    class: legitimate
+    justification: "example scaffolding marker the reader replaces"
+  - path: data.json
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "genesis all-zero pointer in a fixture"

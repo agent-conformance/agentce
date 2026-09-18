@@ -1,0 +1,27 @@
+# Placeholder sweep: scan every tracked file for stub and placeholder markers and fail on any hit
+# that is not accounted for in tools/placeholder_allowlist.yaml with a class and a justification.
+# The self-test proves the scanner discriminates. Every action is pinned by commit SHA
+# (AGENTS.md quality gates).
+name: placeholder-sweep
+
+on:
+  push:
+    branches: [main, "phase/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  placeholder-sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: placeholder_sweep self-test
+        run: uv run --project tools --frozen python -m placeholder_sweep --self-test
+      - name: placeholder sweep
+        run: uv run --project tools --frozen python -m placeholder_sweep
