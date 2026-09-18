@@ -142,7 +142,7 @@ def test_medium_insufficient_is_ready(tmp_path: Path) -> None:
 
 
 def _deviation(**over: object) -> dict:
-    base = {
+    base: dict[str, object] = {
         "control": "OVS-03",
         "rationale": "compensated",
         "compensating_control": "manual review",
@@ -220,7 +220,7 @@ def test_invalid_deviation_makes_report_not_ready(tmp_path: Path) -> None:
 
 
 def _checklist(**over: object) -> dict:
-    base = {
+    base: dict[str, object] = {
         "checklist": "OVS-09-M",
         "control": "OVS-09",
         "items": [
