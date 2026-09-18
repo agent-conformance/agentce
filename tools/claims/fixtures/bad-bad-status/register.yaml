@@ -1,0 +1,6 @@
+version: 1
+claims:
+  - id: sample.badstatus
+    text: A claim with an invalid status.
+    status: shipped
+    pages: []

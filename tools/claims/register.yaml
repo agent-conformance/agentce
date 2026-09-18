@@ -1,0 +1,52 @@
+# Public-claims register - every public claim the project makes, the pages that state it, whether it
+# is `built` (proven by a wired CI check) or `roadmap`, and the check that proves it. See ADR-0010.
+#
+# A claim is `built` only together with a green CI check that runs on every pull request. Claims that
+# are not yet true are entered as `roadmap` during the phase-8 truth-first sweep, and each flips to
+# `built` only when its proving check goes green. `tools/claims_check.py` enforces these rules on
+# every push and pull request.
+#
+# The register starts with the claims that are demonstrably true today. It grows to cover every
+# remaining public claim as the truth-first work lands.
+version: 1
+claims:
+  - id: engine.deterministic
+    text: >-
+      The reference engine is deterministic: the same inputs produce byte-identical canonical
+      outputs, independent of order, locale, and clock. Per-project manifests are byte-identical on
+      x86_64 and arm64, excluding only the recorded run timestamp, host fingerprint, and operator.
+    status: built
+    pages:
+      - website/src/pages/index.astro
+    check:
+      workflow: .github/workflows/determinism.yml
+      job: compare
+      description: >-
+        Runs the Engine Conformance Suite on two CPU architectures and fails unless the normalised
+        per-project manifests are identical.
+  - id: engine.model-free
+    text: >-
+      No evaluation path, nor its dependency tree, resolves a machine-learning framework, an LLM, or
+      an embedding client. The engine evaluates explicit rules over structured evidence and never
+      guesses.
+    status: built
+    pages:
+      - website/src/pages/index.astro
+    check:
+      workflow: .github/workflows/no-ml.yml
+      job: no-ml
+      description: >-
+        Scans every uv.lock in the repository against the no-learned-components denylist and fails
+        on any match.
+  - id: engine.assertions-byte-identical
+    text: >-
+      The Python, TypeScript, and Java engines produce byte-identical per-project assertions.json
+      over the simulated corpus for `agentce conformance run`.
+    status: built
+    pages: []
+    check:
+      workflow: .github/workflows/three-engine.yml
+      job: compare
+      description: >-
+        Runs all three engines over the full corpus and fails unless their per-project
+        assertions.json outputs are byte-identical.

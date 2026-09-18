@@ -1,0 +1,6 @@
+version: 1
+claims:
+  - id: sample.nocheck
+    text: A built claim that names no proving check.
+    status: built
+    pages: []

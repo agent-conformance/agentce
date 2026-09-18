@@ -1,0 +1,5 @@
+version: 1
+claims:
+  - id: sample.notext
+    status: roadmap
+    pages: []

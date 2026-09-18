@@ -1,0 +1,9 @@
+version: 1
+claims:
+  - id: sample.notpr
+    text: A built claim whose workflow only runs on manual dispatch.
+    status: built
+    pages: []
+    check:
+      workflow: .github/workflows/manual.yml
+      job: build

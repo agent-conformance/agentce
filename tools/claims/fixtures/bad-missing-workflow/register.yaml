@@ -1,0 +1,9 @@
+version: 1
+claims:
+  - id: sample.nowf
+    text: A built claim whose workflow is missing.
+    status: built
+    pages: []
+    check:
+      workflow: .github/workflows/nope.yml
+      job: build
