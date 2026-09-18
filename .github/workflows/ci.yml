@@ -28,23 +28,37 @@ jobs:
           echo "guardrails ok"
 
   no-network:
-    # Scaffold for the offline assessment guarantee (real assessment lands with the engine).
-    # Dead proxies (set at shell level, so both letter cases are covered without a duplicate
-    # case-insensitive env key) make any accidental network call fail, proving the step runs offline.
+    # Real offline guarantee: run an actual assessment inside a network namespace that has no route
+    # off the host. Dependencies are synced online first; the assessment itself runs with networking
+    # disabled, and the job fails if the namespace can still reach the network. This proves the
+    # offline invariant by behaviour, not by a placeholder computation.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Offline check
+      - name: Install uv
         run: |
-          set -e
-          export HTTP_PROXY=http://127.0.0.1:9 HTTPS_PROXY=http://127.0.0.1:9
-          export http_proxy=http://127.0.0.1:9 https_proxy=http://127.0.0.1:9 NO_PROXY=""
-          python3 - <<'PY'
-          # Local-only computation; no sockets opened. Proven offline by the dead proxies above.
-          total = sum(len(line) for line in open("AGENTS.md", encoding="utf-8"))
-          assert total > 0
-          print("no-network ok")
-          PY
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Sync the engine (online, before isolation)
+        working-directory: engines/python
+        run: uv sync --frozen
+      - name: Assess with networking disabled
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/offline-report"
+          # `sudo unshare -n` gives a fresh network namespace whose only interface is a down
+          # loopback: no default route, no way off the host. It needs no user-namespace privileges.
+          sudo unshare -n bash -euo pipefail -c '
+            cd engines/python
+            # Fail loudly unless the namespace is genuinely offline, so a leak can never pass silently.
+            if timeout 5 bash -c "exec 3<>/dev/tcp/1.1.1.1/53" 2>/dev/null; then
+              echo "::error::network reachable inside the isolated namespace; offline proof invalid" >&2
+              exit 1
+            fi
+            ./.venv/bin/agentce quickstart --out "$1"
+          ' _ "$out"
+          test -e "$out"
+          echo "no-network ok: assessment completed with networking disabled"
 
   yaml:
     runs-on: ubuntu-latest
