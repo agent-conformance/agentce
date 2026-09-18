@@ -5,6 +5,7 @@ import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 plugins {
     java
     application
+    jacoco
 }
 
 group = "org.agentce"
@@ -47,4 +48,37 @@ tasks.test {
         events("failed")
         exceptionFormat = TestExceptionFormat.FULL
     }
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(false)
+    }
+}
+
+// Per-package coverage floor (a ratchet that may only rise). Wired into `check` so a coverage
+// regression fails the build, not only a test failure.
+tasks.jacocoTestCoverageVerification {
+    dependsOn(tasks.jacocoTestReport)
+    violationRules {
+        rule {
+            limit {
+                // Floor set at today's measured instruction coverage (~77%). It is a ratchet:
+                // raise it as coverage improves toward the >=90% target; never lower it.
+                counter = "INSTRUCTION"
+                minimum = "0.77".toBigDecimal()
+            }
+        }
+    }
+}
+
+tasks.check {
+    dependsOn(tasks.jacocoTestCoverageVerification)
 }
