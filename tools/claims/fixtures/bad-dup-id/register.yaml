@@ -1,0 +1,10 @@
+version: 1
+claims:
+  - id: dup
+    text: A roadmap item, planned.
+    status: roadmap
+    pages: []
+  - id: dup
+    text: Another roadmap item, also planned.
+    status: roadmap
+    pages: []

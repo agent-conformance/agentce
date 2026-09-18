@@ -1,0 +1,27 @@
+# Public-claims register: every claim marked `built` must name a CI check that exists, defines the
+# job it cites, and runs on pull_request or push; referenced pages and workflows must exist; roadmap
+# material must not be worded as shipped. The self-test proves the checker discriminates. Every
+# action is pinned by commit SHA (AGENTS.md quality gates).
+name: claims
+
+on:
+  push:
+    branches: [main, "phase/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  claims:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: claims_check self-test
+        run: uv run --project tools --frozen python -m claims_check --self-test
+      - name: claims register integrity
+        run: uv run --project tools --frozen python -m claims_check

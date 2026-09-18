@@ -1,0 +1,10 @@
+version: 1
+claims:
+  - id: sample.nopage
+    text: A built claim that points at a page which does not exist.
+    status: built
+    pages:
+      - pages/gone.html
+    check:
+      workflow: .github/workflows/proof.yml
+      job: build

@@ -1,0 +1,14 @@
+version: 1
+claims:
+  - id: sample.built
+    text: A capability that is proven by a wired CI check.
+    status: built
+    pages:
+      - pages/index.html
+    check:
+      workflow: .github/workflows/proof.yml
+      job: build
+  - id: sample.roadmap
+    text: This capability is planned for a future release.
+    status: roadmap
+    pages: []

@@ -1,0 +1,6 @@
+version: 1
+claims:
+  - id: sample.shippedword
+    text: The engine verifies catalog signatures on the assess path.
+    status: roadmap
+    pages: []

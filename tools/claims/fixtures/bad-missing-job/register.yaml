@@ -1,0 +1,9 @@
+version: 1
+claims:
+  - id: sample.nojob
+    text: A built claim whose job is missing from the workflow.
+    status: built
+    pages: []
+    check:
+      workflow: .github/workflows/proof.yml
+      job: ghost
