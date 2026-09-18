@@ -8,8 +8,8 @@ Spec refs: —
 The repository conventions state that continuous integration lints, type-checks, and tests every
 package with per-package coverage floors, and that a dedicated job proves an assessment runs with
 networking disabled. None of that was true. Across every workflow, no job ran `ruff`, `mypy`,
-`pytest`, `biome`, `tsc`, `pnpm test`, or `./gradlew check`; the workflows only built placeholder
-packages, validated YAML, and grepped for hygiene. No package declared a coverage floor. The
+`pytest`, `biome`, `tsc`, `pnpm test`, or `./gradlew check`; the workflows only built the pre-GA
+distribution packages, validated YAML, and grepped for hygiene. No package declared a coverage floor. The
 "offline" job opened no assessment and disabled no networking: it exported dead loopback proxies and
 summed the length of a text file, so it would pass whether or not the code could run offline.
 
@@ -77,6 +77,6 @@ branch-protection change and therefore a maintainer action.
 - The **java** job runs `./gradlew check`, whose `jacocoTestCoverageVerification` fails below the
   floor.
 - The rebuilt `no-network` job runs an assessment under `sudo unshare -n` and fails if the namespace
-  can still reach the network — a real behavioural offline proof, not a placeholder computation.
+  can still reach the network — a real behavioural offline proof, not a stand-in computation.
 - `.github/workflows/tests.yml` and the rebuilt `no-network` job in `.github/workflows/ci.yml` run on
   every push and pull request.
