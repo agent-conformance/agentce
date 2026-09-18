@@ -59,6 +59,10 @@ addopts = "-p no:cacheprovider"
 branch = true
 source = ["agentce"]
 
+[tool.coverage.report]
+# Per-package coverage floor (a ratchet that may only rise). The suite measures ~91% today.
+fail_under = 90
+
 [tool.mypy]
 python_version = "3.12"
 
