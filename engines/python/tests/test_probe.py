@@ -153,7 +153,7 @@ agentce:ProbeSafe a sh:NodeShape ;
 
 
 def test_structural_oracle(tmp_path: Path) -> None:
-    cases = [
+    cases: list[dict[str, Any]] = [
         {
             "id": "clean",
             "prompt": "p1",
