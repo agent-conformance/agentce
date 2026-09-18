@@ -1,0 +1,7 @@
+version: 1
+allow:
+  - path: sample.py
+    pattern: todo
+    count: 1
+    class: legitimate
+    justification: "stale: the hit it named is gone"

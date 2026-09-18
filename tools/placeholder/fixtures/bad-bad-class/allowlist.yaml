@@ -1,0 +1,7 @@
+version: 1
+allow:
+  - path: sample.py
+    pattern: todo
+    count: 1
+    class: sideways
+    justification: "class is neither legitimate nor debt"
