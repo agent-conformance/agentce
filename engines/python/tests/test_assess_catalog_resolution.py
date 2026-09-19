@@ -244,15 +244,10 @@ def test_the_documented_assess_example_evaluates_as_written(
     page: str,
     words: list[str],
 ) -> None:
-    """Stage the paths the page uses (an evidence bundle and the profile and domain ``init``
-    writes), run the command exactly as documented, and require real assertions."""
-    (tmp_path / "bundle").symlink_to(_QUICKSTART / "evidence")
-    declarations = tmp_path / "my-assessment" / "agentce"
-    declarations.mkdir(parents=True)
-    for name in ("applicability.yaml", "domain.linkml.yaml"):
-        (declarations / name).write_text(
-            (_QUICKSTART / name).read_text(encoding="utf-8"), encoding="utf-8"
-        )
+    """Stage the paths the page uses (the vendored quickstart project, under the same relative path a
+    checkout has), run the command exactly as documented, and require real assertions."""
+    (tmp_path / "corpus").mkdir()
+    (tmp_path / "corpus" / "quickstart").symlink_to(_QUICKSTART)
     monkeypatch.chdir(tmp_path)
     assert cli.main([*words, "--json"]) == 0, capsys.readouterr()
     capsys.readouterr()
