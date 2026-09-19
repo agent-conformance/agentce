@@ -129,6 +129,12 @@ allow:
     class: legitimate
     justification: "The init command emits a starter applicability profile whose TODO markers the user fills in; product scaffolding, not unfinished work."
 
+  - path: engines/python/tests/test_default_identity.py
+    pattern: todo
+    count: 1
+    class: legitimate
+    justification: "Asserts the starter profile keeps its fill-in source marker when the user picks a non-default framework; the marker is init scaffolding, not unfinished work."
+
   - path: engines/python/agentce/signing.py
     pattern: not-implemented
     count: 2
