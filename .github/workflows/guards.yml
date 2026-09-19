@@ -1,0 +1,53 @@
+# Server-side guards that were previously enforced only by the maintainer's local git hooks:
+#   - leak-guard: no private term in added file content or a commit message, and no commit-denylisted
+#     term in a commit message -- matched against salted digests, so neither list is ever disclosed.
+#   - spec-validators: the evidence vocabulary and the worked examples stay internally consistent.
+# Every action is pinned by commit SHA. Minimal permissions and the default `pull_request` trigger
+# (never the privileged target-context variant, and no secrets) so this runs safely on fork pull
+# requests too: the guard reads only committed salted digests, never the private lists.
+name: guards
+
+on:
+  push:
+    branches: [main, "phase/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  leak-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0 # need the base commit to diff added content and messages
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: leak-guard self-test (proves detection has teeth)
+        run: python tools/leak_guard.py --self-test
+      - name: no-disclosure self-scan of the committed guard artifacts
+        run: python tools/leak_guard.py --files tools/leak_guard.py tools/leak_tokens.hashes .github/workflows/guards.yml
+      - name: Determine the diff base
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "LEAK_BASE=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"
+          else
+            echo "LEAK_BASE=${{ github.event.before }}" >> "$GITHUB_ENV"
+          fi
+      - name: leak-guard scan of added content and commit messages
+        run: python tools/leak_guard.py --diff "$LEAK_BASE"
+
+  spec-validators:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Validate the evidence vocabulary (check_vocab.py)
+        run: uv run --project spec/vocab --frozen python spec/vocab/check_vocab.py
+      - name: Validate the worked examples against their schemas (validate_examples.py)
+        run: uv run --project spec --frozen python spec/validate_examples.py
