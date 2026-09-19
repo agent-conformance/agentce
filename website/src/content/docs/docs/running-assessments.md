@@ -29,11 +29,16 @@ because it shows what happened rather than what was intended. See
 
 ## Assess
 
-Run an assessment over a bundle of evidence, the profile you declared, and its domain binding:
+Run an assessment over a [bundle](/docs/concepts/) of evidence, the profile you declared, and its domain
+binding. This form runs as written from a checkout of the repository, against the vendored quickstart
+project, so you can see a full assessment before you have evidence of your own:
 
 ```bash
-uv run --project engines/python agentce assess --bundle ./bundle --profile ./my-assessment/agentce/applicability.yaml --domain ./my-assessment/agentce/domain.linkml.yaml --out ./out
+uv run --project engines/python agentce assess --bundle corpus/quickstart/evidence --profile corpus/quickstart/applicability.yaml --domain corpus/quickstart/domain.linkml.yaml --out ./out
 ```
+
+For your own agent, pass your bundle and the profile and domain binding `agentce init` wrote:
+`--bundle ./my-assessment/evidence --profile ./my-assessment/agentce/applicability.yaml --domain ./my-assessment/agentce/domain.linkml.yaml`.
 
 The profile's `catalogs:` list names what to assess against, and each `id@version` resolves to a catalog
 under `spec/catalogs/` in the repository checkout. Pass `--catalog <id@version>` to choose others, or

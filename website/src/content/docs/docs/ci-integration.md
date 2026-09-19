@@ -24,10 +24,12 @@ by hash, never captured, so no prompts or outputs are stored in the evidence.
 ## Run offline in the pipeline
 
 An assessment needs no network. A typical job installs the pinned engine, runs the assessment over the
-evidence the agent produced, and validates the artifacts:
+evidence the agent produced, and validates the artifacts. The paths below name the vendored quickstart
+project so the job runs as written from a checkout; substitute your own bundle, profile, and domain
+binding:
 
 ```bash
-uv run --project engines/python agentce assess --bundle ./bundle --profile ./my-assessment/agentce/applicability.yaml --domain ./my-assessment/agentce/domain.linkml.yaml --out ./out
+uv run --project engines/python agentce assess --bundle corpus/quickstart/evidence --profile corpus/quickstart/applicability.yaml --domain corpus/quickstart/domain.linkml.yaml --out ./out
 uv run --project engines/python agentce report --validate ./out
 ```
 
