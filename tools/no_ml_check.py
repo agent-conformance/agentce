@@ -12,7 +12,10 @@ collapsed to one `-`), never as a substring, so a package whose name merely cont
 pyyaml, html5lib -- is never mistaken for a machine-learning package. The single denylist governs all
 three ecosystems; there is never a second list to drift out of sync.
 
-    no_ml_check.py             scan every lockfile; exit 1 if any locked package is denylisted
+    no_ml_check.py             scan every lockfile in the repository; exit 1 if any is denylisted
+                               (the invocation the required CI job uses)
+    no_ml_check.py ROOT        scan every lockfile under ROOT instead, against the same one denylist;
+                               exit 2 if ROOT is not a directory
     no_ml_check.py --self-test prove the matcher and every lockfile parser catch a denylisted name
                                and clear a clean set
 
@@ -22,6 +25,8 @@ install step. No network, no learned component.
 
 from __future__ import annotations
 
+import contextlib
+import io
 import re
 import sys
 import tempfile
@@ -179,6 +184,24 @@ def self_test() -> int:
         denylisted="tensorflow",
         clean="slf4j-api",
     )
+    # The optional ROOT positional makes an out-of-tree scan possible (a temporary tree, never a file
+    # committed into the scanned repository): a denylisted package under the given root is caught and
+    # returns exit 1, while a non-directory root is a usage error (exit 2), not a silent clean pass.
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pnpm-lock.yaml").write_text(
+            "lockfileVersion: '9.0'\n\npackages:\n\n"
+            "  torch@2.4.1:\n    resolution: {integrity: sha512-x==}\n\n"
+            "snapshots: {}\n",
+            encoding="utf-8",
+        )
+        captured = io.StringIO()
+        with contextlib.redirect_stdout(captured):
+            hit = main([str(root)])
+        assert hit == 1 and "torch" in captured.getvalue(), (hit, captured.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            usage = main([str(root / "absent")])
+        assert usage == 2, usage
     print("NO-ML SELF-TEST PASSED (uv.lock, pnpm-lock.yaml, gradle.lockfile detection proven)")
     return 0
 
@@ -187,8 +210,22 @@ def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     if "--self-test" in argv:
         return self_test()
+    # An optional positional selects the tree to scan; with none, scan the whole repository exactly as
+    # the required CI job does. The denylist is always the one repo-level list, so an out-of-tree scan
+    # is judged against the same rules; a missing or unreadable root is a usage error (exit 2), kept
+    # distinct from a denylist hit (exit 1) and a clean tree (exit 0).
+    roots = [a for a in argv if not a.startswith("-")]
+    if len(roots) > 1:
+        print(f"NO-ML USAGE: at most one root path, got {len(roots)}", file=sys.stderr)
+        return 2
+    root = ROOT
+    if roots:
+        root = Path(roots[0]).resolve()
+        if not root.is_dir():
+            print(f"NO-ML USAGE: not a directory: {root}", file=sys.stderr)
+            return 2
     denylist = load_denylist(DENYLIST)
-    violations, n_locks, n_pkgs = scan(ROOT, denylist)
+    violations, n_locks, n_pkgs = scan(root, denylist)
     if violations:
         print("NO-ML FAILED: learned-component dependency found:")
         for v in violations:
