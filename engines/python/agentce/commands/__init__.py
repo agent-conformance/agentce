@@ -1231,7 +1231,7 @@ def cmd_init(ns: argparse.Namespace) -> CommandResult:
     ):
         result.note(
             f"emit under this subject with AGENTCE_EMIT_SUBJECT={subject} "
-            f"AGENTCE_EMIT_SOURCE={source}; the emitter's own defaults are different."
+            f"AGENTCE_EMIT_SOURCE={source}; without them auto() emits under its own defaults."
         )
     return result
 
