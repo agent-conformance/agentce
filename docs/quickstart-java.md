@@ -1,32 +1,29 @@
 # Quickstart — Java engine
 
-Assess the vendored quickstart project with the Java engine on a fresh machine (SPEC §13.4, §5.3). The
-Java engine produces byte-identical `assertions.json` to the reference engine after RFC 8785
+Run the Engine Conformance Suite with the Java engine on a fresh machine (SPEC §11.5, §5.3). The Java
+engine implements the `conformance run` command: it assesses every project in the simulated corpus and
+writes an `assertions.json` per project that is byte-identical to the reference engine's after RFC 8785
 canonicalisation.
+
+The Java engine does not yet implement `assess`, `report`, `validate`, or `quickstart`; those are planned.
+To assess an agent's evidence today, use the Python engine — see the [main quickstart](quickstart.md).
 
 ## Prerequisites
 
 - JDK 21 (Temurin or another distribution)
 - Gradle (the wrapper `./gradlew` is vendored)
+- `uv`, which the suite uses to materialise the corpus by running its Python generator
 
 ## Build and run
+
+From the repository root:
 
 ```bash
 cd engines/java
 ./gradlew --no-daemon installDist
+build/install/agentce/bin/agentce conformance run --engine . --corpus ../../corpus --out ./out
 ```
 
-Then assess the vendored [`corpus/quickstart`](../corpus/quickstart) project from the repository root:
-
-```bash
-engines/java/build/install/agentce/bin/agentce assess \
-  --bundle corpus/quickstart/evidence \
-  --profile corpus/quickstart/applicability.yaml \
-  --domain corpus/quickstart/domain.linkml.yaml \
-  --catalog eu-ai-act@2026.09 \
-  --catalog-dir spec/catalogs/base/eu-ai-act \
-  --out ./out
-```
-
-The report directory has the same shape as the reference engine's — see the
-[main quickstart](quickstart.md) for what each file contains.
+The run prints one line such as `ECS: 30/30 identical; claim full; no_ml pass` and exits 0 when the engine
+claims `full`. The output directory holds `implementation-report.json` and one
+`projects/<domain>/<style>/<variant>/assertions.json` per project.
