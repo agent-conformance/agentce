@@ -22,9 +22,11 @@
   --text-muted: #475569;
   --text-faint: #64748b;
 
-  /* Verification teal — the accent, declared here and nowhere else. */
-  --accent: #0d9488;
-  --accent-strong: #0f766e;
+  /* Verification teal — the accent, declared here and nowhere else. The light-theme accent doubles as
+   * the primary-CTA background under white text, so it is darkened to clear WCAG 2.2 AA contrast
+   * (>= 4.5:1); --accent-strong stays one step darker for hover and on-surface accent text. */
+  --accent: #0f766e;
+  --accent-strong: #115e59;
   --accent-soft: #f0fdfa;
   --accent-border: #99f6e4;
   --accent-contrast: #ffffff;
@@ -64,7 +66,7 @@
     --border-strong: #334155;
     --text: #e2e8f0;
     --text-muted: #94a3b8;
-    --text-faint: #64748b;
+    --text-faint: #8595a9;
 
     --accent: #2dd4bf;
     --accent-strong: #5eead4;
@@ -91,7 +93,7 @@
   --border-strong: #334155;
   --text: #e2e8f0;
   --text-muted: #94a3b8;
-  --text-faint: #64748b;
+  --text-faint: #8595a9;
 
   --accent: #2dd4bf;
   --accent-strong: #5eead4;
