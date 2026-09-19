@@ -60,3 +60,60 @@ def test_failing_command_has_no_traceback(capsys) -> None:
     err = capsys.readouterr()
     assert code == 3
     assert "Traceback (most recent call last)" not in (err.out + err.err)
+
+
+def test_doctor_agrees_with_init_layout(tmp_path: Path, capsys) -> None:
+    project = tmp_path / "my-assessment"
+    assert (
+        cli.main(
+            [
+                "init",
+                "--non-interactive",
+                "--framework",
+                "custom-loop",
+                "--subject",
+                "spiffe://example/agents/t",
+                "--role",
+                "deployer",
+                "--out",
+                str(project),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    cli.main(["doctor", "--project", str(project), "--json"])
+    keys = {p["key"] for p in json.loads(capsys.readouterr().out)["problems"]}
+    # Only the not-yet-collected evidence remains; init wrote every declaration doctor reads.
+    assert keys == {"input.bundle_manifest_missing"}
+
+
+def test_doctor_still_reads_the_flat_quickstart_layout(capsys) -> None:
+    cli.main(["doctor", "--project", str(_QUICKSTART), "--json"])
+    assert json.loads(capsys.readouterr().out)["healthy"] is True
+
+
+def test_docs_and_skills_name_the_one_applicability_file() -> None:
+    import re
+
+    files = [
+        "engines/python/agentce/commands/__init__.py",
+        "docs/quickstart.md",
+        "docs/integrate.md",
+        "docs/errors.md",
+        "website/src/content/docs/docs/running-assessments.md",
+        *(
+            str(p.relative_to(_REPO_ROOT))
+            for p in (_REPO_ROOT / "skills" / "agentce-onboard").rglob("*")
+            if p.is_file() and p.suffix in {".md", ".yaml"}
+        ),
+    ]
+    names = {
+        name
+        for rel in files
+        for name in re.findall(
+            r"applicability[-a-zA-Z]*\.yaml", (_REPO_ROOT / rel).read_text("utf-8")
+        )
+    }
+    assert names == {"applicability.yaml"}
