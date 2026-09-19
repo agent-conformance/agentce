@@ -259,7 +259,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--framework", help="the agent framework, e.g. custom-loop, langgraph"
     )
-    p.add_argument("--subject", help="the assessed subject id")
+    p.add_argument(
+        "--subject",
+        help="the assessed subject id (default: the id agentce_emit.auto() emits under)",
+    )
     p.add_argument(
         "--role",
         choices=commands.INIT_ROLES,

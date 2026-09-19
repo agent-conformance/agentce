@@ -21,6 +21,11 @@ from typing import Any
 
 BASE_CONTEXT = "https://agent-conformance.org/contexts/evidence/v1"
 DEFAULT_CONVENTION = "agentce-emit:1.0"
+#: The identities ``auto()`` emits under when nothing is configured. ``agentce init`` writes the same
+#: two strings into its starter applicability profile, so a bare init plus a bare ``auto()`` describe
+#: one subject and one evidence source; change them here and in ``agentce.commands`` together.
+DEFAULT_SUBJECT = "agentce:subject/local"
+DEFAULT_SOURCE = "urn:agentce:emit:local"
 _VALID_CLASSES = frozenset({"self_report", "enforcement_point", "independent_system"})
 _BASE = datetime.datetime(2026, 5, 1, 9, 0, 0, tzinfo=datetime.timezone.utc)
 
@@ -284,12 +289,12 @@ def auto(**overrides: Any) -> Emitter:
         subject=str(
             overrides.get("subject")
             or os.environ.get("AGENTCE_EMIT_SUBJECT")
-            or "agentce:subject/local"
+            or DEFAULT_SUBJECT
         ),
         source=str(
             overrides.get("source")
             or os.environ.get("AGENTCE_EMIT_SOURCE")
-            or "urn:agentce:emit:local"
+            or DEFAULT_SOURCE
         ),
         source_class=str(overrides.get("source_class", "self_report")),
         active=active,

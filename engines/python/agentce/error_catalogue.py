@@ -92,6 +92,11 @@ MESSAGE_KEYS: dict[str, Entry] = {
         "no base catalog was found under the expected path.",
         "run from the repository root or pass --catalog-dir to a catalog directory.",
     ),
+    "input.nothing_evaluated": Entry(
+        "error",
+        "no control reached conformant, non-conformant, or insufficient_evidence, so the run judged nothing.",
+        "emit under the subject and source the profile declares, and record the evidence the catalog's controls apply to.",
+    ),
     "input.profile_missing": Entry(
         "error",
         "the applicability profile was not supplied.",

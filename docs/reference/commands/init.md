@@ -12,7 +12,8 @@ options:
   --non-interactive     generate without prompting (required)
   --framework FRAMEWORK
                         the agent framework, e.g. custom-loop, langgraph
-  --subject SUBJECT     the assessed subject id
+  --subject SUBJECT     the assessed subject id (default: the id
+                        agentce_emit.auto() emits under)
   --role {deployer,provider,both}
                         the subject's role: deployer, provider, or both
   --out OUT             the output directory

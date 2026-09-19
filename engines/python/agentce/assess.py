@@ -138,6 +138,16 @@ def _assert_control(
     )
 
 
+#: The outcomes that mean a control was actually judged. A run with none of them evaluated nothing:
+#: every pair was inapplicable or beyond the engine's rungs, so its clean tally says nothing.
+VERDICT_OUTCOMES = frozenset({"conformant", "non-conformant", "insufficient_evidence"})
+
+
+def evaluated_nothing(assertions: list[Assertion]) -> bool:
+    """True when no assertion reached a verdict (see :data:`VERDICT_OUTCOMES`)."""
+    return not any(a.outcome in VERDICT_OUTCOMES for a in assertions)
+
+
 def assess_subjects(
     accepted: list[dict[str, Any]],
     profile: Profile,

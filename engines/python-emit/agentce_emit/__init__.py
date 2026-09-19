@@ -8,8 +8,23 @@ JSON-LD payloads, labelled ``self_report``; the bundle is written on flush (or a
 
 from __future__ import annotations
 
-from ._emit import BASE_CONTEXT, DEFAULT_CONVENTION, Emitter, auto
+from ._emit import (
+    BASE_CONTEXT,
+    DEFAULT_CONVENTION,
+    DEFAULT_SOURCE,
+    DEFAULT_SUBJECT,
+    Emitter,
+    auto,
+)
 
 __version__ = "0.0.1"
 
-__all__ = ["BASE_CONTEXT", "DEFAULT_CONVENTION", "Emitter", "auto", "__version__"]
+__all__ = [
+    "BASE_CONTEXT",
+    "DEFAULT_CONVENTION",
+    "DEFAULT_SOURCE",
+    "DEFAULT_SUBJECT",
+    "Emitter",
+    "auto",
+    "__version__",
+]

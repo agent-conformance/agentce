@@ -25,7 +25,7 @@ import yaml
 
 from .. import ENGINE_NAME, SPEC_VERSION, __version__, no_ml, readiness
 from ..applicability import resolve as resolve_applicability
-from ..assess import assess_subjects
+from ..assess import assess_subjects, evaluated_nothing
 from ..bundle import load_bundle
 from ..catalog import lint_catalog, load_catalog
 from ..collect import EnvSecretManager, load_config, run_collect
@@ -444,10 +444,47 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "Ingest through report complete; pass --catalog-dir to evaluate controls "
             "and populate assertions.",
         )
+    if evaluated_nothing(evaluated):
+        raise _nothing_evaluated(profile_obj, ingested.accepted, len(evaluated))
     result.note(
         f"assessed {len(evaluated)} (control, subject) pairs; {non_conformant} non-conformant"
     )
     return result
+
+
+def _nothing_evaluated(
+    profile: Profile, accepted: list[dict[str, Any]], pairs: int
+) -> InputError:
+    """The exit-3 error for a run whose every (control, subject) pair was inapplicable or unassessed."""
+    declared = sorted(s.id for s in profile.subjects)
+    seen = sorted({str(e["subject"]) for e in accepted if "subject" in e})
+    matched = set(declared) & set(seen)
+    if not accepted:
+        why = "the bundle has no accepted events"
+    elif not matched:
+        why = (
+            f"none of the {len(accepted)} accepted events is about a subject the profile declares "
+            f"(profile: {_ids(declared)}; bundle: {_ids(seen)})"
+        )
+    else:
+        why = (
+            f"the {len(accepted)} accepted events give no control an applicable population "
+            f"(subjects matched: {_ids(sorted(matched))})"
+        )
+    return InputError(
+        "input.nothing_evaluated",
+        f"assessed {pairs} (control, subject) pairs and none reached conformant, non-conformant, "
+        f"or insufficient_evidence: {why}. The reports were written, but they judge nothing.",
+        "emit under the subject and source the profile declares (agentce-emit reads "
+        "AGENTCE_EMIT_SUBJECT and AGENTCE_EMIT_SOURCE), and record the evidence the catalog's "
+        "controls apply to.",
+    )
+
+
+def _ids(ids: list[str], cap: int = 3) -> str:
+    """A bounded, quoted rendering of identifiers, for a message that must stay one line."""
+    shown = ", ".join(repr(i[:80]) for i in ids[:cap]) or "none"
+    return shown + (f" and {len(ids) - cap} more" if len(ids) > cap else "")
 
 
 def _operator() -> str:
@@ -1090,6 +1127,11 @@ _FRAMEWORK_ADAPTER = {
     "custom-loop": "agentce-emit",
 }
 INIT_ROLES = ("deployer", "provider", "both")
+#: The identities ``agentce_emit.auto()`` emits under when nothing is configured (its
+#: ``DEFAULT_SUBJECT`` and ``DEFAULT_SOURCE``); ``init`` writes the same strings so a bare init and a
+#: bare ``auto()`` describe one subject and one source. A test holds the two packages equal.
+DEFAULT_SUBJECT = "agentce:subject/local"
+DEFAULT_EMIT_SOURCE = "urn:agentce:emit:local"
 
 
 def cmd_quickstart(ns: argparse.Namespace) -> CommandResult:
@@ -1141,7 +1183,7 @@ def cmd_init(ns: argparse.Namespace) -> CommandResult:
         raise InputError(
             "input.out_missing", "an output directory is required.", "pass --out <dir>."
         )
-    subject = _opt_str(ns, "subject") or "spiffe://example/agents/my-agent"
+    subject = _opt_str(ns, "subject") or DEFAULT_SUBJECT
     role = _opt_str(ns, "role") or "deployer"
     if role not in INIT_ROLES:
         raise InputError(
@@ -1152,8 +1194,17 @@ def cmd_init(ns: argparse.Namespace) -> CommandResult:
     framework = _opt_str(ns, "framework") or "custom-loop"
     adapter = _FRAMEWORK_ADAPTER.get(framework, "otel-genai")
 
+    source = (
+        DEFAULT_EMIT_SOURCE
+        if adapter == "agentce-emit"
+        else f"urn:agentce:source:{framework}:TODO"
+    )
     profile = _render_starter_profile(
-        subject=subject, role=role, framework=framework, adapter=adapter
+        subject=subject,
+        role=role,
+        framework=framework,
+        adapter=adapter,
+        source=source,
     )
     profile_path = Path(out) / DECLARATIONS_DIR / PROFILE_FILE
     domain_path = Path(out) / DECLARATIONS_DIR / DOMAIN_FILE
@@ -1167,6 +1218,7 @@ def cmd_init(ns: argparse.Namespace) -> CommandResult:
             "domain": str(domain_path),
             "framework": framework,
             "subject": subject,
+            "source": source,
             "role": role,
         }
     )
@@ -1174,6 +1226,13 @@ def cmd_init(ns: argparse.Namespace) -> CommandResult:
         f"wrote a starter profile to {profile_path} and a domain binding to {domain_path}; "
         f"fill in the TODOs, then run `agentce doctor --project {out}`."
     )
+    if adapter == "agentce-emit" and (
+        subject != DEFAULT_SUBJECT or source != DEFAULT_EMIT_SOURCE
+    ):
+        result.note(
+            f"emit under this subject with AGENTCE_EMIT_SUBJECT={subject} "
+            f"AGENTCE_EMIT_SOURCE={source}; the emitter's own defaults are different."
+        )
     return result
 
 
@@ -1194,8 +1253,11 @@ _STARTER_DOMAIN_BINDING = (
 
 
 def _render_starter_profile(
-    *, subject: str, role: str, framework: str, adapter: str
+    *, subject: str, role: str, framework: str, adapter: str, source: str
 ) -> str:
+    source_todo = (
+        "" if source == DEFAULT_EMIT_SOURCE else "  # TODO: your evidence source id"
+    )
     return (
         f"# Starter applicability profile generated by `agentce init` for a {framework} agent "
         "(SPEC §6.5).\n"
@@ -1211,7 +1273,7 @@ def _render_starter_profile(
         f'    role: "{role}"\n'
         "    evidence_sources:\n"
         f'      - adapter: "{adapter}"\n'
-        f'        source: "urn:agentce:source:{framework}:TODO"  # TODO: your evidence source id\n'
+        f'        source: "{source}"{source_todo}\n'
         '        class: "self_report"\n'
         '        class_justification: "TODO: justify this source\'s trust class (SPEC §5.2)"\n'
     )
