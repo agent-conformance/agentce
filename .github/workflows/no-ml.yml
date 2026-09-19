@@ -20,5 +20,5 @@ jobs:
           python-version: "3.12"
       - name: no_ml self-test
         run: python tools/no_ml_check.py --self-test
-      - name: no_ml denylist scan of every uv.lock
+      - name: no_ml denylist scan of every lockfile (uv, pnpm, gradle)
         run: python tools/no_ml_check.py
