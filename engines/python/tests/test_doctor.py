@@ -99,14 +99,15 @@ def test_docs_and_skills_name_the_one_applicability_file() -> None:
 
     files = [
         "engines/python/agentce/commands/__init__.py",
-        "docs/quickstart.md",
-        "docs/integrate.md",
-        "docs/errors.md",
-        "website/src/content/docs/docs/running-assessments.md",
         *(
             str(p.relative_to(_REPO_ROOT))
-            for p in (_REPO_ROOT / "skills" / "agentce-onboard").rglob("*")
-            if p.is_file() and p.suffix in {".md", ".yaml"}
+            for tree in (
+                "docs",
+                "website/src/content/docs",
+                "skills/agentce-onboard",
+            )
+            for p in (_REPO_ROOT / tree).rglob("*")
+            if p.is_file() and p.suffix in {".md", ".mdx", ".yaml"}
         ),
     ]
     names = {
