@@ -12,9 +12,9 @@ until then report ``status: not_implemented`` and exit ``ok``.
 from __future__ import annotations
 
 import argparse
-import getpass
 import hashlib
 import json
+import os
 import re
 from collections.abc import Iterable
 from datetime import date
@@ -410,7 +410,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         bundle_digest=loaded.digest,
         catalogs=catalog.split(","),
         operator=_operator(),
-        invocation=["assess", str(bundle), str(profile)],
+        invocation=["assess", _scrub_path(bundle), _scrub_path(profile)],
         supersedes=supersedes,
         report_language=_opt_str(ns, "report_language") or "en",
     )
@@ -451,10 +451,32 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
 
 
 def _operator() -> str:
+    """The run's provenance identity (SPEC §8.4): a string the deployer controls via the
+    ``operator`` config key (``AGENTCE_OPERATOR`` or ``agentce.toml``), never the invoking OS
+    user by default — the OS username and home directory are not the deployer's to disclose."""
+    return str(next(v["value"] for v in resolve_config() if v["key"] == "operator"))
+
+
+def _scrub_path(path: str | Path) -> str:
+    """A path safe to write into a shared artifact (SPEC §8.4: ``invocation`` records paths,
+    never a person or their local filesystem layout). Never returns an absolute path: under the
+    home directory it becomes ``~/…``; else under the current directory it becomes a relative
+    path; anywhere else — a devcontainer's `/workspaces`, an `/opt` checkout, a path outside both
+    — only the final path component is kept. Compares the stated path, not where a symlink might
+    ultimately point, so a path reached through a symlink under the home directory is still
+    caught."""
+    p = Path(os.path.abspath(path))
+    home = Path(os.path.abspath(Path.home()))
     try:
-        return getpass.getuser()
-    except Exception:  # noqa: BLE001 - environments without a resolvable user
-        return "unknown"
+        return "~/" + p.relative_to(home).as_posix()
+    except ValueError:
+        pass
+    cwd = Path(os.path.abspath(Path.cwd()))
+    try:
+        return p.relative_to(cwd).as_posix()
+    except ValueError:
+        pass
+    return p.name
 
 
 def cmd_report(ns: argparse.Namespace) -> CommandResult:

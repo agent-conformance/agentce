@@ -48,6 +48,13 @@ CONFIG_KEYS: tuple[ConfigKey, ...] = (
     ConfigKey(
         "pseudonymisation", "none", str, "principal pseudonymisation key source (IR-12)"
     ),
+    ConfigKey(
+        "operator",
+        "unset",
+        str,
+        "run.operator recorded in manifest.json (SPEC §8.4) — a string the deployer "
+        "controls via AGENTCE_OPERATOR or agentce.toml; never the invoking OS user by default",
+    ),
 )
 
 _KEYS_BY_NAME = {ck.key: ck for ck in CONFIG_KEYS}
