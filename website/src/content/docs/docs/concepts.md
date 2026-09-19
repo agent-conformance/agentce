@@ -26,6 +26,18 @@ non-conformant, partial, not applicable, not assessed, or insufficient evidence 
 evidence behind it. "Insufficient evidence" is a first-class result: the engine reports what it
 cannot verify rather than guessing.
 
+**The bundle.** The directory of evidence an assessment reads: a `manifest.json` that lists every file
+with its hash, and the `events/` streams the agent emitted. You pass it to `assess` with `--bundle`.
+
+**The profile.** The applicability profile: what you declare about the subject — its role, its evidence
+sources, and the catalogs to assess against. You pass it with `--profile`, and `agentce init` writes a
+starter for you to complete.
+
+**The layout.** Where a project keeps its files: the declarations in an `agentce/` directory
+(`applicability.yaml` for the profile and `domain.linkml.yaml` for the domain binding) and the evidence
+bundle in `evidence/`. `agentce init` writes the declarations, and `agentce doctor --project <dir>`
+checks all of it.
+
 ## Why it is deterministic and model-free
 
 No learned component takes part in a verdict. The engine reads evidence and evaluates explicit rules,
