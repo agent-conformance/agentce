@@ -1,0 +1,30 @@
+<!doctype html>
+<!-- Deliberately inaccessible fixture for check-a11y.mjs --self-test. It seeds one WCAG failure per
+     REQUIRED_SELFTEST_RULES so the axe gate proves it can fail. Do NOT "fix" this page: the self-test
+     asserts axe still reports these violations. The <html> element intentionally omits lang. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Inaccessible fixture</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <main>
+      <h1>Inaccessible fixture</h1>
+      <!-- color-contrast: ~1.6:1 body text, and a teal CTA on white (~3.75:1) mirroring the #45 defect. -->
+      <p style="color: #bfbfbf; background: #ffffff">This paragraph has far too little contrast to read.</p>
+      <a
+        href="#"
+        style="display: inline-block; background: #0d9488; color: #ffffff; padding: 10px 16px; text-decoration: none"
+        >Low-contrast call to action</a
+      >
+      <!-- image-alt: an image with no alt attribute. -->
+      <img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" />
+      <!-- button-name: a control with no accessible name. -->
+      <button type="button"></button>
+      <!-- scrollable-region-focusable: a horizontally scrollable region with no keyboard focus (no
+           tabindex), mirroring an un-fixed code block. -->
+      <pre style="overflow: auto; width: 180px; white-space: pre; border: 1px solid #000">const verificationTeal = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";</pre>
+    </main>
+  </body>
+</html>

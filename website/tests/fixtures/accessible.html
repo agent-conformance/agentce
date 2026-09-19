@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- Accessible control fixture for check-a11y.mjs --self-test. axe must report ZERO violations here,
+     proving the gate does not raise false positives (it discriminates good from bad). -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Accessible fixture</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <main>
+      <h1>Accessible fixture</h1>
+      <p style="color: #0f172a; background: #ffffff">This paragraph has strong, readable contrast.</p>
+      <a
+        href="#"
+        style="display: inline-block; background: #0f172a; color: #ffffff; padding: 10px 16px; text-decoration: none"
+        >Readable call to action</a
+      >
+      <img
+        src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="
+        alt="A one-pixel placeholder image"
+      />
+      <button type="button">Save changes</button>
+    </main>
+  </body>
+</html>
