@@ -43,7 +43,11 @@ claims:
       The Python, TypeScript, and Java engines produce byte-identical per-project assertions.json
       over the simulated corpus for `agentce conformance run`.
     status: built
-    pages: []
+    pages:
+      - website/src/pages/index.astro
+      - website/src/content/docs/docs/running-assessments.md
+      - docs/quickstart-typescript.md
+      - docs/quickstart-java.md
     check:
       workflow: .github/workflows/three-engine.yml
       job: compare
@@ -183,3 +187,34 @@ claims:
         removed instead of fixed, and on an opt-out with no reason; a self-test proves the checker
         rejects each of those and the once-documented assess command that named a bundle that does not
         exist.
+  - id: cli.docs-match-implementation
+    text: >-
+      The TypeScript and Java quickstart pages tell a reader to run only commands those engines
+      implement, which today is `conformance run`; run for real, that command claims full and writes
+      one non-empty assertions.json per project. A page that prescribes a command the engine rejects
+      as unavailable fails the build.
+    status: built
+    pages:
+      - docs/quickstart-typescript.md
+      - docs/quickstart-java.md
+      - website/src/content/docs/docs/running-assessments.md
+    check:
+      workflow: .github/workflows/three-engine.yml
+      job: compare
+      description: >-
+        On every pull request, runs the real TypeScript and Java command-line tools: every command a
+        quickstart page names is invoked and must not be rejected as unavailable, then `conformance
+        run` is executed and must claim full with one non-empty assertions.json per reported project;
+        the checker's own tests reject a page that names a command the engine rejects, an engine that
+        writes fewer or empty assertions, and a partial claim.
+  - id: engine.ts-java-assess
+    text: >-
+      The TypeScript and Java engines are planned to implement `assess`, `report`, `validate`, and
+      `quickstart`; today they implement `conformance run` only, and the Python engine is the
+      reference for assessing an agent's own evidence.
+    status: roadmap
+    pages:
+      - docs/quickstart-typescript.md
+      - docs/quickstart-java.md
+      - website/src/content/docs/docs/running-assessments.md
+      - engines/typescript/README.md

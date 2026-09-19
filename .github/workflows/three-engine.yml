@@ -1,5 +1,6 @@
 # Three-engine byte-identity (SPEC 11.5, check P5.1): the Python, TypeScript, and Java engines must
-# produce byte-identical per-project assertions.json over the full corpus, and each must claim full.
+# produce byte-identical per-project assertions.json over the full corpus, and each must claim full. The
+# TypeScript and Java quickstart pages must prescribe only commands those engines run (`conformance run`).
 # Every action is pinned by commit SHA (AGENTS.md quality gates).
 name: three-engine
 
@@ -37,8 +38,17 @@ jobs:
         run: |
           corepack enable
           pnpm install --frozen-lockfile
+          pnpm build
 
       - name: Compare the three engines over the full corpus
         working-directory: conformance
         run: |
           uv run python ecs.py --engines python,typescript,java --corpus ../corpus --compare
+
+      - name: Engine quickstart-page check (self-test)
+        working-directory: conformance
+        run: uv run --frozen pytest -q -p no:cacheprovider tests/test_engine_docs_check.py
+
+      - name: Each engine's quickstart page prescribes only commands that engine runs
+        working-directory: conformance
+        run: uv run --frozen python engine_docs_check.py --engines typescript,java

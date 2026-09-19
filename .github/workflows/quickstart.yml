@@ -1,7 +1,9 @@
 # Fresh-machine proof (SPEC §13.4 AX-1, §14.4): on a clean runner with only the language toolchain,
-# each engine runs the vendored quickstart project end to end within five minutes, and the engine
-# container image builds. Dispatched under the pre-GA guardrails (not run on every push); every action
-# is pinned by commit SHA (AGENTS.md quality gates). No image is pushed.
+# each engine runs end to end within five minutes — the Python engine assesses the vendored quickstart
+# project; the TypeScript and Java engines, which implement `conformance run`, run the conformance suite
+# and must write one assertions.json per project — and the engine container image builds. Dispatched
+# under the pre-GA guardrails (not run on every push); every action is pinned by commit SHA (AGENTS.md
+# quality gates). No image is pushed.
 name: quickstart
 
 on:
@@ -40,15 +42,26 @@ jobs:
           corepack enable
           pnpm install --frozen-lockfile
           pnpm build
-      - name: Assess the quickstart project
+      - name: Install uv
         run: |
-          node engines/typescript/bin/agentce.js assess \
-            --bundle corpus/quickstart/evidence \
-            --profile corpus/quickstart/applicability.yaml \
-            --domain corpus/quickstart/domain.linkml.yaml \
-            --catalog eu-ai-act@2026.09 \
-            --catalog-dir spec/catalogs/base/eu-ai-act \
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Run the conformance suite
+        run: |
+          node engines/typescript/bin/agentce.js conformance run \
+            --engine engines/typescript \
+            --corpus corpus \
             --out "$RUNNER_TEMP/report"
+      - name: Assert one assertions.json per project was written
+        run: |
+          python3 - "$RUNNER_TEMP/report" <<'PY'
+          import json, pathlib, sys
+          out = pathlib.Path(sys.argv[1])
+          total = json.loads((out / "implementation-report.json").read_text())["projects"]["total"]
+          found = [p for p in (out / "projects").rglob("assertions.json") if p.stat().st_size > 0]
+          if total <= 0 or len(found) != total:
+              sys.exit(f"expected {total} non-empty assertions.json files, found {len(found)}")
+          PY
 
   java:
     name: quickstart (java)
@@ -63,15 +76,26 @@ jobs:
       - name: Build the Java engine
         working-directory: engines/java
         run: ./gradlew --no-daemon --quiet installDist
-      - name: Assess the quickstart project
+      - name: Install uv
         run: |
-          engines/java/build/install/agentce/bin/agentce assess \
-            --bundle corpus/quickstart/evidence \
-            --profile corpus/quickstart/applicability.yaml \
-            --domain corpus/quickstart/domain.linkml.yaml \
-            --catalog eu-ai-act@2026.09 \
-            --catalog-dir spec/catalogs/base/eu-ai-act \
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Run the conformance suite
+        run: |
+          engines/java/build/install/agentce/bin/agentce conformance run \
+            --engine engines/java \
+            --corpus corpus \
             --out "$RUNNER_TEMP/report"
+      - name: Assert one assertions.json per project was written
+        run: |
+          python3 - "$RUNNER_TEMP/report" <<'PY'
+          import json, pathlib, sys
+          out = pathlib.Path(sys.argv[1])
+          total = json.loads((out / "implementation-report.json").read_text())["projects"]["total"]
+          found = [p for p in (out / "projects").rglob("assertions.json") if p.stat().st_size > 0]
+          if total <= 0 or len(found) != total:
+              sys.exit(f"expected {total} non-empty assertions.json files, found {len(found)}")
+          PY
 
   image:
     name: container image build (no push)

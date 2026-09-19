@@ -4,8 +4,10 @@ description: The command-line workflow — declare a profile, collect evidence, 
 ---
 
 The engine ships a single command-line tool, `agentce`. Every command supports `--json` for scripting
-and returns a documented exit code. The commands below use the Python engine; the TypeScript and Java
-engines expose the same interface and produce byte-identical output.
+and returns a documented exit code. The commands below use the Python engine. The TypeScript and Java
+engines implement the `conformance run` command, which runs the conformance suite and produces
+byte-identical `assertions.json` files over the simulated corpus; `assess`, `report`, `validate`, and
+`quickstart` are planned for them and are not yet available.
 
 ## Declare an applicability profile
 
