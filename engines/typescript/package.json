@@ -31,6 +31,7 @@
     "lint": "biome check src bin",
     "format": "biome format --write src",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "test:cov": "node --import tsx --test --experimental-test-coverage --test-coverage-lines=90 \"src/**/*.test.ts\"",
     "agentce": "tsx src/cli.ts",
     "prepublishOnly": "pnpm build"
   },

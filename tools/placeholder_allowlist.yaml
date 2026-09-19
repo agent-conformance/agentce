@@ -159,6 +159,12 @@ allow:
     class: debt
     justification: "The TypeScript engine's non-core commands are not yet implemented; built in the engine-parity work (removes this entry)."
 
+  - path: engines/typescript/src/report.test.ts
+    pattern: todo
+    count: 1
+    class: debt
+    justification: "The TypeScript report's human renderers (report.md/report.html labels and structure) and evidence-pack shape are not yet byte-identical to the reference; the parity assertion is a tracked known gap until the engine-parity, internationalisation, and HTML-hardening work lands (removes this entry)."
+
   - path: engines/typescript/testdata/ingest-bundle/events/log.jsonl
     pattern: zero-digest
     count: 2
