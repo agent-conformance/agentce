@@ -30,6 +30,15 @@ jobs:
       - name: Check links and structural accessibility (fast regex pre-check)
         working-directory: website
         run: node scripts/check-site.mjs
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Hero terminal equals a fresh quickstart run
+        working-directory: website
+        run: |
+          node scripts/quickstart-hero.mjs --self-test
+          node scripts/quickstart-hero.mjs
 
   a11y:
     runs-on: ubuntu-latest
