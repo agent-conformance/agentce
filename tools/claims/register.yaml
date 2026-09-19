@@ -144,3 +144,22 @@ claims:
         Runs a fresh quickstart on every pull request and fails unless the committed hero terminal
         and caption equal that run, and fails on the banned all-pass sentences; a self-test proves the
         check rejects a changed tally, a stale run, and a hand-written claim.
+  - id: quickstart.tally
+    text: >-
+      The Getting Started page, the docs quickstart page, and the corpus quickstart README state the
+      conformant, insufficient-evidence, and not-assessed tally of a real `agentce quickstart` run over
+      the bundled corpus/quickstart project, define insufficient evidence in place, and carry no
+      blanket "every control is conformant" claim. The bundled project is not all-conformant.
+    status: built
+    pages:
+      - website/src/content/docs/docs/getting-started.md
+      - docs/quickstart.md
+      - corpus/quickstart/README.md
+    check:
+      workflow: .github/workflows/website.yml
+      job: build
+      description: >-
+        Runs a fresh quickstart on every pull request and fails unless each of the three pages equals
+        what that run generates and none claims every control is conformant while the run is not; a
+        self-test proves the check rejects a changed tally, a stale run, missing markers, and a softened
+        blanket claim, and passes an honest partial tally.
