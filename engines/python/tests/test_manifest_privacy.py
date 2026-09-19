@@ -158,9 +158,15 @@ def test_operator_config_round_trips_when_set(
 ) -> None:
     """The deployer can still set `run.operator` explicitly (SPEC §8.4's own worked example is
     a CI identity string) — it just is not the bare OS user by default."""
-    monkeypatch.setenv("AGENTCE_OPERATOR", "ci:github-actions:corp/assessments/assess.yml@refs/heads/main")
+    monkeypatch.setenv(
+        "AGENTCE_OPERATOR",
+        "ci:github-actions:corp/assessments/assess.yml@refs/heads/main",
+    )
     out = tmp_path / "out"
     code = cli.main(["quickstart", "--out", str(out)])
     assert code == 0
     manifest: dict[str, Any] = json.loads((out / "manifest.json").read_text("utf-8"))
-    assert manifest["run"]["operator"] == "ci:github-actions:corp/assessments/assess.yml@refs/heads/main"
+    assert (
+        manifest["run"]["operator"]
+        == "ci:github-actions:corp/assessments/assess.yml@refs/heads/main"
+    )
