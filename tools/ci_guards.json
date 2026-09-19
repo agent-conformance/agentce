@@ -1,0 +1,122 @@
+[
+  {
+    "name": "python-lint",
+    "description": "Reference engine lint (ruff) on every push and pull request.",
+    "roles": ["lint"],
+    "workflow": ".github/workflows/tests.yml",
+    "command": "uv run --frozen ruff check .",
+    "run_in_eval": false
+  },
+  {
+    "name": "python-typecheck",
+    "description": "Reference engine strict type-check (mypy).",
+    "roles": ["typecheck"],
+    "workflow": ".github/workflows/tests.yml",
+    "command": "uv run --frozen mypy .",
+    "run_in_eval": false
+  },
+  {
+    "name": "python-tests-coverage",
+    "description": "Reference engine tests with the 90% coverage floor.",
+    "roles": ["tests", "coverage"],
+    "workflow": ".github/workflows/tests.yml",
+    "command": "uv run --frozen pytest -q -p no:cacheprovider --cov=agentce --cov-fail-under=90",
+    "run_in_eval": false
+  },
+  {
+    "name": "typescript-lint",
+    "description": "TypeScript engine lint.",
+    "roles": ["lint"],
+    "workflow": ".github/workflows/tests.yml",
+    "command": "pnpm lint",
+    "run_in_eval": false
+  },
+  {
+    "name": "typescript-typecheck",
+    "description": "TypeScript engine type-check (no any).",
+    "roles": ["typecheck"],
+    "workflow": ".github/workflows/tests.yml",
+    "command": "pnpm typecheck",
+    "run_in_eval": false
+  },
+  {
+    "name": "typescript-tests-coverage",
+    "description": "TypeScript engine tests with the coverage floor.",
+    "roles": ["tests", "coverage"],
+    "workflow": ".github/workflows/tests.yml",
+    "command": "pnpm test:cov",
+    "run_in_eval": false
+  },
+  {
+    "name": "java-check",
+    "description": "Java engine build, tests, and JaCoCo coverage floor via Gradle check.",
+    "roles": ["tests", "lint", "typecheck", "coverage"],
+    "workflow": ".github/workflows/tests.yml",
+    "command": "./gradlew check --no-daemon --console=plain",
+    "run_in_eval": false
+  },
+  {
+    "name": "offline-assessment",
+    "description": "Real offline proof: an assessment runs inside a Linux network namespace with no route off the host. Linux/sudo-only, so it is wired and gated in CI but not smoke-run in the eval.",
+    "roles": ["offline"],
+    "workflow": ".github/workflows/ci.yml",
+    "command": "sudo unshare -n bash -euo pipefail -c '",
+    "run_in_eval": false
+  },
+  {
+    "name": "no-ml-selftest",
+    "description": "Proves the no-learned-components denylist scan has teeth (seeded ML framework in each lockfile format is caught).",
+    "roles": ["no-ml"],
+    "workflow": ".github/workflows/no-ml.yml",
+    "command": "python tools/no_ml_check.py --self-test",
+    "run_in_eval": true
+  },
+  {
+    "name": "no-ml-scan",
+    "description": "Scans every lockfile (uv, pnpm, gradle) in the tree for a denylisted ML/LLM dependency.",
+    "roles": ["no-ml"],
+    "workflow": ".github/workflows/no-ml.yml",
+    "command": "python tools/no_ml_check.py",
+    "run_in_eval": true
+  },
+  {
+    "name": "leak-guard-selftest",
+    "description": "Proves the private/public leakage guard detects a sentinel private term and denylisted phrase without disclosing either list.",
+    "roles": ["leakage"],
+    "workflow": ".github/workflows/guards.yml",
+    "command": "python tools/leak_guard.py --self-test",
+    "run_in_eval": true
+  },
+  {
+    "name": "leak-guard-no-disclosure",
+    "description": "Confirms the committed guard artifacts themselves disclose no private term.",
+    "roles": ["leakage"],
+    "workflow": ".github/workflows/guards.yml",
+    "command": "python tools/leak_guard.py --files tools/leak_guard.py tools/leak_tokens.hashes .github/workflows/guards.yml",
+    "run_in_eval": true
+  },
+  {
+    "name": "leak-guard-diff",
+    "description": "Scans added content and commit messages against the base commit. Needs the CI-provided base SHA, so it is wired and gated in CI but not smoke-run in the eval.",
+    "roles": ["leakage"],
+    "workflow": ".github/workflows/guards.yml",
+    "command": "python tools/leak_guard.py --diff \"$LEAK_BASE\"",
+    "run_in_eval": false
+  },
+  {
+    "name": "spec-validate-vocab",
+    "description": "Validates the evidence vocabulary for internal consistency.",
+    "roles": ["spec-validate"],
+    "workflow": ".github/workflows/guards.yml",
+    "command": "uv run --project spec/vocab --frozen python spec/vocab/check_vocab.py",
+    "run_in_eval": true
+  },
+  {
+    "name": "spec-validate-examples",
+    "description": "Validates the worked examples against their schemas.",
+    "roles": ["spec-validate"],
+    "workflow": ".github/workflows/guards.yml",
+    "command": "uv run --project spec --frozen python spec/validate_examples.py",
+    "run_in_eval": true
+  }
+]
