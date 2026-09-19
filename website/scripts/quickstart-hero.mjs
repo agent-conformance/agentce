@@ -7,8 +7,8 @@
 // when the committed page no longer equals a fresh run (--check, the default). A committed transcript
 // that stops matching the engine is therefore a build failure, not a silent drift.
 //
-//   node scripts/quickstart-hero.mjs             fail (exit 1) unless the page equals a fresh run
-//   node scripts/quickstart-hero.mjs --write     regenerate the marked region from a fresh run
+//   node scripts/quickstart-hero.mjs [PAGE]          fail (exit 1) unless the page equals a fresh run
+//   node scripts/quickstart-hero.mjs --write [PAGE]  regenerate the marked region from a fresh run
 //   node scripts/quickstart-hero.mjs --self-test prove the check fails on a stale or fabricated hero
 //
 // Exit codes: 0 ok · 1 the page differs from a fresh run · 2 the run itself could not be made.
@@ -191,14 +191,15 @@ function main(argv) {
     console.error(`hero.run_failed: ${err.message}`);
     return 2;
   }
-  const page = readFileSync(PAGE, 'utf8');
+  const pagePath = argv.find((a) => !a.startsWith('--')) ?? PAGE;
+  const page = readFileSync(pagePath, 'utf8');
   if (argv.includes('--write')) {
     const next = spliceRegion(page, renderRegion(run));
     if (next === null) {
-      console.error('hero.markers_missing: the quickstart-run markers are absent from src/pages/index.astro');
+      console.error('hero.markers_missing: the quickstart-run markers are absent from the page');
       return 1;
     }
-    writeFileSync(PAGE, next);
+    writeFileSync(pagePath, next);
     console.log(`quickstart-hero: wrote the hero from a fresh run (${run.total} assertions)`);
     return 0;
   }
