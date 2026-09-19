@@ -491,8 +491,9 @@ def test_init_writes_a_valid_profile(
         capsys,
     )
     assert code == 0
-    profile = tmp_path / "init" / "agentce" / "applicability-profile.yaml"
+    profile = tmp_path / "init" / "agentce" / "applicability.yaml"
     assert env["profile"] == str(profile)
+    assert env["domain"] == str(tmp_path / "init" / "agentce" / "domain.linkml.yaml")
     assert validate_main([str(profile)]) == 0  # the generated profile is schema-valid
 
 

@@ -95,7 +95,7 @@ MESSAGE_KEYS: dict[str, Entry] = {
     "input.profile_missing": Entry(
         "error",
         "the applicability profile was not supplied.",
-        "pass --profile applicability.yaml (start from agentce init).",
+        "pass --profile agentce/applicability.yaml (start from agentce init).",
     ),
     "internal.unexpected": Entry(
         "error",
