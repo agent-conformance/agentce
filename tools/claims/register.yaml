@@ -50,3 +50,31 @@ claims:
       description: >-
         Runs all three engines over the full corpus and fails unless their per-project
         assertions.json outputs are byte-identical.
+  - id: ci.tests-gate
+    text: >-
+      Every push and pull request runs the per-package quality gate for all three engines: lint,
+      type-check, and tests with a declared coverage floor. Nothing merges without that signal.
+    status: built
+    pages:
+      - AGENTS.md
+    check:
+      workflow: .github/workflows/tests.yml
+      job: python
+      description: >-
+        The tests workflow runs ruff, mypy, and pytest (with a coverage floor) for the Python
+        engine, biome/tsc/tests for the TypeScript engine, and gradlew check with a JaCoCo floor for
+        the Java engine, on every push and pull request.
+  - id: ci.offline-none
+    text: >-
+      An assessment runs with networking disabled. A dedicated job runs a real assessment inside a
+      network namespace with no route off the host, and fails if the namespace can still reach the
+      network.
+    status: built
+    pages:
+      - AGENTS.md
+    check:
+      workflow: .github/workflows/ci.yml
+      job: no-network
+      description: >-
+        Runs agentce quickstart inside an isolated network namespace (unshare -n) after asserting the
+        namespace cannot open a socket off the host, proving the offline invariant by behaviour.
