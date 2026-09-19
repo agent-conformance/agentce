@@ -21,7 +21,7 @@
 //                                            stubbed or toothless gate exits 1.
 import { createServer } from 'node:http';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
-import { dirname, join, resolve, extname, relative, sep } from 'node:path';
+import { dirname, join, resolve, extname, relative, sep, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import axeModule from '@axe-core/playwright';
@@ -68,19 +68,30 @@ const MIME = {
   '.map': 'application/json; charset=utf-8',
 };
 
+// Resolve a request URL to an absolute path confined to `root`, or null if it would escape.
+// The containment guard (path.relative → no leading `..`, not absolute) dominates every filesystem
+// call downstream, so an untrusted request path can never traverse outside the served directory.
+function resolveWithin(root, urlPath) {
+  let p = decodeURIComponent(urlPath.split('?')[0].split('#')[0]);
+  if (p.endsWith('/')) p += 'index.html';
+  const candidate = resolve(join(root, p));
+  const rel = relative(root, candidate);
+  if (rel.startsWith('..') || isAbsolute(rel)) return null;
+  // A directory request maps to its index.html — a constant suffix that stays within `root`.
+  if (existsSync(candidate) && statSync(candidate).isDirectory()) return join(candidate, 'index.html');
+  return candidate;
+}
+
 function serve(rootDir) {
   const root = resolve(rootDir);
   const server = createServer((req, res) => {
     try {
-      let p = decodeURIComponent(req.url.split('?')[0].split('#')[0]);
-      if (p.endsWith('/')) p += 'index.html';
-      let file = resolve(join(root, p));
-      if (file !== root && !file.startsWith(root + sep)) {
+      const file = resolveWithin(root, req.url);
+      if (file === null) {
         res.writeHead(403);
         res.end('forbidden');
         return;
       }
-      if (existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html');
       if (!existsSync(file)) {
         res.writeHead(404);
         res.end('not found');
@@ -88,9 +99,12 @@ function serve(rootDir) {
       }
       res.writeHead(200, { 'content-type': MIME[extname(file)] || 'application/octet-stream' });
       res.end(readFileSync(file));
-    } catch (e) {
-      res.writeHead(500);
-      res.end(String(e));
+    } catch (err) {
+      // Never reflect exception text or a stack trace into the response (avoids HTML injection and
+      // information exposure); log server-side for diagnosis and return a generic message instead.
+      console.error('a11y static server error:', err);
+      res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
+      res.end('internal server error');
     }
   });
   return new Promise((res) => {
