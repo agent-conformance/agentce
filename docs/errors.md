@@ -10,7 +10,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.bundle_manifest_missing` | the evidence bundle has no manifest.json. | add a manifest.json listing every stream file with its sha256. |
 | `input.catalog_missing` | no catalog id was passed to assess. | pass --catalog <id@version> and --catalog-dir <dir>. |
 | `input.catalog_not_found` | no base catalog was found under the expected path. | run from the repository root or pass --catalog-dir to a catalog directory. |
-| `input.profile_missing` | the applicability profile was not supplied. | pass --profile applicability.yaml (start from agentce init). |
+| `input.profile_missing` | the applicability profile was not supplied. | pass --profile agentce/applicability.yaml (start from agentce init). |
 | `internal.unexpected` | an unexpected internal error occurred. | re-run with --debug to see the stack trace, then file an issue. |
 
 ## Warnings

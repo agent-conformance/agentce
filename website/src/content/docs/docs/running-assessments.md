@@ -18,7 +18,7 @@ uv run --project engines/python agentce init \
   --out ./my-assessment
 ```
 
-Fill in the `TODO`s in the generated `applicability-profile.yaml`, then confirm it validates.
+Fill in the `TODO`s in the generated `agentce/applicability.yaml`, then confirm it validates.
 
 ## Provide evidence
 

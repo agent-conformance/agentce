@@ -27,8 +27,8 @@ uv run --project engines/python agentce report --validate ./out
 
 ## Start your own profile
 
-`agentce init` writes a starter applicability profile — what you declare about the system under
-assessment (SPEC §6.5):
+`agentce init` writes a starter applicability profile, `agentce/applicability.yaml` — what you declare
+about the system under assessment (SPEC §6.5) — and an empty domain binding, `agentce/domain.linkml.yaml`:
 
 ```bash
 uv run --project engines/python agentce init \
@@ -36,10 +36,17 @@ uv run --project engines/python agentce init \
   --out ./my-assessment
 ```
 
-Fill in the `TODO`s in `./my-assessment/agentce/applicability-profile.yaml`, then check it validates:
+Fill in the `TODO`s in `./my-assessment/agentce/applicability.yaml`, then check it validates:
 
 ```bash
-uv run --project engines/python python -m agentce.tools.validate_profile ./my-assessment/agentce/applicability-profile.yaml
+uv run --project engines/python python -m agentce.tools.validate_profile ./my-assessment/agentce/applicability.yaml
+```
+
+`agentce doctor` reads the same layout and names the fix for anything still missing (until you collect
+evidence it reports the empty `evidence/` directory, which is expected):
+
+```bash
+uv run --project engines/python agentce doctor --project ./my-assessment
 ```
 
 ## Inspect the configuration
