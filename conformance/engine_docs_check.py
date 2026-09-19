@@ -5,11 +5,11 @@ engine that tells a reader to run a command the engine does not implement sends 
 ``cli.not_implemented`` error. This check keeps the two pages honest by running the real engine CLI, not by
 reading source:
 
-* every reference-CLI command name the page shows in a code block, or after ``agentce``, is invoked on the
-  engine's own CLI, and the run fails if any of them answers ``cli.not_implemented``. The vocabulary of
-  command names comes from the reference engine's real parser, and a code block is read as a bag of
-  words, so a command written with a line continuation, through ``npx``, or as a Gradle ``--args``
-  string is found the same way as a plain one;
+* every reference-CLI command name the page shows in code a reader would run, or after ``agentce``, is
+  invoked on the engine's own CLI, and the run fails if any of them answers ``cli.not_implemented``. The
+  vocabulary of command names comes from the reference engine's real parser, and the code is read as a
+  bag of words, so a command written with a line continuation, through ``npx``, as a Gradle ``--args``
+  string, or inside a list item's indented block is found the same way as a plain one;
 * ``conformance run`` is then executed over the simulated corpus, and the run fails unless the engine
   claims ``full`` and wrote one non-empty ``assertions.json`` for every project it reports.
 
@@ -36,9 +36,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 NOT_IMPLEMENTED_KEY = "cli.not_implemented"
 # A command the page tells a reader to run in prose: `agentce <command>` or `agentce.js <command>`.
 PRESCRIBED = re.compile(r"\bagentce(?:\.js)?[ \t]+([a-z][a-z-]*)")
-# A fenced code block, and the separators that split a shell line into words (continuations, quotes,
-# ``--args=...`` assignments, operators).
-FENCED = re.compile(r"^(```|~~~)[^\n]*\n(.*?)^\1[ \t]*$", re.MULTILINE | re.DOTALL)
+# A fence line at any indent (a list item's code block is indented), its marker, and the separators
+# that split a shell line into words (continuations, quotes, ``--args=...`` assignments, operators).
+FENCE_LINE = re.compile(r"^[ \t]*(?P<marker>`{3,}|~{3,})(?P<rest>.*)$")
+INDENTED_CODE = re.compile(r"^(?: {4}|\t)")
+# An inline code span with more than one word: an instruction such as `npx @scope/cli assess`.
+INLINE_SPAN = re.compile(r"`([^`\n]*\s[^`\n]*)`")
 WORD_SPLIT = re.compile(r"""[\s\\"'`=;&|()<>]+""")
 SKIPPED_VERBS = {"version"}
 RUN_TIMEOUT_S = 300
@@ -85,15 +88,44 @@ def reference_commands() -> frozenset[str]:
     raise SetupError("the reference engine's parser declares no commands.")
 
 
+def code_text(doc: str) -> str:
+    """The parts of a page a reader would copy and run: fenced blocks at any indent and fence length,
+    indented code, and multi-word inline code spans. An unclosed fence runs to the end of the page, so
+    a broken fence fails closed instead of hiding what follows it."""
+    lines: list[str] = []
+    fence: tuple[str, int] | None = None
+    for line in doc.splitlines():
+        m = FENCE_LINE.match(line)
+        if fence is not None:
+            closes = (
+                m is not None
+                and m["marker"][0] == fence[0]
+                and len(m["marker"]) >= fence[1]
+                and not m["rest"].strip()
+            )
+            if closes:
+                fence = None
+            else:
+                lines.append(line)
+        elif m:
+            fence = (m["marker"][0], len(m["marker"]))
+        elif INDENTED_CODE.match(line):
+            lines.append(line)
+        else:
+            lines.extend(span.group(1) for span in INLINE_SPAN.finditer(line))
+    return "\n".join(lines)
+
+
 def prescribed_commands(doc: str, known: frozenset[str]) -> list[str]:
     """The distinct reference-command names a page tells a reader to run, in a stable order.
 
-    A word counts when it appears in a fenced code block or directly after ``agentce``; a command name
-    written any other way in prose (a list of planned commands, say) is a mention, not an instruction.
+    A word counts when it appears in code a reader would run (see ``code_text``) or directly after
+    ``agentce``; a command name written any other way in prose (a list of planned commands, say) is a
+    mention, not an instruction. A verb assembled at run time, such as from a shell variable, is not
+    visible as a word: the check guards documentation drift, not a page written to evade it.
     """
     words = {m.group(1) for m in PRESCRIBED.finditer(doc)}
-    for block in FENCED.finditer(doc):
-        words.update(WORD_SPLIT.split(block.group(2)))
+    words.update(WORD_SPLIT.split(code_text(doc)))
     return sorted((words & known) - SKIPPED_VERBS)
 
 
