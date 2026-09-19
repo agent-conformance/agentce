@@ -1,12 +1,15 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import focusablePre from './src/plugins/a11y-focusable-pre.mjs';
 
 // The canonical origin. Every dereferenceable IRI the specification defines resolves under this host,
 // so the site is built with it fixed here (used for canonical links, Open Graph, and the sitemap).
 export default defineConfig({
   site: 'https://agent-conformance.org',
   integrations: [
+    // Keyboard access for scrollable code blocks (WCAG 2.1.1); enforced by the axe gate in scripts/check-a11y.mjs.
+    focusablePre(),
     starlight({
       title: 'Agent Conformance',
       description:
