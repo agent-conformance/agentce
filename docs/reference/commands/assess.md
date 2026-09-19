@@ -14,6 +14,7 @@ options:
   -h, --help            show this help message and exit
   --bundle BUNDLE       the evidence bundle directory
   --catalog CATALOG     catalog ids, comma-separated: <id@ver>[,<id@ver>...]
+                        (default: the profile's catalogs)
   --profile PROFILE     the applicability profile file
   --deviations DEVIATIONS
                         the deviation register file

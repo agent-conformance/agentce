@@ -172,7 +172,7 @@ def test_assess_missing_profile(
     assert env["error"]["key"] == "input.profile_missing"
 
 
-def test_assess_ingests_then_pending(
+def test_assess_names_the_catalogs_it_cannot_resolve(
     make_bundle: Callable[..., Path],
     example_events: list[dict[str, Any]],
     tmp_path: Path,
@@ -182,7 +182,7 @@ def test_assess_ingests_then_pending(
     profile = tmp_path / "profile.yaml"
     profile.write_text("{}", encoding="utf-8")
     out = tmp_path / "o"
-    code, env = run(
+    code = cli.main(
         [
             "assess",
             "--bundle",
@@ -194,14 +194,13 @@ def test_assess_ingests_then_pending(
             "--out",
             str(out),
             "--json",
-        ],
-        capsys,
+        ]
     )
-    assert code == 0
-    assert env["catalogs"] == ["a@1", "b@2"]
-    assert env["accepted"] == 2
-    assert env["status"] == "not_implemented"
-    assert (out / "quarantine.jsonl").is_file()
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "input.catalog_unresolved"
+    assert "'a@1', 'b@2'" in envelope["error"]["cause"]
+    assert not out.exists()
 
 
 def test_report_from(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -228,25 +227,20 @@ def test_report_validate_empty_dir_is_invalid(
 
 
 def test_report_validate_after_assess(
-    make_bundle: Callable[..., Path],
-    example_events: list[dict[str, Any]],
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    bundle = make_bundle(example_events)
-    profile = tmp_path / "profile.yaml"
-    profile.write_text("{}", encoding="utf-8")
+    quickstart = _REPO_ROOT / "corpus" / "quickstart"
     out = tmp_path / "o"
     assert (
         cli.main(
             [
                 "assess",
                 "--bundle",
-                str(bundle),
-                "--catalog",
-                "c@1",
+                str(quickstart / "evidence"),
                 "--profile",
-                str(profile),
+                str(quickstart / "applicability.yaml"),
+                "--domain",
+                str(quickstart / "domain.linkml.yaml"),
                 "--out",
                 str(out),
             ]

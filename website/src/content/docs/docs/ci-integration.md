@@ -27,7 +27,7 @@ An assessment needs no network. A typical job installs the pinned engine, runs t
 evidence the agent produced, and validates the artifacts:
 
 ```bash
-uv run --project engines/python agentce assess --bundle ./bundle --out ./out
+uv run --project engines/python agentce assess --bundle ./bundle --profile ./my-assessment/agentce/applicability.yaml --domain ./my-assessment/agentce/domain.linkml.yaml --out ./out
 uv run --project engines/python agentce report --validate ./out
 ```
 
