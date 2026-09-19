@@ -81,6 +81,29 @@ def test_a_command_in_a_code_block_is_found_however_it_is_written(block: str) ->
     assert set(check.prescribed_commands(doc, KNOWN)) & {"assess", "report"}
 
 
+@pytest.mark.parametrize(
+    "doc",
+    [
+        "1. Run it:\n\n   ```bash\n   npx @agent-conformance/cli assess --bundle b\n   ```\n",
+        "Run it:\n\n    npx @agent-conformance/cli assess --bundle b\n",
+        'Run it:\n\n\t./gradlew run --args="assess --bundle b"\n',
+        '- step\n\n  ~~~sh\n  ./gradlew run --args="assess --bundle b"\n  ~~~\n',
+        "Then run `npx @agent-conformance/cli assess` on the bundle.\n",
+        "````md\n```bash\nnpx @agent-conformance/cli assess\n```\n````\n",
+        "```bash\nnpx @agent-conformance/cli assess\n",
+    ],
+)
+def test_a_command_in_an_indented_or_nested_or_unclosed_block_is_found(
+    doc: str,
+) -> None:
+    assert check.prescribed_commands(doc, KNOWN) == ["assess"]
+
+
+def test_text_after_a_closed_fence_is_prose_again() -> None:
+    doc = "```bash\nnode bin/agentce.js conformance run\n```\nThe assess step is planned.\n"
+    assert check.prescribed_commands(doc, KNOWN) == ["conformance"]
+
+
 def test_a_tilde_fence_is_read_like_a_backtick_fence() -> None:
     doc = "~~~sh\nnpx @agent-conformance/cli assess\n~~~\n"
     assert check.prescribed_commands(doc, KNOWN) == ["assess"]
