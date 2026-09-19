@@ -27,6 +27,28 @@ jobs:
       - name: Resolve every canonical IRI
         working-directory: website
         run: pnpm run check:iri
-      - name: Check links and accessibility
+      - name: Check links and structural accessibility (fast regex pre-check)
         working-directory: website
         run: node scripts/check-site.mjs
+
+  a11y:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install dependencies
+        working-directory: website
+        run: pnpm install --frozen-lockfile
+      - name: Install the pinned Playwright browser
+        working-directory: website
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build the static site
+        working-directory: website
+        run: pnpm build
+      - name: Accessibility gate can fail (axe self-test over the inaccessible fixture)
+        working-directory: website
+        run: node scripts/check-a11y.mjs --self-test
