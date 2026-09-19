@@ -76,8 +76,9 @@ quickstart complete: 49 assertions; report in ./out
 - not assessed: 5
 - insufficient evidence: 19</code></pre>
       <figcaption>
-        The real output of that command over the bundled <code>corpus/quickstart</code> project: 25 conformant, 5 not assessed, 19 insufficient evidence, of 49 assertions.
-        Where the evidence does not settle a control the engine reports insufficient evidence; it never guesses.
+        The real output of that command over the bundled <code>corpus/quickstart</code> project: 25 conformant, 19 insufficient evidence, 5 not assessed, of 49 controls.
+        Insufficient evidence means a control applies and was evaluated, but the evidence collected did not meet its minimum;
+        it is a gap in what was collected, not a failure and not a guess.
       </figcaption>
       {/* quickstart-run:end */}
     </figure>
