@@ -156,11 +156,12 @@ def test_a_profile_that_declares_no_catalog_and_none_passed_is_refused(
 def test_a_profile_declaring_an_unresolvable_catalog_is_refused(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    code, envelope, _ = _assess(
+    code, envelope, out = _assess(
         tmp_path, capsys, _profile(tmp_path, ["not-a-catalog@1"])
     )
     assert code == 3
     assert envelope["error"]["key"] == "input.catalog_unresolved"
+    assert not out.exists()
 
 
 def test_a_catalog_dir_alone_is_an_explicit_override(
@@ -182,7 +183,7 @@ def test_a_label_that_names_a_different_catalog_than_the_dir_is_refused(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """``--catalog`` is no longer a free-form label riding beside ``--catalog-dir``."""
-    code, envelope, _ = _assess(
+    code, envelope, out = _assess(
         tmp_path,
         capsys,
         _profile(tmp_path, [_EU_LABEL]),
@@ -193,6 +194,7 @@ def test_a_label_that_names_a_different_catalog_than_the_dir_is_refused(
     )
     assert code == 3
     assert envelope["error"]["key"] == "input.catalog_unresolved"
+    assert not out.exists()
 
 
 def test_a_catalog_dir_supplies_the_id_it_carries(
@@ -256,3 +258,29 @@ def test_the_documented_assess_example_evaluates_as_written(
     capsys.readouterr()
     out = tmp_path / words[words.index("--out") + 1]
     assert _assertion_count(out) > 0
+
+    # Without its domain binding the same run still exits 0 yet judges almost nothing (most controls
+    # come out not_applicable), so the example must reach more verdicts than the stripped command.
+    stripped = _without_option(words, "--domain")
+    stripped[stripped.index("--out") + 1] = "./out-without-domain"
+    assert cli.main([*stripped, "--json"]) == 0, capsys.readouterr()
+    capsys.readouterr()
+    assert _verdict_count(out) > _verdict_count(tmp_path / "out-without-domain")
+
+
+def _without_option(words: list[str], option: str) -> list[str]:
+    kept = list(words)
+    if option in kept:
+        at = kept.index(option)
+        del kept[at : at + 2]
+    return kept
+
+
+def _verdict_count(out: Path) -> int:
+    """Assertions that reached a verdict, as opposed to not_applicable or not_assessed."""
+    assertions = json.loads((out / "assertions.json").read_text(encoding="utf-8"))
+    return sum(
+        1
+        for a in assertions
+        if a["outcome"] in ("conformant", "non-conformant", "insufficient_evidence")
+    )
