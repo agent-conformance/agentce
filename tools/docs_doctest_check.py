@@ -57,6 +57,10 @@ SHELL_LIKE = RUNNABLE | {
     "zsh",
     "shell-session",
     "sh-session",
+    "bash-session",
+    "console-session",
+    "shellscript",
+    "shellsession",
     "terminal",
     "powershell",
     "pwsh",
@@ -66,6 +70,10 @@ SHELL_LIKE = RUNNABLE | {
 NEUTRAL = {"", "text", "txt", "plaintext"}
 COMMAND_STARTS = (
     "$ ",
+    "cd ",
+    "export ",
+    "curl ",
+    "brew ",
     "agentce ",
     "uv ",
     "uvx ",
@@ -171,14 +179,17 @@ def _sandbox(repo: Path) -> str:
 def run_block(block: Block, repo: Path) -> tuple[int, str]:
     env = dict(os.environ)
     env.pop("VIRTUAL_ENV", None)
-    proc = subprocess.run(
-        ["bash", "-c", "set -e\n" + block.script],
-        cwd=_sandbox(repo),
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=BLOCK_TIMEOUT_S,
-    )
+    try:
+        proc = subprocess.run(
+            ["bash", "-c", "set -e\n" + block.script],
+            cwd=_sandbox(repo),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=BLOCK_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return 124, f"timed out after {BLOCK_TIMEOUT_S}s"
     return proc.returncode, (proc.stderr or proc.stdout)[-500:]
 
 
