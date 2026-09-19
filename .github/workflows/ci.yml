@@ -117,3 +117,58 @@ jobs:
             fi
           done
           node engines/typescript/bin/agentce.js --version
+
+  python-install-matrix:
+    # Proves the one documented command works off the maintainer's own architecture. The pinned,
+    # advisory-clean cryptography publishes prebuilt wheels for Linux and Apple-silicon macOS but none
+    # for Intel macOS, where the install compiles it from source; each leg installs the engine from
+    # the frozen lockfile, checks `agentce doctor` reports the wheel provenance the docs state for
+    # that platform, and runs the quickstart to a report.
+    name: python-install-matrix (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            wheel: prebuilt
+          - os: macos-latest
+            wheel: prebuilt
+          - os: macos-15-intel
+            wheel: source-build
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Provide OpenSSL 3 for the source build (Intel macOS)
+        if: matrix.wheel == 'source-build'
+        run: |
+          brew list openssl@3 >/dev/null 2>&1 || brew install openssl@3
+          echo "OPENSSL_DIR=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
+      - name: Sync the engine (frozen lockfile)
+        working-directory: engines/python
+        run: uv sync --frozen
+      - name: Doctor reports the toolchain the docs describe
+        env:
+          EXPECTED_WHEEL: ${{ matrix.wheel }}
+        run: |
+          set -euo pipefail
+          uv run --project engines/python --frozen agentce doctor --project corpus/quickstart --json > "$RUNNER_TEMP/doctor.json"
+          python3 - "$RUNNER_TEMP/doctor.json" <<'PY'
+          import json, os, sys
+          doc = json.load(open(sys.argv[1]))
+          env = doc["environment"]
+          got = env["cryptography"]["wheel_source"]
+          print(f"python {env['python']['version']} on {env['platform']['system']} {env['platform']['machine']}; "
+                f"cryptography {env['cryptography']['version']} ({got}), {env['cryptography']['openssl']}")
+          assert doc["healthy"], doc["problems"]
+          assert got == os.environ["EXPECTED_WHEEL"], f"expected a {os.environ['EXPECTED_WHEEL']} cryptography, got {got}"
+          PY
+      - name: Quickstart to a report
+        run: |
+          set -euo pipefail
+          uv run --project engines/python --frozen agentce quickstart --out "$RUNNER_TEMP/report"
+          test -s "$RUNNER_TEMP/report/assertions.json"

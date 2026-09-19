@@ -110,3 +110,21 @@ claims:
       description: >-
         Runs agentce quickstart inside an isolated network namespace (unshare -n) after asserting the
         namespace cannot open a socket off the host, proving the offline invariant by behaviour.
+  - id: firstrun.platforms
+    text: >-
+      The reference engine installs from its frozen lockfile and runs the quickstart to a report on
+      Linux (x86_64), Apple-silicon macOS, and Intel macOS. Linux and Apple-silicon macOS use a
+      prebuilt cryptography wheel; Intel macOS has none and compiles cryptography from source, which
+      needs Rust and OpenSSL 3. Getting Started states the prerequisites, and `agentce doctor`
+      reports the Python version and whether cryptography came from a prebuilt wheel or a source
+      build.
+    status: built
+    pages:
+      - website/src/content/docs/docs/getting-started.md
+    check:
+      workflow: .github/workflows/ci.yml
+      job: python-install-matrix
+      description: >-
+        On every pull request, installs the engine from the frozen lockfile on ubuntu-latest,
+        macos-latest (arm64), and macos-15-intel, asserts `agentce doctor` reports the wheel
+        provenance the docs state for that platform, and runs the quickstart to a report.
