@@ -1,6 +1,6 @@
 # Per-package quality gate: lint, type-check, test, and coverage for every engine, on every push and
 # pull request. This is the gate AGENTS.md promises; it enforces the invariant by running the real
-# commands, not by building placeholder packages. Every action is pinned by commit SHA.
+# lint, type, and test commands on every change. Every action is pinned by commit SHA.
 name: tests
 
 on:
