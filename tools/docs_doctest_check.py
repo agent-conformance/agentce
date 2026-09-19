@@ -3,17 +3,20 @@
 
 A command printed on the documentation site is a promise that a reader can paste it and get the result
 the page describes. This tool keeps that promise by executing the command: it walks every Markdown page
-under ``website/src/content/docs/docs``, extracts each fenced ``bash``, ``sh``, or ``console`` block, and
-runs it for real, each block from its own fresh scratch directory. The scratch directory links to the
-repository's ``engines/``, ``corpus/``, and ``spec/`` trees so that a relative ``--project
-engines/python`` or ``corpus/quickstart/...`` path resolves exactly as it does in a reader's checkout,
-and nothing is ever written into the working tree. A block that exits non-zero fails the run.
+(``.md`` and ``.mdx``) under ``website/src/content/docs/docs``, extracts each fenced ``bash``, ``sh``, or
+``console`` block, and runs it for real, each block from its own fresh scratch directory. The scratch
+directory links to the repository's ``engines/``, ``corpus/``, and ``spec/`` trees so that a relative
+``--project engines/python`` or ``corpus/quickstart/...`` path resolves exactly as it does in a reader's
+checkout. The documented commands write only into the scratch directory; the one side effect on the tree
+is the engine's own gitignored virtual environment that ``uv run`` creates. A block that exits non-zero
+fails the run.
 
 A block that genuinely cannot run in a harness (it needs an operator's own agent, a production key, a live
 service) opts out through the one documented marker: ``no-run`` after the language on the opening fence,
 followed by the reason it cannot run. The opt-out is counted and printed, never silent, and a ``no-run``
 with no reason fails the run. A shell-looking fence the tool cannot classify (``bash title="x"``, ``zsh``)
-also fails the run instead of being skipped, so a block cannot dodge execution by an unusual info string.
+also fails the run instead of being skipped, and so does an untagged (or ``text``) fence whose lines
+start like a command, so a block cannot dodge execution by an unusual or missing language tag.
 The run also fails if fewer than ``MIN_BLOCKS`` blocks ran, so deleting a broken example cannot turn the
 check green.
 
@@ -59,6 +62,25 @@ SHELL_LIKE = RUNNABLE | {
     "pwsh",
     "cmd",
 }
+# Fences that carry no language: prose output, unless a line starts like a command a reader would paste.
+NEUTRAL = {"", "text", "txt", "plaintext"}
+COMMAND_STARTS = (
+    "$ ",
+    "agentce ",
+    "uv ",
+    "uvx ",
+    "pipx ",
+    "pip ",
+    "pnpm ",
+    "npm ",
+    "npx ",
+    "docker ",
+    "java ",
+    "gradle ",
+    "./gradlew ",
+    "python ",
+    "python3 ",
+)
 FENCE_OPEN = re.compile(r"^(?P<indent>[ \t]*)(?P<fence>`{3,}|~{3,})\s*(?P<info>[^`]*)$")
 
 
@@ -99,6 +121,12 @@ def extract(page: str, text: str) -> list[Block]:
             i += 1
         i += 1
         lang = info[0].lower() if info else ""
+        if lang in NEUTRAL:
+            found = [ln for ln in body if ln.lstrip().startswith(COMMAND_STARTS)]
+            if found:
+                msg = f"a {lang or 'untagged'} fence shows a command ({found[0].strip()[:60]!r}); tag it bash so it is run, or `bash no-run <reason>`"
+                blocks.append(Block(page, opened_at, lang, "", None, msg))
+            continue
         if lang not in SHELL_LIKE:
             continue
         rest = info[1:]
@@ -158,7 +186,7 @@ def check(pages_dir: Path, repo: Path, min_blocks: int = MIN_BLOCKS) -> int:
     """Run every block under ``pages_dir``; return 0 iff all ran clean and enough of them ran."""
     ran = skipped = 0
     failures: list[str] = []
-    for page in sorted(pages_dir.rglob("*.md")):
+    for page in sorted([*pages_dir.rglob("*.md"), *pages_dir.rglob("*.mdx")]):
         rel = str(page.relative_to(repo)) if page.is_relative_to(repo) else str(page)
         for block in extract(rel, page.read_text(encoding="utf-8")):
             where = f"{block.page}:{block.line}"
@@ -261,6 +289,27 @@ _CASES: list[tuple[str, str, int, str, int]] = [
         0,
     ),
     (
+        "untagged-command-fence-fails",
+        f"{_FIX}\nuv run --project engines/python agentce assess\n{_FIX}\n",
+        1,
+        "shows a command",
+        0,
+    ),
+    (
+        "untagged-output-fence-is-ignored",
+        f"{_FIX}\n25 conformant, 19 insufficient evidence\n{_FIX}\n{_FIX}bash\ntrue\n{_FIX}\n",
+        0,
+        "ran 1",
+        1,
+    ),
+    (
+        "mdx-page-is-scanned",
+        f"{_FIX}bash\nfalse\n{_FIX}\n",
+        1,
+        "exit 1",
+        1,
+    ),
+    (
         "removed-block-fails-the-floor",
         f"{_FIX}bash\ntrue\n{_FIX}\n",
         1,
@@ -284,7 +333,8 @@ def self_test() -> int:
         for name, text, want_exit, want_text, floor in _CASES:
             pages = Path(tmp) / name
             pages.mkdir()
-            (pages / "page.md").write_text(text, encoding="utf-8")
+            page = "page.mdx" if name.startswith("mdx-") else "page.md"
+            (pages / page).write_text(text, encoding="utf-8")
             got, err = _capture(pages, floor)
             good = got == want_exit and want_text in err
             print(f"self-test {name}: {'ok' if good else 'FAIL'}")
