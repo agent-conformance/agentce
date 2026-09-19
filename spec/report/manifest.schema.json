@@ -48,7 +48,7 @@
       "required": ["started_at", "operator", "invocation"],
       "properties": {
         "started_at": {"type": "string", "format": "date-time"},
-        "operator": {"type": "string", "description": "Invoking OS user or CI identity (SPEC 8.4)."},
+        "operator": {"type": "string", "description": "A string the deployer controls (SPEC 8.4); defaults to \"unset\", never the invoking OS user."},
         "host_fingerprint": {"$ref": "#/$defs/digest"},
         "invocation": {"type": "array", "items": {"type": "string"}, "description": "Command and arguments, paths only, never content."},
         "report_language": {"type": "string", "description": "Message-key catalogue used for rendering (SPEC 9.3); no effect on assertions.json."}
