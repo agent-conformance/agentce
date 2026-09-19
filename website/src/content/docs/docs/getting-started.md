@@ -13,6 +13,27 @@ This is pre-general-availability documentation. The commands below are stable; s
 specification and reference material that ship alongside the engine.
 :::
 
+## Prerequisites
+
+You need two things on your machine before the first command:
+
+- **Python 3.12.** `uv` installs and manages it for you, so you do not need a system Python.
+- **`uv`**, the Python package and environment manager. Install uv once with
+  `curl -LsSf https://astral.sh/uv/install.sh | sh`, or follow the instructions at
+  [astral.sh/uv](https://docs.astral.sh/uv/getting-started/installation/).
+
+The engine signs and verifies with Ed25519 through the `cryptography` package, pinned to a release
+with no known advisories. That package ships prebuilt wheels for Linux and for Apple-silicon macOS, so
+the command below installs with nothing else on those platforms. Intel macOS has no prebuilt wheel:
+the first install compiles `cryptography` from source and needs [Rust](https://rustup.rs) and OpenSSL 3
+(`brew install openssl@3`, then `export OPENSSL_DIR="$(brew --prefix openssl@3)"`). Every pull request
+installs the engine and runs the quickstart on Linux, Apple-silicon macOS, and Intel macOS. Windows is
+not part of that matrix.
+
+After installing, `uv run --project engines/python agentce doctor --project corpus/quickstart` reports
+the Python version and whether `cryptography` came from a prebuilt wheel or a source build, and names
+the exact fix if something is missing.
+
 ## Run the bundled example
 
 The fastest way to see a full assessment is the quickstart, which runs the vendored
