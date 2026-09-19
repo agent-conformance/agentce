@@ -6,6 +6,8 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 
 | Key | Cause | Fix |
 |---|---|---|
+| `environment.cryptography_unavailable` | the cryptography package the engine signs and verifies with is missing or does not import. | install the engine's dependencies with `uv sync`; where no prebuilt wheel exists, install Rust and OpenSSL 3 first. |
+| `environment.python_unsupported` | the running Python is older than the interpreter the engine supports. | run the engine under Python 3.12 or newer (`uv python install 3.12`). |
 | `input.bundle_manifest_mismatch` | a stream file's digest does not match the manifest. | regenerate the manifest after any change to the stream files. |
 | `input.bundle_manifest_missing` | the evidence bundle has no manifest.json. | add a manifest.json listing every stream file with its sha256. |
 | `input.catalog_missing` | assess was given no catalog to evaluate and the profile declares none. | pass --catalog <id@version>, or list the catalogs to apply under `catalogs:` in the profile. |
@@ -19,6 +21,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 
 | Key | Cause | Fix |
 |---|---|---|
+| `environment.cryptography_source_build` | cryptography was built from source because no prebuilt wheel is published for this platform. | install Rust and OpenSSL 3 before `uv sync` (macOS: `brew install openssl@3`, then set OPENSSL_DIR to its prefix). |
 | `warning.pilot_window` | the observation window is shorter than 90 days and is recorded as a pilot. | extend the window to at least 90 days for a full assessment. |
 | `warning.stale_component` | a declared component digest differs from the one observed in the window (STALE). | update the profile's declared component digests and re-run. |
 

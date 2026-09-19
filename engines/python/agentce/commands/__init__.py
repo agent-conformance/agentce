@@ -35,6 +35,7 @@ from ..coverage import compute_coverage
 from ..coverage_matrix import MATRIX_FILE, check_matrix, write_matrix
 from ..error_catalogue import MESSAGE_KEYS, render_errors_md
 from ..domain import DomainBinding
+from ..environment import inspect_environment
 from ..errors import AgentceError, InputError
 from ..exit_codes import ExitCode
 from ..graph import build_graph
@@ -1063,8 +1064,8 @@ def _declaration_path(project: Path, name: str) -> Path:
 
 
 def cmd_doctor(ns: argparse.Namespace) -> CommandResult:
-    """Diagnose a project's declarations, sources, and bundle, naming the exact fix for each problem
-    (SPEC §13.4 AX-5). With ``--write-errors`` it regenerates the message-key catalogue instead."""
+    """Diagnose the interpreter, toolchain, and a project's declarations, sources, and bundle, naming
+    the exact fix for each problem (SPEC §13.4 AX-5). With ``--write-errors`` it regenerates the message-key catalogue instead."""
     result = CommandResult(command="doctor")
     write_errors = _opt_str(ns, "write_errors")
     if write_errors:
@@ -1081,7 +1082,7 @@ def cmd_doctor(ns: argparse.Namespace) -> CommandResult:
         what="the project directory",
         fix="pass --project <dir> (a project from agentce quickstart or agentce init).",
     )
-    problems: list[dict[str, str]] = []
+    environment, problems = inspect_environment()
     declared_sources: set[str] = set()
 
     profile_path = _declaration_path(project, PROFILE_FILE)
@@ -1149,9 +1150,12 @@ def cmd_doctor(ns: argparse.Namespace) -> CommandResult:
             "project": str(project),
             "doctor": "ok" if not problems else "problems",
             "healthy": not problems,
+            "environment": environment,
             "problems": sorted(problems, key=lambda p: (p["key"], p["problem"])),
         }
     )
+    for advice in environment["notes"]:
+        result.note(f"[{advice['key']}] {advice['note']} -> {advice['fix']}")
     if problems:
         result.add_code(int(ExitCode.FINDINGS))
         result.note(f"{project}: {len(problems)} problem(s)")
