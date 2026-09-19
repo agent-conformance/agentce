@@ -22,8 +22,9 @@ catalog. The base catalog maps to the EU AI Act; overlays add domain and framewo
 control is executable: it names the evidence it needs and the shape that evidence must take.
 
 **Verdicts.** For every control and subject, the engine emits one verdict — conformant,
-non-conformant, or insufficient evidence — and cites the evidence behind it. "Insufficient evidence"
-is a first-class result: the engine reports what it cannot verify rather than guessing.
+non-conformant, partial, not applicable, not assessed, or insufficient evidence — and cites the
+evidence behind it. "Insufficient evidence" is a first-class result: the engine reports what it
+cannot verify rather than guessing.
 
 ## Why it is deterministic and model-free
 

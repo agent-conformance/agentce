@@ -64,6 +64,38 @@ claims:
         The tests workflow runs ruff, mypy, and pytest (with a coverage floor) for the Python
         engine, biome/tsc/tests for the TypeScript engine, and gradlew check with a JaCoCo floor for
         the Java engine, on every push and pull request.
+  - id: verifiable.signed-artifacts
+    text: >-
+      Implementation reports and catalogs are signed and content-addressed. `agentce verify
+      --catalog` and `agentce verify --release` check a signature offline and report the signer and
+      trust status; `agentce sign <report-dir> --as claimant|assessor` produces a signed claim for an
+      implementation report under a chosen signing profile, refusing to sign a report that is not
+      ready to publish.
+    status: built
+    pages:
+      - website/src/pages/index.astro
+      - website/src/content/docs/docs/running-assessments.md
+    check:
+      workflow: .github/workflows/tests.yml
+      job: python
+      description: >-
+        engines/python/tests/test_verify_targets.py exercises `verify --catalog`/`--release`
+        (signer identity, trust, tamper and wrong-key rejection); test_cli.py::test_sign_ok and
+        test_signing.py exercise the `sign` CLI path and its DSSE/KMS/keyless signing profiles.
+  - id: cli.inspect-verify
+    text: >-
+      `agentce config show --json` prints every option, its resolved value, and where that value
+      came from; `agentce doctor` reports configuration problems with the exact fix for each.
+    status: built
+    pages:
+      - website/src/content/docs/docs/running-assessments.md
+    check:
+      workflow: .github/workflows/tests.yml
+      job: python
+      description: >-
+        engines/python/tests/test_doctor.py and test_cli.py exercise `agentce doctor` and
+        `agentce config show` against real configuration states, including the failure cases doctor
+        is meant to catch.
   - id: ci.offline-none
     text: >-
       An assessment runs with networking disabled. A dedicated job runs a real assessment inside a
