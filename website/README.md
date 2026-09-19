@@ -33,5 +33,10 @@ pnpm --filter @agent-conformance/website preview  # preview the built site
 
 From inside `website/`, the same scripts run as `pnpm build`, `pnpm dev`, and `pnpm preview`.
 
+The landing-page terminal is generated from a real `agentce quickstart` run, never typed. After a change
+to the engine, the corpus, or the report that alters that run, regenerate it with
+`node scripts/quickstart-hero.mjs --write`; the `website` workflow runs `pnpm check:hero` (which needs
+`uv`) and fails when the committed terminal no longer equals a fresh run.
+
 Deployment is a static upload of `website/dist/`; a human performs the deploy and DNS, so the site is
 built and configured here but never published from this repository.
