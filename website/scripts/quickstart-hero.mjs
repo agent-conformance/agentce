@@ -235,7 +235,7 @@ function selfTest() {
     ['a hero generated from the run passes', hero, run, KINDS.hero, []],
     ['a changed hero tally is drift', hero.replace('3 conformant', '4 conformant'), run, KINDS.hero, ['hero.drift']],
     ['a run that changed under the hero is drift', hero, changed, KINDS.hero, ['hero.drift']],
-    ['a hand-written all-pass hero claim is refused', hero.replace('</figure>', '<p>every control conformant</p></figure>'), run, KINDS.hero, ['hero.forbidden_claim', 'hero.blanket_claim']],
+    ['a hand-written all-pass claim is refused', hero.replace('</figure>', '<p>every control conformant</p></figure>'), run, KINDS.hero, ['hero.forbidden_claim', 'hero.blanket_claim']],
     ['a hero without markers is refused', '<figure></figure>', run, KINDS.hero, ['hero.markers_missing']],
     ['a Markdown block generated from the run passes', md, run, KINDS.tally, []],
     ['a changed Markdown tally is drift', md.replace('3 conformant', '4 conformant'), run, KINDS.tally, ['tally.drift']],
