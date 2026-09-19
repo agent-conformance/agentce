@@ -107,12 +107,27 @@ MESSAGE_KEYS: dict[str, Entry] = {
         "the applicability profile was not supplied.",
         "pass --profile agentce/applicability.yaml (start from agentce init).",
     ),
+    "environment.cryptography_unavailable": Entry(
+        "error",
+        "the cryptography package the engine signs and verifies with is missing or does not import.",
+        "install the engine's dependencies with `uv sync`; where no prebuilt wheel exists, install Rust and OpenSSL 3 first.",
+    ),
+    "environment.python_unsupported": Entry(
+        "error",
+        "the running Python is older than the interpreter the engine supports.",
+        "run the engine under Python 3.12 or newer (`uv python install 3.12`).",
+    ),
     "internal.unexpected": Entry(
         "error",
         "an unexpected internal error occurred.",
         "re-run with --debug to see the stack trace, then file an issue.",
     ),
     # Warnings.
+    "environment.cryptography_source_build": Entry(
+        "warning",
+        "cryptography was built from source because no prebuilt wheel is published for this platform.",
+        "install Rust and OpenSSL 3 before `uv sync` (macOS: `brew install openssl@3`, then set OPENSSL_DIR to its prefix).",
+    ),
     "warning.pilot_window": Entry(
         "warning",
         "the observation window is shorter than 90 days and is recorded as a pilot.",
