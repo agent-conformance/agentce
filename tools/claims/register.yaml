@@ -163,3 +163,23 @@ claims:
         what that run generates and none claims every control is conformant while the run is not; a
         self-test proves the check rejects a changed tally, a stale run, missing markers, and a softened
         blanket claim, and passes an honest partial tally.
+  - id: docs.commands_runnable
+    text: >-
+      Every shell command shown on the documentation site's pages runs against the real command-line
+      tool and exits 0 when pasted from a checkout, and the terms bundle, profile, and layout are each
+      defined once on the Concepts page. A command that stops working fails the build.
+    status: built
+    pages:
+      - website/src/content/docs/docs/running-assessments.md
+      - website/src/content/docs/docs/ci-integration.md
+      - website/src/content/docs/docs/getting-started.md
+      - website/src/content/docs/docs/concepts.md
+    check:
+      workflow: .github/workflows/website.yml
+      job: docs-doctest
+      description: >-
+        Executes every fenced bash, sh, or console block on the docs site from a fresh scratch directory
+        against the real CLI on every pull request and fails on any non-zero exit, on a block that was
+        removed instead of fixed, and on an opt-out with no reason; a self-test proves the checker
+        rejects each of those and the once-documented assess command that named a bundle that does not
+        exist.
