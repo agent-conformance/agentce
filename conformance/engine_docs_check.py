@@ -40,6 +40,8 @@ PRESCRIBED = re.compile(r"\bagentce(?:\.js)?[ \t]+([a-z][a-z-]*)")
 # that split a shell line into words (continuations, quotes, ``--args=...`` assignments, operators).
 FENCE_LINE = re.compile(r"^[ \t]*(?P<marker>`{3,}|~{3,})(?P<rest>.*)$")
 INDENTED_CODE = re.compile(r"^(?: {4}|\t)")
+# Blockquote markers in front of a line (a fenced block inside a quoted note).
+QUOTE_PREFIX = re.compile(r"^(?:[ \t]*>)+ ?")
 # An inline code span with more than one word: an instruction such as `npx @scope/cli assess`.
 INLINE_SPAN = re.compile(r"`([^`\n]*\s[^`\n]*)`")
 WORD_SPLIT = re.compile(r"""[\s\\"'`=;&|()<>]+""")
@@ -94,7 +96,8 @@ def code_text(doc: str) -> str:
     a broken fence fails closed instead of hiding what follows it."""
     lines: list[str] = []
     fence: tuple[str, int] | None = None
-    for line in doc.splitlines():
+    for raw in doc.splitlines():
+        line = QUOTE_PREFIX.sub("", raw)
         m = FENCE_LINE.match(line)
         if fence is not None:
             closes = (
@@ -121,8 +124,9 @@ def prescribed_commands(doc: str, known: frozenset[str]) -> list[str]:
 
     A word counts when it appears in code a reader would run (see ``code_text``) or directly after
     ``agentce``; a command name written any other way in prose (a list of planned commands, say) is a
-    mention, not an instruction. A verb assembled at run time, such as from a shell variable, is not
-    visible as a word: the check guards documentation drift, not a page written to evade it.
+    mention, not an instruction. A verb assembled at run time, such as from a shell variable, and a
+    command inside a raw HTML ``<pre>`` block are not seen: the check guards documentation drift on
+    plain Markdown pages, not a page written to evade it.
     """
     words = {m.group(1) for m in PRESCRIBED.finditer(doc)}
     words.update(WORD_SPLIT.split(code_text(doc)))

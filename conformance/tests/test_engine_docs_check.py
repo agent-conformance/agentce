@@ -90,6 +90,7 @@ def test_a_command_in_a_code_block_is_found_however_it_is_written(block: str) ->
         '- step\n\n  ~~~sh\n  ./gradlew run --args="assess --bundle b"\n  ~~~\n',
         "Then run `npx @agent-conformance/cli assess` on the bundle.\n",
         "````md\n```bash\nnpx @agent-conformance/cli assess\n```\n````\n",
+        "> Note:\n>\n> ```bash\n> npx @agent-conformance/cli assess\n> ```\n",
         "```bash\nnpx @agent-conformance/cli assess\n",
     ],
 )
