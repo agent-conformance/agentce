@@ -27,7 +27,7 @@ from .. import ENGINE_NAME, SPEC_VERSION, __version__, no_ml, readiness
 from ..applicability import resolve as resolve_applicability
 from ..assess import assess_subjects, evaluated_nothing
 from ..bundle import load_bundle
-from ..catalog import lint_catalog, load_catalog
+from ..catalog import Catalog, lint_catalog, load_catalog
 from ..collect import EnvSecretManager, load_config, run_collect
 from ..config import resolve as resolve_config
 from ..conformance import run_ecs
@@ -338,17 +338,17 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         _opt_str(ns, "profile"), key="profile", what="the applicability profile"
     )
     catalog = _opt_str(ns, "catalog")
-    if not catalog:
-        raise InputError(
-            "input.catalog_missing",
-            "at least one catalog id@version is required.",
-            "pass --catalog <id@ver>[,<id@ver>...].",
-        )
     out = _opt_str(ns, "out")
     if not out:
         raise InputError(
             "input.out_missing", "an output directory is required.", "pass --out <dir>."
         )
+    # Resolve the catalogs before any output is written: a run that cannot name what it evaluates
+    # against must leave nothing behind that looks like a result.
+    profile_obj = Profile.load(profile)
+    catalogs, catalog_labels = _resolve_catalogs(
+        catalog, profile_obj, list(getattr(ns, "catalog_dir", None) or [])
+    )
     # Stage 1: ingest and validate. A missing/mismatching manifest aborts with exit 3.
     loaded = load_bundle(bundle)
     ingested = ingest(loaded)
@@ -373,7 +373,6 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     graph_triples = graph_store.triple_count()
     graph_store.close()
     # Stage 4: coverage and reconciliation against independent denominators.
-    profile_obj = Profile.load(profile)
     coverage = compute_coverage(ingested.accepted, profile_obj, loaded.root)
     (out_dir / "coverage.json").write_text(
         json.dumps(coverage, sort_keys=True, indent=2), encoding="utf-8"
@@ -382,13 +381,8 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     statements = resolve_applicability(profile_obj, ingested.accepted)
     _write_jsonl(statements, out_dir / "applicability.jsonl")
     drift_findings = sum(len(s["drift"]) for s in statements)
-    # Stage 6: catalog evaluation and report artifacts. Each --catalog-dir catalog is evaluated
+    # Stage 6: catalog evaluation and report artifacts. Each resolved catalog is evaluated
     # against every subject to produce assertions; the report artifacts are rendered from them.
-    catalog_dirs = [d for d in (getattr(ns, "catalog_dir", None) or [])]
-    catalogs = [
-        load_catalog(_require_dir(d, key="catalog-dir", what="the catalog directory"))
-        for d in catalog_dirs
-    ]
     evaluated = assess_subjects(ingested.accepted, profile_obj, catalogs, domain)
     # Stage 6a: incremental state (SPEC §5.4 B7, HR-10). With --state the engine detects a changed
     # bundle (late-arriving evidence lands here), supersedes the prior report, and counts late events.
@@ -408,7 +402,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         out_dir,
         evaluated,
         bundle_digest=loaded.digest,
-        catalogs=catalog.split(","),
+        catalogs=catalog_labels,
         operator=_operator(),
         invocation=["assess", _scrub_path(bundle), _scrub_path(profile)],
         supersedes=supersedes,
@@ -422,7 +416,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "bundle": str(bundle),
             "bundle_digest": loaded.digest,
             "profile": str(profile),
-            "catalogs": catalog.split(","),
+            "catalogs": catalog_labels,
             "out": out,
             "accepted": len(ingested.accepted),
             "quarantined": len(ingested.quarantined),
@@ -438,18 +432,74 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         result.data["late_events"] = late_events
     if non_conformant:
         result.add_code(int(ExitCode.FINDINGS))
-    if not catalogs:
-        return _pending(
-            result,
-            "Ingest through report complete; pass --catalog-dir to evaluate controls "
-            "and populate assertions.",
-        )
     if evaluated_nothing(evaluated):
         raise _nothing_evaluated(profile_obj, ingested.accepted, len(evaluated))
     result.note(
         f"assessed {len(evaluated)} (control, subject) pairs; {non_conformant} non-conformant"
     )
     return result
+
+
+def _vendored_catalogs() -> dict[str, Path]:
+    """Every catalog vendored in the repository (base and sector overlays), keyed ``id@version``."""
+    root = _repo_root() / "spec" / "catalogs"
+    found: dict[str, Path] = {}
+    for catalog_yaml in sorted(root.glob("*/*/catalog.yaml")):
+        if catalog_yaml.parent.parent.name not in ("base", "overlays"):
+            continue
+        try:
+            meta = yaml.safe_load(catalog_yaml.read_text(encoding="utf-8")) or {}
+            found[f"{meta['id']}@{meta['version']}"] = catalog_yaml.parent
+        except (OSError, yaml.YAMLError, KeyError, TypeError):
+            continue
+    return found
+
+
+def _resolve_catalogs(
+    requested: str | None, profile: Profile, catalog_dirs: list[str]
+) -> tuple[list[Catalog], list[str]]:
+    """The catalogs an assessment evaluates, and their ``id@version`` labels.
+
+    Each ``--catalog-dir`` is loaded as given (the explicit override). Each requested id — the
+    ``--catalog`` list, else the profile's declared ``catalogs`` when no directory was passed — must
+    resolve to a directory that was passed or to a vendored catalog. An id that resolves to nothing,
+    or a request that names no catalog at all, is an input error: an assessment must not proceed
+    to judge nothing."""
+    loaded = [
+        load_catalog(_require_dir(d, key="catalog-dir", what="the catalog directory"))
+        for d in catalog_dirs
+    ]
+    by_label = {f"{c.id}@{c.version}": c for c in loaded}
+    if requested:
+        ids = [i.strip() for i in requested.split(",") if i.strip()]
+    elif catalog_dirs:
+        ids = []
+    else:
+        ids = list(profile.catalogs)
+    if not ids and not loaded:
+        raise InputError(
+            "input.catalog_missing",
+            "no catalog to evaluate: --catalog and --catalog-dir were not passed and the profile "
+            "declares no catalogs.",
+            "pass --catalog <id@version>, or list the catalogs to apply under `catalogs:` in the "
+            "profile.",
+        )
+    unresolved = [i for i in dict.fromkeys(ids) if i not in by_label]
+    if unresolved:
+        vendored = _vendored_catalogs()
+        for label in [u for u in unresolved if u in vendored]:
+            by_label[label] = load_catalog(vendored[label])
+        unresolved = [u for u in unresolved if u not in vendored]
+    if unresolved:
+        available = sorted(set(by_label) | set(_vendored_catalogs()))
+        raise InputError(
+            "input.catalog_unresolved",
+            f"no catalog directory resolves {', '.join(repr(u) for u in unresolved)} "
+            f"(available: {', '.join(available) or 'none'}).",
+            "use an available <id>@<version>, or pass --catalog-dir <dir> for a catalog on disk.",
+        )
+    labels = list(dict.fromkeys([*ids, *(f"{c.id}@{c.version}" for c in loaded)]))
+    return [by_label[label] for label in labels], labels
 
 
 def _nothing_evaluated(

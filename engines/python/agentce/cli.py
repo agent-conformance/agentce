@@ -85,7 +85,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("assess", parents=[common], help="run a full assessment")
     p.add_argument("--bundle", help="the evidence bundle directory")
     p.add_argument(
-        "--catalog", help="catalog ids, comma-separated: <id@ver>[,<id@ver>...]"
+        "--catalog",
+        help="catalog ids, comma-separated: <id@ver>[,<id@ver>...] (default: the profile's catalogs)",
     )
     p.add_argument("--profile", help="the applicability profile file")
     p.add_argument("--deviations", help="the deviation register file")

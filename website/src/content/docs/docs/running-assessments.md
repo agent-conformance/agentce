@@ -29,11 +29,16 @@ because it shows what happened rather than what was intended. See
 
 ## Assess
 
-Run an assessment over a bundle of evidence and a catalog:
+Run an assessment over a bundle of evidence, the profile you declared, and its domain binding:
 
 ```bash
-uv run --project engines/python agentce assess --bundle ./bundle --out ./out
+uv run --project engines/python agentce assess --bundle ./bundle --profile ./my-assessment/agentce/applicability.yaml --domain ./my-assessment/agentce/domain.linkml.yaml --out ./out
 ```
+
+The profile's `catalogs:` list names what to assess against, and each `id@version` resolves to a catalog
+under `spec/catalogs/` in the repository checkout. Pass `--catalog <id@version>` to choose others, or
+`--catalog-dir <dir>` for a catalog on disk. A catalog that resolves to nothing stops the run with exit
+code `3` and the message key `input.catalog_unresolved` instead of writing an empty report.
 
 The run writes the assertions, the human report, and the OSCAL and SARIF renderings, alongside the
 coverage, integrity, and quarantine detail. Validate the artifacts against their schemas with

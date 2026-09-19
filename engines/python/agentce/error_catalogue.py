@@ -84,8 +84,13 @@ MESSAGE_KEYS: dict[str, Entry] = {
     ),
     "input.catalog_missing": Entry(
         "error",
-        "no catalog id was passed to assess.",
-        "pass --catalog <id@version> and --catalog-dir <dir>.",
+        "assess was given no catalog to evaluate and the profile declares none.",
+        "pass --catalog <id@version>, or list the catalogs to apply under `catalogs:` in the profile.",
+    ),
+    "input.catalog_unresolved": Entry(
+        "error",
+        "a requested catalog id@version does not resolve to any catalog directory.",
+        "use an available <id>@<version>, or pass --catalog-dir <dir> for a catalog on disk.",
     ),
     "input.catalog_not_found": Entry(
         "error",
