@@ -20,7 +20,8 @@
     "build": "astro build && node ./scripts/build-iris.mjs",
     "preview": "astro preview",
     "check": "astro check",
-    "check:iri": "node ./scripts/check-iris.mjs"
+    "check:iri": "node ./scripts/check-iris.mjs",
+    "check:hero": "node ./scripts/quickstart-hero.mjs"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.42.1",
