@@ -28,7 +28,7 @@ throughout: a change that could alter a conformance outcome is visible in a vers
 
 ## Distribution channels
 
-Which channels serve a runnable release is recorded in one file, [`release-state.json`](release-state.json):
+Which channels serve a runnable release is recorded in one file, [`website/src/data/release-state.json`](../website/src/data/release-state.json):
 PyPI, npm, Maven Central, the container registry, the Homebrew tap, and the site. Each channel is
 `published: false` until the maintainer publishes to it. A page shows the zero-install command for a
 channel only while it is published; until then it shows the command that works today from a checkout.
