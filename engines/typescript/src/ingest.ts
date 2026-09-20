@@ -11,6 +11,7 @@
 
 import { readFileSync } from "node:fs";
 import type { Bundle } from "./bundle";
+import { parseJson } from "./json";
 import { QuarantineReason, type QuarantineRecord } from "./quarantine";
 import { eventTypes, validateEvent } from "./schema";
 import { byteCompare } from "./util";
@@ -72,7 +73,7 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
       }
       let event: unknown;
       try {
-        event = JSON.parse(line);
+        event = parseJson(line);
       } catch (exc) {
         result.quarantined.push({
           reason: QuarantineReason.SCHEMA_INVALID,

@@ -11,6 +11,7 @@ import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { sha256Hex } from "./canonical";
 import { InputError } from "./errors";
+import { parseJson } from "./json";
 
 export interface Bundle {
   root: string;
@@ -63,7 +64,7 @@ export function loadBundle(bundleDir: string): Bundle {
   }
   let manifest: Record<string, unknown>;
   try {
-    const parsed = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    const parsed = parseJson(readFileSync(manifestPath, "utf-8"));
     if (!isRecord(parsed)) {
       throw new Error("manifest is not an object");
     }

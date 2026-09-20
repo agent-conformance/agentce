@@ -7,13 +7,17 @@
  * shared vectors under `spec/model/test-vectors/`). This is the TypeScript engine's own
  * implementation; it must agree with the Python reference to the byte.
  *
- * A JSON number is accepted only when it is a safe integer: `1.5`, `0.1` and `1e+30` are all refused
- * as `non_integer_number`, matching the reference (a JSON document never carries a whole-number
- * float in this profile, so the parse-time collapse of `1.0` to `1` cannot arise from real
- * evidence). No network, no learned component.
+ * A JSON number is accepted only when its token is an integer (no fraction, no exponent) of at most
+ * 2^53 - 1 in magnitude. `1.5`, `0.1`, `1e+30`, `1.0`, `1e2` and `-0.0` are refused as
+ * `non_integer_number`, and `9007199254740992` and above as `integer_out_of_range`, exactly as the
+ * reference does. `JSON.parse` folds those tokens to ordinary numbers before the canonical form can
+ * see them, so evidence is read with `parseJson` (`./json`), which keeps them refusable.
+ * No network, no learned component.
  */
 
 import { createHash } from "node:crypto";
+
+import { NonCanonicalNumber } from "./json";
 
 export class CanonicalizationError extends Error {
   readonly reason: string;
@@ -79,9 +83,13 @@ function serialise(value: unknown): string {
   if (typeof value === "boolean") {
     return value ? "true" : "false";
   }
+  if (value instanceof NonCanonicalNumber) {
+    throw new CanonicalizationError(value.reason, value.source);
+  }
   if (typeof value === "number") {
     if (!Number.isSafeInteger(value)) {
-      throw new CanonicalizationError("non_integer_number", String(value));
+      const reason = Number.isInteger(value) ? "integer_out_of_range" : "non_integer_number";
+      throw new CanonicalizationError(reason, String(value));
     }
     return String(value);
   }
