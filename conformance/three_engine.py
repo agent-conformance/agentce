@@ -1,8 +1,9 @@
 """The three-engine byte-identity gate (SPEC §11.5, P5.1).
 
 Emits ``{"identical": bool, "engines": ["python", "typescript", "java"], "projects": N, …}`` for the
-phase-5 eval's P5.1 check: all three engines claim ``full`` and every project's ``assertions.json`` is
-identical across engines over the full corpus. It is a thin front for :mod:`ecs`; run it as::
+phase-5 eval's P5.1 check: all three engines claim ``full`` and every project's canonical set
+(``assertions.json``, ``oscal-ar.json``, ``results.sarif``, and every ``packs/*/pack.json``) is identical
+across engines over the full corpus. It is a thin front for :mod:`ecs`; run it as::
 
     cd conformance && uv run python three_engine.py --json
 """
@@ -42,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
         "projects_identical": result["projects_identical"],
         "claims": result["claims"],
         "different": result["different"],
+        "divergences": result["divergences"],
     }
     if args.json:
         print(json.dumps(out, sort_keys=True))
