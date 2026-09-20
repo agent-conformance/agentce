@@ -52,9 +52,11 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Doc-test checker self-test (good and bad page fixtures)
+        run: python3 tools/docs_doctest_check.py --self-test
+      - name: The check is importable as a module of the tools package
         run: uv run --project tools --frozen python -m docs_doctest_check --self-test
       - name: Every shell command on the docs site runs against the real CLI
-        run: uv run --project tools --frozen python -m docs_doctest_check
+        run: python3 tools/docs_doctest_check.py
 
   a11y:
     runs-on: ubuntu-latest
