@@ -51,6 +51,31 @@ class ReportTest {
         assertEquals(Canonical.canonicalString(golden.get("assertions")), Canonical.canonicalString(myAssertions));
     }
 
+    /** Every verdict state, the gap cap, and a control assessed for two subjects render like the reference. */
+    @Test
+    void verdictCasesMatchReference() throws IOException {
+        JsonNode golden = Json.parseFile(TestPaths.testData().resolve("report-golden.json"));
+        assertEquals(3, golden.get("verdict_cases").size());
+        for (JsonNode verdictCase : golden.get("verdict_cases")) {
+            List<Assertions.Assertion> assertions = new java.util.ArrayList<>();
+            for (JsonNode row : verdictCase.get("assertions")) {
+                Assertions.Assertion a = new Assertions.Assertion();
+                a.control = row.get(0).textValue();
+                a.controlVersion = "2026.09";
+                a.subject = row.get(1).textValue();
+                a.outcome = row.get(2).textValue();
+                a.rung = 2;
+                a.mode = "automated";
+                a.window = new String[] {"2026-01-01T00:00:00Z", "2026-04-01T00:00:00Z"};
+                a.population = new int[] {1, a.outcome.equals("non-conformant") ? 1 : 0};
+                assertions.add(a);
+            }
+            Map<String, Integer> counts = Assertions.aggregate(assertions);
+            assertEquals(verdictCase.get("md").textValue(), Report.renderReportMd(assertions, counts, "en"));
+            assertEquals(verdictCase.get("html").textValue(), Report.renderReportHtml(assertions, counts, "en"));
+        }
+    }
+
     @Test
     void writeReportEmitsEveryArtifactAndAManifest(@TempDir Path outDir) throws IOException {
         List<Assertions.Assertion> assertions = ovsFailedAssertions();
