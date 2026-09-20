@@ -15,7 +15,11 @@ CONSEQUENTIAL = "dom:CreditDecision"
 
 
 def emit_framework_session(em: Any, *, style: str) -> None:
-    """A single credit decision as an OTel-instrumented framework agent would emit it."""
+    """A single credit decision as an OTel-instrumented framework agent would emit it.
+
+    Every event is an explicit ``emit_*`` call: no agent framework runs here, and nothing is captured
+    automatically from one (that is on the roadmap, not built).
+    """
     em.emit_session_start(environment="production", session_id=f"{style}-1")
     em.emit_model_call(
         operation="chat",
