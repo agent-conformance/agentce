@@ -1,30 +1,20 @@
 # Docker build context for `docker build -f engines/python/Dockerfile .` (context = repository root).
-# Keep private, dev, and build material out of the context so it can never reach the daemon or an image.
-SPECS
-**/SPECS
-.git
-**/.git
-.github
-node_modules
-**/node_modules
-dist
-**/dist
-build
-**/build
-tests
+# Deny by default: only the Python engine's sources enter the context, so nothing else in the tree
+# (private or dev material, other engines, tests, caches, the git history) can reach the daemon or an
+# image, including paths added later. Order matters: the last matching rule wins.
+*
+!engines
+engines/*
+!engines/python
 **/tests
-.venv
+**/dist
+**/build
 **/.venv
+**/node_modules
 **/__pycache__
-**/*.pyc
-.mypy_cache
 **/.mypy_cache
-.ruff_cache
 **/.ruff_cache
-.pytest_cache
 **/.pytest_cache
-.hypothesis
-.claude
-CLAUDE.md
-.DS_Store
+**/.hypothesis
+**/.git
 **/.DS_Store

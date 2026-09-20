@@ -22,10 +22,12 @@ COPY --from=builder /dist/*.whl /tmp/wheel/
 RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements.txt \
  && pip install --no-cache-dir --no-deps /tmp/wheel/*.whl \
  && rm -rf /tmp/requirements.txt /tmp/wheel \
- && useradd --create-home --uid 10001 agentce
+ && useradd --no-create-home --uid 10001 agentce
 
+# Unprivileged, with an empty working directory that any user id can enter: `docker run --user` maps
+# the caller's own id, and the engine reads its current directory.
 USER agentce
-WORKDIR /home/agentce
+WORKDIR /work
 
 # `docker run <image>` assesses the quickstart project shipped inside the package, end to end.
 ENTRYPOINT ["agentce"]
