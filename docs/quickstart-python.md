@@ -31,5 +31,6 @@ a mounted output directory to keep the report:
 
 ```bash
 docker build -f engines/python/Dockerfile -t agentce/agentce:dev .
+mkdir -p out
 docker run --rm --network none --user "$(id -u):$(id -g)" -v "$PWD/out:/out" agentce/agentce:dev quickstart --out /out
 ```
