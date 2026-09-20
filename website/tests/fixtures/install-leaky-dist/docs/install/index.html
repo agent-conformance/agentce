@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Install</title></head>
+<body>
+<main>
+<h1>Install</h1>
+<pre data-install-tab="uv" data-install-state="unpublished" tabindex="0"><code>uv run --project engines/python agentce quickstart --out ./out</code></pre>
+<pre data-install-tab="uvx" data-install-state="published" tabindex="0"><code>uvx --from agent-conformance==0.1.0 agentce quickstart --out ./out</code></pre>
+<pre data-install-tab="pipx" data-install-state="unpublished" tabindex="0"><code>uv run --project engines/python agentce quickstart --out ./out</code></pre>
+<pre data-install-tab="npx" data-install-state="unpublished" tabindex="0"><code>pnpm --dir engines/typescript build &#x26;&#x26; node engines/typescript/bin/agentce.js --version</code></pre>
+<pre data-install-tab="docker" data-install-state="unpublished" tabindex="0"><code>docker build -f engines/python/Dockerfile -t agentce/agentce:dev . &#x26;&#x26; docker run --rm agentce/agentce:dev quickstart --out /tmp/report</code></pre>
+</main>
+</body>
+</html>
