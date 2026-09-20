@@ -1,0 +1,6 @@
+{
+  "id": "err-token-int-neg-2pow53",
+  "description": "The same bound applies to negative integers.",
+  "input": -9007199254740992,
+  "error": "integer_out_of_range"
+}

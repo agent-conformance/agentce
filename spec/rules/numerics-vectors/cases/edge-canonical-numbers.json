@@ -1,0 +1,172 @@
+{
+  "algorithm": "canonical_token",
+  "reference": "canonical-form.md number grammar",
+  "description": "Accept/refuse decision and canonical form for JSON text containing number tokens the canonical number grammar refuses (a fraction or exponent, even of a whole number; an integer above 2^53 - 1) or accepts. input is JSON text; every engine reads it with a parser that keeps the number token as written (a plain JSON.parse folds 1.0 to 1 and 10000000000000001 to 10000000000000000). expected is canonical:<canonical form> or error:<stable reason>. Every engine consumes this file unchanged.",
+  "cases": [
+    {
+      "name": "whole-float-1.0",
+      "input": "1.0",
+      "expected": "error:non_integer_number"
+    },
+    {
+      "name": "whole-float-0.0",
+      "input": "0.0",
+      "expected": "error:non_integer_number"
+    },
+    {
+      "name": "whole-float-negative-zero",
+      "input": "-0.0",
+      "expected": "error:non_integer_number"
+    },
+    {
+      "name": "whole-float-100.0",
+      "input": "100.0",
+      "expected": "error:non_integer_number"
+    },
+    {
+      "name": "exponent-1e2",
+      "input": "1e2",
+      "expected": "error:non_integer_number"
+    },
+    {
+      "name": "exponent-capital-1E2",
+      "input": "1E2",
+      "expected": "error:non_integer_number"
+    },
+    {
+      "name": "exponent-signed-1e+2",
+      "input": "1E+2",
+      "expected": "error:non_integer_number"
+    },
+    {
+      "name": "exponent-zero-0e0",
+      "input": "0e0",
+      "expected": "error:non_integer_number"
+    },
+    {
+      "name": "exponent-negative-5e-1",
+      "input": "5e-1",
+      "expected": "error:non_integer_number"
+    },
+    {
+      "name": "exponent-with-fraction-1.0e0",
+      "input": "1.0e0",
+      "expected": "error:non_integer_number"
+    },
+    {
+      "name": "exponent-out-of-double-range-1e400",
+      "input": "1e400",
+      "expected": "error:non_integer_number"
+    },
+    {
+      "name": "fraction-1.5",
+      "input": "1.5",
+      "expected": "error:non_integer_number"
+    },
+    {
+      "name": "fraction-trailing-zero-2.50",
+      "input": "2.50",
+      "expected": "error:non_integer_number"
+    },
+    {
+      "name": "int-zero",
+      "input": "0",
+      "expected": "canonical:0"
+    },
+    {
+      "name": "int-negative-zero",
+      "input": "-0",
+      "expected": "canonical:0"
+    },
+    {
+      "name": "int-42",
+      "input": "42",
+      "expected": "canonical:42"
+    },
+    {
+      "name": "int-negative",
+      "input": "-42",
+      "expected": "canonical:-42"
+    },
+    {
+      "name": "int-max-safe",
+      "input": "9007199254740991",
+      "expected": "canonical:9007199254740991"
+    },
+    {
+      "name": "int-min-safe",
+      "input": "-9007199254740991",
+      "expected": "canonical:-9007199254740991"
+    },
+    {
+      "name": "int-2^53",
+      "input": "9007199254740992",
+      "expected": "error:integer_out_of_range"
+    },
+    {
+      "name": "int-negative-2^53",
+      "input": "-9007199254740992",
+      "expected": "error:integer_out_of_range"
+    },
+    {
+      "name": "int-2^53+1",
+      "input": "9007199254740993",
+      "expected": "error:integer_out_of_range"
+    },
+    {
+      "name": "int-10000000000000001",
+      "input": "10000000000000001",
+      "expected": "error:integer_out_of_range"
+    },
+    {
+      "name": "int-18-digits",
+      "input": "999999999999999999",
+      "expected": "error:integer_out_of_range"
+    },
+    {
+      "name": "int-30-digits",
+      "input": "123456789012345678901234567890",
+      "expected": "error:integer_out_of_range"
+    },
+    {
+      "name": "int-16-digits-in-range",
+      "input": "1234567890123456",
+      "expected": "canonical:1234567890123456"
+    },
+    {
+      "name": "nested-whole-float-in-array",
+      "input": "[1,2.0]",
+      "expected": "error:non_integer_number"
+    },
+    {
+      "name": "nested-exponent-in-object",
+      "input": "{\"a\":{\"b\":[1e2]}}",
+      "expected": "error:non_integer_number"
+    },
+    {
+      "name": "nested-out-of-range-in-object",
+      "input": "{\"count\":9007199254740993}",
+      "expected": "error:integer_out_of_range"
+    },
+    {
+      "name": "nested-accepted",
+      "input": "{\"a\":[1,-0,9007199254740991]}",
+      "expected": "canonical:{\"a\":[1,0,9007199254740991]}"
+    },
+    {
+      "name": "string-that-looks-like-a-float",
+      "input": "\"1.0\"",
+      "expected": "canonical:\"1.0\""
+    },
+    {
+      "name": "string-that-looks-like-an-out-of-range-integer",
+      "input": "\"10000000000000001\"",
+      "expected": "canonical:\"10000000000000001\""
+    },
+    {
+      "name": "float-inside-a-string-key",
+      "input": "{\"1.0\":1}",
+      "expected": "canonical:{\"1.0\":1}"
+    }
+  ]
+}

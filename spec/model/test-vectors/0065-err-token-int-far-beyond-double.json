@@ -1,0 +1,6 @@
+{
+  "id": "err-token-int-far-beyond-double",
+  "description": "An arbitrarily large integer is refused.",
+  "input": 123456789012345678901234567890,
+  "error": "integer_out_of_range"
+}

@@ -47,6 +47,34 @@ chain to its end), so that path evaluation is always bounded and identical acros
 `sh:qualifiedMinCount`, `sh:equals`, `sh:disjoint`, `sh:lessThan`, `sh:lessThanOrEquals`, and
 `sh:minInclusive` / `sh:maxInclusive` on `xsd:integer` and `xsd:dateTime` only.
 
+### Literal ordering
+
+`sh:minInclusive`, `sh:maxInclusive`, `sh:lessThan`, and `sh:lessThanOrEquals` order two literals by
+their lexical form, exactly, and every engine gives the same answer. Two forms are comparable and no
+others:
+
+- **Integer.** `[+-]?[0-9]+` (ASCII digits only, no whitespace, no fraction, no exponent). Integers
+  compare as exact integers of any size; leading zeros and a `+` sign do not change the value, and
+  `-0` equals `0`.
+- **Date-time.** `YYYY-MM-DD"T"hh:mm:ss` with an optional fraction of one or more digits (`.` then
+  digits) and an optional zone (`Z` or `±hh:mm`). Upper-case `T` and `Z` only. The date must exist in
+  the proleptic Gregorian calendar (a leap day only in a leap year), `hh` is `00`–`23`, `mm` and `ss`
+  are `00`–`59` (no leap second, no `24:00:00`), and a zone offset is at most `±23:59`. An aware
+  date-time (one with a zone) compares as an instant, to any fractional precision, so `…T00:00:00Z`
+  equals `…T01:00:00+01:00` and `.5` equals `.500`. A naive date-time (no zone) compares with another
+  naive date-time by its written fields.
+
+Two literals are **incomparable** when either is outside both forms, when one is an integer and the
+other a date-time, or when one date-time is aware and the other naive. An incomparable pair never
+satisfies a constraint: it is a violation, not an error. `sh:lessThan` is strict — it is satisfied only
+when the first literal orders strictly before the second, never merely because the two are written
+differently.
+
+No comparison goes through floating point or a runtime date type. `numerics-vectors/cases/
+edge-comparison.json` is the shared golden (`literal_order`: `lt`, `eq`, `gt`, or `incomparable`);
+every engine reproduces it, and `conformance/numerics.py --engines python,typescript,java` proves they
+agree.
+
 `sh:pattern` is permitted only as an anchored literal prefix: the value begins with `^` and the
 remainder contains no regular-expression metacharacters (`. ^ $ * + ? ( ) [ ] { } | \`) and no
 `sh:flags`. Anything richer is refused, because regular-expression engines differ.

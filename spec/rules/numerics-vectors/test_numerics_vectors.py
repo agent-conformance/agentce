@@ -17,6 +17,8 @@ from typing import Any
 import pytest
 
 from agentce import numerics as N
+from agentce.canonical import CanonicalizationError, canonical_string
+from agentce.structural import compare_literals
 
 CASES = Path(__file__).parent / "cases"
 
@@ -56,3 +58,19 @@ def test_incomplete_beta(case: dict[str, Any]) -> None:
 def test_beta_quantile(case: dict[str, Any]) -> None:
     got = N.beta_quantile(case["a"], case["b"], Decimal(case["p"]))
     assert str(N.round_presentation(got)) == case["expected"]
+
+
+@pytest.mark.parametrize("case", _load("edge-comparison.json"), ids=lambda c: c["name"])
+def test_literal_order(case: dict[str, Any]) -> None:
+    order = compare_literals(case["lhs"], case["rhs"])
+    got = "incomparable" if order is None else ("lt", "eq", "gt")[order + 1]
+    assert got == case["expected"]
+
+
+@pytest.mark.parametrize("case", _load("edge-canonical-numbers.json"), ids=lambda c: c["name"])
+def test_canonical_token(case: dict[str, Any]) -> None:
+    try:
+        got = "canonical:" + canonical_string(json.loads(case["input"]))
+    except CanonicalizationError as error:
+        got = f"error:{error.reason}"
+    assert got == case["expected"]

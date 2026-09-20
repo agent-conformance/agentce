@@ -43,12 +43,15 @@ def test_there_are_at_least_fifty_vectors():
 @pytest.mark.parametrize("path", VECTORS, ids=lambda p: p.stem)
 def test_vector(path: Path):
     vector = json.loads(path.read_text(encoding="utf-8"))
+    value = (
+        json.loads(vector["input_json"]) if "input_json" in vector else vector["input"]
+    )
     if "error" in vector:
         with pytest.raises(canonical.CanonicalizationError) as excinfo:
-            canonical.canonicalize(vector["input"])
+            canonical.canonicalize(value)
         assert excinfo.value.reason == vector["error"]
         return
-    out = canonical.canonicalize(vector["input"])
+    out = canonical.canonicalize(value)
     assert out.decode("utf-8") == vector["canonical"]
     assert hashlib.sha256(out).hexdigest() == vector["sha256"]
 
@@ -117,6 +120,20 @@ def test_float_is_refused():
     with pytest.raises(canonical.CanonicalizationError) as excinfo:
         canonical.canonicalize(1.5)
     assert excinfo.value.reason == "non_integer_number"
+
+
+def test_integer_beyond_the_exactly_representable_range_is_refused():
+    for value in (2**53, -(2**53), 10000000000000001, 10**30):
+        with pytest.raises(canonical.CanonicalizationError) as excinfo:
+            canonical.canonicalize(value)
+        assert excinfo.value.reason == "integer_out_of_range"
+
+
+def test_whole_number_floats_are_refused_not_collapsed():
+    for text in ("1.0", "1e2", "1E2", "-0.0"):
+        with pytest.raises(canonical.CanonicalizationError) as excinfo:
+            canonical.canonicalize(json.loads(text))
+        assert excinfo.value.reason == "non_integer_number"
 
 
 def test_duplicate_key_after_nfc_is_refused():

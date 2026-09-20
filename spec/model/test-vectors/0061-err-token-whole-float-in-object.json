@@ -1,0 +1,6 @@
+{
+  "id": "err-token-whole-float-in-object",
+  "description": "A whole-number float nested in an object is refused.",
+  "input": {"count": 2.0},
+  "error": "non_integer_number"
+}
