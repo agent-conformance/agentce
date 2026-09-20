@@ -9,7 +9,7 @@
       "today": "uv run --project engines/python agentce quickstart --out ./out",
       "one_liner": "uvx --from agent-conformance agentce quickstart --out ./out",
       "patterns": [
-        "\\b(pip|pipx|uvx)\\b[^\\n`]*\\b(agent-conformance|agentce)(-emit)?\\b",
+        "\\b(pip3?|pipx|uvx)\\b[^\\n`]*\\b(agent-conformance|agentce)(-emit)?\\b",
         "\\buv\\s+(tool|pip)\\s+(install|run)\\b[^\\n`]*\\b(agent-conformance|agentce)(-emit)?\\b"
       ]
     },

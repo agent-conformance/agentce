@@ -1,7 +1,7 @@
 # Fresh-machine proof (SPEC §13.4 AX-1, §14.4): on a clean runner with only the language toolchain,
 # each engine runs end to end within five minutes — the Python engine assesses the vendored quickstart
 # project; the TypeScript and Java engines, which implement `conformance run`, run the conformance suite
-# and must write one assertions.json per project — and the engine container image builds. Runs on every
+# and must write one assertions.json per project — and the engine container image builds and runs the quickstart with no network. Runs on every
 # push to main or a phase branch and on every pull request, and can still be dispatched by hand; every
 # action is pinned by commit SHA (AGENTS.md quality gates). No image is pushed. The
 # installed-artifacts-offline job builds the wheel, sdist, npm tarball and runnable jar from the current
@@ -103,13 +103,15 @@ jobs:
           PY
 
   image:
-    name: container image build (no push)
+    name: container image build and offline run (no push)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Build the engine image without pushing
         run: docker build -f engines/python/Dockerfile -t agentce/agentce:dev .
+      - name: Run the quickstart in the image with no network
+        run: docker run --rm --network none agentce/agentce:dev quickstart --out /tmp/report
 
   installed-artifacts-offline:
     name: installed artifacts run offline
