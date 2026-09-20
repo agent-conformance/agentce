@@ -145,7 +145,12 @@ export function renderEvidencePack(
   }
   return {
     subject,
-    assertions: assertions.map((a) => ({ control: a.control, outcome: a.outcome, mode: a.mode })),
+    assertions: assertions.map((a) => ({
+      control: a.control,
+      outcome: a.outcome,
+      mode: a.mode,
+      evidence: [...new Set(a.evidence.map((e) => e.ref))].sort(byteCompare),
+    })),
     evidence: [...refs].sort(byteCompare),
   };
 }

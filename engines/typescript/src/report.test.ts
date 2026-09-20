@@ -64,12 +64,22 @@ test("report canonical machine outputs match the Python reference golden", () =>
   );
 });
 
+test("evidence pack matches the Python reference golden, per-assertion evidence included", () => {
+  const golden = JSON.parse(readFileSync(join(TESTDATA, "report-golden.json"), "utf-8"));
+  const pack = renderEvidencePack(SUBJECT, ovsFailedAssertions());
+
+  assert.equal(canonicalString(pack), canonicalString(golden.pack));
+  for (const row of pack.assertions as { evidence?: unknown }[]) {
+    assert.equal(Array.isArray(row.evidence), true);
+  }
+});
+
 test(
-  "report human renderers and evidence pack match the Python reference golden",
+  "report human renderers match the Python reference golden",
   {
     todo:
       "engine-parity and i18n work: humanised outcome labels, escaped structural HTML, and the " +
-      "explicit empty evidence list land with the TypeScript report build-out",
+      "verdict section land with the TypeScript report build-out",
   },
   () => {
     const golden = JSON.parse(readFileSync(join(TESTDATA, "report-golden.json"), "utf-8"));
@@ -78,10 +88,6 @@ test(
 
     assert.equal(renderReportMd(assertions, counts), golden.md);
     assert.equal(renderReportHtml(assertions, counts), golden.html);
-    assert.equal(
-      canonicalString(renderEvidencePack(SUBJECT, assertions)),
-      canonicalString(golden.pack),
-    );
   },
 );
 
