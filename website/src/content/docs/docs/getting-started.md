@@ -56,7 +56,7 @@ A run over this project ends with 25 conformant, 19 insufficient evidence, 5 not
 The command opens with a verdict, then the six-outcome tally, the top gaps, and the next step. The verdict is one of
 three states, never a score:
 
-- **Conformant** — every applicable control met its expectations with evidence.
+- **Conformant** — the applicable controls met their expectations, each with evidence.
 - **Incomplete** — no control failed, but at least one is partial, lacks sufficient evidence, or was not assessed.
 - **Non-conformant** — at least one applicable control failed.
 
