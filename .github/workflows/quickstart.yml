@@ -128,11 +128,13 @@ jobs:
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Prepare the toolchains (online, before any artifact runs)
+      - name: Prepare the Python toolchain (online, before any artifact runs)
+        run: uv sync --frozen --project engines/python
+      - name: Prepare the TypeScript toolchain (online, before any artifact runs)
+        working-directory: engines/typescript
         run: |
-          uv sync --frozen --project engines/python
           corepack enable
-          pnpm --dir engines/typescript install --frozen-lockfile
+          pnpm install --frozen-lockfile
       - name: The check itself must be able to fail
         run: python3 tools/installed_artifacts_check.py --self-test
       - name: Build each artifact, install it outside the checkout, run it with no network
