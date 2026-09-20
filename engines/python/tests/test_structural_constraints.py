@@ -215,3 +215,36 @@ def test_resolve_alternative_returns_union() -> None:
     store.add_edge(FOCUS, "agentce:b", "agentce:vb")
     values = {v.repr for v in resolve_path(store, FOCUS, path)}
     assert values == {"agentce:va", "agentce:vb"}
+
+
+def test_min_inclusive_is_exact_at_the_double_boundary() -> None:
+    # 2**53 and 2**53 + 1 are the same IEEE-754 double, but they are different integers.
+    body = "sh:property [ sh:path agentce:n ; sh:minInclusive 9007199254740993 ]"
+    below = _store()
+    below.add_literal(FOCUS, "agentce:n", "9007199254740992", "xsd:integer")
+    assert _fails(body, below)
+    at_bound = _store()
+    at_bound.add_literal(FOCUS, "agentce:n", "9007199254740993", "xsd:integer")
+    assert not _fails(body, at_bound)
+
+
+def test_mixed_aware_and_naive_datetimes_are_a_violation_not_a_crash() -> None:
+    body = 'sh:property [ sh:path agentce:t ; sh:minInclusive "2026-01-01T00:00:00" ]'
+    aware = _store()
+    aware.add_literal(FOCUS, "agentce:t", "2026-01-01T00:00:00Z", "xsd:dateTime")
+    assert _fails(body, aware)
+    naive = _store()
+    naive.add_literal(FOCUS, "agentce:t", "2026-01-01T00:00:01", "xsd:dateTime")
+    assert not _fails(body, naive)
+
+
+def test_less_than_is_strict_over_equal_instants_written_differently() -> None:
+    body = "sh:property [ sh:path agentce:a ; sh:lessThan agentce:b ]"
+    store = _store()
+    store.add_literal(FOCUS, "agentce:a", "2026-01-01T00:00:00Z", "xsd:dateTime")
+    store.add_literal(FOCUS, "agentce:b", "2026-01-01T01:00:00+01:00", "xsd:dateTime")
+    assert _fails(body, store)  # the same instant is not strictly less
+    later = _store()
+    later.add_literal(FOCUS, "agentce:a", "2026-01-01T00:00:00Z", "xsd:dateTime")
+    later.add_literal(FOCUS, "agentce:b", "2026-01-01T01:00:01+01:00", "xsd:dateTime")
+    assert not _fails(body, later)

@@ -5,7 +5,8 @@ round-trip formatting of IEEE 754 doubles -- never arises, and the canonical for
 set of rules every engine reproduces byte for byte:
 
   * literals   null, true, false serialise as those tokens;
-  * numbers    integers only, as their exact decimal (a non-integer is refused);
+  * numbers    integers only, as their exact decimal (a non-integer, or an integer beyond
+               2^53 - 1 in magnitude, is refused);
   * strings    NFC-normalised, then minimally escaped as ECMAScript JSON.stringify does;
   * arrays     elements in order, comma-separated, no whitespace;
   * objects    members sorted by the UTF-16 code units of their NFC-normalised keys, no whitespace.
@@ -24,11 +25,15 @@ import unicodedata
 __all__ = ["CanonicalizationError", "canonical_string", "canonicalize", "sha256_hex"]
 
 
+_MAX_SAFE_INTEGER = 2**53 - 1  # the range every engine represents exactly
+
+
 class CanonicalizationError(ValueError):
     """A value cannot be put in canonical form under the AgentCE profile.
 
-    ``reason`` is a stable key (``non_integer_number``, ``duplicate_key_after_nfc``,
-    ``unsupported_type``) so that the vectors and every engine agree on which inputs are refused.
+    ``reason`` is a stable key (``non_integer_number``, ``integer_out_of_range``,
+    ``duplicate_key_after_nfc``, ``unsupported_type``) so that the vectors and every engine agree on
+    which inputs are refused.
     """
 
     def __init__(self, reason: str, detail: str = "") -> None:
@@ -78,6 +83,8 @@ def _serialise(value: object) -> str:
     ):  # bool is a subclass of int; must precede the int branch
         return "true" if value else "false"
     if isinstance(value, int):
+        if abs(value) > _MAX_SAFE_INTEGER:
+            raise CanonicalizationError("integer_out_of_range", str(value))
         return str(value)
     if isinstance(value, float):
         raise CanonicalizationError("non_integer_number", repr(value))
