@@ -314,3 +314,20 @@ claims:
         an OTLP export is pushed; if a real run ever completes, no caveat is owed. A self-test rejects a
         guide that promises collection, a caveat placed far from the mention, a silent command page, and
         a config that hides the missing connector or models push as pull.
+  - id: container.minimal-from-wheel
+    text: >-
+      The engine container image is built in two stages from the reference engine's wheel and its
+      hash-pinned dependencies, so it holds the installed package rather than the repository. Its
+      build context excludes private and dev paths, and the image runs the quickstart with the
+      network disabled. The image is built and run in CI but is not published to a registry yet.
+    status: built
+    pages:
+      - docs/quickstart-python.md
+    check:
+      workflow: .github/workflows/quickstart.yml
+      job: image
+      description: >-
+        On every pull request, builds the image from engines/python/Dockerfile, runs the quickstart
+        in it with no network and checks the report it wrote, and asserts the engine is imported
+        from site-packages and that no repository or private path exists in the image; the hygiene
+        job also runs the recipe check over the Dockerfile and the .dockerignore.
