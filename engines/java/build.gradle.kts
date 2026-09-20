@@ -82,3 +82,27 @@ tasks.jacocoTestCoverageVerification {
 tasks.check {
     dependsOn(tasks.jacocoTestCoverageVerification)
 }
+
+// The runnable artifact: one jar carrying the engine and its runtime dependencies, so
+// `java -jar agentce-<version>-all.jar` works from any directory with nothing else installed. The
+// entries are ordered and undated so two builds of the same sources produce the same bytes.
+val runnableJar by tasks.registering(Jar::class) {
+    group = "build"
+    description = "Assembles the engine and its runtime dependencies into one runnable jar."
+    archiveClassifier.set("all")
+    manifest { attributes["Main-Class"] = "org.agentce.Cli" }
+    from(sourceSets.main.get().output)
+    from({
+        configurations.runtimeClasspath.get()
+            .filter { it.name.endsWith(".jar") }
+            .map { zipTree(it) }
+    })
+    exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "module-info.class")
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
+tasks.assemble {
+    dependsOn(runnableJar)
+}
