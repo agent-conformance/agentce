@@ -2,7 +2,8 @@
 
 How a vulnerability is reported, handled, and disclosed (SPEC §14.2). The repository root
 [`SECURITY.md`](../SECURITY.md) is the entry point for reporters; this document records the process the
-maintainers follow.
+maintainer follows. The project has a single maintainer today, so every step below is performed by
+that one person; a second responder is planned, not yet in place.
 
 ## Reporting
 

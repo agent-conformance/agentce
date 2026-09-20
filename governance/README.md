@@ -1,16 +1,23 @@
 # Governance
 
-How the Agent Conformance Engine is governed (SPEC §14.2). The project is open, deterministic, and
-vendor-neutral; these documents fix the working groups, the change process, and the policies a
-contributor or adopter relies on.
+How the Agent Conformance Engine is governed (SPEC §14.2). The project is deterministic and
+vendor-neutral; these documents fix the change process and the policies a contributor or adopter
+relies on, and record which parts of that structure exist today and which are planned.
 
-## Working groups
+## Current state
 
-Each working group owns an area and carries a charter and a change process.
+The project has one maintainer. No working group has been chartered, and no group or committee reviews
+changes yet. Every decision described below is taken by that maintainer today; where a section says
+"planned", it describes the structure the project intends to grow into, not one that exists.
 
-| Group | Owns |
+## Working groups (planned, not yet chartered)
+
+The areas below are planned working groups. None exists yet: each becomes a working group only when it
+has a charter and more than one member, which requires people the project does not yet have.
+
+| Planned group | Would own |
 |---|---|
-| Catalog | Rules, crosswalks, and interpretations. Includes legal reviewers for clause mappings. |
+| Catalog | Rules, crosswalks, and interpretations. Would include legal reviewers for clause mappings. |
 | Engine | The portable shape profile, canonical form, numerics, and the Engine Conformance Suite. |
 | Adapters | Source adapters and their support matrices. |
 | Corpus | The simulated corpus, its generator, and the golden outputs. |
@@ -18,8 +25,9 @@ Each working group owns an area and carries a charter and a change process.
 ## Change process
 
 - **RFC process.** Changes to the evidence model, the portable shape profile, the rule format, the
-  claim schema, and the outcome vocabulary go through an RFC. An interpretation-register entry
-  additionally requires legal review in the Catalog working group.
+  claim schema, and the outcome vocabulary go through an RFC, decided by the maintainer today. An
+  interpretation-register entry is planned to additionally require legal review in a Catalog working
+  group, which does not yet exist; until it does, no entry claims that review has happened.
 - **DCO sign-off.** Every commit carries a Developer Certificate of Origin sign-off (`git commit -s`).
   There is no CLA at launch; inbound licence equals outbound (Apache-2.0 for executable artifacts and
   catalogs, CC-BY-4.0 for documentation and generated datasets).
