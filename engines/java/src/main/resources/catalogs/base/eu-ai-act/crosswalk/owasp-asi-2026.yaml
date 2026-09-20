@@ -1,0 +1,76 @@
+# OWASP Agentic Security Initiative crosswalk: the agentic threat classes whose detection or
+# traceability AgentCE's runtime evidence supports, mapped to AgentCE schema elements, correctness-
+# ladder rungs, and base-catalog control ids.
+#
+# Threat identifiers only; no source text is reproduced. The `obligation` field is AgentCE's own
+# statement of what its evidence makes detectable or reconstructable for that threat class -- AgentCE
+# is an assessment engine, not a runtime guard, so it evidences that the events needed to detect or
+# trace a threat are present and typed, not that the threat is prevented. Every reference carries
+# `verified_against_text: false` until a reviewer confirms the mapping against the source (SPEC 7.3).
+framework: owasp-asi-2026
+title: "OWASP Top 10 for Agentic Applications (Agentic Security Initiative)"
+version: "2025.12"
+source:
+  publisher: OWASP
+  identifier: "OWASP Agentic Security Initiative — Agentic threat taxonomy"
+obligations:
+  - ref: "T1"
+    obligation: Memory poisoning is traceable -- consequential decisions declare their memory reads, and untrusted writes into that memory are visible in the record.
+    schema_elements: [MemoryWrite, MemoryRead, Decision]
+    rungs: [2, 3]
+    controls: [ROB-02]
+    verified_against_text: false
+  - ref: "T2"
+    obligation: Tool misuse is traceable -- each tool call is attributed and gated by an authorization check whose decision is recorded.
+    schema_elements: [ToolCall, AuthzCheck, PolicyDecision]
+    rungs: [2]
+    controls: []
+    verified_against_text: false
+  - ref: "T3"
+    obligation: Privilege compromise is traceable -- delegations carry the granting principal and scope, and access is checked against them.
+    schema_elements: [DelegationIssued, AuthzCheck, ResourceAccess]
+    rungs: [2]
+    controls: []
+    verified_against_text: false
+  - ref: "T6"
+    obligation: Intent breaking and goal manipulation are reconstructable -- the operative determination for each decision is recoverable from typed graph facts.
+    schema_elements: [Instruction, Decision, Outcome]
+    rungs: [2, 4]
+    controls: [REC-04]
+    verified_against_text: false
+  - ref: "T7"
+    obligation: Misaligned or deceptive behavior is evidenced by the override distribution and by human actors present on observed overrides.
+    schema_elements: [Decision, Override, ApprovalDecided]
+    rungs: [3]
+    controls: [OVS-03]
+    verified_against_text: false
+  - ref: "T8"
+    obligation: Repudiation and untraceability are directly countered -- lifetime recording with actor, source timestamp, and integrity results makes actions non-repudiable.
+    schema_elements: [SessionStart, SessionEnd, Decision, IntegrityResult]
+    rungs: [0, 1, 2]
+    controls: [REC-01, REC-04, INT-01]
+    verified_against_text: false
+  - ref: "T9"
+    obligation: Identity spoofing and impersonation are traceable -- acting identities are attested and delegations bind an issuer to a subject.
+    schema_elements: [Attestation, DelegationIssued, AuthzCheck]
+    rungs: [2]
+    controls: []
+    verified_against_text: false
+  - ref: "T10"
+    obligation: Overwhelming the human-in-the-loop is evidenced by approval latency and the distribution of approval decisions, exposing rubber-stamping.
+    schema_elements: [ApprovalRequested, ApprovalDecided]
+    rungs: [3]
+    controls: [OVS-03]
+    verified_against_text: false
+  - ref: "T11"
+    obligation: Unexpected code execution is traceable -- tool calls that reach an execution surface are attributed and gated by a recorded policy decision.
+    schema_elements: [ToolCall, PolicyDecision, Refusal]
+    rungs: [2]
+    controls: [ROB-02]
+    verified_against_text: false
+  - ref: "T13"
+    obligation: Rogue agents in a multi-agent system are traceable -- every participating agent is attested and its delegations and outcomes are attributed.
+    schema_elements: [Attestation, DelegationIssued, Outcome]
+    rungs: [2]
+    controls: [INT-01]
+    verified_against_text: false

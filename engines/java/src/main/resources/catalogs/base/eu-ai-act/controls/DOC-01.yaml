@@ -1,0 +1,28 @@
+id: DOC-01
+version: "2026.09"
+title: Operating components match the declared documentation
+crosswalk:
+  - {framework: eu-ai-act, clause: "Art. 11 / Annex IV", relation: implements, verified_against_text: false}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: self_report
+  minimum_evidence:
+    - {event: Decision, class: self_report}
+  shape: shapes/DOC-01.ttl
+expectations:
+  - {id: S1, text: "Operating components match the declared documentation."}
+severity: high
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+tolerance_rationale: "A single DOC-01 exception is a control failure."
+false_positive_modes:
+  - "A condition declared as an accepted deviation in the applicability profile."
+techniques:
+  - "techniques/doc-evidence-at-source"
+test_cases:
+  - {id: pass, expected: passed, fixture: test/DOC-01/passed.jsonl}
+  - {id: fail, expected: failed, fixture: test/DOC-01/failed.jsonl}
+  - {id: na, expected: inapplicable, fixture: test/DOC-01/inapplicable.jsonl}

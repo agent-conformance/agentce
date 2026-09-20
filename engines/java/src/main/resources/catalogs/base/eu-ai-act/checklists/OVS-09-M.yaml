@@ -1,0 +1,4 @@
+checklist: OVS-09-M
+control: OVS-09
+items:
+  - {id: Q1, artifact: "human-oversight record", question: "Are the named human overseers trained, authorised, and able to interrupt or override every consequential decision type?", answers: [yes, no, not_applicable]}

@@ -1,0 +1,146 @@
+# Interpretation register (SPEC 6.10). Each entry records a question the clause leaves open and the
+# decision AgentCE takes, so that controls cite a decided interpretation rather than reinterpreting a
+# clause per control. Controls reference these ids in their `interpretations` member (SPEC 7.1).
+# A bare top-level list: one entry per interpretation, IR-01 through IR-12.
+- id: IR-01
+  clause: 'Art. 12(1) "events"'
+  question: What counts as an event that must be recorded?
+  decision: >-
+    An event is any activity at an enforcement chokepoint (model call, tool call, resource access,
+    authorization, delegation, approval, bundle load) plus every consequential decision.
+  rationale: >-
+    Art. 12(2)(a) requires identification of risk situations and substantial modifications;
+    modifications cannot be identified without recording what was loaded.
+  references: ["Art. 12(2)(a)"]
+  affected_controls: [REC-01, REC-04, INT-01]
+  date: "2026-09-01"
+  status: accepted
+- id: IR-02
+  clause: Art. 14 record shape
+  question: What form must oversight evidence take?
+  decision: >-
+    Oversight must be evidenced by typed relations between decision, authorization, and human action,
+    not by log lines.
+  rationale: >-
+    Records that satisfy logging can fail to support oversight without typing and relations.
+  references: ["R7"]
+  affected_controls: [OVS-03]
+  date: "2026-09-01"
+  status: accepted
+- id: IR-03
+  clause: Evidence trust
+  question: May a control rest on the agent's own account of what happened?
+  decision: >-
+    Agent self-reports are lower-class evidence; controls may require enforcement-point evidence.
+  rationale: >-
+    Arts. 14 and 15 presuppose the system can be manipulated; oversight evidence must not depend on
+    the manipulated party.
+  references: ["Art. 14", "Art. 15"]
+  affected_controls: [OVS-03, ROB-02, CND-04]
+  date: "2026-09-01"
+  status: accepted
+- id: IR-04
+  clause: '"Why" of a decision'
+  question: What is the record of why a decision was made?
+  decision: >-
+    Model-stated rationale is a claim; the record of "why" is the chain of inputs, authorizations,
+    and human decisions.
+  rationale: >-
+    Art. 86 explanations must be reconstructable, not generated post hoc.
+  references: ["Art. 86"]
+  affected_controls: [TRN-03]
+  date: "2026-09-01"
+  status: accepted
+- id: IR-05
+  clause: Consequential decision
+  question: Which decisions trigger the oversight and explanation duties?
+  decision: >-
+    A decision producing legal effects or similarly significant effects on a natural person (Art. 86
+    threshold), typed via the domain binding. The notice duty (Art. 26(11)) is broader and attaches to
+    every decision that affects a natural person made or assisted by an Annex III system; the
+    explanation right (Art. 86) attaches to consequential decisions only.
+  rationale: Makes applicability explicit and testable.
+  references: ["Art. 86", "Art. 26(11)"]
+  affected_controls: [OVS-03, TRN-03]
+  date: "2026-09-01"
+  status: accepted
+- id: IR-06
+  clause: Content in logs
+  question: How much decision content must the record contain?
+  decision: Hashes by default; content only under an explicit capture policy.
+  rationale: Art. 10 data governance and GDPR minimisation apply to logs.
+  references: ["Art. 10", "GDPR Art. 5(1)(c)"]
+  affected_controls: [DAT-01, REC-01]
+  date: "2026-09-01"
+  status: accepted
+- id: IR-07
+  clause: Tamper evidence
+  question: Must enforcement-point records be tamper-evident even though Art. 12 does not say so?
+  decision: >-
+    Required for enforcement_point streams though Art. 12 does not mandate cryptographic immutability.
+  rationale: >-
+    Without it, rung-1 verification is impossible and every downstream finding is unverifiable.
+  references: ["Art. 12"]
+  affected_controls: [INT-01, INT-02]
+  date: "2026-09-01"
+  status: accepted
+- id: IR-08
+  clause: Multi-agent decisions
+  question: Is a decision spanning several agents one decision or many?
+  decision: >-
+    A decision spanning agents is one decision; cross-agent edges (prov:wasInformedBy, agentcetask)
+    reconstruct it.
+  rationale: Decision diffusion fragments evidence across agents.
+  references: ["R8"]
+  affected_controls: [OVS-03]
+  date: "2026-09-01"
+  status: accepted
+- id: IR-09
+  clause: Observation period
+  question: What observation window do operational controls require?
+  decision: >-
+    Operational controls require a minimum 90-day window unless the profile declares a shorter pilot
+    window, which is reported as a limitation.
+  rationale: Point-in-time evidence cannot show Art. 72 monitoring or Art. 26(6) retention.
+  references: ["Art. 72", "Art. 26(6)"]
+  affected_controls: [REC-04, INC-02]
+  date: "2026-09-01"
+  status: accepted
+- id: IR-10
+  clause: Deviation
+  question: What does an accepted deviation do to an outcome?
+  decision: An accepted deviation changes the outcome label to partial, never to conformant.
+  rationale: DC-4.
+  references: ["DC-4"]
+  affected_controls: []
+  date: "2026-09-01"
+  status: accepted
+- id: IR-11
+  clause: Role of the enterprise (Art. 3(3), 3(4), 25)
+  question: Is an enterprise a provider, a deployer, or both?
+  decision: >-
+    An enterprise that built, commissioned, or substantially modified the agent system for its own use
+    is treated as both provider and deployer; an enterprise using an unmodified third-party system is
+    deployer; each control declares applies_to_roles and outcomes are computed per role.
+  rationale: >-
+    Most in-house agent systems are put into service under the enterprise's own name; assigning
+    provider obligations to the deployer role (or omitting them) fails legal review.
+  references: ["Art. 3(3)", "Art. 3(4)", "Art. 25"]
+  affected_controls: [INC-02, DOC-01]
+  date: "2026-09-01"
+  status: accepted
+- id: IR-12
+  clause: Bundle retention and deletion (Art. 19, 26(6); GDPR Arts. 5(1)(e), 17)
+  question: How long are bundles kept, and how is erasure reconciled with the retention duty?
+  decision: >-
+    Bundles are retained for the declared retention period (>= 6 months) under access control, then
+    deleted or reduced to hash-only form; person_ref values are keyed pseudonyms whose key is held by
+    the deployer outside the bundle so that erasure is effected by key destruction and explanations
+    (Art. 86) remain answerable during retention.
+  rationale: >-
+    Log retention is mandatory and time-bounded; evidence about people is still personal data even
+    when hashed if linkable.
+  references: ["Art. 19", "Art. 26(6)", "GDPR Art. 5(1)(e)", "GDPR Art. 17"]
+  affected_controls: [REC-04, DAT-01]
+  date: "2026-09-01"
+  status: accepted

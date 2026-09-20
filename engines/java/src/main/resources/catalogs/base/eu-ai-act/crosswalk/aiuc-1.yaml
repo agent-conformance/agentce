@@ -1,0 +1,52 @@
+# AIUC-1 crosswalk: the certification standard's requirement areas that AgentCE's runtime evidence can
+# help substantiate, mapped to AgentCE schema elements, correctness-ladder rungs, and base-catalog
+# control ids.
+#
+# Requirement-area identifiers only; no source text is reproduced and the `obligation` field is
+# AgentCE's own statement of what its evidence can show. The mapping is authored at the requirement-
+# area granularity the public structure exposes; finer clause identifiers are added by a reviewer with
+# the source. Every reference carries `verified_against_text: false` until that review confirms the
+# mapping (SPEC 7.3).
+framework: aiuc-1
+title: "AIUC-1 — AI agent certification standard"
+version: "2025"
+source:
+  publisher: AIUC
+  identifier: "AIUC-1"
+obligations:
+  - ref: "Data & Privacy"
+    obligation: Data access by the agent is attributed and tied to the decision that consumed it, so privacy exposure is reconstructable per decision type.
+    schema_elements: [ResourceAccess, Decision]
+    rungs: [2]
+    controls: []
+    verified_against_text: false
+  - ref: "Security"
+    obligation: Security-relevant actions are gated by recorded authorization and policy decisions, and integrity of loaded components is attested.
+    schema_elements: [AuthzCheck, PolicyDecision, Attestation, IntegrityResult]
+    rungs: [2]
+    controls: [ROB-02, INT-01]
+    verified_against_text: false
+  - ref: "Safety"
+    obligation: A stop or interrupt mechanism is evidenced with its enforcement point, and refusals of unsafe actions appear in the record.
+    schema_elements: [Interrupt, Refusal, PolicyDecision]
+    rungs: [2]
+    controls: [OVS-08]
+    verified_against_text: false
+  - ref: "Reliability"
+    obligation: Outcomes and incidents are recorded continuously with no gap beyond the rotation interval, so reliability is measured from evidence, not asserted.
+    schema_elements: [Outcome, Incident, IntegrityResult]
+    rungs: [1, 3]
+    controls: [INC-01]
+    verified_against_text: false
+  - ref: "Accountability"
+    obligation: Every consequential decision records the acting agent and a source timestamp, and human overrides carry a human principal.
+    schema_elements: [Decision, Override, ApprovalDecided]
+    rungs: [2, 3]
+    controls: [REC-04, OVS-03]
+    verified_against_text: false
+  - ref: "Society"
+    obligation: Disclosure of AI interaction and marking of synthetic content is evidenced per interaction type, and affected-person notices are recorded.
+    schema_elements: [Disclosure, ModelCall, Notice]
+    rungs: [2]
+    controls: [TRN-03]
+    verified_against_text: false

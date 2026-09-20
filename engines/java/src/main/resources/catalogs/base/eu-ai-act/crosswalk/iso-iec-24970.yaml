@@ -1,0 +1,38 @@
+# ISO/IEC 24970 crosswalk PLACEHOLDER: a standard in development on AI system logging, expected to be
+# adopted under standardisation request M/613 to operationalise the logging requirements. The standard
+# is not yet published, so no clause identifiers exist to cite. This file reserves the mapping and
+# records the anticipated logging scope AgentCE already substantiates through the REC and INT families;
+# the clause-level mapping is authored when the standard publishes.
+#
+# Clause references only (there are none yet); the standard's text is copyrighted and is never
+# reproduced. Every row carries `status: placeholder` and `verified_against_text: false` until the
+# standard publishes and a reviewer with a licensed copy authors and verifies the mapping (SPEC 7.3).
+framework: iso-iec-24970
+title: "ISO/IEC 24970 — Artificial intelligence — AI system logging (draft)"
+version: "draft"
+status: placeholder
+source:
+  publisher: ISO/IEC
+  identifier: "ISO/IEC 24970 (draft)"
+obligations:
+  - ref: "(pending publication) log-content"
+    obligation: Anticipated -- minimum log content with actor, source timestamp, and typed event so a determination is reconstructable; maps to the REC record-keeping family.
+    schema_elements: [SessionStart, SessionEnd, Decision, ToolCall, ModelCall]
+    rungs: [0, 2]
+    controls: [REC-01, REC-04]
+    status: placeholder
+    verified_against_text: false
+  - ref: "(pending publication) log-integrity"
+    obligation: Anticipated -- integrity and retention of logs with no gap beyond the rotation interval; maps to the INT integrity family and REC retention control.
+    schema_elements: [IntegrityResult, Attestation]
+    rungs: [1, 2]
+    controls: [REC-04, INT-01]
+    status: placeholder
+    verified_against_text: false
+  - ref: "(pending publication) log-availability"
+    obligation: Anticipated -- logs are available for oversight and post-market monitoring; maps to the INC monitoring family.
+    schema_elements: [Incident, Outcome, Notice]
+    rungs: [2, 3]
+    controls: [INC-02]
+    status: placeholder
+    verified_against_text: false

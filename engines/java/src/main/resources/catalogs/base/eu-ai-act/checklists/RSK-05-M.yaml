@@ -1,0 +1,4 @@
+checklist: RSK-05-M
+control: RSK-05
+items:
+  - {id: Q1, artifact: "registration record", question: "Are the EU-database registration and applicability declarations current for this system (Art. 49, 71)?", answers: [yes, no, not_applicable]}

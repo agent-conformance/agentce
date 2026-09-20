@@ -1,0 +1,28 @@
+id: OVS-02
+version: "2026.09"
+title: Observed oversight modality matches the declared modality
+crosswalk:
+  - {framework: eu-ai-act, clause: "Art. 14(1)-(3)", relation: implements, verified_against_text: false}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: self_report
+  minimum_evidence:
+    - {event: Decision, class: self_report}
+  shape: shapes/OVS-02.ttl
+expectations:
+  - {id: S1, text: "Observed oversight modality matches the declared modality."}
+severity: high
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+tolerance_rationale: "A single OVS-02 exception is a control failure."
+false_positive_modes:
+  - "A condition declared as an accepted deviation in the applicability profile."
+techniques:
+  - "techniques/ovs-evidence-at-source"
+test_cases:
+  - {id: pass, expected: passed, fixture: test/OVS-02/passed.jsonl}
+  - {id: fail, expected: failed, fixture: test/OVS-02/failed.jsonl}
+  - {id: na, expected: inapplicable, fixture: test/OVS-02/inapplicable.jsonl}

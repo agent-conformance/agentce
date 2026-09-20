@@ -1,0 +1,5 @@
+checklist: CND-03-M
+control: CND-03
+items:
+  - {id: Q1, artifact: "harm-signal triage log", question: "Is a triage decision recorded for every adverse Outcome, harm-class Override, and adverse-action Notice in the window?", answers: [yes, no]}
+  - {id: Q2, artifact: "incident register", question: "Did every triage that found a serious incident open an Incident within the declared clock?", answers: [yes, no, not_applicable]}
