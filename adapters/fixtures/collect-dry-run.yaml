@@ -1,6 +1,14 @@
-# A collection job (SPEC §5.4 B8): pull evidence from three sources via adapters. Credentials are
-# named only by reference (a secret-manager path or an environment variable) -- never by value.
+# A collection job (SPEC §5.4 B8): plan a pull of evidence from three sources via adapters. Credentials
+# are named only by reference (a secret-manager path or an environment variable) -- never by value.
 # `agentce collect --config this --dry-run` plans the job offline and resolves no credentials.
+#
+# Only the dry run works today. No source connector exists yet (on the roadmap): a real run of this
+# config records every source `incomplete`, reason "no source connector in the reference collector", and
+# exits 1. The endpoints below show the shape of a pull job; nothing polls them.
+#
+# An OTLP trace export is push-based, so an `otel-genai` source is not a URL to poll on a schedule: an
+# OpenTelemetry Collector exports traces to files or object storage and AgentCE reads those exports
+# (SPEC §5.4).
 job:
   id: collect-credit-eu-1
   principal: spiffe://corp/jobs/credit-collector

@@ -68,7 +68,9 @@ have an enforcement point available.
 
 ## From a session to an assessment
 
-1. Emit evidence (above) into a bundle, or collect it from source systems with `agentce collect`.
+1. Emit evidence (above) into a bundle. `agentce collect` cannot pull evidence from source systems yet:
+   it has no source connector, so a real run records every source `incomplete` and exits 1, and
+   `--dry-run` only plans the job. A working connector is on the roadmap.
 2. `agentce validate --bundle <dir>` — fix quarantines until it is clean.
 3. `agentce assess --bundle <dir> --catalog eu-ai-act@2026.09 --profile agentce/applicability.yaml`.
 4. Resolve any `insufficient_evidence` with the `agentce-onboard` skill's `explain_insufficient`, then
