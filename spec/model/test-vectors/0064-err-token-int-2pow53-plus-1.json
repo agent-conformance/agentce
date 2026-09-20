@@ -1,0 +1,6 @@
+{
+  "id": "err-token-int-2pow53-plus-1",
+  "description": "An integer a double cannot tell from a neighbour is refused, not rounded.",
+  "input": 10000000000000001,
+  "error": "integer_out_of_range"
+}

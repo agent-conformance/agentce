@@ -177,10 +177,95 @@ ERROR_VECTORS: list[tuple[str, str, object, str]] = [
 ]
 
 
-def _write(path: Path, obj: dict) -> None:
-    path.write_text(
-        json.dumps(obj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+# (id, description, the input as JSON text, expected reason or None when it must be accepted). The
+# text is written into the vector file verbatim as `input`: re-serialising it would fold `1e2` to
+# `100.0`, and a JSON parser folds `1.0`, `1e2` and `-0.0` to whole numbers and an integer above 2^53
+# to a nearby double, so the number token has to reach each engine as written for the accept/refuse
+# decision to be tested at all. Every engine reads the vector files with a parser that keeps the token.
+TOKEN_VECTORS: list[tuple[str, str, str, str | None]] = [
+    (
+        "err-token-whole-float",
+        "A whole number written with a fractional part is a float token and is refused.",
+        "1.0",
+        "non_integer_number",
+    ),
+    (
+        "err-token-exponent-whole",
+        "A whole number written in exponent form is a float token and is refused.",
+        "1e2",
+        "non_integer_number",
+    ),
+    (
+        "err-token-exponent-capital",
+        "The capital exponent marker is refused the same way.",
+        "1E2",
+        "non_integer_number",
+    ),
+    (
+        "err-token-negative-zero-float",
+        "Negative zero written as a float is refused, never collapsed to 0.",
+        "-0.0",
+        "non_integer_number",
+    ),
+    (
+        "err-token-whole-float-in-object",
+        "A whole-number float nested in an object is refused.",
+        '{"count": 2.0}',
+        "non_integer_number",
+    ),
+    (
+        "err-token-int-2pow53",
+        "The first integer above the exactly representable range is refused.",
+        "9007199254740992",
+        "integer_out_of_range",
+    ),
+    (
+        "err-token-int-neg-2pow53",
+        "The same bound applies to negative integers.",
+        "-9007199254740992",
+        "integer_out_of_range",
+    ),
+    (
+        "err-token-int-2pow53-plus-1",
+        "An integer a double cannot tell from a neighbour is refused, not rounded.",
+        "10000000000000001",
+        "integer_out_of_range",
+    ),
+    (
+        "err-token-int-far-beyond-double",
+        "An arbitrarily large integer is refused.",
+        "123456789012345678901234567890",
+        "integer_out_of_range",
+    ),
+    (
+        "err-token-int-in-array",
+        "An out-of-range integer nested in an array is refused.",
+        "[1, 9007199254740993]",
+        "integer_out_of_range",
+    ),
+    (
+        "token-int-negative-zero",
+        "Negative zero written as an integer token is the integer zero.",
+        "-0",
+        None,
+    ),
+    (
+        "token-int-neg-2pow53-minus-1",
+        "The most negative accepted integer.",
+        "-9007199254740991",
+        None,
+    ),
+]
+
+
+_RAW = "\0raw-input\0"
+
+
+def _write(path: Path, obj: dict, raw_input: str | None = None) -> None:
+    text = json.dumps(obj, ensure_ascii=False, indent=2) + "\n"
+    if raw_input is not None:
+        text = text.replace(json.dumps(_RAW), raw_input)
+    path.write_text(text, encoding="utf-8")
 
 
 def main() -> int:
@@ -188,9 +273,9 @@ def main() -> int:
     n = 0
     order = 1
 
-    def emit(vid: str, body: dict) -> None:
+    def emit(vid: str, body: dict, raw_input: str | None = None) -> None:
         nonlocal order, n
-        _write(OUT / f"{order:04d}-{vid}.json", body)
+        _write(OUT / f"{order:04d}-{vid}.json", body, raw_input)
         order += 1
         n += 1
 
@@ -230,6 +315,22 @@ def main() -> int:
         else:  # pragma: no cover - a mislabelled error vector must fail generation
             raise SystemExit(f"error vector {vid} did not raise")
         emit(vid, {"id": vid, "description": desc, "input": value, "error": reason})
+
+    for vid, desc, text, reason in TOKEN_VECTORS:
+        value = json.loads(text)
+        body: dict = {"id": vid, "description": desc, "input": _RAW}
+        if reason is None:
+            body["canonical"] = canonical.canonical_string(value)
+            body["sha256"] = canonical.sha256_hex(value)
+        else:
+            try:
+                canonical.canonicalize(value)
+            except canonical.CanonicalizationError as e:
+                assert e.reason == reason, f"{vid}: expected {reason}, got {e.reason}"
+            else:  # pragma: no cover - a mislabelled error vector must fail generation
+                raise SystemExit(f"error vector {vid} did not raise")
+            body["error"] = reason
+        emit(vid, body, raw_input=text)
 
     print(f"WROTE {n} vectors to {OUT}")
     return 0

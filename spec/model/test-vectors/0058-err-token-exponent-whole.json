@@ -1,0 +1,6 @@
+{
+  "id": "err-token-exponent-whole",
+  "description": "A whole number written in exponent form is a float token and is refused.",
+  "input": 1e2,
+  "error": "non_integer_number"
+}

@@ -1,0 +1,6 @@
+{
+  "id": "err-token-negative-zero-float",
+  "description": "Negative zero written as a float is refused, never collapsed to 0.",
+  "input": -0.0,
+  "error": "non_integer_number"
+}

@@ -1,0 +1,6 @@
+{
+  "id": "err-token-int-2pow53",
+  "description": "The first integer above the exactly representable range is refused.",
+  "input": 9007199254740992,
+  "error": "integer_out_of_range"
+}

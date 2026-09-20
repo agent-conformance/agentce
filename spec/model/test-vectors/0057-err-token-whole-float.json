@@ -1,0 +1,6 @@
+{
+  "id": "err-token-whole-float",
+  "description": "A whole number written with a fractional part is a float token and is refused.",
+  "input": 1.0,
+  "error": "non_integer_number"
+}

@@ -1,0 +1,6 @@
+{
+  "id": "err-token-exponent-capital",
+  "description": "The capital exponent marker is refused the same way.",
+  "input": 1E2,
+  "error": "non_integer_number"
+}

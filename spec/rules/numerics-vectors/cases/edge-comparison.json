@@ -1,0 +1,319 @@
+{
+  "algorithm": "literal_order",
+  "reference": "psp.md literal ordering",
+  "description": "Exact ordering of xsd:integer and xsd:dateTime literals for sh:minInclusive, sh:maxInclusive, sh:lessThan and sh:lessThanOrEquals. expected is lt, eq, gt, or incomparable (a literal outside both lexical grammars, an aware date-time against a naive one, or an integer against a date-time). Every engine consumes this file unchanged.",
+  "cases": [
+    {
+      "name": "int-2^53-below-2^53+1",
+      "lhs": "9007199254740992",
+      "rhs": "9007199254740993",
+      "expected": "lt"
+    },
+    {
+      "name": "int-2^53+1-above-2^53",
+      "lhs": "9007199254740993",
+      "rhs": "9007199254740992",
+      "expected": "gt"
+    },
+    {
+      "name": "int-2^53+1-vs-2^53+2",
+      "lhs": "9007199254740993",
+      "rhs": "9007199254740994",
+      "expected": "lt"
+    },
+    {
+      "name": "int-beyond-double-equal",
+      "lhs": "123456789012345678901234567890",
+      "rhs": "123456789012345678901234567890",
+      "expected": "eq"
+    },
+    {
+      "name": "int-beyond-double-adjacent",
+      "lhs": "123456789012345678901234567891",
+      "rhs": "123456789012345678901234567890",
+      "expected": "gt"
+    },
+    {
+      "name": "int-negative-2^53+1-below-2^53",
+      "lhs": "-9007199254740993",
+      "rhs": "-9007199254740992",
+      "expected": "lt"
+    },
+    {
+      "name": "int-numeric-not-lexical-9-below-10",
+      "lhs": "9",
+      "rhs": "10",
+      "expected": "lt"
+    },
+    {
+      "name": "int-plus-sign-equal",
+      "lhs": "+5",
+      "rhs": "5",
+      "expected": "eq"
+    },
+    {
+      "name": "int-leading-zeros-equal",
+      "lhs": "007",
+      "rhs": "7",
+      "expected": "eq"
+    },
+    {
+      "name": "int-negative-zero-equals-zero",
+      "lhs": "-0",
+      "rhs": "0",
+      "expected": "eq"
+    },
+    {
+      "name": "int-negative-below-positive",
+      "lhs": "-1",
+      "rhs": "1",
+      "expected": "lt"
+    },
+    {
+      "name": "not-an-integer-decimal",
+      "lhs": "1.5",
+      "rhs": "5",
+      "expected": "incomparable"
+    },
+    {
+      "name": "not-an-integer-exponent",
+      "lhs": "1e2",
+      "rhs": "5",
+      "expected": "incomparable"
+    },
+    {
+      "name": "not-an-integer-rational",
+      "lhs": "1/2",
+      "rhs": "5",
+      "expected": "incomparable"
+    },
+    {
+      "name": "not-an-integer-underscore",
+      "lhs": "1_0",
+      "rhs": "5",
+      "expected": "incomparable"
+    },
+    {
+      "name": "not-an-integer-padded-space",
+      "lhs": " 5",
+      "rhs": "5",
+      "expected": "incomparable"
+    },
+    {
+      "name": "not-an-integer-trailing-newline",
+      "lhs": "5\n",
+      "rhs": "5",
+      "expected": "incomparable"
+    },
+    {
+      "name": "not-an-integer-arabic-indic-digits",
+      "lhs": "١٢",
+      "rhs": "5",
+      "expected": "incomparable"
+    },
+    {
+      "name": "not-an-integer-empty",
+      "lhs": "",
+      "rhs": "5",
+      "expected": "incomparable"
+    },
+    {
+      "name": "not-an-integer-word",
+      "lhs": "nan",
+      "rhs": "5",
+      "expected": "incomparable"
+    },
+    {
+      "name": "not-an-integer-infinity",
+      "lhs": "inf",
+      "rhs": "5",
+      "expected": "incomparable"
+    },
+    {
+      "name": "not-an-integer-sign-only",
+      "lhs": "+",
+      "rhs": "5",
+      "expected": "incomparable"
+    },
+    {
+      "name": "not-an-integer-decimal-vs-decimal",
+      "lhs": "1.5",
+      "rhs": "1.5",
+      "expected": "incomparable"
+    },
+    {
+      "name": "dt-aware-same-instant-other-offset",
+      "lhs": "2026-01-01T00:00:00Z",
+      "rhs": "2026-01-01T01:00:00+01:00",
+      "expected": "eq"
+    },
+    {
+      "name": "dt-aware-offset-orders-by-instant",
+      "lhs": "2026-01-01T00:30:00+01:00",
+      "rhs": "2026-01-01T00:00:00Z",
+      "expected": "lt"
+    },
+    {
+      "name": "dt-negative-offset",
+      "lhs": "2026-01-01T00:00:00-05:00",
+      "rhs": "2026-01-01T04:59:59Z",
+      "expected": "gt"
+    },
+    {
+      "name": "dt-fraction-padding-equal",
+      "lhs": "2026-01-01T00:00:00.5Z",
+      "rhs": "2026-01-01T00:00:00.500Z",
+      "expected": "eq"
+    },
+    {
+      "name": "dt-fraction-orders",
+      "lhs": "2026-01-01T00:00:00.5Z",
+      "rhs": "2026-01-01T00:00:00.51Z",
+      "expected": "lt"
+    },
+    {
+      "name": "dt-nanosecond-resolution",
+      "lhs": "2026-01-01T00:00:00.000000001Z",
+      "rhs": "2026-01-01T00:00:00.000000002Z",
+      "expected": "lt"
+    },
+    {
+      "name": "dt-beyond-nanosecond-resolution",
+      "lhs": "2026-01-01T00:00:00.0000000000001Z",
+      "rhs": "2026-01-01T00:00:00Z",
+      "expected": "gt"
+    },
+    {
+      "name": "dt-fraction-vs-none",
+      "lhs": "2026-01-01T00:00:00Z",
+      "rhs": "2026-01-01T00:00:00.000Z",
+      "expected": "eq"
+    },
+    {
+      "name": "dt-before-epoch",
+      "lhs": "1969-12-31T23:59:59Z",
+      "rhs": "1970-01-01T00:00:00Z",
+      "expected": "lt"
+    },
+    {
+      "name": "dt-year-0001-below-9999",
+      "lhs": "0001-01-01T00:00:00Z",
+      "rhs": "9999-12-31T23:59:59Z",
+      "expected": "lt"
+    },
+    {
+      "name": "dt-leap-day-valid",
+      "lhs": "2024-02-29T00:00:00Z",
+      "rhs": "2024-03-01T00:00:00Z",
+      "expected": "lt"
+    },
+    {
+      "name": "dt-century-not-leap-invalid",
+      "lhs": "1900-02-29T00:00:00Z",
+      "rhs": "1900-03-01T00:00:00Z",
+      "expected": "incomparable"
+    },
+    {
+      "name": "dt-400-year-leap-valid",
+      "lhs": "2000-02-29T00:00:00Z",
+      "rhs": "2000-03-01T00:00:00Z",
+      "expected": "lt"
+    },
+    {
+      "name": "dt-day-after-month-end-invalid",
+      "lhs": "2026-04-31T00:00:00Z",
+      "rhs": "2026-05-01T00:00:00Z",
+      "expected": "incomparable"
+    },
+    {
+      "name": "dt-month-13-invalid",
+      "lhs": "2026-13-01T00:00:00Z",
+      "rhs": "2026-01-01T00:00:00Z",
+      "expected": "incomparable"
+    },
+    {
+      "name": "dt-hour-24-invalid",
+      "lhs": "2026-01-01T24:00:00Z",
+      "rhs": "2026-01-02T00:00:00Z",
+      "expected": "incomparable"
+    },
+    {
+      "name": "dt-second-60-invalid",
+      "lhs": "2026-01-01T00:00:60Z",
+      "rhs": "2026-01-01T00:01:00Z",
+      "expected": "incomparable"
+    },
+    {
+      "name": "dt-lowercase-separators-invalid",
+      "lhs": "2026-01-01t00:00:00z",
+      "rhs": "2026-01-01T00:00:00Z",
+      "expected": "incomparable"
+    },
+    {
+      "name": "dt-offset-without-colon-invalid",
+      "lhs": "2026-01-01T00:00:00+0100",
+      "rhs": "2026-01-01T00:00:00Z",
+      "expected": "incomparable"
+    },
+    {
+      "name": "dt-offset-hour-24-invalid",
+      "lhs": "2026-01-01T00:00:00+24:00",
+      "rhs": "2026-01-01T00:00:00Z",
+      "expected": "incomparable"
+    },
+    {
+      "name": "dt-date-only-invalid",
+      "lhs": "2026-01-01",
+      "rhs": "2026-01-02",
+      "expected": "incomparable"
+    },
+    {
+      "name": "dt-space-separator-invalid",
+      "lhs": "2026-01-01 00:00:00Z",
+      "rhs": "2026-01-01T00:00:00Z",
+      "expected": "incomparable"
+    },
+    {
+      "name": "dt-five-digit-year-invalid",
+      "lhs": "12026-01-01T00:00:00Z",
+      "rhs": "2026-01-01T00:00:00Z",
+      "expected": "incomparable"
+    },
+    {
+      "name": "dt-naive-before-naive",
+      "lhs": "2026-01-01T00:00:00",
+      "rhs": "2026-01-01T00:00:01",
+      "expected": "lt"
+    },
+    {
+      "name": "dt-naive-equal-naive",
+      "lhs": "2026-01-01T12:00:00.0",
+      "rhs": "2026-01-01T12:00:00",
+      "expected": "eq"
+    },
+    {
+      "name": "dt-naive-vs-aware-incomparable",
+      "lhs": "2026-01-01T00:00:00",
+      "rhs": "2026-01-01T00:00:00Z",
+      "expected": "incomparable"
+    },
+    {
+      "name": "dt-aware-vs-naive-incomparable",
+      "lhs": "2026-01-01T00:00:00+00:00",
+      "rhs": "2026-01-01T00:00:00",
+      "expected": "incomparable"
+    },
+    {
+      "name": "mixed-integer-vs-datetime",
+      "lhs": "5",
+      "rhs": "2026-01-01T00:00:00Z",
+      "expected": "incomparable"
+    },
+    {
+      "name": "mixed-datetime-vs-integer",
+      "lhs": "2026-01-01T00:00:00",
+      "rhs": "5",
+      "expected": "incomparable"
+    }
+  ]
+}

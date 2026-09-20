@@ -1,0 +1,6 @@
+{
+  "id": "err-token-int-in-array",
+  "description": "An out-of-range integer nested in an array is refused.",
+  "input": [1, 9007199254740993],
+  "error": "integer_out_of_range"
+}
