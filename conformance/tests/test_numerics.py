@@ -25,3 +25,22 @@ def test_main_json_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
     out = capsys.readouterr().out
     assert rc == 0
     assert '"identical": true' in out
+
+
+@pytest.mark.skipif(
+    shutil.which("java") is None, reason="the Java engine (a JDK) is not available"
+)
+def test_edge_vectors_pass_in_all_three_engines_identically() -> None:
+    result = numerics.run(("python", "typescript", "java"))
+    assert result["total"] > 0
+    assert result["python_failed"] == 0
+    assert result["ts_failed"] == 0
+    assert result["java_failed"] == 0
+    assert result["identical"] is True
+
+
+def test_engines_flag_must_keep_the_two_reference_engines() -> None:
+    with pytest.raises(SystemExit):
+        numerics.main(["--engines", "java"])
+    with pytest.raises(SystemExit):
+        numerics.main(["--engines", "python,typescript,rust"])
