@@ -130,6 +130,10 @@ def test_built_wheel_assess_and_readiness_default_to_the_bundled_catalog(
     assert assessed.returncode == 0, assessed.stderr[-600:]
     assert json.loads(assessed.stdout)["assertions"] > 0
 
+    # readiness exits 1 exactly for NOT READY, so the exit code and the verdict must agree.
     ready = run("readiness", str(out))
-    assert ready.returncode in (0, 1), ready.stderr[-600:]
-    assert json.loads(ready.stdout)["verdict"]
+    verdict = json.loads(ready.stdout)["verdict"]
+    assert verdict in {"READY", "READY WITH LIMITATIONS", "NOT READY"}, ready.stderr[
+        -600:
+    ]
+    assert ready.returncode == (1 if verdict == "NOT READY" else 0)
