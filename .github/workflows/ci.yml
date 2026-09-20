@@ -33,6 +33,14 @@ jobs:
           python3 tools/governance_check.py --self-test
           python3 tools/governance_check.py
 
+      - name: Release state and workflow pins
+        run: |
+          set -e
+          python3 tools/release_state_check.py --self-test
+          python3 tools/release_state_check.py
+          python3 tools/workflow_pins_check.py --self-test
+          python3 tools/workflow_pins_check.py
+
   no-network:
     # Real offline guarantee: run an actual assessment inside a network namespace that has no route
     # off the host. Dependencies are synced online first; the assessment itself runs with networking

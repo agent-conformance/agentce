@@ -1,7 +1,7 @@
 {
   "name": "agentce",
   "version": "0.1.0",
-  "description": "Alias package for @agent-conformance/cli (the Agent Conformance Engine) so that `npx agentce` works.",
+  "description": "Alias package that depends on @agent-conformance/cli (the Agent Conformance Engine), so the agentce name resolves to the same engine.",
   "license": "Apache-2.0",
   "homepage": "https://agent-conformance.org",
   "repository": {

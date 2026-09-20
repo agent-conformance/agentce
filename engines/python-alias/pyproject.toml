@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "agentce"
 version = "0.1.0"
-description = "Alias package: installs agent-conformance (the Agent Conformance Engine) so that `pip install agentce` works."
+description = "Alias package: depends on agent-conformance (the Agent Conformance Engine), so the agentce name resolves to the same engine."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"

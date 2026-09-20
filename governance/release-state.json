@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "version": "0.1.0",
+  "note": "One entry per distribution channel. `published` is flipped by the maintainer when the artifact is live on that channel and `python3 tools/release_state_check.py --online` passes; nothing else may claim a channel is live. A page shows `one_liner` only for a published channel and `today` otherwise; `patterns` are the regular expressions that identify a one-liner for the channel in prose.",
+  "channels": {
+    "pypi": {
+      "published": false,
+      "artifact": "agent-conformance",
+      "today": "uv run --project engines/python agentce quickstart --out ./out",
+      "one_liner": "uvx --from agent-conformance agentce quickstart --out ./out",
+      "patterns": [
+        "\\b(pip|pipx|uvx)\\b[^\\n`]*\\b(agent-conformance|agentce)(-emit)?\\b",
+        "\\buv\\s+(tool|pip)\\s+(install|run)\\b[^\\n`]*\\b(agent-conformance|agentce)(-emit)?\\b"
+      ]
+    },
+    "npm": {
+      "published": false,
+      "artifact": "@agent-conformance/cli",
+      "today": "pnpm --dir engines/typescript build && node engines/typescript/bin/agentce.js --version",
+      "one_liner": "npx --package @agent-conformance/cli agentce --version",
+      "patterns": [
+        "\\bnpx\\b[^\\n`]*(@agent-conformance/|\\bagentce\\b)",
+        "\\b(npm|pnpm|yarn)\\s+(install|i|add|dlx)\\b[^\\n`]*@agent-conformance/"
+      ]
+    },
+    "maven-central": {
+      "published": false,
+      "artifact": "org.agentce:agentce",
+      "today": "engines/java/gradlew -p engines/java runnableJar && java -jar engines/java/build/libs/agentce-0.1.0-all.jar --version",
+      "one_liner": null,
+      "patterns": [
+        "org\\.agentce:agentce",
+        "<groupId>org\\.agentce</groupId>"
+      ]
+    },
+    "container-registry": {
+      "published": false,
+      "artifact": "ghcr.io/agent-conformance/agentce",
+      "today": "docker build -f engines/python/Dockerfile -t agentce/agentce:dev . && docker run --rm agentce/agentce:dev quickstart --out /tmp/report",
+      "one_liner": "docker run --rm --network none ghcr.io/agent-conformance/agentce:0.1.0 quickstart --out /tmp/report",
+      "patterns": [
+        "\\bdocker\\s+(run|pull)\\b[^\\n`]*ghcr\\.io/agent-conformance/",
+        "ghcr\\.io/agent-conformance/agentce"
+      ]
+    },
+    "homebrew-tap": {
+      "published": false,
+      "artifact": "agent-conformance/tap/agentce",
+      "today": null,
+      "one_liner": "brew install agent-conformance/tap/agentce",
+      "patterns": [
+        "\\bbrew\\s+(install|tap)\\b[^\\n`]*(agent-conformance|agentce)"
+      ]
+    },
+    "site": {
+      "published": false,
+      "artifact": "https://agent-conformance.org/",
+      "today": null,
+      "one_liner": null,
+      "patterns": []
+    }
+  }
+}
