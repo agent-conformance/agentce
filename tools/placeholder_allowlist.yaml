@@ -424,3 +424,9 @@ allow:
     count: 6
     class: legitimate
     justification: "Byte-identical vendored copy of spec/catalogs/base/eu-ai-act/crosswalk/pren-18229-1.yaml, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: website/scripts/check-install.mjs
+    pattern: placeholder
+    count: 1
+    class: legitimate
+    justification: "The Install check's own detection pattern for an unfinished published one-liner; it names the word it forbids."

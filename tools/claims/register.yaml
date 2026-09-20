@@ -331,3 +331,20 @@ claims:
         in it with no network and checks the report it wrote, and asserts the engine is imported
         from site-packages and that no repository or private path exists in the image; the hygiene
         job also runs the recipe check over the Dockerfile and the .dockerignore.
+  - id: install.release-state-parity
+    text: >-
+      The Install page shows a zero-install command (uvx, pipx, npx, or docker run) for a distribution
+      channel only when the release-state switch marks that channel published, and the command that
+      works from a checkout today otherwise; a published channel names a pinned version or image digest.
+    status: built
+    pages:
+      - website/src/content/docs/docs/install.mdx
+    check:
+      workflow: .github/workflows/website.yml
+      job: build
+      description: >-
+        On every pull request, runs the Install check's self-test (the resolver flips both ways per
+        channel, constant resolvers are rejected, and planted leaks, unpinned or unfinished artifacts,
+        hand-typed one-liners, and missing tabs each fail) and then checks the built site, where the tabs
+        must equal what the switch renders and no built page may show the one-liner of an unpublished
+        channel.
