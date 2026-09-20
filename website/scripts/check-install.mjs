@@ -3,6 +3,8 @@
 //   node scripts/check-install.mjs                 parity over the committed switch and the Install section's
 //                                                  sources, and over the built site when dist/ exists
 //   node scripts/check-install.mjs --require-built  the same, and fail when the site has not been built
+//   node scripts/check-install.mjs --dist <dir>     check the built pages under <dir> instead of dist/
+//                                                  (how the committed known-bad build is shown to be caught)
 //   node scripts/check-install.mjs --self-test      prove the gate is real logic and the checks can fail:
 //                                                  the resolver flips both ways, and planted bad tabs, bad
 //                                                  data, and bad sources are each rejected
@@ -318,6 +320,12 @@ export function selfTest(base) {
   rejects(tabViolations(all, tabsFromHtml(renderHtml(installTabs(none)))), 'the switch says published', 'unpublished tabs rendered over a published switch');
   rejects(tabViolations(none, tabsFromHtml('<pre><code>uvx x</code></pre>')), 'tabs are absent', 'a page whose tabs are not marked as switch-driven');
 
+  // 7. A committed known-bad build (one tab shows a published one-liner over an unpublished switch)
+  // is rejected by the same check that guards the real build.
+  const leaky = builtViolations(none, join(siteRoot, 'tests/fixtures/install-leaky-dist'));
+  rejects(leaky, 'tab uvx: shown as published but the switch says unpublished', 'the committed leaky build');
+  rejects(leaky, 'shows a pypi one-liner but the channel is not published', 'the committed leaky build');
+
   return failures;
 }
 
@@ -338,7 +346,8 @@ if (args.includes('--self-test')) {
 }
 
 const problems = [...dataViolations(state), ...tabViolations(state, installTabs(state)), ...sourceViolations(state, committedSources())];
-const dist = join(siteRoot, 'dist');
+const distArg = args.indexOf('--dist');
+const dist = distArg >= 0 ? resolve(args[distArg + 1]) : join(siteRoot, 'dist');
 if (existsSync(dist)) problems.push(...builtViolations(state, dist));
 else if (args.includes('--require-built')) problems.push('dist/ not found - run the build first');
 
