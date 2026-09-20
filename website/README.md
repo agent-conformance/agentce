@@ -40,5 +40,12 @@ change to the engine, the corpus, or the report that alters that run, regenerate
 `uv`) and fails when a committed surface no longer equals a fresh run or claims that every control is
 conformant.
 
+The Install page (`src/content/docs/docs/install.mdx`) renders its per-ecosystem tabs from
+`src/data/release-state.json` through `src/lib/install.mjs`: a tab shows a channel's zero-install
+one-liner only when the maintainer has marked that channel published, and the command that works from a
+checkout today otherwise. The `website` workflow runs `node scripts/check-install.mjs --self-test` and
+`node scripts/check-install.mjs --require-built`, which fail when a tab leaks an unpublished one-liner,
+when a published channel names no pinned artifact, or when the gate stops flipping.
+
 Deployment is a static upload of `website/dist/`; a human performs the deploy and DNS, so the site is
 built and configured here but never published from this repository.

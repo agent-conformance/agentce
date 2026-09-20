@@ -30,6 +30,11 @@ jobs:
       - name: Check links and structural accessibility (fast regex pre-check)
         working-directory: website
         run: node scripts/check-site.mjs
+      - name: Install section is gated by the release-state switch (self-test, then the built site)
+        working-directory: website
+        run: |
+          node scripts/check-install.mjs --self-test
+          node scripts/check-install.mjs --require-built
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
