@@ -1,0 +1,16 @@
+# Conduct overlay (SPEC §7.7): agent-conduct controls layered on the base catalog. Selected by
+# a profile that declares task effect scopes; the overlay never weakens a base control.
+id: conduct
+version: "2026.09"
+title: Conduct overlay
+kind: overlay
+families: [CND]
+controls:
+  - controls/CND-01.yaml
+  - controls/CND-02.yaml
+  - controls/CND-03.yaml
+  - controls/CND-04.yaml
+  - controls/CND-05.yaml
+  - controls/CND-06.yaml
+  - controls/CND-07.yaml
+  - controls/CND-08.yaml

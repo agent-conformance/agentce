@@ -1,0 +1,26 @@
+id: CND-03
+version: "2026.09"
+title: Harm signals are triaged into an incident or recorded decision
+crosswalk:
+  - {framework: eu-ai-act, clause: "Art. 26(5), 72, 73", relation: implements, verified_against_text: false}
+applicability:
+  applies_to_roles: [deployer, provider]
+evaluation:
+  mode: semi-automated
+  rung: 3
+  min_source_class: enforcement_point
+  minimum_evidence:
+    - {event: ToolCall, class: enforcement_point}
+expectations:
+  - {id: S1, text: "Harm signals are triaged into an incident or recorded decision."}
+severity: medium
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+tolerance_rationale: "A single CND-03 breach is a conduct failure."
+false_positive_modes:
+  - "An action authorised under a declared, exempt break-glass policy."
+techniques:
+  - "techniques/task-scope-binding-at-ingress"
+# manual part: the CND-03-M checklist (checklists/CND-03-M.yaml), wired to report_readiness in item 4.3
+test_cases:
+  - {id: pending, expected: not_assessed, fixture: test/CND-03/pending.jsonl}

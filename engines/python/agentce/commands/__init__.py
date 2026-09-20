@@ -23,7 +23,7 @@ from typing import Any
 
 import yaml
 
-from .. import ENGINE_NAME, SPEC_VERSION, __version__, no_ml, readiness
+from .. import ENGINE_NAME, SPEC_VERSION, __version__, bundled, no_ml, readiness
 from ..applicability import resolve as resolve_applicability
 from ..assess import assess_subjects, evaluated_nothing
 from ..bundle import load_bundle
@@ -442,8 +442,8 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
 
 
 def _vendored_catalogs() -> dict[str, Path]:
-    """Every catalog vendored in the repository (base and sector overlays), keyed ``id@version``."""
-    root = _repo_root() / "spec" / "catalogs"
+    """Every catalog the engine ships (base and sector overlays), keyed ``id@version``."""
+    root = bundled.catalogs_dir()
     found: dict[str, Path] = {}
     for catalog_yaml in sorted(root.glob("*/*/catalog.yaml")):
         if catalog_yaml.parent.parent.name not in ("base", "overlays"):
@@ -980,7 +980,7 @@ def _sign_signer(ns: argparse.Namespace, profile: str) -> signing.Signer:
 def _readiness_severities(ns: argparse.Namespace) -> dict[str, str]:
     dirs = list(getattr(ns, "catalog_dir", None) or [])
     if not dirs:
-        base = _repo_root() / "spec" / "catalogs" / "base"
+        base = bundled.catalogs_dir() / "base"
         dirs = [str(p.parent) for p in sorted(base.glob("*/catalog.yaml"))]
     severities: dict[str, str] = {}
     for directory in dirs:
@@ -1166,11 +1166,6 @@ def cmd_doctor(ns: argparse.Namespace) -> CommandResult:
     return result
 
 
-def _repo_root() -> Path:
-    """The repository root, from the engine package location (Phase-1 dev layout)."""
-    return Path(__file__).resolve().parents[4]
-
-
 #: Framework → the evidence-source adapter an adopter most likely starts with (SPEC §12).
 _FRAMEWORK_ADAPTER = {
     "langgraph": "otel-genai",
@@ -1196,13 +1191,13 @@ def cmd_quickstart(ns: argparse.Namespace) -> CommandResult:
         raise InputError(
             "input.out_missing", "an output directory is required.", "pass --out <dir>."
         )
-    quickstart = _repo_root() / "corpus" / "quickstart"
-    catalog_dir = _repo_root() / "spec" / "catalogs" / "base" / "eu-ai-act"
+    quickstart = bundled.quickstart_dir()
+    catalog_dir = bundled.catalogs_dir() / "base" / "eu-ai-act"
     if not quickstart.is_dir():
         raise InputError(
             "input.quickstart_missing",
             f"the quickstart project is missing at {quickstart}.",
-            "reinstall the engine, or run from a checkout that carries corpus/quickstart.",
+            "reinstall the engine: the quickstart project ships inside the package.",
         )
     assess_ns = argparse.Namespace(
         bundle=str(quickstart / "evidence"),
