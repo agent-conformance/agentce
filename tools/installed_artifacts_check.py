@@ -86,7 +86,9 @@ def _clean_env(extra: dict[str, str] | None = None) -> dict[str, str]:
         for k, v in os.environ.items()
         if k in ("PATH", "HOME", "TMPDIR", "JAVA_HOME")
     }
-    env.update({"LANG": "C", "LC_ALL": "C", "TZ": "UTC"})
+    env.update(
+        {"LANG": "C", "LC_ALL": "C", "TZ": "UTC", "PYTHONDONTWRITEBYTECODE": "1"}
+    )
     env.update(extra or {})
     return env
 
@@ -517,7 +519,9 @@ def _inert_wheel(directory: Path, version: str) -> Path:
 def self_test() -> int:
     runner = Runner(require_netns=False)
     failures: list[str] = []
-    with tempfile.TemporaryDirectory(prefix="agentce-installed-selftest-") as raw:
+    with tempfile.TemporaryDirectory(
+        prefix="agentce-installed-selftest-", ignore_cleanup_errors=True
+    ) as raw:
         tmp = Path(raw)
         good = tmp / "good"
         (good / "packs" / "p").mkdir(parents=True)
