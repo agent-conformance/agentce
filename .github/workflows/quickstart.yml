@@ -110,7 +110,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Build the engine image without pushing
         run: docker build -f engines/python/Dockerfile -t agentce/agentce:dev .
-      - name: Run the quickstart in the image with no network
+      - name: Run the quickstart in the image with no network, as the caller's own user id
         run: |
           set -e
           mkdir -p "$RUNNER_TEMP/report"
@@ -118,13 +118,16 @@ jobs:
             -v "$RUNNER_TEMP/report:/out" agentce/agentce:dev quickstart --out /out
           test -s "$RUNNER_TEMP/report/assertions.json" || {
             echo "::error::the image's quickstart wrote no assertions.json" >&2; ls -R "$RUNNER_TEMP/report" >&2; exit 1; }
+      - name: Run the image's default command with no network, as its own user
+        run: docker run --rm --network none agentce/agentce:dev
       - name: The image holds the installed package, not the repository
         run: |
           set -e
           docker run --rm --entrypoint python agentce/agentce:dev -c \
             "import agentce, pathlib; p = pathlib.Path(agentce.__file__).resolve(); assert 'site-packages' in p.parts, p"
           docker run --rm --entrypoint sh agentce/agentce:dev -c \
-            'for p in /agentce /src /SPECS /home/agentce/engines /home/agentce/SPECS /home/agentce/.git; do test ! -e "$p" || { echo "unexpected $p in the image" >&2; exit 1; }; done'
+            'test -z "$(ls -A /work)" && test -z "$(find /src /app /agentce /home /opt /srv /tmp /work -maxdepth 3 \( -name .git -o -name engines -o -name "SPEC[S]" \) 2>/dev/null)"' \
+            || { echo "::error::the image holds repository files" >&2; exit 1; }
 
   installed-artifacts-offline:
     name: installed artifacts run offline
