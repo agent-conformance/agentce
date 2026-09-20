@@ -39,10 +39,13 @@ uv run --project engines/python agentce report --validate ./out
 about the system under assessment (SPEC §6.5) — and an empty domain binding, `agentce/domain.linkml.yaml`:
 
 ```bash
-uv run --project engines/python agentce init \
-  --non-interactive --framework custom-loop --subject spiffe://corp/agents/my-agent --role deployer \
-  --out ./my-assessment
+uv run --project engines/python agentce init --out ./my-assessment
 ```
+
+With no other flag it writes the profile for a `custom-loop` agent with the `deployer` role, under the subject
+`agentce:subject/local` that `agentce_emit` emits under by default; without `--out` it writes into the current
+directory. Name your own with `--framework`, `--subject` and `--role`, and pass `--force` to overwrite a profile
+that already exists.
 
 Fill in the `TODO`s in `./my-assessment/agentce/applicability.yaml`, then check it validates:
 

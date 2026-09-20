@@ -37,8 +37,8 @@ records only their SHA-256. Agent-side emission is `self_report` (SPEC §6.4, S-
 Run it:
 
 ```bash
-AGENTCE_EMIT=1 AGENTCE_EMIT_OUT=agentce/bundle python your_agent.py
-agentce validate --bundle agentce/bundle
+AGENTCE_EMIT=1 AGENTCE_EMIT_OUT=evidence python your_agent.py
+agentce validate --bundle evidence
 ```
 
 ## Run an example
