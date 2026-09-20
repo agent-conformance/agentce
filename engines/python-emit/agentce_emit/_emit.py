@@ -1,10 +1,12 @@
 """The AgentCE evidence emitter (SPEC §13.1, §13.4 AX-3).
 
-``agentce-emit`` lets an agent emit canonical AgentCE evidence with one line: ``agentce_emit.auto()``
-returns an :class:`Emitter` that is active when ``AGENTCE_EMIT=1`` and a no-op otherwise, so wiring it
-in never changes behaviour until it is switched on. Every event is a CloudEvents 1.0 envelope with a
-JSON-LD payload, labelled ``self_report`` (agent-side emission is a self-report, S-2), with content
-referenced by hash rather than captured (SPEC R12) and ids derived deterministically. On flush the
+``agentce-emit`` lets an agent emit canonical AgentCE evidence: ``agentce_emit.auto()`` is one line that
+returns an :class:`Emitter`, active when ``AGENTCE_EMIT=1`` and a no-op otherwise, so wiring it in never
+changes behaviour until it is switched on. Each event is an explicit ``emit_*`` call; capturing events
+automatically from an agent framework's own instrumentation is on the roadmap and is not built. Every
+event is a CloudEvents 1.0 envelope with a JSON-LD payload, labelled ``self_report`` (agent-side emission
+is a self-report, S-2), with content referenced by hash rather than captured (SPEC R12) and ids derived
+deterministically. On flush the
 emitter writes an evidence bundle (``events/*.jsonl`` + ``manifest.json``) that ``agentce validate``
 accepts with zero quarantines. Standard library only; no network, no learned component.
 """
@@ -272,12 +274,15 @@ class Emitter:
 
 
 def auto(**overrides: Any) -> Emitter:
-    """One-line integration (SPEC §13.4 AX-3): an :class:`Emitter`, active iff ``AGENTCE_EMIT=1``.
+    """One-line setup (SPEC §13.4 AX-3): an :class:`Emitter`, active iff ``AGENTCE_EMIT=1``.
+
+    This returns the emitter and does nothing else: it does not hook any agent framework, so with no
+    ``emit_*`` calls it captures no events (automatic capture is on the roadmap, not built).
 
     Reads ``AGENTCE_EMIT`` (activation), ``AGENTCE_EMIT_OUT`` (bundle directory),
     ``AGENTCE_EMIT_SUBJECT``, and ``AGENTCE_EMIT_SOURCE``; keyword overrides win. When active, the
-    bundle is flushed at process exit, so ``import agentce_emit; agentce_emit.auto()`` plus a few
-    ``emit_*`` calls is all an agent needs.
+    bundle is flushed at process exit, so ``import agentce_emit; agentce_emit.auto()`` plus an
+    ``emit_*`` call at each chokepoint is all an agent needs.
     """
     active = bool(overrides.get("active", os.environ.get("AGENTCE_EMIT") == "1"))
     emitter = Emitter(
