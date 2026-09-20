@@ -1,7 +1,7 @@
 [project]
 name = "agentce-tools"
 version = "0.1.0"
-description = "Repository-level checks: the no-learned-components denylist scanner, the SPDX licensing check, the public-claims register check, and the placeholder sweep."
+description = "Repository-level checks: the no-learned-components denylist scanner, the SPDX licensing check, the public-claims register check, the placeholder sweep, and the documentation command check."
 requires-python = ">=3.12"
 dependencies = ["pyyaml>=6,<7"]
 
@@ -10,7 +10,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-py-modules = ["claims_check", "placeholder_sweep"]
+py-modules = ["claims_check", "docs_doctest_check", "placeholder_sweep"]
 
 [dependency-groups]
 dev = [
