@@ -117,12 +117,6 @@ allow:
     class: legitimate
     justification: "Genesis all-zero prev pointers in the integrity test fixture's hash chains (no predecessor block)."
 
-  - path: engines/python/README.md
-    pattern: placeholder
-    count: 1
-    class: legitimate
-    justification: "Describes the pre-GA placeholder distribution package."
-
   - path: engines/python/agentce/commands/__init__.py
     pattern: todo
     count: 6
@@ -152,12 +146,6 @@ allow:
     count: 1
     class: legitimate
     justification: "The pre-GA placeholder distribution package's description field."
-
-  - path: engines/typescript/README.md
-    pattern: placeholder
-    count: 1
-    class: legitimate
-    justification: "Describes the pre-GA placeholder distribution package."
 
   - path: engines/typescript/src/cli.ts
     pattern: not-implemented
