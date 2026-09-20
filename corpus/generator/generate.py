@@ -34,7 +34,7 @@ from agentce import canonical
 
 # --- Corpus shape (SPEC §11.2). -------------------------------------------------------------------
 
-GENERATOR_VERSION = "1"
+GENERATOR_VERSION = "2"
 CORPUS_VERSION = "2026.09"
 DOMAIN = "credit"
 
@@ -597,10 +597,37 @@ def _scenario(
             "INT-01": "conformant",
             "INC-02": "conformant",
         }
+        # The independent denominator (SPEC §6.5) is a system of record that saw more tool calls than
+        # the agent's own captured evidence holds: its own events are the yardstick the engine counts.
+        ledger = "urn:agentce:source:reference-ledger"
+        declared = 5
+        for n in range(1, declared + 1):
+            events.append(
+                _event(
+                    eid=f"{style_id}-{variant}-ref{n}",
+                    source=ledger,
+                    subject=subject,
+                    time=clock.next(),
+                    etype="ToolCall",
+                    sclass="independent_system",
+                    data={
+                        "agent": agent,
+                        "tool": {
+                            "name": domain.tool_name,
+                            "server": domain.tool_server,
+                            "protocol": "mcp",
+                        },
+                        "side_effect": "write",
+                    },
+                    conv=conv,
+                    task=task,
+                    trace=trace,
+                )
+            )
         extras["coverage_gap"] = {
-            "source": "urn:agentce:source:reference-ledger",
+            "source": ledger,
+            "kind": "system_of_record_export",
             "event_type": "ToolCall",
-            "declared": 5,
         }
 
     return events, expected, faults, extras
@@ -851,33 +878,16 @@ def _write_project(
         files.append({"path": rel, "sha256": digest})
         total_events += FILLER_EVENTS
 
-    # A coverage denominator that declares more than was captured (SPEC §11.2 coverage-gap).
+    # The coverage-gap denominator (SPEC §11.2): an independent source whose events outnumber the
+    # captured ones. It is declared by kind, source, and the event types it covers.
     coverage_denoms: list[dict[str, Any]] = []
     if "coverage_gap" in extras:
         gap = extras["coverage_gap"]
-        ref_rel = "reference/coverage.json"
-        (evidence / "reference").mkdir(parents=True, exist_ok=True)
-        (evidence / ref_rel).write_text(
-            json.dumps(
-                {"counts": {gap["event_type"]: gap["declared"]}},
-                sort_keys=True,
-                indent=2,
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-        files.append(
-            {
-                "path": ref_rel,
-                "sha256": hashlib.sha256((evidence / ref_rel).read_bytes()).hexdigest(),
-            }
-        )
         coverage_denoms = [
             {
-                "kind": "reference-ledger",
+                "kind": gap["kind"],
                 "source": gap["source"],
                 "covers": [gap["event_type"]],
-                "manifest": ref_rel,
             }
         ]
 
@@ -911,6 +921,7 @@ def _write_project(
         "subject": subject,
         "events": total_events,
         "bundle_digest": bundle_digest,
+        **authored_digests(proj_dir),
         "expected": expected,
         "seeded_faults": len(faults),
     }
@@ -1104,9 +1115,29 @@ def _write_multi_agent(
         "subjects": sorted(subjects.values()),
         "events": total_events,
         "bundle_digest": bundle_digest,
+        **authored_digests(proj_dir),
         "expected": expected_by_subject,
         "seeded_faults": sum(1 for f in faults.values() if f is not None),
     }
+
+
+#: The trust class each evidence source is declared under and why (SPEC §6.5, trust-class
+#: justification): every source in a profile carries one.
+_SOURCE_TRUST: dict[str, tuple[str, str]] = {
+    "agent": ("self_report", "emitted by the agent runtime itself"),
+    "gateway": (
+        "enforcement_point",
+        "the gateway sits on the only egress path and the agent holds no direct tool credential",
+    ),
+    "idp": (
+        "enforcement_point",
+        "the workload identity provider issues and verifies every agent credential",
+    ),
+    "register": (
+        "independent_system",
+        "records kept by the incident register, which agent identities cannot write",
+    ),
+}
 
 
 def _write_multi_profile(
@@ -1132,15 +1163,11 @@ def _write_multi_profile(
         lines.append(f'      "{domain.consequential}": "review_before"')
         lines.append("    evidence_sources:")
         for key in ("agent", "gateway", "idp", "register"):
-            cls = {
-                "agent": "self_report",
-                "gateway": "enforcement_point",
-                "idp": "enforcement_point",
-                "register": "independent_system",
-            }[key]
+            cls, justification = _SOURCE_TRUST[key]
             lines.append(f'      - adapter: "{key}"')
             lines.append(f'        source: "{sources[key]}"')
             lines.append(f'        class: "{cls}"')
+            lines.append(f'        class_justification: "{justification}"')
     (proj_dir / "applicability.yaml").write_text(
         "\n".join(lines) + "\n", encoding="utf-8"
     )
@@ -1257,21 +1284,16 @@ def _write_profile(
         "    evidence_sources:",
     ]
     for key in ("agent", "gateway", "idp", "register"):
-        cls = {
-            "agent": "self_report",
-            "gateway": "enforcement_point",
-            "idp": "enforcement_point",
-            "register": "independent_system",
-        }[key]
+        cls, justification = _SOURCE_TRUST[key]
         lines.append(f'      - adapter: "{key}"')
         lines.append(f'        source: "{sources[key]}"')
         lines.append(f'        class: "{cls}"')
+        lines.append(f'        class_justification: "{justification}"')
     if coverage_denoms:
         lines.append("    coverage_denominators:")
         for denom in coverage_denoms:
             lines.append(f'      - kind: "{denom["kind"]}"')
             lines.append(f'        source: "{denom["source"]}"')
-            lines.append(f'        manifest: "{denom["manifest"]}"')
             lines.append("        covers:")
             for cover in denom["covers"]:
                 lines.append(f'          - "{cover}"')
@@ -1427,21 +1449,50 @@ def _build_full(out: Path) -> dict[str, Any]:
     return _finalise(out, "full", "multi", projects)
 
 
+#: The authored files each project's pin covers, beside its evidence bundle: the manifest key that
+#: records the file's digest, and the file's path under the project directory. The ground truth and
+#: the inputs to an assessment (profile, domain binding, deviations) must not drift unseen.
+AUTHORED_FILES: dict[str, str] = {
+    "ground_truth_digest": "expected/outcomes.json",
+    "profile_digest": "applicability.yaml",
+    "domain_digest": "domain.linkml.yaml",
+    "deviations_digest": "deviations.yaml",
+}
+
+
+def authored_digests(proj_dir: Path) -> dict[str, str]:
+    """Return the ``sha256:`` digest of each authored file of the project in ``proj_dir``."""
+    return {
+        key: "sha256:" + hashlib.sha256((proj_dir / rel).read_bytes()).hexdigest()
+        for key, rel in AUTHORED_FILES.items()
+    }
+
+
+def corpus_digest(projects: list[dict[str, Any]]) -> str:
+    """The corpus-manifest digest the dataset pin freezes (SPEC §11.7): every project's id, evidence
+    bundle digest, event count, and authored-file digests, in id order."""
+    rows = sorted(projects, key=lambda p: p["id"])
+    material = "\n".join(
+        "\t".join(
+            [p["id"], p["bundle_digest"], str(p["events"])]
+            + [p[key] for key in AUTHORED_FILES]
+        )
+        for p in rows
+    )
+    return "sha256:" + hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
 def _finalise(
     out: Path, set_name: str, domain_label: str, projects: list[dict[str, Any]]
 ) -> dict[str, Any]:
     """Sort the projects, write ``corpus-manifest.json``, and return the manifest."""
     projects.sort(key=lambda p: p["id"])
-    digest_material = "\n".join(
-        f"{p['id']}\t{p['bundle_digest']}\t{p['events']}" for p in projects
-    )
     manifest = {
         "corpus_version": CORPUS_VERSION,
         "generator_version": GENERATOR_VERSION,
         "set": set_name,
         "domain": domain_label,
-        "digest": "sha256:"
-        + hashlib.sha256(digest_material.encode("utf-8")).hexdigest(),
+        "digest": corpus_digest(projects),
         "projects": projects,
     }
     (out / "corpus-manifest.json").write_text(
