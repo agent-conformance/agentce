@@ -6,7 +6,7 @@ One page per command (SPEC §8.5). Each is generated from the engine's own argum
 |---|---|
 | [`agentce assess`](assess.md) | run a full assessment |
 | [`agentce catalog`](catalog.md) | catalog tools |
-| [`agentce collect`](collect.md) | pull evidence from sources via adapters |
+| [`agentce collect`](collect.md) | plan a scheduled collection job; no source connector exists yet |
 | [`agentce config`](config.md) | show engine configuration |
 | [`agentce conformance`](conformance.md) | engine conformance suite |
 | [`agentce diff`](diff.md) | deterministic diff of two assertion sets |

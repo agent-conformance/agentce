@@ -129,7 +129,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=commands.cmd_report)
 
     p = sub.add_parser(
-        "collect", parents=[common], help="pull evidence from sources via adapters"
+        "collect",
+        parents=[common],
+        help="plan a scheduled collection job; no source connector exists yet",
+        description=(
+            "Plan a scheduled collection job from a config. --dry-run lists what would be collected "
+            "and resolves no credential. A real run has no source connector yet (on the roadmap): "
+            "it records every source incomplete, reason 'no source connector in the reference "
+            "collector', and exits 1. To get evidence into a bundle today, emit it with agentce-emit."
+        ),
     )
     p.add_argument("--config", help="the collection config file")
     p.add_argument("--out", help="the output bundle path")
