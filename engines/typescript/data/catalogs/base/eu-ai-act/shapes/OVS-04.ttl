@@ -1,0 +1,8 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+
+agentce:OVS-04-Shape a sh:NodeShape ;
+  sh:targetClass agentce:ToolCall ;
+  agentce:targetWhere [ agentce:executesConsequential true ] ;
+  sh:property [ sh:path ( agentce:delegatedVia agentce:chainVerified ) ; sh:hasValue true ; sh:name "S1" ] .

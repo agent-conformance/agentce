@@ -1,0 +1,46 @@
+{
+  "agentce_bundle_version": 1,
+  "domain": "credit",
+  "files": [
+    {
+      "path": "events/_benign-quarantine.jsonl",
+      "sha256": "1e51ec49bcd11994512777f758d23ed0d23cac69350bb1234ac9a8f9a4d54f4b"
+    },
+    {
+      "path": "events/urn-agentce-source-incident-register-corp.jsonl",
+      "sha256": "588230369bdd29e2c15604d17b258efa379da765236108b5f8b80ca6343c0614"
+    },
+    {
+      "path": "events/urn-agentce-source-langgraph-gateway-eu-1.jsonl",
+      "sha256": "e7cbc309e6fed8d0f72d612dfcbcee066ebb2b55dec168e595ec64289601e2d4"
+    },
+    {
+      "path": "events/urn-agentce-source-langgraph-runtime-eu-1.jsonl",
+      "sha256": "21d55d0be62f6831d5503d2a18c4b09f499e76b8a12fa6749cc3c8349d250b53"
+    },
+    {
+      "path": "events/urn-agentce-source-workload-idp-eu-1.jsonl",
+      "sha256": "958b4b3cec0721ab2ebffd62ce50460febea06bf6ed1a5d42eec6fa1a128f4ca"
+    }
+  ],
+  "sources": [
+    {
+      "id": "urn:agentce:source:incident-register:corp"
+    },
+    {
+      "id": "urn:agentce:source:langgraph-gateway:eu-1"
+    },
+    {
+      "id": "urn:agentce:source:langgraph-runtime-bulk:eu-1"
+    },
+    {
+      "id": "urn:agentce:source:langgraph-runtime:eu-1"
+    },
+    {
+      "id": "urn:agentce:source:langgraph-session:eu-1"
+    },
+    {
+      "id": "urn:agentce:source:workload-idp:eu-1"
+    }
+  ]
+}

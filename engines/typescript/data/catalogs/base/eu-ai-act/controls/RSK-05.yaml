@@ -1,0 +1,25 @@
+id: RSK-05
+version: "2026.09"
+title: Registration and applicability declarations are current
+crosswalk:
+  - {framework: eu-ai-act, clause: "Art. 49 / 71", relation: implements, verified_against_text: false}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: manual
+  rung: 3
+  min_source_class: self_report
+  minimum_evidence:
+    - {event: Decision, class: self_report}
+expectations:
+  - {id: S1, text: "Registration and applicability declarations are current."}
+severity: medium
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+tolerance_rationale: "RSK-05 is a structural expectation with no tolerated exceptions."
+false_positive_modes:
+  - "A condition declared as an accepted deviation in the applicability profile."
+techniques:
+  - "techniques/rsk-evidence-at-source"
+test_cases:
+  - {id: pending, expected: not_assessed, fixture: test/RSK-05/pending.jsonl}

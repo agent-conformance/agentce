@@ -18,6 +18,8 @@
   "files": [
     "bin/",
     "dist/",
+    "data/",
+    "schema/",
     "README.md",
     "LICENSE"
   ],
