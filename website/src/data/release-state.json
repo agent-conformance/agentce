@@ -1,13 +1,14 @@
 {
   "schema": 1,
   "version": "0.1.0",
-  "note": "One entry per distribution channel. `published` is flipped by the maintainer when the artifact is live on that channel and `python3 tools/release_state_check.py --online` passes; nothing else may claim a channel is live. A page shows `one_liner` only for a published channel and `today` otherwise; `patterns` are the regular expressions that identify a one-liner for the channel in prose.",
+  "note": "One entry per distribution channel. `published` is flipped by the maintainer when the artifact is live on that channel and `python3 tools/release_state_check.py --online` passes; nothing else may claim a channel is live. A page shows `one_liner` (and, for PyPI, `pipx_one_liner`) only for a published channel and `today` otherwise; a published channel's one-liners pin the release version or an image digest; `patterns` are the regular expressions that identify a one-liner for the channel in prose.",
   "channels": {
     "pypi": {
       "published": false,
       "artifact": "agent-conformance",
       "today": "uv run --project engines/python agentce quickstart --out ./out",
-      "one_liner": "uvx --from agent-conformance agentce quickstart --out ./out",
+      "one_liner": "uvx --from agent-conformance==0.1.0 agentce quickstart --out ./out",
+      "pipx_one_liner": "pipx run --spec agent-conformance==0.1.0 agentce quickstart --out ./out",
       "patterns": [
         "\\b(pip3?|pipx|uvx)\\b[^\\n`]*\\b(agent-conformance|agentce)(-emit)?\\b",
         "\\buv\\s+(tool|pip)\\s+(install|run)\\b[^\\n`]*\\b(agent-conformance|agentce)(-emit)?\\b"
@@ -17,7 +18,7 @@
       "published": false,
       "artifact": "@agent-conformance/cli",
       "today": "pnpm --dir engines/typescript build && node engines/typescript/bin/agentce.js --version",
-      "one_liner": "npx --package @agent-conformance/cli agentce --version",
+      "one_liner": "npx --package @agent-conformance/cli@0.1.0 agentce --version",
       "patterns": [
         "\\bnpx\\b[^\\n`]*(@agent-conformance/|\\bagentce\\b)",
         "\\b(npm|pnpm|yarn)\\s+(install|i|add|dlx)\\b[^\\n`]*@agent-conformance/"
