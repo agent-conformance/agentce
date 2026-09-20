@@ -1,0 +1,8 @@
+# Insurance sector overlay (SPEC §7.3): bounded-threshold controls layered on the base catalog.
+id: insurance
+version: "2026.09"
+title: Insurance overlay
+kind: overlay
+families: [INS]
+controls:
+  - controls/INS-01.yaml

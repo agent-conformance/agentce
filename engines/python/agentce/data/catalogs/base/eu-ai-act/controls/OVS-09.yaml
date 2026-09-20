@@ -1,0 +1,25 @@
+id: OVS-09
+version: "2026.09"
+title: Human overseers are competent and able to intervene
+crosswalk:
+  - {framework: eu-ai-act, clause: "Art. 14(1)-(3)", relation: implements, verified_against_text: false}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: manual
+  rung: 3
+  min_source_class: self_report
+  minimum_evidence:
+    - {event: Decision, class: self_report}
+expectations:
+  - {id: S1, text: "Human overseers are competent and able to intervene."}
+severity: medium
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+tolerance_rationale: "OVS-09 is a structural expectation with no tolerated exceptions."
+false_positive_modes:
+  - "A condition declared as an accepted deviation in the applicability profile."
+techniques:
+  - "techniques/ovs-evidence-at-source"
+test_cases:
+  - {id: pending, expected: not_assessed, fixture: test/OVS-09/pending.jsonl}

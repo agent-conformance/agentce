@@ -1,0 +1,29 @@
+id: DAT-03
+version: "2026.09"
+title: Outcome parity across declared groups is within thresholds
+crosswalk:
+  - {framework: eu-ai-act, clause: "Art. 10", relation: implements, verified_against_text: false}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: semi-automated
+  rung: 2
+  min_source_class: self_report
+  minimum_evidence:
+    - {event: Decision, class: self_report}
+    - {event: ApprovalDecided, class: any}
+  shape: shapes/DAT-03.ttl
+expectations:
+  - {id: S1, text: "Outcome parity across declared groups is within thresholds."}
+severity: medium
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+tolerance_rationale: "DAT-03 is a structural expectation with no tolerated exceptions."
+false_positive_modes:
+  - "A condition declared as an accepted deviation in the applicability profile."
+techniques:
+  - "techniques/dat-evidence-at-source"
+test_cases:
+  - {id: pass, expected: passed, fixture: test/DAT-03/passed.jsonl}
+  - {id: fail, expected: failed, fixture: test/DAT-03/failed.jsonl}
+  - {id: na, expected: inapplicable, fixture: test/DAT-03/inapplicable.jsonl}

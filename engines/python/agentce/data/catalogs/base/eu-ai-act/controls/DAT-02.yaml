@@ -1,0 +1,29 @@
+id: DAT-02
+version: "2026.09"
+title: Input data quality and representativeness are measured
+crosswalk:
+  - {framework: eu-ai-act, clause: "Art. 10", relation: implements, verified_against_text: false}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: semi-automated
+  rung: 2
+  min_source_class: self_report
+  minimum_evidence:
+    - {event: Decision, class: self_report}
+    - {event: ModelCall, class: any}
+  shape: shapes/DAT-02.ttl
+expectations:
+  - {id: S1, text: "Input data quality and representativeness are measured."}
+severity: medium
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+tolerance_rationale: "DAT-02 is a structural expectation with no tolerated exceptions."
+false_positive_modes:
+  - "A condition declared as an accepted deviation in the applicability profile."
+techniques:
+  - "techniques/dat-evidence-at-source"
+test_cases:
+  - {id: pass, expected: passed, fixture: test/DAT-02/passed.jsonl}
+  - {id: fail, expected: failed, fixture: test/DAT-02/failed.jsonl}
+  - {id: na, expected: inapplicable, fixture: test/DAT-02/inapplicable.jsonl}

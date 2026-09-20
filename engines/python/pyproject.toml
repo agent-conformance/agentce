@@ -35,9 +35,10 @@ agentce = "agentce.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["agentce"]
-# Data files under the package (agentce/data/**: the vendored denylist and schemas) are included by
-# hatchling's default package selection; no force-include is needed (and a directory force-include
-# would double-add them).
+# Data files under the package (agentce/data/**: the vendored denylist, schemas, trust root, catalogs,
+# and quickstart project) are included by hatchling's default package selection, in the wheel and in
+# the sdist; no force-include is needed (and a directory force-include would double-add them).
+# tests/test_bundled_data.py holds each vendored tree byte-identical to its spec/ or corpus/ original.
 
 [dependency-groups]
 dev = [
