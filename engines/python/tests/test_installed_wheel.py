@@ -95,6 +95,39 @@ def test_built_wheel_runs_quickstart_outside_any_checkout(tmp_path: Path) -> Non
     assert isinstance(envelope["assertions"], int) and envelope["assertions"] > 0
     assert (out / "assertions.json").is_file()
 
+    # The first screen a newcomer sees names the verdict, the tally, the gaps, and the next step, and
+    # the machine summary agrees with the assertions the run wrote.
+    assertions = json.loads((out / "assertions.json").read_text(encoding="utf-8"))
+    counts = envelope["summary"]["counts"]
+    assert sum(counts.values()) == len(assertions)
+    assert counts["insufficient_evidence"] == sum(
+        1 for a in assertions if a["outcome"] == "insufficient_evidence"
+    )
+    human = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "agentce.cli",
+            "quickstart",
+            "--out",
+            str(workdir / "out2"),
+        ],
+        cwd=workdir,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert human.returncode == 0, human.stderr[-600:]
+    assert human.stdout.splitlines()[0].startswith("Verdict: ")
+    for phrase in ("Outcomes:", "Top gaps:", "Next step:"):
+        assert phrase in human.stdout
+    lead = (
+        (workdir / "out2" / "report.md")
+        .read_text(encoding="utf-8")
+        .split("## Assertions")[0]
+    )
+    assert lead.index("## Verdict") < lead.index("## Outcome summary")
+
 
 def test_built_wheel_assess_and_readiness_default_to_the_bundled_catalog(
     tmp_path: Path,

@@ -16,6 +16,30 @@ _EN: dict[str, str] = {
     "report.summary_heading": "Outcome summary",
     "report.assertions_heading": "Assertions",
     "report.no_controls": "No controls were evaluated.",
+    "report.verdict_heading": "Verdict",
+    "report.outcomes_label": "Outcomes",
+    "report.top_gaps_heading": "Top gaps",
+    "report.no_gaps": "none",
+    "report.gaps_more": "+{n} more",
+    "report.next_step_heading": "Next step",
+    "report.see_report": "See report.md in {dir} for every control.",
+    "verdict.non-conformant": "Non-conformant \u2014 at least one applicable control failed.",
+    "verdict.incomplete": (
+        "Incomplete \u2014 no control failed, but not every applicable control is demonstrated."
+    ),
+    "verdict.conformant": (
+        "Conformant \u2014 every applicable control met its expectations with evidence."
+    ),
+    "next.non-conformant": (
+        "Fix the non-conformant controls listed under Top gaps, then run the assessment again."
+    ),
+    "next.incomplete": (
+        "Supply the missing evidence, or complete the manual checks, for the controls listed under "
+        "Top gaps, then run the assessment again."
+    ),
+    "next.conformant": (
+        "No gaps. Run the assessment again when the agent, its evidence, or the catalog changes."
+    ),
     "report.affected_persons": (
         "Affected persons may obtain an explanation and raise concerns through the deployer's "
         "published contact channel (EU AI Act Arts. 26(11), 85, 86)."

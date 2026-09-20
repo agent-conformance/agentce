@@ -23,7 +23,16 @@ from typing import Any
 
 import yaml
 
-from .. import ENGINE_NAME, SPEC_VERSION, __version__, bundled, no_ml, readiness
+from .. import (
+    ENGINE_NAME,
+    SPEC_VERSION,
+    __version__,
+    bundled,
+    messages,
+    no_ml,
+    readiness,
+    verdict,
+)
 from ..applicability import resolve as resolve_applicability
 from ..assess import assess_subjects, evaluated_nothing
 from ..bundle import load_bundle
@@ -412,6 +421,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     if state is not None:
         state.record(loaded.digest, out_dir / "manifest.json", new_window_end)
     non_conformant = sum(1 for a in evaluated if a.outcome == "non-conformant")
+    summary = verdict.summarize(evaluated)
     result.data.update(
         {
             "bundle": str(bundle),
@@ -426,6 +436,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "subjects": len(coverage["subjects"]),
             "drift_findings": drift_findings,
             "assertions": len(evaluated),
+            "summary": summary,
         }
     )
     if state is not None:
@@ -435,10 +446,20 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         result.add_code(int(ExitCode.FINDINGS))
     if evaluated_nothing(evaluated):
         raise _nothing_evaluated(profile_obj, ingested.accepted, len(evaluated))
+    for line in _verdict_lines(ns, summary, out):
+        result.note(line)
     result.note(
         f"assessed {len(evaluated)} (control, subject) pairs; {non_conformant} non-conformant"
     )
     return result
+
+
+def _verdict_lines(
+    ns: argparse.Namespace, summary: dict[str, Any], out: str
+) -> list[str]:
+    """The verdict, tally, top gaps, and next step a run prints, in the report language."""
+    catalogue = messages.catalogue(_opt_str(ns, "report_language") or "en")
+    return verdict.cli_lines(summary, catalogue, report_dir=out)
 
 
 def _vendored_catalogs() -> dict[str, Path]:
@@ -1212,6 +1233,8 @@ def cmd_quickstart(ns: argparse.Namespace) -> CommandResult:
     result.data["quickstart"] = "ok"
     for code in assess.codes:
         result.add_code(code)
+    for line in _verdict_lines(assess_ns, assess.data["summary"], out):
+        result.note(line)
     result.note(
         f"quickstart complete: {assess.data.get('assertions', 0)} assertions; report in {out}"
     )
