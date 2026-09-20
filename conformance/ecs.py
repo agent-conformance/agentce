@@ -90,12 +90,12 @@ def _run_typescript(corpus_root: Path, out_dir: Path) -> str:
     return _claim_from_stdout("TypeScript", proc)
 
 
-def _run_java(corpus_root: Path, out_dir: Path) -> str:
-    """Run the Java engine's ECS over ``corpus_root`` (built via the Gradle wrapper); return its claim.
+def java_launcher() -> Path:
+    """Build the Java engine with the Gradle wrapper and return its launcher script.
 
-    The engine is built with ``./gradlew installDist`` (idempotent; Gradle's up-to-date checks make it
-    fast when the source is unchanged) so the comparison runs the freshly compiled engine, then the
-    generated launcher is invoked for a clean JSON envelope on stdout.
+    ``./gradlew installDist`` is idempotent (Gradle's up-to-date checks make it fast when the source is
+    unchanged), so callers always run the freshly compiled engine, and the generated launcher gives a
+    clean JSON envelope on stdout.
     """
     build = subprocess.run(
         ["./gradlew", "--no-daemon", "--quiet", "installDist"],
@@ -108,7 +108,12 @@ def _run_java(corpus_root: Path, out_dir: Path) -> str:
         raise SystemExit(
             f"building the Java engine failed:\n{(build.stderr or build.stdout)[-800:]}"
         )
-    launcher = JAVA_ENGINE / "build" / "install" / "agentce" / "bin" / "agentce"
+    return JAVA_ENGINE / "build" / "install" / "agentce" / "bin" / "agentce"
+
+
+def _run_java(corpus_root: Path, out_dir: Path) -> str:
+    """Run the Java engine's ECS over ``corpus_root``; return its claim."""
+    launcher = java_launcher()
     proc = subprocess.run(
         [
             str(launcher),

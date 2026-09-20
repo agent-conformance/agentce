@@ -71,6 +71,23 @@ claims:
         every packs/*/pack.json are byte-identical and its oscal-ar.json and results.sarif match after
         the engine name and version are neutralised; a self-test proves the comparator flags a missing
         artifact, a pack without its per-assertion evidence, and a byte change.
+  - id: engine.numeric-edge-parity
+    text: >-
+      The three engines decide a JSON number token the same way (a fraction or exponent is refused even
+      on a whole number, an integer above 2^53 - 1 is refused, and the canonical form of what is
+      accepted is identical) and order integer and date-time literals the same way, exactly and without
+      floating point, on the shared edge vectors.
+    status: built
+    pages:
+      - spec/model/canonical-form.md
+      - spec/rules/psp.md
+    check:
+      workflow: .github/workflows/three-engine.yml
+      job: numeric-temporal-edge-vectors
+      description: >-
+        Scores the shared number-token and literal-ordering vectors in Python, TypeScript, and Java and
+        fails unless every engine reproduces each expected result and the three agree; each engine's own
+        canonical-vector suite reads the same vector files with a parser that keeps number tokens.
   - id: ci.tests-gate
     text: >-
       Every push and pull request runs the per-package quality gate for all three engines: lint,
