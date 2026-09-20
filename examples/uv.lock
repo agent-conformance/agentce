@@ -8,7 +8,7 @@ resolution-markers = [
 
 [[package]]
 name = "agent-conformance"
-version = "0.0.1"
+version = "0.1.0"
 source = { editable = "../engines/python" }
 dependencies = [
     { name = "cryptography" },
@@ -39,7 +39,7 @@ dev = [
 
 [[package]]
 name = "agentce-emit"
-version = "0.0.1"
+version = "0.1.0"
 source = { editable = "../engines/python-emit" }
 
 [package.metadata]
