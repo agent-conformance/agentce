@@ -1,6 +1,6 @@
 """Repository check: the release-state switch is honest.
 
-``governance/release-state.json`` lists every distribution channel as published or not. This check
+``website/src/data/release-state.json`` lists every distribution channel as published or not. This check
 keeps the rest of the repository consistent with it:
 
 * the file is well formed: exactly the six known channels, each with a boolean ``published``, an
@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
-STATE = Path("governance/release-state.json")
+STATE = Path("website/src/data/release-state.json")
 CHANNELS = (
     "pypi",
     "npm",
