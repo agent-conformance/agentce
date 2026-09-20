@@ -8,7 +8,7 @@ description: >
 license: Apache-2.0
 metadata:
   spec_version: "0.6"
-  cli_version: ">=0.0.1,<0.1"
+  cli_version: ">=0.1.0,<0.2"
   catalog_versions: ["eu-ai-act@2026.09"]
   skill_version: "1.0.0"
 ---

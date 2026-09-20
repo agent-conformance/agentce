@@ -11,5 +11,5 @@ public final class Version {
 
     public static final String ENGINE_NAME = "agentce-java";
     public static final String SPEC_VERSION = "0.6";
-    public static final String ENGINE_VERSION = "0.0.1";
+    public static final String ENGINE_VERSION = "0.1.0";
 }

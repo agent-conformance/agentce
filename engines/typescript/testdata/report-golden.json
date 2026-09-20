@@ -1024,7 +1024,7 @@
       "metadata": {
         "oscal-version": "1.1.2",
         "title": "AgentCE Assessment Results",
-        "version": "0.0.1"
+        "version": "0.1.0"
       },
       "results": [
         {
@@ -2281,7 +2281,7 @@
                 "id": "TRN-05"
               }
             ],
-            "version": "0.0.1"
+            "version": "0.1.0"
           }
         }
       }

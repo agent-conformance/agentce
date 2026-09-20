@@ -1,6 +1,6 @@
 {
   "name": "@agent-conformance/cli",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Agent Conformance Engine (AgentCE) reference engine and command-line interface (TypeScript).",
   "license": "Apache-2.0",
   "homepage": "https://agent-conformance.org",

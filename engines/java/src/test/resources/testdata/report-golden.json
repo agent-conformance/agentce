@@ -6,7 +6,7 @@
       "uuid": "22fe7070-f169-5c2d-bff8-cc0225de1811",
       "metadata": {
         "title": "AgentCE Assessment Results",
-        "version": "0.0.1",
+        "version": "0.1.0",
         "oscal-version": "1.1.2"
       },
       "results": [
@@ -614,7 +614,7 @@
         "tool": {
           "driver": {
             "name": "agentce-py",
-            "version": "0.0.1",
+            "version": "0.1.0",
             "rules": [
               {
                 "id": "DAT-01"
