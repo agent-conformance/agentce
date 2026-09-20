@@ -66,12 +66,17 @@ def package_version() -> str:
     raise SystemExit("no version in engines/python/pyproject.toml")
 
 
-def _netns_available() -> bool:
+def _netns_prefix() -> list[str] | None:
+    """The command prefix that runs a program in a namespace with no route off the host, if any."""
     if shutil.which("unshare") is None:
-        return False
-    return (
-        subprocess.run(["unshare", "-rn", "true"], capture_output=True).returncode == 0
-    )
+        return None
+    if subprocess.run(["unshare", "-rn", "true"], capture_output=True).returncode == 0:
+        return ["unshare", "-rn"]
+    if shutil.which("sudo") is not None:
+        probe = ["sudo", "-n", "unshare", "-n", "true"]
+        if subprocess.run(probe, capture_output=True).returncode == 0:
+            return ["sudo", "-n", "unshare", "-n"]
+    return None
 
 
 def _clean_env(extra: dict[str, str] | None = None) -> dict[str, str]:
@@ -110,11 +115,23 @@ def _offline_env(env: dict[str, str]) -> dict[str, str]:
 
 class Runner:
     def __init__(self, require_netns: bool) -> None:
-        self.netns = _netns_available()
-        if require_netns and not self.netns:
+        self.netns = _netns_prefix()
+        if require_netns and self.netns is None:
             raise SystemExit(
                 "--require-netns: this host cannot create a network namespace"
             )
+        if self.netns is not None:
+            probe = self.run(
+                [
+                    sys.executable,
+                    "-c",
+                    "import socket; socket.create_connection(('1.1.1.1', 53), 3)",
+                ],
+                Path(tempfile.gettempdir()),
+                offline=True,
+            )
+            if probe.returncode == 0:
+                raise SystemExit("the network namespace can still reach the network")
 
     def run(
         self,
@@ -127,8 +144,18 @@ class Runner:
         env = _clean_env(env)
         if offline:
             env = _offline_env(env)
-            if self.netns:
-                cmd = ["unshare", "-rn", *cmd]
+            if self.netns is not None:
+                if self.netns[0] == "sudo":
+                    # sudo resets the environment; hand ours across explicitly.
+                    cmd = [
+                        *self.netns[:2],
+                        "env",
+                        *[f"{k}={v}" for k, v in env.items()],
+                        *self.netns[2:],
+                        *cmd,
+                    ]
+                else:
+                    cmd = [*self.netns, *cmd]
         return subprocess.run(
             cmd, cwd=cwd, env=env, capture_output=True, text=True, timeout=900
         )
@@ -208,7 +235,9 @@ def check_python_artifact(
 
 
 def check_python(runner: Runner, *, offline_install: bool) -> list[str]:
-    with tempfile.TemporaryDirectory(prefix="agentce-installed-") as raw:
+    with tempfile.TemporaryDirectory(
+        prefix="agentce-installed-", ignore_cleanup_errors=True
+    ) as raw:
         tmp = Path(raw)
         assert _outside_checkout(tmp)
         flags = ["--offline"] if offline_install else []
@@ -227,6 +256,22 @@ def check_python(runner: Runner, *, offline_install: bool) -> list[str]:
             return [
                 f"expected one wheel and one sdist, built {len(wheels)} and {len(sdists)}"
             ]
+        return check_python_files(
+            runner,
+            [("wheel", wheels[0]), ("sdist", sdists[0])],
+            offline_install=offline_install,
+        )
+
+
+def check_python_files(
+    runner: Runner, artifacts: list[tuple[str, Path]], *, offline_install: bool
+) -> list[str]:
+    """Install each built or downloaded artifact into a clean venv and compare with a checkout run."""
+    with tempfile.TemporaryDirectory(
+        prefix="agentce-installed-", ignore_cleanup_errors=True
+    ) as raw:
+        tmp = Path(raw)
+        assert _outside_checkout(tmp)
         reference = tmp / "reference"
         proc = runner.run(
             [
@@ -246,7 +291,7 @@ def check_python(runner: Runner, *, offline_install: bool) -> list[str]:
         if proc.returncode != 0:
             return [_fail("reference quickstart from the checkout", proc)]
         problems: list[str] = []
-        for label, artifact in (("wheel", wheels[0]), ("sdist", sdists[0])):
+        for label, artifact in artifacts:
             problems += check_python_artifact(
                 runner,
                 artifact,
@@ -287,10 +332,11 @@ def _numerics_problems(engine_cmd: list[str], cwd: Path, runner: Runner) -> list
 
 
 def check_npm(runner: Runner, *, offline_install: bool) -> list[str]:
-    version = package_version()
     if shutil.which("npm") is None or shutil.which("pnpm") is None:
         return ["npm and pnpm are required to build and install the package"]
-    with tempfile.TemporaryDirectory(prefix="agentce-installed-") as raw:
+    with tempfile.TemporaryDirectory(
+        prefix="agentce-installed-", ignore_cleanup_errors=True
+    ) as raw:
         tmp = Path(raw)
         assert _outside_checkout(tmp)
         proc = runner.run(["pnpm", "build"], TS_ENGINE, offline=False)
@@ -305,6 +351,19 @@ def check_npm(runner: Runner, *, offline_install: bool) -> list[str]:
         tarballs = sorted((tmp / "dist").glob("*.tgz"))
         if proc.returncode != 0 or len(tarballs) != 1:
             return [_fail("pack the npm tarball", proc)]
+        return check_npm_tarball(runner, tarballs[0], offline_install=offline_install)
+
+
+def check_npm_tarball(
+    runner: Runner, tarball: Path, *, offline_install: bool
+) -> list[str]:
+    """Install a packed or downloaded tarball into an empty project and run it."""
+    version = package_version()
+    with tempfile.TemporaryDirectory(
+        prefix="agentce-installed-", ignore_cleanup_errors=True
+    ) as raw:
+        tmp = Path(raw)
+        assert _outside_checkout(tmp)
         empty = tmp / "empty"
         empty.mkdir()
         (empty / "package.json").write_text(
@@ -319,7 +378,7 @@ def check_npm(runner: Runner, *, offline_install: bool) -> list[str]:
                 "--no-fund",
                 "--loglevel=error",
                 *flags,
-                str(tarballs[0]),
+                str(tarball),
             ],
             empty,
             offline=False,
@@ -371,11 +430,19 @@ def check_jar(runner: Runner, *, offline_install: bool) -> list[str]:
     jars = sorted((JAVA_ENGINE / "build" / "libs").glob(f"agentce-{version}-all.jar"))
     if len(jars) != 1:
         return [f"expected build/libs/agentce-{version}-all.jar, found {len(jars)}"]
-    with tempfile.TemporaryDirectory(prefix="agentce-installed-") as raw:
+    return check_jar_file(runner, jars[0])
+
+
+def check_jar_file(runner: Runner, built: Path) -> list[str]:
+    """Run a built or downloaded jar from an empty directory."""
+    version = package_version()
+    with tempfile.TemporaryDirectory(
+        prefix="agentce-installed-", ignore_cleanup_errors=True
+    ) as raw:
         tmp = Path(raw)
         assert _outside_checkout(tmp)
-        jar = tmp / jars[0].name
-        shutil.copy2(jars[0], jar)
+        jar = tmp / built.name
+        shutil.copy2(built, jar)
         empty = tmp / "empty"
         empty.mkdir()
         problems: list[str] = []
@@ -422,10 +489,10 @@ def run_all(
     return {kind: CHECKS[kind](runner, offline_install=offline) for kind in kinds}
 
 
-# --- self-test: the check must fail on a wheel that is a placeholder and on a stub package ---------
+# --- self-test: the check must fail on an inert wheel and on an inert npm package ---------
 
 
-def _stub_wheel(directory: Path, version: str) -> Path:
+def _inert_wheel(directory: Path, version: str) -> Path:
     """A wheel that installs an ``agentce`` command which exits 0 having evaluated nothing."""
     name = f"agent_conformance-{version}"
     wheel = directory / f"{name}-py3-none-any.whl"
@@ -434,7 +501,7 @@ def _stub_wheel(directory: Path, version: str) -> Path:
         "agentce/__init__.py": "",
         "agentce/cli.py": "def main():\n    return 0\n",
         f"{dist_info}/METADATA": f"Metadata-Version: 2.1\nName: agent-conformance\nVersion: {version}\n",
-        f"{dist_info}/WHEEL": "Wheel-Version: 1.0\nGenerator: stub\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+        f"{dist_info}/WHEEL": "Wheel-Version: 1.0\nGenerator: inert\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
         f"{dist_info}/entry_points.txt": "[console_scripts]\nagentce = agentce.cli:main\n",
     }
     with zipfile.ZipFile(wheel, "w") as zf:
@@ -480,16 +547,16 @@ def self_test() -> int:
         if not any("checkout path" in p for p in compare_outputs(good, leak)):
             failures.append("a report embedding the checkout path was accepted")
 
-        # A placeholder wheel installs and exits 0 but evaluates nothing: it must be rejected.
-        stub = _stub_wheel(tmp, package_version())
+        # An inert wheel installs and exits 0 but evaluates nothing: it must be rejected.
+        inert = _inert_wheel(tmp, package_version())
         reference = tmp / "reference"
         shutil.copytree(good, reference)
         problems = check_python_artifact(
-            runner, stub, tmp, reference, offline_install=False, label="stub"
+            runner, inert, tmp, reference, offline_install=False, label="inert"
         )
         if not problems:
             failures.append(
-                "a placeholder wheel that evaluates nothing passed the installed-artifact check"
+                "an inert wheel that evaluates nothing passed the installed-artifact check"
             )
         if _outside_checkout(ROOT):
             failures.append("the checkout was reported to be outside itself")
@@ -499,9 +566,9 @@ def self_test() -> int:
         consumer = tmp / "consumer"
         (consumer / "node_modules" / ".bin").mkdir(parents=True)
         (consumer / "node_modules" / "@agent-conformance" / "cli").mkdir(parents=True)
-        stub_bin = consumer / "node_modules" / ".bin" / "agentce"
-        stub_bin.write_text("#!/bin/sh\necho agentce 0.0.0\n", encoding="utf-8")
-        stub_bin.chmod(0o755)
+        inert_bin = consumer / "node_modules" / ".bin" / "agentce"
+        inert_bin.write_text("#!/bin/sh\necho agentce 0.0.0\n", encoding="utf-8")
+        inert_bin.chmod(0o755)
         found = _npm_run_problems(runner, consumer, package_version())
         for expected in (
             "--version printed",
@@ -511,7 +578,7 @@ def self_test() -> int:
         ):
             if not any(expected in p for p in found):
                 failures.append(
-                    f"a stub npm install was accepted: missing '{expected}'"
+                    f"an inert npm install was accepted: missing '{expected}'"
                 )
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
