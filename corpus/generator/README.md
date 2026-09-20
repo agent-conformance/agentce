@@ -32,7 +32,7 @@ Agent SDK, Google ADK, CrewAI, a custom loop) × five variants:
 | `known-fail` | missing actor, unverified delegation not reaching a human, mismatched oversight, self-reported consequential tool call, incident without actor | non-conformant with precise violations |
 | `insufficient-evidence` | only self-reported streams for the consequential tool call | insufficient_evidence on the oversight control |
 | `tampered` | one integrity stream edited after hashing | integrity failure detected; structural verdicts unchanged |
-| `coverage-gap` | reference ledger declares more tool calls than captured | coverage below threshold |
+| `coverage-gap` | an independent system of record (reference ledger) saw more tool calls than were captured | coverage below threshold |
 
 The style changes a bundle's surface — source systems, convention versions, agent identity — but never
 the control logic, so the engine reaches the same verdict for a variant whatever the style. One project
