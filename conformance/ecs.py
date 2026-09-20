@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -163,20 +164,36 @@ def _canonical_set(out_dir: Path, project_id: str) -> dict[str, bytes]:
     return found
 
 
-def _without_engine_identity(name: str, data: bytes) -> bytes:
-    """Neutralise the engine name and version a translation carries (each engine owns its own)."""
-    doc = json.loads(data)
+def _identity_fields(name: str, data: bytes) -> list[tuple[str, str]]:
+    """Return the (key, value) pairs a translation carries as its engine identity."""
+    try:
+        doc = json.loads(data)
+    except ValueError:
+        return []
+    fields: list[tuple[str, Any]] = []
     if name == "results.sarif":
         for run in doc.get("runs", []):
             driver = run.get("tool", {}).get("driver", {})
-            for key in ("name", "version"):
-                if key in driver:
-                    driver[key] = _ENGINE_IDENTITY
+            fields += [("name", driver.get("name")), ("version", driver.get("version"))]
     elif name == "oscal-ar.json":
         metadata = doc.get("assessment-results", {}).get("metadata", {})
-        if "version" in metadata:
-            metadata["version"] = _ENGINE_IDENTITY
-    return json.dumps(doc, sort_keys=True, ensure_ascii=False).encode("utf-8")
+        fields.append(("version", metadata.get("version")))
+    return [(key, value) for key, value in fields if isinstance(value, str)]
+
+
+def _without_engine_identity(name: str, data: bytes) -> bytes:
+    """Blank the engine name and version a translation carries (each engine owns its own).
+
+    Only those values are replaced in the raw text, so every other byte — key order, whitespace, escaping,
+    a trailing newline — still has to match for the translations to compare equal.
+    """
+    text = data.decode("utf-8", errors="surrogateescape")
+    for key, value in _identity_fields(name, data):
+        pattern = re.compile(
+            rf'("{re.escape(key)}"\s*:\s*){re.escape(json.dumps(value))}'
+        )
+        text = pattern.sub(rf'\1"{_ENGINE_IDENTITY}"', text)
+    return text.encode("utf-8", errors="surrogateescape")
 
 
 def _comparable(name: str, data: bytes) -> bytes:
