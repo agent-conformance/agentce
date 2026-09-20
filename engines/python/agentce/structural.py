@@ -11,7 +11,7 @@ cross-checks the same shape on small graphs (ADR-0002).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+import re
 from fractions import Fraction
 from typing import Any
 
@@ -93,28 +93,83 @@ def resolve_path(store: GraphStore, focus: str, path: PathExpr) -> list[Value]:
     return []
 
 
-def _as_number(value: str) -> Fraction | None:
-    try:
-        return Fraction(value)
-    except (ValueError, ZeroDivisionError):
+_INTEGER = re.compile(r"[+-]?[0-9]+")
+_DATETIME = re.compile(
+    r"([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})"
+    r"(?:\.([0-9]+))?(Z|[+-][0-9]{2}:[0-9]{2})?"
+)
+_DAYS_IN_MONTH = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+
+
+def _days_from_civil(year: int, month: int, day: int) -> int:
+    """Days since 1970-01-01 in the proleptic Gregorian calendar (exact integer arithmetic)."""
+    year -= month <= 2
+    era = year // 400
+    yoe = year - era * 400
+    doy = (153 * (month + (-3 if month > 2 else 9)) + 2) // 5 + day - 1
+    doe = yoe * 365 + yoe // 4 - yoe // 100 + doy
+    return era * 146097 + doe - 719468
+
+
+def _parse_datetime(value: str) -> tuple[bool, int, str] | None:
+    """Return ``(aware, whole seconds since the epoch in UTC, fraction digits)`` or ``None``."""
+    match = _DATETIME.fullmatch(value)
+    if match is None:
         return None
-
-
-def _as_datetime(value: str) -> datetime | None:
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
+    year, month, day, hour, minute, second = (int(match.group(i)) for i in range(1, 7))
+    leap = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+    if not 1 <= month <= 12:
         return None
+    if not 1 <= day <= _DAYS_IN_MONTH[month - 1] + (1 if leap and month == 2 else 0):
+        return None
+    if hour > 23 or minute > 59 or second > 59:
+        return None
+    zone = match.group(8)
+    offset = 0
+    if zone is not None and zone != "Z":
+        offset_hours, offset_minutes = int(zone[1:3]), int(zone[4:6])
+        if offset_hours > 23 or offset_minutes > 59:
+            return None
+        offset = (offset_hours * 3600 + offset_minutes * 60) * (
+            -1 if zone[0] == "-" else 1
+        )
+    seconds = (
+        _days_from_civil(year, month, day) * 86400
+        + hour * 3600
+        + minute * 60
+        + second
+        - offset
+    )
+    return zone is not None, seconds, match.group(7) or ""
 
 
-def _le(a: str, b: str) -> bool | None:
-    na, nb = _as_number(a), _as_number(b)
-    if na is not None and nb is not None:
-        return na <= nb
-    da, db = _as_datetime(a), _as_datetime(b)
-    if da is not None and db is not None:
-        return da <= db
-    return None
+def compare_literals(a: str, b: str) -> int | None:
+    """Order two literals exactly: ``-1``, ``0``, ``1``, or ``None`` when they are not comparable.
+
+    Only ``xsd:integer`` lexical forms and ``xsd:dateTime`` lexical forms are comparable (SPEC §6.7,
+    ``spec/rules/psp.md``). Integers compare as exact integers of any size. Date-times compare as
+    exact instants to arbitrary fractional-second precision, and an aware date-time (``Z`` or an
+    offset) is never comparable with a naive one. Nothing is parsed through floating point or a
+    runtime date type, so every engine returns the same answer.
+    """
+    if _INTEGER.fullmatch(a) and _INTEGER.fullmatch(b):
+        ia, ib = int(a), int(b)
+        return (ia > ib) - (ia < ib)
+    da, db = _parse_datetime(a), _parse_datetime(b)
+    if da is None or db is None or da[0] != db[0]:
+        return None
+    width = max(len(da[2]), len(db[2]))
+    ka = (da[1], da[2].ljust(width, "0"))
+    kb = (db[1], db[2].ljust(width, "0"))
+    return (ka > kb) - (ka < kb)
+
+
+def _le(a: str, b: str) -> bool:
+    return compare_literals(a, b) in (-1, 0)
+
+
+def _lt(a: str, b: str) -> bool:
+    return compare_literals(a, b) == -1
 
 
 def _check_property(
@@ -167,8 +222,8 @@ def _check_property(
         if {v.repr for v in values} & others:
             failed.append("sh:disjoint")
     for attr, constraint, ok in (
-        ("less_than", "sh:lessThan", lambda a, b: _le(a, b) is True and a != b),
-        ("less_than_or_equals", "sh:lessThanOrEquals", lambda a, b: _le(a, b) is True),
+        ("less_than", "sh:lessThan", _lt),
+        ("less_than_or_equals", "sh:lessThanOrEquals", _le),
     ):
         other_path = getattr(prop, attr)
         if other_path is not None:
