@@ -292,3 +292,147 @@ allow:
     count: 1
     class: legitimate
     justification: "ADR-0011 enumerates the placeholder patterns the sweep scans for."
+
+  - path: engines/python/agentce/data/corpus/quickstart/evidence/events/_benign-quarantine.jsonl
+    pattern: zero-digest
+    count: 2
+    class: legitimate
+    justification: "Byte-identical vendored copy of corpus/quickstart/evidence/events/_benign-quarantine.jsonl, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/python/agentce/data/corpus/quickstart/evidence/events/urn-agentce-source-incident-register-corp.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Byte-identical vendored copy of corpus/quickstart/evidence/events/urn-agentce-source-incident-register-corp.jsonl, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/python/agentce/data/corpus/quickstart/evidence/events/urn-agentce-source-langgraph-gateway-eu-1.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Byte-identical vendored copy of corpus/quickstart/evidence/events/urn-agentce-source-langgraph-gateway-eu-1.jsonl, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/python/agentce/data/corpus/quickstart/evidence/events/urn-agentce-source-langgraph-runtime-eu-1.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Byte-identical vendored copy of corpus/quickstart/evidence/events/urn-agentce-source-langgraph-runtime-eu-1.jsonl, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/python/agentce/data/corpus/quickstart/evidence/events/urn-agentce-source-workload-idp-eu-1.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Byte-identical vendored copy of corpus/quickstart/evidence/events/urn-agentce-source-workload-idp-eu-1.jsonl, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/python/agentce/data/catalogs/base/eu-ai-act/crosswalk/README.md
+    pattern: placeholder
+    count: 4
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/catalogs/base/eu-ai-act/crosswalk/README.md, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/python/agentce/data/catalogs/base/eu-ai-act/crosswalk/iso-iec-24970.yaml
+    pattern: placeholder
+    count: 6
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/catalogs/base/eu-ai-act/crosswalk/iso-iec-24970.yaml, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/python/agentce/data/catalogs/base/eu-ai-act/crosswalk/pren-18229-1.yaml
+    pattern: placeholder
+    count: 6
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/catalogs/base/eu-ai-act/crosswalk/pren-18229-1.yaml, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/typescript/data/corpus/quickstart/evidence/events/_benign-quarantine.jsonl
+    pattern: zero-digest
+    count: 2
+    class: legitimate
+    justification: "Byte-identical vendored copy of corpus/quickstart/evidence/events/_benign-quarantine.jsonl, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/typescript/data/corpus/quickstart/evidence/events/urn-agentce-source-incident-register-corp.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Byte-identical vendored copy of corpus/quickstart/evidence/events/urn-agentce-source-incident-register-corp.jsonl, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/typescript/data/corpus/quickstart/evidence/events/urn-agentce-source-langgraph-gateway-eu-1.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Byte-identical vendored copy of corpus/quickstart/evidence/events/urn-agentce-source-langgraph-gateway-eu-1.jsonl, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/typescript/data/corpus/quickstart/evidence/events/urn-agentce-source-langgraph-runtime-eu-1.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Byte-identical vendored copy of corpus/quickstart/evidence/events/urn-agentce-source-langgraph-runtime-eu-1.jsonl, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/typescript/data/corpus/quickstart/evidence/events/urn-agentce-source-workload-idp-eu-1.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Byte-identical vendored copy of corpus/quickstart/evidence/events/urn-agentce-source-workload-idp-eu-1.jsonl, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/typescript/data/catalogs/base/eu-ai-act/crosswalk/README.md
+    pattern: placeholder
+    count: 4
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/catalogs/base/eu-ai-act/crosswalk/README.md, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/typescript/data/catalogs/base/eu-ai-act/crosswalk/iso-iec-24970.yaml
+    pattern: placeholder
+    count: 6
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/catalogs/base/eu-ai-act/crosswalk/iso-iec-24970.yaml, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/typescript/data/catalogs/base/eu-ai-act/crosswalk/pren-18229-1.yaml
+    pattern: placeholder
+    count: 6
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/catalogs/base/eu-ai-act/crosswalk/pren-18229-1.yaml, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/java/src/main/resources/corpus/quickstart/evidence/events/_benign-quarantine.jsonl
+    pattern: zero-digest
+    count: 2
+    class: legitimate
+    justification: "Byte-identical vendored copy of corpus/quickstart/evidence/events/_benign-quarantine.jsonl, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/java/src/main/resources/corpus/quickstart/evidence/events/urn-agentce-source-incident-register-corp.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Byte-identical vendored copy of corpus/quickstart/evidence/events/urn-agentce-source-incident-register-corp.jsonl, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/java/src/main/resources/corpus/quickstart/evidence/events/urn-agentce-source-langgraph-gateway-eu-1.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Byte-identical vendored copy of corpus/quickstart/evidence/events/urn-agentce-source-langgraph-gateway-eu-1.jsonl, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/java/src/main/resources/corpus/quickstart/evidence/events/urn-agentce-source-langgraph-runtime-eu-1.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Byte-identical vendored copy of corpus/quickstart/evidence/events/urn-agentce-source-langgraph-runtime-eu-1.jsonl, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/java/src/main/resources/corpus/quickstart/evidence/events/urn-agentce-source-workload-idp-eu-1.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Byte-identical vendored copy of corpus/quickstart/evidence/events/urn-agentce-source-workload-idp-eu-1.jsonl, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/java/src/main/resources/catalogs/base/eu-ai-act/crosswalk/README.md
+    pattern: placeholder
+    count: 4
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/catalogs/base/eu-ai-act/crosswalk/README.md, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/java/src/main/resources/catalogs/base/eu-ai-act/crosswalk/iso-iec-24970.yaml
+    pattern: placeholder
+    count: 6
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/catalogs/base/eu-ai-act/crosswalk/iso-iec-24970.yaml, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/java/src/main/resources/catalogs/base/eu-ai-act/crosswalk/pren-18229-1.yaml
+    pattern: placeholder
+    count: 6
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/catalogs/base/eu-ai-act/crosswalk/pren-18229-1.yaml, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."

@@ -43,8 +43,9 @@ For your own agent, pass your bundle and the profile and domain binding `agentce
 `--bundle ./my-assessment/evidence --profile ./my-assessment/agentce/applicability.yaml --domain ./my-assessment/agentce/domain.linkml.yaml`.
 
 The profile's `catalogs:` list names what to assess against, and each `id@version` resolves to a catalog
-under `spec/catalogs/` in the repository checkout. Pass `--catalog <id@version>` to choose others, or
-`--catalog-dir <dir>` for a catalog on disk. A catalog that resolves to nothing stops the run with exit
+that ships inside the engine package, so an installed engine finds the base and sector-overlay catalogs
+without a checkout. Pass `--catalog <id@version>` to choose others, or `--catalog-dir <dir>` for a catalog
+on disk. A catalog that resolves to nothing stops the run with exit
 code `3` and the message key `input.catalog_unresolved` instead of writing an empty report.
 
 The run writes the assertions, the human report, and the OSCAL and SARIF renderings, alongside the
