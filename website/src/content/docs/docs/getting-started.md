@@ -53,6 +53,17 @@ A run over this project ends with 25 conformant, 19 insufficient evidence, 5 not
 
 <!-- quickstart-run:end -->
 
+The command opens with a verdict, then the six-outcome tally, the top gaps, and the next step. The verdict is one of
+three states, never a score:
+
+- **Conformant** — every applicable control met its expectations with evidence.
+- **Incomplete** — no control failed, but at least one is partial, lacks sufficient evidence, or was not assessed.
+- **Non-conformant** — at least one applicable control failed.
+
+The same verdict leads `report.md` and `report.html`, and `agentce quickstart --json` carries it as a machine-readable
+`summary` object with the tally as integers. A verdict describes the evidence supplied to this run; it is not a
+certification.
+
 The run writes, into `./out`:
 
 - `assertions.json` — one machine-readable verdict per control and subject; the source of truth.

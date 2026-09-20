@@ -147,6 +147,23 @@ claims:
         Builds the sdist and the wheel on every pull request, puts only the wheel's contents on the
         import path, and runs quickstart, assess, and readiness from an empty directory; other tests
         hold each vendored tree byte-identical to its spec/ or corpus/ original in all three engines.
+  - id: quickstart.verdict
+    text: >-
+      `agentce quickstart` and `agentce assess` open their output, the top of report.md and report.html,
+      and a `summary` object in the `--json` envelope with a categorical verdict (conformant, incomplete, or
+      non-conformant), the six-outcome tally, the top gaps, and the next step. The verdict is never a
+      composite score.
+    status: built
+    pages:
+      - website/src/content/docs/docs/getting-started.md
+    check:
+      workflow: .github/workflows/tests.yml
+      job: python
+      description: >-
+        On every pull request, runs the real quickstart and assess commands and fails unless the printed
+        verdict, tally, gaps, and next step, the leading section of report.md and report.html, and the
+        --json summary all agree with a fresh assertions.json; the Java engine renders the same report
+        sections byte-for-byte from shared golden cases covering every verdict state.
   - id: hero.tally
     text: >-
       The landing-page terminal shows the real output of `agentce quickstart` over the bundled

@@ -8,6 +8,17 @@ This is the report the vendored quickstart project renders end to end with defau
 
 # AgentCE conformance report
 
+## Verdict
+
+**Incomplete — no control failed, but not every applicable control is demonstrated.**
+
+Top gaps:
+
+- insufficient evidence: DAT-01, DAT-02, DAT-03, INC-01, INC-03 (+14 more)
+- not assessed: DAT-04, DOC-05, OVS-09, RSK-04, RSK-05
+
+Next step: Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.
+
 ## Outcome summary
 
 - conformant: 25
