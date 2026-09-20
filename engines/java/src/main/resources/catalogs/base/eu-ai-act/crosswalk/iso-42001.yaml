@@ -1,0 +1,97 @@
+# ISO/IEC 42001:2023 crosswalk: the management-system clauses and Annex A controls that AgentCE's
+# runtime evidence can help substantiate, mapped to AgentCE schema elements, correctness-ladder rungs,
+# and base-catalog control ids.
+#
+# Clause references only; the standard's text is copyrighted and is never reproduced (SPEC 7.3
+# crosswalk hygiene). The `obligation` field is AgentCE's own statement of what its evidence can show,
+# not a quotation. Every reference carries `verified_against_text: false` until a reviewer with a
+# licensed copy confirms the clause mapping (SPEC 7.3; tracked as a human action). AgentCE is a
+# runtime-evidence engine, so it substantiates the operational and monitoring clauses; governance,
+# planning, and documentation clauses are the deployer's own management system and are left with an
+# empty `controls` list where AgentCE contributes no automated assertion.
+framework: iso-iec-42001
+title: "ISO/IEC 42001:2023 — Information technology — Artificial intelligence — Management system"
+version: "2023"
+source:
+  publisher: ISO/IEC
+  identifier: "ISO/IEC 42001:2023"
+obligations:
+  - ref: "8.1"
+    obligation: Operational planning and control is evidenced by recorded, versioned bundles whose loaded components match what was assessed.
+    schema_elements: [BundleLoaded, Attestation, SessionStart]
+    rungs: [1, 2]
+    controls: [DOC-01]
+    verified_against_text: false
+  - ref: "8.2"
+    obligation: AI risk assessment is exercised in operation; identified risk situations surface as recorded incidents and outcomes.
+    schema_elements: [Incident, Outcome]
+    rungs: [3]
+    process: true
+    controls: []
+    verified_against_text: false
+  - ref: "8.3"
+    obligation: AI risk treatment is observable where a treatment is an enforcement point; policy decisions and refusals evidence the control acting.
+    schema_elements: [PolicyDecision, Refusal, AuthzCheck]
+    rungs: [2]
+    controls: [ROB-02]
+    verified_against_text: false
+  - ref: "8.4"
+    obligation: The AI system impact assessment covers the observed decision types and data classes; observed scope is a subset of the assessed scope.
+    schema_elements: [Decision, ResourceAccess]
+    rungs: [2]
+    controls: []
+    verified_against_text: false
+  - ref: "9.1"
+    obligation: Monitoring, measurement, analysis, and evaluation are supported by continuous outcome and incident records with no gap beyond the rotation interval.
+    schema_elements: [Outcome, Incident, IntegrityResult]
+    rungs: [1, 3]
+    controls: [INC-02]
+    verified_against_text: false
+  - ref: "A.5.2"
+    obligation: The AI system impact assessment process is evidenced by records that let the operative determination be reconstructed for each consequential decision.
+    schema_elements: [Decision]
+    rungs: [2]
+    controls: [REC-04]
+    verified_against_text: false
+  - ref: "A.6.2.4"
+    obligation: AI system verification and validation is exercised by the assessment run itself; conformance findings are reproducible from the recorded graph.
+    schema_elements: [Attestation, IntegrityResult]
+    rungs: [1]
+    controls: [INT-01]
+    verified_against_text: false
+  - ref: "A.6.2.6"
+    obligation: AI system operation and monitoring is evidenced by lifetime event recording with actor and source timestamp on every consequential decision.
+    schema_elements: [SessionStart, SessionEnd, Decision, Outcome]
+    rungs: [0, 2]
+    controls: [REC-01, REC-04]
+    verified_against_text: false
+  - ref: "A.6.2.8"
+    obligation: AI system records are retained for the declared window; retention meets policy and no gap exceeds the rotation interval.
+    schema_elements: [SessionStart, SessionEnd, IntegrityResult]
+    rungs: [1, 2]
+    controls: [REC-04]
+    verified_against_text: false
+  - ref: "A.7.4"
+    obligation: Quality of data used by the AI system is examined in operation, by declared group and decision type where the record carries the class.
+    schema_elements: [ResourceAccess, Decision]
+    rungs: [3]
+    controls: []
+    verified_against_text: false
+  - ref: "A.8.3"
+    obligation: External reporting and disclosure of AI interaction and synthetic content is evidenced per interaction type.
+    schema_elements: [Disclosure, ModelCall, Notice]
+    rungs: [2]
+    controls: [TRN-03]
+    verified_against_text: false
+  - ref: "A.9.2"
+    obligation: Responsible use through human oversight is evidenced -- the declared oversight modality per decision type equals the observed, with a human principal on overrides.
+    schema_elements: [Decision, ApprovalDecided, Override, Interrupt]
+    rungs: [2, 3]
+    controls: [OVS-03]
+    verified_against_text: false
+  - ref: "A.10.4"
+    obligation: Third-party and supplier components in use are declared and their loaded identity matches the attested bundle.
+    schema_elements: [BundleLoaded, Attestation, DelegationIssued]
+    rungs: [2]
+    controls: [DOC-01]
+    verified_against_text: false

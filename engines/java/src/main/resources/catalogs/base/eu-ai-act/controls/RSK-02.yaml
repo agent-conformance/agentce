@@ -1,0 +1,29 @@
+id: RSK-02
+version: "2026.09"
+title: Consequential decisions are subject to a risk-review activity
+crosswalk:
+  - {framework: eu-ai-act, clause: "Art. 9", relation: implements, verified_against_text: false}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: self_report
+  minimum_evidence:
+    - {event: Decision, class: self_report}
+    - {event: ApprovalDecided, class: any}
+  shape: shapes/RSK-02.ttl
+expectations:
+  - {id: S1, text: "Consequential decisions are subject to a risk-review activity."}
+severity: medium
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+tolerance_rationale: "RSK-02 is a structural expectation with no tolerated exceptions."
+false_positive_modes:
+  - "A condition declared as an accepted deviation in the applicability profile."
+techniques:
+  - "techniques/rsk-evidence-at-source"
+test_cases:
+  - {id: pass, expected: passed, fixture: test/RSK-02/passed.jsonl}
+  - {id: fail, expected: failed, fixture: test/RSK-02/failed.jsonl}
+  - {id: na, expected: inapplicable, fixture: test/RSK-02/inapplicable.jsonl}

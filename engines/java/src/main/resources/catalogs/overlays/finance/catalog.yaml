@@ -1,0 +1,8 @@
+# Finance sector overlay (SPEC §7.3): bounded-threshold controls layered on the base catalog.
+id: finance
+version: "2026.09"
+title: Finance overlay
+kind: overlay
+families: [FIN]
+controls:
+  - controls/FIN-01.yaml

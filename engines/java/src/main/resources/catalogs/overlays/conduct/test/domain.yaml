@@ -1,0 +1,4 @@
+# Domain binding for the Conduct overlay's own test fixtures (SPEC §6.5).
+decision_types:
+  - {id: "dom:Credit", subclass_of: "agentce:ConsequentialDecision", consequential: true, required_oversight_modality: "review_before"}
+  - {id: "dom:Minor", subclass_of: "agentce:Decision", consequential: false}
