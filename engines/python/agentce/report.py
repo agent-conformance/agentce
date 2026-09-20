@@ -21,7 +21,7 @@ from typing import Any
 
 import jsonschema
 
-from . import ENGINE_NAME, SPEC_VERSION, __version__, canonical, messages
+from . import ENGINE_NAME, SPEC_VERSION, __version__, canonical, messages, verdict
 from .assertions import Assertion, aggregate, check_dc5
 
 _ZERO_DIGEST = "sha256:" + "0" * 64
@@ -68,6 +68,44 @@ def _outcome_label(catalogue: dict[str, str], outcome: str) -> str:
     return catalogue.get(f"outcome.{outcome}", outcome)
 
 
+def _verdict_md(summary: dict[str, Any], cat: dict[str, str]) -> list[str]:
+    """The lines that lead the report: the verdict, the top gaps, and the next step (SPEC §9.2)."""
+    state = summary["verdict"]
+    lines = [
+        f"## {cat['report.verdict_heading']}",
+        "",
+        f"**{cat[f'verdict.{state}']}**",
+        "",
+    ]
+    if summary["top_gaps"]:
+        lines += [f"{cat['report.top_gaps_heading']}:", ""]
+        lines += [f"- {verdict.gap_text(gap, cat)}" for gap in summary["top_gaps"]]
+    else:
+        lines.append(f"{cat['report.top_gaps_heading']}: {cat['report.no_gaps']}")
+    lines += ["", f"{cat['report.next_step_heading']}: {cat[f'next.{state}']}", ""]
+    return lines
+
+
+def _verdict_html(summary: dict[str, Any], cat: dict[str, str]) -> str:
+    state = summary["verdict"]
+    heading = html.escape(cat["report.top_gaps_heading"])
+    if summary["top_gaps"]:
+        items = "".join(
+            f"<li>{html.escape(verdict.gap_text(gap, cat))}</li>"
+            for gap in summary["top_gaps"]
+        )
+        gaps = f"<p>{heading}:</p><ul>{items}</ul>"
+    else:
+        gaps = f"<p>{heading}: {html.escape(cat['report.no_gaps'])}</p>"
+    return (
+        '<section aria-labelledby="verdict"><h2 id="verdict">'
+        f"{html.escape(cat['report.verdict_heading'])}</h2>"
+        f"<p><strong>{html.escape(cat[f'verdict.{state}'])}</strong></p>{gaps}"
+        f"<p>{html.escape(cat['report.next_step_heading'])}: "
+        f"{html.escape(cat[f'next.{state}'])}</p></section>"
+    )
+
+
 def render_report_md(
     assertions: list[Assertion],
     counts: dict[str, int],
@@ -75,7 +113,10 @@ def render_report_md(
     language: str = messages.DEFAULT_LANGUAGE,
 ) -> str:
     cat = messages.catalogue(language)
-    lines = [f"# {cat['report.title']}", "", f"## {cat['report.summary_heading']}", ""]
+    summary = verdict.summarize(assertions)
+    lines = [f"# {cat['report.title']}", ""]
+    lines += _verdict_md(summary, cat)
+    lines += [f"## {cat['report.summary_heading']}", ""]
     lines += [
         f"- {_outcome_label(cat, outcome)}: {count}"
         for outcome, count in counts.items()
@@ -134,6 +175,7 @@ def render_report_html(
         "content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\">"
         f"<title>{title}</title><style>{_HTML_STYLE}</style></head><body>"
         f"<main><h1>{title}</h1>"
+        f"{_verdict_html(verdict.summarize(assertions), cat)}"
         f'<section aria-labelledby="summary"><h2 id="summary">'
         f"{html.escape(cat['report.summary_heading'])}</h2><ul>{summary}</ul></section>"
         f'<section aria-labelledby="assertions"><h2 id="assertions">'
