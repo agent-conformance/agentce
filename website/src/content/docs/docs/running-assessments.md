@@ -14,11 +14,11 @@ byte-identical `assertions.json` files over the simulated corpus; `assess`, `rep
 Start from a generated profile — what you declare about the system under assessment:
 
 ```bash
-uv run --project engines/python agentce init \
-  --non-interactive --framework custom-loop \
-  --subject spiffe://corp/agents/my-agent --role deployer \
-  --out ./my-assessment
+uv run --project engines/python agentce init --out ./my-assessment
 ```
+
+With no other flag the profile is for a `custom-loop` agent with the `deployer` role; name your own with
+`--framework`, `--subject` and `--role`.
 
 Fill in the `TODO`s in the generated `agentce/applicability.yaml`, then confirm it validates.
 
