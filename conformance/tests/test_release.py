@@ -155,3 +155,14 @@ def test_release_dryrun_gate_json(capsys: pytest.CaptureFixture[str]) -> None:
     out = json.loads(capsys.readouterr().out)
     assert out["reproducible"] and out["sbom_valid"]
     assert out["signatures_verify"] and out["no_publish"]
+    assert out["installed_artifacts"] is True
+
+
+def test_release_dryrun_fails_when_the_built_artifact_does_not_run(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import release_dryrun
+
+    monkeypatch.setattr(release_dryrun, "installed_artifacts_run", lambda: False)
+    assert release_dryrun.main(["--json"]) == 1
+    assert json.loads(capsys.readouterr().out)["installed_artifacts"] is False
