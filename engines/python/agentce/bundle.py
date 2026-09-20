@@ -16,6 +16,7 @@ from typing import Any
 
 from . import canonical
 from .errors import InputError
+from .error_catalogue import MESSAGE_KEYS
 
 
 def _sha256_hex(path: Path) -> str:
@@ -65,7 +66,7 @@ def load_bundle(bundle_dir: Path) -> Bundle:
         raise InputError(
             "input.bundle_manifest_missing",
             f"the bundle at {str(bundle_dir)!r} has no manifest.json.",
-            "add a manifest.json listing every file with its SHA-256.",
+            MESSAGE_KEYS["input.bundle_manifest_missing"].fix,
         )
     try:
         manifest: dict[str, Any] = json.loads(manifest_path.read_text(encoding="utf-8"))

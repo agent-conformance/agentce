@@ -23,7 +23,7 @@ options:
                         a catalog directory to evaluate (repeatable)
   --manual MANUAL       the manual-records directory
   --probes PROBES       the probe-results directory
-  --out OUT             the output directory
+  --out OUT             the output directory (default: ./out)
   --state STATE         the incremental state directory
   --report-language REPORT_LANGUAGE
                         message-key catalogue for the report; does not affect

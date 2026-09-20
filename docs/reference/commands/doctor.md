@@ -8,7 +8,8 @@ usage: agentce doctor [-h] [--json] [--debug] [--quiet] [--project PROJECT]
 
 options:
   -h, --help            show this help message and exit
-  --project PROJECT     the project directory to diagnose
+  --project PROJECT     the project directory to diagnose (default: the
+                        current directory)
   --write-errors WRITE_ERRORS
                         regenerate the message-key catalogue at this path
                         instead of diagnosing
