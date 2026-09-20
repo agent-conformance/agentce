@@ -31,7 +31,7 @@ Generated from the sources, so the documentation and the code never disagree.
 
 ## Governance and conformance
 
-- [Governance](../governance/README.md) — working groups, the change and RFC process, and the policies
+- [Governance](../governance/README.md) — who decides today, the change and RFC process, and the policies
   below.
 - [Conformance program](../governance/CONFORMANCE-PROGRAM.md) — what a conformance claim is and how an
   implementation is listed.
