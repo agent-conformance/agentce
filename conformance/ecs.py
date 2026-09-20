@@ -2,13 +2,14 @@
 
 Runs the same corpus through more than one engine and compares their outputs. The engines assess a
 single materialised full corpus (so the inputs are identical to the byte), and the comparison is over
-each project's ``assertions.json`` — the canonical source of truth that must be byte-identical across
-conforming engines after RFC 8785 canonicalisation (a translation such as OSCAL or SARIF never changes
-it). Run it as::
+each project's whole canonical set: ``assertions.json`` and every ``packs/*/pack.json`` must be
+byte-identical across conforming engines after RFC 8785 canonicalisation, and the ``oscal-ar.json`` and
+``results.sarif`` translations must be identical once the one field each engine deliberately owns — its
+own name and version — is neutralised. Run it as::
 
     cd conformance && uv run python ecs.py --engines python,typescript,java --corpus ../corpus --compare
 
-``--compare`` exits 0 only when every engine claims ``full`` and every project's assertions are
+``--compare`` exits 0 only when every engine claims ``full`` and every project's canonical set is
 identical across engines; ``--json`` prints the per-engine claims and the identical count. For exactly
 ``python,typescript`` the JSON keeps the two-engine shape (``{"python": …, "ts": …, …}``) the phase-3
 gate reads. The corpus source tree is materialised as the full set on demand, so the corpus output need
@@ -142,13 +143,70 @@ def _claim_from_stdout(engine: str, proc: subprocess.CompletedProcess[str]) -> s
 _RUNNERS = {"python": _run_python, "typescript": _run_typescript, "java": _run_java}
 
 
-def _assertions_bytes(out_dir: Path, project_id: str) -> bytes | None:
-    path = out_dir / "projects" / project_id / "assertions.json"
-    return path.read_bytes() if path.is_file() else None
+# The canonical set every conforming engine writes per project. Data artifacts are compared byte for
+# byte; translations are compared after neutralising the engine identity they carry by design.
+_DATA_ARTIFACTS = ("assertions.json",)
+_TRANSLATION_ARTIFACTS = ("oscal-ar.json", "results.sarif")
+_ENGINE_IDENTITY = "<engine>"
+
+
+def _canonical_set(out_dir: Path, project_id: str) -> dict[str, bytes]:
+    """Read one engine's canonical artifacts for a project, keyed by path relative to the project."""
+    project = out_dir / "projects" / project_id
+    found: dict[str, bytes] = {}
+    for name in (*_DATA_ARTIFACTS, *_TRANSLATION_ARTIFACTS):
+        path = project / name
+        if path.is_file():
+            found[name] = path.read_bytes()
+    for pack in sorted(project.glob("packs/*/pack.json")):
+        found[pack.relative_to(project).as_posix()] = pack.read_bytes()
+    return found
+
+
+def _without_engine_identity(name: str, data: bytes) -> bytes:
+    """Neutralise the engine name and version a translation carries (each engine owns its own)."""
+    doc = json.loads(data)
+    if name == "results.sarif":
+        for run in doc.get("runs", []):
+            driver = run.get("tool", {}).get("driver", {})
+            for key in ("name", "version"):
+                if key in driver:
+                    driver[key] = _ENGINE_IDENTITY
+    elif name == "oscal-ar.json":
+        metadata = doc.get("assessment-results", {}).get("metadata", {})
+        if "version" in metadata:
+            metadata["version"] = _ENGINE_IDENTITY
+    return json.dumps(doc, sort_keys=True, ensure_ascii=False).encode("utf-8")
+
+
+def _comparable(name: str, data: bytes) -> bytes:
+    return (
+        _without_engine_identity(name, data) if name in _TRANSLATION_ARTIFACTS else data
+    )
+
+
+def canonical_divergences(reference: Path, other: Path, project_id: str) -> list[str]:
+    """Return the canonical artifacts of ``project_id`` where ``other`` differs from ``reference``.
+
+    An artifact one engine wrote and the other did not counts as a divergence, and a reference that
+    produced no ``assertions.json`` diverges outright, so an engine that wrote nothing never compares
+    equal to another that wrote nothing.
+    """
+    expected = _canonical_set(reference, project_id)
+    actual = _canonical_set(other, project_id)
+    if "assertions.json" not in expected:
+        return ["assertions.json"]
+    return [
+        name
+        for name in sorted(expected.keys() | actual.keys())
+        if name not in expected
+        or name not in actual
+        or _comparable(name, expected[name]) != _comparable(name, actual[name])
+    ]
 
 
 def run_multi_engine(corpus_dir: Path, engines: list[str]) -> dict[str, Any]:
-    """Run every engine over one materialised full corpus and compare their assertions byte for byte."""
+    """Run every engine over one materialised full corpus and compare their canonical sets."""
     corpus_root = _materialise_full(corpus_dir)
     manifest = json.loads(
         (corpus_root / "corpus-manifest.json").read_text(encoding="utf-8")
@@ -161,14 +219,18 @@ def run_multi_engine(corpus_dir: Path, engines: list[str]) -> dict[str, Any]:
     reference = engines[0]
     identical = 0
     different: list[str] = []
+    divergences: list[str] = []
     for pid in project_ids:
-        ref_bytes = _assertions_bytes(tmp / reference, pid)
-        if ref_bytes is not None and all(
-            _assertions_bytes(tmp / name, pid) == ref_bytes for name in engines
-        ):
-            identical += 1
-        else:
+        found = [
+            f"{pid}/{artifact} ({name})"
+            for name in engines[1:]
+            for artifact in canonical_divergences(tmp / reference, tmp / name, pid)
+        ]
+        if found:
             different.append(pid)
+            divergences.extend(found)
+        else:
+            identical += 1
 
     return {
         "claims": claims,
@@ -176,6 +238,7 @@ def run_multi_engine(corpus_dir: Path, engines: list[str]) -> dict[str, Any]:
         "projects_total": len(project_ids),
         "projects_identical": identical,
         "different": different,
+        "divergences": divergences,
     }
 
 
@@ -188,6 +251,7 @@ def run_two_engine(corpus_dir: Path) -> dict[str, Any]:
         "projects_total": result["projects_total"],
         "projects_identical": result["projects_identical"],
         "different": result["different"],
+        "divergences": result["divergences"],
     }
 
 
@@ -202,7 +266,7 @@ def _all_identical(result: dict[str, Any]) -> bool:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="ecs",
-        description="Multi-engine ECS runner and assertions comparator (SPEC §11.5, P3.4, P5.1).",
+        description="Multi-engine ECS runner and canonical-set comparator (SPEC §11.5, P3.4, P5.1).",
     )
     parser.add_argument(
         "--engines",
@@ -218,7 +282,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--compare",
         action="store_true",
-        help="require every engine to claim full and every project's assertions to be identical",
+        help="require every engine to claim full and every project's canonical set to be identical",
     )
     parser.add_argument(
         "--json", action="store_true", help="emit machine-readable JSON"
@@ -244,8 +308,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"python={two['python']} ts={two['ts']} "
                 f"identical={two['projects_identical']}/{two['projects_total']}"
             )
-            if two["different"]:
-                print("different: " + ", ".join(two["different"][:10]))
+            if two["divergences"]:
+                print("different: " + ", ".join(two["divergences"][:10]))
         if args.compare:
             ok = (
                 two["python"] == "full"
@@ -264,8 +328,8 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"{claims} identical={result['projects_identical']}/{result['projects_total']}"
         )
-        if result["different"]:
-            print("different: " + ", ".join(result["different"][:10]))
+        if result["divergences"]:
+            print("different: " + ", ".join(result["divergences"][:10]))
     if args.compare:
         return _report_compare(
             _all_identical(result),
