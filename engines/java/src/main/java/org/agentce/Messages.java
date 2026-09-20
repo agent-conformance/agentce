@@ -23,6 +23,24 @@ public final class Messages {
         m.put("report.summary_heading", "Outcome summary");
         m.put("report.assertions_heading", "Assertions");
         m.put("report.no_controls", "No controls were evaluated.");
+        m.put("report.verdict_heading", "Verdict");
+        m.put("report.outcomes_label", "Outcomes");
+        m.put("report.top_gaps_heading", "Top gaps");
+        m.put("report.no_gaps", "none");
+        m.put("report.gaps_more", "+{n} more");
+        m.put("report.next_step_heading", "Next step");
+        m.put("report.see_report", "See report.md in {dir} for every control.");
+        m.put("verdict.non-conformant", "Non-conformant \u2014 at least one applicable control failed.");
+        m.put("verdict.incomplete",
+                "Incomplete \u2014 no control failed, but not every applicable control is demonstrated.");
+        m.put("verdict.conformant", "Conformant \u2014 every applicable control met its expectations with evidence.");
+        m.put("next.non-conformant",
+                "Fix the non-conformant controls listed under Top gaps, then run the assessment again.");
+        m.put("next.incomplete",
+                "Supply the missing evidence, or complete the manual checks, for the controls listed under "
+                        + "Top gaps, then run the assessment again.");
+        m.put("next.conformant",
+                "No gaps. Run the assessment again when the agent, its evidence, or the catalog changes.");
         m.put("report.affected_persons",
                 "Affected persons may obtain an explanation and raise concerns through the deployer's "
                         + "published contact channel (EU AI Act Arts. 26(11), 85, 86).");

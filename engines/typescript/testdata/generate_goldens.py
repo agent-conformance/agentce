@@ -115,6 +115,59 @@ def build_catalog_golden(catalog: Catalog, domain: DomainBinding) -> dict[str, o
     return result
 
 
+#: Synthetic (control, subject, outcome) sets that exercise every verdict state, the gap cap, and a
+#: control assessed for two subjects. Each engine rebuilds these assertions and renders them.
+VERDICT_CASES: list[list[list[str]]] = [
+    [
+        *(
+            [f"DAT-{n:02d}", "spiffe://corp/agents/a", "insufficient_evidence"]
+            for n in range(8, 0, -1)
+        ),
+        ["DOC-01", "spiffe://corp/agents/a", "conformant"],
+        ["DOC-05", "spiffe://corp/agents/a", "not_assessed"],
+        ["OVS-09", "spiffe://corp/agents/a", "not_assessed"],
+    ],
+    [
+        ["DOC-01", "spiffe://corp/agents/a", "conformant"],
+        ["DOC-02", "spiffe://corp/agents/a", "conformant"],
+        ["INC-02", "spiffe://corp/agents/a", "not_applicable"],
+    ],
+    [
+        ["OVS-02", "spiffe://corp/agents/a", "non-conformant"],
+        ["OVS-02", "spiffe://corp/agents/b", "non-conformant"],
+        ["REC-01", "spiffe://corp/agents/a", "partial"],
+        ["REC-02", "spiffe://corp/agents/b", "insufficient_evidence"],
+    ],
+]
+
+
+def build_verdict_cases() -> list[dict[str, object]]:
+    cases: list[dict[str, object]] = []
+    for rows in VERDICT_CASES:
+        assertions = [
+            Assertion(
+                control=control,
+                control_version="2026.09",
+                subject=subject,
+                outcome=outcome,
+                rung=2,
+                mode="automated",
+                window=("2026-01-01T00:00:00Z", "2026-04-01T00:00:00Z"),
+                population=(1, 1 if outcome == "non-conformant" else 0),
+            )
+            for control, subject, outcome in rows
+        ]
+        counts = aggregate(assertions)
+        cases.append(
+            {
+                "assertions": rows,
+                "md": render_report_md(assertions, counts),
+                "html": render_report_html(assertions, counts),
+            }
+        )
+    return cases
+
+
 def build_report_golden(catalog: Catalog, domain: DomainBinding) -> dict[str, object]:
     """Mirrors engines/typescript/src/report.test.ts (lines 35-63); the SARIF driver name is
     normalised to ``agentce-ts`` since it is the only field that names the implementation
@@ -134,6 +187,7 @@ def build_report_golden(catalog: Catalog, domain: DomainBinding) -> dict[str, ob
         "sarif": sarif,
         "pack": render_evidence_pack(SUBJECT, assertions),
         "assertions": [a.to_json() for a in assertions],
+        "verdict_cases": build_verdict_cases(),
     }
 
 

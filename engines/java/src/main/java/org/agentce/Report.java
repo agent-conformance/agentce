@@ -124,6 +124,23 @@ public final class Report {
         List<String> lines = new ArrayList<>();
         lines.add("# " + cat.get("report.title"));
         lines.add("");
+        Verdict.Summary verdict = Verdict.summarize(assertions);
+        lines.add("## " + cat.get("report.verdict_heading"));
+        lines.add("");
+        lines.add("**" + cat.get("verdict." + verdict.verdict()) + "**");
+        lines.add("");
+        if (verdict.topGaps().isEmpty()) {
+            lines.add(cat.get("report.top_gaps_heading") + ": " + cat.get("report.no_gaps"));
+        } else {
+            lines.add(cat.get("report.top_gaps_heading") + ":");
+            lines.add("");
+            for (Verdict.Gap gap : verdict.topGaps()) {
+                lines.add("- " + Verdict.gapText(gap, cat));
+            }
+        }
+        lines.add("");
+        lines.add(cat.get("report.next_step_heading") + ": " + cat.get("next." + verdict.verdict()));
+        lines.add("");
         lines.add("## " + cat.get("report.summary_heading"));
         lines.add("");
         for (Map.Entry<String, Integer> e : counts.entrySet()) {
@@ -152,6 +169,24 @@ public final class Report {
                     + "@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}"
                     + "table{page-break-inside:auto}tr{page-break-inside:avoid}}";
 
+    private static String verdictHtml(Verdict.Summary summary, Map<String, String> cat) {
+        String heading = esc(cat.get("report.top_gaps_heading"));
+        String gaps;
+        if (summary.topGaps().isEmpty()) {
+            gaps = "<p>" + heading + ": " + esc(cat.get("report.no_gaps")) + "</p>";
+        } else {
+            StringBuilder items = new StringBuilder();
+            for (Verdict.Gap gap : summary.topGaps()) {
+                items.append("<li>").append(esc(Verdict.gapText(gap, cat))).append("</li>");
+            }
+            gaps = "<p>" + heading + ":</p><ul>" + items + "</ul>";
+        }
+        return "<section aria-labelledby=\"verdict\"><h2 id=\"verdict\">" + esc(cat.get("report.verdict_heading"))
+                + "</h2><p><strong>" + esc(cat.get("verdict." + summary.verdict())) + "</strong></p>" + gaps
+                + "<p>" + esc(cat.get("report.next_step_heading")) + ": " + esc(cat.get("next." + summary.verdict()))
+                + "</p></section>";
+    }
+
     public static String renderReportHtml(List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language) {
         Map<String, String> cat = Messages.catalogue(language);
         String title = esc(cat.get("report.title"));
@@ -173,6 +208,7 @@ public final class Report {
                 + "content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\">"
                 + "<title>" + title + "</title><style>" + HTML_STYLE + "</style></head><body>"
                 + "<main><h1>" + title + "</h1>"
+                + verdictHtml(Verdict.summarize(assertions), cat)
                 + "<section aria-labelledby=\"summary\"><h2 id=\"summary\">"
                 + esc(cat.get("report.summary_heading")) + "</h2><ul>" + summary + "</ul></section>"
                 + "<section aria-labelledby=\"assertions\"><h2 id=\"assertions\">"
