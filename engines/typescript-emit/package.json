@@ -1,6 +1,6 @@
 {
   "name": "@agent-conformance/emit",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Evidence emitter library for the Agent Conformance Engine (canonical CloudEvents + JSON-LD). Placeholder release.",
   "license": "Apache-2.0",
   "homepage": "https://agent-conformance.org",

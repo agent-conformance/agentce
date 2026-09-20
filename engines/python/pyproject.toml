@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-conformance"
-version = "0.0.1"
+version = "0.1.0"
 description = "Agent Conformance Engine (AgentCE) - a deterministic, model-free engine that evaluates AI-agent evidence against executable control catalogs and emits a conformance report."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -18,7 +18,7 @@ dependencies = [
 ]
 keywords = ["ai-agents", "conformance", "eu-ai-act", "oscal", "provenance", "shacl", "opentelemetry"]
 classifiers = [
-  "Development Status :: 1 - Planning",
+  "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.12",

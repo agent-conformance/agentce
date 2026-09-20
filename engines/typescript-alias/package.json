@@ -1,6 +1,6 @@
 {
   "name": "agentce",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Alias package for @agent-conformance/cli (the Agent Conformance Engine) so that `npx agentce` works.",
   "license": "Apache-2.0",
   "homepage": "https://agent-conformance.org",
@@ -12,6 +12,6 @@
   "bin": { "agentce": "bin/agentce.js" },
   "files": ["bin/", "README.md", "LICENSE"],
   "engines": { "node": ">=20" },
-  "dependencies": { "@agent-conformance/cli": "0.0.1" },
+  "dependencies": { "@agent-conformance/cli": "0.1.0" },
   "publishConfig": { "access": "public", "provenance": true }
 }

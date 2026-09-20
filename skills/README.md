@@ -36,4 +36,4 @@ it was written against; a mismatch stops the skill.
 
 | Skill | skill_version | spec_version | cli_version | catalog_versions |
 |---|---|---|---|---|
-| `agentce-onboard` | 1.0.0 | 0.6 | >=0.0.1,<0.1 | eu-ai-act@2026.09 |
+| `agentce-onboard` | 1.0.0 | 0.6 | >=0.1.0,<0.2 | eu-ai-act@2026.09 |

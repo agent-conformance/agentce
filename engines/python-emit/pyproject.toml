@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agentce-emit"
-version = "0.0.1"
+version = "0.1.0"
 description = "Evidence emitter for the Agent Conformance Engine: one-line agent-side emission of canonical CloudEvents + JSON-LD evidence (SPEC 13.1, 13.4). Standard library only."
 readme = "README.md"
 requires-python = ">=3.12"

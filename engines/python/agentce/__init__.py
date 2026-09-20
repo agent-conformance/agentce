@@ -14,7 +14,7 @@ from __future__ import annotations
 ENGINE_NAME = "agentce-py"
 
 #: Package version.
-__version__ = "0.0.1"
+__version__ = "0.1.0"
 
 #: Specification draft this engine targets (SPEC front matter).
 SPEC_VERSION = "0.6"
