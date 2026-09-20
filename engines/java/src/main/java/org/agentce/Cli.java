@@ -25,6 +25,17 @@ public final class Cli {
             return 0;
         }
 
+        // The numerics verb is a plain computation seam for the cross-engine vector check: it reads a
+        // numerics-vectors case file and prints {caseName: result} as plain JSON, not the envelope.
+        if ("numerics".equals(command)) {
+            if (args.length < 2) {
+                System.err.println("numerics: a case file path is required");
+                return ExitCode.INPUT_ERROR.code;
+            }
+            System.out.println(Json.pretty(Numerics.computeVectorFile(java.nio.file.Path.of(args[1]))));
+            return 0;
+        }
+
         boolean json = Arrays.asList(args).contains("--json");
         CommandResult result;
         try {

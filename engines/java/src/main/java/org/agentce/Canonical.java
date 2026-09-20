@@ -1,6 +1,7 @@
 package org.agentce;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -22,11 +23,15 @@ import java.util.Set;
  * <p>A JSON number is an integer exactly when its source token carries no {@code .}, {@code e}, or
  * {@code E} — the same rule the reference's {@code json.loads} applies (an {@code int} versus a
  * {@code float}). Jackson exposes that distinction as {@link JsonNode#isIntegralNumber()}, so {@code
- * 1e+30} and {@code 0.1} are refused as {@code non_integer_number} while {@code 9007199254740991} is
- * kept. No network, no learned component.
+ * 1e+30}, {@code 1.0}, {@code 1e2} and {@code 0.1} are refused as {@code non_integer_number}, an
+ * integer beyond 2^53 - 1 in magnitude as {@code integer_out_of_range}, and {@code 9007199254740991}
+ * is kept. No network, no learned component.
  */
 public final class Canonical {
     private Canonical() {}
+
+    /** The range every engine represents exactly: an integer beyond 2^53 - 1 in magnitude is refused. */
+    private static final BigInteger MAX_SAFE_INTEGER = BigInteger.ONE.shiftLeft(53).subtract(BigInteger.ONE);
 
     /** A value cannot be put in canonical form under the AgentCE profile (stable {@code reason}). */
     public static final class CanonicalizationError extends RuntimeException {
@@ -119,7 +124,11 @@ public final class Canonical {
             out.append(value.booleanValue() ? "true" : "false");
         } else if (value.isNumber()) {
             if (value.isIntegralNumber()) {
-                out.append(value.bigIntegerValue().toString());
+                BigInteger integer = value.bigIntegerValue();
+                if (integer.abs().compareTo(MAX_SAFE_INTEGER) > 0) {
+                    throw new CanonicalizationError("integer_out_of_range", integer.toString());
+                }
+                out.append(integer.toString());
             } else {
                 throw new CanonicalizationError("non_integer_number", value.asText());
             }

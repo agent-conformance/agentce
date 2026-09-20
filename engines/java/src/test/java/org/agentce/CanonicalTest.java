@@ -39,6 +39,7 @@ class CanonicalTest {
     @MethodSource("vectors")
     void canonicalVector(Path file) {
         JsonNode vector = Json.parseFile(file);
+        // Jackson keeps an integer token apart from a float token, so 1.0 and 1e2 reach the engine as written.
         JsonNode input = vector.get("input");
         if (vector.has("error")) {
             String want = vector.get("error").textValue();
