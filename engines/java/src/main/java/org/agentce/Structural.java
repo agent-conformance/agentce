@@ -8,6 +8,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * The structural evaluator: compile a PSP shape to queries over the graph store (SPEC §7.2, §9.2).
@@ -129,44 +131,101 @@ public final class Structural {
         }
     }
 
-    private static Double asNumber(String value) {
-        String s = value.trim();
-        if (s.matches("[+-]?\\d+/\\d+")) {
-            String[] parts = s.split("/");
-            double den = Double.parseDouble(parts[1]);
-            return den != 0 ? Double.parseDouble(parts[0]) / den : null;
-        }
-        if (s.matches("[+-]?(?:\\d+\\.?\\d*|\\.\\d+)")) {
-            return Double.parseDouble(s);
-        }
-        return null;
+    private static final Pattern INTEGER = Pattern.compile("[+-]?[0-9]+");
+    private static final Pattern DATETIME = Pattern.compile(
+            "([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})"
+                    + "(?:\\.([0-9]+))?(Z|[+-][0-9]{2}:[0-9]{2})?");
+    private static final int[] DAYS_IN_MONTH = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+    /** Days since 1970-01-01 in the proleptic Gregorian calendar (exact integer arithmetic). */
+    private static long daysFromCivil(int yearIn, int month, int day) {
+        long year = month <= 2 ? yearIn - 1L : yearIn;
+        long era = Math.floorDiv(year, 400L);
+        long yoe = year - era * 400;
+        long doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
+        long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+        return era * 146097 + doe - 719468;
     }
 
-    private static Long asDatetime(String value) {
-        try {
-            return java.time.Instant.parse(value).toEpochMilli();
-        } catch (RuntimeException ignored) {
-            // fall through
-        }
-        try {
-            return java.time.OffsetDateTime.parse(value).toInstant().toEpochMilli();
-        } catch (RuntimeException ignored) {
+    /** A parsed date-time: whether it carries an offset, whole seconds since the epoch in UTC, and the fraction digits. */
+    private record Instant(boolean aware, long seconds, String fraction) {}
+
+    private static Instant parseDatetime(String value) {
+        Matcher match = DATETIME.matcher(value);
+        if (!match.matches()) {
             return null;
         }
+        int year = Integer.parseInt(match.group(1));
+        int month = Integer.parseInt(match.group(2));
+        int day = Integer.parseInt(match.group(3));
+        int hour = Integer.parseInt(match.group(4));
+        int minute = Integer.parseInt(match.group(5));
+        int second = Integer.parseInt(match.group(6));
+        boolean leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+        if (month < 1 || month > 12) {
+            return null;
+        }
+        if (day < 1 || day > DAYS_IN_MONTH[month - 1] + (leap && month == 2 ? 1 : 0)) {
+            return null;
+        }
+        if (hour > 23 || minute > 59 || second > 59) {
+            return null;
+        }
+        String zone = match.group(8);
+        long offset = 0;
+        if (zone != null && !zone.equals("Z")) {
+            int offsetHours = Integer.parseInt(zone.substring(1, 3));
+            int offsetMinutes = Integer.parseInt(zone.substring(4, 6));
+            if (offsetHours > 23 || offsetMinutes > 59) {
+                return null;
+            }
+            offset = (offsetHours * 3600L + offsetMinutes * 60L) * (zone.charAt(0) == '-' ? -1 : 1);
+        }
+        long seconds = daysFromCivil(year, month, day) * 86400L + hour * 3600L + minute * 60L + second - offset;
+        String fraction = match.group(7);
+        return new Instant(zone != null, seconds, fraction == null ? "" : fraction);
     }
 
-    private static Boolean le(String a, String b) {
-        Double na = asNumber(a);
-        Double nb = asNumber(b);
-        if (na != null && nb != null) {
-            return na <= nb;
+    /**
+     * Order two literals exactly: -1, 0, 1, or {@code null} when they are not comparable.
+     *
+     * <p>Only {@code xsd:integer} and {@code xsd:dateTime} lexical forms are comparable
+     * ({@code spec/rules/psp.md}). Integers compare as exact integers of any size; date-times compare as
+     * exact instants to arbitrary fractional-second precision, and an aware date-time is never comparable
+     * with a naive one. Nothing goes through IEEE-754 or a runtime date type, so every engine returns the
+     * same answer.
+     */
+    public static Integer compareLiterals(String a, String b) {
+        if (INTEGER.matcher(a).matches() && INTEGER.matcher(b).matches()) {
+            return Integer.signum(new BigInteger(a.startsWith("+") ? a.substring(1) : a)
+                    .compareTo(new BigInteger(b.startsWith("+") ? b.substring(1) : b)));
         }
-        Long da = asDatetime(a);
-        Long db = asDatetime(b);
-        if (da != null && db != null) {
-            return da <= db;
+        Instant da = parseDatetime(a);
+        Instant db = parseDatetime(b);
+        if (da == null || db == null || da.aware() != db.aware()) {
+            return null;
         }
-        return null;
+        if (da.seconds() != db.seconds()) {
+            return da.seconds() < db.seconds() ? -1 : 1;
+        }
+        int width = Math.max(da.fraction().length(), db.fraction().length());
+        String fa = padEnd(da.fraction(), width);
+        String fb = padEnd(db.fraction(), width);
+        return Integer.signum(fa.compareTo(fb));
+    }
+
+    private static String padEnd(String digits, int width) {
+        return digits + "0".repeat(width - digits.length());
+    }
+
+    private static boolean le(String a, String b) {
+        Integer order = compareLiterals(a, b);
+        return order != null && order <= 0;
+    }
+
+    private static boolean lt(String a, String b) {
+        Integer order = compareLiterals(a, b);
+        return order != null && order < 0;
     }
 
     private static Set<String> reprs(List<Value> values) {
@@ -243,10 +302,10 @@ public final class Structural {
                 failed.add("sh:in");
             }
         }
-        if (prop.minInclusive != null && !values.stream().allMatch(v -> Boolean.TRUE.equals(le(prop.minInclusive, v.repr)))) {
+        if (prop.minInclusive != null && !values.stream().allMatch(v -> le(prop.minInclusive, v.repr))) {
             failed.add("sh:minInclusive");
         }
-        if (prop.maxInclusive != null && !values.stream().allMatch(v -> Boolean.TRUE.equals(le(v.repr, prop.maxInclusive)))) {
+        if (prop.maxInclusive != null && !values.stream().allMatch(v -> le(v.repr, prop.maxInclusive))) {
             failed.add("sh:maxInclusive");
         }
         if (prop.equals != null) {
@@ -263,13 +322,13 @@ public final class Structural {
         }
         if (prop.lessThan != null) {
             List<Value> others = predicateValues(store, focus, prop.lessThan);
-            if (!values.stream().allMatch(v -> others.stream().allMatch(o -> Boolean.TRUE.equals(le(v.repr, o.repr)) && !v.repr.equals(o.repr)))) {
+            if (!values.stream().allMatch(v -> others.stream().allMatch(o -> lt(v.repr, o.repr)))) {
                 failed.add("sh:lessThan");
             }
         }
         if (prop.lessThanOrEquals != null) {
             List<Value> others = predicateValues(store, focus, prop.lessThanOrEquals);
-            if (!values.stream().allMatch(v -> others.stream().allMatch(o -> Boolean.TRUE.equals(le(v.repr, o.repr))))) {
+            if (!values.stream().allMatch(v -> others.stream().allMatch(o -> le(v.repr, o.repr)))) {
                 failed.add("sh:lessThanOrEquals");
             }
         }
