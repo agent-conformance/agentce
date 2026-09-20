@@ -15,6 +15,8 @@ specification and reference material that ship alongside the engine.
 
 ## Prerequisites
 
+The [Install](/docs/install/) page lists every way to run the engine and which of them are published.
+
 You need two things on your machine before the first command:
 
 - **Python 3.12.** `uv` installs and manages it for you, so you do not need a system Python.

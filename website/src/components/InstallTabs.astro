@@ -1,0 +1,31 @@
+---
+// The Install section's tabs, rendered from the release-state switch (src/lib/install.mjs), never
+// hand-typed: a tab shows a channel's one-liner only when that channel is published.
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+import state from '../data/release-state.json';
+import { installTabs } from '../lib/install.mjs';
+
+const tabs = installTabs(state);
+---
+
+<Tabs syncKey="install">
+  {
+    tabs.map((tab) => (
+      <TabItem label={tab.label}>
+        <p data-install-summary>
+          {tab.summary}.{' '}
+          {!tab.gated ? (
+            <>Runs from a checkout of the repository; nothing needs to be published.</>
+          ) : tab.published ? (
+            <>
+              Published as <code>{tab.artifact}</code>, version {state.version}.
+            </>
+          ) : (
+            <>Not published yet, so this is the command that works from a checkout today.</>
+          )}
+        </p>
+        <pre data-install-tab={tab.id} data-install-state={tab.published ? 'published' : 'unpublished'} tabindex="0"><code>{tab.command}</code></pre>
+      </TabItem>
+    ))
+  }
+</Tabs>
