@@ -1,16 +1,19 @@
 ---
 title: CI Integration
-description: Assess an agent on every change — emit evidence in one line, run offline, and gate on exit codes.
+description: Assess an agent on every change — switch the emitter on in one line, run offline, and gate on exit codes.
 ---
 
 Agent Conformance is designed to run in continuous integration: it is scriptable, runs with networking
 disabled, and communicates results through exit codes and standard file formats. You can assess an
 agent on every change before it reaches production.
 
-## Emit evidence in one line
+## Switch the emitter on in one line
 
-Wire the emitter into the agent with a single call. It is a no-op until you switch it on with
-`AGENTCE_EMIT=1`, so it never changes what the agent does until you want evidence:
+Create the emitter with a single call. It is a no-op until you switch it on with `AGENTCE_EMIT=1`, so
+it never changes what the agent does until you want evidence. That call only returns the emitter: it
+does not hook an agent framework, so you emit at each chokepoint yourself, and capturing evidence
+automatically from LangGraph, the OpenAI Agents SDK, CrewAI, Google ADK, or the Claude Agent SDK is on
+the roadmap and is not built:
 
 ```python
 import agentce_emit

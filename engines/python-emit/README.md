@@ -11,7 +11,11 @@ em.emit_decision(decision_type="dom:CreditDecision", affects_natural_person=True
 ```
 
 `auto()` is a no-op until `AGENTCE_EMIT=1`, so wiring it in never changes behaviour until you switch
-it on. Every event is labelled `self_report` (agent-side emission is a self-report, SPEC §6.4);
+it on.
+`auto()` only returns the emitter: it does not hook any agent framework, so an agent that calls it and
+nothing else emits no events. Every event is an explicit `emit_*` call. Capturing evidence automatically
+from LangGraph, the OpenAI Agents SDK, CrewAI, Google ADK, or the Claude Agent SDK is on the roadmap and
+is not built. Every event is labelled `self_report` (agent-side emission is a self-report, SPEC §6.4);
 content is referenced by SHA-256, never captured (SPEC R12); ids are deterministic; the flushed bundle
 (`events/*.jsonl` + `manifest.json`) validates with zero quarantines. Standard library only — no
 runtime dependencies, no network, no learned component.
