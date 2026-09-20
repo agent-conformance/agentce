@@ -28,6 +28,7 @@ export default defineConfig({
         {
           label: 'Documentation',
           items: [
+            { label: 'Install', slug: 'docs/install' },
             { label: 'Getting Started', slug: 'docs/getting-started' },
             { label: 'What is agent conformance?', slug: 'docs/concepts' },
             { label: 'The Conformance Spec', slug: 'docs/specification' },
