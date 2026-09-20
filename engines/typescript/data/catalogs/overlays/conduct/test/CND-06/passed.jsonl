@@ -1,0 +1,2 @@
+{"id":"i1","source":"urn:src:enforcement_point","subject":"spiffe://corp/agents/a","type":"org.agent-conformance.evidence.Instruction.v1","agentcesourceclass":"enforcement_point","data":{"@type":"Instruction","source_class":"tool_output"},"time":"2026-01-01T00:00:00Z"}
+{"id":"rf1","source":"urn:src:enforcement_point","subject":"spiffe://corp/agents/a","type":"org.agent-conformance.evidence.Refusal.v1","agentcesourceclass":"enforcement_point","data":{"@type":"Refusal","refs":{"instruction":"agentce:event/i1"}},"time":"2026-01-01T00:00:00Z"}

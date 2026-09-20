@@ -1,0 +1,4 @@
+checklist: RSK-04-M
+control: RSK-04
+items:
+  - {id: Q1, artifact: "fundamental-rights impact assessment", question: "Is a fundamental-rights impact assessment recorded, dated, and approved for this deployment (Art. 27)?", answers: [yes, no, not_applicable]}

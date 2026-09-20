@@ -1,0 +1,29 @@
+id: ROB-07
+version: "2026.09"
+title: Cyber-incident detection and response are exercised
+crosswalk:
+  - {framework: eu-ai-act, clause: "Art. 15", relation: implements, verified_against_text: false}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: semi-automated
+  rung: 2
+  min_source_class: self_report
+  minimum_evidence:
+    - {event: Decision, class: self_report}
+    - {event: ApprovalDecided, class: any}
+  shape: shapes/ROB-07.ttl
+expectations:
+  - {id: S1, text: "Cyber-incident detection and response are exercised."}
+severity: medium
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+tolerance_rationale: "ROB-07 is a structural expectation with no tolerated exceptions."
+false_positive_modes:
+  - "A condition declared as an accepted deviation in the applicability profile."
+techniques:
+  - "techniques/rob-evidence-at-source"
+test_cases:
+  - {id: pass, expected: passed, fixture: test/ROB-07/passed.jsonl}
+  - {id: fail, expected: failed, fixture: test/ROB-07/failed.jsonl}
+  - {id: na, expected: inapplicable, fixture: test/ROB-07/inapplicable.jsonl}

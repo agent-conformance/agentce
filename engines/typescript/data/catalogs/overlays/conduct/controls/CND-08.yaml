@@ -1,0 +1,25 @@
+id: CND-08
+version: "2026.09"
+title: Adverse-outcome rates by declared group are within thresholds
+crosswalk:
+  - {framework: eu-ai-act, clause: "Art. 10, 14(4)(a)", relation: implements, verified_against_text: false}
+applicability:
+  applies_to_roles: [deployer, provider]
+evaluation:
+  mode: semi-automated
+  rung: 3
+  min_source_class: enforcement_point
+  minimum_evidence:
+    - {event: ToolCall, class: enforcement_point}
+expectations:
+  - {id: S1, text: "Adverse-outcome rates by declared group are within thresholds."}
+severity: high
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+tolerance_rationale: "A single CND-08 breach is a conduct failure."
+false_positive_modes:
+  - "An action authorised under a declared, exempt break-glass policy."
+techniques:
+  - "techniques/task-scope-binding-at-ingress"
+test_cases:
+  - {id: pending, expected: not_assessed, fixture: test/CND-08/pending.jsonl}
