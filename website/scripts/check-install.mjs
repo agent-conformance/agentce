@@ -10,7 +10,8 @@
 //                                                  data, and bad sources are each rejected
 //
 // It needs no browser and no network, and reads only committed files and the built HTML.
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TABS, installTabs, resolveTab } from '../src/lib/install.mjs';
@@ -177,7 +178,8 @@ export function builtViolations(state, dist) {
   if (!existsSync(page)) return [`dist/docs/install/index.html: the Install page was not built`];
   problems.push(...tabViolations(state, tabsFromHtml(readFileSync(page, 'utf8'))).map((p) => `install page: ${p}`));
   for (const file of htmlFiles(dist)) {
-    const text = decode(readFileSync(file, 'utf8').replace(/<[^>]*>/g, '\n'));
+    // Inline spans (syntax highlighting splits one command into many) join; every other tag breaks a line.
+    const text = decode(readFileSync(file, 'utf8').replace(/<\/?span\b[^>]*>/g, '').replace(/<[^>]*>/g, '\n'));
     text.split('\n').forEach((line) => {
       const unpublished = Object.entries(state.channels).filter(([, entry]) => !entry.published);
       for (const [name, entry] of unpublished) {
@@ -325,6 +327,20 @@ export function selfTest(base) {
   const leaky = builtViolations(none, join(siteRoot, 'tests/fixtures/install-leaky-dist'));
   rejects(leaky, 'tab uvx: shown as published but the switch says unpublished', 'the committed leaky build');
   rejects(leaky, 'shows a pypi one-liner but the channel is not published', 'the committed leaky build');
+
+  // 8. A leak in a syntax-highlighted code block on another page (one command split across spans) is caught.
+  const scratch = mkdtempSync(join(tmpdir(), 'install-check-'));
+  try {
+    mkdirSync(join(scratch, 'docs/install'), { recursive: true });
+    writeFileSync(join(scratch, 'docs/install/index.html'), renderHtml(installTabs(none)));
+    writeFileSync(
+      join(scratch, 'other.html'),
+      '<pre><code><span class="x">uvx</span> <span>--from</span> <span>agent-conformance==0.1.0</span> <span>agentce</span></code></pre>',
+    );
+    rejects(builtViolations(none, scratch), 'other.html: shows a pypi one-liner', 'a highlighted one-liner on another page');
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
 
   return failures;
 }
