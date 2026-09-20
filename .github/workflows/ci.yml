@@ -107,6 +107,29 @@ jobs:
           sys.exit(1 if bad else 0)
           PY
 
+  corpus:
+    # The simulated corpus backs every accuracy claim, so it must be a set of valid inputs and its
+    # dataset pin must freeze what it names: every generated applicability profile validates against
+    # the applicability-profile schema, and the pin covers the ground truth and the profiles, not only
+    # the evidence bundles. The pin is verified against a freshly generated corpus.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Lint
+        run: |
+          uv run --project corpus --frozen ruff check corpus
+          uv run --project corpus --frozen ruff format --check corpus
+      - name: Test (profile validity, the pin, the generator, the ground truth)
+        working-directory: corpus
+        run: uv run --frozen pytest -q
+      - name: The dataset pin holds for a freshly generated corpus
+        run: uv run --project corpus --frozen python -m corpus.check_versions --corpus corpus
+
   examples:
     # The framework examples and the integration pages must not claim more than is built: the check
     # runs the real `agentce_emit.auto()` and requires every example and page to say automatic
