@@ -137,13 +137,15 @@ export function sourceViolations(state, files) {
   return problems;
 }
 
-const decode = (text) =>
-  text
-    .replace(/&#x26;|&amp;/g, '&')
-    .replace(/&#x3C;|&lt;/gi, '<')
-    .replace(/&#x3E;|&gt;/gi, '>')
-    .replace(/&quot;|&#x22;/g, '"')
-    .replace(/&#39;|&#x27;/g, "'");
+// One pass, so an escaped ampersand is never decoded a second time (`&amp;lt;` stays `&lt;`).
+const ENTITIES = new Map([
+  ['&#x26;', '&'], ['&amp;', '&'],
+  ['&#x3c;', '<'], ['&lt;', '<'],
+  ['&#x3e;', '>'], ['&gt;', '>'],
+  ['&quot;', '"'], ['&#x22;', '"'],
+  ['&#39;', "'"], ['&#x27;', "'"],
+]);
+const decode = (text) => text.replace(/&(?:#x26|amp|#x3c|lt|#x3e|gt|quot|#x22|#39|#x27);/gi, (entity) => ENTITIES.get(entity.toLowerCase()));
 
 // The tabs in a built page: every <pre data-install-tab=… data-install-state=…><code>…</code></pre>.
 export function tabsFromHtml(html) {
@@ -247,6 +249,10 @@ export function selfTest(base) {
   };
   const rejects = (problems, needle, message) =>
     expect(problems.some((p) => p.includes(needle)), `${message}: expected a violation containing \`${needle}\`, got [${problems.join(' | ')}]`);
+
+  // 0. A built page is read as it was written: an escaped ampersand is decoded once, never twice.
+  const escaped = '<pre data-install-tab="t" data-install-state="published"><code>a &amp;lt; b &amp;&amp; c</code></pre>';
+  expect(tabsFromHtml(escaped)[0]?.command === 'a &lt; b && c', 'the built-page reader decodes an escaped ampersand more than once');
 
   // 1. The gate is real logic: the resolver flips both ways, and constant resolvers cannot pass.
   expect(resolverProblems(resolveTab, base).length === 0, `the resolver fails its own contract: ${resolverProblems(resolveTab, base).join(' | ')}`);
