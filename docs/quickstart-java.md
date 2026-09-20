@@ -3,7 +3,8 @@
 Run the Engine Conformance Suite with the Java engine on a fresh machine (SPEC §11.5, §5.3). The Java
 engine implements the `conformance run` command: it assesses every project in the simulated corpus and
 writes an `assertions.json` per project that is byte-identical to the reference engine's after RFC 8785
-canonicalisation.
+canonicalisation. Its evidence packs are byte-identical too, and its `oscal-ar.json` and
+`results.sarif` are identical once the engine name and version each engine carries are set aside.
 
 The Java engine does not yet implement `assess`, `report`, `validate`, or `quickstart`; those are planned.
 To assess an agent's evidence today, use the Python engine — see the [main quickstart](quickstart.md).

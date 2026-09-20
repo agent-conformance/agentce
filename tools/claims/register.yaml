@@ -54,6 +54,23 @@ claims:
       description: >-
         Runs all three engines over the full corpus and fails unless their per-project
         assertions.json outputs are byte-identical.
+  - id: engine.canonical-set-identical
+    text: >-
+      Beyond assertions.json, the three engines' evidence packs are byte-identical per project, and their
+      oscal-ar.json and results.sarif are identical once the engine name and version each carries by
+      design are set aside.
+    status: built
+    pages:
+      - docs/quickstart-typescript.md
+      - docs/quickstart-java.md
+    check:
+      workflow: .github/workflows/three-engine.yml
+      job: compare
+      description: >-
+        Runs all three engines over the full corpus and fails unless each project's assertions.json and
+        every packs/*/pack.json are byte-identical and its oscal-ar.json and results.sarif match after
+        the engine name and version are neutralised; a self-test proves the comparator flags a missing
+        artifact, a pack without its per-assertion evidence, and a byte change.
   - id: ci.tests-gate
     text: >-
       Every push and pull request runs the per-package quality gate for all three engines: lint,
