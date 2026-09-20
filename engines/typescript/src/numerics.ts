@@ -10,6 +10,10 @@
 
 import Decimal from "decimal.js";
 
+import { CanonicalizationError, canonicalString } from "./canonical";
+import { parseJson } from "./json";
+import { compareLiterals } from "./structural";
+
 const D = Decimal.clone({ precision: 30, rounding: Decimal.ROUND_HALF_EVEN });
 const LENTZ_FLOOR = new D("1e-30");
 const LENTZ_CONVERGENCE = new D("1e-30");
@@ -296,6 +300,20 @@ function computeCase(algorithm: string, c: VectorCase): unknown {
       );
     case "beta_quantile":
       return roundPresentation(betaQuantile(c.a as number, c.b as number, new D(c.p as string)));
+    case "canonical_token": {
+      try {
+        return `canonical:${canonicalString(parseJson(c.input as string))}`;
+      } catch (exc) {
+        if (exc instanceof CanonicalizationError) {
+          return `error:${exc.reason}`;
+        }
+        throw exc;
+      }
+    }
+    case "literal_order": {
+      const order = compareLiterals(c.lhs as string, c.rhs as string);
+      return order === null ? "incomparable" : order < 0 ? "lt" : order > 0 ? "gt" : "eq";
+    }
     default:
       throw new NumericsError(`unknown algorithm ${JSON.stringify(algorithm)}`);
   }

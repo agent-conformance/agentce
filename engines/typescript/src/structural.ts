@@ -92,35 +92,100 @@ export function resolvePath(store: GraphStore, focus: string, path: PathExpr): V
   return [];
 }
 
-function asNumber(value: string): number | null {
-  const s = value.trim();
-  if (/^[+-]?\d+\/\d+$/.test(s)) {
-    const [num, den] = s.split("/").map(Number);
-    return den !== 0 ? (num as number) / (den as number) : null;
-  }
-  if (/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(s)) {
-    return Number(s);
-  }
-  return null;
+const INTEGER = /^[+-]?[0-9]+$/;
+const DATETIME =
+  /^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]+))?(Z|[+-][0-9]{2}:[0-9]{2})?$/;
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/** Days since 1970-01-01 in the proleptic Gregorian calendar (exact integer arithmetic). */
+function daysFromCivil(yearIn: number, month: number, day: number): number {
+  const year = month <= 2 ? yearIn - 1 : yearIn;
+  const era = Math.floor(year / 400);
+  const yoe = year - era * 400;
+  const doy = Math.floor((153 * (month + (month > 2 ? -3 : 9)) + 2) / 5) + day - 1;
+  const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
+  return era * 146097 + doe - 719468;
 }
 
-function asDatetime(value: string): number | null {
-  const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? null : parsed;
+interface Instant {
+  aware: boolean;
+  seconds: number;
+  fraction: string;
 }
 
-function le(a: string, b: string): boolean | null {
-  const na = asNumber(a);
-  const nb = asNumber(b);
-  if (na !== null && nb !== null) {
-    return na <= nb;
+function parseDatetime(value: string): Instant | null {
+  const match = DATETIME.exec(value);
+  if (match === null) {
+    return null;
   }
-  const da = asDatetime(a);
-  const db = asDatetime(b);
-  if (da !== null && db !== null) {
-    return da <= db;
+  const [year, month, day, hour, minute, second] = [1, 2, 3, 4, 5, 6].map((i) => Number(match[i]));
+  const leap =
+    (year as number) % 4 === 0 && ((year as number) % 100 !== 0 || (year as number) % 400 === 0);
+  if ((month as number) < 1 || (month as number) > 12) {
+    return null;
   }
-  return null;
+  const monthDays =
+    (DAYS_IN_MONTH[(month as number) - 1] as number) + (leap && month === 2 ? 1 : 0);
+  if ((day as number) < 1 || (day as number) > monthDays) {
+    return null;
+  }
+  if ((hour as number) > 23 || (minute as number) > 59 || (second as number) > 59) {
+    return null;
+  }
+  const zone = match[8];
+  let offset = 0;
+  if (zone !== undefined && zone !== "Z") {
+    const offsetHours = Number(zone.slice(1, 3));
+    const offsetMinutes = Number(zone.slice(4, 6));
+    if (offsetHours > 23 || offsetMinutes > 59) {
+      return null;
+    }
+    offset = (offsetHours * 3600 + offsetMinutes * 60) * (zone[0] === "-" ? -1 : 1);
+  }
+  const seconds =
+    daysFromCivil(year as number, month as number, day as number) * 86400 +
+    (hour as number) * 3600 +
+    (minute as number) * 60 +
+    (second as number) -
+    offset;
+  return { aware: zone !== undefined, seconds, fraction: match[7] ?? "" };
+}
+
+/**
+ * Order two literals exactly: -1, 0, 1, or null when they are not comparable.
+ *
+ * Only `xsd:integer` and `xsd:dateTime` lexical forms are comparable (`spec/rules/psp.md`). Integers
+ * compare as exact integers of any size; date-times compare as exact instants to arbitrary
+ * fractional-second precision, and an aware date-time is never comparable with a naive one. Nothing
+ * goes through IEEE-754 or `Date`, so every engine returns the same answer.
+ */
+export function compareLiterals(a: string, b: string): -1 | 0 | 1 | null {
+  if (INTEGER.test(a) && INTEGER.test(b)) {
+    const ia = BigInt(a);
+    const ib = BigInt(b);
+    return ia < ib ? -1 : ia > ib ? 1 : 0;
+  }
+  const da = parseDatetime(a);
+  const db = parseDatetime(b);
+  if (da === null || db === null || da.aware !== db.aware) {
+    return null;
+  }
+  if (da.seconds !== db.seconds) {
+    return da.seconds < db.seconds ? -1 : 1;
+  }
+  const width = Math.max(da.fraction.length, db.fraction.length);
+  const fa = da.fraction.padEnd(width, "0");
+  const fb = db.fraction.padEnd(width, "0");
+  return fa < fb ? -1 : fa > fb ? 1 : 0;
+}
+
+function le(a: string, b: string): boolean {
+  const order = compareLiterals(a, b);
+  return order === -1 || order === 0;
+}
+
+function lt(a: string, b: string): boolean {
+  return compareLiterals(a, b) === -1;
 }
 
 function setsEqual(a: Set<string>, b: Set<string>): boolean {
@@ -207,16 +272,10 @@ function checkProperty(
       failed.push("sh:in");
     }
   }
-  if (
-    prop.minInclusive !== null &&
-    !values.every((v) => le(prop.minInclusive as string, v.repr) === true)
-  ) {
+  if (prop.minInclusive !== null && !values.every((v) => le(prop.minInclusive as string, v.repr))) {
     failed.push("sh:minInclusive");
   }
-  if (
-    prop.maxInclusive !== null &&
-    !values.every((v) => le(v.repr, prop.maxInclusive as string) === true)
-  ) {
+  if (prop.maxInclusive !== null && !values.every((v) => le(v.repr, prop.maxInclusive as string))) {
     failed.push("sh:maxInclusive");
   }
   if (prop.equals !== null) {
@@ -232,8 +291,8 @@ function checkProperty(
     }
   }
   const relational: Array<[string | null, string, (a: string, b: string) => boolean]> = [
-    [prop.lessThan, "sh:lessThan", (a, b) => le(a, b) === true && a !== b],
-    [prop.lessThanOrEquals, "sh:lessThanOrEquals", (a, b) => le(a, b) === true],
+    [prop.lessThan, "sh:lessThan", lt],
+    [prop.lessThanOrEquals, "sh:lessThanOrEquals", le],
   ];
   for (const [otherPath, constraint, ok] of relational) {
     if (otherPath !== null) {

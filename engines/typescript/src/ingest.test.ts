@@ -1,10 +1,12 @@
 /** Bundle loading, schema validation, and ingest quarantine (cross-checked with the Python engine). */
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { loadBundle } from "./bundle";
+import { CanonicalizationError } from "./canonical";
 import { InputError } from "./errors";
 import { ingest } from "./ingest";
 import { countsByReason } from "./quarantine";
@@ -70,4 +72,26 @@ test("validateEvent rejects an unknown payload type", () => {
     data: { "@type": "Nonsense" },
   });
   assert.ok(errors.length > 0);
+});
+
+test("a manifest number the canonical form refuses is refused, not folded to a whole number", () => {
+  for (const [token, reason] of [
+    ["2.0", "non_integer_number"],
+    ["1e2", "non_integer_number"],
+    ["10000000000000001", "integer_out_of_range"],
+  ] as const) {
+    const dir = mkdtempSync(join(tmpdir(), "agentce-manifest-"));
+    mkdirSync(join(dir, "events"));
+    copyFileSync(join(BUNDLE, "events", "log.jsonl"), join(dir, "events", "log.jsonl"));
+    const manifest = readFileSync(join(BUNDLE, "manifest.json"), "utf-8").replace(
+      '"bundle_format": "1.0"',
+      `"bundle_format": "1.0", "note": ${token}`,
+    );
+    writeFileSync(join(dir, "manifest.json"), manifest);
+    assert.throws(
+      () => loadBundle(dir),
+      (err: unknown) => err instanceof CanonicalizationError && err.reason === reason,
+      token,
+    );
+  }
 });

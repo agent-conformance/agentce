@@ -19,6 +19,8 @@ const FILES = [
   "clopper-pearson.json",
   "incomplete-beta.json",
   "beta-quantile.json",
+  "edge-comparison.json",
+  "edge-canonical-numbers.json",
 ];
 
 for (const file of FILES) {
