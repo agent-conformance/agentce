@@ -106,6 +106,22 @@ jobs:
       - name: Run every example and validate its bundle
         run: uv run --project examples --frozen python examples/run_all.py --check
 
+  collect-honesty:
+    # `agentce collect` has no source connector, so the pages and the example config that introduce it
+    # must say so: the check runs the real command against the shipped config and fails when the
+    # command page, the integration guide, or the config presents it as pulling evidence.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: collect_check self-test
+        run: uv run --project engines/python --frozen python tools/collect_check.py --self-test
+      - name: The collect pages and example config state what is built
+        run: uv run --project engines/python --frozen python tools/collect_check.py
+
   python-placeholders:
     runs-on: ubuntu-latest
     steps:

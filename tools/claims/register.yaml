@@ -251,3 +251,34 @@ claims:
         rejects an unlabelled example, a standard-library import passed off as a framework, a page
         without the label, and a label that appears only on another page. Also runs every example and
         validates its bundle.
+  - id: collect.source-connector
+    text: >-
+      Pulling evidence from a source system with `agentce collect` is planned and not yet built:
+      `--dry-run` plans a job offline, and a real run has no source connector, so it records every
+      source incomplete and exits 1.
+    status: roadmap
+    pages:
+      - docs/integrate.md
+      - docs/reference/commands/collect.md
+      - adapters/fixtures/collect-dry-run.yaml
+  - id: collect.pages-labelled
+    text: >-
+      The command page, the integration guide, and the example collection config each say that a real
+      `agentce collect` has no source connector and records every source incomplete, and the config
+      says an OTLP export is pushed to files or object storage rather than polled, for as long as a real
+      run of the shipped config completes no source.
+    status: built
+    pages:
+      - docs/integrate.md
+      - docs/reference/commands/collect.md
+      - adapters/fixtures/collect-dry-run.yaml
+    check:
+      workflow: .github/workflows/ci.yml
+      job: collect-honesty
+      description: >-
+        On every pull request, runs the real `agentce collect` against the shipped example config and
+        fails when the generated command page, the integration guide beside any mention of the command,
+        or the config does not say a real run has no source connector, or when the config does not say
+        an OTLP export is pushed; if a real run ever completes, no caveat is owed. A self-test rejects a
+        guide that promises collection, a caveat placed far from the mention, a silent command page, and
+        a config that hides the missing connector or models push as pull.
