@@ -111,7 +111,20 @@ jobs:
       - name: Build the engine image without pushing
         run: docker build -f engines/python/Dockerfile -t agentce/agentce:dev .
       - name: Run the quickstart in the image with no network
-        run: docker run --rm --network none agentce/agentce:dev quickstart --out /tmp/report
+        run: |
+          set -e
+          mkdir -p "$RUNNER_TEMP/report"
+          docker run --rm --network none --user "$(id -u):$(id -g)" \
+            -v "$RUNNER_TEMP/report:/out" agentce/agentce:dev quickstart --out /out
+          test -s "$RUNNER_TEMP/report/assertions.json" || {
+            echo "::error::the image's quickstart wrote no assertions.json" >&2; ls -R "$RUNNER_TEMP/report" >&2; exit 1; }
+      - name: The image holds the installed package, not the repository
+        run: |
+          set -e
+          docker run --rm --entrypoint python agentce/agentce:dev -c \
+            "import agentce, pathlib; p = pathlib.Path(agentce.__file__).resolve(); assert 'site-packages' in p.parts, p"
+          docker run --rm --entrypoint sh agentce/agentce:dev -c \
+            'for p in /agentce /src /SPECS /home/agentce/engines /home/agentce/SPECS /home/agentce/.git; do test ! -e "$p" || { echo "unexpected $p in the image" >&2; exit 1; }; done'
 
   installed-artifacts-offline:
     name: installed artifacts run offline
