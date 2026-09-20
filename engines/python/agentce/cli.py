@@ -99,7 +99,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--manual", help="the manual-records directory")
     p.add_argument("--probes", help="the probe-results directory")
-    p.add_argument("--out", help="the output directory")
+    p.add_argument("--out", help="the output directory (default: ./out)")
     p.add_argument("--state", help="the incremental state directory")
     p.add_argument(
         "--report-language",
@@ -242,7 +242,10 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[common],
         help="diagnose a project and name the exact fix (SPEC 13.4)",
     )
-    p.add_argument("--project", help="the project directory to diagnose")
+    p.add_argument(
+        "--project",
+        help="the project directory to diagnose (default: the current directory)",
+    )
     p.add_argument(
         "--write-errors",
         dest="write_errors",
@@ -253,7 +256,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser(
         "quickstart", parents=[common], help="assess the bundled quickstart project"
     )
-    p.add_argument("--out", help="the output directory for the report")
+    p.add_argument("--out", help="the output directory for the report (default: ./out)")
     p.set_defaults(func=commands.cmd_quickstart)
 
     p = sub.add_parser(
@@ -263,7 +266,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--non-interactive",
         dest="non_interactive",
         action="store_true",
-        help="generate without prompting (required)",
+        help="accepted for compatibility; init never prompts",
     )
     p.add_argument(
         "--framework", help="the agent framework, e.g. custom-loop, langgraph"
@@ -277,7 +280,14 @@ def build_parser() -> argparse.ArgumentParser:
         choices=commands.INIT_ROLES,
         help="the subject's role: deployer, provider, or both",
     )
-    p.add_argument("--out", help="the output directory")
+    p.add_argument(
+        "--out", help="the output directory (default: the current directory)"
+    )
+    p.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite a profile or domain binding that already exists",
+    )
     p.set_defaults(func=commands.cmd_init)
 
     p = sub.add_parser("config", parents=[common], help="show engine configuration")

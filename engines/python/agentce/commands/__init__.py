@@ -73,6 +73,11 @@ from ..canonical import canonicalize
 _log = get_logger()
 
 REPORT_FORMATS = ("md", "html", "oscal", "sarif", "public", "pack")
+#: Where a command writes, or reads a project from, when the caller names no directory: the working
+#: directory for a project (``init``, ``doctor``) and ``./out`` for a run's output (``assess``,
+#: ``quickstart``), so the first command a newcomer types needs no flag.
+DEFAULT_PROJECT_DIR = "."
+DEFAULT_OUT_DIR = "out"
 SIGN_ROLES = ("claimant", "assessor")
 SIGN_PROFILES = ("sigstore-public", "sigstore-private", "kms")
 
@@ -348,11 +353,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         _opt_str(ns, "profile"), key="profile", what="the applicability profile"
     )
     catalog = _opt_str(ns, "catalog")
-    out = _opt_str(ns, "out")
-    if not out:
-        raise InputError(
-            "input.out_missing", "an output directory is required.", "pass --out <dir>."
-        )
+    out = _opt_str(ns, "out") or DEFAULT_OUT_DIR
     # Resolve the catalogs before any output is written: a run that cannot name what it evaluates
     # against must leave nothing behind that looks like a result.
     profile_obj = Profile.load(profile)
@@ -1098,7 +1099,7 @@ def cmd_doctor(ns: argparse.Namespace) -> CommandResult:
         return result
 
     project = _require_dir(
-        _opt_str(ns, "project"),
+        _opt_str(ns, "project") or DEFAULT_PROJECT_DIR,
         key="project",
         what="the project directory",
         fix="pass --project <dir> (a project from agentce quickstart or agentce init).",
@@ -1137,7 +1138,12 @@ def cmd_doctor(ns: argparse.Namespace) -> CommandResult:
     if not bundle_dir.is_dir():
         problems.append(
             _doctor_problem(
-                "input.bundle_manifest_missing", f"no evidence bundle at {bundle_dir}"
+                "input.bundle_manifest_missing",
+                f"no evidence bundle at {bundle_dir}",
+                f"run your agent with the emitter on, `AGENTCE_EMIT=1 AGENTCE_EMIT_OUT={bundle_dir}` "
+                "(see docs/integrate.md), or watch one built with "
+                f"`examples/custom-loop/run.sh {bundle_dir}` from a checkout; then check it with "
+                f"`agentce validate --bundle {bundle_dir}`.",
             )
         )
     else:
@@ -1207,11 +1213,7 @@ DEFAULT_EMIT_SOURCE = "urn:agentce:emit:local"
 def cmd_quickstart(ns: argparse.Namespace) -> CommandResult:
     """Assess the bundled quickstart project end to end — one command, offline (SPEC §13.4 AX-1)."""
     result = CommandResult(command="quickstart")
-    out = _opt_str(ns, "out")
-    if not out:
-        raise InputError(
-            "input.out_missing", "an output directory is required.", "pass --out <dir>."
-        )
+    out = _opt_str(ns, "out") or DEFAULT_OUT_DIR
     quickstart = bundled.quickstart_dir()
     catalog_dir = bundled.catalogs_dir() / "base" / "eu-ai-act"
     if not quickstart.is_dir():
@@ -1244,17 +1246,7 @@ def cmd_quickstart(ns: argparse.Namespace) -> CommandResult:
 def cmd_init(ns: argparse.Namespace) -> CommandResult:
     """Write a starter applicability profile for an adopter (SPEC §13.4 AX-2)."""
     result = CommandResult(command="init")
-    if not _flag(ns, "non_interactive"):
-        raise InputError(
-            "input.init_interactive",
-            "interactive init is not available; pass --non-interactive with --subject and --role.",
-            "run `agentce init --non-interactive --framework <fw> --subject <id> --role <role> --out <dir>`.",
-        )
-    out = _opt_str(ns, "out")
-    if not out:
-        raise InputError(
-            "input.out_missing", "an output directory is required.", "pass --out <dir>."
-        )
+    out = _opt_str(ns, "out") or DEFAULT_PROJECT_DIR
     subject = _opt_str(ns, "subject") or DEFAULT_SUBJECT
     role = _opt_str(ns, "role") or "deployer"
     if role not in INIT_ROLES:
@@ -1280,6 +1272,13 @@ def cmd_init(ns: argparse.Namespace) -> CommandResult:
     )
     profile_path = Path(out) / DECLARATIONS_DIR / PROFILE_FILE
     domain_path = Path(out) / DECLARATIONS_DIR / DOMAIN_FILE
+    existing = [str(p) for p in (profile_path, domain_path) if p.exists()]
+    if existing and not _flag(ns, "force"):
+        raise InputError(
+            "input.init_exists",
+            f"init would overwrite {', '.join(existing)}.",
+            "pass --force to overwrite, or --out <dir> to write somewhere else.",
+        )
     profile_path.parent.mkdir(parents=True, exist_ok=True)
     profile_path.write_text(profile, encoding="utf-8")
     domain_path.write_text(_STARTER_DOMAIN_BINDING, encoding="utf-8")

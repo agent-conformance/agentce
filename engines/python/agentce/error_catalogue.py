@@ -75,7 +75,9 @@ MESSAGE_KEYS: dict[str, Entry] = {
     "input.bundle_manifest_missing": Entry(
         "error",
         "the evidence bundle has no manifest.json.",
-        "add a manifest.json listing every stream file with its sha256.",
+        "an agent writes a bundle by running with the agentce_emit emitter on: set "
+        "`AGENTCE_EMIT=1 AGENTCE_EMIT_OUT=<dir>` and see docs/integrate.md; to watch one built, run "
+        "`examples/custom-loop/run.sh <dir>` from a checkout, then `agentce validate --bundle <dir>`.",
     ),
     "input.bundle_manifest_mismatch": Entry(
         "error",
@@ -101,6 +103,11 @@ MESSAGE_KEYS: dict[str, Entry] = {
         "error",
         "no control reached conformant, non-conformant, or insufficient_evidence, so the run judged nothing.",
         "emit under the subject and source the profile declares, and record the evidence the catalog's controls apply to.",
+    ),
+    "input.init_exists": Entry(
+        "error",
+        "init would overwrite a profile or domain binding that already exists.",
+        "pass --force to overwrite, or --out <dir> to write somewhere else.",
     ),
     "input.profile_missing": Entry(
         "error",

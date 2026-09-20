@@ -457,12 +457,6 @@ def test_quickstart(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert (tmp_path / "qs" / "assertions.json").is_file()
 
 
-def test_quickstart_requires_out(capsys: pytest.CaptureFixture[str]) -> None:
-    code, env = run(["quickstart", "--json"], capsys)
-    assert code == 3
-    assert env["error"]["key"] == "input.out_missing"
-
-
 def test_init_writes_a_valid_profile(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -489,12 +483,6 @@ def test_init_writes_a_valid_profile(
     assert env["profile"] == str(profile)
     assert env["domain"] == str(tmp_path / "init" / "agentce" / "domain.linkml.yaml")
     assert validate_main([str(profile)]) == 0  # the generated profile is schema-valid
-
-
-def test_init_requires_non_interactive(capsys: pytest.CaptureFixture[str]) -> None:
-    code, env = run(["init", "--out", "/tmp/x", "--json"], capsys)
-    assert code == 3
-    assert env["error"]["key"] == "input.init_interactive"
 
 
 def test_config_show_reports_sources(capsys: pytest.CaptureFixture[str]) -> None:

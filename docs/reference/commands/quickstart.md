@@ -7,7 +7,7 @@ usage: agentce quickstart [-h] [--json] [--debug] [--quiet] [--out OUT]
 
 options:
   -h, --help  show this help message and exit
-  --out OUT   the output directory for the report
+  --out OUT   the output directory for the report (default: ./out)
 
 global options:
   --json      emit machine-readable JSON on stdout
