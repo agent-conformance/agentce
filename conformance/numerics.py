@@ -112,13 +112,15 @@ def _java_results(launcher: Path, casefile: Path) -> dict[str, Any]:
     return parsed
 
 
-def run(engines: tuple[str, ...] = ("python", "typescript")) -> dict[str, Any]:
-    """Score every numerics vector through the selected engines (P3.1)."""
+def run(
+    engines: tuple[str, ...] = ("python", "typescript"), cases: Path = CASES
+) -> dict[str, Any]:
+    """Score every numerics vector in ``cases`` through the selected engines (P3.1)."""
     total = python_failed = ts_failed = java_failed = 0
     identical = True
     launcher = java_launcher() if "java" in engines else None
     for name in FILES:
-        casefile = CASES / name
+        casefile = cases / name
         data = json.loads(casefile.read_text(encoding="utf-8"))
         algorithm = data["algorithm"]
         ts = _ts_results(casefile)
@@ -168,6 +170,12 @@ def main(argv: list[str] | None = None) -> int:
         default="python,typescript",
         help="comma-separated engines to score (python and typescript always run; add java)",
     )
+    parser.add_argument(
+        "--cases",
+        type=Path,
+        default=CASES,
+        help="directory holding the vector files (default: spec/rules/numerics-vectors/cases)",
+    )
     args = parser.parse_args(argv)
     engines = tuple(part for part in args.engines.split(",") if part)
     unknown = set(engines) - {"python", "typescript", "java"}
@@ -175,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(
             "--engines must include python and typescript and only known engines"
         )
-    result = run(engines)
+    result = run(engines, args.cases)
     if args.json:
         print(json.dumps(result, sort_keys=True))
     else:
