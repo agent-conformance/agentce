@@ -27,6 +27,12 @@ jobs:
           lines=$(wc -l < README.md); if [ "$lines" -gt 40 ]; then echo "::error::Root README exceeds the pre-GA minimal size ($lines lines)" >&2; exit 1; fi
           echo "guardrails ok"
 
+      - name: Governance text and the quickstart gate
+        run: |
+          set -e
+          python3 tools/governance_check.py --self-test
+          python3 tools/governance_check.py
+
   no-network:
     # Real offline guarantee: run an actual assessment inside a network namespace that has no route
     # off the host. Dependencies are synced online first; the assessment itself runs with networking

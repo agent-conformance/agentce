@@ -1,12 +1,15 @@
 # Fresh-machine proof (SPEC §13.4 AX-1, §14.4): on a clean runner with only the language toolchain,
 # each engine runs end to end within five minutes — the Python engine assesses the vendored quickstart
 # project; the TypeScript and Java engines, which implement `conformance run`, run the conformance suite
-# and must write one assertions.json per project — and the engine container image builds. Dispatched
-# under the pre-GA guardrails (not run on every push); every action is pinned by commit SHA (AGENTS.md
-# quality gates). No image is pushed.
+# and must write one assertions.json per project — and the engine container image builds. Runs on every
+# push to main or a phase branch and on every pull request, and can still be dispatched by hand; every
+# action is pinned by commit SHA (AGENTS.md quality gates). No image is pushed.
 name: quickstart
 
 on:
+  push:
+    branches: [main, "phase/**"]
+  pull_request:
   workflow_dispatch:
 
 permissions:
