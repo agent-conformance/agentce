@@ -28,6 +28,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import filecmp
 import json
 import os
@@ -36,6 +37,7 @@ import subprocess
 import sys
 import tempfile
 import zipfile
+from collections.abc import Iterator
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -57,6 +59,19 @@ CANONICAL_OUTPUTS = (
     "report.html",
     "results.sarif",
 )
+
+
+@contextlib.contextmanager
+def _scratch(prefix: str) -> Iterator[str]:
+    """A temporary directory that is removed even when a namespaced run left root-owned files in it.
+
+    ``tempfile.TemporaryDirectory`` raises from its own error handler in that case.
+    """
+    path = tempfile.mkdtemp(prefix=prefix)
+    try:
+        yield path
+    finally:
+        shutil.rmtree(path, ignore_errors=True)
 
 
 def package_version() -> str:
@@ -237,9 +252,7 @@ def check_python_artifact(
 
 
 def check_python(runner: Runner, *, offline_install: bool) -> list[str]:
-    with tempfile.TemporaryDirectory(
-        prefix="agentce-installed-", ignore_cleanup_errors=True
-    ) as raw:
+    with _scratch("agentce-installed-") as raw:
         tmp = Path(raw)
         assert _outside_checkout(tmp)
         flags = ["--offline"] if offline_install else []
@@ -269,9 +282,7 @@ def check_python_files(
     runner: Runner, artifacts: list[tuple[str, Path]], *, offline_install: bool
 ) -> list[str]:
     """Install each built or downloaded artifact into a clean venv and compare with a checkout run."""
-    with tempfile.TemporaryDirectory(
-        prefix="agentce-installed-", ignore_cleanup_errors=True
-    ) as raw:
+    with _scratch("agentce-installed-") as raw:
         tmp = Path(raw)
         assert _outside_checkout(tmp)
         reference = tmp / "reference"
@@ -336,9 +347,7 @@ def _numerics_problems(engine_cmd: list[str], cwd: Path, runner: Runner) -> list
 def check_npm(runner: Runner, *, offline_install: bool) -> list[str]:
     if shutil.which("npm") is None or shutil.which("pnpm") is None:
         return ["npm and pnpm are required to build and install the package"]
-    with tempfile.TemporaryDirectory(
-        prefix="agentce-installed-", ignore_cleanup_errors=True
-    ) as raw:
+    with _scratch("agentce-installed-") as raw:
         tmp = Path(raw)
         assert _outside_checkout(tmp)
         proc = runner.run(["pnpm", "build"], TS_ENGINE, offline=False)
@@ -361,9 +370,7 @@ def check_npm_tarball(
 ) -> list[str]:
     """Install a packed or downloaded tarball into an empty project and run it."""
     version = package_version()
-    with tempfile.TemporaryDirectory(
-        prefix="agentce-installed-", ignore_cleanup_errors=True
-    ) as raw:
+    with _scratch("agentce-installed-") as raw:
         tmp = Path(raw)
         assert _outside_checkout(tmp)
         empty = tmp / "empty"
@@ -438,9 +445,7 @@ def check_jar(runner: Runner, *, offline_install: bool) -> list[str]:
 def check_jar_file(runner: Runner, built: Path) -> list[str]:
     """Run a built or downloaded jar from an empty directory."""
     version = package_version()
-    with tempfile.TemporaryDirectory(
-        prefix="agentce-installed-", ignore_cleanup_errors=True
-    ) as raw:
+    with _scratch("agentce-installed-") as raw:
         tmp = Path(raw)
         assert _outside_checkout(tmp)
         jar = tmp / built.name
@@ -519,9 +524,7 @@ def _inert_wheel(directory: Path, version: str) -> Path:
 def self_test() -> int:
     runner = Runner(require_netns=False)
     failures: list[str] = []
-    with tempfile.TemporaryDirectory(
-        prefix="agentce-installed-selftest-", ignore_cleanup_errors=True
-    ) as raw:
+    with _scratch("agentce-installed-selftest-") as raw:
         tmp = Path(raw)
         good = tmp / "good"
         (good / "packs" / "p").mkdir(parents=True)
