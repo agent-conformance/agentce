@@ -41,6 +41,12 @@ jobs:
           python3 tools/workflow_pins_check.py --self-test
           python3 tools/workflow_pins_check.py
 
+      - name: Container recipe
+        run: |
+          set -e
+          python3 tools/container_recipe_check.py --self-test
+          python3 tools/container_recipe_check.py
+
   no-network:
     # Real offline guarantee: run an actual assessment inside a network namespace that has no route
     # off the host. Dependencies are synced online first; the assessment itself runs with networking
