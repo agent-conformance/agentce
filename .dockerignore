@@ -1,0 +1,30 @@
+# Docker build context for `docker build -f engines/python/Dockerfile .` (context = repository root).
+# Keep private, dev, and build material out of the context so it can never reach the daemon or an image.
+SPECS
+**/SPECS
+.git
+**/.git
+.github
+node_modules
+**/node_modules
+dist
+**/dist
+build
+**/build
+tests
+**/tests
+.venv
+**/.venv
+**/__pycache__
+**/*.pyc
+.mypy_cache
+**/.mypy_cache
+.ruff_cache
+**/.ruff_cache
+.pytest_cache
+**/.pytest_cache
+.hypothesis
+.claude
+CLAUDE.md
+.DS_Store
+**/.DS_Store
