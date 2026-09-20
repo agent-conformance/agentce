@@ -87,6 +87,25 @@ jobs:
           sys.exit(1 if bad else 0)
           PY
 
+  examples:
+    # The framework examples and the integration pages must not claim more than is built: the check
+    # runs the real `agentce_emit.auto()` and requires every example and page to say automatic
+    # framework capture is on the roadmap while that captures nothing; the examples themselves must
+    # still run and emit bundles that validate with zero quarantines.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: examples_check self-test
+        run: uv run --project engines/python-emit --frozen python tools/examples_check.py --self-test
+      - name: Examples and integration pages state what is built
+        run: uv run --project engines/python-emit --frozen python tools/examples_check.py
+      - name: Run every example and validate its bundle
+        run: uv run --project examples --frozen python examples/run_all.py --check
+
   python-placeholders:
     runs-on: ubuntu-latest
     steps:

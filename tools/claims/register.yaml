@@ -218,3 +218,36 @@ claims:
       - docs/quickstart-java.md
       - website/src/content/docs/docs/running-assessments.md
       - engines/typescript/README.md
+  - id: integration.framework-capture
+    text: >-
+      Capturing evidence automatically from LangGraph, the OpenAI Agents SDK, CrewAI, Google ADK, and
+      the Claude Agent SDK, from one line, is planned and not yet built; today `agentce_emit.auto()`
+      returns the emitter and every event is an explicit `emit_*` call, and none of the six example
+      agents imports the framework it is named for.
+    status: roadmap
+    pages:
+      - docs/integrate.md
+      - engines/python-emit/README.md
+      - website/src/content/docs/docs/ci-integration.md
+      - examples/scenario.py
+  - id: examples.frameworks-labelled
+    text: >-
+      Each of the six example agents either imports a real package of its own or says in its own source
+      that automatic framework capture is on the roadmap, and the pages that explain the one-line setup
+      say the same for as long as the real `auto()` captures no events by itself. The examples still run
+      and their bundles validate with zero quarantines.
+    status: built
+    pages:
+      - docs/integrate.md
+      - engines/python-emit/README.md
+      - website/src/content/docs/docs/ci-integration.md
+    check:
+      workflow: .github/workflows/ci.yml
+      job: examples
+      description: >-
+        On every pull request, runs the real `agentce_emit.auto()` with no `emit_*` call and fails when
+        an example or a setup page does not label automatic framework capture as roadmap, or when
+        `auto()` starts capturing events without the wording and this claim being retired; a self-test
+        rejects an unlabelled example, a standard-library import passed off as a framework, a page
+        without the label, and a label that appears only on another page. Also runs every example and
+        validates its bundle.
