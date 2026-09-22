@@ -183,3 +183,11 @@ export function assessSubjects(
   }
   return assertions;
 }
+
+/** Outcomes that count as a verdict was reached at all (a run that assessed nothing reaches none). */
+const VERDICT_OUTCOMES = new Set(["conformant", "non-conformant", "insufficient_evidence"]);
+
+/** True when no assertion reached a verdict (see {@link VERDICT_OUTCOMES}). */
+export function evaluatedNothing(assertions: Assertion[]): boolean {
+  return !assertions.some((a) => VERDICT_OUTCOMES.has(a.outcome));
+}

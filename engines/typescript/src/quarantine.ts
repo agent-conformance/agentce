@@ -3,6 +3,9 @@
  * Quarantine is an output, never a silent drop. Each record is one line of `quarantine.jsonl`.
  */
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+
 export enum QuarantineReason {
   SCHEMA_INVALID = "schema_invalid",
   DUPLICATE_ID = "duplicate_id",
@@ -54,4 +57,17 @@ export function countsByReason(records: Iterable<QuarantineRecord>): Record<stri
     out[reason] = counts.get(reason) as number;
   }
   return out;
+}
+
+/** Write `records` to `path` as one JSON object per line, in input order. Return the count written. */
+export function writeQuarantine(records: Iterable<QuarantineRecord>, path: string): number {
+  mkdirSync(dirname(path), { recursive: true });
+  let written = 0;
+  const lines: string[] = [];
+  for (const record of records) {
+    lines.push(JSON.stringify(quarantineToJson(record)));
+    written += 1;
+  }
+  writeFileSync(path, lines.length > 0 ? `${lines.join("\n")}\n` : "");
+  return written;
 }
