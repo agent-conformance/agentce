@@ -116,16 +116,45 @@ def test_full_set_structure(tmp_path: Path) -> None:
     assert ids == sorted(ids) and len(set(ids)) == len(
         ids
     )  # unique, deterministic order
-    assert len(projects) == 150
+    assert len(projects) == 132
     groups = {p["id"]: p["group"] for p in projects}
     from collections import Counter
 
     counts = Counter(groups.values())
-    assert counts == {"core": 126, "held-out": 9, "adversarial": 9, "multi-agent": 6}
-    # three domains, each crossed with six styles and the seven full variants
+    assert counts == {"core": 108, "held-out": 9, "adversarial": 9, "multi-agent": 6}
+    # three domains, each crossed with six styles and the seven full variants, minus the six
+    # (style, variant) recipes reserved for held-out/adversarial (18 fewer core projects)
     core = [p for p in projects if p["group"] == "core"]
     assert {p["domain"] for p in core} == {"credit", "hiring", "benefits"}
     assert {p["variant"] for p in core} == set(generate.FULL_VARIANTS)
+
+
+def test_held_out_and_adversarial_recipes_are_disjoint_from_core(tmp_path: Path) -> None:
+    """A held-out or adversarial project must never be a relabelled twin of a core project sharing
+    its (domain, style, variant) recipe -- otherwise the subset is not a genuine blind check."""
+    _out, manifest = tmp_path / "f", generate.build_corpus(tmp_path / "f", "full")
+    projects = manifest["projects"]
+    core = {
+        (p["domain"], p["style"], p["variant"])
+        for p in projects
+        if p["group"] == "core"
+    }
+    reserved = set(generate.HELD_OUT_COMBOS) | set(generate.ADVERSARIAL_COMBOS)
+    assert reserved, "the reserved-recipe set must not be empty"
+    overlap = [
+        p["id"]
+        for p in projects
+        if p["group"] in ("held-out", "adversarial")
+        and (p["domain"], p["style"], p["variant"]) in core
+    ]
+    assert overlap == []
+    # every held-out/adversarial project's (style, variant) is one of the reserved recipes, and no
+    # reserved recipe is generated in the core loop at all
+    for p in projects:
+        if p["group"] in ("held-out", "adversarial"):
+            assert (p["style"], p["variant"]) in reserved
+        elif p["group"] == "core":
+            assert (p["style"], p["variant"]) not in reserved
 
 
 def test_project_layout_is_complete(tmp_path: Path) -> None:

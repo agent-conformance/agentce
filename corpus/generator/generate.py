@@ -4,8 +4,9 @@ This is a seeded, deterministic program: the same ``--set`` produces byte-identi
 on any machine, with no clock, locale, or network dependency (HR-1). ``--set v1`` emits the Phase-1
 subset — the *credit decisioning* domain crossed with six implementation styles and five variants,
 thirty synthetic projects in all. ``--set full`` emits the full corpus (SPEC §11.2): three domains
-crossed with the styles and seven variants, plus multi-agent, held-out, and adversarial projects,
-roughly 150 in all. Each project carries the complete inputs the engine expects (an evidence bundle, an
+crossed with the styles and seven variants (minus the recipes reserved for the held-out and
+adversarial subsets), plus multi-agent, held-out, and adversarial projects, roughly 130 in all. Each
+project carries the complete inputs the engine expects (an evidence bundle, an
 applicability profile, a domain binding, a deviation register) and the authored ground truth
 (``expected/`` outcomes plus a narrative ``README.md``). It writes a top-level ``corpus-manifest.json``
 of the shape ``{"projects":[{"id":…,"events":<int>}, …], …}`` whose v1 digest is pinned in
@@ -1411,15 +1412,27 @@ ADVERSARIAL_COMBOS: tuple[tuple[str, str], ...] = (
 )
 
 
+#: The (style, variant) recipes reserved for the held-out and adversarial subsets. Carved out of the
+#: core cross-product below so those subsets are genuinely disjoint from core -- a held-out or
+#: adversarial project is never a relabelled twin of a core project sharing its (domain, style,
+#: variant) recipe (SPEC §11.2, B12).
+_RESERVED_RECIPES: frozenset[tuple[str, str]] = frozenset(HELD_OUT_COMBOS) | frozenset(
+    ADVERSARIAL_COMBOS
+)
+
+
 def _build_full(out: Path) -> dict[str, Any]:
     """The full corpus (SPEC §11.2): three domains crossed with the styles and the seven variants,
-    plus multi-agent, held-out, and adversarial projects — roughly 150 projects in all. Every ground
-    truth is authored to the reference engine and proven by the corpus test suite (SPEC §11.3)."""
+    minus the recipes reserved for held-out/adversarial, plus multi-agent, held-out, and adversarial
+    projects -- roughly 130 projects in all. Every ground truth is authored to the reference engine
+    and proven by the corpus test suite (SPEC §11.3)."""
     projects: list[dict[str, Any]] = []
     index = 0
     for domain in DOMAINS:
         for style_id, _desc, _conv in STYLES:
             for variant in FULL_VARIANTS:
+                if (style_id, variant) in _RESERVED_RECIPES:
+                    continue
                 project = _write_project(out, domain, style_id, variant, index)
                 project["group"] = "core"
                 projects.append(project)
