@@ -498,7 +498,7 @@ function cmdReport(argv: string[]): CommandResult {
   if (argv.includes("--validate")) {
     throw new InputError(
       "input.report_validate_unsupported",
-      "report --validate is not yet implemented in the TypeScript engine.",
+      "the TypeScript engine has no report --validate support.",
       "validate the report's artifacts against their vendored schemas with the Python engine.",
     );
   }
