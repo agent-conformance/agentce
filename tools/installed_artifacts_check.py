@@ -13,8 +13,11 @@ works because the monorepo is next to it (or because it reaches out) fails here.
 * ``jar``: build the runnable jar of ``engines/java``; ``java -jar`` must report the package version and
   load its dependencies (a ``--json`` envelope), and the jar must carry the vendored schema and data.
 
-The TypeScript and Java engines do not implement ``quickstart`` yet, so those two checks prove only what
-each artifact really offers today; the checks tighten when they do.
+The ``npm`` and ``jar`` checks also run the installed artifact's own ``quickstart`` command — no flags
+beyond ``--out`` (kept inside the scratch directory so the run cannot write into the checkout), against
+the package's bundled ``corpus/quickstart`` project — and reject a run that answers
+``cli.not_implemented`` or that exits 0 having evaluated nothing (the same real-work proof
+``tools/assess_smoke_check.py`` gives the in-checkout build).
 
 Network cut-off: inside a network namespace (``unshare -rn``) where the kernel allows it, else dead
 proxies plus the offline switches of each tool. ``--require-netns`` makes the namespace mandatory (CI).
@@ -39,6 +42,8 @@ import tempfile
 import zipfile
 from collections.abc import Iterator
 from pathlib import Path
+
+import assess_smoke_check
 
 ROOT = Path(__file__).resolve().parent.parent
 PY_ENGINE = ROOT / "engines" / "python"
@@ -423,6 +428,13 @@ def _npm_run_problems(runner: Runner, empty: Path, version: str) -> list[str]:
     ):
         if not (package / rel).exists():
             problems.append(f"the installed package lacks {rel}")
+    qs_out = empty / "quickstart-out"
+    proc = runner.run([*exe, "quickstart", "--out", str(qs_out), "--json"], empty, offline=True)
+    try:
+        qs_envelope = json.loads(proc.stdout)
+    except ValueError:
+        qs_envelope = {}
+    problems += [f"quickstart: {p}" for p in assess_smoke_check.check(qs_out, qs_envelope)]
     return problems
 
 
@@ -483,6 +495,17 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
         ):
             if entry not in names:
                 problems.append(f"the jar lacks {entry}")
+        qs_out = tmp / "quickstart-out"
+        proc = runner.run(
+            ["java", "-jar", str(jar), "quickstart", "--out", str(qs_out), "--json"],
+            empty,
+            offline=True,
+        )
+        try:
+            qs_envelope = json.loads(proc.stdout)
+        except ValueError:
+            qs_envelope = {}
+        problems += [f"quickstart: {p}" for p in assess_smoke_check.check(qs_out, qs_envelope)]
         return problems
 
 
@@ -519,6 +542,44 @@ def _inert_wheel(directory: Path, version: str) -> Path:
             "".join(f"{p},,\n" for p in files) + f"{dist_info}/RECORD,,\n",
         )
     return wheel
+
+
+def _inert_jar(directory: Path) -> Path | None:
+    """A runnable jar whose ``agentce`` prints the wrong version and evaluates nothing, else.
+
+    Compiled with the host's own ``javac``/``jar`` (the same JDK the real jar check needs), so this
+    returns ``None`` where neither is on PATH rather than fabricate bytecode by hand.
+    """
+    if shutil.which("javac") is None or shutil.which("jar") is None:
+        return None
+    src = directory / "Inert.java"
+    src.write_text(
+        "public class Inert {\n"
+        '    public static void main(String[] args) {\n'
+        '        if (args.length > 0 && args[0].equals("--version")) {\n'
+        '            System.out.println("agentce 0.0.0");\n'
+        "        }\n"
+        "        // every other invocation, including quickstart, exits 0 having evaluated nothing\n"
+        "    }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    classes = directory / "inert-classes"
+    classes.mkdir()
+    proc = subprocess.run(
+        ["javac", "-d", str(classes), str(src)], capture_output=True, text=True
+    )
+    if proc.returncode != 0:
+        raise SystemExit(f"self-test: could not compile the inert jar fixture: {proc.stderr}")
+    jar = directory / "inert.jar"
+    proc = subprocess.run(
+        ["jar", "--create", "--file", str(jar), "--main-class", "Inert", "-C", str(classes), "."],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        raise SystemExit(f"self-test: could not package the inert jar fixture: {proc.stderr}")
+    return jar
 
 
 def self_test() -> int:
@@ -582,15 +643,36 @@ def self_test() -> int:
             "stable error envelope",
             "numerics",
             "lacks data/catalogs/base",
+            "quickstart: ",
         ):
             if not any(expected in p for p in found):
                 failures.append(
                     f"an inert npm install was accepted: missing '{expected}'"
                 )
+
+        # A jar whose agentce prints the wrong version, answers no envelope, evaluates nothing on
+        # quickstart, and carries no vendored data must be rejected on every count too.
+        inert_jar = _inert_jar(tmp)
+        if inert_jar is None:
+            failures.append(
+                "self-test: javac/jar are not on PATH, cannot prove the jar check has teeth"
+            )
+        else:
+            found = check_jar_file(runner, inert_jar)
+            for expected in (
+                "--version printed",
+                "stable error envelope",
+                "the jar lacks",
+                "quickstart: ",
+            ):
+                if not any(expected in p for p in found):
+                    failures.append(
+                        f"an inert jar install was accepted: missing '{expected}'"
+                    )
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if not failures:
-        print("installed_artifacts_check self-test: 6 cases discriminate")
+        print("installed_artifacts_check self-test: 7 cases discriminate")
     return 1 if failures else 0
 
 

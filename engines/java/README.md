@@ -4,6 +4,10 @@ The Java engine of the Agent Conformance Engine (SPEC §5.3): a deterministic, r
 port of the reference engine. It implements the Engine Conformance Suite path so `agentce conformance
 run` produces reports byte-identical to the other engines after RFC 8785 canonicalisation.
 
+The command-line tool implements `conformance run` (the conformance suite), `assess`, `validate`,
+`report`, `quickstart`, and `--version`. `report --validate` (schema validation of the report
+artifacts) is not yet ported; use the Python engine for that one check.
+
 Every module cites the specification section it implements. The evaluation path has no learned
 component (SPEC §8.7, HR-1/HR-2); `no_ml` scans `gradle.lockfile` against the shared denylist.
 
@@ -22,4 +26,15 @@ in `gradle.lockfile`. The vendored `agentce-evidence.schema.json` is kept byte-i
 ```
 ./gradlew -q installDist
 build/install/agentce/bin/agentce conformance run --engine . --corpus ../../corpus --json
+```
+
+## Assess a bundle, or try the bundled quickstart project
+
+```
+./gradlew -q installDist
+build/install/agentce/bin/agentce assess \
+  --bundle path/to/evidence --profile path/to/applicability.yaml \
+  --catalog-dir path/to/catalog --out ./out --json
+build/install/agentce/bin/agentce quickstart --json
+build/install/agentce/bin/agentce report --from ./out/assertions.json --format md
 ```
