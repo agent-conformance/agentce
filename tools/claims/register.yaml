@@ -283,6 +283,7 @@ claims:
       - docs/quickstart-java.md
       - website/src/content/docs/docs/running-assessments.md
       - engines/typescript/README.md
+      - engines/java/README.md
     check:
       workflow: .github/workflows/quickstart.yml
       job: typescript
