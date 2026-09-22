@@ -106,6 +106,47 @@ export function assertionToJson(assertion: Assertion): Record<string, unknown> {
   return record;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function evidencePointerFromJson(data: unknown): EvidencePointer {
+  const d = isRecord(data) ? data : {};
+  return {
+    ref: String(d.ref ?? ""),
+    digest: String(d.digest ?? ""),
+    sourceClass: String(d.source_class ?? ""),
+  };
+}
+
+/** Reconstruct an assertion from its JSON form (the inverse of {@link assertionToJson}), for
+ * re-rendering a report from a committed `assertions.json` (SPEC §9.4). */
+export function assertionFromJson(data: unknown): Assertion {
+  const d = isRecord(data) ? data : {};
+  const window = isRecord(d.window) ? d.window : {};
+  const population = isRecord(d.population) ? d.population : {};
+  return {
+    control: String(d.control ?? ""),
+    controlVersion: String(d.control_version ?? ""),
+    subject: String(d.subject ?? ""),
+    outcome: String(d.outcome ?? ""),
+    rung: Number(d.rung ?? 0),
+    mode: String(d.mode ?? ""),
+    window: [String(window.start ?? ""), String(window.end ?? "")],
+    population: [Number(population.applicable ?? 0), Number(population.failed ?? 0)],
+    expectations: Array.isArray(d.expectations)
+      ? (d.expectations as Array<Record<string, string>>)
+      : [],
+    violations: Array.isArray(d.violations) ? (d.violations as Array<Record<string, string>>) : [],
+    evidence: Array.isArray(d.evidence) ? d.evidence.map(evidencePointerFromJson) : [],
+    sourceClassSatisfied:
+      typeof d.source_class_satisfied === "boolean" ? d.source_class_satisfied : null,
+    evidenceStrength: typeof d.evidence_strength === "string" ? d.evidence_strength : null,
+    deviation: typeof d.deviation === "string" ? d.deviation : null,
+    crosswalk: Array.isArray(d.crosswalk) ? (d.crosswalk as Array<Record<string, string>>) : [],
+  };
+}
+
 /** Return the six-outcome counts (SPEC §9.2); every outcome is present, even at zero. */
 export function aggregate(assertions: Assertion[]): Record<string, number> {
   const counts: Record<string, number> = {};

@@ -1,5 +1,8 @@
 /** Shared helpers. */
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+
 /**
  * Compare two strings by their UTF-8 bytes, matching SQLite's BINARY collation (and so the Python
  * engine's `ORDER BY` on the graph store). For the ASCII IRIs and CURIEs the graph uses this equals
@@ -7,6 +10,16 @@
  */
 export function byteCompare(a: string, b: string): number {
   return Buffer.compare(Buffer.from(a, "utf-8"), Buffer.from(b, "utf-8"));
+}
+
+/** Write `records` to `path` as one compact JSON object per line, in input order (side-channel diagnostics — not part of the cross-engine canonical output set). */
+export function writeJsonl(records: Iterable<unknown>, path: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  const lines: string[] = [];
+  for (const record of records) {
+    lines.push(JSON.stringify(sortKeysDeep(record)));
+  }
+  writeFileSync(path, lines.length > 0 ? `${lines.join("\n")}\n` : "");
 }
 
 /**
