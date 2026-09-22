@@ -130,6 +130,26 @@ jobs:
       - name: The dataset pin holds for a freshly generated corpus
         run: uv run --project corpus --frozen python -m corpus.check_versions --corpus corpus
 
+  corpus-gate:
+    # The held-out and adversarial subsets must be a genuine blind check on the engine, not
+    # relabelled twins of core projects, and the precision/recall release gate must never let a
+    # reader believe "recall 1.0 / FPR 0.0" covers more of the base catalog than it actually scores
+    # (SPEC §11.2, §11.6). Each check runs the real generator/gate over the committed sources.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Held-out/adversarial recipes are disjoint from the core set
+        working-directory: corpus
+        run: uv run --frozen pytest -q generator/tests/test_generate.py::test_held_out_and_adversarial_recipes_are_disjoint_from_core
+      - name: Precision/recall gate states its honest scope
+        working-directory: conformance
+        run: uv run --frozen pytest -q tests/test_precision_gate.py::test_scope_is_stated_and_accurate_in_the_readme
+
   examples:
     # The framework examples and the integration pages must not claim more than is built: the check
     # runs the real `agentce_emit.auto()` and requires every example and page to say automatic
