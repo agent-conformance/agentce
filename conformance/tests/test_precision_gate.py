@@ -48,3 +48,30 @@ def test_family_filter_scores_one_family(small_corpus: Path) -> None:
     assert metrics["recall"] == 1.0
     assert metrics["fpr_rung2"] == 0.0
     assert metrics["seeded_faults"] > 0
+
+
+def test_scope_is_stated_and_accurate_in_the_readme(small_corpus: Path) -> None:
+    """The README's scope claim must name exactly what the gate scores today (SPEC §11.6): a reader
+    of "recall 1.0 / FPR 0.0" must not read broader coverage than the corpus actually seeds."""
+    metrics = compute_precision_recall(small_corpus)
+    scored = metrics["scored_controls"]
+    assert scored, "a degenerate gate that scores nothing would be meaningless"
+    automated, total = precision_gate.automated_control_count()
+    readme = (
+        (Path(precision_gate.__file__).resolve().parent / "README.md")
+        .read_text(encoding="utf-8")
+        .lower()
+    )
+    n = len(scored)
+    patterns = [
+        f"{n} of {automated}",
+        f"{n}/{automated}",
+        f"{n} of the {automated}",
+        f"{n} of {total}",
+        f"{n}/{total}",
+        f"{n} of the {total}",
+    ]
+    assert any(p in readme for p in patterns), (
+        f"README does not state the gate's real scope ({n} of {automated} automated, "
+        f"{total} total): {readme}"
+    )

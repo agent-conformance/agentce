@@ -10,8 +10,12 @@ truth carried in the corpus manifest:
 * **fpr_rung2** — the false-positive rate on the known-pass projects (every base-catalog control is
   rung 2): the fraction of known-pass controls the engine wrongly flags non-conformant. The gate
   requires 0.0 for rung-2 rules.
+* **scored_controls** — the distinct controls the metric actually scores (counted for recall, or
+  carried by a known-pass project as a negative). The authored corpus seeds faults for a subset of the
+  catalog's automated controls, not all of them; this names exactly which ones so "recall 1.0 / FPR
+  0.0" is never read as broader coverage than it is (SPEC §11.6).
 
-``python -m corpus.precision_recall --corpus <dir> --json`` prints ``{"recall": …, "fpr_rung2": …}``
+``python -m corpus.precision_recall --corpus <dir> --json`` prints ``{"recall": …, "fpr_rung2": …, …}``
 (the interface the phase-1 eval's P1.3 check calls); the source tree is materialised on demand, so the
 corpus output need never be committed (SPEC §11.7).
 """
@@ -69,6 +73,7 @@ def compute_precision_recall(
     )
 
     seeded = detected = negatives = false_positives = 0
+    scored_controls: set[str] = set()
     with tempfile.TemporaryDirectory(prefix="corpus-pr-out-") as tmp:
         for project in sorted(manifest.get("projects", []), key=lambda p: str(p["id"])):
             pid = str(project["id"])
@@ -83,9 +88,11 @@ def compute_precision_recall(
                 if want == "non-conformant":
                     seeded += 1
                     detected += int(observed == "non-conformant")
+                    scored_controls.add(control)
                 if project.get("variant") == "known-pass":
                     negatives += 1
                     false_positives += int(observed == "non-conformant")
+                    scored_controls.add(control)
 
     recall = 1.0 if seeded == 0 else detected / seeded
     fpr_rung2 = 0.0 if negatives == 0 else false_positives / negatives
@@ -96,6 +103,7 @@ def compute_precision_recall(
         "detected": detected,
         "known_pass_controls": negatives,
         "false_positives": false_positives,
+        "scored_controls": sorted(scored_controls),
     }
 
 
