@@ -172,13 +172,16 @@ def rejected_commands(engine: Engine, commands: list[str]) -> list[str]:
             f"{engine.name}: the CLI did not start (exit {probe.returncode}); {engine.setup_hint}."
         )
     missing = []
-    for command in commands:
-        proc = _run(engine, [command, "--json"])
-        envelope = _envelope(proc.stdout)
-        error = envelope.get("error") if envelope else None
-        key = error.get("message_key") if isinstance(error, dict) else None
-        if key == NOT_IMPLEMENTED_KEY or NOT_IMPLEMENTED_KEY in proc.stdout:
-            missing.append(command)
+    with tempfile.TemporaryDirectory(prefix="engine-docs-probe-") as tmp:
+        # --out keeps a now-implemented command (quickstart needs no other flag) from writing its
+        # report into the engine's own checkout; this call only asks whether the verb is implemented.
+        for command in commands:
+            proc = _run(engine, [command, "--json", "--out", tmp])
+            envelope = _envelope(proc.stdout)
+            error = envelope.get("error") if envelope else None
+            key = error.get("message_key") if isinstance(error, dict) else None
+            if key == NOT_IMPLEMENTED_KEY or NOT_IMPLEMENTED_KEY in proc.stdout:
+                missing.append(command)
     return missing
 
 
