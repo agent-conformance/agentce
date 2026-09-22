@@ -109,6 +109,62 @@ public final class Assertions {
         }
     }
 
+    private static String text(JsonNode node, String field) {
+        JsonNode v = node.get(field);
+        return v != null ? v.asText() : "";
+    }
+
+    private static EvidencePointer evidencePointerFromJson(JsonNode data) {
+        return new EvidencePointer(text(data, "ref"), text(data, "digest"), text(data, "source_class"));
+    }
+
+    /** Reconstruct an assertion from its JSON form (the inverse of {@link Assertion#toJson()}), for
+     * re-rendering a report from a committed {@code assertions.json} (SPEC §9.4). */
+    public static Assertion fromJson(JsonNode data) {
+        Assertion a = new Assertion();
+        a.control = text(data, "control");
+        a.controlVersion = text(data, "control_version");
+        a.subject = text(data, "subject");
+        a.outcome = text(data, "outcome");
+        JsonNode rung = data.get("rung");
+        a.rung = rung != null && rung.isNumber() ? rung.asInt() : 0;
+        a.mode = text(data, "mode");
+        JsonNode window = data.get("window");
+        a.window = new String[] {
+            window != null ? text(window, "start") : "", window != null ? text(window, "end") : ""
+        };
+        JsonNode population = data.get("population");
+        a.population = new int[] {
+            population != null && population.get("applicable") != null ? population.get("applicable").asInt() : 0,
+            population != null && population.get("failed") != null ? population.get("failed").asInt() : 0
+        };
+        JsonNode expectations = data.get("expectations");
+        if (expectations != null && expectations.isArray()) {
+            expectations.forEach(a.expectations::add);
+        }
+        JsonNode violations = data.get("violations");
+        if (violations != null && violations.isArray()) {
+            violations.forEach(a.violations::add);
+        }
+        JsonNode evidence = data.get("evidence");
+        if (evidence != null && evidence.isArray()) {
+            for (JsonNode e : evidence) {
+                a.evidence.add(evidencePointerFromJson(e));
+            }
+        }
+        JsonNode scs = data.get("source_class_satisfied");
+        a.sourceClassSatisfied = scs != null && scs.isBoolean() ? scs.booleanValue() : null;
+        JsonNode strength = data.get("evidence_strength");
+        a.evidenceStrength = strength != null && strength.isTextual() ? strength.textValue() : null;
+        JsonNode deviation = data.get("deviation");
+        a.deviation = deviation != null && deviation.isTextual() ? deviation.textValue() : null;
+        JsonNode crosswalk = data.get("crosswalk");
+        if (crosswalk != null && crosswalk.isArray()) {
+            crosswalk.forEach(a.crosswalk::add);
+        }
+        return a;
+    }
+
     /** Build an assertion with the required base fields; optional fields are set on the returned object. */
     public static Assertion make(
             String control, String controlVersion, String subject, String outcome, int rung, String mode,
