@@ -256,9 +256,8 @@ claims:
   - id: cli.docs-match-implementation
     text: >-
       The TypeScript and Java quickstart pages tell a reader to run only commands those engines
-      implement, which today is `conformance run`; run for real, that command claims full and writes
-      one non-empty assertions.json per project. A page that prescribes a command the engine rejects
-      as unavailable fails the build.
+      implement; run for real, `conformance run` claims full and writes one non-empty assertions.json
+      per project. A page that prescribes a command the engine rejects as unavailable fails the build.
     status: built
     pages:
       - docs/quickstart-typescript.md
@@ -275,15 +274,22 @@ claims:
         writes fewer or empty assertions, and a partial claim.
   - id: engine.ts-java-assess
     text: >-
-      The TypeScript and Java engines are planned to implement `assess`, `report`, `validate`, and
-      `quickstart`; today they implement `conformance run` only, and the Python engine is the
-      reference for assessing an agent's own evidence.
-    status: roadmap
+      The TypeScript and Java engines implement `assess`, `validate`, `report`, and `quickstart` on the
+      same evaluation path `conformance run` exercises. Schema validation (`report --validate`) is not
+      yet ported to them; the Python engine remains the reference for that one check.
+    status: built
     pages:
       - docs/quickstart-typescript.md
       - docs/quickstart-java.md
       - website/src/content/docs/docs/running-assessments.md
       - engines/typescript/README.md
+    check:
+      workflow: .github/workflows/quickstart.yml
+      job: typescript
+      description: >-
+        On every pull request, builds the TypeScript engine and runs `assess` against the vendored
+        quickstart project, asserting a non-empty assertions.json and a real verdict; the `java` job in
+        the same workflow proves the same for the Java engine.
   - id: integration.framework-capture
     text: >-
       Capturing evidence automatically from LangGraph, the OpenAI Agents SDK, CrewAI, Google ADK, and
