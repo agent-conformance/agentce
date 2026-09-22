@@ -3,8 +3,8 @@
 The TypeScript and Java `quickstart.yml` jobs run `agentce assess` against the vendored quickstart
 project with the built engine, then hand this script the output directory and the captured `--json`
 envelope. It fails unless `assess` wrote a non-empty `assertions.json` and the envelope reports at least
-one assertion and a real verdict — proof the run judged something, not a stub that exits 0 having
-evaluated nothing (see #4/#6).
+one assertion and a real verdict — proof the run judged something rather than exiting 0 having
+evaluated nothing.
 
     assess_smoke_check.py OUT_DIR ENVELOPE_JSON   check a real run's output
     assess_smoke_check.py --self-test             prove the checker discriminates
