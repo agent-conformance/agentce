@@ -22,8 +22,7 @@ import java.util.stream.Stream;
  * The {@code agentce} command-line interface (SPEC §8.5): the same {@code --json} envelope and
  * exit-code scheme as the reference. {@code assess}, {@code validate}, {@code report}, and {@code
  * quickstart} are implemented on the existing ECS/report path (the same modules {@code conformance run}
- * already exercises); a verb not yet implemented returns a stable {@code input_error} envelope rather
- * than a guess.
+ * already exercises); any other verb returns a stable {@code input_error} envelope rather than a guess.
  */
 public final class Cli {
     private Cli() {}
