@@ -67,6 +67,18 @@ jobs:
           if total <= 0 or len(found) != total:
               sys.exit(f"expected {total} non-empty assertions.json files, found {len(found)}")
           PY
+      - name: The assess smoke check itself must be able to fail
+        run: python3 tools/assess_smoke_check.py --self-test
+      - name: Assess the vendored quickstart project
+        run: |
+          node engines/typescript/bin/agentce.js assess \
+            --bundle corpus/quickstart/evidence \
+            --profile corpus/quickstart/applicability.yaml \
+            --domain corpus/quickstart/domain.linkml.yaml \
+            --catalog-dir spec/catalogs/base/eu-ai-act \
+            --out "$RUNNER_TEMP/assess" --json > "$RUNNER_TEMP/assess.json"
+      - name: Assert the assess run produced a real report
+        run: python3 tools/assess_smoke_check.py "$RUNNER_TEMP/assess" "$RUNNER_TEMP/assess.json"
 
   java:
     name: quickstart (java)
@@ -101,6 +113,18 @@ jobs:
           if total <= 0 or len(found) != total:
               sys.exit(f"expected {total} non-empty assertions.json files, found {len(found)}")
           PY
+      - name: The assess smoke check itself must be able to fail
+        run: python3 tools/assess_smoke_check.py --self-test
+      - name: Assess the vendored quickstart project
+        run: |
+          engines/java/build/install/agentce/bin/agentce assess \
+            --bundle corpus/quickstart/evidence \
+            --profile corpus/quickstart/applicability.yaml \
+            --domain corpus/quickstart/domain.linkml.yaml \
+            --catalog-dir spec/catalogs/base/eu-ai-act \
+            --out "$RUNNER_TEMP/assess" --json > "$RUNNER_TEMP/assess.json"
+      - name: Assert the assess run produced a real report
+        run: python3 tools/assess_smoke_check.py "$RUNNER_TEMP/assess" "$RUNNER_TEMP/assess.json"
 
   image:
     name: container image build and offline run (no push)
