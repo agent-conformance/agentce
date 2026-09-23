@@ -71,6 +71,45 @@ service.
 | 12 | Pseudonym re-identification by dictionary | A2 | `person_ref` values are keyed pseudonyms (HMAC-SHA-256 with a per-subject key held outside the bundle and supplied by reference); the manifest names, but never contains, the key | SPEC §6.7, IR-12; `manifest.json` `pseudonym_key_id` |
 | 13 | Cross-engine parser divergence on number tokens | A2 | A number token the canonical form refuses (a fraction or exponent, even on a whole number; an integer above `2^53 − 1`) is refused by every engine, and the accepted form is identical, so a value one engine hashes cannot be one another folds to a different number or refuses; literal ordering in shape constraints is exact and covers only integer and date-time forms | `spec/model/canonical-form.md` (number grammar), `spec/rules/psp.md` (literal ordering); the `numeric-temporal-edge-vectors` job in `three-engine.yml` |
 
+## Untrusted evidence-bundle input hardening
+
+An evidence bundle's contents -- the manifest, the YAML files that ride with it (the applicability
+profile, the domain binding), and every event line -- are adversarial input to the file-system and
+parsing layer, independent of whatever the evidence itself claims about the assessed agent (SPEC
+§8.1, §8.7). This section names the mitigations that hold that boundary and the check that proves
+each.
+
+- **Path confinement and symlink handling.** `bundle.py`'s manifest loader refuses a listed path that
+  is absolute or contains a `..` segment, and additionally resolves every listed path (following
+  symlinks) and refuses one that resolves outside the bundle root -- so a manifest entry with an
+  innocuous relative string that is actually a symlink to a file outside the bundle cannot be read
+  through. Both cases are refused with `input.bundle_manifest_path` at exit `3`, never silently
+  followed. Proved by `engines/python/tests/test_bundle.py` and the bundle-manifest checks in
+  `engines/python/tests/test_input_hardening.py`.
+- **Structural depth limits.** `Profile.load`/`DomainBinding.load` (`safe_yaml.py`) and per-event JSON
+  parsing (`ingest.py`) each catch the `RecursionError` a pathologically deep -- but small-byte --
+  nested structure raises, and refuse it with a specific, named `input.*` key (`input.profile_invalid`,
+  `input.domain_binding_invalid`, `input.event_structure_too_deep`) at exit `3`, never letting it fall
+  through to the generic `internal.unexpected` catch-all a genuinely unforeseen bug uses.
+- **YAML-hazard handling.** The same `safe_yaml.py` wrapper around `yaml.safe_load` catches
+  `yaml.YAMLError` (a disallowed tag such as `!!python/object/apply:...`, which `safe_load` already
+  refuses to construct) and reports it under the same named `input.*` key, rather than the generic
+  catch-all.
+- **Size limits.** A single evidence-event line over the per-event byte limit continues to be
+  quarantined `oversize` (`ingest.py`, `DEFAULT_MAX_EVENT_BYTES`); a manifest-listed file's own byte
+  size is now checked with `stat()`, before it is opened or hashed, against
+  `DEFAULT_MAX_MANIFEST_FILE_BYTES` (`bundle.py`), refused with `input.bundle_manifest_file_too_large`
+  if it is over the limit.
+- **Archive hazards: no attack surface today, by design.** `--bundle` must already be an existing
+  directory (`commands/__init__.py`'s `_require_dir`); no archive format (zip, tar, gzip) is ever
+  parsed anywhere in the ingestion path, so zip-slip and decompression-bomb payloads have nothing to
+  reach. This is a stated design choice, not an oversight: if archive convenience-loading is ever
+  proposed, its hazards must be closed here first, before any extraction step is added.
+- **Fuzz fixtures and the CI guard.** The hostile fixtures above (a symlink escaping the bundle root, a
+  disallowed YAML tag, pathologically deep YAML and JSON, an oversized manifest-listed file) are proved
+  by the `evidence-input-hardening` job in `.github/workflows/ci.yml`, which runs on every push and
+  pull request and fails if any of these refusals regresses.
+
 ## Assumptions and residual risk
 
 - The integrity guarantees rest on at least one **independent system** and one **independent coverage
@@ -80,5 +119,6 @@ service.
   in the manifest, never a silent network call (SPEC §8.7). The [verification procedure](verification.md)
   gives the trust roots and the per-profile checks.
 - The engine treats evidence content as data, never code (no template expansion, no native
-  deserialisation, per-event and per-file size limits), so a crafted payload cannot execute; this is a
+  deserialisation, path confinement, structural depth limits, per-event and per-file size limits — see
+  "Untrusted evidence-bundle input hardening" above), so a crafted payload cannot execute; this is a
   standing invariant checked by the input-handling tests rather than a per-threat control.
