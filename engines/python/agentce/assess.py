@@ -148,6 +148,16 @@ def evaluated_nothing(assertions: list[Assertion]) -> bool:
     return not any(a.outcome in VERDICT_OUTCOMES for a in assertions)
 
 
+def _index_by_subject(
+    accepted: list[dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    """Group ``accepted`` by subject id in one pass over the list."""
+    index: dict[str, list[dict[str, Any]]] = {}
+    for event in accepted:
+        index.setdefault(str(event.get("subject", "")), []).append(event)
+    return index
+
+
 def assess_subjects(
     accepted: list[dict[str, Any]],
     profile: Profile,
@@ -156,10 +166,9 @@ def assess_subjects(
 ) -> list[Assertion]:
     """Evaluate every catalog control against every subject and return the assertions."""
     assertions: list[Assertion] = []
+    events_by_subject = _index_by_subject(accepted)
     for subject in profile.subjects:
-        subject_events = [
-            e for e in accepted if str(e.get("subject", "")) == subject.id
-        ]
+        subject_events = events_by_subject.get(subject.id, [])
         store = build_graph(subject_events, domain=domain)
         events_by_iri = {
             event_iri(str(e["id"])): e for e in subject_events if "id" in e
