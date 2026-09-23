@@ -44,16 +44,16 @@ const artifacts = [
   <section class="hero" aria-labelledby="hero-title">
     <div class="hero-copy">
       <p class="eyebrow">The open conformance standard for AI agents</p>
-      <h1 id="hero-title">Prove how your agents behave — the same way, across every vendor.</h1>
+      <h1 id="hero-title">Assess any AI agent against the same standard.</h1>
       <p class="lede">
-        Agent Conformance is a deterministic, model-free assessment standard: one executable
-        specification, conforming engines in several languages, and byte-identical evidence you can
-        verify. A claim about an agent means the same thing no matter who makes it.
+        For teams that build, buy, or audit agents: an engine that turns evidence into a verdict
+        anyone can reproduce.
       </p>
       <div class="actions">
         <a class="button primary" href="/docs/getting-started/">Get started</a>
         <a class="button" href="https://github.com/agent-conformance/agentce">View on GitHub</a>
       </div>
+      <p class="disclaimer">A conformant result is not a certification.</p>
     </div>
 
     <figure class="terminal" aria-label="Running an assessment with the command-line engine">
@@ -247,6 +247,11 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
       display: flex;
       gap: 0.75rem;
       flex-wrap: wrap;
+    }
+    .disclaimer {
+      margin: 1rem 0 0;
+      font-size: 0.85rem;
+      color: var(--text-muted);
     }
     .button {
       display: inline-flex;
