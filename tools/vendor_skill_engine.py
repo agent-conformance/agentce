@@ -14,7 +14,11 @@ file, never a relative path back into the monorepo.
                                           and bytes a fresh build of engines/python produces (the CI
                                           guard: fails on drift)
     vendor_skill_engine.py --write       rebuild the wheel and re-vendor it into every skill; then run
-                                          `uv lock` in each skill directory yourself and commit both
+                                          `uv lock --refresh-package agent-conformance` in each skill
+                                          directory yourself and commit both (plain `uv lock` does not
+                                          re-hash a local path wheel whose filename is unchanged, so it
+                                          silently leaves the old hash pinned -- this check does not
+                                          catch that; only a real `uv sync --frozen` does)
     vendor_skill_engine.py --self-test   prove --check discriminates: a corrupted vendored wheel and a
                                           version-stale filename both fail, an in-sync one passes
 
