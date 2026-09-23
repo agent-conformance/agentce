@@ -3,6 +3,13 @@
     {
       "control": "DAT-01",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 10",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -19,6 +26,13 @@
     {
       "control": "DAT-02",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 10",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "semi-automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -35,6 +49,13 @@
     {
       "control": "DAT-03",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 10",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "semi-automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -51,6 +72,13 @@
     {
       "control": "DAT-04",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 10",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "manual",
       "outcome": "not_assessed",
       "population": {
@@ -67,6 +95,13 @@
     {
       "control": "DOC-01",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 11 / Annex IV",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
@@ -92,6 +127,13 @@
     {
       "control": "DOC-02",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 13",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
@@ -117,6 +159,13 @@
     {
       "control": "DOC-03",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 11 / Annex IV",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
@@ -142,6 +191,13 @@
     {
       "control": "DOC-04",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 13",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
@@ -167,6 +223,13 @@
     {
       "control": "DOC-05",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 11 / Annex IV",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "manual",
       "outcome": "not_assessed",
       "population": {
@@ -183,6 +246,13 @@
     {
       "control": "INC-01",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 72",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -199,6 +269,18 @@
     {
       "control": "INC-02",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 73",
+          "framework": "eu-ai-act",
+          "verified": false
+        },
+        {
+          "clause": "Art. 26(5)",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "automated",
       "outcome": "not_applicable",
       "population": {
@@ -215,6 +297,13 @@
     {
       "control": "INC-03",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 26(5)",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -231,6 +320,13 @@
     {
       "control": "INC-04",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 73",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
@@ -256,6 +352,13 @@
     {
       "control": "INT-01",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 12",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
@@ -281,6 +384,13 @@
     {
       "control": "INT-02",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "engine integrity",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:00b9493911e572ff8cdc6dc7303bd4c36e0b4e1366bbcf6fc80a22424f82dd5d",
@@ -306,6 +416,13 @@
     {
       "control": "INT-03",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "engine integrity",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
@@ -331,6 +448,13 @@
     {
       "control": "INT-04",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "engine integrity",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
@@ -356,6 +480,13 @@
     {
       "control": "OVS-01",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 14(4)(a)",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -372,6 +503,13 @@
     {
       "control": "OVS-02",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 14(1)-(3)",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
@@ -405,6 +543,18 @@
     {
       "control": "OVS-03",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 14",
+          "framework": "eu-ai-act",
+          "verified": false
+        },
+        {
+          "clause": "Art. 26(2)",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
@@ -438,6 +588,13 @@
     {
       "control": "OVS-04",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 14(4)(c)-(d)",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
@@ -463,6 +620,13 @@
     {
       "control": "OVS-05",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 26(2)",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -479,6 +643,13 @@
     {
       "control": "OVS-06",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 14(4)(e)",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
@@ -504,6 +675,13 @@
     {
       "control": "OVS-07",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 14(4)(b)",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "semi-automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -520,6 +698,13 @@
     {
       "control": "OVS-08",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 14(5)",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "semi-automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -536,6 +721,13 @@
     {
       "control": "OVS-09",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 14(1)-(3)",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "manual",
       "outcome": "not_assessed",
       "population": {
@@ -552,6 +744,13 @@
     {
       "control": "REC-01",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 12(1)-(2)",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
@@ -577,6 +776,13 @@
     {
       "control": "REC-02",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 12(1)-(2)",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
@@ -602,6 +808,13 @@
     {
       "control": "REC-03",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 12(2)",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -618,6 +831,18 @@
     {
       "control": "REC-04",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 12",
+          "framework": "eu-ai-act",
+          "verified": false
+        },
+        {
+          "clause": "Art. 19",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
@@ -643,6 +868,13 @@
     {
       "control": "REC-05",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 26(6)",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -659,6 +891,13 @@
     {
       "control": "REC-06",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 19",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
@@ -684,6 +923,13 @@
     {
       "control": "ROB-01",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 15",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
@@ -709,6 +955,13 @@
     {
       "control": "ROB-02",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 15",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -725,6 +978,13 @@
     {
       "control": "ROB-03",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 15",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
@@ -750,6 +1010,13 @@
     {
       "control": "ROB-04",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 15",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
@@ -775,6 +1042,13 @@
     {
       "control": "ROB-05",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 15",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
@@ -800,6 +1074,13 @@
     {
       "control": "ROB-06",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 15",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
@@ -825,6 +1106,13 @@
     {
       "control": "ROB-07",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 15",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "semi-automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -841,6 +1129,13 @@
     {
       "control": "RSK-01",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 9",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -857,6 +1152,13 @@
     {
       "control": "RSK-02",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 9",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -873,6 +1175,13 @@
     {
       "control": "RSK-03",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 9",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "semi-automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -889,6 +1198,13 @@
     {
       "control": "RSK-04",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 27",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "manual",
       "outcome": "not_assessed",
       "population": {
@@ -905,6 +1221,13 @@
     {
       "control": "RSK-05",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 49 / 71",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "manual",
       "outcome": "not_assessed",
       "population": {
@@ -921,6 +1244,13 @@
     {
       "control": "TRN-01",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 26(11) / 86",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -937,6 +1267,13 @@
     {
       "control": "TRN-02",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 86",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
@@ -962,6 +1299,13 @@
     {
       "control": "TRN-03",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 26(11) / 86",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "semi-automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -978,6 +1322,13 @@
     {
       "control": "TRN-04",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 50",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "evidence": [
         {
           "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
@@ -1003,6 +1354,13 @@
     {
       "control": "TRN-05",
       "control_version": "2026.09",
+      "crosswalk": [
+        {
+          "clause": "Art. 50",
+          "framework": "eu-ai-act",
+          "verified": false
+        }
+      ],
       "mode": "semi-automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -1017,8 +1375,8 @@
       }
     }
   ],
-  "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Non-conformant \u2014 at least one applicable control failed.</strong></p><p>Top gaps:</p><ul><li>non-conformant: OVS-02, OVS-03</li><li>insufficient evidence: DAT-01, DAT-02, DAT-03, INC-01, INC-03 (+14 more)</li><li>not assessed: DAT-04, DOC-05, OVS-09, RSK-04, RSK-05</li></ul><p>Next step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 22</li><li>non-conformant: 2</li><li>partial: 0</li><li>not applicable: 1</li><li>not assessed: 5</li><li>insufficient evidence: 19</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Outcome</th></tr></thead><tbody><tr><td>DAT-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>DAT-02</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>DAT-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>DAT-04</td><td>spiffe://corp/agents/a</td><td>not assessed</td></tr><tr><td>DOC-01</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>DOC-02</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>DOC-03</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>DOC-04</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>DOC-05</td><td>spiffe://corp/agents/a</td><td>not assessed</td></tr><tr><td>INC-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>INC-02</td><td>spiffe://corp/agents/a</td><td>not applicable</td></tr><tr><td>INC-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>INC-04</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>INT-01</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>INT-02</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>INT-03</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>INT-04</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>OVS-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>OVS-02</td><td>spiffe://corp/agents/a</td><td>non-conformant</td></tr><tr><td>OVS-03</td><td>spiffe://corp/agents/a</td><td>non-conformant</td></tr><tr><td>OVS-04</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>OVS-05</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>OVS-06</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>OVS-07</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>OVS-08</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>OVS-09</td><td>spiffe://corp/agents/a</td><td>not assessed</td></tr><tr><td>REC-01</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>REC-02</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>REC-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>REC-04</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>REC-05</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>REC-06</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>ROB-01</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>ROB-02</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>ROB-03</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>ROB-04</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>ROB-05</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>ROB-06</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>ROB-07</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>RSK-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>RSK-02</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>RSK-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>RSK-04</td><td>spiffe://corp/agents/a</td><td>not assessed</td></tr><tr><td>RSK-05</td><td>spiffe://corp/agents/a</td><td>not assessed</td></tr><tr><td>TRN-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>TRN-02</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>TRN-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>TRN-04</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>TRN-05</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr></tbody></table></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n",
-  "md": "# AgentCE conformance report\n\n## Verdict\n\n**Non-conformant \u2014 at least one applicable control failed.**\n\nTop gaps:\n\n- non-conformant: OVS-02, OVS-03\n- insufficient evidence: DAT-01, DAT-02, DAT-03, INC-01, INC-03 (+14 more)\n- not assessed: DAT-04, DOC-05, OVS-09, RSK-04, RSK-05\n\nNext step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.\n\n## Outcome summary\n\n- conformant: 22\n- non-conformant: 2\n- partial: 0\n- not applicable: 1\n- not assessed: 5\n- insufficient evidence: 19\n\n## Assertions\n\n- `DAT-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-02` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n- `DAT-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n- `DAT-04` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n- `DOC-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `DOC-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `DOC-03` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `DOC-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, semi-automated; 0/1 failed)\n- `DOC-05` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n- `INC-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `INC-02` @ `spiffe://corp/agents/a` -> **not applicable** (rung 2, automated; 0/0 failed)\n- `INC-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `INC-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `INT-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `INT-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `INT-03` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `INT-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `OVS-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `OVS-02` @ `spiffe://corp/agents/a` -> **non-conformant** (rung 2, automated; 1/1 failed)\n- `OVS-03` @ `spiffe://corp/agents/a` -> **non-conformant** (rung 2, automated; 1/1 failed)\n- `OVS-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `OVS-05` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `OVS-06` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `OVS-07` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n- `OVS-08` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n- `OVS-09` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n- `REC-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `REC-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `REC-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `REC-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `REC-05` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `REC-06` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `ROB-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `ROB-02` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `ROB-03` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `ROB-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `ROB-05` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, semi-automated; 0/1 failed)\n- `ROB-06` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, semi-automated; 0/1 failed)\n- `ROB-07` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n- `RSK-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `RSK-02` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `RSK-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n- `RSK-04` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n- `RSK-05` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n- `TRN-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `TRN-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `TRN-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n- `TRN-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `TRN-05` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n",
+  "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Non-conformant \u2014 at least one applicable control failed.</strong></p><p>Top gaps:</p><ul><li>non-conformant: OVS-02, OVS-03</li><li>insufficient evidence: DAT-01, DAT-02, DAT-03, INC-01, INC-03 (+14 more)</li><li>not assessed: DAT-04, DOC-05, OVS-09, RSK-04, RSK-05</li></ul><p>Next step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 22</li><li>non-conformant: 2</li><li>partial: 0</li><li>not applicable: 1</li><li>not assessed: 5</li><li>insufficient evidence: 19</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th></tr></thead><tbody><tr><td>DAT-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 10 (clause reference unverified)</td></tr><tr><td>DAT-02</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 10 (clause reference unverified)</td></tr><tr><td>DAT-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 10 (clause reference unverified)</td></tr><tr><td>DAT-04</td><td>spiffe://corp/agents/a</td><td>not assessed</td><td>eu-ai-act Art. 10 (clause reference unverified)</td></tr><tr><td>DOC-01</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 11 / Annex IV (clause reference unverified)</td></tr><tr><td>DOC-02</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 13 (clause reference unverified)</td></tr><tr><td>DOC-03</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 11 / Annex IV (clause reference unverified)</td></tr><tr><td>DOC-04</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 13 (clause reference unverified)</td></tr><tr><td>DOC-05</td><td>spiffe://corp/agents/a</td><td>not assessed</td><td>eu-ai-act Art. 11 / Annex IV (clause reference unverified)</td></tr><tr><td>INC-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 72 (clause reference unverified)</td></tr><tr><td>INC-02</td><td>spiffe://corp/agents/a</td><td>not applicable</td><td>eu-ai-act Art. 73 (clause reference unverified); eu-ai-act Art. 26(5) (clause reference unverified)</td></tr><tr><td>INC-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 26(5) (clause reference unverified)</td></tr><tr><td>INC-04</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 73 (clause reference unverified)</td></tr><tr><td>INT-01</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 12 (clause reference unverified)</td></tr><tr><td>INT-02</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act engine integrity (clause reference unverified)</td></tr><tr><td>INT-03</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act engine integrity (clause reference unverified)</td></tr><tr><td>INT-04</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act engine integrity (clause reference unverified)</td></tr><tr><td>OVS-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 14(4)(a) (clause reference unverified)</td></tr><tr><td>OVS-02</td><td>spiffe://corp/agents/a</td><td>non-conformant</td><td>eu-ai-act Art. 14(1)-(3) (clause reference unverified)</td></tr><tr><td>OVS-03</td><td>spiffe://corp/agents/a</td><td>non-conformant</td><td>eu-ai-act Art. 14 (clause reference unverified); eu-ai-act Art. 26(2) (clause reference unverified)</td></tr><tr><td>OVS-04</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 14(4)(c)-(d) (clause reference unverified)</td></tr><tr><td>OVS-05</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 26(2) (clause reference unverified)</td></tr><tr><td>OVS-06</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 14(4)(e) (clause reference unverified)</td></tr><tr><td>OVS-07</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 14(4)(b) (clause reference unverified)</td></tr><tr><td>OVS-08</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 14(5) (clause reference unverified)</td></tr><tr><td>OVS-09</td><td>spiffe://corp/agents/a</td><td>not assessed</td><td>eu-ai-act Art. 14(1)-(3) (clause reference unverified)</td></tr><tr><td>REC-01</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 12(1)-(2) (clause reference unverified)</td></tr><tr><td>REC-02</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 12(1)-(2) (clause reference unverified)</td></tr><tr><td>REC-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 12(2) (clause reference unverified)</td></tr><tr><td>REC-04</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 12 (clause reference unverified); eu-ai-act Art. 19 (clause reference unverified)</td></tr><tr><td>REC-05</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 26(6) (clause reference unverified)</td></tr><tr><td>REC-06</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 19 (clause reference unverified)</td></tr><tr><td>ROB-01</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td></tr><tr><td>ROB-02</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 15 (clause reference unverified)</td></tr><tr><td>ROB-03</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td></tr><tr><td>ROB-04</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td></tr><tr><td>ROB-05</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td></tr><tr><td>ROB-06</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td></tr><tr><td>ROB-07</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 15 (clause reference unverified)</td></tr><tr><td>RSK-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 9 (clause reference unverified)</td></tr><tr><td>RSK-02</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 9 (clause reference unverified)</td></tr><tr><td>RSK-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 9 (clause reference unverified)</td></tr><tr><td>RSK-04</td><td>spiffe://corp/agents/a</td><td>not assessed</td><td>eu-ai-act Art. 27 (clause reference unverified)</td></tr><tr><td>RSK-05</td><td>spiffe://corp/agents/a</td><td>not assessed</td><td>eu-ai-act Art. 49 / 71 (clause reference unverified)</td></tr><tr><td>TRN-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 26(11) / 86 (clause reference unverified)</td></tr><tr><td>TRN-02</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 86 (clause reference unverified)</td></tr><tr><td>TRN-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 26(11) / 86 (clause reference unverified)</td></tr><tr><td>TRN-04</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 50 (clause reference unverified)</td></tr><tr><td>TRN-05</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 50 (clause reference unverified)</td></tr></tbody></table></section><section aria-labelledby=\"provenance\"><h2 id=\"provenance\">Provenance</h2><ul><li>Engine: agentce-py 0.1.0</li><li>Catalog: (none)</li><li>Reproduce: <code>agentce quickstart</code></li></ul></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n",
+  "md": "# AgentCE conformance report\n\n## Verdict\n\n**Non-conformant \u2014 at least one applicable control failed.**\n\nTop gaps:\n\n- non-conformant: OVS-02, OVS-03\n- insufficient evidence: DAT-01, DAT-02, DAT-03, INC-01, INC-03 (+14 more)\n- not assessed: DAT-04, DOC-05, OVS-09, RSK-04, RSK-05\n\nNext step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.\n\n## Outcome summary\n\n- conformant: 22\n- non-conformant: 2\n- partial: 0\n- not applicable: 1\n- not assessed: 5\n- insufficient evidence: 19\n\n## Assertions\n\n- `DAT-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 10 (clause reference unverified)\n- `DAT-02` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 10 (clause reference unverified)\n- `DAT-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 10 (clause reference unverified)\n- `DAT-04` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n  - eu-ai-act Art. 10 (clause reference unverified)\n- `DOC-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 11 / Annex IV (clause reference unverified)\n- `DOC-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 13 (clause reference unverified)\n- `DOC-03` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 11 / Annex IV (clause reference unverified)\n- `DOC-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 13 (clause reference unverified)\n- `DOC-05` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n  - eu-ai-act Art. 11 / Annex IV (clause reference unverified)\n- `INC-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 72 (clause reference unverified)\n- `INC-02` @ `spiffe://corp/agents/a` -> **not applicable** (rung 2, automated; 0/0 failed)\n  - eu-ai-act Art. 73 (clause reference unverified)\n  - eu-ai-act Art. 26(5) (clause reference unverified)\n- `INC-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 26(5) (clause reference unverified)\n- `INC-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 73 (clause reference unverified)\n- `INT-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 12 (clause reference unverified)\n- `INT-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act engine integrity (clause reference unverified)\n- `INT-03` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act engine integrity (clause reference unverified)\n- `INT-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act engine integrity (clause reference unverified)\n- `OVS-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 14(4)(a) (clause reference unverified)\n- `OVS-02` @ `spiffe://corp/agents/a` -> **non-conformant** (rung 2, automated; 1/1 failed)\n  - eu-ai-act Art. 14(1)-(3) (clause reference unverified)\n- `OVS-03` @ `spiffe://corp/agents/a` -> **non-conformant** (rung 2, automated; 1/1 failed)\n  - eu-ai-act Art. 14 (clause reference unverified)\n  - eu-ai-act Art. 26(2) (clause reference unverified)\n- `OVS-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 14(4)(c)-(d) (clause reference unverified)\n- `OVS-05` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 26(2) (clause reference unverified)\n- `OVS-06` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 14(4)(e) (clause reference unverified)\n- `OVS-07` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 14(4)(b) (clause reference unverified)\n- `OVS-08` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 14(5) (clause reference unverified)\n- `OVS-09` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n  - eu-ai-act Art. 14(1)-(3) (clause reference unverified)\n- `REC-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 12(1)-(2) (clause reference unverified)\n- `REC-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 12(1)-(2) (clause reference unverified)\n- `REC-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 12(2) (clause reference unverified)\n- `REC-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 12 (clause reference unverified)\n  - eu-ai-act Art. 19 (clause reference unverified)\n- `REC-05` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 26(6) (clause reference unverified)\n- `REC-06` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 19 (clause reference unverified)\n- `ROB-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n- `ROB-02` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n- `ROB-03` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n- `ROB-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n- `ROB-05` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n- `ROB-06` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n- `ROB-07` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n- `RSK-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 9 (clause reference unverified)\n- `RSK-02` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 9 (clause reference unverified)\n- `RSK-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 9 (clause reference unverified)\n- `RSK-04` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n  - eu-ai-act Art. 27 (clause reference unverified)\n- `RSK-05` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n  - eu-ai-act Art. 49 / 71 (clause reference unverified)\n- `TRN-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 26(11) / 86 (clause reference unverified)\n- `TRN-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 86 (clause reference unverified)\n- `TRN-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 26(11) / 86 (clause reference unverified)\n- `TRN-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 50 (clause reference unverified)\n- `TRN-05` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 50 (clause reference unverified)\n\n## Provenance\n\n- Engine: agentce-py 0.1.0\n- Catalog: (none)\n- Reproduce: `agentce quickstart`\n\n",
   "oscal": {
     "assessment-results": {
       "metadata": {
@@ -1629,30 +1987,65 @@
     "assertions": [
       {
         "control": "DAT-01",
+        "crosswalk": [
+          {
+            "clause": "Art. 10",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "DAT-02",
+        "crosswalk": [
+          {
+            "clause": "Art. 10",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "semi-automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "DAT-03",
+        "crosswalk": [
+          {
+            "clause": "Art. 10",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "semi-automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "DAT-04",
+        "crosswalk": [
+          {
+            "clause": "Art. 10",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "manual",
         "outcome": "not_assessed"
       },
       {
         "control": "DOC-01",
+        "crosswalk": [
+          {
+            "clause": "Art. 11 / Annex IV",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/d1"
         ],
@@ -1661,6 +2054,13 @@
       },
       {
         "control": "DOC-02",
+        "crosswalk": [
+          {
+            "clause": "Art. 13",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/d1"
         ],
@@ -1669,6 +2069,13 @@
       },
       {
         "control": "DOC-03",
+        "crosswalk": [
+          {
+            "clause": "Art. 11 / Annex IV",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/tc1"
         ],
@@ -1677,6 +2084,13 @@
       },
       {
         "control": "DOC-04",
+        "crosswalk": [
+          {
+            "clause": "Art. 13",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/d1"
         ],
@@ -1685,30 +2099,70 @@
       },
       {
         "control": "DOC-05",
+        "crosswalk": [
+          {
+            "clause": "Art. 11 / Annex IV",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "manual",
         "outcome": "not_assessed"
       },
       {
         "control": "INC-01",
+        "crosswalk": [
+          {
+            "clause": "Art. 72",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "INC-02",
+        "crosswalk": [
+          {
+            "clause": "Art. 73",
+            "framework": "eu-ai-act",
+            "verified": false
+          },
+          {
+            "clause": "Art. 26(5)",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "automated",
         "outcome": "not_applicable"
       },
       {
         "control": "INC-03",
+        "crosswalk": [
+          {
+            "clause": "Art. 26(5)",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "INC-04",
+        "crosswalk": [
+          {
+            "clause": "Art. 73",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/tc1"
         ],
@@ -1717,6 +2171,13 @@
       },
       {
         "control": "INT-01",
+        "crosswalk": [
+          {
+            "clause": "Art. 12",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/tc1"
         ],
@@ -1725,6 +2186,13 @@
       },
       {
         "control": "INT-02",
+        "crosswalk": [
+          {
+            "clause": "engine integrity",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/dl1"
         ],
@@ -1733,6 +2201,13 @@
       },
       {
         "control": "INT-03",
+        "crosswalk": [
+          {
+            "clause": "engine integrity",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/tc1"
         ],
@@ -1741,6 +2216,13 @@
       },
       {
         "control": "INT-04",
+        "crosswalk": [
+          {
+            "clause": "engine integrity",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/tc1"
         ],
@@ -1749,12 +2231,26 @@
       },
       {
         "control": "OVS-01",
+        "crosswalk": [
+          {
+            "clause": "Art. 14(4)(a)",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "OVS-02",
+        "crosswalk": [
+          {
+            "clause": "Art. 14(1)-(3)",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/d1"
         ],
@@ -1763,6 +2259,18 @@
       },
       {
         "control": "OVS-03",
+        "crosswalk": [
+          {
+            "clause": "Art. 14",
+            "framework": "eu-ai-act",
+            "verified": false
+          },
+          {
+            "clause": "Art. 26(2)",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/tc1"
         ],
@@ -1771,6 +2279,13 @@
       },
       {
         "control": "OVS-04",
+        "crosswalk": [
+          {
+            "clause": "Art. 14(4)(c)-(d)",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/tc1"
         ],
@@ -1779,12 +2294,26 @@
       },
       {
         "control": "OVS-05",
+        "crosswalk": [
+          {
+            "clause": "Art. 26(2)",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "OVS-06",
+        "crosswalk": [
+          {
+            "clause": "Art. 14(4)(e)",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/tc1"
         ],
@@ -1793,24 +2322,52 @@
       },
       {
         "control": "OVS-07",
+        "crosswalk": [
+          {
+            "clause": "Art. 14(4)(b)",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "semi-automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "OVS-08",
+        "crosswalk": [
+          {
+            "clause": "Art. 14(5)",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "semi-automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "OVS-09",
+        "crosswalk": [
+          {
+            "clause": "Art. 14(1)-(3)",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "manual",
         "outcome": "not_assessed"
       },
       {
         "control": "REC-01",
+        "crosswalk": [
+          {
+            "clause": "Art. 12(1)-(2)",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/d1"
         ],
@@ -1819,6 +2376,13 @@
       },
       {
         "control": "REC-02",
+        "crosswalk": [
+          {
+            "clause": "Art. 12(1)-(2)",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/d1"
         ],
@@ -1827,12 +2391,31 @@
       },
       {
         "control": "REC-03",
+        "crosswalk": [
+          {
+            "clause": "Art. 12(2)",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "REC-04",
+        "crosswalk": [
+          {
+            "clause": "Art. 12",
+            "framework": "eu-ai-act",
+            "verified": false
+          },
+          {
+            "clause": "Art. 19",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/d1"
         ],
@@ -1841,12 +2424,26 @@
       },
       {
         "control": "REC-05",
+        "crosswalk": [
+          {
+            "clause": "Art. 26(6)",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "REC-06",
+        "crosswalk": [
+          {
+            "clause": "Art. 19",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/tc1"
         ],
@@ -1855,6 +2452,13 @@
       },
       {
         "control": "ROB-01",
+        "crosswalk": [
+          {
+            "clause": "Art. 15",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/tc1"
         ],
@@ -1863,12 +2467,26 @@
       },
       {
         "control": "ROB-02",
+        "crosswalk": [
+          {
+            "clause": "Art. 15",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "ROB-03",
+        "crosswalk": [
+          {
+            "clause": "Art. 15",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/tc1"
         ],
@@ -1877,6 +2495,13 @@
       },
       {
         "control": "ROB-04",
+        "crosswalk": [
+          {
+            "clause": "Art. 15",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/tc1"
         ],
@@ -1885,6 +2510,13 @@
       },
       {
         "control": "ROB-05",
+        "crosswalk": [
+          {
+            "clause": "Art. 15",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/tc1"
         ],
@@ -1893,6 +2525,13 @@
       },
       {
         "control": "ROB-06",
+        "crosswalk": [
+          {
+            "clause": "Art. 15",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/tc1"
         ],
@@ -1901,48 +2540,104 @@
       },
       {
         "control": "ROB-07",
+        "crosswalk": [
+          {
+            "clause": "Art. 15",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "semi-automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "RSK-01",
+        "crosswalk": [
+          {
+            "clause": "Art. 9",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "RSK-02",
+        "crosswalk": [
+          {
+            "clause": "Art. 9",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "RSK-03",
+        "crosswalk": [
+          {
+            "clause": "Art. 9",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "semi-automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "RSK-04",
+        "crosswalk": [
+          {
+            "clause": "Art. 27",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "manual",
         "outcome": "not_assessed"
       },
       {
         "control": "RSK-05",
+        "crosswalk": [
+          {
+            "clause": "Art. 49 / 71",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "manual",
         "outcome": "not_assessed"
       },
       {
         "control": "TRN-01",
+        "crosswalk": [
+          {
+            "clause": "Art. 26(11) / 86",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "TRN-02",
+        "crosswalk": [
+          {
+            "clause": "Art. 86",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/d1"
         ],
@@ -1951,12 +2646,26 @@
       },
       {
         "control": "TRN-03",
+        "crosswalk": [
+          {
+            "clause": "Art. 26(11) / 86",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "semi-automated",
         "outcome": "insufficient_evidence"
       },
       {
         "control": "TRN-04",
+        "crosswalk": [
+          {
+            "clause": "Art. 50",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [
           "agentce:event/d1"
         ],
@@ -1965,6 +2674,13 @@
       },
       {
         "control": "TRN-05",
+        "crosswalk": [
+          {
+            "clause": "Art. 50",
+            "framework": "eu-ai-act",
+            "verified": false
+          }
+        ],
         "evidence": [],
         "mode": "semi-automated",
         "outcome": "insufficient_evidence"
@@ -2347,8 +3063,8 @@
           "not_assessed"
         ]
       ],
-      "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Incomplete \u2014 no control failed, but not every applicable control is demonstrated.</strong></p><p>Top gaps:</p><ul><li>insufficient evidence: DAT-01, DAT-02, DAT-03, DAT-04, DAT-05 (+3 more)</li><li>not assessed: DOC-05, OVS-09</li></ul><p>Next step: Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 1</li><li>non-conformant: 0</li><li>partial: 0</li><li>not applicable: 0</li><li>not assessed: 2</li><li>insufficient evidence: 8</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Outcome</th></tr></thead><tbody><tr><td>DAT-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>DAT-02</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>DAT-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>DAT-04</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>DAT-05</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>DAT-06</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>DAT-07</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>DAT-08</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td></tr><tr><td>DOC-01</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>DOC-05</td><td>spiffe://corp/agents/a</td><td>not assessed</td></tr><tr><td>OVS-09</td><td>spiffe://corp/agents/a</td><td>not assessed</td></tr></tbody></table></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n",
-      "md": "# AgentCE conformance report\n\n## Verdict\n\n**Incomplete \u2014 no control failed, but not every applicable control is demonstrated.**\n\nTop gaps:\n\n- insufficient evidence: DAT-01, DAT-02, DAT-03, DAT-04, DAT-05 (+3 more)\n- not assessed: DOC-05, OVS-09\n\nNext step: Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.\n\n## Outcome summary\n\n- conformant: 1\n- non-conformant: 0\n- partial: 0\n- not applicable: 0\n- not assessed: 2\n- insufficient evidence: 8\n\n## Assertions\n\n- `DAT-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-02` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-04` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-05` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-06` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-07` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-08` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DOC-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `DOC-05` @ `spiffe://corp/agents/a` -> **not assessed** (rung 2, automated; 0/1 failed)\n- `OVS-09` @ `spiffe://corp/agents/a` -> **not assessed** (rung 2, automated; 0/1 failed)\n"
+      "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Incomplete \u2014 no control failed, but not every applicable control is demonstrated.</strong></p><p>Top gaps:</p><ul><li>insufficient evidence: DAT-01, DAT-02, DAT-03, DAT-04, DAT-05 (+3 more)</li><li>not assessed: DOC-05, OVS-09</li></ul><p>Next step: Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 1</li><li>non-conformant: 0</li><li>partial: 0</li><li>not applicable: 0</li><li>not assessed: 2</li><li>insufficient evidence: 8</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th></tr></thead><tbody><tr><td>DAT-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td></td></tr><tr><td>DAT-02</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td></td></tr><tr><td>DAT-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td></td></tr><tr><td>DAT-04</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td></td></tr><tr><td>DAT-05</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td></td></tr><tr><td>DAT-06</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td></td></tr><tr><td>DAT-07</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td></td></tr><tr><td>DAT-08</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td></td></tr><tr><td>DOC-01</td><td>spiffe://corp/agents/a</td><td>conformant</td><td></td></tr><tr><td>DOC-05</td><td>spiffe://corp/agents/a</td><td>not assessed</td><td></td></tr><tr><td>OVS-09</td><td>spiffe://corp/agents/a</td><td>not assessed</td><td></td></tr></tbody></table></section><section aria-labelledby=\"provenance\"><h2 id=\"provenance\">Provenance</h2><ul><li>Engine: agentce-py 0.1.0</li><li>Catalog: (none)</li><li>Reproduce: <code>agentce quickstart</code></li></ul></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n",
+      "md": "# AgentCE conformance report\n\n## Verdict\n\n**Incomplete \u2014 no control failed, but not every applicable control is demonstrated.**\n\nTop gaps:\n\n- insufficient evidence: DAT-01, DAT-02, DAT-03, DAT-04, DAT-05 (+3 more)\n- not assessed: DOC-05, OVS-09\n\nNext step: Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.\n\n## Outcome summary\n\n- conformant: 1\n- non-conformant: 0\n- partial: 0\n- not applicable: 0\n- not assessed: 2\n- insufficient evidence: 8\n\n## Assertions\n\n- `DAT-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-02` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-04` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-05` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-06` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-07` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-08` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DOC-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `DOC-05` @ `spiffe://corp/agents/a` -> **not assessed** (rung 2, automated; 0/1 failed)\n- `OVS-09` @ `spiffe://corp/agents/a` -> **not assessed** (rung 2, automated; 0/1 failed)\n\n## Provenance\n\n- Engine: agentce-py 0.1.0\n- Catalog: (none)\n- Reproduce: `agentce quickstart`\n\n"
     },
     {
       "assertions": [
@@ -2368,8 +3084,8 @@
           "not_applicable"
         ]
       ],
-      "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Conformant \u2014 every applicable control met its expectations with evidence.</strong></p><p>Top gaps: none</p><p>Next step: No gaps. Run the assessment again when the agent, its evidence, or the catalog changes.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 2</li><li>non-conformant: 0</li><li>partial: 0</li><li>not applicable: 1</li><li>not assessed: 0</li><li>insufficient evidence: 0</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Outcome</th></tr></thead><tbody><tr><td>DOC-01</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>DOC-02</td><td>spiffe://corp/agents/a</td><td>conformant</td></tr><tr><td>INC-02</td><td>spiffe://corp/agents/a</td><td>not applicable</td></tr></tbody></table></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n",
-      "md": "# AgentCE conformance report\n\n## Verdict\n\n**Conformant \u2014 every applicable control met its expectations with evidence.**\n\nTop gaps: none\n\nNext step: No gaps. Run the assessment again when the agent, its evidence, or the catalog changes.\n\n## Outcome summary\n\n- conformant: 2\n- non-conformant: 0\n- partial: 0\n- not applicable: 1\n- not assessed: 0\n- insufficient evidence: 0\n\n## Assertions\n\n- `DOC-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `DOC-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `INC-02` @ `spiffe://corp/agents/a` -> **not applicable** (rung 2, automated; 0/1 failed)\n"
+      "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Conformant \u2014 every applicable control met its expectations with evidence.</strong></p><p>Top gaps: none</p><p>Next step: No gaps. Run the assessment again when the agent, its evidence, or the catalog changes.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 2</li><li>non-conformant: 0</li><li>partial: 0</li><li>not applicable: 1</li><li>not assessed: 0</li><li>insufficient evidence: 0</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th></tr></thead><tbody><tr><td>DOC-01</td><td>spiffe://corp/agents/a</td><td>conformant</td><td></td></tr><tr><td>DOC-02</td><td>spiffe://corp/agents/a</td><td>conformant</td><td></td></tr><tr><td>INC-02</td><td>spiffe://corp/agents/a</td><td>not applicable</td><td></td></tr></tbody></table></section><section aria-labelledby=\"provenance\"><h2 id=\"provenance\">Provenance</h2><ul><li>Engine: agentce-py 0.1.0</li><li>Catalog: (none)</li><li>Reproduce: <code>agentce quickstart</code></li></ul></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n",
+      "md": "# AgentCE conformance report\n\n## Verdict\n\n**Conformant \u2014 every applicable control met its expectations with evidence.**\n\nTop gaps: none\n\nNext step: No gaps. Run the assessment again when the agent, its evidence, or the catalog changes.\n\n## Outcome summary\n\n- conformant: 2\n- non-conformant: 0\n- partial: 0\n- not applicable: 1\n- not assessed: 0\n- insufficient evidence: 0\n\n## Assertions\n\n- `DOC-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `DOC-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `INC-02` @ `spiffe://corp/agents/a` -> **not applicable** (rung 2, automated; 0/1 failed)\n\n## Provenance\n\n- Engine: agentce-py 0.1.0\n- Catalog: (none)\n- Reproduce: `agentce quickstart`\n\n"
     },
     {
       "assertions": [
@@ -2394,8 +3110,8 @@
           "insufficient_evidence"
         ]
       ],
-      "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Non-conformant \u2014 at least one applicable control failed.</strong></p><p>Top gaps:</p><ul><li>non-conformant: OVS-02</li><li>partial: REC-01</li><li>insufficient evidence: REC-02</li></ul><p>Next step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 0</li><li>non-conformant: 2</li><li>partial: 1</li><li>not applicable: 0</li><li>not assessed: 0</li><li>insufficient evidence: 1</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Outcome</th></tr></thead><tbody><tr><td>OVS-02</td><td>spiffe://corp/agents/a</td><td>non-conformant</td></tr><tr><td>REC-01</td><td>spiffe://corp/agents/a</td><td>partial</td></tr><tr><td>OVS-02</td><td>spiffe://corp/agents/b</td><td>non-conformant</td></tr><tr><td>REC-02</td><td>spiffe://corp/agents/b</td><td>insufficient evidence</td></tr></tbody></table></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n",
-      "md": "# AgentCE conformance report\n\n## Verdict\n\n**Non-conformant \u2014 at least one applicable control failed.**\n\nTop gaps:\n\n- non-conformant: OVS-02\n- partial: REC-01\n- insufficient evidence: REC-02\n\nNext step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.\n\n## Outcome summary\n\n- conformant: 0\n- non-conformant: 2\n- partial: 1\n- not applicable: 0\n- not assessed: 0\n- insufficient evidence: 1\n\n## Assertions\n\n- `OVS-02` @ `spiffe://corp/agents/a` -> **non-conformant** (rung 2, automated; 1/1 failed)\n- `REC-01` @ `spiffe://corp/agents/a` -> **partial** (rung 2, automated; 0/1 failed)\n- `OVS-02` @ `spiffe://corp/agents/b` -> **non-conformant** (rung 2, automated; 1/1 failed)\n- `REC-02` @ `spiffe://corp/agents/b` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n"
+      "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Non-conformant \u2014 at least one applicable control failed.</strong></p><p>Top gaps:</p><ul><li>non-conformant: OVS-02</li><li>partial: REC-01</li><li>insufficient evidence: REC-02</li></ul><p>Next step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 0</li><li>non-conformant: 2</li><li>partial: 1</li><li>not applicable: 0</li><li>not assessed: 0</li><li>insufficient evidence: 1</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th></tr></thead><tbody><tr><td>OVS-02</td><td>spiffe://corp/agents/a</td><td>non-conformant</td><td></td></tr><tr><td>REC-01</td><td>spiffe://corp/agents/a</td><td>partial</td><td></td></tr><tr><td>OVS-02</td><td>spiffe://corp/agents/b</td><td>non-conformant</td><td></td></tr><tr><td>REC-02</td><td>spiffe://corp/agents/b</td><td>insufficient evidence</td><td></td></tr></tbody></table></section><section aria-labelledby=\"provenance\"><h2 id=\"provenance\">Provenance</h2><ul><li>Engine: agentce-py 0.1.0</li><li>Catalog: (none)</li><li>Reproduce: <code>agentce quickstart</code></li></ul></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n",
+      "md": "# AgentCE conformance report\n\n## Verdict\n\n**Non-conformant \u2014 at least one applicable control failed.**\n\nTop gaps:\n\n- non-conformant: OVS-02\n- partial: REC-01\n- insufficient evidence: REC-02\n\nNext step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.\n\n## Outcome summary\n\n- conformant: 0\n- non-conformant: 2\n- partial: 1\n- not applicable: 0\n- not assessed: 0\n- insufficient evidence: 1\n\n## Assertions\n\n- `OVS-02` @ `spiffe://corp/agents/a` -> **non-conformant** (rung 2, automated; 1/1 failed)\n- `REC-01` @ `spiffe://corp/agents/a` -> **partial** (rung 2, automated; 0/1 failed)\n- `OVS-02` @ `spiffe://corp/agents/b` -> **non-conformant** (rung 2, automated; 1/1 failed)\n- `REC-02` @ `spiffe://corp/agents/b` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n\n## Provenance\n\n- Engine: agentce-py 0.1.0\n- Catalog: (none)\n- Reproduce: `agentce quickstart`\n\n"
     }
   ]
 }

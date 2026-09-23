@@ -66,7 +66,7 @@ class Assertion:
     source_class_satisfied: bool | None = None
     evidence_strength: str | None = None
     deviation: str | None = None
-    crosswalk: list[dict[str, str]] = field(default_factory=list)
+    crosswalk: list[dict[str, Any]] = field(default_factory=list)
 
     def to_json(self) -> dict[str, Any]:
         record: dict[str, Any] = {

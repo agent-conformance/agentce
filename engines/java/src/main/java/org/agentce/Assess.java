@@ -1,6 +1,7 @@
 package org.agentce;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -111,6 +112,30 @@ public final class Assess {
         return pointers;
     }
 
+    /**
+     * Carry each control's own crosswalk entries into every assertion built for it (SPEC §7.3).
+     *
+     * <p>{@code verified} is read from the control's {@code verified_against_text} and coerced to a
+     * real boolean -- never invented, and never set true by the engine itself; only a human with
+     * access to the licensed standard text may flip that flag in the catalog source (human action H4).
+     */
+    private static List<JsonNode> crosswalkFor(Catalog.ControlSpec control) {
+        List<JsonNode> out = new ArrayList<>();
+        JsonNode raw = control.raw.get("crosswalk");
+        if (raw == null || !raw.isArray()) {
+            return out;
+        }
+        for (JsonNode entry : raw) {
+            ObjectNode node = Json.nodes().objectNode();
+            node.set("framework", entry.get("framework"));
+            node.set("clause", entry.get("clause"));
+            JsonNode verified = entry.get("verified_against_text");
+            node.put("verified", verified != null && verified.isBoolean() && verified.booleanValue());
+            out.add(node);
+        }
+        return out;
+    }
+
     private static Assertions.Assertion assertControl(
             GraphStore store,
             Catalog catalog,
@@ -120,21 +145,30 @@ public final class Assess {
             List<JsonNode> events,
             Map<String, JsonNode> eventsByIri,
             String[] win) {
+        List<JsonNode> crosswalk = crosswalkFor(control);
         if (!roleApplies(roles, control.appliesToRoles)) {
-            return Assertions.make(control.id, control.version, subject.id, "not_applicable", control.rung, control.mode, win, new int[] {0, 0});
+            Assertions.Assertion a = Assertions.make(control.id, control.version, subject.id, "not_applicable", control.rung, control.mode, win, new int[] {0, 0});
+            a.crosswalk = crosswalk;
+            return a;
         }
 
         Psp.Shape shape = Catalog.shapeFor(catalog, control);
         if (control.rung != 2 || shape == null) {
-            return Assertions.make(control.id, control.version, subject.id, "not_assessed", control.rung, control.mode, win, new int[] {0, 0});
+            Assertions.Assertion a = Assertions.make(control.id, control.version, subject.id, "not_assessed", control.rung, control.mode, win, new int[] {0, 0});
+            a.crosswalk = crosswalk;
+            return a;
         }
 
         Structural.ShapeResult result = Structural.evaluateShape(store, shape, catalog.shapes, control.id);
         if (result.applicable.isEmpty()) {
-            return Assertions.make(control.id, control.version, subject.id, "not_applicable", control.rung, control.mode, win, new int[] {0, 0});
+            Assertions.Assertion a = Assertions.make(control.id, control.version, subject.id, "not_applicable", control.rung, control.mode, win, new int[] {0, 0});
+            a.crosswalk = crosswalk;
+            return a;
         }
         if (!hasMinimumEvidence(events, control.minimumEvidence)) {
-            return Assertions.make(control.id, control.version, subject.id, "insufficient_evidence", control.rung, control.mode, win, new int[] {result.applicable.size(), 0});
+            Assertions.Assertion a = Assertions.make(control.id, control.version, subject.id, "insufficient_evidence", control.rung, control.mode, win, new int[] {result.applicable.size(), 0});
+            a.crosswalk = crosswalk;
+            return a;
         }
 
         boolean conformant = Structural.withinTolerance(result.applicable.size(), result.failing.size(), control.tolerance);
@@ -152,6 +186,7 @@ public final class Assess {
             assertion.violations.add(Structural.violationToJson(v));
         }
         assertion.evidence = evidence(eventsByIri, focusForEvidence);
+        assertion.crosswalk = crosswalk;
         assertion.sourceClassSatisfied = Boolean.TRUE;
         JsonNode strength = control.raw.get("evidence_strength");
         assertion.evidenceStrength = strength != null && strength.isTextual() ? strength.textValue() : null;

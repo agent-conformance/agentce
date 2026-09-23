@@ -30,6 +30,7 @@ public final class Messages {
         m.put("report.gaps_more", "+{n} more");
         m.put("report.next_step_heading", "Next step");
         m.put("report.see_report", "See report.md in {dir} for every control.");
+        m.put("report.crosswalk_unverified", "(clause reference unverified)");
         m.put("verdict.non-conformant", "Non-conformant \u2014 at least one applicable control failed.");
         m.put("verdict.incomplete",
                 "Incomplete \u2014 no control failed, but not every applicable control is demonstrated.");
