@@ -9,8 +9,8 @@
  * integer arithmetic so it is cross-language identical.
  */
 
-import { readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
+import { confineToRoot, safeIsFile } from "./bundle";
 import { type CoverageDenominator, type Profile, denominatorIds } from "./profile";
 import { byteCompare } from "./util";
 
@@ -22,14 +22,6 @@ type Event = Record<string, unknown>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isFile(path: string): boolean {
-  try {
-    return statSync(path).isFile();
-  } catch {
-    return false;
-  }
 }
 
 function eventType(event: Event): string {
@@ -70,9 +62,12 @@ function denominatorCounts(
   bundleRoot: string | null,
 ): Record<string, number> {
   if (denominator.manifest && bundleRoot !== null) {
-    const path = join(bundleRoot, denominator.manifest);
-    if (isFile(path)) {
-      const data = JSON.parse(readFileSync(path, "utf-8"));
+    // A denominator manifest is a bundle-adjacent reference: confine it to the bundle root so a
+    // path that escapes (literally or through a symlink) is not read at all, falling through to
+    // the source's own ingested counts exactly as a missing manifest does.
+    const confined = confineToRoot(bundleRoot, denominator.manifest);
+    if (confined !== null && safeIsFile(confined)) {
+      const data = JSON.parse(readFileSync(confined, "utf-8"));
       if (isRecord(data)) {
         const declared = firstNonEmpty(data.counts, data.expected);
         const out: Record<string, number> = {};

@@ -11,8 +11,7 @@
  * port of the Python reference; its results inform findings and do not feed assertions (SPEC §8.1).
  */
 
-import { statSync } from "node:fs";
-import { join } from "node:path";
+import { confineToRoot, safeIsFile } from "./bundle";
 import { sha256Hex } from "./canonical";
 import { byteCompare } from "./util";
 
@@ -61,14 +60,6 @@ export function integrityResultToJson(result: IntegrityResult): Record<string, u
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isFile(path: string): boolean {
-  try {
-    return statSync(path).isFile();
-  } catch {
-    return false;
-  }
 }
 
 function integrityBlock(event: Record<string, unknown>): Record<string, unknown> | null {
@@ -133,7 +124,10 @@ function isSigned(block: Record<string, unknown> | null, bundleRoot: string | nu
   if (bundleRoot === null) {
     return true;
   }
-  return isFile(join(bundleRoot, sigRef));
+  // A sig_ref is evidence content: confine it to the bundle root so a signature file outside it
+  // (reached literally or through a symlink) never counts as a verified signature.
+  const confined = confineToRoot(bundleRoot, sigRef);
+  return confined !== null && safeIsFile(confined);
 }
 
 function verifyStream(
