@@ -9,7 +9,7 @@ usage: agentce assess [-h] [--json] [--debug] [--quiet] [--bundle BUNDLE]
                       [--catalog-dir CATALOG_DIR] [--trust-root TRUST_ROOT]
                       [--allow-unverified-catalog] [--manual MANUAL]
                       [--probes PROBES] [--out OUT] [--state STATE]
-                      [--report-language REPORT_LANGUAGE]
+                      [--report-language REPORT_LANGUAGE] [--emit EMIT]
 
 options:
   -h, --help            show this help message and exit
@@ -37,6 +37,10 @@ options:
   --report-language REPORT_LANGUAGE
                         message-key catalogue for the report; does not affect
                         assertions.json (SPEC 9.3)
+  --emit EMIT           comma-separated report formats to render (default: the
+                        fixed bundle: html, md, oscal, pack, sarif); one or
+                        more of: md, html, oscal, sarif, public, pack, junit,
+                        csv, oscal_xml, pdf, remediation
 
 global options:
   --json                emit machine-readable JSON on stdout
