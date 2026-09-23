@@ -18,6 +18,11 @@ from . import canonical
 from .errors import InputError
 from .error_catalogue import MESSAGE_KEYS
 
+#: Ceiling on any single manifest-listed file's byte size, checked with `stat()` before the file is
+#: opened or hashed (SPEC §8.1) -- so a hostile bundle cannot force gigabytes to stream through
+#: `_sha256_hex` before any check has a chance to refuse it.
+DEFAULT_MAX_MANIFEST_FILE_BYTES = 512 * 1024 * 1024
+
 
 def _sha256_hex(path: Path) -> str:
     digest = hashlib.sha256()
@@ -56,7 +61,26 @@ def _safe_member(root: Path, rel: str) -> Path:
             f"manifest lists an unsafe path {rel!r}.",
             "the manifest must list only paths inside the bundle.",
         )
-    return root / rel
+    member = root / rel
+    try:
+        resolved_member = member.resolve(strict=False)
+        resolved_root = root.resolve(strict=False)
+    except OSError as exc:
+        raise InputError(
+            "input.bundle_manifest_path",
+            f"manifest path {rel!r} could not be resolved: {exc}.",
+            "the manifest must list only paths inside the bundle.",
+        ) from exc
+    if resolved_member != resolved_root and not resolved_member.is_relative_to(
+        resolved_root
+    ):
+        raise InputError(
+            "input.bundle_manifest_path",
+            f"manifest lists {rel!r}, which resolves outside the bundle root "
+            "(a symlink or junction escapes it).",
+            "the manifest must list only paths that stay inside the bundle after symlinks resolve.",
+        )
+    return member
 
 
 def load_bundle(bundle_dir: Path) -> Bundle:
@@ -100,6 +124,15 @@ def load_bundle(bundle_dir: Path) -> Bundle:
                 "input.bundle_manifest_mismatch",
                 f"manifest lists {rel!r}, which is missing from the bundle.",
                 "regenerate the bundle so its files match the manifest.",
+            )
+        size = member.stat().st_size
+        if size > DEFAULT_MAX_MANIFEST_FILE_BYTES:
+            raise InputError(
+                "input.bundle_manifest_file_too_large",
+                f"{rel!r} is {size} bytes, over the {DEFAULT_MAX_MANIFEST_FILE_BYTES}-byte "
+                "per-file limit.",
+                "split large evidence into more, smaller files, or reference bulk content by an "
+                "opaque locator instead of inlining it (SPEC R12).",
             )
         actual = _sha256_hex(member)
         if actual != _normalise_digest(str(entry["sha256"])):
