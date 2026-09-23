@@ -27,7 +27,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["uuid", "title", "findings"],
+            "required": ["uuid", "title"],
             "properties": {
               "uuid": {"type": "string"},
               "title": {"type": "string"},

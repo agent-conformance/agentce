@@ -20,6 +20,7 @@ the enumerations of Appendix F.
 | `oscal-component-definition.schema.json` | §2.1, §7.3 | The AgentCE profile of an OSCAL Component Definition. |
 | `oscal-component-definition.json` | §2.1, §7.3 | AgentCE as an OSCAL `validation` component: one implemented requirement per base-catalog control. Generated. |
 | `examples/` | — | A worked example per schema. |
+| `vendor/` | §9 | Third-party schemas AgentCE validates against but does not author (the real NIST OSCAL 1.1.2 assessment-results schema), each with a recorded source, retrieval date, and digest. |
 
 The applicability profile schema is published under `spec/model/generated/json-schema/` alongside the
 evidence schema. The manual evaluation record (a completed checklist) is validated by
@@ -45,5 +46,10 @@ cd spec/report && uv run python validate_oscal.py
 `validate_oscal.py` refuses a committed file that a fresh generation would not reproduce, so the
 document never drifts from the catalog. The obligation crosswalks to regulatory and standards clauses
 live beside the base catalog under `spec/catalogs/base/eu-ai-act/crosswalk/`.
+
+`oscal-assessment-results.schema.json` is a bounded local profile; each engine additionally validates
+its emitted `oscal-ar.json` against the real, vendored NIST OSCAL 1.1.2 schema (`vendor/`) -- in the
+Python engine, `agentce.report.validate_oscal_ar_nist`, reachable via `agentce report --validate` and
+guarded in CI by the `three-engine.yml` `validate-schemas` job.
 
 Nothing here opens a network connection or uses a learned component.

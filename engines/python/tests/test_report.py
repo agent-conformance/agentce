@@ -10,7 +10,13 @@ import pytest
 from agentce.assertions import Assertion, EvidencePointer
 from agentce.catalog import Catalog
 from agentce.errors import AgentceError
-from agentce.report import render_oscal, render_sarif, validate_report, write_report
+from agentce.report import (
+    render_oscal,
+    render_sarif,
+    validate_oscal_ar_nist,
+    validate_report,
+    write_report,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _BASE_CATALOG_DIR = _REPO_ROOT / "spec/catalogs/base/eu-ai-act"
@@ -120,6 +126,85 @@ def test_oscal_maps_outcomes() -> None:
     oscal = render_oscal([_assertion("conformant")])
     finding = oscal["assessment-results"]["results"][0]["findings"][0]
     assert finding["target"]["status"]["state"] == "satisfied"
+
+
+def test_oscal_finding_resolves_to_an_observation_with_its_evidence() -> None:
+    oscal = render_oscal([_assertion("conformant")])
+    result = oscal["assessment-results"]["results"][0]
+    finding = result["findings"][0]
+    obs_uuid = finding["related-observations"][0]["observation-uuid"]
+    observations = {o["uuid"]: o for o in result["observations"]}
+    assert obs_uuid in observations
+    evidence_hrefs = [e["href"] for e in observations[obs_uuid]["relevant-evidence"]]
+    assert _EVIDENCE.ref in evidence_hrefs
+
+
+def test_oscal_finding_without_evidence_still_resolves_to_an_observation() -> None:
+    bare = Assertion(
+        control="OVS-03",
+        control_version="2026.09",
+        subject="spiffe://corp/agents/a",
+        outcome="not_assessed",
+        rung=2,
+        mode="automated",
+        window=_WINDOW,
+        population=(3, 0),
+        evidence=[],
+    )
+    oscal = render_oscal([bare])
+    result = oscal["assessment-results"]["results"][0]
+    finding = result["findings"][0]
+    obs_uuid = finding["related-observations"][0]["observation-uuid"]
+    observations = {o["uuid"]: o for o in result["observations"]}
+    assert obs_uuid in observations
+    assert "relevant-evidence" not in observations[obs_uuid]
+
+
+def test_oscal_finding_links_to_its_real_control_id() -> None:
+    oscal = render_oscal([_assertion("conformant")])
+    finding = oscal["assessment-results"]["results"][0]["findings"][0]
+    assert any("OVS-03" in link["href"] for link in finding["links"]), (
+        "finding must trace back to a real control id, per SPEC §9"
+    )
+
+
+def test_oscal_ar_validates_against_the_real_nist_1_1_2_schema() -> None:
+    oscal = render_oscal([_assertion("conformant"), _assertion("non-conformant")])
+    assert validate_oscal_ar_nist(oscal) == []
+
+
+def test_oscal_ar_validates_with_no_assertions() -> None:
+    assert validate_oscal_ar_nist(render_oscal([])) == []
+
+
+def test_todays_bare_pre_fix_shape_fails_the_real_nist_schema() -> None:
+    """Proves the check discriminates: the pre-fix shape (target-id + status + title + uuid, no
+    observations, no import-ap, no reviewed-controls) is what `render_oscal` emitted at the base
+    commit, and it must fail real NIST validation -- that failure is exactly finding #23."""
+    pre_fix_shape = {
+        "assessment-results": {
+            "uuid": "12345678-1234-5678-89ab-1234567890ab",
+            "metadata": {"title": "x", "version": "0.1.0", "oscal-version": "1.1.2"},
+            "results": [
+                {
+                    "uuid": "11111111-1234-5678-89ab-1234567890ab",
+                    "title": "t",
+                    "findings": [
+                        {
+                            "uuid": "44444444-1234-5678-89ab-1234567890ab",
+                            "title": "OVS-03 for x",
+                            "target": {
+                                "type": "objective-id",
+                                "target-id": "OVS-03",
+                                "status": {"state": "satisfied"},
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+    }
+    assert validate_oscal_ar_nist(pre_fix_shape) != []
 
 
 def test_supersedes_recorded_in_manifest(tmp_path: Path) -> None:

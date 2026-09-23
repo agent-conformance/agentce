@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import jsonschema
+import regex
 
 from . import ENGINE_NAME, SPEC_VERSION, __version__, canonical, messages, verdict
 from .assertions import Assertion, aggregate, check_dc5
@@ -346,11 +347,55 @@ def render_report_html(
     )
 
 
+def _oscal_timestamp(assertions: list[Assertion]) -> str:
+    """A deterministic OSCAL date-time for this run: the earliest evidence-window start across the
+    assertions, so it reflects what was actually reviewed rather than the run's wall clock (the
+    byte-identical canonical set must stay clock-independent). A run with no assertions falls back to
+    a fixed epoch, never `now()`."""
+    if not assertions:
+        return "1970-01-01T00:00:00Z"
+    return min(a.window[0] for a in assertions)
+
+
 def render_oscal(assertions: list[Assertion]) -> dict[str, Any]:
-    findings = [
-        {
+    """Render ``oscal-ar.json`` as an importable NIST OSCAL 1.1.2 Assessment Results document (SPEC
+    §9, §9.4): every result carries real ``observations[]`` built from the assertion's own evidence
+    pointers, every finding resolves to the observation that backs it and links to its real control id
+    so a GRC platform can trace the finding to the requirement it assesses. No catalog object is
+    needed here -- the control id alone is the traceable token (SPEC §7.3's control ids are globally
+    unique) -- so this keeps its existing ``(assertions)`` signature."""
+    ordered = sorted(assertions, key=lambda x: (x.subject, x.control))
+    when = _oscal_timestamp(assertions)
+
+    observation_uuid: dict[tuple[str, str], str] = {}
+    observations: list[dict[str, Any]] = []
+    for a in ordered:
+        # An observation backs every finding, evidence-bearing or not, so every finding resolves to
+        # one (SPEC §9); only an evidence-bearing assertion's observation carries `relevant-evidence`.
+        obs_uuid = _uuid("observation", a.control, a.subject)
+        observation_uuid[(a.control, a.subject)] = obs_uuid
+        observation: dict[str, Any] = {
+            "uuid": obs_uuid,
+            "description": f"Assessment activity for {a.control} on {a.subject}.",
+            "methods": ["TEST"],
+            "collected": when,
+        }
+        if a.evidence:
+            observation["relevant-evidence"] = [
+                {
+                    "href": e.ref,
+                    "description": f"{e.source_class} evidence, digest {e.digest}",
+                }
+                for e in a.evidence
+            ]
+        observations.append(observation)
+
+    findings: list[dict[str, Any]] = []
+    for a in ordered:
+        finding: dict[str, Any] = {
             "uuid": _uuid("finding", a.control, a.subject),
             "title": f"{a.control} for {a.subject}",
+            "description": f"{a.control} assessed for {a.subject}: {a.outcome}.",
             "target": {
                 "type": "objective-id",
                 "target-id": a.control,
@@ -359,9 +404,28 @@ def render_oscal(assertions: list[Assertion]) -> dict[str, Any]:
                     "reason": a.outcome,
                 },
             },
+            "links": [{"href": f"urn:agentce:control:{a.control}", "rel": "control"}],
+            "related-observations": [
+                {"observation-uuid": observation_uuid[(a.control, a.subject)]}
+            ],
         }
-        for a in sorted(assertions, key=lambda x: (x.subject, x.control))
-    ]
+        findings.append(finding)
+
+    result: dict[str, Any] = {
+        "uuid": _uuid("result"),
+        "title": "AgentCE structural assessment",
+        "description": (
+            "AgentCE's structural, statistical, and probe-based assessment of the run's "
+            "subjects against the resolved catalog(s)."
+        ),
+        "start": when,
+        "reviewed-controls": {"control-selections": [{"include-all": {}}]},
+    }
+    if observations:
+        result["observations"] = observations
+    if findings:
+        result["findings"] = findings
+
     return {
         "assessment-results": {
             "uuid": _uuid("assessment-results"),
@@ -369,14 +433,10 @@ def render_oscal(assertions: list[Assertion]) -> dict[str, Any]:
                 "title": "AgentCE Assessment Results",
                 "version": __version__,
                 "oscal-version": "1.1.2",
+                "last-modified": when,
             },
-            "results": [
-                {
-                    "uuid": _uuid("result"),
-                    "title": "AgentCE structural assessment",
-                    "findings": findings,
-                }
-            ],
+            "import-ap": {"href": "urn:agentce:assessment-plan:structural"},
+            "results": [result],
         }
     }
 
@@ -718,6 +778,65 @@ def _load_schema(name: str) -> dict[str, Any]:
     return parsed
 
 
+def _pattern_with_regex_module(
+    validator: Any, patrn: str, instance: Any, schema: dict[str, Any]
+) -> Any:
+    """`jsonschema`'s built-in ``pattern`` keyword compiles with the standard-library ``re`` module,
+    which cannot compile a Unicode property escape (``\\p{L}``); the vendored NIST OSCAL schema's
+    ``TokenDatatype`` uses one. This overrides the keyword to match with the third-party ``regex``
+    module instead, which supports it, so the vendored schema is validated unmodified."""
+    if validator.is_type(instance, "string") and not regex.search(patrn, instance):
+        yield jsonschema.exceptions.ValidationError(
+            f"{instance!r} does not match {patrn!r}"
+        )
+
+
+def _pattern_properties_with_regex_module(
+    validator: Any,
+    pattern_properties: dict[str, Any],
+    instance: Any,
+    schema: dict[str, Any],
+) -> Any:
+    if not validator.is_type(instance, "object"):
+        return
+    for pattern, subschema in pattern_properties.items():
+        for key, value in instance.items():
+            if regex.search(pattern, key):
+                yield from validator.descend(
+                    value, subschema, path=key, schema_path=pattern
+                )
+
+
+#: A draft-07 validator identical to `jsonschema`'s, except that ``pattern``/``patternProperties``
+#: match with the ``regex`` module so it can validate the vendored NIST OSCAL 1.1.2 schema's
+#: `TokenDatatype` (SPEC §9, §7.3; see ``spec/report/vendor/README.md``). Schema-checking (which would
+#: itself try to compile that pattern with stdlib `re`) is deliberately skipped by never calling
+#: `check_schema` -- only the pinned, already-vendored schema is ever passed to it.
+_OscalArValidator = jsonschema.validators.extend(
+    jsonschema.Draft7Validator,
+    {
+        "pattern": _pattern_with_regex_module,
+        "patternProperties": _pattern_properties_with_regex_module,
+    },
+)
+
+
+def validate_oscal_ar_nist(document: dict[str, Any]) -> list[str]:
+    """Validate ``document`` against the vendored NIST OSCAL 1.1.2 assessment-results schema
+    (SPEC §9: "validate offline against vendored schemas"); return a list of problems, empty on
+    success."""
+    schema = _load_schema("oscal-assessment-results-nist-1.1.2")
+    errors = sorted(
+        _OscalArValidator(schema).iter_errors(document),
+        key=lambda e: list(e.absolute_path),
+    )
+    problems = []
+    for error in errors:
+        location = "/".join(str(p) for p in error.absolute_path) or "<root>"
+        problems.append(f"{location}: {error.message}")
+    return problems
+
+
 def validate_report(out_dir: Path) -> list[str]:
     """Validate every emitted artifact against its vendored schema; return a list of problems."""
     problems: list[str] = []
@@ -733,6 +852,12 @@ def validate_report(out_dir: Path) -> list[str]:
             problems.append(f"{filename}: invalid JSON ({exc.msg})")
         except jsonschema.ValidationError as exc:
             problems.append(f"{filename}: {exc.message}")
+            continue
+        if filename == "oscal-ar.json":
+            problems += [
+                f"oscal-ar.json (NIST OSCAL 1.1.2): {p}"
+                for p in validate_oscal_ar_nist(instance)
+            ]
     for filename in ("report.md", "report.html"):
         path = out_dir / filename
         if not path.is_file() or not path.read_text(encoding="utf-8").strip():

@@ -55,6 +55,30 @@ def test_vendored_tree_matches_its_original(
     assert not drifted, f"vendored bytes drifted from {authoritative}: {drifted[:5]}"
 
 
+#: The upstream release this file is vendored from (`spec/report/vendor/README.md`); catches drift in
+#: either copy at once, even if both changed together.
+_OSCAL_AR_NIST_SHA256 = (
+    "d033da70154cf6625ae46a746199e88e58f2928b1387dfac051d381b92f41b0d"
+)
+
+
+def test_vendored_nist_oscal_ar_schema_matches_its_source_and_pin() -> None:
+    import hashlib
+
+    name = "oscal-assessment-results-nist-1.1.2.schema.json"
+    vendored = bundled.catalogs_dir().parent / "schemas" / name
+    authoritative = _REPO_ROOT / "spec" / "report" / "vendor" / name
+    vendored_bytes = vendored.read_bytes()
+    assert vendored_bytes == authoritative.read_bytes(), (
+        f"{vendored} drifted from {authoritative}; re-sync with "
+        f"`cp {authoritative} {vendored}`"
+    )
+    assert hashlib.sha256(vendored_bytes).hexdigest() == _OSCAL_AR_NIST_SHA256, (
+        "vendored NIST OSCAL schema no longer matches its recorded digest "
+        "(spec/report/vendor/README.md) -- update the pin only after re-vendoring deliberately"
+    )
+
+
 def test_bundled_data_resolves_through_the_package_not_the_checkout() -> None:
     assert (bundled.catalogs_dir() / "base" / "eu-ai-act" / "catalog.yaml").is_file()
     assert (bundled.quickstart_dir() / "applicability.yaml").is_file()
