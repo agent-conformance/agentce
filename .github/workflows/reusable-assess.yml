@@ -64,25 +64,25 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run agentce assess
+        env:
+          # Bound to env vars, never interpolated directly into the script (same rule as the
+          # composite action): a value with shell metacharacters must not reach the runner's shell.
+          AGENTCE_BUNDLE: ${{ inputs.bundle }}
+          AGENTCE_PROFILE: ${{ inputs.profile }}
+          AGENTCE_DOMAIN: ${{ inputs.domain }}
+          AGENTCE_CATALOG: ${{ inputs.catalog }}
+          AGENTCE_FAIL_ON: ${{ inputs.fail-on }}
+          AGENTCE_OUT: ${{ inputs.out }}
         run: |
           set -e
-          catalog_flag=""
-          if [ -n "${{ inputs.catalog }}" ]; then
-            catalog_flag="--catalog ${{ inputs.catalog }}"
-          fi
-          fail_on_flag=""
-          if [ -n "${{ inputs.fail-on }}" ]; then
-            fail_on_flag="--fail-on ${{ inputs.fail-on }}"
-          fi
-          uv run --project .agentce-engine/engines/python --frozen agentce assess \
-            --bundle "${{ inputs.bundle }}" \
-            --profile "${{ inputs.profile }}" \
-            --domain "${{ inputs.domain }}" \
-            $catalog_flag \
-            $fail_on_flag \
-            --out "${{ inputs.out }}"
+          set -- --bundle "$AGENTCE_BUNDLE" --profile "$AGENTCE_PROFILE" --domain "$AGENTCE_DOMAIN" --out "$AGENTCE_OUT"
+          if [ -n "$AGENTCE_CATALOG" ]; then set -- "$@" --catalog "$AGENTCE_CATALOG"; fi
+          if [ -n "$AGENTCE_FAIL_ON" ]; then set -- "$@" --fail-on "$AGENTCE_FAIL_ON"; fi
+          uv run --project .agentce-engine/engines/python --frozen agentce assess "$@"
 
       - name: Upload results.sarif to code scanning
+        # Runs even when the step above exits non-zero (the gate firing on a real finding).
+        if: always()
         uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
         with:
           sarif_file: ${{ inputs.out }}/results.sarif
