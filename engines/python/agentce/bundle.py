@@ -115,6 +115,12 @@ def load_bundle(bundle_dir: Path) -> Bundle:
             f"manifest.json is not valid JSON: {exc}.",
             "regenerate the bundle so its manifest.json is well-formed.",
         ) from exc
+    except RecursionError as exc:
+        raise InputError(
+            "input.bundle_manifest_invalid",
+            "manifest.json is nested too deeply to parse safely.",
+            "flatten manifest.json's structure; it exceeds the engine's safe nesting depth.",
+        ) from exc
 
     files = manifest.get("files")
     if not isinstance(files, list) or not files:

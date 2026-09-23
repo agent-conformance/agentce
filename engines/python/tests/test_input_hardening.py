@@ -321,3 +321,41 @@ def test_confine_to_root_handles_symlink_loop_without_raising(tmp_path: Path) ->
 
 def test_confine_to_root_handles_embedded_nul_without_raising(tmp_path: Path) -> None:
     assert confine_to_root(tmp_path, "evil\x00name") is None
+
+
+# --- Structural-depth hazard in JSON parsed elsewhere in the bundle-adjacent path: the primary
+# --- manifest itself, and an in-root coverage-denominator manifest file.
+
+
+def test_manifest_json_with_pathologically_deep_json_is_refused(tmp_path: Path) -> None:
+    root = tmp_path / "bundle"
+    root.mkdir()
+    depth = 20000
+    (root / "manifest.json").write_text(
+        "[" * depth + "1" + "]" * depth, encoding="utf-8"
+    )
+
+    with pytest.raises(InputError) as excinfo:
+        load_bundle(root)
+    assert excinfo.value.key == "input.bundle_manifest_invalid"
+
+
+def test_coverage_denominator_manifest_with_deep_json_is_refused(
+    tmp_path: Path,
+) -> None:
+    bundle_root = tmp_path / "bundle"
+    (bundle_root / "reference").mkdir(parents=True)
+    depth = 20000
+    (bundle_root / "reference" / "counts.json").write_text(
+        "[" * depth + "1" + "]" * depth, encoding="utf-8"
+    )
+
+    denominator = CoverageDenominator(
+        kind="registry",
+        source="urn:src:egress",
+        covers=["ToolCall"],
+        manifest="reference/counts.json",
+    )
+    with pytest.raises(InputError) as excinfo:
+        _denominator_counts(denominator, {}, bundle_root)
+    assert excinfo.value.key == "input.coverage_denominator_manifest_invalid"

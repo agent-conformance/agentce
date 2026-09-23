@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from .bundle import confine_to_root, safe_is_file
+from .errors import InputError
 from .profile import CoverageDenominator, Profile
 
 STATUS_COVERED = "covered"
@@ -50,7 +51,16 @@ def _denominator_counts(
     if denominator.manifest and bundle_root is not None:
         path = confine_to_root(bundle_root, denominator.manifest)
         if path is not None and safe_is_file(path):
-            data = json.loads(path.read_text(encoding="utf-8"))
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except RecursionError as exc:
+                raise InputError(
+                    "input.coverage_denominator_manifest_invalid",
+                    f"the coverage denominator manifest at {str(path)!r} is nested too deeply "
+                    "to parse safely.",
+                    "flatten the denominator manifest's structure; it exceeds the engine's safe "
+                    "nesting depth.",
+                ) from exc
             declared = data.get("counts") or data.get("expected") or {}
             if isinstance(declared, dict):
                 return {str(k): int(v) for k, v in declared.items()}
