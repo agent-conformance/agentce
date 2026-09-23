@@ -1,0 +1,57 @@
+# Remediation prompt
+
+Subject: `{{subject}}`
+Generated from assertions digest: `{{generated_from.assertions_digest}}`
+
+Regenerate this file after every re-run: it names the assertions digest above, and a re-run produces
+a new one. Do not act on a copy that does not match the assertions.json you are looking at.
+
+{{^findings}}
+No non-passing findings for this subject.
+{{/findings}}
+{{#findings}}
+## {{control}} — {{title}}
+
+- Outcome: {{outcome}} (severity: {{severity}}, rung {{rung}}, mode {{mode}})
+- Window: {{window.start}} .. {{window.end}}
+{{#clauses}}
+- Clause: `{{framework}} {{clause}}` ({{relation}}){{#verified_against_text}} — verified against the standard text{{/verified_against_text}}{{^verified_against_text}} — unverified against the standard text{{/verified_against_text}}
+{{/clauses}}
+{{#expectations}}
+- Expected: {{text}}
+{{/expectations}}
+
+### Evidence
+- Required: {{#evidence_gap.required}}`{{event}}`/{{class}} {{/evidence_gap.required}}
+- Observed: {{#evidence_gap.observed}}`{{event}}`/{{class}} {{/evidence_gap.observed}}
+- Missing: {{#evidence_gap.missing}}`{{event}}`/{{class}} {{/evidence_gap.missing}}
+{{#violations}}
+- Violation: {{constraint}} at `{{path}}` ({{message_key}})
+{{/violations}}
+{{#evidence}}
+- Evidence cited: `{{ref}}` ({{digest}})
+{{/evidence}}
+
+### How to fix
+{{#remediation.techniques}}
+- Technique (`{{style}}`): `{{ref}}`
+{{/remediation.techniques}}
+
+### Acceptance
+- Expected transition: {{acceptance.expected_transition.from}} to {{acceptance.expected_transition.to}}
+- Criteria: {{acceptance.criteria}}
+- Re-verify command: `{{#acceptance.reverify_command}}{{.}} {{/acceptance.reverify_command}}`
+
+### Guardrails ({{guardrails_ref}})
+Do not mark this finding resolved without re-running the re-verify command above and seeing it
+change outcome. Cite the clause above exactly as written, together with its verification status --
+never state or imply a clause is verified against the standard text unless it says so. Make the
+minimal change that satisfies the expectation text above; never fabricate or edit evidence.
+
+{{/findings}}
+{{#not_assessed}}
+- Not assessed: {{control}} — {{title}} (severity: {{severity}}) — {{reason}}
+{{/not_assessed}}
+{{#deviations_applied}}
+- Deviation applied: {{.}}
+{{/deviations_applied}}
