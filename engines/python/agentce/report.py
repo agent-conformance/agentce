@@ -1198,6 +1198,96 @@ def render_remediation_md(package: dict[str, Any]) -> str:
     )
 
 
+def _tool_names_for_subject(subject_events: list[dict[str, Any]]) -> list[str]:
+    """Every distinct tool name this subject's own events name (SPEC §7 injection hardening: tool
+    names are one of the named evidence-derived-string categories, alongside subject ids and paths),
+    escaped and length-capped with the same :func:`_md_escape` the subject id and evidence refs
+    already use, so a hostile or oversized tool name can neither hide instruction sentences nor blow
+    up a rendered note. Scans every event this subject carries, not only those a specific finding
+    cites as evidence -- a control can be `insufficient_evidence` (no evidence pointer at all) while
+    the subject's raw events still show real tool activity worth surfacing as context. Deduplicated,
+    in first-seen order."""
+    names: list[str] = []
+    seen: set[str] = set()
+    for event in subject_events:
+        data = event.get("data")
+        if not isinstance(data, dict) or data.get("@type") != "ToolCall":
+            continue
+        tool = data.get("tool")
+        name = tool.get("name") if isinstance(tool, dict) else None
+        if not name:
+            continue
+        escaped = _md_escape(str(name))
+        if escaped not in seen:
+            seen.add(escaped)
+            names.append(escaped)
+    return names
+
+
+def _skill_finding_context(
+    finding: dict[str, Any], tool_calls: list[str]
+) -> dict[str, Any]:
+    """A render-only view of one remediation-package finding for its ``findings/<control>--<n>.md``
+    note: the same escaping :func:`_remediation_md_context` applies per finding, plus the subject's
+    already-escaped tool names (SPEC §7). The canonical package itself is never mutated."""
+    ctx = dict(finding)
+    ctx["evidence"] = [
+        {**e, "ref": _md_escape(str(e.get("ref", "")))}
+        for e in finding.get("evidence", [])
+    ]
+    ctx["violations"] = [
+        {**v, "path": _md_escape(str(v.get("path", "")))}
+        for v in finding.get("violations", [])
+    ]
+    ctx["tool_calls"] = list(tool_calls)
+    return ctx
+
+
+def render_skill_finding_md(finding: dict[str, Any], tool_calls: list[str]) -> str:
+    """Render one ``findings/<control>--<n>.md`` note (Appendix A2 (C)) from a single remediation
+    finding, by the language-neutral template ``spec/report/templates/skill-finding.md.tmpl``.
+    ``tool_calls`` is this finding's subject's escaped tool names (:func:`_tool_names_for_subject`)."""
+    return templating.render(
+        bundled.skill_finding_template(), _skill_finding_context(finding, tool_calls)
+    )
+
+
+def render_skill_md(
+    *,
+    spec_version: str,
+    cli_version: str,
+    catalog_version: str,
+    assertions_digest: str,
+) -> str:
+    """Render the generated skill's ``SKILL.md`` (SPEC §13.3, skill rules S-1..S-10; Appendix A2
+    (C)): fixed instructions from the one language-neutral template
+    ``spec/report/templates/skill.md.tmpl`` plus this run's pinned versions and assertions digest --
+    never per-run authored prose, so an instruction sentence can never be assembled from evidence."""
+    return templating.render(
+        bundled.skill_template(),
+        {
+            "spec_version": spec_version,
+            "cli_version": cli_version,
+            "catalog_version": catalog_version,
+            "assertions_digest": assertions_digest,
+        },
+    )
+
+
+def render_reverify_md(argv: list[str]) -> str:
+    """Render ``REVERIFY.md`` (SPEC §7): the exact, real re-verify command for this run, from the
+    language-neutral template ``spec/report/templates/skill-reverify.md.tmpl``. ``argv`` is the full
+    command line including the program name, e.g. ``["agentce", "assess", "--bundle", ...]``."""
+    return templating.render(bundled.skill_reverify_template(), {"argv": list(argv)})
+
+
+def _skill_finding_filename(control: str, index: int) -> str:
+    """``findings/<control>--<n>.md``'s filename: ``_safe`` keeps a hostile or unusual control id
+    (never expected in practice -- control ids are catalog-defined -- but never trusted regardless)
+    from escaping the ``findings/`` directory or colliding with another file."""
+    return f"{_safe(control)}--{index}.md"
+
+
 def build_manifest(
     *,
     bundle_digest: str,
@@ -1292,8 +1382,8 @@ def _build_claim(
 
 
 #: Every token `assess --emit` and `write_report`'s `emit` accept. The first six are the formats
-#: `report --format` has always rendered one at a time; the rest are new (SPEC §9). `remediation`
-#: is assess-only (Appendix A2 (C)): it is never added to `commands.REPORT_FORMATS`.
+#: `report --format` has always rendered one at a time; the rest are new (SPEC §9). `remediation` and
+#: `skill` are assess-only (Appendix A2 (C)): neither is ever added to `commands.REPORT_FORMATS`.
 EMIT_FORMATS = (
     "md",
     "html",
@@ -1306,6 +1396,7 @@ EMIT_FORMATS = (
     "oscal_xml",
     "pdf",
     "remediation",
+    "skill",
 )
 #: What an `emit`-less `write_report` call renders (the engine's original fixed bundle, predating
 #: `--emit`): every non-regression test pins this set exactly.
@@ -1476,6 +1567,52 @@ def write_report(
             md_bytes = md.encode("utf-8")
             (out_dir / rel_dir / "remediation.md").write_bytes(md_bytes)
             outputs[f"{rel_dir}/remediation.md"] = _digest_bytes(md_bytes)
+
+    if wants("skill"):
+        events_by_subject = index_by_subject(events or [])
+        assertions_digest = outputs["assertions.json"]
+        argv = list(reverify_command) if reverify_command else list(invocation or [])
+        catalog_version = ", ".join(f"{c.id}@{c.version}" for c in catalogs)
+        subjects = sorted({a.subject for a in assertions})
+        for subject in subjects:
+            subject_events = events_by_subject.get(subject, [])
+            tool_calls = _tool_names_for_subject(subject_events)
+            package = render_remediation_package(
+                subject,
+                [a for a in assertions if a.subject == subject],
+                catalogs=catalogs,
+                assertions_digest=assertions_digest,
+                subject_events=subject_events,
+                reverify_command=argv,
+            )
+            rel_dir = f"skill/{_safe(subject)}"
+            skill_dir = out_dir / rel_dir
+            (skill_dir / "findings").mkdir(parents=True, exist_ok=True)
+
+            pkg_bytes = canonical.canonicalize(package)
+            (skill_dir / "remediation-package.json").write_bytes(pkg_bytes)
+            outputs[f"{rel_dir}/remediation-package.json"] = _digest_bytes(pkg_bytes)
+
+            skill_md_bytes = render_skill_md(
+                spec_version=SPEC_VERSION,
+                cli_version=__version__,
+                catalog_version=catalog_version,
+                assertions_digest=assertions_digest,
+            ).encode("utf-8")
+            (skill_dir / "SKILL.md").write_bytes(skill_md_bytes)
+            outputs[f"{rel_dir}/SKILL.md"] = _digest_bytes(skill_md_bytes)
+
+            for i, finding in enumerate(package["findings"], start=1):
+                note_bytes = render_skill_finding_md(finding, tool_calls).encode(
+                    "utf-8"
+                )
+                name = _skill_finding_filename(str(finding["control"]), i)
+                (skill_dir / "findings" / name).write_bytes(note_bytes)
+                outputs[f"{rel_dir}/findings/{name}"] = _digest_bytes(note_bytes)
+
+            reverify_bytes = render_reverify_md(["agentce", *argv]).encode("utf-8")
+            (skill_dir / "REVERIFY.md").write_bytes(reverify_bytes)
+            outputs[f"{rel_dir}/REVERIFY.md"] = _digest_bytes(reverify_bytes)
 
     if assertions:
         # claim.json is unsigned here (SPEC §9.1: the engine never signs its own claim); it exists

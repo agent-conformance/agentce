@@ -42,3 +42,18 @@ def templates_dir() -> Path:
 def remediation_template() -> str:
     """The language-neutral Mustache-style template ``remediation.md`` is rendered from."""
     return (templates_dir() / "remediation.md.tmpl").read_text(encoding="utf-8")
+
+
+def skill_template() -> str:
+    """The language-neutral template the generated skill's ``SKILL.md`` is rendered from."""
+    return (templates_dir() / "skill.md.tmpl").read_text(encoding="utf-8")
+
+
+def skill_finding_template() -> str:
+    """The language-neutral template each ``findings/<control>--<n>.md`` note is rendered from."""
+    return (templates_dir() / "skill-finding.md.tmpl").read_text(encoding="utf-8")
+
+
+def skill_reverify_template() -> str:
+    """The language-neutral template the generated skill's ``REVERIFY.md`` is rendered from."""
+    return (templates_dir() / "skill-reverify.md.tmpl").read_text(encoding="utf-8")
