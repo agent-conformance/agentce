@@ -7,8 +7,8 @@
  */
 
 import { createHash } from "node:crypto";
-import { readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, realpathSync, statSync } from "node:fs";
+import { isAbsolute, join, relative, sep } from "node:path";
 import { sha256Hex } from "./canonical";
 import { InputError } from "./errors";
 import { parseJson } from "./json";
@@ -34,7 +34,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isFile(path: string): boolean {
+/**
+ * `statSync(path).isFile()`, but an OS-level hazard a confined path can still hit at access time (a
+ * symlink loop, a name too long for the filesystem) is treated as "not present", never left to
+ * propagate as an unexpected error.
+ */
+export function safeIsFile(path: string): boolean {
   try {
     return statSync(path).isFile();
   } catch {
@@ -42,20 +47,56 @@ function isFile(path: string): boolean {
   }
 }
 
+/**
+ * Resolve `rel` against `root`; return the path only if it stays inside `root` after symlinks
+ * resolve, else `null`. Every bundle-adjacent reference an adversarial evidence bundle can carry --
+ * the primary manifest's own file list, a coverage denominator's manifest, an integrity block's
+ * `sig_ref` -- is confined through this one function, so a symlink escape, a literal `..`/absolute
+ * path, a symlink loop, an embedded NUL byte, or a path segment too long for the filesystem are
+ * refused the same deliberate way everywhere, never left to surface as an unexpected error.
+ */
+export function confineToRoot(root: string, rel: string): string | null {
+  if (!rel || rel.startsWith("/") || rel.split("/").includes("..")) {
+    return null;
+  }
+  const candidate = join(root, rel);
+  let resolvedRoot: string;
+  try {
+    resolvedRoot = realpathSync(root);
+  } catch {
+    return null;
+  }
+  let resolved: string;
+  try {
+    resolved = realpathSync(candidate);
+  } catch (exc) {
+    // A path that simply is not there is not a confinement failure: the caller's own
+    // "missing from the bundle" check reports that with its own message key. Any other
+    // hazard (symlink loop, name too long, an embedded NUL) fails closed.
+    return (exc as NodeJS.ErrnoException | null)?.code === "ENOENT" ? candidate : null;
+  }
+  const inside = relative(resolvedRoot, resolved);
+  if (inside !== "" && (inside === ".." || inside.startsWith(`..${sep}`) || isAbsolute(inside))) {
+    return null;
+  }
+  return candidate;
+}
+
 function safeMember(root: string, rel: string): string {
-  if (rel.startsWith("/") || rel.split("/").includes("..")) {
+  const member = confineToRoot(root, rel);
+  if (member === null) {
     throw new InputError(
       "input.bundle_manifest_path",
       `manifest lists an unsafe path ${JSON.stringify(rel)}.`,
       "the manifest must list only paths inside the bundle.",
     );
   }
-  return join(root, rel);
+  return member;
 }
 
 export function loadBundle(bundleDir: string): Bundle {
   const manifestPath = join(bundleDir, "manifest.json");
-  if (!isFile(manifestPath)) {
+  if (!safeIsFile(manifestPath)) {
     throw new InputError(
       "input.bundle_manifest_missing",
       `the bundle at ${JSON.stringify(bundleDir)} has no manifest.json.`,
@@ -97,7 +138,7 @@ export function loadBundle(bundleDir: string): Bundle {
     }
     const rel = String(entry.path);
     const member = safeMember(bundleDir, rel);
-    if (!isFile(member)) {
+    if (!safeIsFile(member)) {
       throw new InputError(
         "input.bundle_manifest_mismatch",
         `manifest lists ${JSON.stringify(rel)}, which is missing from the bundle.`,
