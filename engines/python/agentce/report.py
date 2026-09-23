@@ -418,6 +418,7 @@ def build_manifest(
     invocation: list[str],
     supersedes: list[str],
     report_language: str = messages.DEFAULT_LANGUAGE,
+    limitations: list[str] | None = None,
 ) -> dict[str, Any]:
     package_digest = _package_digest()
     host = hashlib.sha256(
@@ -444,6 +445,11 @@ def build_manifest(
     }
     if supersedes:
         manifest["supersedes"] = supersedes
+    if limitations:
+        # What the run could not verify but was told to use anyway (SPEC §8.7
+        # ``--allow-unverified-catalog``): recorded here so a reader of the report knows, and absent
+        # from an ordinary run's manifest.
+        manifest["limitations"] = limitations
     return manifest
 
 
@@ -465,6 +471,7 @@ def _build_claim(
     *,
     catalogs: list[Catalog],
     operator: str,
+    limitations: list[str] | None = None,
 ) -> dict[str, Any]:
     """The conformance claim body (SPEC §9.1, ``claim.schema.json``): the scoped, content-addressed
     statement of what was assessed, against what catalogs, that ``agentce sign`` attaches a claimant
@@ -486,6 +493,10 @@ def _build_claim(
         "claimant": {"org": operator},
         "statement": _CLAIM_STATEMENT,
     }
+    if limitations:
+        # ``limitations`` is optional in claim.schema.json, so an ordinary claim omits it; a claim
+        # produced over an unverified catalog carries what the claimant is signing over (SPEC §8.7).
+        body["limitations"] = limitations
     claim_id = "sha256:" + hashlib.sha256(canonical.canonicalize(body)).hexdigest()
     return {"claim_id": claim_id, **body}
 
@@ -500,8 +511,12 @@ def write_report(
     invocation: list[str] | None = None,
     supersedes: list[str] | None = None,
     report_language: str = messages.DEFAULT_LANGUAGE,
+    limitations: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Write every report artifact for ``assertions`` and return the reproducibility manifest."""
+    """Write every report artifact for ``assertions`` and return the reproducibility manifest.
+
+    ``limitations`` names what the run was told to use without being able to verify it (SPEC §8.7);
+    the manifest and the claim both carry it, and both omit it on an ordinary run."""
     check_dc5(
         assertions
     )  # DC-5: refuse a supporting verdict without an evidence pointer
@@ -559,7 +574,9 @@ def write_report(
     if assertions:
         # claim.json is unsigned here (SPEC §9.1: the engine never signs its own claim); it exists
         # so the already-built `agentce sign --as claimant|assessor` can reach and sign a real run.
-        claim = _build_claim(assertions, catalogs=catalogs, operator=operator)
+        claim = _build_claim(
+            assertions, catalogs=catalogs, operator=operator, limitations=limitations
+        )
         (out_dir / "claim.json").write_text(
             json.dumps(claim, sort_keys=True, indent=2) + "\n", encoding="utf-8"
         )
@@ -572,6 +589,7 @@ def write_report(
         invocation=invocation or [],
         supersedes=supersedes or [],
         report_language=report_language,
+        limitations=limitations,
     )
     (out_dir / "manifest.json").write_text(
         json.dumps(manifest, sort_keys=True, indent=2), encoding="utf-8"

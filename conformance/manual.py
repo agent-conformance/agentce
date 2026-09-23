@@ -7,7 +7,8 @@ refuses a deviation on an ``insufficient_evidence`` outcome and on the INT famil
 faults are detected (recall 1.0); and a CND-conformant project is conformant on every CND control.
 
 The CND corpus is built here as self-contained assess bundles and evaluated with the base catalog plus
-the Conduct overlay (``--catalog-dir`` loads both), so it never perturbs the two-engine ECS corpus.
+the Conduct overlay (``--catalog eu-ai-act@2026.09,conduct@2026.09`` resolves both from the catalogs
+the engine ships), so it never perturbs the two-engine ECS corpus.
 """
 
 from __future__ import annotations
@@ -36,7 +37,6 @@ from agentce.readiness import (  # noqa: E402
 from corpus.assess_one import assess_project  # type: ignore[import-not-found]  # noqa: E402
 
 _BASE = _REPO / "spec" / "catalogs" / "base" / "eu-ai-act"
-_CONDUCT = _REPO / "spec" / "catalogs" / "overlays" / "conduct"
 _SUBJECT = "spiffe://corp/agents/a"
 _AGENT = {"id": _SUBJECT}
 _WINDOW = {"start": "2026-01-01T00:00:00Z", "end": "2026-06-01T00:00:00Z"}
@@ -193,10 +193,6 @@ def _assess_cnd(variant: str) -> dict[str, str]:
                 str(project / "domain.linkml.yaml"),
                 "--catalog",
                 "eu-ai-act@2026.09,conduct@2026.09",
-                "--catalog-dir",
-                str(_BASE),
-                "--catalog-dir",
-                str(_CONDUCT),
                 "--out",
                 str(out),
             ],

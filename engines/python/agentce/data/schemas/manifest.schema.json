@@ -69,6 +69,7 @@
       }
     },
     "supersedes": {"type": "array", "items": {"$ref": "#/$defs/digest"}},
+    "limitations": {"type": "array", "items": {"type": "string"}, "description": "What the run was told to use without being able to verify it, one string each (SPEC 8.7 --allow-unverified-catalog); absent when there was none."},
     "signature_ref": {"type": "string"}
   },
   "$defs": {

@@ -10,12 +10,15 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `environment.python_unsupported` | the running Python is older than the interpreter the engine supports. | run the engine under Python 3.12 or newer (`uv python install 3.12`). |
 | `input.bundle_manifest_mismatch` | a stream file's digest does not match the manifest. | regenerate the manifest after any change to the stream files. |
 | `input.bundle_manifest_missing` | the evidence bundle has no manifest.json. | an agent writes a bundle by running with the agentce_emit emitter on: set `AGENTCE_EMIT=1 AGENTCE_EMIT_OUT=<dir>` and see docs/integrate.md; to watch one built, run `examples/custom-loop/run.sh <dir>` from a checkout, then `agentce validate --bundle <dir>`. |
+| `input.catalog_mismatch` | a --catalog-dir carries an id@version the --catalog request did not name. | pass --catalog-dir for the catalog you named, or name the id@version the directory carries. |
 | `input.catalog_missing` | assess was given no catalog to evaluate and the profile declares none. | pass --catalog <id@version>, or list the catalogs to apply under `catalogs:` in the profile. |
 | `input.catalog_not_found` | no base catalog was found under the expected path. | run from the repository root or pass --catalog-dir to a catalog directory. |
 | `input.catalog_unresolved` | a requested catalog id@version does not resolve to any catalog directory. | use an available <id>@<version>, or pass --catalog-dir <dir> for a catalog on disk. |
+| `input.catalog_unverified` | a --catalog-dir catalog is unsigned, or its signature does not verify against the effective trust root. | point --catalog-dir at a catalog whose catalog.sig.json verifies, or pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) for the root that signed it. |
 | `input.init_exists` | init would overwrite a profile or domain binding that already exists. | pass --force to overwrite, or --out <dir> to write somewhere else. |
 | `input.nothing_evaluated` | no control reached conformant, non-conformant, or insufficient_evidence, so the run judged nothing. | emit under the subject and source the profile declares, and record the evidence the catalog's controls apply to. |
 | `input.profile_missing` | the applicability profile was not supplied. | pass --profile agentce/applicability.yaml (start from agentce init). |
+| `input.trust_root_invalid` | the trust root supplied by --trust-root or AGENTCE_TRUST_ROOT could not be loaded. | pass --trust-root <file> pointing at a trust root in the form of the engine's vendored data/trust/dev-root.json. |
 | `internal.unexpected` | an unexpected internal error occurred. | re-run with --debug to see the stack trace, then file an issue. |
 
 ## Warnings
