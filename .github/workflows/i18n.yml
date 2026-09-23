@@ -127,7 +127,7 @@ jobs:
             printf '  %s\n' "${problems[@]}" >&2
             exit 1
           fi
-          echo "GREEN: a language-neutral ICU message catalog lives in spec/ and is vendored per engine with a sync test"
+          echo "GREEN: a language-neutral ICU message catalog lives in spec/ and is vendored into the Python reference engine with a byte-identity sync test (TS/Java vendor nothing yet -- see Dispositions)"
 
       - name: Every message key referenced in code is defined, and every defined key is used (C4)
         run: |
