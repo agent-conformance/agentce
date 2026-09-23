@@ -15,6 +15,12 @@ package = false
 # make this example uninstallable on Intel Macs. Cap it at the last release with those wheels -- a
 # mature, advisory-clean version (OSV: no known vulnerabilities), not a test-environment special case.
 constraint-dependencies = ["onnxruntime<1.24"]
+# crewai pins chromadb~=1.1.0, which excludes the fix for CVE-2026-45829 (a pre-authentication code
+# injection vulnerability in ChromaDB's server component, GHSA-f4j7-r4q5-qw2c, patched in 1.5.9). This
+# example never runs the ChromaDB server (no network exposure here), but shipping a lockfile with a
+# known-critical vulnerable package is not something this repository does regardless of reachability.
+# Override crewai's own pin so uv resolves the patched release instead.
+override-dependencies = ["chromadb>=1.5.9"]
 
 [tool.uv.sources]
 agentce-emit = { path = "../../engines/python-emit", editable = true }
