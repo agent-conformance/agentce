@@ -151,12 +151,16 @@ def test_held_out_and_adversarial_recipes_are_disjoint_from_core(
     ]
     assert overlap == []
     # every held-out/adversarial project's (style, variant) is one of the reserved recipes, and no
-    # reserved recipe is generated in the core loop at all
+    # *other* group (not just "core" -- relabelling a reserved-recipe project into some other group,
+    # e.g. "multi-agent", must not be a way to dodge this check) generates a reserved recipe either
     for p in projects:
         if p["group"] in ("held-out", "adversarial"):
             assert (p["style"], p["variant"]) in reserved
-        elif p["group"] == "core":
-            assert (p["style"], p["variant"]) not in reserved
+        else:
+            assert (p["style"], p["variant"]) not in reserved, (
+                f"non-blind group {p['group']!r} project {p['id']} reuses a reserved recipe "
+                f"({p['style']}, {p['variant']})"
+            )
     # A minimum-size guard: shrinking the reserved-recipe sets to near-triviality (e.g. one recipe
     # each) must not silently stay green -- each subset needs at least 3 distinct recipes and must
     # span every domain, or it is no longer a meaningful blind check.
