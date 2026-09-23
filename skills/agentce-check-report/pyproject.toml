@@ -14,7 +14,7 @@ dependencies = [
 package = false
 
 [tool.uv.sources]
-agent-conformance = { path = "../../engines/python", editable = true }
+agent-conformance = { path = "vendor/agent_conformance-0.1.0-py3-none-any.whl" }
 
 [dependency-groups]
 dev = [

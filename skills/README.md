@@ -32,6 +32,20 @@ Skills are published from this monorepo at tagged releases with Sigstore signatu
 never to a moving branch. Each skill's `SKILL.md` frontmatter pins the spec, CLI, and catalog versions
 it was written against; a mismatch stops the skill.
 
+Each skill folder is **one-command installable on its own**, severed from this monorepo: copy the
+folder anywhere (a zip, an assistant's skill directory, a registry checkout) and run its self-test
+directly, with no sibling `engines/` checkout beside it —
+
+```sh
+uv run --frozen python3 scripts/lint_profile.py --self-test --json   # agentce-onboard
+```
+
+This works because each skill vendors a real wheel of `engines/python` under its own `vendor/`
+directory (`pyproject.toml`'s `[tool.uv.sources]` resolves `agent-conformance` from that local file,
+never a relative path back into this repository). `tools/vendor_skill_engine.py` keeps every skill's
+vendored wheel in sync with `engines/python`; run it with `--write` after a change to the engine and
+commit the rebuilt `vendor/*.whl` alongside the skill's re-locked `uv.lock`.
+
 ## Version table
 
 | Skill | skill_version | spec_version | cli_version | catalog_versions |
