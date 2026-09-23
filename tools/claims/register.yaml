@@ -293,10 +293,12 @@ claims:
         the same workflow proves the same for the Java engine.
   - id: integration.framework-capture
     text: >-
-      Capturing evidence automatically from LangGraph, the OpenAI Agents SDK, CrewAI, Google ADK, and
-      the Claude Agent SDK, from one line, is planned and not yet built; today `agentce_emit.auto()`
-      returns the emitter and every event is an explicit `emit_*` call, and none of the six example
-      agents imports the framework it is named for.
+      Capturing every model/tool/decision automatically from LangGraph, the OpenAI Agents SDK, CrewAI,
+      Google ADK, and the Claude Agent SDK, from one line and no further code, is planned and not yet
+      built; `agentce_emit.auto()` alone still captures no per-event framework activity by itself.
+      Five of the six example agents now really import and run their named framework, but each does so
+      with its own integration code -- a callback/event handler that turns that framework's real
+      callback payloads into explicit `emit_*` calls -- not automatic capture from the one line alone.
     status: roadmap
     pages:
       - docs/integrate.md
@@ -307,8 +309,9 @@ claims:
     text: >-
       Each of the six example agents either imports a real package of its own or says in its own source
       that automatic framework capture is on the roadmap, and the pages that explain the one-line setup
-      say the same for as long as the real `auto()` captures no events by itself. The examples still run
-      and their bundles validate with zero quarantines.
+      say the same for as long as `agentce_emit.auto()` with zero `emit_*` calls records nothing beyond
+      the fact that a session ran, never a framework's per-event activity. The examples still run and
+      their bundles validate with zero quarantines.
     status: built
     pages:
       - docs/integrate.md
@@ -318,12 +321,32 @@ claims:
       workflow: .github/workflows/ci.yml
       job: examples
       description: >-
-        On every pull request, runs the real `agentce_emit.auto()` with no `emit_*` call and fails when
-        an example or a setup page does not label automatic framework capture as roadmap, or when
-        `auto()` starts capturing events without the wording and this claim being retired; a self-test
-        rejects an unlabelled example, a standard-library import passed off as a framework, a page
-        without the label, and a label that appears only on another page. Also runs every example and
-        validates its bundle.
+        On every pull request, runs the real `agentce_emit.auto()` with no `emit_*` call, measured
+        before flush, and fails when an example or a setup page does not label automatic framework
+        capture as roadmap, or when that measurement starts finding events without the wording and this
+        claim being retired; a self-test rejects an unlabelled example, a standard-library import passed
+        off as a framework, a page without the label, and a label that appears only on another page.
+        Also runs every example and validates its bundle.
+  - id: examples.frameworks-really-run
+    text: >-
+      Five of the six example agents (LangGraph, the OpenAI Agents SDK, CrewAI, Google ADK, the Claude
+      Agent SDK) really import and run their named framework end to end, offline and keyless, against a
+      scripted deterministic model or transport -- never a live network call, never a real API key --
+      and each produces a bundle the engine accepts with zero quarantines. Each example resolves its
+      framework's own dependencies in its own isolated environment, never the engine's.
+    status: built
+    pages:
+      - docs/integrate.md
+      - examples/scenario.py
+    check:
+      workflow: .github/workflows/ci.yml
+      job: python-tests
+      description: >-
+        On every pull request, runs each of the five framework examples for real through its own run.sh
+        and asserts the agent script imports its named framework (no roadmap-label fallback), the run
+        exits 0, and the resulting bundle ingests with zero quarantines and the ModelCall/ToolCall/
+        Decision/SessionStart/SessionEnd event types -- proving the framework's own code path ran, not
+        merely that the script names the package.
   - id: collect.source-connector
     text: >-
       Pulling evidence from a source system with `agentce collect` is planned and not yet built:

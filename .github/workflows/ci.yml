@@ -169,6 +169,27 @@ jobs:
       - name: Run every example and validate its bundle
         run: uv run --project examples --frozen python examples/run_all.py --check
 
+  python-tests:
+    # AgentCESpanProcessor/instrument() (SPEC 13.4 AX-3): a real OTel SpanProcessor-shaped bridge over
+    # the existing otel-genai mapping, plus the one-line auto() integration declaring a session on its
+    # own. Also proves the five framework examples (LangGraph, the OpenAI Agents SDK, CrewAI, Google
+    # ADK, the Claude Agent SDK) really run their named framework, offline and keyless, each in its own
+    # environment, and that the no-ml scan stays honest once those frameworks are actually installed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: agentce-emit unit tests (AgentCESpanProcessor, instrument(), auto() self-capture)
+        run: uv run --project engines/python-emit --frozen pytest -q -p no:cacheprovider
+      - name: framework_examples_check self-test
+        run: uv run --project engines/python --frozen python tools/framework_examples_check.py --self-test
+      - name: Every framework example really runs its framework, offline and keyless
+        run: uv run --project engines/python --frozen python tools/framework_examples_check.py
+
   policy-gating:
     # Policy-as-code (SPEC §8.5): every assertion carries a real, catalog-derived severity and
     # family, and `agentce assess --fail-on <expr>` gates the exit code on a tiny, deterministic
