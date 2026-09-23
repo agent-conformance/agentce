@@ -45,6 +45,14 @@ access exists, or the deployment's own Sigstore/KMS root for the `sigstore-priva
 profiles. Verification of `kms` and `sigstore-private` needs no network once the trust root is
 supplied.
 
+`agentce assess --trust-root <file>` names the root for a run; `AGENTCE_TRUST_ROOT` names it for an
+environment, and the flag wins where both are set. With neither, the vendored development root
+applies, so the catalogs the engine ships verify out of the box. The file holds the same JSON as the
+vendored root: `keys` (a content-addressed `keyid` per pinned Ed25519 public key, with its
+`identity`) and `certificate_authorities` (the issuers keyless certificates must chain to). The
+private half of a production root belongs on the machine that signs, never on the machine that
+assesses.
+
 ## The three signing profiles (SPEC §9.1)
 
 `agentce sign` records each signature's `profile`:
@@ -65,7 +73,18 @@ the certificate against the pinned authority, then checks the signature with the
 
 Catalogs, overlays, probe corpora, and rule fixtures are distributed with a detached signature,
 `catalog.sig.json`, over the directory's content digest. The engine verifies it before use and
-refuses an unsigned or unverifiable one unless `--allow-unverified-catalog` is passed (SPEC §8.7).
+refuses an unsigned or unverifiable one (SPEC §8.7). `agentce assess` applies the same check to every
+`--catalog-dir` it is given, before it evaluates a single control: a catalog that is unsigned, signed
+by a key the effective trust root does not pin, or altered after signing is refused with
+`input.catalog_unverified` (exit `3`), and a catalog whose own `id@version` is not the one `--catalog`
+requested is refused with `input.catalog_mismatch`. Nothing is written in either case.
+
+`--allow-unverified-catalog` is the one way past the *signature* check, and it is never silent: the
+run proceeds, prints what it waived, and records one limitation string per unverified catalog in both
+`manifest.json` (`limitations`) and `claim.json` (`limitations`), so a claimant signs over the
+override and every later reader sees it. It does not excuse `input.catalog_mismatch`: SPEC §8.7's
+override covers "unsigned or unverifiable", and a catalog whose signature verifies but whose identity
+is not the one requested is neither, so that refusal stands with or without the flag.
 
 ```bash
 agentce verify --catalog spec/catalogs/base/eu-ai-act --json
