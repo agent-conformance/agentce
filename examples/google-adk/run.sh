@@ -7,4 +7,4 @@ export AGENTCE_EMIT=1
 export AGENTCE_EMIT_OUT="$BUNDLE"
 export AGENTCE_EMIT_SUBJECT="spiffe://corp/agents/credit-google-adk"
 export PYTHONPATH="$HERE/..${PYTHONPATH:+:$PYTHONPATH}"
-exec uv run --project "$HERE/.." --quiet python "$HERE/agent.py"
+exec uv run --project "$HERE" --quiet python "$HERE/agent.py"
