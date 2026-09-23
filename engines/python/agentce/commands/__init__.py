@@ -223,25 +223,16 @@ def _verify_catalog(result: CommandResult, catalog_dir: Path) -> CommandResult:
         catalog_dir, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME})
     )
     result.data.update({"catalog": str(catalog_dir), "digest": recomputed})
-    sig_path = catalog_dir / signing.CATALOG_SIGNATURE_NAME
-    if not sig_path.is_file():
-        result.data["verified"] = False
-        result.data["reason"] = (
-            f"unsigned: {signing.CATALOG_SIGNATURE_NAME} is absent; the engine refuses an "
-            "unverifiable catalog (SPEC §8.7)."
+    try:
+        verified = signing.verify_catalog_directory(
+            catalog_dir, signing.vendored_trust()
         )
+    except signing.UnsignedError as exc:
+        result.data["verified"] = False
+        result.data["reason"] = str(exc)
         result.note(f"catalog {catalog_dir.name}: unsigned")
         result.add_code(int(ExitCode.INPUT_ERROR))
         return result
-    try:
-        envelope = json.loads(sig_path.read_text("utf-8"))
-        verified = signing.verify_envelope(envelope, signing.vendored_trust())
-        statement = json.loads(verified.payload)
-        signed_digest = _statement_subject_digest(statement)
-        if signed_digest != recomputed:
-            raise signing.VerificationError(
-                "the signature covers a different catalog digest than the directory content"
-            )
     except (signing.VerificationError, ValueError, KeyError, IndexError) as exc:
         result.data["verified"] = False
         result.data["reason"] = str(exc)
@@ -300,7 +291,7 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
         try:
             verified = signing.verify_envelope(entry["envelope"], trust)
             if (
-                _statement_subject_digest(json.loads(verified.payload))
+                signing.statement_subject_digest(json.loads(verified.payload))
                 != manifest_digest
             ):
                 raise signing.VerificationError(
@@ -329,12 +320,6 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
     return result
 
 
-def _statement_subject_digest(statement: dict[str, Any]) -> str:
-    """Return the ``sha256:`` digest of an in-toto Statement's single subject."""
-    digest = statement["subject"][0]["digest"]
-    return "sha256:" + digest["sha256"]
-
-
 def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="assess")
     bundle = _require_dir(
@@ -346,10 +331,14 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     catalog = _opt_str(ns, "catalog")
     out = _opt_str(ns, "out") or DEFAULT_OUT_DIR
     # Resolve the catalogs before any output is written: a run that cannot name what it evaluates
-    # against must leave nothing behind that looks like a result.
+    # against — or cannot verify it — must leave nothing behind that looks like a result.
     profile_obj = Profile.load(profile)
-    catalogs, catalog_labels = _resolve_catalogs(
-        catalog, profile_obj, list(getattr(ns, "catalog_dir", None) or [])
+    catalogs, catalog_labels, limitations = _resolve_catalogs(
+        catalog,
+        profile_obj,
+        list(getattr(ns, "catalog_dir", None) or []),
+        _effective_trust_root(ns),
+        allow_unverified=_flag(ns, "allow_unverified_catalog"),
     )
     # Stage 1: ingest and validate. A missing/mismatching manifest aborts with exit 3.
     loaded = load_bundle(bundle)
@@ -415,6 +404,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         invocation=invocation,
         supersedes=supersedes,
         report_language=_opt_str(ns, "report_language") or "en",
+        limitations=limitations,
     )
     if state is not None:
         state.record(loaded.digest, out_dir / "manifest.json", new_window_end)
@@ -440,6 +430,12 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     if state is not None:
         result.data["supersedes"] = supersedes
         result.data["late_events"] = late_events
+    if limitations:
+        # The override is never silent: it is on stderr for the operator and in the manifest and the
+        # claim for every later reader (SPEC §8.7).
+        result.data["limitations"] = limitations
+        for limitation in limitations:
+            result.note(limitation)
     if non_conformant:
         result.add_code(int(ExitCode.FINDINGS))
     if evaluated_nothing(evaluated):
@@ -475,20 +471,92 @@ def _vendored_catalogs() -> dict[str, Path]:
     return found
 
 
-def _resolve_catalogs(
-    requested: str | None, profile: Profile, catalog_dirs: list[str]
-) -> tuple[list[Catalog], list[str]]:
-    """The catalogs an assessment evaluates, and their ``id@version`` labels.
+def _effective_trust_root(ns: argparse.Namespace) -> signing.TrustRoot:
+    """The trust root catalog verification consults: ``--trust-root``, else ``AGENTCE_TRUST_ROOT``,
+    else the trust root vendored in the engine (SPEC §8.7).
 
-    Each ``--catalog-dir`` is loaded as given (the explicit override). Each requested id — the
-    ``--catalog`` list, else the profile's declared ``catalogs`` when no directory was passed — must
-    resolve to a directory that was passed or to a vendored catalog. An id that resolves to nothing,
-    or a request that names no catalog at all, is an input error: an assessment must not proceed
-    to judge nothing."""
+    The vendored development root is the default so the engine's own signed catalogs verify offline
+    out of the box; a deployment that signs its catalogs with its own keys points either surface at
+    its own root, and that root — never the vendored one — is what verification then uses."""
+    raw = _opt_str(ns, "trust_root") or os.environ.get("AGENTCE_TRUST_ROOT")
+    if raw is None or not raw.strip():
+        return signing.vendored_trust()
+    path = _require_file(raw, key="trust_root", what="the trust root")
+    try:
+        return signing.load_trust_root(path)
+    except signing.VerificationError as exc:
+        raise InputError(
+            "input.trust_root_invalid",
+            f"the trust root {str(path)!r} could not be loaded: {exc}",
+            "pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) to a trust root in the form of "
+            "the engine's vendored data/trust/dev-root.json.",
+        ) from exc
+
+
+def _verify_catalog_dirs(
+    loaded: list[Catalog], trust: signing.TrustRoot, *, allow_unverified: bool = False
+) -> list[str]:
+    """Refuse every ``--catalog-dir`` catalog whose signature does not verify (SPEC §8.7).
+
+    A catalog an operator points the engine at is untrusted input: unsigned, signed by a key the
+    effective trust root does not know, or signed over different bytes than the directory holds, it
+    cannot be evaluated. The refusal happens before any control runs and before anything is written,
+    so an unverifiable catalog never produces a report that looks as confident as a verified one.
+
+    ``allow_unverified`` is the operator's explicit ``--allow-unverified-catalog`` override (SPEC
+    §8.7): the run proceeds and each unverifiable catalog is returned as a limitation string, which
+    the caller records in the manifest and the claim so no reader can mistake the report for one
+    produced from verified inputs. The override covers *only* what this function checks — an absent
+    or failing signature; the identity cross-check in :func:`_resolve_catalogs` has no override."""
+    limitations: list[str] = []
+    for catalog in loaded:
+        try:
+            signing.verify_catalog_directory(catalog.directory, trust)
+        except signing.VerificationError as exc:
+            if allow_unverified:
+                limitations.append(
+                    f"catalog {catalog.id}@{catalog.version} at "
+                    f"{_scrub_path(catalog.directory)} was used unverified "
+                    f"(--allow-unverified-catalog): {exc}"
+                )
+                continue
+            raise InputError(
+                "input.catalog_unverified",
+                f"the catalog directory {_scrub_path(catalog.directory)} did not verify against "
+                f"the effective trust root: {exc}",
+                "point --catalog-dir at a catalog whose catalog.sig.json verifies, or pass "
+                "--trust-root <file> (or set AGENTCE_TRUST_ROOT) for the root that signed it; "
+                "--allow-unverified-catalog assesses it anyway and records the override as a "
+                "limitation.",
+            ) from exc
+    return limitations
+
+
+def _resolve_catalogs(
+    requested: str | None,
+    profile: Profile,
+    catalog_dirs: list[str],
+    trust: signing.TrustRoot,
+    *,
+    allow_unverified: bool = False,
+) -> tuple[list[Catalog], list[str], list[str]]:
+    """The catalogs an assessment evaluates, their ``id@version`` labels, and any limitations.
+
+    Each ``--catalog-dir`` is loaded as given (the explicit override) and its signature verified
+    against ``trust`` before anything else happens. Each requested id — the ``--catalog`` list, else
+    the profile's declared ``catalogs`` when no directory was passed — must resolve to a directory
+    that was passed or to a vendored catalog, and every directory that was passed must be one the
+    request names. An id that resolves to nothing, a directory the request does not name, or a
+    request that names no catalog at all, is an input error: an assessment must not proceed to judge
+    nothing, nor to judge something other than what was asked for.
+
+    The returned limitations are the signature checks ``--allow-unverified-catalog`` waived, for the
+    manifest and the claim to record; the list is empty on an ordinary run."""
     loaded = [
         load_catalog(_require_dir(d, key="catalog-dir", what="the catalog directory"))
         for d in catalog_dirs
     ]
+    limitations = _verify_catalog_dirs(loaded, trust, allow_unverified=allow_unverified)
     by_label = {f"{c.id}@{c.version}": c for c in loaded}
     if requested:
         ids = [i.strip() for i in requested.split(",") if i.strip()]
@@ -518,8 +586,28 @@ def _resolve_catalogs(
             f"(available: {', '.join(available) or 'none'}).",
             "use an available <id>@<version>, or pass --catalog-dir <dir> for a catalog on disk.",
         )
+    # A verified signature proves the bytes were not altered; it does not prove the directory holds
+    # the catalog that was asked for. When both a request and a directory were given, every directory
+    # must carry an id@version the request names — a rebranded or swapped catalog is refused here even
+    # though its own signature verifies. This step is deliberately separate from the signature check
+    # above and has no override: SPEC §8.7's --allow-unverified-catalog waives "unsigned or
+    # unverifiable", and a catalog whose signature verifies but whose identity is not the one
+    # requested is neither, so it is refused whether or not the flag was passed.
+    if ids and loaded:
+        wanted = set(ids)
+        unrequested = [
+            f"{c.id}@{c.version}" for c in loaded if f"{c.id}@{c.version}" not in wanted
+        ]
+        if unrequested:
+            raise InputError(
+                "input.catalog_mismatch",
+                f"a --catalog-dir carries {', '.join(repr(u) for u in unrequested)}, which "
+                f"--catalog did not request ({', '.join(repr(i) for i in ids)}).",
+                "pass --catalog-dir for the catalog you named, or name the id@version the "
+                "directory carries.",
+            )
     labels = list(dict.fromkeys([*ids, *(f"{c.id}@{c.version}" for c in loaded)]))
-    return [by_label[label] for label in labels], labels
+    return [by_label[label] for label in labels], labels, limitations
 
 
 def _nothing_evaluated(

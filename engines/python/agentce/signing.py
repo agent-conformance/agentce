@@ -10,7 +10,10 @@ Two directions, one core:
 
 * **Verify** — ``verify_envelope`` checks a DSSE envelope against a :class:`TrustRoot` and never
   contacts a transparency log (HR-1). The engine ships one trust root, :func:`vendored_trust`, that
-  verifies the repository's own signed catalogs, corpora, and dry-run release artifacts.
+  verifies the repository's own signed catalogs, corpora, and dry-run release artifacts; a deployment
+  that signs with its own keys supplies its own root (:func:`load_trust_root`, reached through
+  ``agentce assess --trust-root`` or ``AGENTCE_TRUST_ROOT``). :func:`verify_catalog_directory` is the
+  one place that decides whether a catalog directory on disk may be used.
 * **Sign** — given an operator-held key, :func:`sign_statement` produces the envelope. The engine
   holds no signing identity of its own; ``agentce sign`` signs on the invoking identity's behalf and
   the release tooling supplies the development keys for the dry-run (SPEC §9.1).
@@ -52,6 +55,7 @@ __all__ = [
     "CATALOG_SIGNATURE_NAME",
     "SigningError",
     "VerificationError",
+    "UnsignedError",
     "Verified",
     "TrustRoot",
     "Signer",
@@ -62,7 +66,10 @@ __all__ = [
     "intoto_statement",
     "issue_certificate",
     "sign_statement",
+    "statement_subject_digest",
     "verify_envelope",
+    "verify_catalog_directory",
+    "load_trust_root",
     "vendored_trust",
     "vendored_trust_path",
 ]
@@ -74,6 +81,10 @@ class SigningError(Exception):
 
 class VerificationError(Exception):
     """A signature, certificate, or bound digest failed verification (exit code 3)."""
+
+
+class UnsignedError(VerificationError):
+    """The directory carries no detached signature at all, so there is nothing to verify."""
 
 
 def _b64e(data: bytes) -> str:
@@ -346,6 +357,50 @@ def verify_envelope(envelope: dict[str, Any], trust: TrustRoot) -> Verified:
     )
 
 
+def statement_subject_digest(statement: dict[str, Any]) -> str:
+    """Return the ``sha256:`` digest of an in-toto Statement's single subject."""
+    digest = statement["subject"][0]["digest"]
+    return "sha256:" + digest["sha256"]
+
+
+def verify_catalog_directory(directory: Path, trust: TrustRoot) -> Verified:
+    """Verify a catalog directory's detached signature against ``trust`` (SPEC §8.7).
+
+    One place decides whether a catalog on disk may be used: the signature file must be present, the
+    DSSE envelope must verify against the trust root, and the digest it covers must equal a fresh
+    recomputation of the directory's content. Any failure raises :class:`VerificationError` — an
+    absent signature raises the :class:`UnsignedError` subclass, so a caller that reports "unsigned"
+    differently from "did not verify" can tell them apart. Never contacts the network.
+    """
+    import json
+
+    sig_path = directory / CATALOG_SIGNATURE_NAME
+    if not sig_path.is_file():
+        raise UnsignedError(
+            f"unsigned: {CATALOG_SIGNATURE_NAME} is absent, so there is no signature to verify "
+            "(SPEC §8.7)."
+        )
+    try:
+        envelope = json.loads(sig_path.read_text("utf-8"))
+    except (OSError, ValueError) as exc:
+        raise VerificationError(
+            f"{CATALOG_SIGNATURE_NAME} is not readable JSON: {exc}"
+        ) from exc
+    verified = verify_envelope(envelope, trust)
+    try:
+        signed_digest = statement_subject_digest(json.loads(verified.payload))
+    except (ValueError, KeyError, IndexError, TypeError) as exc:
+        raise VerificationError(
+            f"the signed statement carries no catalog digest: {exc}"
+        ) from exc
+    recomputed = digest_tree(directory, exclude=frozenset({CATALOG_SIGNATURE_NAME}))
+    if signed_digest != recomputed:
+        raise VerificationError(
+            "the signature covers a different catalog digest than the directory content"
+        )
+    return verified
+
+
 def vendored_trust_path() -> Path:
     """The path to the trust root vendored in the engine package (SPEC §8.7)."""
     return Path(__file__).resolve().parent / "data" / "trust" / "dev-root.json"
@@ -356,3 +411,19 @@ def vendored_trust() -> TrustRoot:
     import json
 
     return TrustRoot.from_dict(json.loads(vendored_trust_path().read_text("utf-8")))
+
+
+def load_trust_root(path: Path) -> TrustRoot:
+    """Load a trust root from a JSON file an operator supplies (``--trust-root``, SPEC §8.7)."""
+    import json
+
+    try:
+        data = json.loads(path.read_text("utf-8"))
+    except (OSError, ValueError) as exc:
+        raise VerificationError(f"{path} is not readable JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise VerificationError(f"{path} does not hold a trust-root object")
+    try:
+        return TrustRoot.from_dict(data)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise VerificationError(f"{path} is not a usable trust root: {exc}") from exc

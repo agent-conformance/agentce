@@ -94,6 +94,21 @@ MESSAGE_KEYS: dict[str, Entry] = {
         "a requested catalog id@version does not resolve to any catalog directory.",
         "use an available <id>@<version>, or pass --catalog-dir <dir> for a catalog on disk.",
     ),
+    "input.catalog_mismatch": Entry(
+        "error",
+        "a --catalog-dir carries an id@version the --catalog request did not name.",
+        "pass --catalog-dir for the catalog you named, or name the id@version the directory carries.",
+    ),
+    "input.catalog_unverified": Entry(
+        "error",
+        "a --catalog-dir catalog is unsigned, or its signature does not verify against the effective trust root.",
+        "point --catalog-dir at a catalog whose catalog.sig.json verifies, or pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) for the root that signed it.",
+    ),
+    "input.trust_root_invalid": Entry(
+        "error",
+        "the trust root supplied by --trust-root or AGENTCE_TRUST_ROOT could not be loaded.",
+        "pass --trust-root <file> pointing at a trust root in the form of the engine's vendored data/trust/dev-root.json.",
+    ),
     "input.catalog_not_found": Entry(
         "error",
         "no base catalog was found under the expected path.",

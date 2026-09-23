@@ -97,6 +97,19 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         help="a catalog directory to evaluate (repeatable)",
     )
+    p.add_argument(
+        "--trust-root",
+        dest="trust_root",
+        help="trust root every --catalog-dir signature is verified against (default: "
+        "AGENTCE_TRUST_ROOT, else the vendored development root)",
+    )
+    p.add_argument(
+        "--allow-unverified-catalog",
+        dest="allow_unverified_catalog",
+        action="store_true",
+        help="assess a --catalog-dir catalog whose signature is absent or does not verify, "
+        "recording the override as a limitation in the manifest and the claim (SPEC 8.7)",
+    )
     p.add_argument("--manual", help="the manual-records directory")
     p.add_argument("--probes", help="the probe-results directory")
     p.add_argument("--out", help="the output directory (default: ./out)")
