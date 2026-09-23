@@ -143,6 +143,39 @@ sharing the same hardening building blocks, not the same mitigation:
   refused with its named key and no `Traceback` text reaches the user; it is part of the
   `collect-ingest` job in `.github/workflows/ci.yml`, which runs on every push and pull request.
 
+## AI-consumed generated-output surface (remediation package + skill folder)
+
+`agentce assess --emit remediation` and `--emit skill` both generate Markdown that a coding assistant
+or AI agent is expected to read and act on directly (SPEC §13.3 S-1..S-10) -- a different trust
+boundary from the machine-readable formats above, because here evidence- and profile-derived strings
+(a subject id, an evidence ref, a validation path, a tool name) sit inline in the same document as the
+catalog- and template-authored instruction text the assistant is meant to follow. An adversary who
+controls one of those derived strings (for example, an evidence bundle's `subject` field, or a tool
+name observed on an assessed agent) could otherwise smuggle an instruction-shaped line -- a fake
+Markdown heading, a bare imperative sentence, a fenced code block -- into that document and have the
+reading assistant treat it as part of the trusted prompt rather than as inert data about the finding.
+
+- **Escaping, not trust separation by format.** Both renderers build their template context by
+  routing every evidence- or profile-derived field -- the subject id, each evidence ref, each
+  validation path, each tool-call name -- through the same `_md_escape` helper
+  (`engines/python/agentce/report.py:953`, `_remediation_md_context` at line 1166 for the remediation
+  package, `_skill_finding_context` at line 1227 for the skill folder) before it reaches the template
+  (SPEC §7 injection hardening). `_md_escape` collapses embedded newlines and other whitespace to
+  single spaces (so a derived string can never start a new line and become a live heading or a bare
+  instruction line of its own), replaces backticks with `'` (so it cannot break out of the template's
+  own backtick delimiters), and caps the result at `_MD_ESCAPE_CAP` (200) characters. Instruction
+  sentences in the rendered document come only from the template or the signed catalog; everything
+  evidence-derived is escaped and length-capped this way, never trusted verbatim. This is escaping, not
+  erasure -- the string still appears, as inert data.
+- **Same mitigation, two output formats.** `render_remediation_md` (line 1189) and
+  `render_skill_finding_md`/`render_skill_md` (lines 1246/1255) are two templates over the same
+  canonical `remediation-package.json`, and both derive their context through `_md_escape`, so one row
+  covers both F17's and F31's rendered output.
+- **Proved by hostile fixtures.** `engines/python/tests/test_remediation.py::test_md_escapes_a_hostile_subject_id`
+  renders a package whose subject id contains a Markdown heading and a backtick fence and asserts the
+  rendered document neutralises both; `engines/python/tests/test_skill_emit.py::test_finding_note_escapes_a_hostile_tool_name`
+  does the equivalent for a hostile tool-call name in a generated skill finding note.
+
 ## Assumptions and residual risk
 
 - The integrity guarantees rest on at least one **independent system** and one **independent coverage
