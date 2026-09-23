@@ -385,9 +385,9 @@ def render_public_statement(
 
 
 def _catalog_refs(catalogs: list[Catalog]) -> list[dict[str, str]]:
-    """Each catalog's id, version, and its real, content-derived provenance digest (never a
-    placeholder) -- the same recomputation a reader can independently verify against the catalog
-    directory (SPEC §14.5 CP-3)."""
+    """Each catalog's id, version, and its real, content-derived provenance digest -- never a fixed
+    or all-zero constant -- the same recomputation a reader can independently verify against the
+    catalog directory (SPEC §14.5 CP-3)."""
     return [
         {
             "id": c.id,
