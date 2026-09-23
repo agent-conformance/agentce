@@ -62,6 +62,8 @@ jobs:
         run: uv run --project tools --frozen python -m docs_doctest_check --self-test
       - name: Every shell command on the docs site runs against the real CLI
         run: python3 tools/docs_doctest_check.py
+      - name: Generated reference pages match a fresh build from the sources
+        run: uv run --project docs --frozen python docs/build.py --check-links
 
   a11y:
     runs-on: ubuntu-latest
