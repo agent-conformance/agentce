@@ -1,6 +1,6 @@
-"""The report's provenance is real, not placeholder (SPEC §9.1): a real catalog digest, the engine
-version and a reproduce command embedded in report.md/report.html, an end-to-end signable bundle,
-and a real, deterministic, order-independent ``agentce diff``."""
+"""The report's provenance is real, never a fixed or all-zero constant (SPEC §9.1): a real catalog
+digest, the engine version and a reproduce command embedded in report.md/report.html, an end-to-end
+signable bundle, and a real, deterministic, order-independent ``agentce diff``."""
 
 from __future__ import annotations
 
