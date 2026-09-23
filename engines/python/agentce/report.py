@@ -30,12 +30,18 @@ from . import ENGINE_NAME, SPEC_VERSION, __version__, canonical, messages, verdi
 from .assertions import Assertion, aggregate, check_dc5
 from .catalog import Catalog, ControlSpec, catalog_provenance_digest
 
-_ARTIFACT_SCHEMAS = {
+#: Always written, regardless of `--emit`: the run's structural core (write_report's docstring).
+_MANDATORY_ARTIFACT_SCHEMAS = {
     "assertions.json": "assertions",
     "manifest.json": "manifest",
+}
+#: Written only when `--emit` selects the format that produces them: validated when present,
+#: skipped when a narrower `--emit` legitimately left them unwritten.
+_OPTIONAL_ARTIFACT_SCHEMAS = {
     "oscal-ar.json": "oscal-assessment-results",
     "results.sarif": "results-sarif",
 }
+_ARTIFACT_SCHEMAS = {**_MANDATORY_ARTIFACT_SCHEMAS, **_OPTIONAL_ARTIFACT_SCHEMAS}
 _SARIF_LEVEL = {
     "non-conformant": "error",
     "partial": "warning",
@@ -1320,18 +1326,26 @@ _OPTIONAL_ARTIFACTS = ("report.junit.xml", "oscal-ar.xml", "report.csv")
 
 
 def validate_report(out_dir: Path) -> list[str]:
-    """Validate every emitted artifact against its vendored schema; return a list of problems."""
+    """Validate every emitted artifact against its vendored schema; return a list of problems.
+
+    `--emit` selects which formats a run writes, so only `_MANDATORY_ARTIFACT_SCHEMAS` (the run's
+    structural core, always written) is required; every format-specific artifact is validated when
+    present and skipped when a narrower `--emit` legitimately left it unwritten -- 'validate every
+    emission' means every artifact the run actually emitted, not every format that exists."""
     problems: list[str] = []
+    for filename in _MANDATORY_ARTIFACT_SCHEMAS:
+        if not (out_dir / filename).is_file():
+            problems.append(f"{filename}: missing")
     for filename, schema_name in _ARTIFACT_SCHEMAS.items():
         path = out_dir / filename
         if not path.is_file():
-            problems.append(f"{filename}: missing")
-            continue
+            continue  # mandatory absence was already reported above; optional absence is not a problem
         try:
             instance = json.loads(path.read_text(encoding="utf-8"))
             jsonschema.validate(instance, _load_schema(schema_name))
         except json.JSONDecodeError as exc:
             problems.append(f"{filename}: invalid JSON ({exc.msg})")
+            continue
         except jsonschema.ValidationError as exc:
             problems.append(f"{filename}: {exc.message}")
             continue
@@ -1347,8 +1361,8 @@ def validate_report(out_dir: Path) -> list[str]:
             ]
     for filename in ("report.md", "report.html"):
         path = out_dir / filename
-        if not path.is_file() or not path.read_text(encoding="utf-8").strip():
-            problems.append(f"{filename}: missing or empty")
+        if path.is_file() and not path.read_text(encoding="utf-8").strip():
+            problems.append(f"{filename}: empty")
     for filename in _OPTIONAL_ARTIFACTS:
         path = out_dir / filename
         if not path.is_file():
