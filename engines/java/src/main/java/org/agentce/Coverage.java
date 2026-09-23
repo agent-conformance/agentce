@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.math.BigInteger;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -69,11 +68,14 @@ public final class Coverage {
         return whole[0].toString() + "." + frac;
     }
 
-    private static Map<String, Integer> denominatorCounts(
+    static Map<String, Integer> denominatorCounts(
             Profile.CoverageDenominator denominator, Map<String, Map<String, Integer>> bySource, Path bundleRoot) {
         if (denominator.manifest != null && !denominator.manifest.isEmpty() && bundleRoot != null) {
-            Path path = bundleRoot.resolve(denominator.manifest);
-            if (Files.isRegularFile(path)) {
+            // The denominator's manifest path comes from the applicability profile: confine it to the
+            // bundle root the same way the primary manifest's own entries are, so it cannot escape (by
+            // '..', by an absolute path, or by a symlink) and read a file from outside into the report.
+            Path path = Bundle.confineToRoot(bundleRoot, denominator.manifest);
+            if (path != null && Bundle.safeIsFile(path)) {
                 JsonNode data = Json.parseFile(path);
                 if (data != null && data.isObject()) {
                     JsonNode declared = firstNonEmpty(data.get("counts"), data.get("expected"));

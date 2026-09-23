@@ -3,7 +3,6 @@ package org.agentce;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -126,7 +125,7 @@ public final class Integrity {
         return times;
     }
 
-    private static boolean isSigned(JsonNode block, Path bundleRoot) {
+    static boolean isSigned(JsonNode block, Path bundleRoot) {
         if (block == null) {
             return false;
         }
@@ -137,7 +136,10 @@ public final class Integrity {
         if (bundleRoot == null) {
             return true;
         }
-        return Files.isRegularFile(bundleRoot.resolve(sigRef.textValue()));
+        // A sig_ref is evidence content: confine it to the bundle root so a hostile event cannot have
+        // an attacker-chosen file outside the bundle stand in as this stream's signature.
+        Path confined = Bundle.confineToRoot(bundleRoot, sigRef.textValue());
+        return confined != null && Bundle.safeIsFile(confined);
     }
 
     private static Result verifyStream(String stream, List<JsonNode> events, List<JsonNode> anchors, Path bundleRoot) {

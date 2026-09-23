@@ -3,6 +3,7 @@ package org.agentce;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -58,14 +59,62 @@ public final class Bundle {
                 : raw.toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * {@link Files#isRegularFile} that never propagates: an OS-level hazard a confined path can still
+     * hit at access time (a symlink loop, a name too long for the filesystem, an unreadable parent) is
+     * treated as "not present", never left to surface as an unexpected error.
+     */
+    static boolean safeIsFile(Path path) {
+        try {
+            return Files.isRegularFile(path);
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Resolve {@code rel} against {@code root}; return the path only if it stays inside {@code root}
+     * after symlinks resolve, else {@code null}.
+     *
+     * <p>Every bundle-adjacent reference an adversarial evidence bundle can carry -- the primary
+     * manifest's own file list, a coverage denominator's manifest, an integrity block's {@code
+     * sig_ref} -- is confined through this one function, so a symlink escape, a literal {@code
+     * ..}/absolute path, a symlink loop, an embedded NUL byte, or a path segment too long for the
+     * filesystem are refused the same deliberate way everywhere. A path that simply does not exist
+     * yet is not a confinement failure: it is returned unresolved so the caller's own "missing from
+     * the bundle" check reports it under its own message key.
+     */
+    static Path confineToRoot(Path root, String rel) {
+        if (rel == null || rel.isEmpty() || rel.startsWith("/") || Arrays.asList(rel.split("/")).contains("..")) {
+            return null;
+        }
+        try {
+            Path candidate = root.resolve(rel);
+            Path resolvedRoot = root.toRealPath();
+            Path resolved;
+            try {
+                resolved = candidate.toRealPath();
+            } catch (NoSuchFileException missing) {
+                return candidate;
+            }
+            if (!resolved.equals(resolvedRoot) && !resolved.startsWith(resolvedRoot)) {
+                return null;
+            }
+            return candidate;
+        } catch (IOException | RuntimeException e) {
+            return null; // fail closed: anything unresolvable is unsafe.
+        }
+    }
+
     private static Path safeMember(Path root, String rel) {
-        if (rel.startsWith("/") || Arrays.asList(rel.split("/")).contains("..")) {
+        Path member = confineToRoot(root, rel);
+        if (member == null) {
             throw new InputError(
                     "input.bundle_manifest_path",
                     "manifest lists an unsafe path " + Json.quote(rel) + ".",
                     "the manifest must list only paths inside the bundle.");
         }
-        return root.resolve(rel);
+        return member;
     }
 
     public static Bundle load(Path bundleDir) {
@@ -110,7 +159,7 @@ public final class Bundle {
             }
             String rel = entry.get("path").asText();
             Path member = safeMember(bundleDir, rel);
-            if (!Files.isRegularFile(member)) {
+            if (!safeIsFile(member)) {
                 throw new InputError(
                         "input.bundle_manifest_mismatch",
                         "manifest lists " + Json.quote(rel) + ", which is missing from the bundle.",
