@@ -20,7 +20,11 @@ constraint-dependencies = ["onnxruntime<1.24"]
 # docs/adr/0018-crewai-chromadb-advisory-exception.md for the four GHSA IDs and why this example's
 # use is not reachable). Override to the newest release anyway, so this at least tracks upstream
 # instead of pinning to whatever crewai's own constraint happened to resolve first.
-override-dependencies = ["chromadb>=1.5.9"]
+# json-repair is an unconstrained crewai dependency; below 0.60.1 it carries a high-severity
+# unbounded-CPU-DoS advisory (GHSA-xf7x-x43h-rpqh). Pin the first patched release rather than
+# letting uv float to whatever is newest today -- a mature, advisory-clean version, not the
+# release from yesterday.
+override-dependencies = ["chromadb>=1.5.9", "json-repair==0.60.1"]
 
 [tool.uv.sources]
 agentce-emit = { path = "../../engines/python-emit", editable = true }
