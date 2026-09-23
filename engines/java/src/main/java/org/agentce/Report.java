@@ -246,7 +246,30 @@ public final class Report {
                 + "</main></body></html>\n";
     }
 
+    /** A deterministic OSCAL date-time for this run: the earliest evidence-window start across the
+     * assertions, so it reflects what was actually reviewed rather than the run's wall clock. A run
+     * with no assertions falls back to a fixed epoch, never the wall clock. */
+    private static String oscalTimestamp(List<Assertions.Assertion> assertions) {
+        String earliest = null;
+        for (Assertions.Assertion a : assertions) {
+            String start = a.window[0];
+            if (earliest == null || start.compareTo(earliest) < 0) {
+                earliest = start;
+            }
+        }
+        return earliest != null ? earliest : "1970-01-01T00:00:00Z";
+    }
+
+    /** Render {@code oscal-ar.json} as an importable NIST OSCAL 1.1.2 Assessment Results document
+     * (SPEC §9, §9.4): every result carries real {@code observations[]} built from the assertion's
+     * own evidence pointers, every finding resolves to the observation that backs it and links to its
+     * real control id so a GRC platform can trace the finding to the requirement it assesses. A
+     * faithful port of the Python reference; no catalog object is needed since the control id alone is
+     * the traceable token. */
     public static ObjectNode renderOscal(List<Assertions.Assertion> assertions) {
+        String when = oscalTimestamp(assertions);
+        List<Assertions.Assertion> ordered = sortedBySubjectControl(assertions);
+
         ObjectNode root = Json.nodes().objectNode();
         ObjectNode ar = root.putObject("assessment-results");
         ar.put("uuid", uuid("assessment-results"));
@@ -254,22 +277,73 @@ public final class Report {
         metadata.put("title", "AgentCE Assessment Results");
         metadata.put("version", Version.ENGINE_VERSION);
         metadata.put("oscal-version", "1.1.2");
+        metadata.put("last-modified", when);
+        ar.putObject("import-ap").put("href", "urn:agentce:assessment-plan:structural");
+
         ArrayNode results = ar.putArray("results");
         ObjectNode result = results.addObject();
         result.put("uuid", uuid("result"));
         result.put("title", "AgentCE structural assessment");
-        ArrayNode findings = result.putArray("findings");
-        for (Assertions.Assertion a : sortedBySubjectControl(assertions)) {
+        result.put(
+                "description",
+                "AgentCE's structural, statistical, and probe-based assessment of the run's "
+                        + "subjects against the resolved catalog(s).");
+        result.put("start", when);
+        result.putObject("reviewed-controls")
+                .putArray("control-selections")
+                .addObject()
+                .putObject("include-all");
+
+        Map<String, String> observationUuid = new LinkedHashMap<>();
+        ArrayNode observations = Json.nodes().arrayNode();
+        for (Assertions.Assertion a : ordered) {
+            String key = a.control + " " + a.subject;
+            String obsUuid = uuid("observation", a.control, a.subject);
+            observationUuid.put(key, obsUuid);
+            ObjectNode observation = observations.addObject();
+            observation.put("uuid", obsUuid);
+            observation.put("description", "Assessment activity for " + a.control + " on " + a.subject + ".");
+            observation.putArray("methods").add("TEST");
+            observation.put("collected", when);
+            if (!a.evidence.isEmpty()) {
+                ArrayNode relevantEvidence = observation.putArray("relevant-evidence");
+                for (Assertions.EvidencePointer e : a.evidence) {
+                    relevantEvidence
+                            .addObject()
+                            .put("href", e.ref)
+                            .put("description", e.sourceClass + " evidence, digest " + e.digest);
+                }
+            }
+        }
+        if (observations.size() > 0) {
+            result.set("observations", observations);
+        }
+
+        ArrayNode findings = Json.nodes().arrayNode();
+        for (Assertions.Assertion a : ordered) {
+            String key = a.control + " " + a.subject;
             ObjectNode finding = findings.addObject();
             finding.put("uuid", uuid("finding", a.control, a.subject));
             finding.put("title", a.control + " for " + a.subject);
+            finding.put("description", a.control + " assessed for " + a.subject + ": " + a.outcome + ".");
             ObjectNode target = finding.putObject("target");
             target.put("type", "objective-id");
             target.put("target-id", a.control);
             ObjectNode status = target.putObject("status");
             status.put("state", OSCAL_STATE.getOrDefault(a.outcome, "not-satisfied"));
             status.put("reason", a.outcome);
+            finding.putArray("links")
+                    .addObject()
+                    .put("href", "urn:agentce:control:" + a.control)
+                    .put("rel", "control");
+            finding.putArray("related-observations")
+                    .addObject()
+                    .put("observation-uuid", observationUuid.get(key));
         }
+        if (findings.size() > 0) {
+            result.set("findings", findings);
+        }
+
         return root;
     }
 

@@ -1,22 +1,574 @@
 {
-  "md": "# AgentCE conformance report\n\n## Verdict\n\n**Non-conformant \u2014 at least one applicable control failed.**\n\nTop gaps:\n\n- non-conformant: OVS-02, OVS-03\n- insufficient evidence: DAT-01, DAT-02, DAT-03, INC-01, INC-03 (+14 more)\n- not assessed: DAT-04, DOC-05, OVS-09, RSK-04, RSK-05\n\nNext step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.\n\n## Outcome summary\n\n- conformant: 22\n- non-conformant: 2\n- partial: 0\n- not applicable: 1\n- not assessed: 5\n- insufficient evidence: 19\n\n## Assertions\n\n- `DAT-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 10 (clause reference unverified)\n- `DAT-02` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 10 (clause reference unverified)\n- `DAT-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 10 (clause reference unverified)\n- `DAT-04` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n  - eu-ai-act Art. 10 (clause reference unverified)\n- `DOC-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 11 / Annex IV (clause reference unverified)\n- `DOC-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 13 (clause reference unverified)\n- `DOC-03` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 11 / Annex IV (clause reference unverified)\n- `DOC-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 13 (clause reference unverified)\n- `DOC-05` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n  - eu-ai-act Art. 11 / Annex IV (clause reference unverified)\n- `INC-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 72 (clause reference unverified)\n- `INC-02` @ `spiffe://corp/agents/a` -> **not applicable** (rung 2, automated; 0/0 failed)\n  - eu-ai-act Art. 73 (clause reference unverified)\n  - eu-ai-act Art. 26(5) (clause reference unverified)\n- `INC-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 26(5) (clause reference unverified)\n- `INC-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 73 (clause reference unverified)\n- `INT-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 12 (clause reference unverified)\n- `INT-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act engine integrity (clause reference unverified)\n- `INT-03` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act engine integrity (clause reference unverified)\n- `INT-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act engine integrity (clause reference unverified)\n- `OVS-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 14(4)(a) (clause reference unverified)\n- `OVS-02` @ `spiffe://corp/agents/a` -> **non-conformant** (rung 2, automated; 1/1 failed)\n  - eu-ai-act Art. 14(1)-(3) (clause reference unverified)\n- `OVS-03` @ `spiffe://corp/agents/a` -> **non-conformant** (rung 2, automated; 1/1 failed)\n  - eu-ai-act Art. 14 (clause reference unverified)\n  - eu-ai-act Art. 26(2) (clause reference unverified)\n- `OVS-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 14(4)(c)-(d) (clause reference unverified)\n- `OVS-05` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 26(2) (clause reference unverified)\n- `OVS-06` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 14(4)(e) (clause reference unverified)\n- `OVS-07` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 14(4)(b) (clause reference unverified)\n- `OVS-08` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 14(5) (clause reference unverified)\n- `OVS-09` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n  - eu-ai-act Art. 14(1)-(3) (clause reference unverified)\n- `REC-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 12(1)-(2) (clause reference unverified)\n- `REC-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 12(1)-(2) (clause reference unverified)\n- `REC-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 12(2) (clause reference unverified)\n- `REC-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 12 (clause reference unverified)\n  - eu-ai-act Art. 19 (clause reference unverified)\n- `REC-05` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 26(6) (clause reference unverified)\n- `REC-06` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 19 (clause reference unverified)\n- `ROB-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n- `ROB-02` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n- `ROB-03` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n- `ROB-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n- `ROB-05` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n- `ROB-06` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n- `ROB-07` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n- `RSK-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 9 (clause reference unverified)\n- `RSK-02` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 9 (clause reference unverified)\n- `RSK-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 9 (clause reference unverified)\n- `RSK-04` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n  - eu-ai-act Art. 27 (clause reference unverified)\n- `RSK-05` @ `spiffe://corp/agents/a` -> **not assessed** (rung 3, manual; 0/0 failed)\n  - eu-ai-act Art. 49 / 71 (clause reference unverified)\n- `TRN-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 26(11) / 86 (clause reference unverified)\n- `TRN-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 86 (clause reference unverified)\n- `TRN-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 26(11) / 86 (clause reference unverified)\n- `TRN-04` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 50 (clause reference unverified)\n- `TRN-05` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 50 (clause reference unverified)\n",
-  "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Non-conformant \u2014 at least one applicable control failed.</strong></p><p>Top gaps:</p><ul><li>non-conformant: OVS-02, OVS-03</li><li>insufficient evidence: DAT-01, DAT-02, DAT-03, INC-01, INC-03 (+14 more)</li><li>not assessed: DAT-04, DOC-05, OVS-09, RSK-04, RSK-05</li></ul><p>Next step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 22</li><li>non-conformant: 2</li><li>partial: 0</li><li>not applicable: 1</li><li>not assessed: 5</li><li>insufficient evidence: 19</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th></tr></thead><tbody><tr><td>DAT-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 10 (clause reference unverified)</td></tr><tr><td>DAT-02</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 10 (clause reference unverified)</td></tr><tr><td>DAT-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 10 (clause reference unverified)</td></tr><tr><td>DAT-04</td><td>spiffe://corp/agents/a</td><td>not assessed</td><td>eu-ai-act Art. 10 (clause reference unverified)</td></tr><tr><td>DOC-01</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 11 / Annex IV (clause reference unverified)</td></tr><tr><td>DOC-02</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 13 (clause reference unverified)</td></tr><tr><td>DOC-03</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 11 / Annex IV (clause reference unverified)</td></tr><tr><td>DOC-04</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 13 (clause reference unverified)</td></tr><tr><td>DOC-05</td><td>spiffe://corp/agents/a</td><td>not assessed</td><td>eu-ai-act Art. 11 / Annex IV (clause reference unverified)</td></tr><tr><td>INC-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 72 (clause reference unverified)</td></tr><tr><td>INC-02</td><td>spiffe://corp/agents/a</td><td>not applicable</td><td>eu-ai-act Art. 73 (clause reference unverified); eu-ai-act Art. 26(5) (clause reference unverified)</td></tr><tr><td>INC-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 26(5) (clause reference unverified)</td></tr><tr><td>INC-04</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 73 (clause reference unverified)</td></tr><tr><td>INT-01</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 12 (clause reference unverified)</td></tr><tr><td>INT-02</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act engine integrity (clause reference unverified)</td></tr><tr><td>INT-03</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act engine integrity (clause reference unverified)</td></tr><tr><td>INT-04</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act engine integrity (clause reference unverified)</td></tr><tr><td>OVS-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 14(4)(a) (clause reference unverified)</td></tr><tr><td>OVS-02</td><td>spiffe://corp/agents/a</td><td>non-conformant</td><td>eu-ai-act Art. 14(1)-(3) (clause reference unverified)</td></tr><tr><td>OVS-03</td><td>spiffe://corp/agents/a</td><td>non-conformant</td><td>eu-ai-act Art. 14 (clause reference unverified); eu-ai-act Art. 26(2) (clause reference unverified)</td></tr><tr><td>OVS-04</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 14(4)(c)-(d) (clause reference unverified)</td></tr><tr><td>OVS-05</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 26(2) (clause reference unverified)</td></tr><tr><td>OVS-06</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 14(4)(e) (clause reference unverified)</td></tr><tr><td>OVS-07</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 14(4)(b) (clause reference unverified)</td></tr><tr><td>OVS-08</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 14(5) (clause reference unverified)</td></tr><tr><td>OVS-09</td><td>spiffe://corp/agents/a</td><td>not assessed</td><td>eu-ai-act Art. 14(1)-(3) (clause reference unverified)</td></tr><tr><td>REC-01</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 12(1)-(2) (clause reference unverified)</td></tr><tr><td>REC-02</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 12(1)-(2) (clause reference unverified)</td></tr><tr><td>REC-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 12(2) (clause reference unverified)</td></tr><tr><td>REC-04</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 12 (clause reference unverified); eu-ai-act Art. 19 (clause reference unverified)</td></tr><tr><td>REC-05</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 26(6) (clause reference unverified)</td></tr><tr><td>REC-06</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 19 (clause reference unverified)</td></tr><tr><td>ROB-01</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td></tr><tr><td>ROB-02</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 15 (clause reference unverified)</td></tr><tr><td>ROB-03</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td></tr><tr><td>ROB-04</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td></tr><tr><td>ROB-05</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td></tr><tr><td>ROB-06</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td></tr><tr><td>ROB-07</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 15 (clause reference unverified)</td></tr><tr><td>RSK-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 9 (clause reference unverified)</td></tr><tr><td>RSK-02</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 9 (clause reference unverified)</td></tr><tr><td>RSK-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 9 (clause reference unverified)</td></tr><tr><td>RSK-04</td><td>spiffe://corp/agents/a</td><td>not assessed</td><td>eu-ai-act Art. 27 (clause reference unverified)</td></tr><tr><td>RSK-05</td><td>spiffe://corp/agents/a</td><td>not assessed</td><td>eu-ai-act Art. 49 / 71 (clause reference unverified)</td></tr><tr><td>TRN-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 26(11) / 86 (clause reference unverified)</td></tr><tr><td>TRN-02</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 86 (clause reference unverified)</td></tr><tr><td>TRN-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 26(11) / 86 (clause reference unverified)</td></tr><tr><td>TRN-04</td><td>spiffe://corp/agents/a</td><td>conformant</td><td>eu-ai-act Art. 50 (clause reference unverified)</td></tr><tr><td>TRN-05</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td>eu-ai-act Art. 50 (clause reference unverified)</td></tr></tbody></table></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n",
+  "md": "# AgentCE conformance report\n\n## Verdict\n\n**Non-conformant \u2014 at least one applicable control failed.**\n\nTop gaps:\n\n- non-conformant: OVS-02, OVS-03\n- insufficient evidence: DAT-01, DAT-02, DAT-03, INC-01, INC-03 (+14 more)\n- not assessed: DAT-04, DOC-05, OVS-09, RSK-04, RSK-05\n\nNext step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.\n\n## Outcome summary\n\n- conformant: 22\n- non-conformant: 2\n- partial: 0\n- not applicable: 1\n- not assessed: 5\n- insufficient evidence: 19\n\n## Assertions\n\n### Unrated\n\n- **DAT-01** (`DAT-01` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 10 (clause reference unverified)\n- **DAT-02** (`DAT-02` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 10 (clause reference unverified)\n- **DAT-03** (`DAT-03` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 10 (clause reference unverified)\n- **DAT-04** (`DAT-04` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, manual; 0/0 failed)\n  - eu-ai-act Art. 10 (clause reference unverified)\n- **DOC-01** (`DOC-01` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 11 / Annex IV (clause reference unverified)\n  - Evidence: `agentce:event/d1`\n- **DOC-02** (`DOC-02` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 13 (clause reference unverified)\n  - Evidence: `agentce:event/d1`\n- **DOC-03** (`DOC-03` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 11 / Annex IV (clause reference unverified)\n  - Evidence: `agentce:event/tc1`\n- **DOC-04** (`DOC-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 13 (clause reference unverified)\n  - Evidence: `agentce:event/d1`\n- **DOC-05** (`DOC-05` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, manual; 0/0 failed)\n  - eu-ai-act Art. 11 / Annex IV (clause reference unverified)\n- **INC-01** (`INC-01` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 72 (clause reference unverified)\n- **INC-02** (`INC-02` @ `spiffe://corp/agents/a`) -> **not applicable** (rung 2, automated; 0/0 failed)\n  - eu-ai-act Art. 73 (clause reference unverified)\n  - eu-ai-act Art. 26(5) (clause reference unverified)\n- **INC-03** (`INC-03` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 26(5) (clause reference unverified)\n- **INC-04** (`INC-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 73 (clause reference unverified)\n  - Evidence: `agentce:event/tc1`\n- **INT-01** (`INT-01` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 12 (clause reference unverified)\n  - Evidence: `agentce:event/tc1`\n- **INT-02** (`INT-02` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act engine integrity (clause reference unverified)\n  - Evidence: `agentce:event/dl1`\n- **INT-03** (`INT-03` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act engine integrity (clause reference unverified)\n  - Evidence: `agentce:event/tc1`\n- **INT-04** (`INT-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act engine integrity (clause reference unverified)\n  - Evidence: `agentce:event/tc1`\n- **OVS-01** (`OVS-01` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 14(4)(a) (clause reference unverified)\n- **OVS-02** (`OVS-02` @ `spiffe://corp/agents/a`) -> **non-conformant** (rung 2, automated; 1/1 failed)\n  - eu-ai-act Art. 14(1)-(3) (clause reference unverified)\n  - Evidence: `agentce:event/d1`\n  - Violations: `agentce:event/d1`\n- **OVS-03** (`OVS-03` @ `spiffe://corp/agents/a`) -> **non-conformant** (rung 2, automated; 1/1 failed)\n  - eu-ai-act Art. 14 (clause reference unverified)\n  - eu-ai-act Art. 26(2) (clause reference unverified)\n  - Evidence: `agentce:event/tc1`\n  - Violations: `agentce:event/tc1`\n- **OVS-04** (`OVS-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 14(4)(c)-(d) (clause reference unverified)\n  - Evidence: `agentce:event/tc1`\n- **OVS-05** (`OVS-05` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 26(2) (clause reference unverified)\n- **OVS-06** (`OVS-06` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 14(4)(e) (clause reference unverified)\n  - Evidence: `agentce:event/tc1`\n- **OVS-07** (`OVS-07` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 14(4)(b) (clause reference unverified)\n- **OVS-08** (`OVS-08` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 14(5) (clause reference unverified)\n- **OVS-09** (`OVS-09` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, manual; 0/0 failed)\n  - eu-ai-act Art. 14(1)-(3) (clause reference unverified)\n- **REC-01** (`REC-01` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 12(1)-(2) (clause reference unverified)\n  - Evidence: `agentce:event/d1`\n- **REC-02** (`REC-02` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 12(1)-(2) (clause reference unverified)\n  - Evidence: `agentce:event/d1`\n- **REC-03** (`REC-03` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 12(2) (clause reference unverified)\n- **REC-04** (`REC-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 12 (clause reference unverified)\n  - eu-ai-act Art. 19 (clause reference unverified)\n  - Evidence: `agentce:event/d1`\n- **REC-05** (`REC-05` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 26(6) (clause reference unverified)\n- **REC-06** (`REC-06` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 19 (clause reference unverified)\n  - Evidence: `agentce:event/tc1`\n- **ROB-01** (`ROB-01` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n  - Evidence: `agentce:event/tc1`\n- **ROB-02** (`ROB-02` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n- **ROB-03** (`ROB-03` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n  - Evidence: `agentce:event/tc1`\n- **ROB-04** (`ROB-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n  - Evidence: `agentce:event/tc1`\n- **ROB-05** (`ROB-05` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n  - Evidence: `agentce:event/tc1`\n- **ROB-06** (`ROB-06` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n  - Evidence: `agentce:event/tc1`\n- **ROB-07** (`ROB-07` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 15 (clause reference unverified)\n- **RSK-01** (`RSK-01` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 9 (clause reference unverified)\n- **RSK-02** (`RSK-02` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 9 (clause reference unverified)\n- **RSK-03** (`RSK-03` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 9 (clause reference unverified)\n- **RSK-04** (`RSK-04` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, manual; 0/0 failed)\n  - eu-ai-act Art. 27 (clause reference unverified)\n- **RSK-05** (`RSK-05` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, manual; 0/0 failed)\n  - eu-ai-act Art. 49 / 71 (clause reference unverified)\n- **TRN-01** (`TRN-01` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 26(11) / 86 (clause reference unverified)\n- **TRN-02** (`TRN-02` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 86 (clause reference unverified)\n  - Evidence: `agentce:event/d1`\n- **TRN-03** (`TRN-03` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 26(11) / 86 (clause reference unverified)\n- **TRN-04** (`TRN-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - eu-ai-act Art. 50 (clause reference unverified)\n  - Evidence: `agentce:event/d1`\n- **TRN-05** (`TRN-05` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - eu-ai-act Art. 50 (clause reference unverified)\n\n",
+  "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Non-conformant \u2014 at least one applicable control failed.</strong></p><p>Top gaps:</p><ul><li>non-conformant: OVS-02, OVS-03</li><li>insufficient evidence: DAT-01, DAT-02, DAT-03, INC-01, INC-03 (+14 more)</li><li>not assessed: DAT-04, DOC-05, OVS-09, RSK-04, RSK-05</li></ul><p>Next step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 22</li><li>non-conformant: 2</li><li>partial: 0</li><li>not applicable: 1</li><li>not assessed: 5</li><li>insufficient evidence: 19</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Title</th><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Severity</th><th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th><th scope=\"col\">Details</th></tr></thead><tbody><tr><td>DAT-01</td><td>DAT-01</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 10 (clause reference unverified)</td><td></td></tr><tr><td>DAT-02</td><td>DAT-02</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 10 (clause reference unverified)</td><td></td></tr><tr><td>DAT-03</td><td>DAT-03</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 10 (clause reference unverified)</td><td></td></tr><tr><td>DAT-04</td><td>DAT-04</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 10 (clause reference unverified)</td><td></td></tr><tr><td>DOC-01</td><td>DOC-01</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 11 / Annex IV (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>DOC-02</td><td>DOC-02</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 13 (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>DOC-03</td><td>DOC-03</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 11 / Annex IV (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>DOC-04</td><td>DOC-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 13 (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>DOC-05</td><td>DOC-05</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 11 / Annex IV (clause reference unverified)</td><td></td></tr><tr><td>INC-01</td><td>INC-01</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 72 (clause reference unverified)</td><td></td></tr><tr><td>INC-02</td><td>INC-02</td><td>spiffe://corp/agents/a</td><td></td><td>not applicable</td><td>eu-ai-act Art. 73 (clause reference unverified); eu-ai-act Art. 26(5) (clause reference unverified)</td><td></td></tr><tr><td>INC-03</td><td>INC-03</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 26(5) (clause reference unverified)</td><td></td></tr><tr><td>INC-04</td><td>INC-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 73 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>INT-01</td><td>INT-01</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 12 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>INT-02</td><td>INT-02</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act engine integrity (clause reference unverified)</td><td>Evidence: agentce:event/dl1</td></tr><tr><td>INT-03</td><td>INT-03</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act engine integrity (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>INT-04</td><td>INT-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act engine integrity (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>OVS-01</td><td>OVS-01</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 14(4)(a) (clause reference unverified)</td><td></td></tr><tr><td>OVS-02</td><td>OVS-02</td><td>spiffe://corp/agents/a</td><td></td><td>non-conformant</td><td>eu-ai-act Art. 14(1)-(3) (clause reference unverified)</td><td>Evidence: agentce:event/d1<br>Violations: agentce:event/d1</td></tr><tr><td>OVS-03</td><td>OVS-03</td><td>spiffe://corp/agents/a</td><td></td><td>non-conformant</td><td>eu-ai-act Art. 14 (clause reference unverified); eu-ai-act Art. 26(2) (clause reference unverified)</td><td>Evidence: agentce:event/tc1<br>Violations: agentce:event/tc1</td></tr><tr><td>OVS-04</td><td>OVS-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 14(4)(c)-(d) (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>OVS-05</td><td>OVS-05</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 26(2) (clause reference unverified)</td><td></td></tr><tr><td>OVS-06</td><td>OVS-06</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 14(4)(e) (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>OVS-07</td><td>OVS-07</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 14(4)(b) (clause reference unverified)</td><td></td></tr><tr><td>OVS-08</td><td>OVS-08</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 14(5) (clause reference unverified)</td><td></td></tr><tr><td>OVS-09</td><td>OVS-09</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 14(1)-(3) (clause reference unverified)</td><td></td></tr><tr><td>REC-01</td><td>REC-01</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 12(1)-(2) (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>REC-02</td><td>REC-02</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 12(1)-(2) (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>REC-03</td><td>REC-03</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 12(2) (clause reference unverified)</td><td></td></tr><tr><td>REC-04</td><td>REC-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 12 (clause reference unverified); eu-ai-act Art. 19 (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>REC-05</td><td>REC-05</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 26(6) (clause reference unverified)</td><td></td></tr><tr><td>REC-06</td><td>REC-06</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 19 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>ROB-01</td><td>ROB-01</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>ROB-02</td><td>ROB-02</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td></td></tr><tr><td>ROB-03</td><td>ROB-03</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>ROB-04</td><td>ROB-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>ROB-05</td><td>ROB-05</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>ROB-06</td><td>ROB-06</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>ROB-07</td><td>ROB-07</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td></td></tr><tr><td>RSK-01</td><td>RSK-01</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 9 (clause reference unverified)</td><td></td></tr><tr><td>RSK-02</td><td>RSK-02</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 9 (clause reference unverified)</td><td></td></tr><tr><td>RSK-03</td><td>RSK-03</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 9 (clause reference unverified)</td><td></td></tr><tr><td>RSK-04</td><td>RSK-04</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 27 (clause reference unverified)</td><td></td></tr><tr><td>RSK-05</td><td>RSK-05</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 49 / 71 (clause reference unverified)</td><td></td></tr><tr><td>TRN-01</td><td>TRN-01</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 26(11) / 86 (clause reference unverified)</td><td></td></tr><tr><td>TRN-02</td><td>TRN-02</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 86 (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>TRN-03</td><td>TRN-03</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 26(11) / 86 (clause reference unverified)</td><td></td></tr><tr><td>TRN-04</td><td>TRN-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 50 (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>TRN-05</td><td>TRN-05</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 50 (clause reference unverified)</td><td></td></tr></tbody></table></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n",
   "oscal": {
     "assessment-results": {
       "uuid": "22fe7070-f169-5c2d-bff8-cc0225de1811",
       "metadata": {
         "title": "AgentCE Assessment Results",
         "version": "0.1.0",
-        "oscal-version": "1.1.2"
+        "oscal-version": "1.1.2",
+        "last-modified": "2026-01-01T00:00:00Z"
+      },
+      "import-ap": {
+        "href": "urn:agentce:assessment-plan:structural"
       },
       "results": [
         {
           "uuid": "2736afa7-2f66-580a-8ade-4df53595c705",
           "title": "AgentCE structural assessment",
+          "description": "AgentCE's structural, statistical, and probe-based assessment of the run's subjects against the resolved catalog(s).",
+          "start": "2026-01-01T00:00:00Z",
+          "reviewed-controls": {
+            "control-selections": [
+              {
+                "include-all": {}
+              }
+            ]
+          },
+          "observations": [
+            {
+              "uuid": "7bf8d705-e217-535d-b3e2-5224609cab16",
+              "description": "Assessment activity for DAT-01 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "d1e08856-34fc-5cd2-96c1-0c735f77a661",
+              "description": "Assessment activity for DAT-02 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "37ae14f7-79fc-5e28-ad16-3fcd816faa00",
+              "description": "Assessment activity for DAT-03 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "31922f18-a499-57a1-b72f-01c899a51a8e",
+              "description": "Assessment activity for DAT-04 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "174397f1-d376-57fd-b8e2-e40074916c53",
+              "description": "Assessment activity for DOC-01 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/d1",
+                  "description": "self_report evidence, digest sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb"
+                }
+              ]
+            },
+            {
+              "uuid": "008bf6d6-5c53-5d57-b7b3-db45b71abff2",
+              "description": "Assessment activity for DOC-02 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/d1",
+                  "description": "self_report evidence, digest sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb"
+                }
+              ]
+            },
+            {
+              "uuid": "ae2c42b4-3082-5321-b402-fe7df29b42fe",
+              "description": "Assessment activity for DOC-03 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/tc1",
+                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b"
+                }
+              ]
+            },
+            {
+              "uuid": "f5b9fd0a-fc20-5024-b16f-8d926394664f",
+              "description": "Assessment activity for DOC-04 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/d1",
+                  "description": "self_report evidence, digest sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb"
+                }
+              ]
+            },
+            {
+              "uuid": "cb71e6ae-ddd7-58c2-b0b0-5ec16f6ce6b4",
+              "description": "Assessment activity for DOC-05 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "12ba383b-4da0-56df-9f13-98d3c13cc4b4",
+              "description": "Assessment activity for INC-01 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "56f238e5-23dc-5ba2-95e7-3f385a6c00e6",
+              "description": "Assessment activity for INC-02 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "d8071300-3eab-516a-9614-16c7383dd48b",
+              "description": "Assessment activity for INC-03 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "a821e867-b97d-57d4-aca6-f61d3bc3cd99",
+              "description": "Assessment activity for INC-04 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/tc1",
+                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b"
+                }
+              ]
+            },
+            {
+              "uuid": "8918fe21-0193-5c28-8369-17da83f86ac1",
+              "description": "Assessment activity for INT-01 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/tc1",
+                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b"
+                }
+              ]
+            },
+            {
+              "uuid": "c7d11e76-c600-562c-858e-d414f585a934",
+              "description": "Assessment activity for INT-02 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/dl1",
+                  "description": "enforcement_point evidence, digest sha256:00b9493911e572ff8cdc6dc7303bd4c36e0b4e1366bbcf6fc80a22424f82dd5d"
+                }
+              ]
+            },
+            {
+              "uuid": "0d3ab344-7ef9-5efb-bfa1-e82048bd5f1e",
+              "description": "Assessment activity for INT-03 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/tc1",
+                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b"
+                }
+              ]
+            },
+            {
+              "uuid": "720d6745-1a2c-5ee8-abba-65255c47b054",
+              "description": "Assessment activity for INT-04 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/tc1",
+                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b"
+                }
+              ]
+            },
+            {
+              "uuid": "98abeca1-5f84-5e90-8627-1fdcc05ec274",
+              "description": "Assessment activity for OVS-01 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "f3342175-d42a-5667-9661-c1ac6e6eac11",
+              "description": "Assessment activity for OVS-02 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/d1",
+                  "description": "self_report evidence, digest sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb"
+                }
+              ]
+            },
+            {
+              "uuid": "ad44f9fa-6795-5f59-b16e-a58a9df08d2a",
+              "description": "Assessment activity for OVS-03 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/tc1",
+                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b"
+                }
+              ]
+            },
+            {
+              "uuid": "9dfa2471-81da-51f0-aef9-f2fc0e494408",
+              "description": "Assessment activity for OVS-04 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/tc1",
+                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b"
+                }
+              ]
+            },
+            {
+              "uuid": "2a7aaf66-565d-5386-89f5-692fa08bfdaa",
+              "description": "Assessment activity for OVS-05 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "4a59be90-98e4-5ae2-9dff-906645a79909",
+              "description": "Assessment activity for OVS-06 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/tc1",
+                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b"
+                }
+              ]
+            },
+            {
+              "uuid": "3b0291f5-eb23-5dd8-8a20-b8ed64663656",
+              "description": "Assessment activity for OVS-07 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "44aff171-a228-5e34-aee2-b21e5691a3a5",
+              "description": "Assessment activity for OVS-08 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "4e99270e-852c-5069-be5d-ae23ebf07fdc",
+              "description": "Assessment activity for OVS-09 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "02c22a7a-9d75-56a0-a853-2cb04774eb7b",
+              "description": "Assessment activity for REC-01 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/d1",
+                  "description": "self_report evidence, digest sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb"
+                }
+              ]
+            },
+            {
+              "uuid": "65fd39ca-ec00-568a-adf8-8e4a5664a7fb",
+              "description": "Assessment activity for REC-02 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/d1",
+                  "description": "self_report evidence, digest sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb"
+                }
+              ]
+            },
+            {
+              "uuid": "82eac061-7c6d-56e8-a69b-39516b76bc60",
+              "description": "Assessment activity for REC-03 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "19323270-708d-517f-b3f4-25990872fce8",
+              "description": "Assessment activity for REC-04 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/d1",
+                  "description": "self_report evidence, digest sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb"
+                }
+              ]
+            },
+            {
+              "uuid": "1cfb89e4-91d0-5833-be29-c178eafeb6ba",
+              "description": "Assessment activity for REC-05 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "e226bbfa-608d-5ae4-b3d0-afc0eee7895e",
+              "description": "Assessment activity for REC-06 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/tc1",
+                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b"
+                }
+              ]
+            },
+            {
+              "uuid": "da4940e9-6408-5e78-9a1a-4357205fb59d",
+              "description": "Assessment activity for ROB-01 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/tc1",
+                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b"
+                }
+              ]
+            },
+            {
+              "uuid": "0bd7e167-5542-5aa9-8501-43bcc269a0f3",
+              "description": "Assessment activity for ROB-02 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "54f1a8ce-3de1-5a8c-b178-a3b6ae8d7ae0",
+              "description": "Assessment activity for ROB-03 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/tc1",
+                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b"
+                }
+              ]
+            },
+            {
+              "uuid": "9d59f716-623e-578a-ad25-1153f1142f42",
+              "description": "Assessment activity for ROB-04 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/tc1",
+                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b"
+                }
+              ]
+            },
+            {
+              "uuid": "b2f15442-2ac0-5985-9f17-1741877f01fe",
+              "description": "Assessment activity for ROB-05 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/tc1",
+                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b"
+                }
+              ]
+            },
+            {
+              "uuid": "f4aa129a-72ab-5be3-9bc8-4344404fd7e7",
+              "description": "Assessment activity for ROB-06 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/tc1",
+                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b"
+                }
+              ]
+            },
+            {
+              "uuid": "aae217a1-d5af-56e1-ac9c-b4a3967e5775",
+              "description": "Assessment activity for ROB-07 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "7b444247-1da0-5bad-b2db-cbedf35251d6",
+              "description": "Assessment activity for RSK-01 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "a7372bc2-b5b7-516d-88a3-d62777969196",
+              "description": "Assessment activity for RSK-02 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "085f9605-d6a6-54ea-a075-c26304e66549",
+              "description": "Assessment activity for RSK-03 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "62c6f4b3-04cb-52b4-aca9-bad039597715",
+              "description": "Assessment activity for RSK-04 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "efb8c1bc-3b97-50ba-b931-d78f5407d426",
+              "description": "Assessment activity for RSK-05 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "3baf277a-ab05-53fd-8db4-55a05250d1fa",
+              "description": "Assessment activity for TRN-01 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "67557727-0f1d-5fd2-ba7c-7c7cd3e5474b",
+              "description": "Assessment activity for TRN-02 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/d1",
+                  "description": "self_report evidence, digest sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb"
+                }
+              ]
+            },
+            {
+              "uuid": "9ceeb780-4208-55b2-b149-1cb68883fdfd",
+              "description": "Assessment activity for TRN-03 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            },
+            {
+              "uuid": "e66b6fa7-f471-5c70-89c5-4b00b665fb7f",
+              "description": "Assessment activity for TRN-04 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z",
+              "relevant-evidence": [
+                {
+                  "href": "agentce:event/d1",
+                  "description": "self_report evidence, digest sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb"
+                }
+              ]
+            },
+            {
+              "uuid": "d723432e-7d51-5061-99a6-9ddd538bc9fa",
+              "description": "Assessment activity for TRN-05 on spiffe://corp/agents/a.",
+              "methods": [
+                "TEST"
+              ],
+              "collected": "2026-01-01T00:00:00Z"
+            }
+          ],
           "findings": [
             {
               "uuid": "f291c4f4-b5a0-568d-bc8a-4564695962bc",
               "title": "DAT-01 for spiffe://corp/agents/a",
+              "description": "DAT-01 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "DAT-01",
@@ -24,11 +576,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:DAT-01",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "7bf8d705-e217-535d-b3e2-5224609cab16"
+                }
+              ]
             },
             {
               "uuid": "68db0af0-9a88-51d9-b126-9d1262a958a5",
               "title": "DAT-02 for spiffe://corp/agents/a",
+              "description": "DAT-02 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "DAT-02",
@@ -36,11 +600,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:DAT-02",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "d1e08856-34fc-5cd2-96c1-0c735f77a661"
+                }
+              ]
             },
             {
               "uuid": "2eae3a24-b20c-503b-8f3c-1f887718b970",
               "title": "DAT-03 for spiffe://corp/agents/a",
+              "description": "DAT-03 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "DAT-03",
@@ -48,11 +624,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:DAT-03",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "37ae14f7-79fc-5e28-ad16-3fcd816faa00"
+                }
+              ]
             },
             {
               "uuid": "26663e80-f4b0-5be2-b4e4-9852300bbdfc",
               "title": "DAT-04 for spiffe://corp/agents/a",
+              "description": "DAT-04 assessed for spiffe://corp/agents/a: not_assessed.",
               "target": {
                 "type": "objective-id",
                 "target-id": "DAT-04",
@@ -60,11 +648,23 @@
                   "state": "not-satisfied",
                   "reason": "not_assessed"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:DAT-04",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "31922f18-a499-57a1-b72f-01c899a51a8e"
+                }
+              ]
             },
             {
               "uuid": "8d2290d7-5c90-564d-a47e-5179a8ec0606",
               "title": "DOC-01 for spiffe://corp/agents/a",
+              "description": "DOC-01 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "DOC-01",
@@ -72,11 +672,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:DOC-01",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "174397f1-d376-57fd-b8e2-e40074916c53"
+                }
+              ]
             },
             {
               "uuid": "1469dab7-0808-5287-b446-7b1e4b249f73",
               "title": "DOC-02 for spiffe://corp/agents/a",
+              "description": "DOC-02 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "DOC-02",
@@ -84,11 +696,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:DOC-02",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "008bf6d6-5c53-5d57-b7b3-db45b71abff2"
+                }
+              ]
             },
             {
               "uuid": "04b33a10-4980-5631-b7bf-34a7e5d96415",
               "title": "DOC-03 for spiffe://corp/agents/a",
+              "description": "DOC-03 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "DOC-03",
@@ -96,11 +720,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:DOC-03",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "ae2c42b4-3082-5321-b402-fe7df29b42fe"
+                }
+              ]
             },
             {
               "uuid": "989ca2fd-f905-5926-b567-d7ce56bca74a",
               "title": "DOC-04 for spiffe://corp/agents/a",
+              "description": "DOC-04 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "DOC-04",
@@ -108,11 +744,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:DOC-04",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "f5b9fd0a-fc20-5024-b16f-8d926394664f"
+                }
+              ]
             },
             {
               "uuid": "2a7516e2-ec33-5553-a42c-131434b83a65",
               "title": "DOC-05 for spiffe://corp/agents/a",
+              "description": "DOC-05 assessed for spiffe://corp/agents/a: not_assessed.",
               "target": {
                 "type": "objective-id",
                 "target-id": "DOC-05",
@@ -120,11 +768,23 @@
                   "state": "not-satisfied",
                   "reason": "not_assessed"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:DOC-05",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "cb71e6ae-ddd7-58c2-b0b0-5ec16f6ce6b4"
+                }
+              ]
             },
             {
               "uuid": "727bca02-b025-5a6c-9203-9527927178d0",
               "title": "INC-01 for spiffe://corp/agents/a",
+              "description": "INC-01 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "INC-01",
@@ -132,11 +792,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:INC-01",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "12ba383b-4da0-56df-9f13-98d3c13cc4b4"
+                }
+              ]
             },
             {
               "uuid": "7ed0ceaa-0e81-511f-b2c9-0c06720bcd1d",
               "title": "INC-02 for spiffe://corp/agents/a",
+              "description": "INC-02 assessed for spiffe://corp/agents/a: not_applicable.",
               "target": {
                 "type": "objective-id",
                 "target-id": "INC-02",
@@ -144,11 +816,23 @@
                   "state": "not-satisfied",
                   "reason": "not_applicable"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:INC-02",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "56f238e5-23dc-5ba2-95e7-3f385a6c00e6"
+                }
+              ]
             },
             {
               "uuid": "f3d7819b-0c49-5c8a-a246-e6073b95b9ea",
               "title": "INC-03 for spiffe://corp/agents/a",
+              "description": "INC-03 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "INC-03",
@@ -156,11 +840,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:INC-03",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "d8071300-3eab-516a-9614-16c7383dd48b"
+                }
+              ]
             },
             {
               "uuid": "3a2c0fa1-1d07-5bd7-9de0-e7452e9f76ba",
               "title": "INC-04 for spiffe://corp/agents/a",
+              "description": "INC-04 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "INC-04",
@@ -168,11 +864,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:INC-04",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "a821e867-b97d-57d4-aca6-f61d3bc3cd99"
+                }
+              ]
             },
             {
               "uuid": "280002e2-dafc-532a-88c6-4faffe3f3607",
               "title": "INT-01 for spiffe://corp/agents/a",
+              "description": "INT-01 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "INT-01",
@@ -180,11 +888,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:INT-01",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "8918fe21-0193-5c28-8369-17da83f86ac1"
+                }
+              ]
             },
             {
               "uuid": "3ebd7c95-36c2-5869-ab96-1d92f30a649b",
               "title": "INT-02 for spiffe://corp/agents/a",
+              "description": "INT-02 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "INT-02",
@@ -192,11 +912,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:INT-02",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "c7d11e76-c600-562c-858e-d414f585a934"
+                }
+              ]
             },
             {
               "uuid": "9bb9323d-58d8-58d6-8329-8370cc11a76b",
               "title": "INT-03 for spiffe://corp/agents/a",
+              "description": "INT-03 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "INT-03",
@@ -204,11 +936,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:INT-03",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "0d3ab344-7ef9-5efb-bfa1-e82048bd5f1e"
+                }
+              ]
             },
             {
               "uuid": "7ab136dc-e92b-59e2-9e4b-847a75054247",
               "title": "INT-04 for spiffe://corp/agents/a",
+              "description": "INT-04 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "INT-04",
@@ -216,11 +960,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:INT-04",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "720d6745-1a2c-5ee8-abba-65255c47b054"
+                }
+              ]
             },
             {
               "uuid": "3df5350a-6728-5906-9691-8b5e7c10edce",
               "title": "OVS-01 for spiffe://corp/agents/a",
+              "description": "OVS-01 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "OVS-01",
@@ -228,11 +984,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:OVS-01",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "98abeca1-5f84-5e90-8627-1fdcc05ec274"
+                }
+              ]
             },
             {
               "uuid": "9c167b02-05e4-549e-807f-393312a5eea1",
               "title": "OVS-02 for spiffe://corp/agents/a",
+              "description": "OVS-02 assessed for spiffe://corp/agents/a: non-conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "OVS-02",
@@ -240,11 +1008,23 @@
                   "state": "not-satisfied",
                   "reason": "non-conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:OVS-02",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "f3342175-d42a-5667-9661-c1ac6e6eac11"
+                }
+              ]
             },
             {
               "uuid": "3df9f50b-d2cb-537d-842a-34f484a505f6",
               "title": "OVS-03 for spiffe://corp/agents/a",
+              "description": "OVS-03 assessed for spiffe://corp/agents/a: non-conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "OVS-03",
@@ -252,11 +1032,23 @@
                   "state": "not-satisfied",
                   "reason": "non-conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:OVS-03",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "ad44f9fa-6795-5f59-b16e-a58a9df08d2a"
+                }
+              ]
             },
             {
               "uuid": "935671e4-d9d3-5f38-8aa0-f43c4a80a233",
               "title": "OVS-04 for spiffe://corp/agents/a",
+              "description": "OVS-04 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "OVS-04",
@@ -264,11 +1056,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:OVS-04",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "9dfa2471-81da-51f0-aef9-f2fc0e494408"
+                }
+              ]
             },
             {
               "uuid": "d77e1c45-c6ce-5379-b37c-c041c6fa3b2e",
               "title": "OVS-05 for spiffe://corp/agents/a",
+              "description": "OVS-05 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "OVS-05",
@@ -276,11 +1080,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:OVS-05",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "2a7aaf66-565d-5386-89f5-692fa08bfdaa"
+                }
+              ]
             },
             {
               "uuid": "4a1f0c14-7059-57a8-a5af-5d2532964fd7",
               "title": "OVS-06 for spiffe://corp/agents/a",
+              "description": "OVS-06 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "OVS-06",
@@ -288,11 +1104,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:OVS-06",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "4a59be90-98e4-5ae2-9dff-906645a79909"
+                }
+              ]
             },
             {
               "uuid": "e3adf9c1-3658-517d-b671-5155f4fc1b96",
               "title": "OVS-07 for spiffe://corp/agents/a",
+              "description": "OVS-07 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "OVS-07",
@@ -300,11 +1128,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:OVS-07",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "3b0291f5-eb23-5dd8-8a20-b8ed64663656"
+                }
+              ]
             },
             {
               "uuid": "3771ae77-51f4-5bc9-88b4-a55f00fe1a2b",
               "title": "OVS-08 for spiffe://corp/agents/a",
+              "description": "OVS-08 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "OVS-08",
@@ -312,11 +1152,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:OVS-08",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "44aff171-a228-5e34-aee2-b21e5691a3a5"
+                }
+              ]
             },
             {
               "uuid": "bcf988ca-15a4-5a8c-bb55-d253d7bd5718",
               "title": "OVS-09 for spiffe://corp/agents/a",
+              "description": "OVS-09 assessed for spiffe://corp/agents/a: not_assessed.",
               "target": {
                 "type": "objective-id",
                 "target-id": "OVS-09",
@@ -324,11 +1176,23 @@
                   "state": "not-satisfied",
                   "reason": "not_assessed"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:OVS-09",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "4e99270e-852c-5069-be5d-ae23ebf07fdc"
+                }
+              ]
             },
             {
               "uuid": "165b0d38-7ca3-596a-9c54-1e2636e22c5f",
               "title": "REC-01 for spiffe://corp/agents/a",
+              "description": "REC-01 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "REC-01",
@@ -336,11 +1200,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:REC-01",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "02c22a7a-9d75-56a0-a853-2cb04774eb7b"
+                }
+              ]
             },
             {
               "uuid": "da4addaf-49ac-5b09-a659-c4a9ef08afc9",
               "title": "REC-02 for spiffe://corp/agents/a",
+              "description": "REC-02 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "REC-02",
@@ -348,11 +1224,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:REC-02",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "65fd39ca-ec00-568a-adf8-8e4a5664a7fb"
+                }
+              ]
             },
             {
               "uuid": "03e4e177-53a7-51f0-a8d9-b83108053929",
               "title": "REC-03 for spiffe://corp/agents/a",
+              "description": "REC-03 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "REC-03",
@@ -360,11 +1248,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:REC-03",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "82eac061-7c6d-56e8-a69b-39516b76bc60"
+                }
+              ]
             },
             {
               "uuid": "3951879a-6d28-5a87-8d32-129d6f624640",
               "title": "REC-04 for spiffe://corp/agents/a",
+              "description": "REC-04 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "REC-04",
@@ -372,11 +1272,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:REC-04",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "19323270-708d-517f-b3f4-25990872fce8"
+                }
+              ]
             },
             {
               "uuid": "8d0b359a-6ade-5d89-94d9-9afa8c1fb50d",
               "title": "REC-05 for spiffe://corp/agents/a",
+              "description": "REC-05 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "REC-05",
@@ -384,11 +1296,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:REC-05",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "1cfb89e4-91d0-5833-be29-c178eafeb6ba"
+                }
+              ]
             },
             {
               "uuid": "856bc7ce-9db9-5648-94e5-0d0841dd580c",
               "title": "REC-06 for spiffe://corp/agents/a",
+              "description": "REC-06 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "REC-06",
@@ -396,11 +1320,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:REC-06",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "e226bbfa-608d-5ae4-b3d0-afc0eee7895e"
+                }
+              ]
             },
             {
               "uuid": "ea6fbf70-8ce8-5d7d-a0ae-fe901080728f",
               "title": "ROB-01 for spiffe://corp/agents/a",
+              "description": "ROB-01 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "ROB-01",
@@ -408,11 +1344,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:ROB-01",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "da4940e9-6408-5e78-9a1a-4357205fb59d"
+                }
+              ]
             },
             {
               "uuid": "75fc8f85-83cd-5749-bb44-d4f0ea1c38ca",
               "title": "ROB-02 for spiffe://corp/agents/a",
+              "description": "ROB-02 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "ROB-02",
@@ -420,11 +1368,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:ROB-02",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "0bd7e167-5542-5aa9-8501-43bcc269a0f3"
+                }
+              ]
             },
             {
               "uuid": "a2425e20-e43a-5a0c-8283-979682b8b606",
               "title": "ROB-03 for spiffe://corp/agents/a",
+              "description": "ROB-03 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "ROB-03",
@@ -432,11 +1392,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:ROB-03",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "54f1a8ce-3de1-5a8c-b178-a3b6ae8d7ae0"
+                }
+              ]
             },
             {
               "uuid": "005836fb-5a1f-53a5-872a-434753691edd",
               "title": "ROB-04 for spiffe://corp/agents/a",
+              "description": "ROB-04 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "ROB-04",
@@ -444,11 +1416,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:ROB-04",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "9d59f716-623e-578a-ad25-1153f1142f42"
+                }
+              ]
             },
             {
               "uuid": "51d42a23-b72d-51cd-8c6a-87d0711e430a",
               "title": "ROB-05 for spiffe://corp/agents/a",
+              "description": "ROB-05 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "ROB-05",
@@ -456,11 +1440,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:ROB-05",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "b2f15442-2ac0-5985-9f17-1741877f01fe"
+                }
+              ]
             },
             {
               "uuid": "77150ef3-1d08-54e0-ba61-ffe24524e9fc",
               "title": "ROB-06 for spiffe://corp/agents/a",
+              "description": "ROB-06 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "ROB-06",
@@ -468,11 +1464,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:ROB-06",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "f4aa129a-72ab-5be3-9bc8-4344404fd7e7"
+                }
+              ]
             },
             {
               "uuid": "ee516369-2839-501c-87cf-8472ae843fe0",
               "title": "ROB-07 for spiffe://corp/agents/a",
+              "description": "ROB-07 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "ROB-07",
@@ -480,11 +1488,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:ROB-07",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "aae217a1-d5af-56e1-ac9c-b4a3967e5775"
+                }
+              ]
             },
             {
               "uuid": "26b751d1-8f4c-5e40-b743-11a90e16aa74",
               "title": "RSK-01 for spiffe://corp/agents/a",
+              "description": "RSK-01 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "RSK-01",
@@ -492,11 +1512,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:RSK-01",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "7b444247-1da0-5bad-b2db-cbedf35251d6"
+                }
+              ]
             },
             {
               "uuid": "cda21e5f-6a50-5daf-9119-fe69bb7d5e3c",
               "title": "RSK-02 for spiffe://corp/agents/a",
+              "description": "RSK-02 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "RSK-02",
@@ -504,11 +1536,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:RSK-02",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "a7372bc2-b5b7-516d-88a3-d62777969196"
+                }
+              ]
             },
             {
               "uuid": "5e8f68aa-c57a-512c-8d3d-83a87b64c2ce",
               "title": "RSK-03 for spiffe://corp/agents/a",
+              "description": "RSK-03 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "RSK-03",
@@ -516,11 +1560,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:RSK-03",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "085f9605-d6a6-54ea-a075-c26304e66549"
+                }
+              ]
             },
             {
               "uuid": "af17ccd9-8db0-5ed1-82b9-63092b99eff9",
               "title": "RSK-04 for spiffe://corp/agents/a",
+              "description": "RSK-04 assessed for spiffe://corp/agents/a: not_assessed.",
               "target": {
                 "type": "objective-id",
                 "target-id": "RSK-04",
@@ -528,11 +1584,23 @@
                   "state": "not-satisfied",
                   "reason": "not_assessed"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:RSK-04",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "62c6f4b3-04cb-52b4-aca9-bad039597715"
+                }
+              ]
             },
             {
               "uuid": "5398014a-377a-5474-9050-fc615e5dbcd9",
               "title": "RSK-05 for spiffe://corp/agents/a",
+              "description": "RSK-05 assessed for spiffe://corp/agents/a: not_assessed.",
               "target": {
                 "type": "objective-id",
                 "target-id": "RSK-05",
@@ -540,11 +1608,23 @@
                   "state": "not-satisfied",
                   "reason": "not_assessed"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:RSK-05",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "efb8c1bc-3b97-50ba-b931-d78f5407d426"
+                }
+              ]
             },
             {
               "uuid": "dad5dc7a-1aac-5ebc-b9f1-6da2b438f197",
               "title": "TRN-01 for spiffe://corp/agents/a",
+              "description": "TRN-01 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "TRN-01",
@@ -552,11 +1632,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:TRN-01",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "3baf277a-ab05-53fd-8db4-55a05250d1fa"
+                }
+              ]
             },
             {
               "uuid": "e0e7025f-7297-51f8-8f90-b8481bd681fa",
               "title": "TRN-02 for spiffe://corp/agents/a",
+              "description": "TRN-02 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "TRN-02",
@@ -564,11 +1656,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:TRN-02",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "67557727-0f1d-5fd2-ba7c-7c7cd3e5474b"
+                }
+              ]
             },
             {
               "uuid": "95259578-f1f8-5159-ab77-4cf54cf5e729",
               "title": "TRN-03 for spiffe://corp/agents/a",
+              "description": "TRN-03 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "TRN-03",
@@ -576,11 +1680,23 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:TRN-03",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "9ceeb780-4208-55b2-b149-1cb68883fdfd"
+                }
+              ]
             },
             {
               "uuid": "068b01a4-95c9-5aff-9d40-d39477b63607",
               "title": "TRN-04 for spiffe://corp/agents/a",
+              "description": "TRN-04 assessed for spiffe://corp/agents/a: conformant.",
               "target": {
                 "type": "objective-id",
                 "target-id": "TRN-04",
@@ -588,11 +1704,23 @@
                   "state": "satisfied",
                   "reason": "conformant"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:TRN-04",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "e66b6fa7-f471-5c70-89c5-4b00b665fb7f"
+                }
+              ]
             },
             {
               "uuid": "d5262c45-f08f-5c4f-9499-7a303ccc8b10",
               "title": "TRN-05 for spiffe://corp/agents/a",
+              "description": "TRN-05 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "target": {
                 "type": "objective-id",
                 "target-id": "TRN-05",
@@ -600,7 +1728,18 @@
                   "state": "not-satisfied",
                   "reason": "insufficient_evidence"
                 }
-              }
+              },
+              "links": [
+                {
+                  "href": "urn:agentce:control:TRN-05",
+                  "rel": "control"
+                }
+              ],
+              "related-observations": [
+                {
+                  "observation-uuid": "d723432e-7d51-5061-99a6-9ddd538bc9fa"
+                }
+              ]
             }
           ]
         }
@@ -3063,8 +4202,8 @@
           "not_assessed"
         ]
       ],
-      "md": "# AgentCE conformance report\n\n## Verdict\n\n**Incomplete \u2014 no control failed, but not every applicable control is demonstrated.**\n\nTop gaps:\n\n- insufficient evidence: DAT-01, DAT-02, DAT-03, DAT-04, DAT-05 (+3 more)\n- not assessed: DOC-05, OVS-09\n\nNext step: Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.\n\n## Outcome summary\n\n- conformant: 1\n- non-conformant: 0\n- partial: 0\n- not applicable: 0\n- not assessed: 2\n- insufficient evidence: 8\n\n## Assertions\n\n- `DAT-01` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-02` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-03` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-04` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-05` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-06` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-07` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DAT-08` @ `spiffe://corp/agents/a` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- `DOC-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `DOC-05` @ `spiffe://corp/agents/a` -> **not assessed** (rung 2, automated; 0/1 failed)\n- `OVS-09` @ `spiffe://corp/agents/a` -> **not assessed** (rung 2, automated; 0/1 failed)\n",
-      "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Incomplete \u2014 no control failed, but not every applicable control is demonstrated.</strong></p><p>Top gaps:</p><ul><li>insufficient evidence: DAT-01, DAT-02, DAT-03, DAT-04, DAT-05 (+3 more)</li><li>not assessed: DOC-05, OVS-09</li></ul><p>Next step: Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 1</li><li>non-conformant: 0</li><li>partial: 0</li><li>not applicable: 0</li><li>not assessed: 2</li><li>insufficient evidence: 8</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th></tr></thead><tbody><tr><td>DAT-01</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td></td></tr><tr><td>DAT-02</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td></td></tr><tr><td>DAT-03</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td></td></tr><tr><td>DAT-04</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td></td></tr><tr><td>DAT-05</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td></td></tr><tr><td>DAT-06</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td></td></tr><tr><td>DAT-07</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td></td></tr><tr><td>DAT-08</td><td>spiffe://corp/agents/a</td><td>insufficient evidence</td><td></td></tr><tr><td>DOC-01</td><td>spiffe://corp/agents/a</td><td>conformant</td><td></td></tr><tr><td>DOC-05</td><td>spiffe://corp/agents/a</td><td>not assessed</td><td></td></tr><tr><td>OVS-09</td><td>spiffe://corp/agents/a</td><td>not assessed</td><td></td></tr></tbody></table></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n"
+      "md": "# AgentCE conformance report\n\n## Verdict\n\n**Incomplete \u2014 no control failed, but not every applicable control is demonstrated.**\n\nTop gaps:\n\n- insufficient evidence: DAT-01, DAT-02, DAT-03, DAT-04, DAT-05 (+3 more)\n- not assessed: DOC-05, OVS-09\n\nNext step: Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.\n\n## Outcome summary\n\n- conformant: 1\n- non-conformant: 0\n- partial: 0\n- not applicable: 0\n- not assessed: 2\n- insufficient evidence: 8\n\n## Assertions\n\n### Unrated\n\n- **DAT-01** (`DAT-01` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- **DAT-02** (`DAT-02` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- **DAT-03** (`DAT-03` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- **DAT-04** (`DAT-04` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- **DAT-05** (`DAT-05` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- **DAT-06** (`DAT-06` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- **DAT-07** (`DAT-07` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- **DAT-08** (`DAT-08` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n- **DOC-01** (`DOC-01` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n- **DOC-05** (`DOC-05` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 2, automated; 0/1 failed)\n- **OVS-09** (`OVS-09` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 2, automated; 0/1 failed)\n\n",
+      "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Incomplete \u2014 no control failed, but not every applicable control is demonstrated.</strong></p><p>Top gaps:</p><ul><li>insufficient evidence: DAT-01, DAT-02, DAT-03, DAT-04, DAT-05 (+3 more)</li><li>not assessed: DOC-05, OVS-09</li></ul><p>Next step: Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 1</li><li>non-conformant: 0</li><li>partial: 0</li><li>not applicable: 0</li><li>not assessed: 2</li><li>insufficient evidence: 8</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Title</th><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Severity</th><th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th><th scope=\"col\">Details</th></tr></thead><tbody><tr><td>DAT-01</td><td>DAT-01</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td></td><td></td></tr><tr><td>DAT-02</td><td>DAT-02</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td></td><td></td></tr><tr><td>DAT-03</td><td>DAT-03</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td></td><td></td></tr><tr><td>DAT-04</td><td>DAT-04</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td></td><td></td></tr><tr><td>DAT-05</td><td>DAT-05</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td></td><td></td></tr><tr><td>DAT-06</td><td>DAT-06</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td></td><td></td></tr><tr><td>DAT-07</td><td>DAT-07</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td></td><td></td></tr><tr><td>DAT-08</td><td>DAT-08</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td></td><td></td></tr><tr><td>DOC-01</td><td>DOC-01</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td></td><td></td></tr><tr><td>DOC-05</td><td>DOC-05</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td></td><td></td></tr><tr><td>OVS-09</td><td>OVS-09</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td></td><td></td></tr></tbody></table></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n"
     },
     {
       "assertions": [
@@ -3084,8 +4223,8 @@
           "not_applicable"
         ]
       ],
-      "md": "# AgentCE conformance report\n\n## Verdict\n\n**Conformant \u2014 every applicable control met its expectations with evidence.**\n\nTop gaps: none\n\nNext step: No gaps. Run the assessment again when the agent, its evidence, or the catalog changes.\n\n## Outcome summary\n\n- conformant: 2\n- non-conformant: 0\n- partial: 0\n- not applicable: 1\n- not assessed: 0\n- insufficient evidence: 0\n\n## Assertions\n\n- `DOC-01` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `DOC-02` @ `spiffe://corp/agents/a` -> **conformant** (rung 2, automated; 0/1 failed)\n- `INC-02` @ `spiffe://corp/agents/a` -> **not applicable** (rung 2, automated; 0/1 failed)\n",
-      "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Conformant \u2014 every applicable control met its expectations with evidence.</strong></p><p>Top gaps: none</p><p>Next step: No gaps. Run the assessment again when the agent, its evidence, or the catalog changes.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 2</li><li>non-conformant: 0</li><li>partial: 0</li><li>not applicable: 1</li><li>not assessed: 0</li><li>insufficient evidence: 0</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th></tr></thead><tbody><tr><td>DOC-01</td><td>spiffe://corp/agents/a</td><td>conformant</td><td></td></tr><tr><td>DOC-02</td><td>spiffe://corp/agents/a</td><td>conformant</td><td></td></tr><tr><td>INC-02</td><td>spiffe://corp/agents/a</td><td>not applicable</td><td></td></tr></tbody></table></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n"
+      "md": "# AgentCE conformance report\n\n## Verdict\n\n**Conformant \u2014 every applicable control met its expectations with evidence.**\n\nTop gaps: none\n\nNext step: No gaps. Run the assessment again when the agent, its evidence, or the catalog changes.\n\n## Outcome summary\n\n- conformant: 2\n- non-conformant: 0\n- partial: 0\n- not applicable: 1\n- not assessed: 0\n- insufficient evidence: 0\n\n## Assertions\n\n### Unrated\n\n- **DOC-01** (`DOC-01` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n- **DOC-02** (`DOC-02` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n- **INC-02** (`INC-02` @ `spiffe://corp/agents/a`) -> **not applicable** (rung 2, automated; 0/1 failed)\n\n",
+      "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Conformant \u2014 every applicable control met its expectations with evidence.</strong></p><p>Top gaps: none</p><p>Next step: No gaps. Run the assessment again when the agent, its evidence, or the catalog changes.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 2</li><li>non-conformant: 0</li><li>partial: 0</li><li>not applicable: 1</li><li>not assessed: 0</li><li>insufficient evidence: 0</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Title</th><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Severity</th><th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th><th scope=\"col\">Details</th></tr></thead><tbody><tr><td>DOC-01</td><td>DOC-01</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td></td><td></td></tr><tr><td>DOC-02</td><td>DOC-02</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td></td><td></td></tr><tr><td>INC-02</td><td>INC-02</td><td>spiffe://corp/agents/a</td><td></td><td>not applicable</td><td></td><td></td></tr></tbody></table></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n"
     },
     {
       "assertions": [
@@ -3110,8 +4249,8 @@
           "insufficient_evidence"
         ]
       ],
-      "md": "# AgentCE conformance report\n\n## Verdict\n\n**Non-conformant \u2014 at least one applicable control failed.**\n\nTop gaps:\n\n- non-conformant: OVS-02\n- partial: REC-01\n- insufficient evidence: REC-02\n\nNext step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.\n\n## Outcome summary\n\n- conformant: 0\n- non-conformant: 2\n- partial: 1\n- not applicable: 0\n- not assessed: 0\n- insufficient evidence: 1\n\n## Assertions\n\n- `OVS-02` @ `spiffe://corp/agents/a` -> **non-conformant** (rung 2, automated; 1/1 failed)\n- `REC-01` @ `spiffe://corp/agents/a` -> **partial** (rung 2, automated; 0/1 failed)\n- `OVS-02` @ `spiffe://corp/agents/b` -> **non-conformant** (rung 2, automated; 1/1 failed)\n- `REC-02` @ `spiffe://corp/agents/b` -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n",
-      "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Non-conformant \u2014 at least one applicable control failed.</strong></p><p>Top gaps:</p><ul><li>non-conformant: OVS-02</li><li>partial: REC-01</li><li>insufficient evidence: REC-02</li></ul><p>Next step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 0</li><li>non-conformant: 2</li><li>partial: 1</li><li>not applicable: 0</li><li>not assessed: 0</li><li>insufficient evidence: 1</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th></tr></thead><tbody><tr><td>OVS-02</td><td>spiffe://corp/agents/a</td><td>non-conformant</td><td></td></tr><tr><td>REC-01</td><td>spiffe://corp/agents/a</td><td>partial</td><td></td></tr><tr><td>OVS-02</td><td>spiffe://corp/agents/b</td><td>non-conformant</td><td></td></tr><tr><td>REC-02</td><td>spiffe://corp/agents/b</td><td>insufficient evidence</td><td></td></tr></tbody></table></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n"
+      "md": "# AgentCE conformance report\n\n## Verdict\n\n**Non-conformant \u2014 at least one applicable control failed.**\n\nTop gaps:\n\n- non-conformant: OVS-02\n- partial: REC-01\n- insufficient evidence: REC-02\n\nNext step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.\n\n## Outcome summary\n\n- conformant: 0\n- non-conformant: 2\n- partial: 1\n- not applicable: 0\n- not assessed: 0\n- insufficient evidence: 1\n\n## Assertions\n\n### Unrated\n\n- **OVS-02** (`OVS-02` @ `spiffe://corp/agents/a`) -> **non-conformant** (rung 2, automated; 1/1 failed)\n- **REC-01** (`REC-01` @ `spiffe://corp/agents/a`) -> **partial** (rung 2, automated; 0/1 failed)\n- **OVS-02** (`OVS-02` @ `spiffe://corp/agents/b`) -> **non-conformant** (rung 2, automated; 1/1 failed)\n- **REC-02** (`REC-02` @ `spiffe://corp/agents/b`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n\n",
+      "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Non-conformant \u2014 at least one applicable control failed.</strong></p><p>Top gaps:</p><ul><li>non-conformant: OVS-02</li><li>partial: REC-01</li><li>insufficient evidence: REC-02</li></ul><p>Next step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 0</li><li>non-conformant: 2</li><li>partial: 1</li><li>not applicable: 0</li><li>not assessed: 0</li><li>insufficient evidence: 1</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Title</th><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Severity</th><th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th><th scope=\"col\">Details</th></tr></thead><tbody><tr><td>OVS-02</td><td>OVS-02</td><td>spiffe://corp/agents/a</td><td></td><td>non-conformant</td><td></td><td></td></tr><tr><td>REC-01</td><td>REC-01</td><td>spiffe://corp/agents/a</td><td></td><td>partial</td><td></td><td></td></tr><tr><td>OVS-02</td><td>OVS-02</td><td>spiffe://corp/agents/b</td><td></td><td>non-conformant</td><td></td><td></td></tr><tr><td>REC-02</td><td>REC-02</td><td>spiffe://corp/agents/b</td><td></td><td>insufficient evidence</td><td></td><td></td></tr></tbody></table></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n"
     }
   ]
 }
