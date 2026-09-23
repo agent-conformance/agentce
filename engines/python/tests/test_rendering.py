@@ -63,6 +63,49 @@ def test_html_escapes_evidence_derived_strings() -> None:
     assert "&lt;script&gt;" in page
 
 
+def _crosswalk_assertions() -> list[Assertion]:
+    base = _assertions()[0]
+    unverified = Assertion(
+        **{
+            **base.__dict__,
+            "crosswalk": [
+                {
+                    "framework": "eu-ai-act",
+                    "clause": "Art. 11 / Annex IV",
+                    "verified": False,
+                }
+            ],
+        }
+    )
+    verified = Assertion(
+        **{
+            **base.__dict__,
+            "control": "DAT-01",
+            "crosswalk": [
+                {
+                    "framework": "eu-ai-act",
+                    "clause": "TEST-CLAUSE-VERIFIED-99",
+                    "verified": True,
+                }
+            ],
+        }
+    )
+    return [unverified, verified]
+
+
+def test_crosswalk_citation_renders_unverified_label_only_when_not_verified() -> None:
+    """SPEC §7.3: every rendering shows the clause citation, and labels it unverified exactly
+    when its carried ``verified`` flag is not ``True`` -- never unconditionally on or off."""
+    assertions = _crosswalk_assertions()
+    counts = aggregate(assertions)
+    md = render_report_md(assertions, counts)
+    html = render_report_html(assertions, counts)
+    for page in (md, html):
+        assert "Art. 11 / Annex IV" in page
+        assert "TEST-CLAUSE-VERIFIED-99" in page
+        assert page.lower().count("unverified") == 1
+
+
 def test_markdown_translation_changes_text() -> None:
     counts = aggregate(_assertions())
     assert render_report_md(_assertions(), counts, language="en") != render_report_md(

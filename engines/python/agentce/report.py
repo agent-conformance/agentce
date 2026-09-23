@@ -68,6 +68,14 @@ def _outcome_label(catalogue: dict[str, str], outcome: str) -> str:
     return catalogue.get(f"outcome.{outcome}", outcome)
 
 
+def _crosswalk_text(entry: dict[str, Any], cat: dict[str, str]) -> str:
+    """One clause citation, labelled unverified when the carried flag is not ``True`` (SPEC §7.3)."""
+    text = f"{entry.get('framework', '')} {entry.get('clause', '')}".strip()
+    if entry.get("verified") is not True:
+        text += f" {cat['report.crosswalk_unverified']}"
+    return text
+
+
 def _verdict_md(summary: dict[str, Any], cat: dict[str, str]) -> list[str]:
     """The lines that lead the report: the verdict, the top gaps, and the next step (SPEC §9.2)."""
     state = summary["verdict"]
@@ -149,6 +157,7 @@ def render_report_md(
             f"- `{a.control}` @ `{a.subject}` -> **{_outcome_label(cat, a.outcome)}** "
             f"(rung {a.rung}, {a.mode}; {a.population[1]}/{a.population[0]} failed)"
         )
+        lines += [f"  - {_crosswalk_text(e, cat)}" for e in a.crosswalk]
     lines += [""] + _provenance_md(catalogs or [], invocation)
     return "\n".join(lines) + "\n"
 
@@ -196,11 +205,12 @@ def render_report_html(
     )
     rows = "".join(
         f"<tr><td>{html.escape(a.control)}</td><td>{html.escape(a.subject)}</td>"
-        f"<td>{html.escape(_outcome_label(cat, a.outcome))}</td></tr>"
+        f"<td>{html.escape(_outcome_label(cat, a.outcome))}</td>"
+        f"<td>{'; '.join(html.escape(_crosswalk_text(e, cat)) for e in a.crosswalk)}</td></tr>"
         for a in sorted(assertions, key=lambda x: (x.subject, x.control))
     )
     body_rows = rows or (
-        f'<tr><td colspan="3">{html.escape(cat["report.no_controls"])}</td></tr>'
+        f'<tr><td colspan="4">{html.escape(cat["report.no_controls"])}</td></tr>'
     )
     return (
         f'<!doctype html><html lang="{html.escape(language)}"><head><meta charset="utf-8">'
@@ -216,7 +226,7 @@ def render_report_html(
         f"{html.escape(cat['report.assertions_heading'])}</h2>"
         f"<table><caption>{html.escape(cat['report.assertions_heading'])}</caption>"
         '<thead><tr><th scope="col">Control</th><th scope="col">Subject</th>'
-        '<th scope="col">Outcome</th></tr></thead>'
+        '<th scope="col">Outcome</th><th scope="col">Clause</th></tr></thead>'
         f"<tbody>{body_rows}</tbody></table></section>"
         f"{_provenance_html(catalogs or [], invocation)}"
         f"<footer><p>{html.escape(cat['report.affected_persons'])}</p></footer>"
@@ -301,6 +311,7 @@ def render_evidence_pack(
                 "outcome": a.outcome,
                 "mode": a.mode,
                 "evidence": sorted({e.ref for e in a.evidence}),
+                **({"crosswalk": a.crosswalk} if a.crosswalk else {}),
             }
             for a in assertions
         ],
