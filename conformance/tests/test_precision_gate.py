@@ -75,3 +75,9 @@ def test_scope_is_stated_and_accurate_in_the_readme(small_corpus: Path) -> None:
         f"README does not state the gate's real scope ({n} of {automated} automated, "
         f"{total} total): {readme}"
     )
+    # The count alone is not enough: swapping which controls are scored while the count stays the
+    # same must also be caught, so the README must name every control the gate actually scores.
+    missing_names = [c for c in scored if c.lower() not in readme]
+    assert not missing_names, (
+        f"README's scope line does not name every scored control: missing {missing_names}"
+    )

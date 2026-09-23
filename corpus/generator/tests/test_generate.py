@@ -157,6 +157,15 @@ def test_held_out_and_adversarial_recipes_are_disjoint_from_core(
             assert (p["style"], p["variant"]) in reserved
         elif p["group"] == "core":
             assert (p["style"], p["variant"]) not in reserved
+    # A minimum-size guard: shrinking the reserved-recipe sets to near-triviality (e.g. one recipe
+    # each) must not silently stay green -- each subset needs at least 3 distinct recipes and must
+    # span every domain, or it is no longer a meaningful blind check.
+    assert len(generate.HELD_OUT_COMBOS) >= 3
+    assert len(generate.ADVERSARIAL_COMBOS) >= 3
+    all_domains = {d.name for d in generate.DOMAINS}
+    for group in ("held-out", "adversarial"):
+        domains = {p["domain"] for p in projects if p["group"] == group}
+        assert domains == all_domains, f"{group} does not span every domain: {domains}"
 
 
 def test_project_layout_is_complete(tmp_path: Path) -> None:
