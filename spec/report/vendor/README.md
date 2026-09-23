@@ -7,6 +7,7 @@ mirrored into every engine's `data/schemas/` and checked for drift by that engin
 | File | Source | Retrieved | SHA-256 |
 |---|---|---|---|
 | `oscal-assessment-results-nist-1.1.2.schema.json` | `https://github.com/usnistgov/OSCAL/releases/download/v1.1.2/oscal_assessment-results_schema.json` | 2026-09-23 | `d033da70154cf6625ae46a746199e88e58f2928b1387dfac051d381b92f41b0d` |
+| `sarif-2.1.0.schema.json` | `https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json` | 2026-09-23 | `c3b4bb2d6093897483348925aaa73af03b3e3f4bd4ca38cef26dcb4212a2682e` |
 
 ## Re-vendoring
 
@@ -18,10 +19,20 @@ curl -sSL -o spec/report/vendor/oscal-assessment-results-nist-1.1.2.schema.json 
   https://github.com/usnistgov/OSCAL/releases/download/v1.1.2/oscal_assessment-results_schema.json
 rsync -a spec/report/vendor/oscal-assessment-results-nist-1.1.2.schema.json \
   engines/python/agentce/data/schemas/
+
+curl -sSL -o spec/report/vendor/sarif-2.1.0.schema.json \
+  https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json
+rsync -a spec/report/vendor/sarif-2.1.0.schema.json \
+  engines/python/agentce/data/schemas/
 ```
 
-This file is JSON Schema draft-07 (`$schema: http://json-schema.org/draft-07/schema#`), not the
-2020-12 dialect the rest of `spec/report/` uses; validate it with a draft-07 validator. Its
-`TokenDatatype` definition uses a Unicode property escape (`\p{L}`, `\p{N}`) that Python's standard
-`re` module cannot compile; engines validate against it with the third-party `regex` module instead
-(see `agentce.report._oscal_ar_validator`).
+`oscal-assessment-results-nist-1.1.2.schema.json` is JSON Schema draft-07
+(`$schema: http://json-schema.org/draft-07/schema#`), not the 2020-12 dialect the rest of
+`spec/report/` uses; validate it with a draft-07 validator. Its `TokenDatatype` definition uses a
+Unicode property escape (`\p{L}`, `\p{N}`) that Python's standard `re` module cannot compile; engines
+validate against it with the third-party `regex` module instead (see
+`agentce.report._oscal_ar_validator`).
+
+`sarif-2.1.0.schema.json` is the OASIS Standard SARIF 2.1.0 schema (errata01), JSON Schema draft-04;
+validate it with a draft-04 validator (`agentce.report.validate_sarif_2_1_0`). It needs no exotic regex
+support -- Python's standard `re` module compiles every pattern it uses.

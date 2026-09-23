@@ -79,6 +79,28 @@ def test_vendored_nist_oscal_ar_schema_matches_its_source_and_pin() -> None:
     )
 
 
+#: The upstream release this file is vendored from (`spec/report/vendor/README.md`); catches drift in
+#: either copy at once, even if both changed together.
+_SARIF_2_1_0_SHA256 = "c3b4bb2d6093897483348925aaa73af03b3e3f4bd4ca38cef26dcb4212a2682e"
+
+
+def test_vendored_sarif_2_1_0_schema_matches_its_source_and_pin() -> None:
+    import hashlib
+
+    name = "sarif-2.1.0.schema.json"
+    vendored = bundled.catalogs_dir().parent / "schemas" / name
+    authoritative = _REPO_ROOT / "spec" / "report" / "vendor" / name
+    vendored_bytes = vendored.read_bytes()
+    assert vendored_bytes == authoritative.read_bytes(), (
+        f"{vendored} drifted from {authoritative}; re-sync with "
+        f"`cp {authoritative} {vendored}`"
+    )
+    assert hashlib.sha256(vendored_bytes).hexdigest() == _SARIF_2_1_0_SHA256, (
+        "vendored OASIS SARIF 2.1.0 schema no longer matches its recorded digest "
+        "(spec/report/vendor/README.md) -- update the pin only after re-vendoring deliberately"
+    )
+
+
 def test_bundled_data_resolves_through_the_package_not_the_checkout() -> None:
     assert (bundled.catalogs_dir() / "base" / "eu-ai-act" / "catalog.yaml").is_file()
     assert (bundled.quickstart_dir() / "applicability.yaml").is_file()
