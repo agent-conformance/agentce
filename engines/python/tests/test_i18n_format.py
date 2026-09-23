@@ -12,8 +12,8 @@ def test_plain_interpolation() -> None:
     )
 
 
-def test_template_without_placeholders_is_returned_unchanged() -> None:
-    assert i18n_format.format_message("no placeholders here") == "no placeholders here"
+def test_template_with_no_interpolation_slots_is_returned_unchanged() -> None:
+    assert i18n_format.format_message("static text only") == "static text only"
 
 
 def test_plural_one_category() -> None:

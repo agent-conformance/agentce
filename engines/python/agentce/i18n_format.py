@@ -3,7 +3,7 @@
 The catalogue (authored once under ``spec/i18n/``, vendored byte-identical to ``agentce/data/i18n/``,
 ``tests/test_bundled_data.py`` holds the two in sync) backs both the CLI/error strings
 (:mod:`agentce.error_catalogue`) and the report strings (:mod:`agentce.messages`). Most entries are
-plain text or carry a single ``{var}`` placeholder; a handful use a real ICU
+plain text or carry a single ``{var}`` interpolation slot; a handful use a real ICU
 ``{var, plural, one {...} other {...}}`` or ``{var, select, ...}`` construct. This module implements
 just that subset -- not a general ICU MessageFormat engine -- because that is everything the
 catalogue actually uses.
