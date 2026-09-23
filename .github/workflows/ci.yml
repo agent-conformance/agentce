@@ -228,6 +228,31 @@ jobs:
       - name: The collect pages and example config state what is built
         run: uv run --project engines/python --frozen python tools/collect_check.py
 
+  collect-ingest:
+    # `agentce ingest` turns a real, committed adapter export into a bundle `agentce validate`
+    # accepts, and a real `agentce collect` run against the shipped example config completes every
+    # source by reading its local export -- both without a live connector. An ADR names the
+    # OpenTelemetry Collector recipe that produces such an export and points at a real artifact.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Sync the engine
+        working-directory: engines/python
+        run: uv sync --frozen
+      - name: Sync the exercised adapters
+        run: |
+          for adapter in otel-genai mcp-gateway policy-engines; do
+            (cd "adapters/$adapter" && uv sync --frozen)
+          done
+      - name: collect_ingest_check self-test
+        run: uv run --project engines/python --frozen python tools/collect_ingest_check.py --self-test
+      - name: ingest, collect, and the collector component all work
+        run: uv run --project engines/python --frozen python tools/collect_ingest_check.py
+
   evidence-input-hardening:
     # An evidence bundle's manifest, YAML files, and event lines are adversarial input (SPEC §8.1,
     # §8.7; docs/threat-model.md "Untrusted evidence-bundle input hardening"). A manifest-listed path
