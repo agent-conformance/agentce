@@ -1,28 +1,34 @@
 # `agentce collect`
 
-Plan a scheduled collection job; no source connector exists yet.
+Run a scheduled collection job over sources with a local export, or plan one.
 
 ```text
 usage: agentce collect [-h] [--json] [--debug] [--quiet] [--config CONFIG]
-                       [--out OUT] [--dry-run]
+                       [--out OUT] [--dry-run] [--adapters-root ADAPTERS_ROOT]
 
-Plan a scheduled collection job from a config. --dry-run lists what would be
-collected and resolves no credential. A real run has no source connector yet
-(on the roadmap): it records every source incomplete, reason 'no source
-connector in the reference collector', and exits 1. To get evidence into a
-bundle today, emit it with agentce-emit.
+Plan or run a scheduled collection job from a config. --dry-run lists what
+would be collected and resolves no credential. A real run adapts every source
+that names a local export (already written by its own pipeline, e.g. an OTel
+Collector's file exporter, SPEC 5.4) and records it complete; a source with no
+export, or whose export cannot be adapted, is recorded incomplete, reason 'no
+source connector in the reference collector', and the run exits 1. To get
+evidence into a bundle today without a config, emit it with agentce-emit, or
+adapt one export file directly with `agentce ingest`.
 
 options:
-  -h, --help       show this help message and exit
-  --config CONFIG  the collection config file
-  --out OUT        the output bundle path
-  --dry-run        plan only; write nothing
+  -h, --help            show this help message and exit
+  --config CONFIG       the collection config file
+  --out OUT             the output bundle path
+  --dry-run             plan only; write nothing
+  --adapters-root ADAPTERS_ROOT
+                        the adapters checkout a source's `export` is resolved
+                        through (default: ./adapters)
 
 global options:
-  --json           emit machine-readable JSON on stdout
-  --debug          verbose logs on stderr and a stack trace on unexpected
-                   errors
-  --quiet          log warnings and errors only
+  --json                emit machine-readable JSON on stdout
+  --debug               verbose logs on stderr and a stack trace on unexpected
+                        errors
+  --quiet               log warnings and errors only
 ```
 
 Exit codes follow the [common CLI scheme](index.md#exit-codes).

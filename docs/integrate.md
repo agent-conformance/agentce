@@ -74,9 +74,12 @@ have an enforcement point available.
 
 ## From a session to an assessment
 
-1. Emit evidence (above) into a bundle. `agentce collect` cannot pull evidence from source systems yet:
-   it has no source connector, so a real run records every source `incomplete` and exits 1, and
-   `--dry-run` only plans the job. A working connector is on the roadmap.
+1. Emit evidence (above) into a bundle, or read it from an export a source already wrote. `agentce
+   ingest --adapter <name> --in <export file> --out <bundle>` adapts one file directly; `agentce
+   collect` runs a scheduled job over a config's sources, reading each one's local `export` (an
+   OpenTelemetry Collector's file exporter writes this shape, SPEC §5.4) and recording it `complete`.
+   A source with no `export`, or whose export cannot be adapted, has no live connector: it is recorded
+   `incomplete` and the run exits 1, never hidden. `--dry-run` only plans the job.
 2. `agentce validate --bundle <dir>` — fix quarantines until it is clean.
 3. `agentce assess --bundle <dir> --catalog eu-ai-act@2026.09 --profile agentce/applicability.yaml`.
 4. Resolve any `insufficient_evidence` with the `agentce-onboard` skill's `explain_insufficient`, then
