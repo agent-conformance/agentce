@@ -44,6 +44,292 @@ jobs:
         run: |
           node scripts/quickstart-hero.mjs --self-test
           node scripts/quickstart-hero.mjs
+      - name: Every real catalog control has a generated, content-matching reference page
+        run: |
+          set -u
+
+          # Fresh-clone-safe bootstrap: node_modules is gitignored and absent from a fresh clone --
+          # exactly what RED capture builds from (a clean `git clone` of base_sha) -- so it is
+          # populated here from the local pnpm content-addressable store with `--offline` (no
+          # network) instead of being copied from a pre-existing node_modules. website is the repo's
+          # sole pnpm workspace member (pnpm-workspace.yaml) and its build-iris.mjs step resolves the
+          # canonical-IRI sources relative to the repo root (../../spec/... from website/scripts/),
+          # so the build runs at the repo root directly rather than in an isolated per-package copy,
+          # which would otherwise have to duplicate the rest of the repo just to satisfy that script.
+          # A setup/build failure here is never the defect this check exists to find, so it gets its
+          # own exit code (3), distinct from both the defect's exit (1) and GREEN's exit (0).
+          rm -rf website/dist
+          pnpm install --offline --frozen-lockfile
+          install_exit=$?
+          if [ "$install_exit" -ne 0 ]; then
+            echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          pnpm -C website build
+          build_exit=$?
+          if [ "$build_exit" -ne 0 ]; then
+            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          env -u VIRTUAL_ENV uv run --project engines/python --frozen python3 - "website/dist" <<'PY'
+          import glob, re, sys
+          import yaml
+
+          dist = sys.argv[1]
+
+          # Ground truth: every real control id, read directly from the committed catalogs' own YAML
+          # -- never from any generated output -- so a partial or hand-written page set cannot slip
+          # past as complete. Scope: the base catalog plus its sector/behavioural overlays (the
+          # catalogs the standard itself ships). org-template is an adopter starting point ("copy this
+          # directory and replace ORG-01 with your own controls" -- its own catalog.yaml), not one of
+          # the standard's own controls.
+          catalog_dirs = [
+              "spec/catalogs/base/eu-ai-act",
+              "spec/catalogs/overlays/conduct",
+              "spec/catalogs/overlays/employment",
+              "spec/catalogs/overlays/finance",
+              "spec/catalogs/overlays/insurance",
+          ]
+          real_ids = set()
+          for d in catalog_dirs:
+              for f in glob.glob(f"{d}/controls/*.yaml"):
+                  doc = yaml.safe_load(open(f, encoding="utf-8"))
+                  real_ids.add(doc["id"])
+
+          if len(real_ids) < 40:
+              print(f"ground-truth control count implausibly low ({len(real_ids)}) -- fixture problem", file=sys.stderr)
+              sys.exit(3)
+
+          # Observed: every distinct control id that is the entire <h1> of some built HTML page.
+          # scripts/check-site.mjs (this repo's own offline site check, run in CI) already requires
+          # every page to carry exactly one <h1> -- so one id appearing as some page's h1 can only be
+          # satisfied by a distinct page per id; a single index page that merely lists/links every id
+          # cannot inflate the count.
+          h1_re = re.compile(r"<h1[^>]*>(.*?)</h1>", re.S)
+          matched = {}
+          for path in glob.glob(f"{dist}/**/*.html", recursive=True):
+              html = open(path, encoding="utf-8").read()
+              for h1 in h1_re.findall(html):
+                  text = re.sub(r"<[^>]+>", "", h1)
+                  for cid in real_ids:
+                      if cid in text:
+                          matched.setdefault(cid, path)
+
+          missing = sorted(real_ids - matched.keys())
+          if missing:
+              print(f"RED: {len(missing)}/{len(real_ids)} catalog controls have no generated "
+                    f"reference page (<h1> match) in the built site, e.g. {missing[:5]}", file=sys.stderr)
+              sys.exit(1)
+          print(f"GREEN: all {len(real_ids)} catalog controls have a distinct generated reference page in the built site")
+          sys.exit(0)
+          PY
+          exit $?
+      - name: Every canonical IRI has a distinct human page and a schema/IRI explorer links them all
+        run: |
+          set -u
+
+          # Fresh-clone-safe bootstrap: node_modules is gitignored and absent from a fresh clone --
+          # exactly what RED capture builds from (a clean `git clone` of base_sha) -- so it is
+          # populated here from the local pnpm content-addressable store with `--offline` (no
+          # network) instead of being copied from a pre-existing node_modules. website is the repo's
+          # sole pnpm workspace member (pnpm-workspace.yaml) and its build-iris.mjs step resolves the
+          # canonical-IRI sources relative to the repo root (../../spec/... from website/scripts/),
+          # so the build runs at the repo root directly rather than in an isolated per-package copy,
+          # which would otherwise have to duplicate the rest of the repo just to satisfy that script.
+          # A setup/build failure here is never the defect this check exists to find, so it gets its
+          # own exit code (3), distinct from both the defect's exit (1) and GREEN's exit (0).
+          rm -rf website/dist
+          pnpm install --offline --frozen-lockfile
+          install_exit=$?
+          if [ "$install_exit" -ne 0 ]; then
+            echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          pnpm -C website build
+          build_exit=$?
+          if [ "$build_exit" -ne 0 ]; then
+            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          env -u VIRTUAL_ENV uv run --project engines/python --frozen python3 - "website/dist" <<'PY'
+          import glob, json, re, sys
+          from pathlib import Path
+
+          dist = sys.argv[1]
+          manifest = json.loads(Path("website/iri-manifest.json").read_text(encoding="utf-8"))
+          if len(manifest) < 10:
+              print(f"iri-manifest.json has only {len(manifest)} entries -- fixture/assumption stale", file=sys.stderr)
+              sys.exit(3)
+
+          # Acceptable match text for each canonical IRI: its own path, plus -- for a *.schema.json
+          # source that declares one -- its own "title" field, so a fix may render a human title
+          # instead of the bare path.
+          targets = []
+          for e in manifest:
+              labels = {e["path"]}
+              src = Path(e["source"])
+              if src.suffix == ".json":
+                  try:
+                      doc = json.loads(src.read_text(encoding="utf-8"))
+                      if isinstance(doc, dict) and isinstance(doc.get("title"), str):
+                          labels.add(doc["title"])
+                  except Exception:
+                      pass
+              targets.append((e["path"], labels))
+
+          html_files = glob.glob(f"{dist}/**/*.html", recursive=True)
+          h1_re = re.compile(r"<h1[^>]*>(.*?)</h1>", re.S)
+          page_h1_text = {}
+          page_full_text = {}
+          for path in html_files:
+              html = open(path, encoding="utf-8").read()
+              page_h1_text[path] = " ".join(re.sub(r"<[^>]+>", "", h) for h in h1_re.findall(html))
+              page_full_text[path] = html
+
+          problems = []
+
+          # (b) a distinct, generated human page per canonical IRI/schema -- proven the same way C1
+          # proves it for controls: the IRI's own path or schema title is the entire <h1> of some
+          # built page, and check-site.mjs's one-<h1>-per-page rule means that can only be satisfied
+          # by a distinct page each.
+          missing = [
+              path for path, labels in targets
+              if not any(any(label in h1text for label in labels) for h1text in page_h1_text.values())
+          ]
+          if missing:
+              problems.append(
+                  f"{len(missing)}/{len(targets)} canonical IRIs have no distinct generated human page "
+                  f"(<h1> match on the IRI's own path or schema title): {missing}"
+              )
+
+          # (e) a schema/IRI explorer: one page that surfaces every canonical IRI together, not just
+          # the per-item pages -- so an auditor can discover the full set from a single starting point.
+          explorer_found = any(
+              all(e["path"] in text for e in manifest) for text in page_full_text.values()
+          )
+          if not explorer_found:
+              problems.append("no single page (a schema/IRI explorer) lists/links all of the canonical IRIs together")
+
+          if problems:
+              print("RED:", file=sys.stderr)
+              for p in problems:
+                  print(f"  {p}", file=sys.stderr)
+              sys.exit(1)
+          print(f"GREEN: all {len(targets)} canonical IRIs have a distinct human reference page, and a schema/IRI explorer page links them all together")
+          sys.exit(0)
+          PY
+          exit $?
+      - name: llms.txt is real and the glossary page defines every canonical term
+        run: |
+          set -u
+
+          # Fresh-clone-safe bootstrap: node_modules is gitignored and absent from a fresh clone --
+          # exactly what RED capture builds from (a clean `git clone` of base_sha) -- so it is
+          # populated here from the local pnpm content-addressable store with `--offline` (no
+          # network) instead of being copied from a pre-existing node_modules. website is the repo's
+          # sole pnpm workspace member (pnpm-workspace.yaml) and its build-iris.mjs step resolves the
+          # canonical-IRI sources relative to the repo root (../../spec/... from website/scripts/),
+          # so the build runs at the repo root directly rather than in an isolated per-package copy,
+          # which would otherwise have to duplicate the rest of the repo just to satisfy that script.
+          # A setup/build failure here is never the defect this check exists to find, so it gets its
+          # own exit code (3), distinct from both the defect's exit (1) and GREEN's exit (0).
+          #
+          # This check's `overlay: ["spec/methodology/glossary.yaml"]` matters only for RED capture
+          # at base_sha, where that file does not exist yet (it is new on the fix branch). At the fix
+          # commit and in real CI the file is already committed, so the overlay is a no-op there.
+          rm -rf website/dist
+          pnpm install --offline --frozen-lockfile
+          install_exit=$?
+          if [ "$install_exit" -ne 0 ]; then
+            echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          pnpm -C website build
+          build_exit=$?
+          if [ "$build_exit" -ne 0 ]; then
+            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          env -u VIRTUAL_ENV uv run --project engines/python --frozen python3 - "website/dist" <<'PY'
+          import glob, json, re, sys
+          from pathlib import Path
+
+          dist = sys.argv[1]
+          problems = []
+
+          # --- (d) llms.txt: must exist, be non-empty, and be shaped like a real llms.txt (an H1
+          # title, then markdown links) with enough links to plausibly cover the canonical IRI set --
+          # not a one-line stub. The link floor is read from iri-manifest.json at run time, never
+          # hardcoded.
+          manifest = json.loads(Path("website/iri-manifest.json").read_text(encoding="utf-8"))
+          llms_path = Path(dist) / "llms.txt"
+          if not llms_path.is_file() or llms_path.stat().st_size == 0:
+              problems.append(f"{llms_path}: missing or empty (no llms.txt served by the built site)")
+          else:
+              text = llms_path.read_text(encoding="utf-8")
+              if not re.match(r"^#\s+\S", text.lstrip("﻿")):
+                  problems.append("llms.txt: does not start with a markdown H1 title ('# ...')")
+              link_count = text.count("](")
+              if link_count < len(manifest):
+                  problems.append(
+                      f"llms.txt: only {link_count} markdown links, fewer than the {len(manifest)} "
+                      f"canonical IRIs alone -- looks like a stub, not a real generated index"
+                  )
+
+          # --- (c) glossary: a dedicated page (h1 contains "glossary") that defines every term the
+          # committed glossary source declares (spec/methodology/glossary.yaml), each as a real <dt>
+          # definition-list term, not merely a word that happens to occur in running prose, so the
+          # website glossary cannot drift from its own committed source.
+          import yaml as _yaml
+          glossary_path = Path("spec/methodology/glossary.yaml")
+          if not glossary_path.is_file():
+              print(f"{glossary_path}: not found -- this check's ground-truth fixture is missing, not the defect", file=sys.stderr)
+              sys.exit(3)
+          glossary_doc = _yaml.safe_load(glossary_path.read_text(encoding="utf-8")) or {}
+          real_terms = [entry["term"] for entry in (glossary_doc.get("terms") or [])]
+          if len(real_terms) < 5:
+              print(f"ground-truth glossary term count implausibly low ({len(real_terms)}) -- fixture problem", file=sys.stderr)
+              sys.exit(3)
+
+
+          glossary_page = None
+          h1_re = re.compile(r"<h1[^>]*>(.*?)</h1>", re.S)
+          for path in glob.glob(f"{dist}/**/*.html", recursive=True):
+              html = open(path, encoding="utf-8").read()
+              for h1 in h1_re.findall(html):
+                  if "glossary" in re.sub(r"<[^>]+>", "", h1).lower():
+                      glossary_page = path
+                      break
+              if glossary_page:
+                  break
+
+          if not glossary_page:
+              problems.append("no page has a <h1> identifying it as the glossary")
+          else:
+              html = open(glossary_page, encoding="utf-8").read()
+              dt_terms = [re.sub(r"<[^>]+>", "", dt) for dt in re.findall(r"<dt[^>]*>(.*?)</dt>", html, re.S)]
+              missing_terms = [term for term in real_terms if not any(term in dt for dt in dt_terms)]
+              if missing_terms:
+                  problems.append(
+                      f"glossary page ({glossary_page}) is missing {len(missing_terms)}/{len(real_terms)} "
+                      f"real glossary.yaml terms as <dt> entries: {missing_terms}"
+                  )
+
+          if problems:
+              print("RED:", file=sys.stderr)
+              for p in problems:
+                  print(f"  {p}", file=sys.stderr)
+              sys.exit(1)
+          print(f"GREEN: llms.txt is served with a real link index, and the glossary page defines all {len(real_terms)} real spec/methodology/glossary.yaml terms")
+          sys.exit(0)
+          PY
+          exit $?
 
   docs-doctest:
     runs-on: ubuntu-latest
