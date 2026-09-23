@@ -442,3 +442,15 @@ allow:
     count: 12
     class: legitimate
     justification: "Byte-identical vendored copy of spec/report/vendor/oscal-assessment-results-nist-1.1.2.schema.json, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: spec/report/vendor/sarif-2.1.0.schema.json
+    pattern: placeholder
+    count: 2
+    class: legitimate
+    justification: "Vendored OASIS SARIF 2.1.0 schema: OASIS's own multiformatMessageString field descriptions use the word 'placeholders' for message-string interpolation tokens; third-party text we do not edit."
+
+  - path: engines/python/agentce/data/schemas/sarif-2.1.0.schema.json
+    pattern: placeholder
+    count: 2
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/report/vendor/sarif-2.1.0.schema.json, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
