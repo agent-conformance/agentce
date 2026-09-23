@@ -253,6 +253,106 @@ def test_report_validate_after_assess(
     assert env["valid"] is True
 
 
+def _quickstart_assess_argv(out: Path, *extra: str) -> list[str]:
+    quickstart = _REPO_ROOT / "corpus" / "quickstart"
+    return [
+        "assess",
+        "--bundle",
+        str(quickstart / "evidence"),
+        "--profile",
+        str(quickstart / "applicability.yaml"),
+        "--domain",
+        str(quickstart / "domain.linkml.yaml"),
+        "--out",
+        str(out),
+        *extra,
+    ]
+
+
+def test_emit_formats_consistent_between_commands_and_report() -> None:
+    from agentce import commands
+    from agentce.report import EMIT_FORMATS as report_emit_formats
+
+    assert set(commands.EMIT_FORMATS) == set(report_emit_formats)
+
+
+def test_assess_without_emit_reproduces_the_fixed_bundle(tmp_path: Path) -> None:
+    out = tmp_path / "o"
+    assert cli.main(_quickstart_assess_argv(out)) == 0
+    for name in (
+        "assertions.json",
+        "report.md",
+        "report.html",
+        "oscal-ar.json",
+        "results.sarif",
+        "manifest.json",
+    ):
+        assert (out / name).is_file(), name
+    for name in (
+        "report.junit.xml",
+        "report.csv",
+        "oscal-ar.xml",
+        "report.pdf",
+        "public-statement.md",
+    ):
+        assert not (out / name).exists(), name
+
+
+def test_assess_emit_md_renders_only_report_md(tmp_path: Path) -> None:
+    out = tmp_path / "o"
+    assert cli.main(_quickstart_assess_argv(out, "--emit", "md")) == 0
+    assert (out / "report.md").is_file()
+    for name in (
+        "report.html",
+        "oscal-ar.json",
+        "results.sarif",
+        "report.junit.xml",
+        "report.csv",
+        "oscal-ar.xml",
+        "report.pdf",
+        "public-statement.md",
+    ):
+        assert not (out / name).exists(), name
+    assert not (out / "packs").exists()
+
+
+def test_assess_emit_new_formats_and_public(tmp_path: Path) -> None:
+    out = tmp_path / "o"
+    assert (
+        cli.main(
+            _quickstart_assess_argv(out, "--emit", "junit,csv,oscal_xml,pdf,public")
+        )
+        == 0
+    )
+    assert (out / "report.junit.xml").is_file()
+    assert (out / "report.csv").is_file()
+    assert (out / "oscal-ar.xml").is_file()
+    assert (out / "report.pdf").read_bytes().startswith(b"%PDF-")
+    matches = [
+        p
+        for p in out.rglob("*")
+        if p.is_file()
+        and "Public conformance statement"
+        in p.read_text(encoding="utf-8", errors="ignore")
+    ]
+    assert matches, (
+        "no file under the output directory carries the public statement heading"
+    )
+
+
+def test_assess_emit_invalid_token_is_rejected_before_writing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out = tmp_path / "o"
+    code, env = run(
+        _quickstart_assess_argv(out, "--emit", "junit,bogus") + ["--json"], capsys
+    )
+    assert code == 3
+    assert env["error"]["key"] == "input.emit_format"
+    assert "bogus" in env["error"]["cause"]
+    assert not out.exists()
+
+
 def test_collect_dry_run(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     cfg = tmp_path / "collect.yaml"
     cfg.write_text(

@@ -10,11 +10,15 @@ emitted artifact against its vendored schema.
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import html
+import io
 import json
+import os
 import platform
 import uuid
+import xml.etree.ElementTree as ET
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -442,6 +446,276 @@ def render_oscal(assertions: list[Assertion]) -> dict[str, Any]:
     }
 
 
+def _xml_tag(key: str) -> str:
+    """Turn an OSCAL AR dict key into a well-formed XML element name: an XML ``Name`` cannot start
+    with a digit or a character outside ``[A-Za-z_]``, so a key that does is prefixed; every other
+    character an XML ``Name`` allows (letters, digits, ``-``, ``_``, ``.``) passes through unchanged
+    (every real OSCAL key, e.g. ``last-modified``, already satisfies this)."""
+    safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in key)
+    if not safe or not (safe[0].isalpha() or safe[0] == "_"):
+        safe = f"_{safe}"
+    return safe
+
+
+def _xml_from_value(tag: str, value: Any) -> ET.Element:
+    """Recursively render a JSON-like value (dict/list/scalar) as an XML element: a dict's keys are
+    sorted and a list's items keep their original order, so two independent renders of the same
+    document are byte-identical (no dict hash-order or library-chosen attribute order); every scalar
+    becomes element *text*, which :mod:`xml.etree.ElementTree`'s serializer escapes on write -- values
+    are never string-concatenated into the markup (the mistake behind finding #19's stored-XSS bug in
+    the TypeScript SARIF renderer)."""
+    element = ET.Element(tag)
+    if isinstance(value, dict):
+        for key in sorted(value.keys()):
+            element.append(_xml_from_value(_xml_tag(key), value[key]))
+    elif isinstance(value, list):
+        for item in value:
+            element.append(_xml_from_value("item", item))
+    elif value is not None:
+        element.text = str(value)
+    return element
+
+
+def render_oscal_xml(document: dict[str, Any]) -> str:
+    """Render ``oscal-ar.xml`` (SPEC §9): a well-formed XML serialization of the very same OSCAL AR
+    object :func:`render_oscal` serializes to ``oscal-ar.json`` -- pass ``render_oscal(assertions)`` in
+    directly, so the two artifacts can never drift apart. Every finding's ``target.target-id`` appears
+    as element text somewhere in the output. Deterministic: dict keys sorted, list order preserved, no
+    library-chosen attribute order, so two renders of the same document are byte-identical."""
+    root_tag, root_value = next(iter(document.items()))
+    root = _xml_from_value(_xml_tag(root_tag), root_value)
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        + ET.tostring(root, encoding="unicode")
+        + "\n"
+    )
+
+
+def render_junit(assertions: list[Assertion]) -> str:
+    """Render ``report.junit.xml`` (SPEC §9): exactly one ``<testcase>`` per real ``(subject,
+    control)`` pair, sorted by ``(subject, control)`` for a canonical, byte-identical-across-runs
+    order. A ``<failure>`` child is present iff the pair's outcome is not ``"conformant"``, so a CI
+    job's JUnit consumer marks every non-conformant, partial, not-assessed, or unproven pair failed and
+    a conformant one green -- the same one-bit-of-information a JUnit consumer already understands,
+    without it having to know AgentCE's six-outcome vocabulary."""
+    ordered = sorted(assertions, key=lambda a: (a.subject, a.control))
+    failures = sum(1 for a in ordered if a.outcome != "conformant")
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": "agentce",
+            "tests": str(len(ordered)),
+            "failures": str(failures),
+            "errors": "0",
+            "skipped": "0",
+        },
+    )
+    for a in ordered:
+        case = ET.SubElement(
+            suite, "testcase", {"classname": a.subject, "name": a.control}
+        )
+        if a.outcome != "conformant":
+            failure = ET.SubElement(
+                case,
+                "failure",
+                {"message": a.outcome, "type": "agentce.non_conformant"},
+            )
+            failure.text = f"{a.control} on {a.subject}: {a.outcome}"
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        + ET.tostring(suite, encoding="unicode")
+        + "\n"
+    )
+
+
+#: report.csv's header row (SPEC §9); `validate_report` requires at least these columns.
+CSV_COLUMNS = ("control", "subject", "outcome", "control_version", "rung", "mode")
+
+
+def render_csv(assertions: list[Assertion]) -> str:
+    """Render ``report.csv`` (SPEC §9): one row per real ``(subject, control)`` pair, sorted by
+    ``(subject, control)``, a fixed ``csv`` dialect (``\\n`` line terminator, so the bytes never vary
+    by platform) -- byte-identical across independent runs of the same input."""
+    ordered = sorted(assertions, key=lambda a: (a.subject, a.control))
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(CSV_COLUMNS)
+    for a in ordered:
+        writer.writerow(
+            [a.control, a.subject, a.outcome, a.control_version, a.rung, a.mode]
+        )
+    return buffer.getvalue()
+
+
+def _pdf_date(started_at: str) -> str:
+    """A PDF-native date string (``D:YYYYMMDDHHMMSSZ``) derived from ``started_at`` -- the run's own
+    ``manifest.run.started_at`` -- never an independent wall-clock read."""
+    digits = "".join(c for c in started_at if c.isdigit())
+    return f"D:{digits}Z" if digits else "D:19700101000000Z"
+
+
+def _pdf_ascii(text: str) -> str:
+    """Standard-14 Helvetica uses WinAnsiEncoding (effectively Latin-1); a character outside it is
+    replaced rather than raising, so a subject id or control title with an unusual character never
+    breaks PDF generation."""
+    return text.encode("latin-1", "replace").decode("latin-1")
+
+
+def _pdf_escape(text: str) -> str:
+    """Escape a PDF string literal's three special characters (SPEC's stored-content rule: no value
+    is ever concatenated into the file's syntax unescaped)."""
+    return text.replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
+
+
+def _pdf_body_lines(
+    assertions: list[Assertion],
+    counts: dict[str, int],
+    cat: dict[str, str],
+    started_at: str,
+) -> list[str]:
+    summary = verdict.summarize(assertions)
+    lines = [
+        cat["report.title"],
+        "",
+        "This PDF is a DERIVED, NON-CANONICAL rendering of the AgentCE report; report.md and "
+        "report.html are the canonical artifacts.",
+        f"Generated: {started_at}",
+        "",
+        cat[f"verdict.{summary['verdict']}"],
+        "",
+    ]
+    lines += [
+        f"{_outcome_label(cat, outcome)}: {count}" for outcome, count in counts.items()
+    ]
+    lines.append("")
+    for a in sorted(assertions, key=lambda x: (x.subject, x.control)):
+        lines.append(f"{a.control} @ {a.subject}: {_outcome_label(cat, a.outcome)}")
+    return lines
+
+
+def _pdf_content_stream(lines: list[str]) -> bytes:
+    parts = ["BT", "/F1 10 Tf", "50 740 Td", "14 TL"]
+    for i, line in enumerate(lines):
+        safe = _pdf_escape(_pdf_ascii(line))
+        parts.append(f"({safe}) Tj")
+        if i != len(lines) - 1:
+            parts.append("T*")
+    parts.append("ET")
+    return ("\n".join(parts) + "\n").encode("latin-1")
+
+
+#: This standard-14 font object's bytes are pinned: Helvetica needs no embedded font file (ADR-0015),
+#: and this block never varies between runs or reports, satisfying the "byte-identical font object"
+#: requirement trivially -- it is simply never computed from run data.
+_PDF_FONT_OBJECT = (
+    b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"
+)
+
+
+def render_pdf(
+    assertions: list[Assertion],
+    counts: dict[str, int],
+    *,
+    started_at: str,
+    language: str = messages.DEFAULT_LANGUAGE,
+) -> bytes:
+    """Render ``report.pdf`` (SPEC §9, ADR-0015): a minimal, hand-rolled, real PDF -- no third-party
+    PDF library -- with one page of Helvetica text summarizing the run, clearly labelled a derived,
+    non-canonical rendering, and dated from ``started_at`` (the run's own ``manifest.run.started_at``,
+    never an independent wall-clock read). The font object (``_PDF_FONT_OBJECT``) is a fixed standard-14
+    font dictionary, byte-identical across every run."""
+    cat = messages.catalogue(language)
+    lines = _pdf_body_lines(assertions, counts, cat, started_at)
+    content = _pdf_content_stream(lines)
+
+    title = _pdf_escape(_pdf_ascii("AgentCE report (derived, non-canonical)"))
+    objects_bodies: dict[int, bytes] = {
+        1: b"<< /Type /Catalog /Pages 2 0 R >>",
+        2: b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        3: (
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            b"/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"
+        ),
+        4: _PDF_FONT_OBJECT,
+        5: (
+            f"<< /Length {len(content)} >>\nstream\n".encode("ascii")
+            + content
+            + b"endstream"
+        ),
+        6: (
+            f"<< /Producer (AgentCE) /Title ({title}) "
+            f"/CreationDate ({_pdf_date(started_at)}) >>"
+        ).encode("ascii"),
+    }
+
+    header = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n"
+    body = bytearray()
+    offsets: dict[int, int] = {}
+    cursor = len(header)
+    for num in range(1, 7):
+        offsets[num] = cursor
+        obj_bytes = (
+            f"{num} 0 obj\n".encode("ascii") + objects_bodies[num] + b"\nendobj\n"
+        )
+        body += obj_bytes
+        cursor += len(obj_bytes)
+
+    xref_offset = cursor
+    xref_lines = ["xref", "0 7", "0000000000 65535 f "]
+    xref_lines += [f"{offsets[num]:010d} 00000 n " for num in range(1, 7)]
+    xref = ("\n".join(xref_lines) + "\n").encode("ascii")
+
+    trailer = (
+        f"trailer\n<< /Size 7 /Root 1 0 R /Info 6 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n"
+    ).encode("ascii")
+
+    return header + bytes(body) + xref + trailer
+
+
+def render_step_summary(
+    assertions: list[Assertion],
+    counts: dict[str, int],
+    *,
+    language: str = messages.DEFAULT_LANGUAGE,
+    catalogs: list[Catalog] | None = None,
+    invocation: list[str] | None = None,
+) -> str:
+    """The markdown job summary for ``$GITHUB_STEP_SUMMARY`` (SPEC §9): a heading, how many
+    ``(control, subject)`` pairs were assessed, and the same verdict/tally/findings ``report.md``
+    carries, so a GitHub Actions run's Summary tab shows the real result without opening the report
+    artifact."""
+    header = f"## AgentCE assessment summary\n\n{len(assertions)} (control, subject) pair(s) assessed.\n\n"
+    return header + render_report_md(
+        assertions, counts, language=language, catalogs=catalogs, invocation=invocation
+    )
+
+
+def write_github_step_summary(
+    assertions: list[Assertion],
+    counts: dict[str, int],
+    *,
+    language: str = messages.DEFAULT_LANGUAGE,
+    catalogs: list[Catalog] | None = None,
+    invocation: list[str] | None = None,
+) -> bool:
+    """Append the step summary to ``$GITHUB_STEP_SUMMARY``, unconditionally, whenever that
+    environment variable names a writable file (SPEC §9) -- never behind a flag: a CI job sets the
+    variable, and a plain ``agentce assess`` honours it. Returns whether anything was written (``False``
+    when the variable is unset, or the file could not be appended to)."""
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not path:
+        return False
+    text = render_step_summary(
+        assertions, counts, language=language, catalogs=catalogs, invocation=invocation
+    )
+    try:
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(text)
+    except OSError:
+        return False
+    return True
+
+
 def _sarif_help_uri(control: str) -> str:
     """A stable, deterministic reference URL for the control's family page (`docs/reference/catalog/`,
     published at the site under the same path). SARIF's `helpUri` is a citation, not a runtime
@@ -655,6 +929,7 @@ def build_manifest(
     supersedes: list[str],
     report_language: str = messages.DEFAULT_LANGUAGE,
     limitations: list[str] | None = None,
+    started_at: str | None = None,
 ) -> dict[str, Any]:
     package_digest = _package_digest()
     host = hashlib.sha256(
@@ -672,7 +947,7 @@ def build_manifest(
         "inputs": {"bundle_digest": bundle_digest, "catalogs": catalog_refs},
         "outputs": outputs,
         "run": {
-            "started_at": _now(),
+            "started_at": started_at or _now(),
             "operator": operator,
             "host_fingerprint": "sha256:" + host,
             "invocation": invocation,
@@ -737,6 +1012,25 @@ def _build_claim(
     return {"claim_id": claim_id, **body}
 
 
+#: Every token `assess --emit` and `write_report`'s `emit` accept. The first six are the formats
+#: `report --format` has always rendered one at a time; the last four are new (SPEC §9).
+EMIT_FORMATS = (
+    "md",
+    "html",
+    "oscal",
+    "sarif",
+    "public",
+    "pack",
+    "junit",
+    "csv",
+    "oscal_xml",
+    "pdf",
+)
+#: What an `emit`-less `write_report` call renders (the engine's original fixed bundle, predating
+#: `--emit`): every non-regression test pins this set exactly.
+_LEGACY_EMIT = frozenset({"md", "html", "oscal", "sarif", "pack"})
+
+
 def write_report(
     out_dir: Path,
     assertions: list[Assertion],
@@ -748,16 +1042,28 @@ def write_report(
     supersedes: list[str] | None = None,
     report_language: str = messages.DEFAULT_LANGUAGE,
     limitations: list[str] | None = None,
+    emit: frozenset[str] | None = None,
 ) -> dict[str, Any]:
     """Write every report artifact for ``assertions`` and return the reproducibility manifest.
 
     ``limitations`` names what the run was told to use without being able to verify it (SPEC §8.7);
-    the manifest and the claim both carry it, and both omit it on an ordinary run."""
+    the manifest and the claim both carry it, and both omit it on an ordinary run.
+
+    ``emit`` selects which report renderings to write, from :data:`EMIT_FORMATS`. ``None`` (the
+    default) reproduces the engine's original fixed bundle exactly -- ``report.md``, ``report.html``,
+    ``oscal-ar.json``, ``results.sarif``, and ``packs/<subject>/pack.json`` -- unchanged, byte for
+    byte, regardless of anything added since. A caller that passes a set renders only the formats
+    named in it (``frozenset()`` renders none of them); ``assertions.json``, ``claim.json``, and
+    ``manifest.json`` are never gated by ``emit`` -- they are the run's structural core, not a
+    rendering choice."""
     check_dc5(
         assertions
     )  # DC-5: refuse a supporting verdict without an evidence pointer
     out_dir.mkdir(parents=True, exist_ok=True)
     outputs: dict[str, str] = {}
+    started_at = (
+        _now()
+    )  # read once; also embedded in report.pdf and manifest.run.started_at
 
     def write_json(name: str, obj: Any) -> None:
         data = canonical.canonicalize(obj)
@@ -769,42 +1075,94 @@ def write_report(
         (out_dir / name).write_bytes(data)
         outputs[name] = _digest_bytes(data)
 
-    counts = aggregate(assertions)
-    write_json("assertions.json", [a.to_json() for a in assertions])
-    write_text(
-        "report.md",
-        render_report_md(
-            assertions,
-            counts,
-            language=report_language,
-            catalogs=catalogs,
-            invocation=invocation,
-        ),
-    )
-    write_text(
-        "report.html",
-        render_report_html(
-            assertions,
-            counts,
-            language=report_language,
-            catalogs=catalogs,
-            invocation=invocation,
-        ),
-    )
-    write_json("oscal-ar.json", render_oscal(assertions))
-    write_json("results.sarif", render_sarif(assertions, catalogs=catalogs))
+    def write_bytes(name: str, data: bytes) -> None:
+        (out_dir / name).write_bytes(data)
+        outputs[name] = _digest_bytes(data)
 
-    subjects = sorted({a.subject for a in assertions})
-    for subject in subjects:
-        pack = render_evidence_pack(
-            subject, [a for a in assertions if a.subject == subject]
+    counts = aggregate(assertions)
+    write_github_step_summary(
+        assertions,
+        counts,
+        language=report_language,
+        catalogs=catalogs,
+        invocation=invocation,
+    )
+
+    # `emit is None`: the legacy fixed bundle -- exactly the five formats every run always rendered
+    # before `--emit` existed (never the four new ones, and never `public`, which was previously
+    # reachable only through `report --format public`). `emit` given: only the named formats render.
+    def wants(token: str) -> bool:
+        if emit is None:
+            return token in _LEGACY_EMIT
+        return token in emit
+
+    write_json("assertions.json", [a.to_json() for a in assertions])
+
+    if wants("md"):
+        write_text(
+            "report.md",
+            render_report_md(
+                assertions,
+                counts,
+                language=report_language,
+                catalogs=catalogs,
+                invocation=invocation,
+            ),
         )
-        rel = f"packs/{_safe(subject)}/pack.json"
-        data = canonical.canonicalize(pack)
-        path = out_dir / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)
-        outputs[rel] = _digest_bytes(data)
+    if wants("html"):
+        write_text(
+            "report.html",
+            render_report_html(
+                assertions,
+                counts,
+                language=report_language,
+                catalogs=catalogs,
+                invocation=invocation,
+            ),
+        )
+
+    oscal_doc: dict[str, Any] | None = None
+    if wants("oscal") or wants("oscal_xml"):
+        oscal_doc = render_oscal(assertions)
+    if wants("oscal") and oscal_doc is not None:
+        write_json("oscal-ar.json", oscal_doc)
+    if wants("oscal_xml") and oscal_doc is not None:
+        write_text("oscal-ar.xml", render_oscal_xml(oscal_doc))
+
+    if wants("sarif"):
+        write_json("results.sarif", render_sarif(assertions, catalogs=catalogs))
+    if wants("junit"):
+        write_text("report.junit.xml", render_junit(assertions))
+    if wants("csv"):
+        write_text("report.csv", render_csv(assertions))
+    if wants("pdf"):
+        write_bytes(
+            "report.pdf",
+            render_pdf(
+                assertions, counts, started_at=started_at, language=report_language
+            ),
+        )
+    if wants("public"):
+        write_text(
+            "public-statement.md",
+            render_public_statement(
+                assertions,
+                catalogs=[f"{c.id}@{c.version}" for c in catalogs],
+            ),
+        )
+
+    if wants("pack"):
+        subjects = sorted({a.subject for a in assertions})
+        for subject in subjects:
+            pack = render_evidence_pack(
+                subject, [a for a in assertions if a.subject == subject]
+            )
+            rel = f"packs/{_safe(subject)}/pack.json"
+            data = canonical.canonicalize(pack)
+            path = out_dir / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+            outputs[rel] = _digest_bytes(data)
 
     if assertions:
         # claim.json is unsigned here (SPEC §9.1: the engine never signs its own claim); it exists
@@ -825,6 +1183,7 @@ def write_report(
         supersedes=supersedes or [],
         report_language=report_language,
         limitations=limitations,
+        started_at=started_at,
     )
     (out_dir / "manifest.json").write_text(
         json.dumps(manifest, sort_keys=True, indent=2), encoding="utf-8"
@@ -917,6 +1276,47 @@ def validate_sarif_2_1_0(document: dict[str, Any]) -> list[str]:
     return problems
 
 
+def _validate_xml_wellformed(path: Path) -> list[str]:
+    try:
+        ET.parse(path)
+    except ET.ParseError as exc:
+        return [f"{path.name}: invalid XML ({exc})"]
+    return []
+
+
+def _validate_csv(path: Path) -> list[str]:
+    """A ``report.csv`` is valid iff it parses as CSV, carries every column in
+    :data:`CSV_COLUMNS`, and every row has the same field count as the header -- enough to accept a
+    genuine run's output and reject garbage (a non-CSV-structured file either fails to parse, is
+    missing the required columns, or has ragged rows)."""
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            rows = list(csv.reader(handle))
+    except (OSError, csv.Error, UnicodeDecodeError) as exc:
+        return [f"{path.name}: invalid CSV ({exc})"]
+    if not rows:
+        return [f"{path.name}: empty CSV (no header row)"]
+    header = rows[0]
+    problems = [
+        f"{path.name}: missing column {column!r}"
+        for column in CSV_COLUMNS
+        if column not in header
+    ]
+    width = len(header)
+    problems += [
+        f"{path.name}: row {i} has {len(row)} field(s), expected {width}"
+        for i, row in enumerate(rows[1:], start=2)
+        if len(row) != width
+    ]
+    return problems
+
+
+#: The optional new artifacts (SPEC §9): validated when a run's `--emit` produced them, unlike
+#: `_ARTIFACT_SCHEMAS`'s entries, which every run has always written and whose absence is itself a
+#: problem.
+_OPTIONAL_ARTIFACTS = ("report.junit.xml", "oscal-ar.xml", "report.csv")
+
+
 def validate_report(out_dir: Path) -> list[str]:
     """Validate every emitted artifact against its vendored schema; return a list of problems."""
     problems: list[str] = []
@@ -947,4 +1347,12 @@ def validate_report(out_dir: Path) -> list[str]:
         path = out_dir / filename
         if not path.is_file() or not path.read_text(encoding="utf-8").strip():
             problems.append(f"{filename}: missing or empty")
+    for filename in _OPTIONAL_ARTIFACTS:
+        path = out_dir / filename
+        if not path.is_file():
+            continue  # optional: only present, and only validated, when `--emit` requested it
+        if filename == "report.csv":
+            problems += _validate_csv(path)
+        else:
+            problems += _validate_xml_wellformed(path)
     return problems
