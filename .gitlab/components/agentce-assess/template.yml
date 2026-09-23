@@ -1,0 +1,52 @@
+# A GitLab CI/CD component: the vendor-neutral counterpart to the GitHub composite action and reusable
+# workflow. GitLab has no native SARIF ingestion and no exact analogue of $GITHUB_STEP_SUMMARY, so this
+# job exposes results.sarif and report.md as downloadable, inspectable job artifacts (GitLab's own
+# general mechanism) and prints the report to the job log, rather than claiming a feature GitLab does
+# not provide.
+spec:
+  inputs:
+    agentce_ref:
+      description: the agent-conformance/agentce commit SHA to run assess from
+    bundle:
+      description: the evidence bundle directory, relative to the including project's root
+    profile:
+      description: the applicability profile file, relative to the including project's root
+    domain:
+      description: the domain ontology binding file, relative to the including project's root
+    catalog:
+      description: "catalog ids, comma-separated: <id@ver>[,<id@ver>...] (default: the profile's catalogs)"
+      default: ""
+    fail_on:
+      description: a --fail-on expression scoping which assertions fail the build
+      default: ""
+    out:
+      description: the output directory for assertions.json, results.sarif, report.md, and the rest
+      default: "out"
+---
+agentce-assess:
+  stage: test
+  image: python:3.12-slim
+  variables:
+    GIT_STRATEGY: clone
+  before_script:
+    - pip install --no-cache-dir uv
+    - git clone --depth 1 --branch "$[[ inputs.agentce_ref ]]" https://github.com/agent-conformance/agentce.git .agentce-engine || (git clone https://github.com/agent-conformance/agentce.git .agentce-engine && git -C .agentce-engine checkout "$[[ inputs.agentce_ref ]]")
+  script:
+    - |
+      catalog_flag=""
+      if [ -n "$[[ inputs.catalog ]]" ]; then catalog_flag="--catalog $[[ inputs.catalog ]]"; fi
+      fail_on_flag=""
+      if [ -n "$[[ inputs.fail_on ]]" ]; then fail_on_flag="--fail-on $[[ inputs.fail_on ]]"; fi
+      uv run --project .agentce-engine/engines/python --frozen agentce assess \
+        --bundle "$[[ inputs.bundle ]]" \
+        --profile "$[[ inputs.profile ]]" \
+        --domain "$[[ inputs.domain ]]" \
+        $catalog_flag \
+        $fail_on_flag \
+        --out "$[[ inputs.out ]]"
+    - cat "$[[ inputs.out ]]/report.md"
+  artifacts:
+    when: always
+    paths:
+      - "$[[ inputs.out ]]/results.sarif"
+      - "$[[ inputs.out ]]/report.md"

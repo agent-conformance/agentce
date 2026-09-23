@@ -1,0 +1,74 @@
+name: agentce-assess
+description: >-
+  Assess an evidence bundle against a signed AgentCE catalog, gate the build on the result, upload
+  results.sarif to code scanning, and write a job summary. Offline: no network call is made by the
+  assessment itself, only by this action's own setup steps.
+inputs:
+  bundle:
+    description: the evidence bundle directory, relative to the calling repository's root
+    required: true
+  profile:
+    description: the applicability profile file, relative to the calling repository's root
+    required: true
+  domain:
+    description: the domain ontology binding file, relative to the calling repository's root
+    required: true
+  catalog:
+    description: "catalog ids, comma-separated: <id@ver>[,<id@ver>...] (default: the profile's catalogs)"
+    required: false
+    default: ""
+  fail-on:
+    description: >-
+      a --fail-on expression scoping which assertions fail the build (default: fail on any
+      non-conformant assertion)
+    required: false
+    default: ""
+  out:
+    description: the output directory for assertions.json, results.sarif, report.md, and the rest
+    required: false
+    default: "./out"
+outputs:
+  out:
+    description: the output directory that was written
+    value: ${{ inputs.out }}
+runs:
+  using: composite
+  steps:
+    - name: Install uv
+      shell: bash
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+    - name: Locate the AgentCE reference engine
+      shell: bash
+      run: |
+        engine_dir="$(cd "${{ github.action_path }}/../../.." && pwd)/engines/python"
+        echo "AGENTCE_ENGINE_DIR=$engine_dir" >> "$GITHUB_ENV"
+
+    - name: Run agentce assess
+      shell: bash
+      run: |
+        set -e
+        catalog_flag=""
+        if [ -n "${{ inputs.catalog }}" ]; then
+          catalog_flag="--catalog ${{ inputs.catalog }}"
+        fi
+        fail_on_flag=""
+        if [ -n "${{ inputs.fail-on }}" ]; then
+          fail_on_flag="--fail-on ${{ inputs.fail-on }}"
+        fi
+        # agentce assess writes its job summary to $GITHUB_STEP_SUMMARY automatically (SPEC §9);
+        # no separate summary step is needed.
+        uv run --project "$AGENTCE_ENGINE_DIR" --frozen agentce assess \
+          --bundle "${{ inputs.bundle }}" \
+          --profile "${{ inputs.profile }}" \
+          --domain "${{ inputs.domain }}" \
+          $catalog_flag \
+          $fail_on_flag \
+          --out "${{ inputs.out }}"
+
+    - name: Upload results.sarif to code scanning
+      uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
+      with:
+        sarif_file: ${{ inputs.out }}/results.sarif

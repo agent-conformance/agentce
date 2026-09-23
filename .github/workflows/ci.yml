@@ -436,3 +436,21 @@ jobs:
           rm -rf "$work/installed-skill/.venv" "$work/installed-skill/.mypy_cache" "$work/installed-skill/.ruff_cache" "$work/installed-skill/__pycache__"
           cd "$work/installed-skill"
           uv run --frozen pytest -q -p no:cacheprovider
+
+  reusable-ci-artifacts:
+    # A platform team gates a build on an AgentCE assessment through one of three artifacts: the
+    # composite GitHub Action, the workflow_call reusable workflow, or the GitLab CI/CD component. This
+    # job proves each is real (valid YAML, the real shape, the fail-on input wired through to a real
+    # `agentce assess` invocation, results.sarif exposed, every third-party action pinned by commit SHA)
+    # rather than a declared-but-unused input.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: reusable_ci_artifacts_check self-test
+        run: uv run --project tools --frozen python tools/reusable_ci_artifacts_check.py --self-test
+      - name: The composite action, the reusable workflow, and the GitLab component are real
+        run: uv run --project tools --frozen python tools/reusable_ci_artifacts_check.py

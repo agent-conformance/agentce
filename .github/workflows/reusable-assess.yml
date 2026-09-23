@@ -1,0 +1,88 @@
+# A workflow_call reusable workflow: the one-line adoption path for a consumer who wants a full job
+# (checkout, engine sync, assess, SARIF upload) rather than a single composite-action step. Checks out
+# the calling repository (for the evidence bundle) and a pinned commit of this repository (for the
+# engine) separately, since a reusable workflow — unlike a composite action — has no implicit access to
+# its own repository's files.
+name: reusable-assess
+
+on:
+  workflow_call:
+    inputs:
+      agentce-ref:
+        description: the agent-conformance/agentce commit SHA to run assess from
+        required: true
+        type: string
+      bundle:
+        description: the evidence bundle directory, relative to the calling repository's root
+        required: true
+        type: string
+      profile:
+        description: the applicability profile file, relative to the calling repository's root
+        required: true
+        type: string
+      domain:
+        description: the domain ontology binding file, relative to the calling repository's root
+        required: true
+        type: string
+      catalog:
+        description: "catalog ids, comma-separated: <id@ver>[,<id@ver>...] (default: the profile's catalogs)"
+        required: false
+        type: string
+        default: ""
+      fail-on:
+        description: a --fail-on expression scoping which assertions fail the build
+        required: false
+        type: string
+        default: ""
+      out:
+        description: the output directory for assertions.json, results.sarif, report.md, and the rest
+        required: false
+        type: string
+        default: "./out"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  assess:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the calling repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Checkout the AgentCE engine at the pinned commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: agent-conformance/agentce
+          ref: ${{ inputs.agentce-ref }}
+          path: .agentce-engine
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run agentce assess
+        run: |
+          set -e
+          catalog_flag=""
+          if [ -n "${{ inputs.catalog }}" ]; then
+            catalog_flag="--catalog ${{ inputs.catalog }}"
+          fi
+          fail_on_flag=""
+          if [ -n "${{ inputs.fail-on }}" ]; then
+            fail_on_flag="--fail-on ${{ inputs.fail-on }}"
+          fi
+          uv run --project .agentce-engine/engines/python --frozen agentce assess \
+            --bundle "${{ inputs.bundle }}" \
+            --profile "${{ inputs.profile }}" \
+            --domain "${{ inputs.domain }}" \
+            $catalog_flag \
+            $fail_on_flag \
+            --out "${{ inputs.out }}"
+
+      - name: Upload results.sarif to code scanning
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
+        with:
+          sarif_file: ${{ inputs.out }}/results.sarif
