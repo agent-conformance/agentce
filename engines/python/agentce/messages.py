@@ -1,82 +1,51 @@
 """Message-key catalogue for report rendering (SPEC §9.3, §8.4).
 
-All human-readable text in ``report.md`` and ``report.html`` comes from message keys, so a
-translation changes only the report — never ``assertions.json``, the manifest digests, or the claim.
-v1 ships the ``en`` catalogue; a partial ``de`` catalogue demonstrates the translation mechanism (any
-key it omits falls back to ``en``). The report language is recorded in the manifest as
-``run.report_language`` and has no effect on the machine-readable outputs.
+All human-readable text in ``report.md`` and ``report.html`` comes from message keys, read from the
+vendored, language-neutral catalogue (``agentce/data/i18n/``, sourced from ``spec/i18n/``) that also
+backs :mod:`agentce.error_catalogue`'s CLI strings, so a translation changes only the report — never
+``assertions.json``, the manifest digests, or the claim. v1 ships the ``en`` catalogue complete; a
+partial ``de`` catalogue demonstrates the translation mechanism (any key it omits falls back to
+``en``). The report language is recorded in the manifest as ``run.report_language`` and has no effect
+on the machine-readable outputs.
 """
 
 from __future__ import annotations
 
+import functools
+
+from . import i18n_format
+
 DEFAULT_LANGUAGE = "en"
 
-_EN: dict[str, str] = {
-    "report.title": "AgentCE conformance report",
-    "report.summary_heading": "Outcome summary",
-    "report.assertions_heading": "Assertions",
-    "report.no_controls": "No controls were evaluated.",
-    "report.verdict_heading": "Verdict",
-    "report.outcomes_label": "Outcomes",
-    "report.top_gaps_heading": "Top gaps",
-    "report.no_gaps": "none",
-    "report.gaps_more": "+{n} more",
-    "report.next_step_heading": "Next step",
-    "report.see_report": "See report.md in {dir} for every control.",
-    "report.crosswalk_unverified": "(clause reference unverified)",
-    "report.severity_high": "High severity",
-    "report.severity_medium": "Medium severity",
-    "report.severity_low": "Low severity",
-    "report.severity_unrated": "Unrated",
-    "report.evidence_label": "Evidence",
-    "report.violations_label": "Violations",
-    "report.remediation_label": "Remediation",
-    "verdict.non-conformant": "Non-conformant \u2014 at least one applicable control failed.",
-    "verdict.incomplete": (
-        "Incomplete \u2014 no control failed, but not every applicable control is demonstrated."
-    ),
-    "verdict.conformant": (
-        "Conformant \u2014 every applicable control met its expectations with evidence."
-    ),
-    "next.non-conformant": (
-        "Fix the non-conformant controls listed under Top gaps, then run the assessment again."
-    ),
-    "next.incomplete": (
-        "Supply the missing evidence, or complete the manual checks, for the controls listed under "
-        "Top gaps, then run the assessment again."
-    ),
-    "next.conformant": (
-        "No gaps. Run the assessment again when the agent, its evidence, or the catalog changes."
-    ),
-    "report.affected_persons": (
-        "Affected persons may obtain an explanation and raise concerns through the deployer's "
-        "published contact channel (EU AI Act Arts. 26(11), 85, 86)."
-    ),
-    "outcome.conformant": "conformant",
-    "outcome.non-conformant": "non-conformant",
-    "outcome.partial": "partial",
-    "outcome.not_applicable": "not applicable",
-    "outcome.not_assessed": "not assessed",
-    "outcome.insufficient_evidence": "insufficient evidence",
-}
+#: Which of the catalogue's keys this module renders. Their English text lives in the vendored
+#: catalogue, never hardcoded in this module.
+_REPORT_KEY_PREFIXES = ("report.", "verdict.", "next.", "outcome.")
 
-#: A partial translation, to exercise the mechanism; missing keys fall back to ``en``.
-_DE: dict[str, str] = {
-    "report.title": "AgentCE-Konformitätsbericht",
-    "report.summary_heading": "Ergebnisübersicht",
-    "report.assertions_heading": "Aussagen",
-    "report.no_controls": "Es wurden keine Kontrollen bewertet.",
-}
 
-_CATALOGUES: dict[str, dict[str, str]] = {"en": _EN, "de": _DE}
+@functools.cache
+def _full_catalog(language: str) -> dict[str, str]:
+    return i18n_format.load_catalog(language)
+
+
+def _report_keys(language: str) -> dict[str, str]:
+    return {
+        key: value
+        for key, value in _full_catalog(language).items()
+        if key.startswith(_REPORT_KEY_PREFIXES)
+    }
 
 
 def available_languages() -> list[str]:
-    return sorted(_CATALOGUES)
+    from . import bundled
+
+    languages = {"en"}
+    for path in bundled.i18n_dir().glob("messages.*.json"):
+        languages.add(path.stem.removeprefix("messages."))
+    return sorted(languages)
 
 
 def catalogue(language: str = DEFAULT_LANGUAGE) -> dict[str, str]:
-    """Return the message catalogue for ``language``, backed by ``en`` for any missing key."""
-    merged = dict(_EN)
-    merged.update(_CATALOGUES.get(language, {}))
+    """Return the report-string catalogue for ``language``, backed by ``en`` for any missing key."""
+    merged = _report_keys("en")
+    merged.update(_report_keys(language))
     return merged

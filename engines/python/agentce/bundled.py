@@ -39,6 +39,11 @@ def templates_dir() -> Path:
     return _data_root() / "templates"
 
 
+def i18n_dir() -> Path:
+    """The vendored ICU MessageFormat catalogue (the language-neutral original lives in `spec/i18n/`)."""
+    return _data_root() / "i18n"
+
+
 def remediation_template() -> str:
     """The language-neutral Mustache-style template ``remediation.md`` is rendered from."""
     return (templates_dir() / "remediation.md.tmpl").read_text(encoding="utf-8")
