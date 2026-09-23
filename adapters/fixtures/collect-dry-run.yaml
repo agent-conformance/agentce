@@ -1,14 +1,15 @@
-# A collection job (SPEC §5.4 B8): plan a pull of evidence from three sources via adapters. Credentials
-# are named only by reference (a secret-manager path or an environment variable) -- never by value.
+# A collection job (SPEC §5.4 B8): pull evidence from three sources via adapters. Credentials are
+# named only by reference (a secret-manager path or an environment variable) -- never by value.
 # `agentce collect --config this --dry-run` plans the job offline and resolves no credentials.
-#
-# Only the dry run works today. No source connector exists yet (on the roadmap): a real run of this
-# config records every source `incomplete`, reason "no source connector in the reference collector", and
-# exits 1. The endpoints below show the shape of a pull job; nothing polls them.
 #
 # An OTLP trace export is push-based, so an `otel-genai` source is not a URL to poll on a schedule: an
 # OpenTelemetry Collector exports traces to files or object storage and AgentCE reads those exports
-# (SPEC §5.4).
+# (SPEC §5.4). Each source below names both the live endpoint it would poll for metadata/health and an
+# `export`: the local path its own pipeline already wrote its evidence to (here, one of this repo's own
+# adapter fixtures, resolved relative to the repository root, the same shape `adapters/otel-genai/
+# otel-collector/config.yaml`'s file exporter produces). A real (non-dry-run) run reads that export and
+# records the source `complete`; a source with no `export`, or whose export cannot be adapted, is
+# recorded `incomplete`, reason "no source connector in the reference collector", and never hidden.
 job:
   id: collect-credit-eu-1
   principal: spiffe://corp/jobs/credit-collector
@@ -19,18 +20,25 @@ sources:
   - id: urn:otel:credit-underwriter
     adapter: otel-genai
     endpoint: https://collector.internal/v1/traces
+    export: adapters/otel-genai/fixtures/otel-genai-chat/input.json
+    subject: spiffe://corp/agents/credit-underwriter
     class: self_report
     credential:
       secret_ref: "vault://secret/data/otel-collector#token"
   - id: urn:mcp-gateway:mcp-gateway-prod
     adapter: mcp-gateway
     endpoint: https://gateway.internal/v1/logs
+    export: adapters/mcp-gateway/fixtures/tools-call-enforced/input.jsonl
+    subject: spiffe://corp/agents/credit-underwriter
     class: enforcement_point
     credential:
       env: "AGENTCE_MCP_GATEWAY_TOKEN"
   - id: urn:policy-engine:opa:prod
     adapter: policy-engines
     endpoint: https://opa.internal/v1/decisions
+    export: adapters/policy-engines/fixtures/opa-decisions/input.jsonl
+    engine: opa
+    subject: spiffe://corp/agents/credit-underwriter
     class: enforcement_point
     credential:
       secret_ref: "vault://secret/data/opa#token"
