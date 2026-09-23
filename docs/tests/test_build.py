@@ -31,6 +31,48 @@ def test_a_page_exists_for_every_command_adapter_and_family() -> None:
     assert "example-report.md" in pages
 
 
+def test_a_page_exists_for_every_evidence_class_and_report_schema() -> None:
+    pages = {p.relative_to(build.DOCS).as_posix() for p in build.generate()}
+    for name in build._evidence_specs():
+        assert f"reference/evidence/{name}.md" in pages
+    for path in (build.REPO_ROOT / "spec" / "report").glob("*.schema.json"):
+        slug = path.name[: -len(".schema.json")]
+        assert f"reference/report-schemas/{slug}.md" in pages
+
+
+def test_published_pages_are_current() -> None:
+    """The committed website pages match a fresh publish."""
+    assert build.check_site() == []
+
+
+def test_published_pages_cover_every_command_control_class_and_schema() -> None:
+    pages = {p.relative_to(build.SITE_DOCS).as_posix() for p in build.generate_site()}
+    for name, _summary, _help in build._command_specs():
+        assert f"reference/commands/{name}.md" in pages
+    for name in build._evidence_specs():
+        assert f"reference/evidence/{name}.md" in pages
+    for filename, _schema, _iri in build._report_schema_specs():
+        slug = filename[: -len(".schema.json")]
+        assert f"reference/report-schemas/{slug}.md" in pages
+    for family in build._family_specs():
+        assert f"reference/catalog/{family}.md" in pages
+    for slug in ("threat-model", "verification", "errors"):
+        assert f"explanation/{slug}.md" in pages
+
+
+def test_published_pages_have_a_starlight_title_and_a_single_top_level_heading() -> (
+    None
+):
+    for path, content in build.generate_site().items():
+        assert content.startswith("---\ntitle:"), (
+            f"{path} is missing Starlight frontmatter"
+        )
+        body = content.split("---\n", 2)[2]
+        assert body.count("\n# ") == 0 and not body.startswith("# "), (
+            f"{path} has a body-level top-level heading, which would duplicate Starlight's own"
+        )
+
+
 def test_link_checker_is_not_vacuous() -> None:
     """The anchor slugger and link scanner behave, so a clean result means something."""
     assert build._slug("`agentce verify`") == "agentce-verify"

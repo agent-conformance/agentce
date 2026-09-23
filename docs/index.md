@@ -2,8 +2,9 @@
 
 The Agent Conformance Engine (AgentCE) is a deterministic, read-only, model-free engine that
 evaluates the evidence an AI-agent deployment produces against executable control catalogs and emits
-a conformance report. This is the pre-general-availability documentation; the published site follows
-at general availability.
+a conformance report. This is the standalone, link-checked documentation bundle generated and checked
+here; its reference and explanation pages are also published on the website
+(agent-conformance.org) — see "Building the documentation" below.
 
 ## Start here
 
@@ -20,6 +21,8 @@ Generated from the sources, so the documentation and the code never disagree.
 - [CLI commands](reference/commands/index.md) — one page per command.
 - [Source adapters](reference/adapters/index.md) — one page per adapter.
 - [Control families](reference/catalog/index.md) — one page per family of the EU AI Act base catalog.
+- [Evidence model](reference/evidence/index.md) — one page per class in the evidence schema.
+- [Report schemas](reference/report-schemas/index.md) — one page per JSON Schema an output validates against.
 
 ## Trust and operations
 
@@ -44,4 +47,6 @@ Generated from the sources, so the documentation and the code never disagree.
 
 `cd docs && python build.py` regenerates the reference pages and the living report example from the
 sources. `python build.py --check-links` verifies the generated pages are current and that every
-internal link resolves; it opens no socket.
+internal link resolves; it opens no socket. `python build.py --publish` regenerates the reference and
+explanation pages published on the website; `python build.py --check-publish` verifies they are
+current. Both commands run under `uv run --project docs --frozen` in CI.
