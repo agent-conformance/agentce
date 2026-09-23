@@ -150,6 +150,7 @@ export function renderEvidencePack(
       outcome: a.outcome,
       mode: a.mode,
       evidence: [...new Set(a.evidence.map((e) => e.ref))].sort(byteCompare),
+      ...(a.crosswalk.length > 0 ? { crosswalk: a.crosswalk } : {}),
     })),
     evidence: [...refs].sort(byteCompare),
   };

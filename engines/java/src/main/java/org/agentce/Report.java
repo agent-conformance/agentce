@@ -102,6 +102,20 @@ public final class Report {
         return cat.getOrDefault("outcome." + outcome, outcome);
     }
 
+    /** One clause citation, labelled unverified when the carried flag is not true (SPEC §7.3). */
+    private static String crosswalkText(JsonNode entry, Map<String, String> cat) {
+        JsonNode framework = entry.get("framework");
+        JsonNode clause = entry.get("clause");
+        String text = (framework != null ? framework.asText("") : "") + " "
+                + (clause != null ? clause.asText("") : "");
+        text = text.strip();
+        JsonNode verified = entry.get("verified");
+        if (verified == null || !verified.isBoolean() || !verified.booleanValue()) {
+            text += " " + cat.get("report.crosswalk_unverified");
+        }
+        return text;
+    }
+
     private static String esc(String s) {
         return s.replace("&", "&amp;")
                 .replace("<", "&lt;")
@@ -155,6 +169,9 @@ public final class Report {
         for (Assertions.Assertion a : sortedBySubjectControl(assertions)) {
             lines.add("- `" + a.control + "` @ `" + a.subject + "` -> **" + outcomeLabel(cat, a.outcome) + "** "
                     + "(rung " + a.rung + ", " + a.mode + "; " + a.population[1] + "/" + a.population[0] + " failed)");
+            for (JsonNode entry : a.crosswalk) {
+                lines.add("  - " + crosswalkText(entry, cat));
+            }
         }
         return String.join("\n", lines) + "\n";
     }
@@ -196,12 +213,20 @@ public final class Report {
         }
         StringBuilder rows = new StringBuilder();
         for (Assertions.Assertion a : sortedBySubjectControl(assertions)) {
+            StringBuilder clauses = new StringBuilder();
+            for (int i = 0; i < a.crosswalk.size(); i++) {
+                if (i > 0) {
+                    clauses.append("; ");
+                }
+                clauses.append(esc(crosswalkText(a.crosswalk.get(i), cat)));
+            }
             rows.append("<tr><td>").append(esc(a.control)).append("</td><td>").append(esc(a.subject)).append("</td>")
-                    .append("<td>").append(esc(outcomeLabel(cat, a.outcome))).append("</td></tr>");
+                    .append("<td>").append(esc(outcomeLabel(cat, a.outcome))).append("</td>")
+                    .append("<td>").append(clauses).append("</td></tr>");
         }
         String bodyRows = rows.length() > 0
                 ? rows.toString()
-                : "<tr><td colspan=\"3\">" + esc(cat.get("report.no_controls")) + "</td></tr>";
+                : "<tr><td colspan=\"4\">" + esc(cat.get("report.no_controls")) + "</td></tr>";
         return "<!doctype html><html lang=\"" + esc(language) + "\"><head><meta charset=\"utf-8\">"
                 + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
                 + "<meta http-equiv=\"Content-Security-Policy\" "
@@ -215,7 +240,7 @@ public final class Report {
                 + esc(cat.get("report.assertions_heading")) + "</h2>"
                 + "<table><caption>" + esc(cat.get("report.assertions_heading")) + "</caption>"
                 + "<thead><tr><th scope=\"col\">Control</th><th scope=\"col\">Subject</th>"
-                + "<th scope=\"col\">Outcome</th></tr></thead>"
+                + "<th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th></tr></thead>"
                 + "<tbody>" + bodyRows + "</tbody></table></section>"
                 + "<footer><p>" + esc(cat.get("report.affected_persons")) + "</p></footer>"
                 + "</main></body></html>\n";
@@ -294,6 +319,10 @@ public final class Report {
             }
             ArrayNode evidence = row.putArray("evidence");
             refs.forEach(evidence::add);
+            if (!a.crosswalk.isEmpty()) {
+                ArrayNode crosswalk = row.putArray("crosswalk");
+                a.crosswalk.forEach(crosswalk::add);
+            }
         }
         ArrayNode packEvidence = pack.putArray("evidence");
         allEvidence.forEach(packEvidence::add);

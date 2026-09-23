@@ -48,7 +48,7 @@ export interface Assertion {
   sourceClassSatisfied: boolean | null;
   evidenceStrength: string | null;
   deviation: string | null;
-  crosswalk: Array<Record<string, string>>;
+  crosswalk: Array<Record<string, string | boolean>>;
 }
 
 /** Build an assertion, defaulting the optional collections and nullable fields (mirrors the dataclass). */
@@ -143,7 +143,9 @@ export function assertionFromJson(data: unknown): Assertion {
       typeof d.source_class_satisfied === "boolean" ? d.source_class_satisfied : null,
     evidenceStrength: typeof d.evidence_strength === "string" ? d.evidence_strength : null,
     deviation: typeof d.deviation === "string" ? d.deviation : null,
-    crosswalk: Array.isArray(d.crosswalk) ? (d.crosswalk as Array<Record<string, string>>) : [],
+    crosswalk: Array.isArray(d.crosswalk)
+      ? (d.crosswalk as Array<Record<string, string | boolean>>)
+      : [],
   };
 }
 

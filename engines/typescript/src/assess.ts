@@ -101,6 +101,28 @@ function evidence(eventsByIri: Map<string, Event>, focusNodes: string[]): Eviden
   return pointers;
 }
 
+/**
+ * Carry each control's own crosswalk entries into every assertion built for it (SPEC §7.3).
+ *
+ * `verified` is read from the control's `verified_against_text` and coerced to a real boolean --
+ * never invented, and never set true by the engine itself; only a human with access to the licensed
+ * standard text may flip that flag in the catalog source (human action H4).
+ */
+function crosswalkFor(control: ControlSpec): Array<Record<string, string | boolean>> {
+  const raw = control.raw.crosswalk;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.map((entry) => {
+    const e = isRecord(entry) ? entry : {};
+    return {
+      framework: e.framework as string,
+      clause: e.clause as string,
+      verified: e.verified_against_text === true,
+    };
+  });
+}
+
 function assertControl(
   store: GraphStore,
   catalog: Catalog,
@@ -118,6 +140,7 @@ function assertControl(
     rung: control.rung,
     mode: control.mode,
     window: win,
+    crosswalk: crosswalkFor(control),
   };
   if (!roleApplies(roles, control.appliesToRoles)) {
     return makeAssertion({ ...base, outcome: "not_applicable", population: [0, 0] });
