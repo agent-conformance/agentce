@@ -24,6 +24,13 @@ _EN: dict[str, str] = {
     "report.next_step_heading": "Next step",
     "report.see_report": "See report.md in {dir} for every control.",
     "report.crosswalk_unverified": "(clause reference unverified)",
+    "report.severity_high": "High severity",
+    "report.severity_medium": "Medium severity",
+    "report.severity_low": "Low severity",
+    "report.severity_unrated": "Unrated",
+    "report.evidence_label": "Evidence",
+    "report.violations_label": "Violations",
+    "report.remediation_label": "Remediation",
     "verdict.non-conformant": "Non-conformant \u2014 at least one applicable control failed.",
     "verdict.incomplete": (
         "Incomplete \u2014 no control failed, but not every applicable control is demonstrated."
