@@ -26,7 +26,7 @@ agent-conformance = { path = "../../engines/python", editable = true }
 [dependency-groups]
 dev = [
   "agent-conformance",
-  "pytest>=8,<9",
+  "pytest>=8,<10",
   "pytest-cov>=5,<7",
   "mypy>=1.11,<2",
   "ruff>=0.6,<0.13",
