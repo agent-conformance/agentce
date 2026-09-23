@@ -185,6 +185,27 @@ jobs:
       - name: The collect pages and example config state what is built
         run: uv run --project engines/python --frozen python tools/collect_check.py
 
+  evidence-input-hardening:
+    # An evidence bundle's manifest, YAML files, and event lines are adversarial input (SPEC §8.1,
+    # §8.7; docs/threat-model.md "Untrusted evidence-bundle input hardening"). A manifest-listed path
+    # that resolves outside the bundle root (a symlink escape), a disallowed YAML construct, and a
+    # pathologically deep YAML or JSON structure must all be refused with a deliberate input.* key or
+    # quarantine reason -- never fall through to the generic internal.unexpected catch-all. Runs a
+    # small deterministic fuzz corpus over each hazard class, not just one hand-picked fixture.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Sync the engine
+        working-directory: engines/python
+        run: uv sync --frozen
+      - name: Untrusted evidence-bundle input hardening
+        working-directory: engines/python
+        run: uv run --frozen pytest -q -p no:cacheprovider tests/test_input_hardening.py
+
   python-placeholders:
     runs-on: ubuntu-latest
     steps:
