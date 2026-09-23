@@ -8,14 +8,22 @@ from pathlib import Path
 import pytest
 
 from agentce.assertions import Assertion, EvidencePointer
+from agentce.catalog import Catalog
 from agentce.errors import AgentceError
 from agentce.report import render_oscal, render_sarif, validate_report, write_report
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
+_BASE_CATALOG_DIR = _REPO_ROOT / "spec/catalogs/base/eu-ai-act"
 _WINDOW = ("2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
 _EVIDENCE = EvidencePointer(
     "agentce:event/x", "sha256:" + "0" * 64, "enforcement_point"
 )
+
+
+def _catalog(id: str = "eu-ai-act", version: str = "2026.09") -> Catalog:
+    return Catalog(
+        id=id, version=version, directory=_BASE_CATALOG_DIR, controls=[], shapes={}
+    )
 
 
 def _assertion(outcome: str) -> Assertion:
@@ -48,7 +56,7 @@ def test_write_report_produces_valid_artifacts(tmp_path: Path) -> None:
         tmp_path,
         [_assertion("conformant"), _assertion("non-conformant")],
         bundle_digest="sha256:" + "a" * 64,
-        catalogs=["eu-ai-act@2026.09"],
+        catalogs=[_catalog()],
     )
     for name in (
         "assertions.json",
@@ -57,6 +65,7 @@ def test_write_report_produces_valid_artifacts(tmp_path: Path) -> None:
         "oscal-ar.json",
         "results.sarif",
         "manifest.json",
+        "claim.json",
     ):
         assert (tmp_path / name).is_file()
     assert validate_report(tmp_path) == []
@@ -64,8 +73,9 @@ def test_write_report_produces_valid_artifacts(tmp_path: Path) -> None:
 
 def test_empty_report_is_valid(tmp_path: Path) -> None:
     write_report(
-        tmp_path, [], bundle_digest="sha256:" + "a" * 64, catalogs=["eu-ai-act@2026.09"]
+        tmp_path, [], bundle_digest="sha256:" + "a" * 64, catalogs=[_catalog()]
     )
+    assert not (tmp_path / "claim.json").exists()
     assert json.loads((tmp_path / "assertions.json").read_text(encoding="utf-8")) == []
     assert validate_report(tmp_path) == []
 
@@ -75,13 +85,13 @@ def test_assertions_json_is_deterministic(tmp_path: Path) -> None:
         tmp_path / "a",
         [_assertion("conformant")],
         bundle_digest="sha256:" + "a" * 64,
-        catalogs=["c@1"],
+        catalogs=[_catalog("c", "1")],
     )
     write_report(
         tmp_path / "b",
         [_assertion("conformant")],
         bundle_digest="sha256:" + "a" * 64,
-        catalogs=["c@1"],
+        catalogs=[_catalog("c", "1")],
     )
     assert (tmp_path / "a" / "assertions.json").read_bytes() == (
         tmp_path / "b" / "assertions.json"
@@ -93,7 +103,9 @@ def test_dc5_aborts_before_writing(tmp_path: Path) -> None:
         "C", "1", "s", "conformant", 2, "automated", _WINDOW, (1, 0), evidence=[]
     )
     with pytest.raises(AgentceError) as excinfo:
-        write_report(tmp_path, [bad], bundle_digest="sha256:" + "a" * 64, catalogs=[])
+        write_report(
+            tmp_path, [bad], bundle_digest="sha256:" + "a" * 64, catalogs=[_catalog()]
+        )
     assert excinfo.value.key == "report.missing_evidence_pointer"
     assert not (tmp_path / "assertions.json").exists()
 
@@ -115,7 +127,7 @@ def test_supersedes_recorded_in_manifest(tmp_path: Path) -> None:
         tmp_path,
         [_assertion("conformant")],
         bundle_digest="sha256:" + "a" * 64,
-        catalogs=["c@1"],
+        catalogs=[_catalog("c", "1")],
         supersedes=["sha256:" + "b" * 64],
     )
     assert manifest["supersedes"] == ["sha256:" + "b" * 64]

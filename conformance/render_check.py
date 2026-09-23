@@ -23,7 +23,10 @@ _ENGINE = _REPO / "engines" / "python"
 sys.path.insert(0, str(_ENGINE))
 
 from agentce.assertions import Assertion, EvidencePointer, aggregate  # noqa: E402
+from agentce.catalog import load_catalog  # noqa: E402
 from agentce.report import render_report_html, write_report  # noqa: E402
+
+_BASE_CATALOG = _REPO / "spec" / "catalogs" / "base" / "eu-ai-act"
 
 _MALICIOUS_SUBJECT = "s<script>alert(1)</script>"
 
@@ -68,6 +71,7 @@ def _escapes_evidence_strings() -> bool:
 
 def _second_language_leaves_assertions_identical() -> bool:
     assertions = _sample()
+    catalog = load_catalog(_BASE_CATALOG)
     with tempfile.TemporaryDirectory() as tmp:
         en, de = Path(tmp) / "en", Path(tmp) / "de"
         for out, language in ((en, "en"), (de, "de")):
@@ -75,7 +79,7 @@ def _second_language_leaves_assertions_identical() -> bool:
                 out,
                 assertions,
                 bundle_digest="sha256:0",
-                catalogs=["eu-ai-act@2026.09"],
+                catalogs=[catalog],
                 report_language=language,
             )
         assertions_identical = (en / "assertions.json").read_bytes() == (

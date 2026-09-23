@@ -23,8 +23,8 @@ import jsonschema
 
 from . import ENGINE_NAME, SPEC_VERSION, __version__, canonical, messages, verdict
 from .assertions import Assertion, aggregate, check_dc5
+from .catalog import Catalog, catalog_provenance_digest
 
-_ZERO_DIGEST = "sha256:" + "0" * 64
 _ARTIFACT_SCHEMAS = {
     "assertions.json": "assertions",
     "manifest.json": "manifest",
@@ -106,16 +106,37 @@ def _verdict_html(summary: dict[str, Any], cat: dict[str, str]) -> str:
     )
 
 
+def _reproduce_command(invocation: list[str] | None) -> str:
+    return "agentce " + " ".join(invocation) if invocation else "agentce quickstart"
+
+
+def _provenance_md(catalogs: list[str], invocation: list[str] | None) -> list[str]:
+    """The provenance line every report body carries: engine version, catalog(s), reproduce command
+    (SPEC §9.1) -- so a reader of the report file alone, without opening manifest.json, can see what
+    produced it and how to redo it."""
+    return [
+        "## Provenance",
+        "",
+        f"- Engine: {ENGINE_NAME} {__version__}",
+        f"- Catalog: {', '.join(catalogs) if catalogs else '(none)'}",
+        f"- Reproduce: `{_reproduce_command(invocation)}`",
+        "",
+    ]
+
+
 def render_report_md(
     assertions: list[Assertion],
     counts: dict[str, int],
     *,
     language: str = messages.DEFAULT_LANGUAGE,
+    catalogs: list[str] | None = None,
+    invocation: list[str] | None = None,
 ) -> str:
     cat = messages.catalogue(language)
     summary = verdict.summarize(assertions)
     lines = [f"# {cat['report.title']}", ""]
     lines += _verdict_md(summary, cat)
+    lines += _provenance_md(catalogs or [], invocation)
     lines += [f"## {cat['report.summary_heading']}", ""]
     lines += [
         f"- {_outcome_label(cat, outcome)}: {count}"
@@ -145,11 +166,24 @@ _HTML_STYLE = (
 )
 
 
+def _provenance_html(catalogs: list[str], invocation: list[str] | None) -> str:
+    catalog_text = html.escape(", ".join(catalogs) if catalogs else "(none)")
+    return (
+        '<section aria-labelledby="provenance"><h2 id="provenance">Provenance</h2><ul>'
+        f"<li>Engine: {html.escape(ENGINE_NAME)} {html.escape(__version__)}</li>"
+        f"<li>Catalog: {catalog_text}</li>"
+        f"<li>Reproduce: <code>{html.escape(_reproduce_command(invocation))}</code></li>"
+        "</ul></section>"
+    )
+
+
 def render_report_html(
     assertions: list[Assertion],
     counts: dict[str, int],
     *,
     language: str = messages.DEFAULT_LANGUAGE,
+    catalogs: list[str] | None = None,
+    invocation: list[str] | None = None,
 ) -> str:
     """Render a self-contained, escaped, WCAG 2.2 AA report page (SPEC §9.3): a strict CSP meta tag,
     no external references, one ``h1``, a ``main`` landmark, a print stylesheet, and every string that
@@ -176,6 +210,7 @@ def render_report_html(
         f"<title>{title}</title><style>{_HTML_STYLE}</style></head><body>"
         f"<main><h1>{title}</h1>"
         f"{_verdict_html(verdict.summarize(assertions), cat)}"
+        f"{_provenance_html(catalogs or [], invocation)}"
         f'<section aria-labelledby="summary"><h2 id="summary">'
         f"{html.escape(cat['report.summary_heading'])}</h2><ul>{summary}</ul></section>"
         f'<section aria-labelledby="assertions"><h2 id="assertions">'
@@ -349,10 +384,24 @@ def render_public_statement(
     return "\n".join(lines) + "\n"
 
 
+def _catalog_refs(catalogs: list[Catalog]) -> list[dict[str, str]]:
+    """Each catalog's id, version, and its real, content-derived provenance digest (never a
+    placeholder) -- the same recomputation a reader can independently verify against the catalog
+    directory (SPEC §14.5 CP-3)."""
+    return [
+        {
+            "id": c.id,
+            "version": c.version,
+            "digest": catalog_provenance_digest(c.directory),
+        }
+        for c in catalogs
+    ]
+
+
 def build_manifest(
     *,
     bundle_digest: str,
-    catalogs: list[str],
+    catalogs: list[Catalog],
     outputs: dict[str, str],
     operator: str,
     invocation: list[str],
@@ -363,12 +412,7 @@ def build_manifest(
     host = hashlib.sha256(
         f"{platform.system()}|{platform.machine()}|{package_digest}".encode()
     ).hexdigest()
-    catalog_refs = []
-    for entry in catalogs:
-        cid, _, version = entry.partition("@")
-        catalog_refs.append(
-            {"id": cid, "version": version or "0", "digest": _ZERO_DIGEST}
-        )
+    catalog_refs = _catalog_refs(catalogs)
     manifest: dict[str, Any] = {
         "agentce_manifest_version": 1,
         "engine": {
@@ -398,12 +442,49 @@ def _now() -> str:
     return datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+#: The fixed statement text every claim carries (SPEC §9.1; ``claim.schema.json``'s ``statement`` const).
+_CLAIM_STATEMENT = (
+    "This report states conformance to the named catalogs as evaluated by the named engine over "
+    "the named evidence. It is not a legal compliance determination."
+)
+
+
+def _build_claim(
+    assertions: list[Assertion],
+    *,
+    catalogs: list[Catalog],
+    operator: str,
+) -> dict[str, Any]:
+    """The conformance claim body (SPEC §9.1, ``claim.schema.json``): the scoped, content-addressed
+    statement of what was assessed, against what catalogs, that ``agentce sign`` attaches a claimant
+    or assessor signature to. Every field is real data already computed for this run -- no field is
+    fabricated -- so the claim is ready for a human claimant to review and sign, never pre-signed by
+    the engine itself."""
+    subjects = sorted({a.subject for a in assertions})
+    starts = [a.window[0] for a in assertions]
+    ends = [a.window[1] for a in assertions]
+    body: dict[str, Any] = {
+        "subjects": [{"id": s, "role": "both"} for s in subjects],
+        "observation_window": {"start": min(starts), "end": max(ends)},
+        "catalogs": _catalog_refs(catalogs),
+        "engine": {
+            "impl": ENGINE_NAME,
+            "version": __version__,
+            "spec_version": SPEC_VERSION,
+        },
+        "claimant": {"org": operator},
+        "statement": _CLAIM_STATEMENT,
+    }
+    claim_id = "sha256:" + hashlib.sha256(canonical.canonicalize(body)).hexdigest()
+    return {"claim_id": claim_id, **body}
+
+
 def write_report(
     out_dir: Path,
     assertions: list[Assertion],
     *,
     bundle_digest: str,
-    catalogs: list[str],
+    catalogs: list[Catalog],
     operator: str = "unknown",
     invocation: list[str] | None = None,
     supersedes: list[str] | None = None,
@@ -415,6 +496,7 @@ def write_report(
     )  # DC-5: refuse a supporting verdict without an evidence pointer
     out_dir.mkdir(parents=True, exist_ok=True)
     outputs: dict[str, str] = {}
+    labels = [f"{c.id}@{c.version}" for c in catalogs]
 
     def write_json(name: str, obj: Any) -> None:
         data = canonical.canonicalize(obj)
@@ -429,10 +511,24 @@ def write_report(
     counts = aggregate(assertions)
     write_json("assertions.json", [a.to_json() for a in assertions])
     write_text(
-        "report.md", render_report_md(assertions, counts, language=report_language)
+        "report.md",
+        render_report_md(
+            assertions,
+            counts,
+            language=report_language,
+            catalogs=labels,
+            invocation=invocation,
+        ),
     )
     write_text(
-        "report.html", render_report_html(assertions, counts, language=report_language)
+        "report.html",
+        render_report_html(
+            assertions,
+            counts,
+            language=report_language,
+            catalogs=labels,
+            invocation=invocation,
+        ),
     )
     write_json("oscal-ar.json", render_oscal(assertions))
     write_json("results.sarif", render_sarif(assertions))
@@ -448,6 +544,14 @@ def write_report(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
         outputs[rel] = _digest_bytes(data)
+
+    if assertions:
+        # claim.json is unsigned here (SPEC §9.1: the engine never signs its own claim); it exists
+        # so the already-built `agentce sign --as claimant|assessor` can reach and sign a real run.
+        claim = _build_claim(assertions, catalogs=catalogs, operator=operator)
+        (out_dir / "claim.json").write_text(
+            json.dumps(claim, sort_keys=True, indent=2) + "\n", encoding="utf-8"
+        )
 
     manifest = build_manifest(
         bundle_digest=bundle_digest,

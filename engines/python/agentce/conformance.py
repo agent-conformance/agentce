@@ -98,7 +98,6 @@ def _assess_project(
     project: dict[str, Any],
     out_dir: Path,
     catalogs: list[Catalog],
-    labels: list[str],
 ) -> dict[str, Any]:
     """Run one project through the full pipeline; write its report and return an outcome summary."""
     pid = str(project["id"])
@@ -117,7 +116,7 @@ def _assess_project(
         out_dir,
         assertions,
         bundle_digest=bundle.digest,
-        catalogs=labels,
+        catalogs=catalogs,
         operator=_ECS_OPERATOR,
         invocation=["conformance", pid],
     )
@@ -174,7 +173,7 @@ def run_ecs(
     adapter's fixtures) is run too and folded into the report under ``adapters`` (SPEC 11.5, 12.3).
     """
     repo_root = engine_path.resolve().parent.parent
-    catalogs, labels = _catalogs_for(repo_root)
+    catalogs, _ = _catalogs_for(repo_root)
     corpus_root, tempdir = _materialise_corpus(corpus_dir)
     reports_root = (
         (out_dir / "projects")
@@ -193,7 +192,7 @@ def run_ecs(
         pid = str(project["id"])
         try:
             summary = _assess_project(
-                corpus_root, project, reports_root / pid, catalogs, labels
+                corpus_root, project, reports_root / pid, catalogs
             )
             summaries.append(summary)
             identical += (

@@ -131,15 +131,6 @@ def _write_jsonl(records: Iterable[dict[str, Any]], path: Path) -> None:
             handle.write("\n")
 
 
-def _pending(result: CommandResult, summary: str) -> CommandResult:
-    """Mark a handler whose evaluation logic is not built yet; a clean, honest no-op (exit ok)."""
-    result.data.setdefault("status", "not_implemented")
-    result.data.setdefault("message_key", "skeleton.not_implemented")
-    result.note(summary)
-    _log.debug("command.pending", extra={"command": result.command})
-    return result
-
-
 def cmd_validate(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="validate")
     bundle_dir = _require_dir(
@@ -409,13 +400,19 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         supersedes, late_events = state.plan(
             loaded.digest, ingested.accepted, new_window_end
         )
+    command_name = _opt_str(ns, "command_name") or "assess"
+    invocation = (
+        ["quickstart"]
+        if command_name == "quickstart"
+        else ["assess", _scrub_path(bundle), _scrub_path(profile)]
+    )
     write_report(
         out_dir,
         evaluated,
         bundle_digest=loaded.digest,
-        catalogs=catalog_labels,
+        catalogs=catalogs,
         operator=_operator(),
-        invocation=["assess", _scrub_path(bundle), _scrub_path(profile)],
+        invocation=invocation,
         supersedes=supersedes,
         report_language=_opt_str(ns, "report_language") or "en",
     )
@@ -825,6 +822,30 @@ def cmd_conformance(ns: argparse.Namespace) -> CommandResult:
     return result
 
 
+def _diff_assertion_sets(
+    a: list[dict[str, Any]], b: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """A real, content-keyed delta between two assertion sets: every ``(control, subject)`` whose
+    outcome changed, added, or was removed -- keyed by identity, never by array position, so the
+    result is independent of either input's element order."""
+
+    def by_key(entries: list[dict[str, Any]]) -> dict[tuple[str, str], str]:
+        return {
+            (str(e["control"]), str(e["subject"])): str(e["outcome"]) for e in entries
+        }
+
+    left, right = by_key(a), by_key(b)
+    changes = []
+    for key in sorted(set(left) | set(right)):
+        before, after = left.get(key), right.get(key)
+        if before != after:
+            control, subject = key
+            changes.append(
+                {"control": control, "subject": subject, "from": before, "to": after}
+            )
+    return changes
+
+
 def cmd_diff(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="diff")
     fix = "pass two assertion files: `agentce diff <report-a> <report-b>`."
@@ -841,7 +862,19 @@ def cmd_diff(ns: argparse.Namespace) -> CommandResult:
         fix=fix,
     )
     result.data.update({"report_a": str(left), "report_b": str(right)})
-    return _pending(result, "Deterministic report diffing lands in a later work item.")
+    a = json.loads(left.read_text("utf-8"))
+    b = json.loads(right.read_text("utf-8"))
+    changes = _diff_assertion_sets(a, b)
+    result.data["changed"] = len(changes)
+    result.data["diff"] = changes
+    if changes:
+        result.add_code(int(ExitCode.FINDINGS))
+        result.note(f"{len(changes)} assertion(s) differ:")
+        for c in changes:
+            result.note(f"  {c['control']} @ {c['subject']}: {c['from']} -> {c['to']}")
+    else:
+        result.note("no differences")
+    return result
 
 
 def cmd_sign(ns: argparse.Namespace) -> CommandResult:
@@ -1229,6 +1262,7 @@ def cmd_quickstart(ns: argparse.Namespace) -> CommandResult:
         catalog="eu-ai-act@2026.09",
         catalog_dir=[str(catalog_dir)],
         out=out,
+        command_name="quickstart",
     )
     assess = cmd_assess(assess_ns)
     result.data.update(assess.data)

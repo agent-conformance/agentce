@@ -72,7 +72,7 @@ def test_assessment_report_is_dc5_valid(tmp_path: Path) -> None:
         tmp_path,
         assertions,
         bundle_digest="sha256:" + "a" * 64,
-        catalogs=["eu-ai-act@2026.09"],
+        catalogs=[catalog],
     )
     assert (tmp_path / "assertions.json").is_file()
 
