@@ -112,6 +112,12 @@ public final class Assess {
         return pointers;
     }
 
+    /** The control's family: the letter prefix of its own id (SPEC §7.1; mirrors the Python reference). */
+    private static String familyOf(String controlId) {
+        int dash = controlId.indexOf('-');
+        return dash == -1 ? controlId : controlId.substring(0, dash);
+    }
+
     /**
      * Carry each control's own crosswalk entries into every assertion built for it (SPEC §7.3).
      *
@@ -147,26 +153,26 @@ public final class Assess {
             String[] win) {
         List<JsonNode> crosswalk = crosswalkFor(control);
         if (!roleApplies(roles, control.appliesToRoles)) {
-            Assertions.Assertion a = Assertions.make(control.id, control.version, subject.id, "not_applicable", control.rung, control.mode, win, new int[] {0, 0});
+            Assertions.Assertion a = Assertions.make(control.id, control.version, subject.id, "not_applicable", control.rung, control.mode, win, new int[] {0, 0}, control.severity, familyOf(control.id));
             a.crosswalk = crosswalk;
             return a;
         }
 
         Psp.Shape shape = Catalog.shapeFor(catalog, control);
         if (control.rung != 2 || shape == null) {
-            Assertions.Assertion a = Assertions.make(control.id, control.version, subject.id, "not_assessed", control.rung, control.mode, win, new int[] {0, 0});
+            Assertions.Assertion a = Assertions.make(control.id, control.version, subject.id, "not_assessed", control.rung, control.mode, win, new int[] {0, 0}, control.severity, familyOf(control.id));
             a.crosswalk = crosswalk;
             return a;
         }
 
         Structural.ShapeResult result = Structural.evaluateShape(store, shape, catalog.shapes, control.id);
         if (result.applicable.isEmpty()) {
-            Assertions.Assertion a = Assertions.make(control.id, control.version, subject.id, "not_applicable", control.rung, control.mode, win, new int[] {0, 0});
+            Assertions.Assertion a = Assertions.make(control.id, control.version, subject.id, "not_applicable", control.rung, control.mode, win, new int[] {0, 0}, control.severity, familyOf(control.id));
             a.crosswalk = crosswalk;
             return a;
         }
         if (!hasMinimumEvidence(events, control.minimumEvidence)) {
-            Assertions.Assertion a = Assertions.make(control.id, control.version, subject.id, "insufficient_evidence", control.rung, control.mode, win, new int[] {result.applicable.size(), 0});
+            Assertions.Assertion a = Assertions.make(control.id, control.version, subject.id, "insufficient_evidence", control.rung, control.mode, win, new int[] {result.applicable.size(), 0}, control.severity, familyOf(control.id));
             a.crosswalk = crosswalk;
             return a;
         }
@@ -181,7 +187,8 @@ public final class Assess {
         }
         Assertions.Assertion assertion = Assertions.make(
                 control.id, control.version, subject.id, conformant ? "conformant" : "non-conformant",
-                control.rung, control.mode, win, new int[] {result.applicable.size(), result.failing.size()});
+                control.rung, control.mode, win, new int[] {result.applicable.size(), result.failing.size()},
+                control.severity, familyOf(control.id));
         for (Structural.Violation v : result.violations) {
             assertion.violations.add(Structural.violationToJson(v));
         }

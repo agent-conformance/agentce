@@ -55,6 +55,8 @@ def _assertion(outcome: str) -> Assertion:
         mode="automated",
         window=_WINDOW,
         population=(3, 1 if outcome == "non-conformant" else 0),
+        severity="high",
+        family="OVS",
         evidence=[_EVIDENCE],
     )
 
@@ -119,7 +121,17 @@ def test_assertions_json_is_deterministic(tmp_path: Path) -> None:
 
 def test_dc5_aborts_before_writing(tmp_path: Path) -> None:
     bad = Assertion(
-        "C", "1", "s", "conformant", 2, "automated", _WINDOW, (1, 0), evidence=[]
+        "C",
+        "1",
+        "s",
+        "conformant",
+        2,
+        "automated",
+        _WINDOW,
+        (1, 0),
+        "high",
+        "C",
+        evidence=[],
     )
     with pytest.raises(AgentceError) as excinfo:
         write_report(
@@ -286,6 +298,8 @@ def test_oscal_finding_without_evidence_still_resolves_to_an_observation() -> No
         mode="automated",
         window=_WINDOW,
         population=(3, 0),
+        severity="high",
+        family="OVS",
         evidence=[],
     )
     oscal = render_oscal([bare])
@@ -374,6 +388,8 @@ def test_junit_one_testcase_per_pair_and_failure_iff_not_conformant() -> None:
         mode="automated",
         window=_WINDOW,
         population=(3, 1),
+        severity="high",
+        family="OVS",
         evidence=[_EVIDENCE],
     )
     doc = ET.fromstring(render_junit([conformant, failing]))
@@ -407,6 +423,8 @@ def test_junit_is_well_formed_and_sorted() -> None:
         mode="automated",
         window=_WINDOW,
         population=(1, 0),
+        severity="low",
+        family="AAA",
         evidence=[_EVIDENCE],
     )
     doc = ET.fromstring(render_junit([a, b]))
@@ -430,6 +448,8 @@ def _distinct_pair() -> list[Assertion]:
             mode="automated",
             window=_WINDOW,
             population=(3, 1),
+            severity="low",
+            family="AAA",
             evidence=[_EVIDENCE],
         ),
     ]
@@ -491,6 +511,8 @@ def test_oscal_xml_escapes_untrusted_values() -> None:
         mode="automated",
         window=_WINDOW,
         population=(1, 0),
+        severity="high",
+        family="OVS",
         evidence=[_EVIDENCE],
     )
     doc = render_oscal([hostile])

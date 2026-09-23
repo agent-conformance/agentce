@@ -42,6 +42,8 @@ def _sample(subject: str = "spiffe://corp/agents/a") -> list[Assertion]:
             mode="automated",
             window=("2026-01-01T00:00:00Z", "2026-04-01T00:00:00Z"),
             population=(1, 0),
+            severity="high",
+            family="REC",
             evidence=[
                 EvidencePointer("agentce:event/x", "sha256:ab", "enforcement_point")
             ],

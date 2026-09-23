@@ -33,6 +33,8 @@ def _assertions(subject: str = "s") -> list[Assertion]:
             mode="automated",
             window=("2026-01-01T00:00:00Z", "2026-04-01T00:00:00Z"),
             population=(1, 0),
+            severity="high",
+            family="REC",
             evidence=[
                 EvidencePointer("agentce:event/x", "sha256:ab", "enforcement_point")
             ],
@@ -129,6 +131,8 @@ def _severity_findings() -> list[Assertion]:
             mode="automated",
             window=("2026-01-01T00:00:00Z", "2026-04-01T00:00:00Z"),
             population=(1, 0),
+            severity="high",
+            family="DAT",
             evidence=[
                 EvidencePointer("agentce:event/dat", "sha256:dat", "self_report")
             ],
@@ -142,6 +146,8 @@ def _severity_findings() -> list[Assertion]:
             mode="automated",
             window=("2026-01-01T00:00:00Z", "2026-04-01T00:00:00Z"),
             population=(1, 1),
+            severity="medium",
+            family="DOC",
             violations=[
                 {
                     "focus": "agentce:node/UNDOCUMENTED-DECISION-Z9",

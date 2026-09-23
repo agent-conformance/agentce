@@ -18,6 +18,8 @@ test("aggregate lists every outcome, even at zero", () => {
     mode: "test",
     window: ["a", "b"],
     population: [3, 0],
+    severity: "high",
+    family: "C",
     evidence: [{ ref: "r", digest: "sha256:d", sourceClass: "instrumented" }],
   });
   const counts = aggregate([conformant]);
@@ -38,6 +40,8 @@ test("assertionToJson nests window and population and omits empty collections", 
       mode: "test",
       window: ["a", "b"],
       population: [0, 0],
+      severity: "high",
+      family: "C",
     }),
   );
   assert.deepEqual(json.window, { start: "a", end: "b" });
@@ -56,6 +60,8 @@ test("checkDc5 refuses a supporting verdict with no evidence", () => {
     mode: "test",
     window: ["a", "b"],
     population: [3, 1],
+    severity: "high",
+    family: "C",
   });
   assert.throws(
     () => checkDc5([bare]),

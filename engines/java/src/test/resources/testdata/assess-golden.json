@@ -15,6 +15,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DAT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -38,6 +40,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DAT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -61,6 +65,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DAT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -84,6 +90,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DAT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -107,6 +115,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "DOC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -139,6 +149,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DOC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -171,6 +183,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DOC",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -203,6 +217,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DOC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -235,6 +251,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DOC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -258,6 +276,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "INC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -281,6 +301,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -309,6 +331,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "INC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -332,6 +356,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INC",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -364,6 +390,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INT",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -396,6 +424,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INT",
       "evidence": [
         {
           "ref": "agentce:event/dl1",
@@ -428,6 +458,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INT",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -460,6 +492,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INT",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -492,6 +526,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -515,6 +551,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "OVS",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -547,6 +585,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "OVS",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -584,6 +624,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "OVS",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -616,6 +658,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -639,6 +683,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "OVS",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -671,6 +717,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -694,6 +742,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -717,6 +767,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -740,6 +792,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "REC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -772,6 +826,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "REC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -804,6 +860,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "REC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -827,6 +885,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "REC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -864,6 +924,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "REC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -887,6 +949,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "REC",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -919,6 +983,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "ROB",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -951,6 +1017,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -974,6 +1042,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -1006,6 +1076,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "ROB",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -1038,6 +1110,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -1070,6 +1144,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -1102,6 +1178,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1125,6 +1203,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1148,6 +1228,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1171,6 +1253,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1194,6 +1278,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1217,6 +1303,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1240,6 +1328,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "TRN",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1263,6 +1353,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "TRN",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -1295,6 +1387,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "TRN",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1318,6 +1412,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "TRN",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -1350,6 +1446,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "TRN",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1375,6 +1473,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DAT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1398,6 +1498,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DAT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1421,6 +1523,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DAT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1444,6 +1548,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DAT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1467,6 +1573,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "DOC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -1499,6 +1607,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DOC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -1531,6 +1641,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DOC",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -1563,6 +1675,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DOC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -1595,6 +1709,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DOC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1618,6 +1734,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "INC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1641,6 +1759,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1669,6 +1789,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "INC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1692,6 +1814,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INC",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -1724,6 +1848,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INT",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -1756,6 +1882,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INT",
       "evidence": [
         {
           "ref": "agentce:event/dl1",
@@ -1788,6 +1916,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INT",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -1820,6 +1950,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INT",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -1852,6 +1984,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1875,6 +2009,8 @@
         "applicable": 1,
         "failed": 1
       },
+      "severity": "high",
+      "family": "OVS",
       "violations": [
         {
           "focus": "agentce:event/d1",
@@ -1915,6 +2051,8 @@
         "applicable": 1,
         "failed": 1
       },
+      "severity": "high",
+      "family": "OVS",
       "violations": [
         {
           "focus": "agentce:event/tc1",
@@ -1960,6 +2098,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "OVS",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -1992,6 +2132,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2015,6 +2157,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "OVS",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -2047,6 +2191,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2070,6 +2216,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2093,6 +2241,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2116,6 +2266,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "REC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -2148,6 +2300,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "REC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -2180,6 +2334,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "REC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2203,6 +2359,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "REC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -2240,6 +2398,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "REC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2263,6 +2423,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "REC",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -2295,6 +2457,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "ROB",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -2327,6 +2491,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2350,6 +2516,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -2382,6 +2550,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "ROB",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -2414,6 +2584,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -2446,6 +2618,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -2478,6 +2652,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2501,6 +2677,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2524,6 +2702,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2547,6 +2727,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2570,6 +2752,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2593,6 +2777,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2616,6 +2802,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "TRN",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2639,6 +2827,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "TRN",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -2671,6 +2861,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "TRN",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2694,6 +2886,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "TRN",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -2726,6 +2920,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "TRN",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2751,6 +2947,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DAT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2774,6 +2972,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DAT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2797,6 +2997,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DAT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2820,6 +3022,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DAT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2843,6 +3047,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "DOC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -2875,6 +3081,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DOC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -2907,6 +3115,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DOC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2930,6 +3140,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DOC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -2962,6 +3174,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DOC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2985,6 +3199,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "INC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3008,6 +3224,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3036,6 +3254,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "INC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3059,6 +3279,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3082,6 +3304,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3105,6 +3329,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3128,6 +3354,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3151,6 +3379,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3174,6 +3404,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3197,6 +3429,8 @@
         "applicable": 1,
         "failed": 1
       },
+      "severity": "high",
+      "family": "OVS",
       "violations": [
         {
           "focus": "agentce:event/d1",
@@ -3237,6 +3471,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3265,6 +3501,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3288,6 +3526,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3311,6 +3551,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3334,6 +3576,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3357,6 +3601,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3380,6 +3626,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3403,6 +3651,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "REC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -3435,6 +3685,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "REC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -3467,6 +3719,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "REC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3490,6 +3744,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "REC",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -3527,6 +3783,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "REC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3550,6 +3808,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "REC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3573,6 +3833,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3596,6 +3858,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3619,6 +3883,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3642,6 +3908,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3665,6 +3933,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3688,6 +3958,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3711,6 +3983,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3734,6 +4008,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3757,6 +4033,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3780,6 +4058,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3803,6 +4083,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3826,6 +4108,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3849,6 +4133,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "TRN",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3872,6 +4158,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "high",
+      "family": "TRN",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -3904,6 +4192,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "TRN",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3927,6 +4217,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "TRN",
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -3959,6 +4251,8 @@
         "applicable": 1,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "TRN",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3984,6 +4278,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DAT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4007,6 +4303,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DAT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4030,6 +4328,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DAT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4053,6 +4353,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DAT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4076,6 +4378,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "DOC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4099,6 +4403,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DOC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4122,6 +4428,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DOC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4145,6 +4453,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DOC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4168,6 +4478,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "DOC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4191,6 +4503,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "INC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4214,6 +4528,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4242,6 +4558,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "INC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4265,6 +4583,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4288,6 +4608,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4311,6 +4633,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4334,6 +4658,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4357,6 +4683,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "INT",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4380,6 +4708,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4403,6 +4733,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4426,6 +4758,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4454,6 +4788,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4477,6 +4813,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4500,6 +4838,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4523,6 +4863,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4546,6 +4888,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4569,6 +4913,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "OVS",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4592,6 +4938,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "REC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4615,6 +4963,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "REC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4638,6 +4988,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "REC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4661,6 +5013,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "REC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4689,6 +5043,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "REC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4712,6 +5068,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "REC",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4735,6 +5093,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4758,6 +5118,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4781,6 +5143,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4804,6 +5168,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4827,6 +5193,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4850,6 +5218,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4873,6 +5243,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "ROB",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4896,6 +5268,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4919,6 +5293,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4942,6 +5318,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4965,6 +5343,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4988,6 +5368,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "RSK",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -5011,6 +5393,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "TRN",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -5034,6 +5418,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "high",
+      "family": "TRN",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -5057,6 +5443,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "TRN",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -5080,6 +5468,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "TRN",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -5103,6 +5493,8 @@
         "applicable": 0,
         "failed": 0
       },
+      "severity": "medium",
+      "family": "TRN",
       "crosswalk": [
         {
           "framework": "eu-ai-act",

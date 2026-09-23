@@ -212,6 +212,8 @@ def _assertion(outcome: str) -> Assertion:
         window=("2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"),
         outcome=outcome,
         population=(0, 0),
+        severity="high",
+        family="C",
     )
 
 

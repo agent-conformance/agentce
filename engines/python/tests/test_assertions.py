@@ -31,6 +31,8 @@ def _assertion(
         mode="automated",
         window=_WINDOW,
         population=(3, 1),
+        severity="high",
+        family="OVS",
         evidence=evidence or [],
     )
 
