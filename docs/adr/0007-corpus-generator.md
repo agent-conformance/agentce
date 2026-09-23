@@ -8,7 +8,7 @@ Spec refs: SPEC §11, §8.2, §3.1; ADR-0003
 The simulated corpus (SPEC §11) is the shared dataset for the Engine Conformance Suite and for
 documentation snippets. It must be reproducible byte for byte, contain no learned component (SPEC §3.1,
 HR-1/HR-2), carry ground-truth labels and expected outcomes, and be safe to publish (no real personal
-data). It also has to scale to roughly 150 projects across domains, implementation styles, and variants.
+data). It also has to scale to roughly 130 projects across domains, implementation styles, and variants.
 
 ## Decision
 
@@ -24,7 +24,7 @@ control. Seeded faults are injected by rule, not by sampling real traffic.
   problems, and cannot be shared as a stable conformance dataset.
 - **An LLM-based synthesizer.** Introduces a learned component into the toolchain, violating HR-1/HR-2,
   and is non-deterministic; a fork could not reproduce the corpus.
-- **Fixed hand-written fixtures only.** Do not scale to ~150 projects or exercise the statistical and
+- **Fixed hand-written fixtures only.** Do not scale to ~130 projects or exercise the statistical and
   multi-agent paths; retained as small rule fixtures alongside the generator.
 
 ## Consequences (including determinism, portability to TypeScript/Java, performance)

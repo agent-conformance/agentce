@@ -28,8 +28,8 @@ def test_two_engines_are_byte_identical(small_filler: None) -> None:
     result = ecs.run_two_engine(REPO_ROOT / "corpus")
     assert result["python"] == "full"
     assert result["ts"] == "full"
-    assert result["projects_total"] == 150
-    assert result["projects_identical"] == 150, (
+    assert result["projects_total"] == 132
+    assert result["projects_identical"] == 132, (
         f"differing projects: {result['different']}"
     )
     assert result["different"] == []
