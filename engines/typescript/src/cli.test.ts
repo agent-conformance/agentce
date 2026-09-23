@@ -41,7 +41,7 @@ test("quickstart assesses the vendored project end to end and writes a real repo
     assert.ok(JSON.parse(readFileSync(join(out, "oscal-ar.json"), "utf-8")));
     assert.ok(JSON.parse(readFileSync(join(out, "results.sarif"), "utf-8")));
 
-    // The manifest's invocation never carries this machine's raw bundle/profile path (SPEC §8.4, F25).
+    // The manifest's invocation never carries this machine's raw bundle/profile path (SPEC §8.4).
     const manifest = JSON.parse(readFileSync(join(out, "manifest.json"), "utf-8"));
     const invocation = (manifest.run as { invocation: string[] }).invocation;
     assert.ok(!invocation.some((part) => part.includes(quickstartDir())), invocation.join(" "));
