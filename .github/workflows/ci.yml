@@ -169,6 +169,27 @@ jobs:
       - name: Run every example and validate its bundle
         run: uv run --project examples --frozen python examples/run_all.py --check
 
+  policy-gating:
+    # Policy-as-code (SPEC §8.5): every assertion carries a real, catalog-derived severity and
+    # family, and `agentce assess --fail-on <expr>` gates the exit code on a tiny, deterministic
+    # expression -- never `eval`. A hostile expression (a dunder-import call, a backtick-embedded
+    # shell command, a bare os.system call, or a well-formed clause with an evaluable tail) is
+    # refused at exit 3 with a stable input.fail_on* key and never executed; a Rego/Conftest and a
+    # Kyverno example both gate assertions.json on the same fields.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Sync the engine
+        working-directory: engines/python
+        run: uv sync --frozen
+      - name: Policy-as-code gating (severity/family, --fail-on, policy examples)
+        working-directory: engines/python
+        run: uv run --frozen pytest -q -p no:cacheprovider tests/test_policy_gating.py
+
   collect-honesty:
     # `agentce collect` has no source connector, so the pages and the example config that introduce it
     # must say so: the check runs the real command against the shipped config and fails when the
