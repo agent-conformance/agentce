@@ -1,12 +1,19 @@
 package org.agentce;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Integrity verification is byte-identical to the reference (SPEC §6.6). The fixture exercises every
@@ -52,5 +59,37 @@ class IntegrityTest {
         assertEquals("verified", withSig.get(0).status);
         List<Integrity.Result> withoutSig = Integrity.verifyBundle(List.of(signedEvent(null)), Json.nodes().objectNode(), null);
         assertEquals("unsigned", withoutSig.get(0).status);
+    }
+
+    private static JsonNode block(String sigRef) {
+        ObjectNode integrity = Json.nodes().objectNode();
+        integrity.put("sig_ref", sigRef);
+        return integrity;
+    }
+
+    @Test
+    void sigRefEscapingTheBundleRootIsNotTreatedAsSigned(@TempDir Path tempDir) throws IOException {
+        Path bundleRoot = tempDir.resolve("bundle");
+        Files.createDirectories(bundleRoot.resolve("attestations"));
+        Path outside = tempDir.resolve("sig.bin");
+        Files.writeString(outside, "signature bytes\n", StandardCharsets.UTF_8);
+        Files.createSymbolicLink(bundleRoot.resolve("attestations").resolve("alias.sig"), outside);
+
+        // sig_ref is evidence content: neither a literal '..' nor a symlink out may pass as a signature.
+        assertFalse(Integrity.isSigned(block("../sig.bin"), bundleRoot));
+        assertFalse(Integrity.isSigned(block("attestations/alias.sig"), bundleRoot));
+    }
+
+    @Test
+    void sigRefInsideTheBundleRootIsTreatedAsSigned(@TempDir Path tempDir) throws IOException {
+        Path bundleRoot = tempDir.resolve("bundle");
+        Files.createDirectories(bundleRoot.resolve("attestations"));
+        Files.writeString(
+                bundleRoot.resolve("attestations").resolve("sig.bin"),
+                "signature bytes\n",
+                StandardCharsets.UTF_8);
+
+        assertTrue(Integrity.isSigned(block("attestations/sig.bin"), bundleRoot));
+        assertFalse(Integrity.isSigned(block("attestations/absent.bin"), bundleRoot));
     }
 }
