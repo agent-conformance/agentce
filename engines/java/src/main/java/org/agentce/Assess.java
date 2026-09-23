@@ -158,17 +158,22 @@ public final class Assess {
         return assertion;
     }
 
+    /** Group {@code accepted} by subject id in one pass over the list. */
+    private static Map<String, List<JsonNode>> indexBySubject(List<JsonNode> accepted) {
+        Map<String, List<JsonNode>> index = new java.util.HashMap<>();
+        for (JsonNode e : accepted) {
+            index.computeIfAbsent(subjectOf(e), k -> new ArrayList<>()).add(e);
+        }
+        return index;
+    }
+
     /** Evaluate every catalog control against every subject and return the assertions. */
     public static List<Assertions.Assertion> assessSubjects(
             List<JsonNode> accepted, Profile profile, List<Catalog> catalogs, DomainBinding domain) {
         List<Assertions.Assertion> assertions = new ArrayList<>();
+        Map<String, List<JsonNode>> eventsBySubject = indexBySubject(accepted);
         for (Profile.Subject subject : profile.subjects) {
-            List<JsonNode> subjectEvents = new ArrayList<>();
-            for (JsonNode e : accepted) {
-                if (subjectOf(e).equals(subject.id)) {
-                    subjectEvents.add(e);
-                }
-            }
+            List<JsonNode> subjectEvents = eventsBySubject.getOrDefault(subject.id, java.util.List.of());
             GraphStore store = Graph.buildGraph(subjectEvents, domain);
             Map<String, JsonNode> eventsByIri = new java.util.HashMap<>();
             for (JsonNode event : subjectEvents) {

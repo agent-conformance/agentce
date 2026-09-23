@@ -154,6 +154,21 @@ function assertControl(
   });
 }
 
+/** Group `accepted` by subject id in one pass over the list. */
+function indexBySubject(accepted: Event[]): Map<string, Event[]> {
+  const index = new Map<string, Event[]>();
+  for (const event of accepted) {
+    const key = String(event.subject ?? "");
+    const events = index.get(key);
+    if (events) {
+      events.push(event);
+    } else {
+      index.set(key, [event]);
+    }
+  }
+  return index;
+}
+
 /** Evaluate every catalog control against every subject and return the assertions. */
 export function assessSubjects(
   accepted: Event[],
@@ -162,8 +177,9 @@ export function assessSubjects(
   domain: DomainBinding,
 ): Assertion[] {
   const assertions: Assertion[] = [];
+  const eventsBySubject = indexBySubject(accepted);
   for (const subject of profile.subjects) {
-    const subjectEvents = accepted.filter((e) => String(e.subject ?? "") === subject.id);
+    const subjectEvents = eventsBySubject.get(subject.id) ?? [];
     const store = buildGraph(subjectEvents, { domain });
     const eventsByIri = new Map<string, Event>();
     for (const event of subjectEvents) {
