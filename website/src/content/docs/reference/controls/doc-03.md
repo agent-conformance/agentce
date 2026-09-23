@@ -1,0 +1,15 @@
+---
+title: DOC-03
+description: Declared egress paths match the observed enforcement point (EU AI Act base catalog).
+---
+
+Declared egress paths match the observed enforcement point.
+
+| Field | Value |
+|---|---|
+| Severity | medium |
+| Mode | automated |
+| Rung | 2 |
+| Catalog | EU AI Act base catalog (base) |
+
+Crosswalked to clause(s) Art. 11 / Annex IV. Clause numbers only are cited; standard text is never reproduced.
