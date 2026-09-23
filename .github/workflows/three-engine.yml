@@ -53,6 +53,10 @@ jobs:
         working-directory: conformance
         run: uv run --frozen pytest -q -p no:cacheprovider tests/test_ecs_canonical_set.py
 
+      - name: Two-engine byte-identity over the full corpus
+        working-directory: conformance
+        run: uv run --frozen pytest -q -p no:cacheprovider tests/test_ecs.py
+
       - name: Engine quickstart-page check (self-test)
         working-directory: conformance
         run: uv run --frozen pytest -q -p no:cacheprovider tests/test_engine_docs_check.py
