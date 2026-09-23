@@ -26,8 +26,18 @@ from typing import Any
 import jsonschema
 import regex
 
-from . import ENGINE_NAME, SPEC_VERSION, __version__, canonical, messages, verdict
+from . import (
+    ENGINE_NAME,
+    SPEC_VERSION,
+    __version__,
+    bundled,
+    canonical,
+    messages,
+    templating,
+    verdict,
+)
 from .assertions import Assertion, aggregate, check_dc5
+from .assess import index_by_subject, requirement_met
 from .catalog import Catalog, ControlSpec, catalog_provenance_digest
 
 #: Always written, regardless of `--emit`: the run's structural core (write_report's docstring).
@@ -925,6 +935,269 @@ def _catalog_refs(catalogs: list[Catalog]) -> list[dict[str, str]]:
     ]
 
 
+#: Outcomes a remediation package reports as a finding (SPEC §7; Appendix A2 (A)): non-passing
+#: verdicts only -- `conformant` has nothing to remediate, `not_applicable` was never in scope, and
+#: `not_assessed` gets its own top-level array because there is no verdict yet to remediate toward.
+_REMEDIATION_FINDING_OUTCOMES = frozenset(
+    {"non-conformant", "partial", "insufficient_evidence"}
+)
+#: The fixed guardrail block every remediation finding cites by reference (never re-derived per
+#: finding, so it can never drift control to control): don't over-claim, cite the clause with its
+#: verification status, make the minimal change, and re-verify before considering it fixed.
+_REMEDIATION_GUARDRAILS_REF = "remediation.guardrails.v1"
+#: Cap applied when an evidence- or profile-derived string is escaped for `remediation.md` (SPEC §7
+#: injection hardening): long enough to stay useful, short enough to bound a hostile payload.
+_MD_ESCAPE_CAP = 200
+
+
+def _md_escape(text: str, cap: int = _MD_ESCAPE_CAP) -> str:
+    """Neutralise an evidence- or profile-derived string before it reaches the `remediation.md`
+    template (SPEC §7 injection hardening): collapse embedded newlines and other whitespace to single
+    spaces so the string can never start a new line and become a live Markdown heading or a bare
+    instruction line, replace backticks so it cannot break out of the template's own backtick
+    delimiters, and cap its length. Escaping, never erasure -- the string still appears, as inert
+    data."""
+    collapsed = " ".join(text.split()).replace("`", "'")
+    if len(collapsed) > cap:
+        collapsed = collapsed[: cap - 1] + "…"
+    return collapsed
+
+
+def _remediation_severity(spec: ControlSpec | None) -> str:
+    return spec.severity if spec and spec.severity in _SEVERITY_LEVELS else "unrated"
+
+
+def _remediation_clauses(spec: ControlSpec | None) -> list[dict[str, Any]]:
+    """Every crosswalk clause exactly as the catalog carries it (SPEC §7.3): `verified_against_text`
+    is read, never invented -- only a human with the licensed standard text may flip it (finding #21,
+    human action H4)."""
+    if spec is None:
+        return []
+    return [
+        {
+            "framework": str(entry.get("framework", "")),
+            "clause": str(entry.get("clause", "")),
+            "relation": str(entry.get("relation", "")),
+            "verified_against_text": bool(entry.get("verified_against_text", False)),
+        }
+        for entry in spec.raw.get("crosswalk", []) or []
+    ]
+
+
+def _remediation_expectations(
+    spec: ControlSpec | None, outcome: str
+) -> list[dict[str, str]]:
+    if spec is None:
+        return []
+    return [
+        {"id": str(e.get("id", "")), "text": str(e.get("text", "")), "result": outcome}
+        for e in spec.raw.get("expectations", []) or []
+    ]
+
+
+def _requirement_list(minimum: list[dict[str, str]]) -> list[dict[str, str]]:
+    return [
+        {"event": str(r.get("event", "")), "class": str(r.get("class", "any"))}
+        for r in minimum
+    ]
+
+
+def _remediation_evidence_gap(
+    spec: ControlSpec | None, outcome: str, subject_events: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """What this control's own `minimum_evidence` requires, and which of those requirements this
+    subject's own events did and did not satisfy -- the exact rule the assessment itself used to
+    reach `outcome` (:func:`agentce.assess.requirement_met`). Reaching a structural verdict
+    (`non-conformant`/`partial`) means every requirement was already met; only `insufficient_evidence`
+    can have a real gap."""
+    required = _requirement_list(spec.minimum_evidence if spec else [])
+    if outcome == "insufficient_evidence":
+        observed = [r for r in required if requirement_met(subject_events, r)]
+        missing = [r for r in required if not requirement_met(subject_events, r)]
+    else:
+        observed, missing = list(required), []
+    return {"required": required, "observed": observed, "missing": missing}
+
+
+def _remediation_techniques(spec: ControlSpec | None) -> dict[str, Any]:
+    """The control's technique pointers as the remediation block's `techniques` (Appendix A2 (A)) --
+    the catalog's only machine-readable remediation hint when, as for every base `eu-ai-act` control
+    today, `remediation_hint` itself is unset (mirrors `_remediation_hints`'s reading of the same
+    field). `style` is `generic`: the catalog does not yet carry a technique per agent style."""
+    if spec is None:
+        return {"techniques": []}
+    block: dict[str, Any] = {
+        "techniques": [
+            {
+                "style": "generic",
+                "ref": str(ref),
+                "digest": "sha256:" + hashlib.sha256(str(ref).encode()).hexdigest(),
+            }
+            for ref in spec.raw.get("techniques", []) or []
+        ]
+    }
+    hint = spec.raw.get("remediation_hint")
+    if hint:
+        block["hint"] = str(hint)
+    return block
+
+
+def _remediation_acceptance(
+    spec: ControlSpec | None, outcome: str, reverify_command: list[str]
+) -> dict[str, Any]:
+    texts = [
+        str(e.get("text", ""))
+        for e in ((spec.raw.get("expectations", []) or []) if spec else [])
+        if e.get("text")
+    ]
+    return {
+        "expected_transition": {"from": outcome, "to": "conformant"},
+        "criteria": "; ".join(texts)
+        or "re-run and reach a conformant outcome for this control.",
+        "reverify_command": list(reverify_command),
+    }
+
+
+def _remediation_finding(
+    a: Assertion,
+    spec: ControlSpec | None,
+    subject_events: list[dict[str, Any]],
+    reverify_command: list[str],
+) -> dict[str, Any]:
+    finding: dict[str, Any] = {
+        "control": a.control,
+        "control_version": a.control_version,
+        "outcome": a.outcome,
+        "rung": a.rung,
+        "mode": a.mode,
+        "severity": _remediation_severity(spec),
+        "window": {"start": a.window[0], "end": a.window[1]},
+        "title": _finding_title(a, spec),
+        "clauses": _remediation_clauses(spec),
+        "expectations": _remediation_expectations(spec, a.outcome),
+        "evidence_gap": _remediation_evidence_gap(spec, a.outcome, subject_events),
+        "violations": list(a.violations),
+        "evidence": [e.to_json() for e in a.evidence],
+        "remediation": _remediation_techniques(spec),
+        "acceptance": _remediation_acceptance(spec, a.outcome, reverify_command),
+        "guardrails_ref": _REMEDIATION_GUARDRAILS_REF,
+    }
+    description = spec.raw.get("description") if spec else None
+    if description:
+        finding["description"] = str(description)
+    return finding
+
+
+def _remediation_not_assessed_reason(spec: ControlSpec | None, a: Assertion) -> str:
+    rung = spec.rung if spec else a.rung
+    if rung != 2:
+        return f"rung {rung} is not yet evaluated by this engine"
+    return "no structural shape is defined for this control"
+
+
+def _remediation_not_assessed(a: Assertion, spec: ControlSpec | None) -> dict[str, Any]:
+    return {
+        "control": a.control,
+        "control_version": a.control_version,
+        "title": _finding_title(a, spec),
+        "severity": _remediation_severity(spec),
+        "reason": _remediation_not_assessed_reason(spec, a),
+    }
+
+
+def render_remediation_package(
+    subject: str,
+    subject_assertions: list[Assertion],
+    *,
+    catalogs: list[Catalog],
+    assertions_digest: str,
+    subject_events: list[dict[str, Any]],
+    reverify_command: list[str],
+) -> dict[str, Any]:
+    """The canonical, per-subject AI-actionable remediation package (SPEC §7; Appendix A2 (A)): a
+    pure deterministic join of each non-passing control's catalog data (`control.raw` -- crosswalk,
+    severity, expectation text, remediation techniques, minimum evidence) with that control's real
+    assertion outcome (evidence, violations, evidence gap). No model call; RFC 8785 canonical
+    (via :func:`agentce.canonical.canonicalize` at the call site); byte-identical across independent
+    runs over the same assertions."""
+    by_control = _control_index(catalogs)
+    ordered = sorted(subject_assertions, key=lambda a: a.control)
+    findings = [
+        _remediation_finding(
+            a, by_control.get(a.control), subject_events, reverify_command
+        )
+        for a in ordered
+        if a.outcome in _REMEDIATION_FINDING_OUTCOMES
+    ]
+    not_assessed = [
+        _remediation_not_assessed(a, by_control.get(a.control))
+        for a in ordered
+        if a.outcome == "not_assessed"
+    ]
+    deviations_applied = sorted(
+        {a.deviation for a in subject_assertions if a.deviation}
+    )
+    body: dict[str, Any] = {
+        "package_version": 1,
+        "generated_from": {
+            "assertions_digest": assertions_digest,
+            "engine": {
+                "impl": ENGINE_NAME,
+                "version": __version__,
+                "spec_version": SPEC_VERSION,
+            },
+            "catalogs": _catalog_refs(catalogs),
+        },
+        "subject": subject,
+        "findings": findings,
+        "not_assessed": not_assessed,
+        "deviations_applied": deviations_applied,
+    }
+    # $id is content-derived (mirrors `_build_claim`'s `claim_id`): never a clock, a host, or a
+    # random value, so two independent runs over the same assertions produce the same $id too.
+    digest = hashlib.sha256(canonical.canonicalize(body)).hexdigest()
+    return {
+        "$schema": "https://agent-conformance.org/spec/report/remediation-package.schema.json",
+        "$id": f"urn:agentce:remediation-package:sha256:{digest}",
+        **body,
+    }
+
+
+def _remediation_md_context(package: dict[str, Any]) -> dict[str, Any]:
+    """A render-only view of `package`: every evidence- or profile-derived string the template
+    interpolates (the subject id, each finding's evidence refs and violation paths) is escaped
+    (:func:`_md_escape`); the canonical `package` itself is never mutated -- only this copy feeds the
+    template (SPEC §7 injection hardening)."""
+    ctx = dict(package)
+    ctx["subject"] = _md_escape(str(package.get("subject", "")))
+    findings = []
+    for finding in package.get("findings", []):
+        f = dict(finding)
+        f["evidence"] = [
+            {**e, "ref": _md_escape(str(e.get("ref", "")))}
+            for e in finding.get("evidence", [])
+        ]
+        f["violations"] = [
+            {**v, "path": _md_escape(str(v.get("path", "")))}
+            for v in finding.get("violations", [])
+        ]
+        findings.append(f)
+    ctx["findings"] = findings
+    return ctx
+
+
+def render_remediation_md(package: dict[str, Any]) -> str:
+    """Render the derived Markdown prompt from a canonical remediation package (SPEC §7; Appendix A2
+    (B)) by the one language-neutral template `spec/report/templates/remediation.md.tmpl` (vendored
+    at `agentce/data/templates/`; `tests/test_bundled_data.py` holds the two byte-identical) -- never
+    per-engine hardcoded string logic. A pure function of `package`'s content: no clock, no host, no
+    absolute path, so two runs whose only difference is their `--out` directory render
+    byte-identical bytes."""
+    return templating.render(
+        bundled.remediation_template(), _remediation_md_context(package)
+    )
+
+
 def build_manifest(
     *,
     bundle_digest: str,
@@ -1019,7 +1292,8 @@ def _build_claim(
 
 
 #: Every token `assess --emit` and `write_report`'s `emit` accept. The first six are the formats
-#: `report --format` has always rendered one at a time; the last four are new (SPEC §9).
+#: `report --format` has always rendered one at a time; the rest are new (SPEC §9). `remediation`
+#: is assess-only (Appendix A2 (C)): it is never added to `commands.REPORT_FORMATS`.
 EMIT_FORMATS = (
     "md",
     "html",
@@ -1031,6 +1305,7 @@ EMIT_FORMATS = (
     "csv",
     "oscal_xml",
     "pdf",
+    "remediation",
 )
 #: What an `emit`-less `write_report` call renders (the engine's original fixed bundle, predating
 #: `--emit`): every non-regression test pins this set exactly.
@@ -1049,6 +1324,8 @@ def write_report(
     report_language: str = messages.DEFAULT_LANGUAGE,
     limitations: list[str] | None = None,
     emit: frozenset[str] | None = None,
+    events: list[dict[str, Any]] | None = None,
+    reverify_command: list[str] | None = None,
 ) -> dict[str, Any]:
     """Write every report artifact for ``assertions`` and return the reproducibility manifest.
 
@@ -1061,7 +1338,11 @@ def write_report(
     byte, regardless of anything added since. A caller that passes a set renders only the formats
     named in it (``frozenset()`` renders none of them); ``assertions.json``, ``claim.json``, and
     ``manifest.json`` are never gated by ``emit`` -- they are the run's structural core, not a
-    rendering choice."""
+    rendering choice.
+
+    ``events`` (the accepted, ingested events ``remediation`` was computed from) and
+    ``reverify_command`` (the actual re-verify argv, SPEC §7) feed the ``remediation`` emission only;
+    both default to a safe empty fallback so every other caller is unaffected."""
     check_dc5(
         assertions
     )  # DC-5: refuse a supporting verdict without an evidence pointer
@@ -1171,6 +1452,30 @@ def write_report(
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
             outputs[rel] = _digest_bytes(data)
+
+    if wants("remediation"):
+        events_by_subject = index_by_subject(events or [])
+        assertions_digest = outputs["assertions.json"]
+        argv = list(reverify_command) if reverify_command else list(invocation or [])
+        subjects = sorted({a.subject for a in assertions})
+        for subject in subjects:
+            package = render_remediation_package(
+                subject,
+                [a for a in assertions if a.subject == subject],
+                catalogs=catalogs,
+                assertions_digest=assertions_digest,
+                subject_events=events_by_subject.get(subject, []),
+                reverify_command=argv,
+            )
+            md = render_remediation_md(package)
+            rel_dir = f"remediation/{_safe(subject)}"
+            (out_dir / rel_dir).mkdir(parents=True, exist_ok=True)
+            pkg_bytes = canonical.canonicalize(package)
+            (out_dir / rel_dir / "remediation-package.json").write_bytes(pkg_bytes)
+            outputs[f"{rel_dir}/remediation-package.json"] = _digest_bytes(pkg_bytes)
+            md_bytes = md.encode("utf-8")
+            (out_dir / rel_dir / "remediation.md").write_bytes(md_bytes)
+            outputs[f"{rel_dir}/remediation.md"] = _digest_bytes(md_bytes)
 
     if assertions:
         # claim.json is unsigned here (SPEC §9.1: the engine never signs its own claim); it exists

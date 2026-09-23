@@ -74,9 +74,10 @@ _log = get_logger()
 
 REPORT_FORMATS = ("md", "html", "oscal", "sarif", "public", "pack")
 #: Every token `assess --emit` accepts: the six `report --format` has always rendered one at a time,
-#: plus the four new report.py renderers (SPEC §9). Kept identical to `report.EMIT_FORMATS`; a test
-#: holds the two equal.
-EMIT_FORMATS = REPORT_FORMATS + ("junit", "csv", "oscal_xml", "pdf")
+#: plus report.py's newer renderers (SPEC §9). Kept identical to `report.EMIT_FORMATS`; a test holds
+#: the two equal. `remediation` is assess-only (Appendix A2 (C)) -- deliberately not in
+#: `REPORT_FORMATS`, so `report --format` never accepts it.
+EMIT_FORMATS = REPORT_FORMATS + ("junit", "csv", "oscal_xml", "pdf", "remediation")
 #: Where a command writes, or reads a project from, when the caller names no directory: the working
 #: directory for a project (``init``, ``doctor``) and ``./out`` for a run's output (``assess``,
 #: ``quickstart``), so the first command a newcomer types needs no flag.
@@ -421,6 +422,24 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         if command_name == "quickstart"
         else ["assess", _scrub_path(bundle), _scrub_path(profile)]
     )
+    # The actual re-verify invocation a remediation finding names (SPEC §7): unlike `invocation`
+    # above (kept positional for backward compatibility with the manifest), this carries every flag
+    # needed to reproduce this run's catalog resolution exactly -- `--catalog` (the resolved
+    # id@version labels, always reproducible regardless of how they were originally supplied),
+    # every `--catalog-dir`, and `--domain` when one was given.
+    reverify_argv = [
+        "assess",
+        "--bundle",
+        _scrub_path(bundle),
+        "--profile",
+        _scrub_path(profile),
+    ]
+    if catalog_labels:
+        reverify_argv += ["--catalog", ",".join(catalog_labels)]
+    for catalog_dir in list(getattr(ns, "catalog_dir", None) or []):
+        reverify_argv += ["--catalog-dir", _scrub_path(catalog_dir)]
+    if domain_path is not None:
+        reverify_argv += ["--domain", _scrub_path(domain_path)]
     write_report(
         out_dir,
         evaluated,
@@ -432,6 +451,8 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         report_language=_opt_str(ns, "report_language") or "en",
         limitations=limitations,
         emit=emit,
+        events=ingested.accepted,
+        reverify_command=reverify_argv,
     )
     if state is not None:
         state.record(loaded.digest, out_dir / "manifest.json", new_window_end)
