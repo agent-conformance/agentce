@@ -23,7 +23,7 @@ import jsonschema
 
 from . import ENGINE_NAME, SPEC_VERSION, __version__, canonical, messages, verdict
 from .assertions import Assertion, aggregate, check_dc5
-from .catalog import Catalog, catalog_provenance_digest
+from .catalog import Catalog, ControlSpec, catalog_provenance_digest
 
 _ARTIFACT_SCHEMAS = {
     "assertions.json": "assertions",
@@ -74,6 +74,63 @@ def _crosswalk_text(entry: dict[str, Any], cat: dict[str, str]) -> str:
     if entry.get("verified") is not True:
         text += f" {cat['report.crosswalk_unverified']}"
     return text
+
+
+def _control_index(catalogs: list[Catalog]) -> dict[str, ControlSpec]:
+    """Every control, keyed by id, across every resolved catalog -- so a finding can carry its
+    control's title, severity, and remediation technique (SPEC §9.3). A later catalog in the list
+    (an overlay) wins over an earlier one (the base) for the same control id."""
+    index: dict[str, ControlSpec] = {}
+    for catalog in catalogs:
+        for control in catalog.controls:
+            index[control.id] = control
+    return index
+
+
+def _remediation_hints(spec: ControlSpec | None) -> list[str]:
+    """The control's technique pointers, the catalog's only machine-readable remediation hint
+    (SPEC §7.3), stripped of any ``techniques/`` path prefix for a readable label."""
+    if spec is None:
+        return []
+    return [str(t).rsplit("/", 1)[-1] for t in spec.raw.get("techniques", []) or []]
+
+
+_SEVERITY_LEVELS = ("high", "medium", "low")
+_SEVERITY_HEADING_KEY = {
+    "high": "report.severity_high",
+    "medium": "report.severity_medium",
+    "low": "report.severity_low",
+}
+
+
+def _severity_heading(level: str, cat: dict[str, str]) -> str:
+    return cat.get(_SEVERITY_HEADING_KEY.get(level, ""), cat["report.severity_unrated"])
+
+
+def _grouped_by_severity(
+    assertions: list[Assertion], by_control: dict[str, ControlSpec]
+) -> list[tuple[str, list[Assertion]]]:
+    """Findings grouped by control severity, highest risk first, then ``unrated`` for a control
+    with no severity known to this render (no catalog resolved, or an id the catalog does not
+    carry) -- so the report reads as a ranked audit, never a bare alphabetical tally (SPEC §9.3)."""
+    groups: dict[str, list[Assertion]] = {}
+    for a in assertions:
+        spec = by_control.get(a.control)
+        level = (
+            spec.severity if spec and spec.severity in _SEVERITY_LEVELS else "unrated"
+        )
+        groups.setdefault(level, []).append(a)
+    levels = [lvl for lvl in _SEVERITY_LEVELS if lvl in groups]
+    if "unrated" in groups:
+        levels.append("unrated")
+    return [
+        (level, sorted(groups[level], key=lambda a: (a.subject, a.control)))
+        for level in levels
+    ]
+
+
+def _finding_title(a: Assertion, spec: ControlSpec | None) -> str:
+    return spec.title if spec and spec.title else a.control
 
 
 def _verdict_md(summary: dict[str, Any], cat: dict[str, str]) -> list[str]:
@@ -132,15 +189,42 @@ def _provenance_md(catalogs: list[str], invocation: list[str] | None) -> list[st
     ]
 
 
+def _finding_md(
+    a: Assertion, spec: ControlSpec | None, cat: dict[str, str]
+) -> list[str]:
+    """One finding: its control title, outcome, crosswalk citation, and -- when present -- the
+    evidence pointers, the offending nodes from its violations, and the control's remediation
+    technique (SPEC §9.3), so a reviewer sees not just the verdict but why and what to do about it."""
+    lines = [
+        f"- **{_finding_title(a, spec)}** (`{a.control}` @ `{a.subject}`) -> "
+        f"**{_outcome_label(cat, a.outcome)}** "
+        f"(rung {a.rung}, {a.mode}; {a.population[1]}/{a.population[0]} failed)"
+    ]
+    lines += [f"  - {_crosswalk_text(e, cat)}" for e in a.crosswalk]
+    if a.evidence:
+        refs = ", ".join(f"`{e.ref}`" for e in a.evidence)
+        lines.append(f"  - {cat['report.evidence_label']}: {refs}")
+    offending = [str(v.get("focus", "")) for v in a.violations if v.get("focus")]
+    if offending:
+        nodes = ", ".join(f"`{node}`" for node in offending)
+        lines.append(f"  - {cat['report.violations_label']}: {nodes}")
+    hints = _remediation_hints(spec)
+    if hints:
+        lines.append(f"  - {cat['report.remediation_label']}: {', '.join(hints)}")
+    return lines
+
+
 def render_report_md(
     assertions: list[Assertion],
     counts: dict[str, int],
     *,
     language: str = messages.DEFAULT_LANGUAGE,
-    catalogs: list[str] | None = None,
+    catalogs: list[Catalog] | None = None,
     invocation: list[str] | None = None,
 ) -> str:
     cat = messages.catalogue(language)
+    by_control = _control_index(catalogs or [])
+    labels = [f"{c.id}@{c.version}" for c in (catalogs or [])]
     summary = verdict.summarize(assertions)
     lines = [f"# {cat['report.title']}", ""]
     lines += _verdict_md(summary, cat)
@@ -152,13 +236,12 @@ def render_report_md(
     lines += ["", f"## {cat['report.assertions_heading']}", ""]
     if not assertions:
         lines.append(f"_{cat['report.no_controls']}_")
-    for a in sorted(assertions, key=lambda x: (x.subject, x.control)):
-        lines.append(
-            f"- `{a.control}` @ `{a.subject}` -> **{_outcome_label(cat, a.outcome)}** "
-            f"(rung {a.rung}, {a.mode}; {a.population[1]}/{a.population[0]} failed)"
-        )
-        lines += [f"  - {_crosswalk_text(e, cat)}" for e in a.crosswalk]
-    lines += [""] + _provenance_md(catalogs or [], invocation)
+    for level, items in _grouped_by_severity(assertions, by_control):
+        lines += [f"### {_severity_heading(level, cat)}", ""]
+        for a in items:
+            lines += _finding_md(a, by_control.get(a.control), cat)
+        lines.append("")
+    lines += [""] + _provenance_md(labels, invocation)
     return "\n".join(lines) + "\n"
 
 
@@ -186,31 +269,58 @@ def _provenance_html(catalogs: list[str], invocation: list[str] | None) -> str:
     )
 
 
+def _row_html(a: Assertion, spec: ControlSpec | None, cat: dict[str, str]) -> str:
+    """One finding row: its title, severity, outcome, clause citation, and -- when present -- the
+    evidence pointers, offending nodes, and remediation technique in a Details cell (SPEC §9.3),
+    every field escaped since a control title, an evidence ref, and a violation's focus node can
+    all originate in evidence or a third-party catalog."""
+    details: list[str] = []
+    if a.evidence:
+        refs = ", ".join(html.escape(e.ref) for e in a.evidence)
+        details.append(f"{html.escape(cat['report.evidence_label'])}: {refs}")
+    offending = [str(v.get("focus", "")) for v in a.violations if v.get("focus")]
+    if offending:
+        nodes = ", ".join(html.escape(node) for node in offending)
+        details.append(f"{html.escape(cat['report.violations_label'])}: {nodes}")
+    hints = _remediation_hints(spec)
+    if hints:
+        label = html.escape(cat["report.remediation_label"])
+        details.append(f"{label}: {html.escape(', '.join(hints))}")
+    return (
+        f"<tr><td>{html.escape(_finding_title(a, spec))}</td>"
+        f"<td>{html.escape(a.control)}</td><td>{html.escape(a.subject)}</td>"
+        f"<td>{html.escape(spec.severity if spec else '')}</td>"
+        f"<td>{html.escape(_outcome_label(cat, a.outcome))}</td>"
+        f"<td>{'; '.join(html.escape(_crosswalk_text(e, cat)) for e in a.crosswalk)}</td>"
+        f"<td>{'<br>'.join(details)}</td></tr>"
+    )
+
+
 def render_report_html(
     assertions: list[Assertion],
     counts: dict[str, int],
     *,
     language: str = messages.DEFAULT_LANGUAGE,
-    catalogs: list[str] | None = None,
+    catalogs: list[Catalog] | None = None,
     invocation: list[str] | None = None,
 ) -> str:
     """Render a self-contained, escaped, WCAG 2.2 AA report page (SPEC §9.3): a strict CSP meta tag,
     no external references, one ``h1``, a ``main`` landmark, a print stylesheet, and every string that
     originates in evidence or declarations rendered as escaped text, never as markup."""
     cat = messages.catalogue(language)
+    by_control = _control_index(catalogs or [])
+    labels = [f"{c.id}@{c.version}" for c in (catalogs or [])]
     title = html.escape(cat["report.title"])
     summary = "".join(
         f"<li>{html.escape(_outcome_label(cat, o))}: {c}</li>"
         for o, c in counts.items()
     )
-    rows = "".join(
-        f"<tr><td>{html.escape(a.control)}</td><td>{html.escape(a.subject)}</td>"
-        f"<td>{html.escape(_outcome_label(cat, a.outcome))}</td>"
-        f"<td>{'; '.join(html.escape(_crosswalk_text(e, cat)) for e in a.crosswalk)}</td></tr>"
-        for a in sorted(assertions, key=lambda x: (x.subject, x.control))
-    )
+    ordered = [
+        a for _, items in _grouped_by_severity(assertions, by_control) for a in items
+    ]
+    rows = "".join(_row_html(a, by_control.get(a.control), cat) for a in ordered)
     body_rows = rows or (
-        f'<tr><td colspan="4">{html.escape(cat["report.no_controls"])}</td></tr>'
+        f'<tr><td colspan="7">{html.escape(cat["report.no_controls"])}</td></tr>'
     )
     return (
         f'<!doctype html><html lang="{html.escape(language)}"><head><meta charset="utf-8">'
@@ -225,10 +335,12 @@ def render_report_html(
         f'<section aria-labelledby="assertions"><h2 id="assertions">'
         f"{html.escape(cat['report.assertions_heading'])}</h2>"
         f"<table><caption>{html.escape(cat['report.assertions_heading'])}</caption>"
-        '<thead><tr><th scope="col">Control</th><th scope="col">Subject</th>'
-        '<th scope="col">Outcome</th><th scope="col">Clause</th></tr></thead>'
+        '<thead><tr><th scope="col">Title</th><th scope="col">Control</th>'
+        '<th scope="col">Subject</th><th scope="col">Severity</th>'
+        '<th scope="col">Outcome</th><th scope="col">Clause</th>'
+        '<th scope="col">Details</th></tr></thead>'
         f"<tbody>{body_rows}</tbody></table></section>"
-        f"{_provenance_html(catalogs or [], invocation)}"
+        f"{_provenance_html(labels, invocation)}"
         f"<footer><p>{html.escape(cat['report.affected_persons'])}</p></footer>"
         "</main></body></html>\n"
     )
@@ -522,7 +634,6 @@ def write_report(
     )  # DC-5: refuse a supporting verdict without an evidence pointer
     out_dir.mkdir(parents=True, exist_ok=True)
     outputs: dict[str, str] = {}
-    labels = [f"{c.id}@{c.version}" for c in catalogs]
 
     def write_json(name: str, obj: Any) -> None:
         data = canonical.canonicalize(obj)
@@ -542,7 +653,7 @@ def write_report(
             assertions,
             counts,
             language=report_language,
-            catalogs=labels,
+            catalogs=catalogs,
             invocation=invocation,
         ),
     )
@@ -552,7 +663,7 @@ def write_report(
             assertions,
             counts,
             language=report_language,
-            catalogs=labels,
+            catalogs=catalogs,
             invocation=invocation,
         ),
     )
