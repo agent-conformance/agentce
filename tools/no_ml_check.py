@@ -12,6 +12,13 @@ collapsed to one `-`), never as a substring, so a package whose name merely cont
 pyyaml, html5lib -- is never mistaken for a machine-learning package. The single denylist governs all
 three ecosystems; there is never a second list to drift out of sync.
 
+`FRAMEWORK_EXAMPLE_LOCKS` (docs/adr/0016) names the handful of lockfiles this rule does not apply to:
+each `examples/<style>/uv.lock` for a framework example (SPEC 13.4 AX-4) that really imports and runs
+an agent framework, whose own dependency tree is the thing being observed, not part of an engine,
+adapter, conformance, or tools dependency tree. The list is exact paths, never a directory prefix or a
+glob -- a new example is scanned like everything else until it earns its own named line here and in
+the ADR.
+
     no_ml_check.py             scan every lockfile in the repository; exit 1 if any is denylisted
                                (the invocation the required CI job uses)
     no_ml_check.py ROOT        scan every lockfile under ROOT instead, against the same one denylist;
@@ -41,6 +48,22 @@ DENYLIST = ROOT / "spec" / "rules" / "no-ml-denylist.txt"
 # dependencies, not a dependency the project declares, so it is never scanned -- extending the original
 # `.venv` exclusion (uv) to `node_modules` (pnpm) and `.gradle` (Gradle's own cache).
 EXCLUDE_DIRS = frozenset({".venv", "node_modules", ".gradle"})
+
+# Named, ADR-documented exemption (docs/adr/0016): a framework example's own dependency tree is the
+# subject of the example, not part of an engine/adapter/conformance/tools tree, and several of these
+# frameworks require an LLM/embedding client of their own even though the example's scripted model
+# never calls it. Exact repo-relative paths only -- never a prefix or a glob over `examples/**` -- so
+# the shared `examples/uv.lock` (custom-loop, mcp-server, a2a-mesh: no framework dependency) and every
+# other lockfile in the repository stay covered by the scan exactly as before.
+FRAMEWORK_EXAMPLE_LOCKS = frozenset(
+    {
+        "examples/langgraph/uv.lock",
+        "examples/crewai/uv.lock",
+        "examples/openai-agents/uv.lock",
+        "examples/google-adk/uv.lock",
+        "examples/claude-agent-sdk/uv.lock",
+    }
+)
 
 
 def normalize(name: str) -> str:
@@ -116,11 +139,25 @@ LOCK_PARSERS = {
 }
 
 
+def _is_framework_example_lock(path: Path, root: Path) -> bool:
+    """True iff ``path`` is one of the named, ADR-documented exemptions (docs/adr/0016), by exact
+    repo-relative path -- never a prefix or a directory match."""
+    try:
+        return path.relative_to(root).as_posix() in FRAMEWORK_EXAMPLE_LOCKS
+    except ValueError:
+        return False
+
+
 def find_locks(root: Path) -> list[Path]:
-    """Every lockfile of every ecosystem, anywhere in the tree, minus vendored/build-cache dirs."""
+    """Every lockfile of every ecosystem, anywhere in the tree, minus vendored/build-cache dirs and
+    the named framework-example exemptions (docs/adr/0016)."""
     out: list[Path] = []
     for name in LOCK_PARSERS:
-        out.extend(p for p in root.rglob(name) if EXCLUDE_DIRS.isdisjoint(p.parts))
+        out.extend(
+            p
+            for p in root.rglob(name)
+            if EXCLUDE_DIRS.isdisjoint(p.parts) and not _is_framework_example_lock(p, root)
+        )
     return sorted(out)
 
 
@@ -202,7 +239,26 @@ def self_test() -> int:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             usage = main([str(root / "absent")])
         assert usage == 2, usage
-    print("NO-ML SELF-TEST PASSED (uv.lock, pnpm-lock.yaml, gradle.lockfile detection proven)")
+    # The named framework-example exemption (docs/adr/0016) is exact-path, not a directory match: a
+    # denylisted package inside one of the five named `examples/<style>/uv.lock` paths is exempt, but
+    # the same package inside the *shared* `examples/uv.lock` (not on the list) is still caught -- so a
+    # regression that widened the exemption to all of `examples/` would fail this self-test.
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        deny_lock = (
+            "version = 1\nrevision = 2\nrequires-python = \">=3.12\"\n\n"
+            '[[package]]\nname = "openai"\nversion = "2.0.0"\nsource = { registry = "https://pypi.org/simple" }\n'
+        )
+        exempt = root / "examples" / "langgraph" / "uv.lock"
+        exempt.parent.mkdir(parents=True)
+        exempt.write_text(deny_lock, encoding="utf-8")
+        shared = root / "examples" / "uv.lock"
+        shared.write_text(deny_lock, encoding="utf-8")
+        deny = load_denylist(DENYLIST)
+        violations, n_locks, _ = scan(root, deny)
+        assert n_locks == 1, n_locks  # only the shared (non-exempt) lockfile is scanned
+        assert violations == ["examples/uv.lock: openai"], violations
+    print("NO-ML SELF-TEST PASSED (uv.lock, pnpm-lock.yaml, gradle.lockfile detection, exemption scoping proven)")
     return 0
 
 
