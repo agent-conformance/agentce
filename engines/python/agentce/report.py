@@ -1325,17 +1325,42 @@ def _validate_csv(path: Path) -> list[str]:
 _OPTIONAL_ARTIFACTS = ("report.junit.xml", "oscal-ar.xml", "report.csv")
 
 
+def _recorded_outputs(out_dir: Path) -> dict[str, str]:
+    """``manifest.json``'s own ``outputs`` map: the filenames *this run* actually wrote, recorded
+    by ``write_report`` itself as it wrote them (SPEC §9) -- ground truth for what a narrower
+    ``--emit`` did and did not request, independent of the directory's current contents."""
+    manifest_path = out_dir / "manifest.json"
+    if not manifest_path.is_file():
+        return {}
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    outputs = manifest.get("outputs")
+    return outputs if isinstance(outputs, dict) else {}
+
+
 def validate_report(out_dir: Path) -> list[str]:
     """Validate every emitted artifact against its vendored schema; return a list of problems.
 
     `--emit` selects which formats a run writes, so only `_MANDATORY_ARTIFACT_SCHEMAS` (the run's
-    structural core, always written) is required; every format-specific artifact is validated when
-    present and skipped when a narrower `--emit` legitimately left it unwritten -- 'validate every
-    emission' means every artifact the run actually emitted, not every format that exists."""
+    structural core, always written) is unconditionally required; every format-specific artifact is
+    additionally required when `manifest.json`'s own `outputs` map recorded that this run wrote it
+    (so a run that emitted `report.html` but somehow lost it before `--validate` runs is still
+    caught) and is validated when present regardless -- 'validate every emission' means every
+    artifact the run actually emitted, not every format that exists."""
     problems: list[str] = []
     for filename in _MANDATORY_ARTIFACT_SCHEMAS:
         if not (out_dir / filename).is_file():
             problems.append(f"{filename}: missing")
+    recorded = _recorded_outputs(out_dir)
+    for filename in (
+        set(_ARTIFACT_SCHEMAS) | {"report.md", "report.html"} | set(_OPTIONAL_ARTIFACTS)
+    ):
+        if filename in recorded and not (out_dir / filename).is_file():
+            problems.append(
+                f"{filename}: missing (recorded in manifest.json's outputs but not on disk)"
+            )
     for filename, schema_name in _ARTIFACT_SCHEMAS.items():
         path = out_dir / filename
         if not path.is_file():

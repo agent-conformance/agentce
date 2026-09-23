@@ -762,3 +762,21 @@ def test_validate_report_optional_artifacts_absent_is_fine(tmp_path: Path) -> No
         catalogs=[_catalog()],
     )
     assert validate_report(tmp_path) == []
+
+
+def test_validate_report_catches_a_recorded_output_that_went_missing(
+    tmp_path: Path,
+) -> None:
+    """manifest.json's own `outputs` map names report.html as written; deleting it after the fact
+    (corruption, a partial copy, a bug that skips a write silently) must not look like a legitimate
+    `--emit` narrowing that never requested it."""
+    write_report(
+        tmp_path,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+    )
+    assert validate_report(tmp_path) == []
+    (tmp_path / "report.html").unlink()
+    problems = validate_report(tmp_path)
+    assert any("report.html" in p and "manifest.json" in p for p in problems), problems
