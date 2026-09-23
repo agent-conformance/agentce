@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """collect_ingest_check - prove the file-based path into AgentCE works for real.
 
-Three independent facts, none standing in for another:
+Four independent facts, none standing in for another:
 
 1. **ingest** -- ``agentce ingest`` turns a real, already-committed adapter export
    (``adapters/otel-genai/fixtures/otel-genai-chat/input.json``) into a bundle ``agentce validate``
@@ -12,6 +12,9 @@ Three independent facts, none standing in for another:
 3. **collector component** -- an ADR under ``docs/adr/`` names an OpenTelemetry Collector component and
    a real, non-empty, collector-shaped artifact it points at actually exists (ADR 0017,
    ``adapters/otel-genai/otel-collector/config.yaml``).
+4. **hardened input** -- a deeply nested export or collect config gets the same deliberate, named
+   ``input.*`` refusal the rest of the engine already gives untrusted, bundle-adjacent input, never a
+   raw Python traceback (loophole L13.1).
 
     collect_ingest_check.py              check the repository (the invocation the CI job uses)
     collect_ingest_check.py --self-test  prove each fact discriminates: good input passes, and a
@@ -87,6 +90,50 @@ def check_ingest(
     return None
 
 
+def _error_of(env: dict[str, object]) -> dict[str, object]:
+    error = env.get("error")
+    return error if isinstance(error, dict) else {}
+
+
+def check_hardened_input(root: Path, *, adapters_root: Path | None = None) -> str | None:
+    """A deeply nested export or collect config is a deliberate ``input.*`` refusal, never a raw
+    Python traceback (loophole L13.1: ``ingest``/``collect`` get the same hardening the rest of the
+    engine already gives untrusted, bundle-adjacent input)."""
+    adapters_dir = adapters_root if adapters_root is not None else root / "adapters"
+    with tempfile.TemporaryDirectory() as tmp:
+        export = Path(tmp) / "deep-export.json"
+        # json's C accelerator tolerates far deeper nesting than PyYAML's parser before it raises
+        # RecursionError; 6000 (enough for the YAML config below) is not enough here.
+        export.write_text("[" * 20_000 + "]" * 20_000, encoding="utf-8")
+        code, env = _run_cli(
+            [
+                "ingest",
+                "--in",
+                str(export),
+                "--out",
+                str(Path(tmp) / "bundle"),
+                "--adapter",
+                "otel-genai",
+                "--adapters-root",
+                str(adapters_dir),
+            ]
+        )
+        cause = str(_error_of(env).get("cause", ""))
+        if code == 0 or "Traceback (most recent call last)" in cause or "too deep" not in cause:
+            return f"a deeply nested ingest export did not get a deliberate refusal: exit {code}, {cause!r}"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        config = Path(tmp) / "deep-collect.yaml"
+        config.write_text("a: " + "[" * 6000 + "]" * 6000 + "\n", encoding="utf-8")
+        code, env = _run_cli(
+            ["collect", "--config", str(config), "--out", str(Path(tmp) / "bundle")]
+        )
+        error = _error_of(env)
+        if code == 0 or error.get("key") != "input.collect_config":
+            return f"a deeply nested collect config did not get input.collect_config: exit {code}, {error!r}"
+    return None
+
+
 def check_collect(root: Path, config: str = COLLECT_CONFIG) -> str | None:
     """A real ``agentce collect`` run against ``config`` completes every source."""
     config_path = root / config
@@ -149,6 +196,7 @@ def check(root: Path = ROOT) -> list[str]:
             check_ingest(root),
             check_collect(root),
             check_collector_component(root),
+            check_hardened_input(root),
         )
         if problem is not None
     ]
@@ -254,11 +302,22 @@ def _self_test_collector_component() -> bool:
     return ok
 
 
+def _self_test_hardened_input() -> bool:
+    ok = True
+    if check_hardened_input(ROOT) is not None:
+        print("self-test hardened-input-deep-export-and-config-refused: FAIL")
+        ok = False
+    else:
+        print("self-test hardened-input-deep-export-and-config-refused: ok")
+    return ok
+
+
 def self_test() -> int:
     results = [
         _self_test_ingest(),
         _self_test_collect(),
         _self_test_collector_component(),
+        _self_test_hardened_input(),
     ]
     ok = all(results)
     print(f"collect_ingest_check self-test: {'ok' if ok else 'FAIL'}")

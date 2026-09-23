@@ -70,6 +70,15 @@ def test_load_config_rejects_malformed(tmp_path: Path) -> None:
             load_config(_write_config(tmp_path / "bad.yaml", body))
 
 
+def test_load_config_refuses_a_too_deeply_nested_config(tmp_path: Path) -> None:
+    """The config load goes through the same hardened YAML loader ``domain.py``/``profile.py`` use
+    for untrusted, bundle-adjacent input (loophole L13.1): a config nested past Python's recursion
+    limit is a deliberate ``input.collect_config`` refusal, never an uncaught ``RecursionError``."""
+    nested = "a: " + "[" * 6000 + "]" * 6000 + "\n"
+    with pytest.raises(InputError, match="input.collect_config"):
+        load_config(_write_config(tmp_path / "deep.yaml", nested))
+
+
 def test_plan_shows_credential_reference_never_resolved() -> None:
     config = load_config(_DRY_RUN_CONFIG)
     p = plan(config)

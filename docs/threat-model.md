@@ -111,6 +111,38 @@ each.
   by the `evidence-input-hardening` job in `.github/workflows/ci.yml`, which runs on every push and
   pull request and fails if any of these refusals regresses.
 
+## Untrusted `ingest`/`collect` export-file input
+
+`agentce ingest` and a real (non-dry-run) `agentce collect` both read an already-exported evidence
+file from disk -- an OTel Collector's file or object-storage export, or whatever `source.export`
+names in a collect config (SPEC §5.4) -- through an adapter (`ExportAdapter`), not through the
+`--bundle` layout the section above covers. This is a distinct surface with its own trust boundary,
+sharing the same hardening building blocks, not the same mitigation:
+
+- **Structural depth limits.** `collect.py`'s config loader now goes through the same
+  `safe_yaml.py` wrapper `Profile.load`/`DomainBinding.load` use, so a pathologically deep collect
+  config is a deliberate `input.collect_config` refusal at exit `3`, never an uncaught
+  `RecursionError`. The adapter's own export parse (`adapters/_ingest.py`, shared by every v1
+  adapter, invoked by both `ingest` and the real `collect` path) catches a `RecursionError` from a
+  pathologically deep export and reports it in its `{"error": ...}` contract, so the caller
+  (`commands/__init__.py`'s `_adapt_export`) surfaces a clean `input.ingest_failed` message rather
+  than a raw traceback fragment. Proved by `engines/python/tests/test_collect.py` and the
+  `check_hardened_input` fact in `tools/collect_ingest_check.py`.
+- **Path confinement does not apply here, by design.** `bundle.confine_to_root`'s threat model is a
+  bundle-relative reference inside a shared root someone else produced (a manifest entry that could
+  symlink-escape). `source.export`/`agentce ingest --in` are operator-supplied absolute paths naming
+  wherever a collector wrote its own output -- the same shape as `--bundle` itself -- so there is no
+  shared root to confine them to; the operator invoking `ingest`/`collect` already has whatever
+  filesystem access the path grants, exactly as with `--bundle`.
+- **Size limits and archive hazards: not yet a control.** Unlike the per-event and per-manifest-file
+  limits above, the export file itself carries no byte-size cap and no archive format is parsed here
+  either, for the same reason: no archive extraction step exists in this path. If a size limit for
+  export files is added, it belongs here.
+- **CI guard.** `check_hardened_input` (`tools/collect_ingest_check.py`) runs a deeply nested export
+  through `agentce ingest` and a deeply nested config through `agentce collect`, asserting each is
+  refused with its named key and no `Traceback` text reaches the user; it is part of the
+  `collect-ingest` job in `.github/workflows/ci.yml`, which runs on every push and pull request.
+
 ## Assumptions and residual risk
 
 - The integrity guarantees rest on at least one **independent system** and one **independent coverage
