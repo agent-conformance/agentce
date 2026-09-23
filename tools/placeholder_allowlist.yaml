@@ -466,3 +466,9 @@ allow:
     count: 2
     class: legitimate
     justification: "Byte-identical vendored copy of spec/report/vendor/sarif-2.1.0.schema.json, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: .github/workflows/website.yml
+    pattern: stub
+    count: 2
+    class: legitimate
+    justification: "The llms.txt coverage guard's own check describes what it rejects: a one-line stub, or a link count that looks like a stub rather than a real generated index. Both hits are inside that check's requirements comment and its own RED error message, never a stub left in the workflow itself."
