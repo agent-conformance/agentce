@@ -10,6 +10,11 @@ dependencies = [
 
 [tool.uv]
 package = false
+# chromadb (crewai's transitive default-embeddings dependency) accepts onnxruntime>=1.14.1 with no
+# upper bound and uv resolves the newest by default; 1.24+ dropped macOS x86_64 wheels, which would
+# make this example uninstallable on Intel Macs. Cap it at the last release with those wheels -- a
+# mature, advisory-clean version (OSV: no known vulnerabilities), not a test-environment special case.
+constraint-dependencies = ["onnxruntime<1.24"]
 
 [tool.uv.sources]
 agentce-emit = { path = "../../engines/python-emit", editable = true }
