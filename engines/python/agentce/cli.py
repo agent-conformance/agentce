@@ -119,6 +119,11 @@ def build_parser() -> argparse.ArgumentParser:
         dest="report_language",
         help="message-key catalogue for the report; does not affect assertions.json (SPEC 9.3)",
     )
+    p.add_argument(
+        "--emit",
+        help="comma-separated report formats to render (default: the fixed bundle: html, md, "
+        "oscal, pack, sarif); one or more of: " + ", ".join(commands.EMIT_FORMATS),
+    )
     p.set_defaults(func=commands.cmd_assess)
 
     p = sub.add_parser(

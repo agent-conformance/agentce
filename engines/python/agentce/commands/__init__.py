@@ -73,6 +73,10 @@ from ..canonical import canonicalize
 _log = get_logger()
 
 REPORT_FORMATS = ("md", "html", "oscal", "sarif", "public", "pack")
+#: Every token `assess --emit` accepts: the six `report --format` has always rendered one at a time,
+#: plus the four new report.py renderers (SPEC §9). Kept identical to `report.EMIT_FORMATS`; a test
+#: holds the two equal.
+EMIT_FORMATS = REPORT_FORMATS + ("junit", "csv", "oscal_xml", "pdf")
 #: Where a command writes, or reads a project from, when the caller names no directory: the working
 #: directory for a project (``init``, ``doctor``) and ``./out`` for a run's output (``assess``,
 #: ``quickstart``), so the first command a newcomer types needs no flag.
@@ -320,6 +324,25 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
     return result
 
 
+def _parse_emit(raw: str | None) -> frozenset[str] | None:
+    """Parse and validate ``--emit``'s comma-separated token list (SPEC §9). ``None`` when the flag
+    is absent, so ``write_report`` renders its legacy fixed bundle unchanged. Every token is validated
+    here, before any output is written: an assessment that names a format it cannot produce must
+    leave nothing behind that looks like a result (mirrors ``cmd_report``'s ``input.report_format``
+    check for the single-format ``--format`` flag)."""
+    if raw is None:
+        return None
+    tokens = [t.strip() for t in raw.split(",") if t.strip()]
+    invalid = [t for t in tokens if t not in EMIT_FORMATS]
+    if invalid:
+        raise InputError(
+            "input.emit_format",
+            f"unknown --emit format(s): {', '.join(repr(t) for t in invalid)}.",
+            f"choose from: {', '.join(EMIT_FORMATS)}.",
+        )
+    return frozenset(tokens)
+
+
 def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="assess")
     bundle = _require_dir(
@@ -330,6 +353,9 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     )
     catalog = _opt_str(ns, "catalog")
     out = _opt_str(ns, "out") or DEFAULT_OUT_DIR
+    # --emit is validated before any output is written (below, before ingest/quarantine): an unknown
+    # token must never leave a partial or misleading result behind.
+    emit = _parse_emit(_opt_str(ns, "emit"))
     # Resolve the catalogs before any output is written: a run that cannot name what it evaluates
     # against — or cannot verify it — must leave nothing behind that looks like a result.
     profile_obj = Profile.load(profile)
@@ -405,6 +431,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         supersedes=supersedes,
         report_language=_opt_str(ns, "report_language") or "en",
         limitations=limitations,
+        emit=emit,
     )
     if state is not None:
         state.record(loaded.digest, out_dir / "manifest.json", new_window_end)
@@ -417,6 +444,9 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "profile": str(profile),
             "catalogs": catalog_labels,
             "out": out,
+            "emit": sorted(emit)
+            if emit is not None
+            else ["html", "md", "oscal", "pack", "sarif"],
             "accepted": len(ingested.accepted),
             "quarantined": len(ingested.quarantined),
             "streams": len(integrity_results),
