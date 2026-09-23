@@ -28,7 +28,10 @@ These mirror the CI workflows; keep them in sync.
 - Type-check: `uv run mypy .` (Python); `pnpm typecheck` (Node)
 - Test: `uv run pytest` (Python); `pnpm test` (Node)
 - Build: `uv build` (Python packages); `pnpm build` (Node packages)
-- Docs: `uv run mkdocs build` (once docs land)
+- Docs: `uv run --project docs --frozen python docs/build.py --check-links` (source-generated
+  reference, checked offline) and `uv run --project docs --frozen python docs/build.py --check-publish`
+  (the same content published to the site); the published site itself builds with `pnpm build` in
+  `website/` (see Commands above)
 - Quickstart: `agentce quickstart --out ./out`
 - Examples: `uv run python examples/run_all.py --check`
 
