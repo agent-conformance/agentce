@@ -1,0 +1,46 @@
+# Gate a deployment on an agentce assertions.json with Kyverno's JSON policy validation
+# (SPEC §9.4). Apply with: kyverno apply spec/report/examples/policy/kyverno/policy.yaml
+#   --resource spec/report/examples/assertions.example.json
+#
+# Mirrors the same policy the engine's own --fail-on flag can express in-process (SPEC §8.5):
+# every assertion whose outcome is non-conformant or insufficient_evidence must not carry
+# severity "high". Both severity and family are present on every real assertion record (never
+# omitted, never a constant placeholder); adjust the comparisons below to your own policy.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: agentce-assertions-high-severity-gate
+  annotations:
+    policies.kyverno.io/title: AgentCE high-severity assertions gate
+    policies.kyverno.io/description: >-
+      Denies a resource that embeds an agentce assertions.json array (as
+      data.assertions) carrying a non-conformant or insufficient_evidence outcome
+      on a high-severity control family.
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+    - name: deny-high-severity-non-conformant-assertions
+      match:
+        any:
+          - resources:
+              kinds:
+                - ConfigMap
+      validate:
+        message: >-
+          An assertion is non-conformant or insufficient_evidence on a
+          high-severity control (see .data.assertions[].severity and
+          .data.assertions[].family).
+        foreach:
+          - list: "request.object.data.assertions"
+            deny:
+              conditions:
+                all:
+                  - key: "{{ element.severity }}"
+                    operator: Equals
+                    value: high
+                  - key: "{{ element.outcome }}"
+                    operator: AnyIn
+                    value:
+                      - non-conformant
+                      - insufficient_evidence
