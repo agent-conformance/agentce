@@ -32,3 +32,13 @@ def catalogs_dir() -> Path:
 def quickstart_dir() -> Path:
     """The vendored quickstart project: an evidence bundle, an applicability profile, and a domain."""
     return _data_root() / "corpus" / "quickstart"
+
+
+def templates_dir() -> Path:
+    """The vendored report-rendering templates (SPEC §7: one language-neutral template in `spec/`)."""
+    return _data_root() / "templates"
+
+
+def remediation_template() -> str:
+    """The language-neutral Mustache-style template ``remediation.md`` is rendered from."""
+    return (templates_dir() / "remediation.md.tmpl").read_text(encoding="utf-8")
