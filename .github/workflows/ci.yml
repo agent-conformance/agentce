@@ -184,7 +184,8 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: agentce-emit unit tests (AgentCESpanProcessor, instrument(), auto() self-capture)
-        run: uv run --project engines/python-emit --frozen pytest -q -p no:cacheprovider
+        working-directory: engines/python-emit
+        run: uv run --frozen pytest -q -p no:cacheprovider
       - name: framework_examples_check self-test
         run: uv run --project engines/python --frozen python tools/framework_examples_check.py --self-test
       - name: Every framework example really runs its framework, offline and keyless
