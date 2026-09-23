@@ -1,0 +1,36 @@
+# An OpenTelemetry Collector recipe (SPEC §5.4): receive GenAI instrumentation spans over OTLP and
+# export them to a local file AgentCE's otel-genai adapter reads directly. Every component below --
+# the `otlp` receiver, the `batch` processor, the `file` exporter -- ships in the upstream
+# `otelcol-contrib` distribution; this configures the stock collector, so no custom Go component and
+# no new build toolchain (AGENTS.md lists none for one) are needed. See ../../../docs/adr/0017
+# for the decision.
+#
+# Run it: `otelcol-contrib --config adapters/otel-genai/otel-collector/config.yaml`. Point an
+# OTel-instrumented GenAI SDK's OTLP exporter at this collector's receiver endpoints, and its spans
+# land, one JSON-encoded ExportTraceServiceRequest per line, at the exporter's `path` below -- the same
+# OTLP/JSON export shape `agentce_adapters.otel_genai.adapt` and `agentce ingest --adapter otel-genai`
+# already consume (see adapters/otel-genai/fixtures/otel-genai-chat/input.json). A collect config
+# source can then name that path as its `export` (adapters/fixtures/collect-dry-run.yaml does) so a
+# real `agentce collect` run reads it on schedule.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  file:
+    path: /var/lib/agentce/exports/otel-genai/traces.json
+    format: json
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [file]
