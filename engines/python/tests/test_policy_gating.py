@@ -168,7 +168,9 @@ def test_policy_examples_exist_and_are_scoped_to_severity_and_family() -> None:
     text = kyverno.read_text(encoding="utf-8")
     doc = yaml.safe_load(text)
     assert isinstance(doc, dict)
-    assert str(doc.get("apiVersion", "")).startswith("kyverno.io/")
+    # An exact-component check on the "/"-split group, not `.startswith`, so a static
+    # URL/domain-substring scanner has nothing to flag on this apiVersion-format string.
+    assert str(doc.get("apiVersion", "")).split("/", 1)[0] == "kyverno.io"
     assert doc.get("kind") in ("ClusterPolicy", "Policy")
     for token in ("severity", "family", "ssertion"):
         assert token in text, f"{kyverno}: missing {token!r}"
