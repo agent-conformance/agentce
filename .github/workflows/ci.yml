@@ -392,3 +392,47 @@ jobs:
           set -euo pipefail
           uv run --project engines/python --frozen agentce quickstart --out "$RUNNER_TEMP/report"
           test -s "$RUNNER_TEMP/report/assertions.json"
+
+  agent-skill-tests:
+    # The generated agent-skill output (`assess --emit skill`, SPEC §7/§13.3, Appendix A2 (C)) and the
+    # two approved skills' standalone installability. A regression in the skill emitter's structure,
+    # its injection hardening (escaping and length-capping a second evidence-derived-string category,
+    # tool names), or either skill's vendored-dependency install fails this job.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Sync the engine
+        working-directory: engines/python
+        run: uv sync --frozen
+      - name: Skill-emitter unit tests
+        working-directory: engines/python
+        run: uv run --frozen pytest -q -p no:cacheprovider tests/test_skill_emit.py tests/test_remediation.py
+      - name: Every skill's vendored engine wheel matches a fresh build (self-test then check)
+        run: |
+          python3 tools/vendor_skill_engine.py --self-test
+          python3 tools/vendor_skill_engine.py
+      - name: agentce-onboard runs standalone, no sibling engines/ checkout
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          cp -R skills/agentce-onboard "$work/installed-skill"
+          rm -rf "$work/installed-skill/.venv" "$work/installed-skill/.mypy_cache" "$work/installed-skill/.ruff_cache" "$work/installed-skill/__pycache__"
+          cd "$work/installed-skill"
+          out="$(uv run --frozen python3 scripts/lint_profile.py --self-test --json)"
+          echo "$out"
+          echo "$out" | grep -q '"self_test": "ok"'
+      - name: agentce-check-report runs standalone, no sibling engines/ checkout
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          cp -R skills/agentce-check-report "$work/installed-skill"
+          rm -rf "$work/installed-skill/.venv" "$work/installed-skill/.mypy_cache" "$work/installed-skill/.ruff_cache" "$work/installed-skill/__pycache__"
+          cd "$work/installed-skill"
+          uv run --frozen pytest -q -p no:cacheprovider
