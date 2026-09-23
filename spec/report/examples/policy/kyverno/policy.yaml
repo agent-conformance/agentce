@@ -5,7 +5,7 @@
 # Mirrors the same policy the engine's own --fail-on flag can express in-process (SPEC §8.5):
 # every assertion whose outcome is non-conformant or insufficient_evidence must not carry
 # severity "high". Both severity and family are present on every real assertion record (never
-# omitted, never a constant placeholder); adjust the comparisons below to your own policy.
+# omitted, never a fixed, invented value); adjust the comparisons below to your own policy.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
