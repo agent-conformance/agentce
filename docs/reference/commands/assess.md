@@ -28,8 +28,8 @@ options:
                         vendored development root)
   --allow-unverified-catalog
                         assess a --catalog-dir catalog whose signature is
-                        absent or does not verify, recording the override as
-                        a limitation in the manifest and the claim (SPEC 8.7)
+                        absent or does not verify, recording the override as a
+                        limitation in the manifest and the claim (SPEC 8.7)
   --manual MANUAL       the manual-records directory
   --probes PROBES       the probe-results directory
   --out OUT             the output directory (default: ./out)

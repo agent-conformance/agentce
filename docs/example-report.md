@@ -30,52 +30,188 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
 
 ## Assertions
 
-- `DAT-01` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, automated; 0/1 failed)
-- `DAT-02` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
-- `DAT-03` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
-- `DAT-04` @ `spiffe://corp/agents/credit-langgraph` -> **not assessed** (rung 3, manual; 0/0 failed)
-- `DOC-01` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `DOC-02` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `DOC-03` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `DOC-04` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, semi-automated; 0/1 failed)
-- `DOC-05` @ `spiffe://corp/agents/credit-langgraph` -> **not assessed** (rung 3, manual; 0/0 failed)
-- `INC-01` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, automated; 0/1 failed)
-- `INC-02` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `INC-03` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, automated; 0/1 failed)
-- `INC-04` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `INT-01` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `INT-02` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `INT-03` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `INT-04` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `OVS-01` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, automated; 0/1 failed)
-- `OVS-02` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `OVS-03` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `OVS-04` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `OVS-05` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, automated; 0/1 failed)
-- `OVS-06` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `OVS-07` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
-- `OVS-08` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
-- `OVS-09` @ `spiffe://corp/agents/credit-langgraph` -> **not assessed** (rung 3, manual; 0/0 failed)
-- `REC-01` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `REC-02` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `REC-03` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, automated; 0/1 failed)
-- `REC-04` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `REC-05` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, automated; 0/1 failed)
-- `REC-06` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `ROB-01` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `ROB-02` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, automated; 0/1 failed)
-- `ROB-03` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `ROB-04` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `ROB-05` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, semi-automated; 0/1 failed)
-- `ROB-06` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, semi-automated; 0/1 failed)
-- `ROB-07` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
-- `RSK-01` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, automated; 0/1 failed)
-- `RSK-02` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, automated; 0/1 failed)
-- `RSK-03` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
-- `RSK-04` @ `spiffe://corp/agents/credit-langgraph` -> **not assessed** (rung 3, manual; 0/0 failed)
-- `RSK-05` @ `spiffe://corp/agents/credit-langgraph` -> **not assessed** (rung 3, manual; 0/0 failed)
-- `TRN-01` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, automated; 0/1 failed)
-- `TRN-02` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `TRN-03` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
-- `TRN-04` @ `spiffe://corp/agents/credit-langgraph` -> **conformant** (rung 2, automated; 0/1 failed)
-- `TRN-05` @ `spiffe://corp/agents/credit-langgraph` -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
+### High severity
+
+- **Operating components match the declared documentation** (`DOC-01` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 11 / Annex IV (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-dec1`
+  - Remediation: doc-evidence-at-source
+- **Serious incidents are recorded with an accountable actor (by role)** (`INC-02` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 73 (clause reference unverified)
+  - eu-ai-act Art. 26(5) (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-inc1`
+- **Incident-linked records carry no dangling references** (`INC-04` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 73 (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-tc1`
+  - Remediation: inc-evidence-at-source
+- **Consequential tool calls are captured by an enforcement point** (`INT-01` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 12 (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-tc1`
+- **Delegation chains for consequential actions are verified** (`INT-02` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act engine integrity (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-del1`
+  - Remediation: int-evidence-at-source
+- **Consequential tool-call records carry no dangling references** (`INT-03` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act engine integrity (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-tc1`
+  - Remediation: int-evidence-at-source
+- **Consequential tool calls carry a corroborated source class** (`INT-04` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act engine integrity (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-tc1`
+  - Remediation: int-evidence-at-source
+- **Observed oversight modality matches the declared modality** (`OVS-02` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 14(1)-(3) (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-dec1`
+  - Remediation: ovs-evidence-at-source
+- **Consequential tool calls run under verified human oversight** (`OVS-03` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 14 (clause reference unverified)
+  - eu-ai-act Art. 26(2) (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-tc1`
+  - Remediation: instruction-attestation-at-ingress
+- **Consequential tool calls run over a verified delegation chain** (`OVS-04` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 14(4)(c)-(d) (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-tc1`
+  - Remediation: ovs-evidence-at-source
+- **Consequential tool calls execute through an enforcement point** (`OVS-06` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 14(4)(e) (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-tc1`
+  - Remediation: ovs-evidence-at-source
+- **Every consequential decision records the acting agent** (`REC-01` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 12(1)-(2) (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-dec1`
+  - Remediation: rec-evidence-at-source
+- **Consequential tool calls carry no dangling evidence references** (`REC-06` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 19 (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-tc1`
+  - Remediation: rec-evidence-at-source
+- **Consequential actions traverse a trusted, corroborated source** (`ROB-01` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 15 (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-tc1`
+  - Remediation: rob-evidence-at-source
+- **Consequential tool calls run over a verified delegation chain** (`ROB-04` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 15 (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-tc1`
+  - Remediation: rob-evidence-at-source
+- **Every consequential decision records the agent that made it** (`TRN-02` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 86 (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-dec1`
+  - Remediation: trn-evidence-at-source
+
+### Medium severity
+
+- **Consequential decisions record the data they consumed** (`DAT-01` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 10 (clause reference unverified)
+  - Remediation: dat-evidence-at-source
+- **Input data quality and representativeness are measured** (`DAT-02` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
+  - eu-ai-act Art. 10 (clause reference unverified)
+  - Remediation: dat-evidence-at-source
+- **Outcome parity across declared groups is within thresholds** (`DAT-03` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
+  - eu-ai-act Art. 10 (clause reference unverified)
+  - Remediation: dat-evidence-at-source
+- **Data-governance measures are documented and reviewed** (`DAT-04` @ `spiffe://corp/agents/credit-langgraph`) -> **not assessed** (rung 3, manual; 0/0 failed)
+  - eu-ai-act Art. 10 (clause reference unverified)
+  - Remediation: dat-evidence-at-source
+- **Consequential decisions are documented with a time of record** (`DOC-02` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 13 (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-dec1`
+  - Remediation: doc-evidence-at-source
+- **Declared egress paths match the observed enforcement point** (`DOC-03` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 11 / Annex IV (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-tc1`
+  - Remediation: doc-evidence-at-source
+- **Configuration drift from the declared snapshot is bounded** (`DOC-04` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, semi-automated; 0/1 failed)
+  - eu-ai-act Art. 13 (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-dec1`
+  - Remediation: doc-evidence-at-source
+- **Technical documentation is complete and current** (`DOC-05` @ `spiffe://corp/agents/credit-langgraph`) -> **not assessed** (rung 3, manual; 0/0 failed)
+  - eu-ai-act Art. 11 / Annex IV (clause reference unverified)
+  - Remediation: doc-evidence-at-source
+- **Adverse outcomes are linked to their consequential decision** (`INC-01` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 72 (clause reference unverified)
+  - Remediation: inc-evidence-at-source
+- **Incident-triggering decisions carry an oversight review** (`INC-03` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 26(5) (clause reference unverified)
+  - Remediation: inc-evidence-at-source
+- **Every consequential decision is reviewed by an oversight activity** (`OVS-01` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 14(4)(a) (clause reference unverified)
+  - Remediation: ovs-evidence-at-source
+- **Consequential decisions record the authorisation that gated them** (`OVS-05` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 26(2) (clause reference unverified)
+  - Remediation: ovs-evidence-at-source
+- **Overrides and interrupts are effective and recorded** (`OVS-07` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
+  - eu-ai-act Art. 14(4)(b) (clause reference unverified)
+  - Remediation: ovs-evidence-at-source
+- **Oversight coverage of consequential decisions is complete** (`OVS-08` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
+  - eu-ai-act Art. 14(5) (clause reference unverified)
+  - Remediation: ovs-evidence-at-source
+- **Human overseers are competent and able to intervene** (`OVS-09` @ `spiffe://corp/agents/credit-langgraph`) -> **not assessed** (rung 3, manual; 0/0 failed)
+  - eu-ai-act Art. 14(1)-(3) (clause reference unverified)
+  - Remediation: ovs-evidence-at-source
+- **Every consequential decision is timestamped** (`REC-02` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 12(1)-(2) (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-dec1`
+  - Remediation: rec-evidence-at-source
+- **Every consequential decision records the inputs it used** (`REC-03` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 12(2) (clause reference unverified)
+  - Remediation: rec-evidence-at-source
+- **Consequential decisions are recorded with actor and time** (`REC-04` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 12 (clause reference unverified)
+  - eu-ai-act Art. 19 (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-dec1`
+- **Every consequential decision records the authority it acted under** (`REC-05` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 26(6) (clause reference unverified)
+  - Remediation: rec-evidence-at-source
+- **No untrusted content influences consequential decisions** (`ROB-02` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 15 (clause reference unverified)
+  - Remediation: rob-evidence-at-source
+- **Consequential tool calls carry no dangling references** (`ROB-03` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 15 (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-tc1`
+  - Remediation: rob-evidence-at-source
+- **Adversarial-probe resilience is measured within thresholds** (`ROB-05` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, semi-automated; 0/1 failed)
+  - eu-ai-act Art. 15 (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-tc1`
+  - Remediation: rob-evidence-at-source
+- **Resource-exhaustion resistance is measured within budgets** (`ROB-06` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, semi-automated; 0/1 failed)
+  - eu-ai-act Art. 15 (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-tc1`
+  - Remediation: rob-evidence-at-source
+- **Cyber-incident detection and response are exercised** (`ROB-07` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
+  - eu-ai-act Art. 15 (clause reference unverified)
+  - Remediation: rob-evidence-at-source
+- **Consequential decisions record the authorisation gate they cleared** (`RSK-01` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 9 (clause reference unverified)
+  - Remediation: rsk-evidence-at-source
+- **Consequential decisions are subject to a risk-review activity** (`RSK-02` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 9 (clause reference unverified)
+  - Remediation: rsk-evidence-at-source
+- **Residual-risk indicators are measured within thresholds** (`RSK-03` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
+  - eu-ai-act Art. 9 (clause reference unverified)
+  - Remediation: rsk-evidence-at-source
+- **A fundamental-rights impact assessment is recorded** (`RSK-04` @ `spiffe://corp/agents/credit-langgraph`) -> **not assessed** (rung 3, manual; 0/0 failed)
+  - eu-ai-act Art. 27 (clause reference unverified)
+  - Remediation: rsk-evidence-at-source
+- **Registration and applicability declarations are current** (`RSK-05` @ `spiffe://corp/agents/credit-langgraph`) -> **not assessed** (rung 3, manual; 0/0 failed)
+  - eu-ai-act Art. 49 / 71 (clause reference unverified)
+  - Remediation: rsk-evidence-at-source
+- **Affected persons are notified for every consequential decision** (`TRN-01` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 26(11) / 86 (clause reference unverified)
+  - Remediation: trn-evidence-at-source
+- **Affected persons informed and explanation reconstructable** (`TRN-03` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
+  - eu-ai-act Art. 26(11) / 86 (clause reference unverified)
+  - Remediation: trn-evidence-at-source
+- **Consequential decisions are timestamped for explanation** (`TRN-04` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+  - eu-ai-act Art. 50 (clause reference unverified)
+  - Evidence: `agentce:event/langgraph-known-pass-dec1`
+  - Remediation: trn-evidence-at-source
+- **AI-interaction disclosure is present where required** (`TRN-05` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
+  - eu-ai-act Art. 50 (clause reference unverified)
+  - Remediation: trn-evidence-at-source
+
+
+## Provenance
+
+- Engine: agentce-py 0.1.0
+- Catalog: eu-ai-act@2026.09
+- Reproduce: `agentce quickstart`
+
