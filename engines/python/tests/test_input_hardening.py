@@ -18,11 +18,13 @@ from typing import Any
 
 import pytest
 
-from agentce.bundle import load_bundle
+from agentce.bundle import confine_to_root, load_bundle
+from agentce.coverage import _denominator_counts
 from agentce.domain import DomainBinding
 from agentce.errors import InputError
 from agentce.ingest import ingest
-from agentce.profile import Profile
+from agentce.integrity import _is_signed
+from agentce.profile import CoverageDenominator, Profile
 from agentce.quarantine import QuarantineReason
 
 
@@ -249,3 +251,73 @@ def test_fuzz_symlink_chain_variants_all_escape_refused(tmp_path: Path) -> None:
         with pytest.raises(InputError) as excinfo:
             load_bundle(root)
         assert excinfo.value.key == "input.bundle_manifest_path"
+
+
+# --- Path confinement for the other bundle-adjacent refs: a coverage-denominator manifest and an
+# --- integrity block's sig_ref, both resolved against bundle_root the same way as the primary
+# --- manifest, not with a raw, unconfined join.
+
+
+def test_coverage_denominator_manifest_escaping_root_is_not_read(
+    tmp_path: Path,
+) -> None:
+    bundle_root = tmp_path / "bundle"
+    bundle_root.mkdir()
+    outside = tmp_path / "secret.json"
+    outside.write_text('{"expected": {"ToolCall": 999999}}', encoding="utf-8")
+
+    denominator = CoverageDenominator(
+        kind="registry",
+        source="urn:src:egress",
+        covers=["ToolCall"],
+        manifest="../secret.json",
+    )
+    counts = _denominator_counts(denominator, {}, bundle_root)
+    assert counts == {}
+
+
+def test_coverage_denominator_manifest_inside_root_is_read(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "bundle"
+    (bundle_root / "reference").mkdir(parents=True)
+    inside = bundle_root / "reference" / "counts.json"
+    inside.write_text('{"expected": {"ToolCall": 7}}', encoding="utf-8")
+
+    denominator = CoverageDenominator(
+        kind="registry",
+        source="urn:src:egress",
+        covers=["ToolCall"],
+        manifest="reference/counts.json",
+    )
+    counts = _denominator_counts(denominator, {}, bundle_root)
+    assert counts == {"ToolCall": 7}
+
+
+def test_integrity_sig_ref_escaping_root_is_not_verified(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "bundle"
+    bundle_root.mkdir()
+    outside = tmp_path / "sig.bin"
+    outside.write_text("signature bytes\n", encoding="utf-8")
+
+    assert _is_signed({"sig_ref": "../sig.bin"}, bundle_root) is False
+
+
+def test_integrity_sig_ref_inside_root_is_verified(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "bundle"
+    (bundle_root / "attestations").mkdir(parents=True)
+    inside = bundle_root / "attestations" / "sig.bin"
+    inside.write_text("signature bytes\n", encoding="utf-8")
+
+    assert _is_signed({"sig_ref": "attestations/sig.bin"}, bundle_root) is True
+
+
+def test_confine_to_root_handles_symlink_loop_without_raising(tmp_path: Path) -> None:
+    loop_a = tmp_path / "a"
+    loop_b = tmp_path / "b"
+    loop_a.symlink_to(loop_b)
+    loop_b.symlink_to(loop_a)
+
+    assert confine_to_root(tmp_path, "a") is None
+
+
+def test_confine_to_root_handles_embedded_nul_without_raising(tmp_path: Path) -> None:
+    assert confine_to_root(tmp_path, "evil\x00name") is None
