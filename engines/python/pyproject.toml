@@ -15,6 +15,7 @@ dependencies = [
   "jsonschema>=4.21,<5",
   "pyyaml>=6,<7",
   "rdflib>=7,<8",
+  "regex>=2026.9.10",
 ]
 keywords = ["ai-agents", "conformance", "eu-ai-act", "oscal", "provenance", "shacl", "opentelemetry"]
 classifiers = [
@@ -50,6 +51,7 @@ dev = [
   "types-jsonschema>=4.21",
   "types-pyyaml>=6",
   "pyshacl>=0.26,<0.31",
+  "types-regex>=2026.9.10.20260911",
 ]
 
 [tool.pytest.ini_options]
