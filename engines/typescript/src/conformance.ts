@@ -127,6 +127,7 @@ function assessProject(
   writeReport(outDir, assertions, {
     bundleDigest: bundle.digest,
     catalogs: labels,
+    catalogObjects: catalogs,
     operator: ECS_OPERATOR,
     invocation: ["conformance", pid],
   });
