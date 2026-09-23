@@ -171,7 +171,8 @@ class AgentCESpanProcessor:
         except ModuleNotFoundError as exc:  # pragma: no cover - exercised by the missing-extra test
             raise ModuleNotFoundError(
                 "AgentCESpanProcessor needs the 'agentce-adapter-otel-genai' package; "
-                "install the 'otel' extra: pip install 'agentce-emit[otel]'"
+                "from a source checkout, install the 'otel' extra with "
+                "`uv sync --project engines/python-emit --extra otel`"
             ) from exc
         for span in spans:
             document = _span_to_document(span, schema_url=self.SCHEMA_URL)
