@@ -65,6 +65,11 @@
     "content_type": "application/schema+json"
   },
   {
+    "path": "/spec/report/remediation-package.schema.json",
+    "source": "spec/report/remediation-package.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
     "path": "/spec/report/results-sarif.schema.json",
     "source": "spec/report/results-sarif.schema.json",
     "content_type": "application/schema+json"
