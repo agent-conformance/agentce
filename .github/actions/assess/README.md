@@ -20,13 +20,13 @@ jobs:
   assess:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: agent-conformance/agentce/.github/actions/assess@45ca972c172dc8e00a9f1f892c196b5cb884a1d2
         with:
           bundle: evidence
           profile: applicability.yaml
           domain: domain.linkml.yaml
-          fail-on: "severity>=high"
+          fail-on: 'outcome=="insufficient_evidence" and severity=="high"'
 ```
 
 Look up the commit SHA you want to pin to at

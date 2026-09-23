@@ -49,7 +49,7 @@ job artifact:
     bundle: evidence
     profile: applicability.yaml
     domain: domain.linkml.yaml
-    fail-on: "severity>=high"
+    fail-on: 'outcome=="insufficient_evidence" and severity=="high"'
 ```
 
 ```yaml

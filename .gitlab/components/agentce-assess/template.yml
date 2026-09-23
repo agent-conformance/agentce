@@ -28,25 +28,28 @@ agentce-assess:
   image: python:3.12-slim
   variables:
     GIT_STRATEGY: clone
+    # Bound to CI/CD variables at the job level, never interpolated directly into a script line: a
+    # value with shell metacharacters must not reach the runner's shell (same rule the GitHub
+    # artifacts follow).
+    AGENTCE_REF: "$[[ inputs.agentce_ref ]]"
+    AGENTCE_BUNDLE: "$[[ inputs.bundle ]]"
+    AGENTCE_PROFILE: "$[[ inputs.profile ]]"
+    AGENTCE_DOMAIN: "$[[ inputs.domain ]]"
+    AGENTCE_CATALOG: "$[[ inputs.catalog ]]"
+    AGENTCE_FAIL_ON: "$[[ inputs.fail_on ]]"
+    AGENTCE_OUT: "$[[ inputs.out ]]"
   before_script:
     - pip install --no-cache-dir uv
-    - git clone --depth 1 --branch "$[[ inputs.agentce_ref ]]" https://github.com/agent-conformance/agentce.git .agentce-engine || (git clone https://github.com/agent-conformance/agentce.git .agentce-engine && git -C .agentce-engine checkout "$[[ inputs.agentce_ref ]]")
+    - git clone --depth 1 --branch "$AGENTCE_REF" https://github.com/agent-conformance/agentce.git .agentce-engine || (git clone https://github.com/agent-conformance/agentce.git .agentce-engine && git -C .agentce-engine checkout "$AGENTCE_REF")
   script:
     - |
-      catalog_flag=""
-      if [ -n "$[[ inputs.catalog ]]" ]; then catalog_flag="--catalog $[[ inputs.catalog ]]"; fi
-      fail_on_flag=""
-      if [ -n "$[[ inputs.fail_on ]]" ]; then fail_on_flag="--fail-on $[[ inputs.fail_on ]]"; fi
-      uv run --project .agentce-engine/engines/python --frozen agentce assess \
-        --bundle "$[[ inputs.bundle ]]" \
-        --profile "$[[ inputs.profile ]]" \
-        --domain "$[[ inputs.domain ]]" \
-        $catalog_flag \
-        $fail_on_flag \
-        --out "$[[ inputs.out ]]"
-    - cat "$[[ inputs.out ]]/report.md"
+      set -- --bundle "$AGENTCE_BUNDLE" --profile "$AGENTCE_PROFILE" --domain "$AGENTCE_DOMAIN" --out "$AGENTCE_OUT"
+      if [ -n "$AGENTCE_CATALOG" ]; then set -- "$@" --catalog "$AGENTCE_CATALOG"; fi
+      if [ -n "$AGENTCE_FAIL_ON" ]; then set -- "$@" --fail-on "$AGENTCE_FAIL_ON"; fi
+      uv run --project .agentce-engine/engines/python --frozen agentce assess "$@"
+    - cat "$AGENTCE_OUT/report.md"
   artifacts:
     when: always
     paths:
-      - "$[[ inputs.out ]]/results.sarif"
-      - "$[[ inputs.out ]]/report.md"
+      - "$AGENTCE_OUT/results.sarif"
+      - "$AGENTCE_OUT/report.md"
