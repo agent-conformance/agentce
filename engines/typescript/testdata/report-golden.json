@@ -3833,153 +3833,501 @@
     "subject": "spiffe://corp/agents/a"
   },
   "sarif": {
+    "$schema": "https://agent-conformance.org/spec/report/results-sarif.schema.json",
     "runs": [
       {
         "results": [
           {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "DAT-01 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "9d57e6d9e257e80e7ee59e26dc307ba72345c307d874fd5503c334350166a222"
             },
             "ruleId": "DAT-01"
           },
           {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "DAT-02 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "a2e19f763f7e0138566783604c37729a6d7ea9ad3202632183896a81cba5ac4b"
             },
             "ruleId": "DAT-02"
           },
           {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "DAT-03 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "46f2271d22fbbcb0c7959dad60e23b6710c436df0a38e0b29f68dc1af9a8eea7"
             },
             "ruleId": "DAT-03"
           },
           {
+            "level": "note",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
+            "message": {
+              "text": "DAT-04 on spiffe://corp/agents/a: not_assessed"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "69c85e9613689e24e33cb0ab6b0f8a2a49c907c19bc87217da5565e180fb5054"
+            },
+            "ruleId": "DAT-04"
+          },
+          {
+            "level": "note",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
+            "message": {
+              "text": "DOC-05 on spiffe://corp/agents/a: not_assessed"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "5b50421fd9ba9a2a9110480482f7a5db389aa725fdc492e201be8bbd989dfe3b"
+            },
+            "ruleId": "DOC-05"
+          },
+          {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "INC-01 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "1b18d4f07fc4e73aa579577b268b486114fcea5e8e17fa75f0b9ced4f3e8cb7c"
             },
             "ruleId": "INC-01"
           },
           {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "INC-03 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "a30d99d5ceac6379d49226cae1d962ffa57604526cd3722818ca9a190527ced6"
             },
             "ruleId": "INC-03"
           },
           {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "OVS-01 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "3a71ad548a5477e55263fd650449f0b1134bc4885c33c116d454523ac49e7b40"
             },
             "ruleId": "OVS-01"
           },
           {
             "level": "error",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "OVS-02 on spiffe://corp/agents/a: non-conformant"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "92b984f2a8c1f64f087859a47c64d82a9fd543af5ce77160028f8728f3059ac2"
             },
             "ruleId": "OVS-02"
           },
           {
             "level": "error",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "OVS-03 on spiffe://corp/agents/a: non-conformant"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "5ae14a8cb1017b1f201c719d9e6ae08a4e6e7ec13756bd67a2b2c770b1c5b84e"
             },
             "ruleId": "OVS-03"
           },
           {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "OVS-05 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "e8c245dce8fda5dd15ca988c81b1ce35d20337a89bc3e86fed54e5a3b7fd6717"
             },
             "ruleId": "OVS-05"
           },
           {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "OVS-07 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "ab7c0cbdd1586dc3b68e249ed5ff76fecbb40aa64a763a33c463182f6ac9a9e1"
             },
             "ruleId": "OVS-07"
           },
           {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "OVS-08 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "7e074111781a72993198b2fcfe1475a6439b045d01e9b73d55aa236020d4d0e8"
             },
             "ruleId": "OVS-08"
           },
           {
+            "level": "note",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
+            "message": {
+              "text": "OVS-09 on spiffe://corp/agents/a: not_assessed"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "7beecf5b485b80a67b47bf6241e267a7a2f289bb174e4dac90bfcfb7c2e9c791"
+            },
+            "ruleId": "OVS-09"
+          },
+          {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "REC-03 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "79945889696bad047980ffca211336b49a0063ec650912fa7c9dba787f817350"
             },
             "ruleId": "REC-03"
           },
           {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "REC-05 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "df6d5877fac5efcac73c9f0af3b6efd2cde62a4daa24a696f831b44988c6cb07"
             },
             "ruleId": "REC-05"
           },
           {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "ROB-02 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "5af348f3d2213e90495c9c133be0a50aa3493185760cabbb0d61992f29777c12"
             },
             "ruleId": "ROB-02"
           },
           {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "ROB-07 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "74aebfb8dfa61ad5aedcc58f56b1b6cb7b15dd3c96f30e17c14225c003ff3d3e"
             },
             "ruleId": "ROB-07"
           },
           {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "RSK-01 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "30c9ba7166690a7812abe8edea6e89cda5af000c1d65dbf4c81976cc8ad10e85"
             },
             "ruleId": "RSK-01"
           },
           {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "RSK-02 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "331deb6ee7933c9a58f09bbf35ffa57f8bd329f65f92b7e9dcb5e57d9c5eba1d"
             },
             "ruleId": "RSK-02"
           },
           {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "RSK-03 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "3e1396436ce16c9531b98a4eb9c008bd16ee4d21ca6ad3489bc26d397206950f"
             },
             "ruleId": "RSK-03"
           },
           {
+            "level": "note",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
+            "message": {
+              "text": "RSK-04 on spiffe://corp/agents/a: not_assessed"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "317d3122847bef69cc058b2bdbbf6ea4df705839126bd276c2d407ea233dba57"
+            },
+            "ruleId": "RSK-04"
+          },
+          {
+            "level": "note",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
+            "message": {
+              "text": "RSK-05 on spiffe://corp/agents/a: not_assessed"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "442887a5deb4990ba0a5140853085f26258f426e6f78e7dd8a56ad6f4b9ad8ef"
+            },
+            "ruleId": "RSK-05"
+          },
+          {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "TRN-01 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "7c8046a0fd9d1535002c25f9a09947e7b05c664ceedfe6b5a412ce59cca592ac"
             },
             "ruleId": "TRN-01"
           },
           {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "TRN-03 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "6bb72d0d2f74989cb79be1142349ab54ca92ed6ad71f3d3bc60ed739187a8e2c"
             },
             "ruleId": "TRN-03"
           },
           {
             "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
             "message": {
               "text": "TRN-05 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "e6c24c4891ee34372bcad0572fdedaa3b8e3fd51a338a82d3b1d2eceb80801c3"
             },
             "ruleId": "TRN-05"
           }
@@ -3989,151 +4337,396 @@
             "name": "agentce-ts",
             "rules": [
               {
-                "id": "DAT-01"
+                "help": {
+                  "text": "AgentCE control DAT-01."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/DAT",
+                "id": "DAT-01",
+                "name": "DAT-01"
               },
               {
-                "id": "DAT-02"
+                "help": {
+                  "text": "AgentCE control DAT-02."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/DAT",
+                "id": "DAT-02",
+                "name": "DAT-02"
               },
               {
-                "id": "DAT-03"
+                "help": {
+                  "text": "AgentCE control DAT-03."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/DAT",
+                "id": "DAT-03",
+                "name": "DAT-03"
               },
               {
-                "id": "DAT-04"
+                "help": {
+                  "text": "AgentCE control DAT-04."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/DAT",
+                "id": "DAT-04",
+                "name": "DAT-04"
               },
               {
-                "id": "DOC-01"
+                "help": {
+                  "text": "AgentCE control DOC-01."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/DOC",
+                "id": "DOC-01",
+                "name": "DOC-01"
               },
               {
-                "id": "DOC-02"
+                "help": {
+                  "text": "AgentCE control DOC-02."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/DOC",
+                "id": "DOC-02",
+                "name": "DOC-02"
               },
               {
-                "id": "DOC-03"
+                "help": {
+                  "text": "AgentCE control DOC-03."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/DOC",
+                "id": "DOC-03",
+                "name": "DOC-03"
               },
               {
-                "id": "DOC-04"
+                "help": {
+                  "text": "AgentCE control DOC-04."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/DOC",
+                "id": "DOC-04",
+                "name": "DOC-04"
               },
               {
-                "id": "DOC-05"
+                "help": {
+                  "text": "AgentCE control DOC-05."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/DOC",
+                "id": "DOC-05",
+                "name": "DOC-05"
               },
               {
-                "id": "INC-01"
+                "help": {
+                  "text": "AgentCE control INC-01."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/INC",
+                "id": "INC-01",
+                "name": "INC-01"
               },
               {
-                "id": "INC-02"
+                "help": {
+                  "text": "AgentCE control INC-02."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/INC",
+                "id": "INC-02",
+                "name": "INC-02"
               },
               {
-                "id": "INC-03"
+                "help": {
+                  "text": "AgentCE control INC-03."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/INC",
+                "id": "INC-03",
+                "name": "INC-03"
               },
               {
-                "id": "INC-04"
+                "help": {
+                  "text": "AgentCE control INC-04."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/INC",
+                "id": "INC-04",
+                "name": "INC-04"
               },
               {
-                "id": "INT-01"
+                "help": {
+                  "text": "AgentCE control INT-01."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/INT",
+                "id": "INT-01",
+                "name": "INT-01"
               },
               {
-                "id": "INT-02"
+                "help": {
+                  "text": "AgentCE control INT-02."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/INT",
+                "id": "INT-02",
+                "name": "INT-02"
               },
               {
-                "id": "INT-03"
+                "help": {
+                  "text": "AgentCE control INT-03."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/INT",
+                "id": "INT-03",
+                "name": "INT-03"
               },
               {
-                "id": "INT-04"
+                "help": {
+                  "text": "AgentCE control INT-04."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/INT",
+                "id": "INT-04",
+                "name": "INT-04"
               },
               {
-                "id": "OVS-01"
+                "help": {
+                  "text": "AgentCE control OVS-01."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/OVS",
+                "id": "OVS-01",
+                "name": "OVS-01"
               },
               {
-                "id": "OVS-02"
+                "help": {
+                  "text": "AgentCE control OVS-02."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/OVS",
+                "id": "OVS-02",
+                "name": "OVS-02"
               },
               {
-                "id": "OVS-03"
+                "help": {
+                  "text": "AgentCE control OVS-03."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/OVS",
+                "id": "OVS-03",
+                "name": "OVS-03"
               },
               {
-                "id": "OVS-04"
+                "help": {
+                  "text": "AgentCE control OVS-04."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/OVS",
+                "id": "OVS-04",
+                "name": "OVS-04"
               },
               {
-                "id": "OVS-05"
+                "help": {
+                  "text": "AgentCE control OVS-05."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/OVS",
+                "id": "OVS-05",
+                "name": "OVS-05"
               },
               {
-                "id": "OVS-06"
+                "help": {
+                  "text": "AgentCE control OVS-06."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/OVS",
+                "id": "OVS-06",
+                "name": "OVS-06"
               },
               {
-                "id": "OVS-07"
+                "help": {
+                  "text": "AgentCE control OVS-07."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/OVS",
+                "id": "OVS-07",
+                "name": "OVS-07"
               },
               {
-                "id": "OVS-08"
+                "help": {
+                  "text": "AgentCE control OVS-08."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/OVS",
+                "id": "OVS-08",
+                "name": "OVS-08"
               },
               {
-                "id": "OVS-09"
+                "help": {
+                  "text": "AgentCE control OVS-09."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/OVS",
+                "id": "OVS-09",
+                "name": "OVS-09"
               },
               {
-                "id": "REC-01"
+                "help": {
+                  "text": "AgentCE control REC-01."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/REC",
+                "id": "REC-01",
+                "name": "REC-01"
               },
               {
-                "id": "REC-02"
+                "help": {
+                  "text": "AgentCE control REC-02."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/REC",
+                "id": "REC-02",
+                "name": "REC-02"
               },
               {
-                "id": "REC-03"
+                "help": {
+                  "text": "AgentCE control REC-03."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/REC",
+                "id": "REC-03",
+                "name": "REC-03"
               },
               {
-                "id": "REC-04"
+                "help": {
+                  "text": "AgentCE control REC-04."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/REC",
+                "id": "REC-04",
+                "name": "REC-04"
               },
               {
-                "id": "REC-05"
+                "help": {
+                  "text": "AgentCE control REC-05."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/REC",
+                "id": "REC-05",
+                "name": "REC-05"
               },
               {
-                "id": "REC-06"
+                "help": {
+                  "text": "AgentCE control REC-06."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/REC",
+                "id": "REC-06",
+                "name": "REC-06"
               },
               {
-                "id": "ROB-01"
+                "help": {
+                  "text": "AgentCE control ROB-01."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/ROB",
+                "id": "ROB-01",
+                "name": "ROB-01"
               },
               {
-                "id": "ROB-02"
+                "help": {
+                  "text": "AgentCE control ROB-02."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/ROB",
+                "id": "ROB-02",
+                "name": "ROB-02"
               },
               {
-                "id": "ROB-03"
+                "help": {
+                  "text": "AgentCE control ROB-03."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/ROB",
+                "id": "ROB-03",
+                "name": "ROB-03"
               },
               {
-                "id": "ROB-04"
+                "help": {
+                  "text": "AgentCE control ROB-04."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/ROB",
+                "id": "ROB-04",
+                "name": "ROB-04"
               },
               {
-                "id": "ROB-05"
+                "help": {
+                  "text": "AgentCE control ROB-05."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/ROB",
+                "id": "ROB-05",
+                "name": "ROB-05"
               },
               {
-                "id": "ROB-06"
+                "help": {
+                  "text": "AgentCE control ROB-06."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/ROB",
+                "id": "ROB-06",
+                "name": "ROB-06"
               },
               {
-                "id": "ROB-07"
+                "help": {
+                  "text": "AgentCE control ROB-07."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/ROB",
+                "id": "ROB-07",
+                "name": "ROB-07"
               },
               {
-                "id": "RSK-01"
+                "help": {
+                  "text": "AgentCE control RSK-01."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/RSK",
+                "id": "RSK-01",
+                "name": "RSK-01"
               },
               {
-                "id": "RSK-02"
+                "help": {
+                  "text": "AgentCE control RSK-02."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/RSK",
+                "id": "RSK-02",
+                "name": "RSK-02"
               },
               {
-                "id": "RSK-03"
+                "help": {
+                  "text": "AgentCE control RSK-03."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/RSK",
+                "id": "RSK-03",
+                "name": "RSK-03"
               },
               {
-                "id": "RSK-04"
+                "help": {
+                  "text": "AgentCE control RSK-04."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/RSK",
+                "id": "RSK-04",
+                "name": "RSK-04"
               },
               {
-                "id": "RSK-05"
+                "help": {
+                  "text": "AgentCE control RSK-05."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/RSK",
+                "id": "RSK-05",
+                "name": "RSK-05"
               },
               {
-                "id": "TRN-01"
+                "help": {
+                  "text": "AgentCE control TRN-01."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/TRN",
+                "id": "TRN-01",
+                "name": "TRN-01"
               },
               {
-                "id": "TRN-02"
+                "help": {
+                  "text": "AgentCE control TRN-02."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/TRN",
+                "id": "TRN-02",
+                "name": "TRN-02"
               },
               {
-                "id": "TRN-03"
+                "help": {
+                  "text": "AgentCE control TRN-03."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/TRN",
+                "id": "TRN-03",
+                "name": "TRN-03"
               },
               {
-                "id": "TRN-04"
+                "help": {
+                  "text": "AgentCE control TRN-04."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/TRN",
+                "id": "TRN-04",
+                "name": "TRN-04"
               },
               {
-                "id": "TRN-05"
+                "help": {
+                  "text": "AgentCE control TRN-05."
+                },
+                "helpUri": "https://agent-conformance.org/reference/catalog/TRN",
+                "id": "TRN-05",
+                "name": "TRN-05"
               }
             ],
             "version": "0.1.0"
