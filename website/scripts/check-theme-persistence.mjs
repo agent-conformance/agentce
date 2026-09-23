@@ -5,12 +5,16 @@
 // driving it with a real browser.
 //
 // Usage:
-//   node scripts/check-theme-persistence.mjs             Drive the built dist/ site; exit 1 if the
-//                                                          control doesn't change or persist the theme.
-//   node scripts/check-theme-persistence.mjs --self-test  Prove the gate can fail: serve the committed
-//                                                          good fixture (control wired, must pass) and
-//                                                          the bad fixture (control present but
-//                                                          disconnected, must fail).
+//   node scripts/check-theme-persistence.mjs               Drive the built dist/ site; exit 1 if the
+//                                                            control doesn't change or persist the theme.
+//   node scripts/check-theme-persistence.mjs --dir <path> [--next <path>]
+//                                                            Drive <path> instead of dist/ (used to point
+//                                                            the gate at the committed disconnected-control
+//                                                            fixture, proving it fails on it).
+//   node scripts/check-theme-persistence.mjs --self-test    Prove the gate can fail: serve the committed
+//                                                            good fixture (control wired, must pass) and
+//                                                            the bad fixture (control present but
+//                                                            disconnected, must fail).
 import { createServer } from 'node:http';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { dirname, join, resolve, extname, relative, isAbsolute } from 'node:path';
@@ -112,14 +116,15 @@ async function drive(base, startPath, nextPath) {
   return problems;
 }
 
-async function runGate() {
-  if (!existsSync(distDir)) {
-    console.error('I18N THEME-PERSISTENCE CHECK FAILED: dist/ not found — run the build first (pnpm build).');
+async function runGate({ dir, next } = {}) {
+  const root = dir ? resolve(dir) : distDir;
+  if (!existsSync(root)) {
+    console.error(`I18N THEME-PERSISTENCE CHECK FAILED: ${root} not found${dir ? '' : ' — run the build first (pnpm build)'}.`);
     process.exit(1);
   }
-  const { server, port } = await serve(distDir);
+  const { server, port } = await serve(root);
   try {
-    const problems = await drive(`http://127.0.0.1:${port}`, '/', '/docs/getting-started/');
+    const problems = await drive(`http://127.0.0.1:${port}`, '/', dir ? next : '/docs/getting-started/');
     if (problems.length === 0) {
       console.log('I18N THEME-PERSISTENCE CHECK OK — the landing-page control changes and persists the theme across reload and navigation.');
       process.exit(0);
@@ -160,8 +165,14 @@ async function selfTest() {
   process.exit(0);
 }
 
-if (process.argv.includes('--self-test')) {
+const argv = process.argv.slice(2);
+if (argv.includes('--self-test')) {
   await selfTest();
 } else {
-  await runGate();
+  const dirIdx = argv.indexOf('--dir');
+  const nextIdx = argv.indexOf('--next');
+  await runGate({
+    dir: dirIdx >= 0 ? argv[dirIdx + 1] : undefined,
+    next: nextIdx >= 0 ? argv[nextIdx + 1] : undefined,
+  });
 }
