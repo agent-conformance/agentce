@@ -2,15 +2,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agent-conformance.org/spec/report/results-sarif.schema.json",
   "title": "AgentCE SARIF results (profile)",
-  "description": "The subset of SARIF 2.1.0 that AgentCE emits as results.sarif (SPEC 9), so CI can gate on non-conformant controls with a format it already reads. This is a bounded profile validated in Phase 1; it conforms to the SARIF 2.1.0 structure for the fields it uses.",
+  "description": "The subset of SARIF 2.1.0 that AgentCE emits as results.sarif (SPEC 9), so CI can gate on non-conformant controls with a format it already reads, GitHub code-scanning can anchor and de-dup findings, and every rule and result carries the fields a code-scanning consumer needs. This is a bounded profile; it conforms to the SARIF 2.1.0 structure for the fields it uses, and every document that satisfies it also validates against the vendored real OASIS SARIF 2.1.0 schema (spec/report/vendor/sarif-schema-2.1.0.json).",
   "type": "object",
   "additionalProperties": true,
-  "required": ["version", "runs"],
+  "required": ["$schema", "version", "runs"],
   "properties": {
-    "$schema": {"type": "string"},
+    "$schema": {"type": "string", "minLength": 1},
     "version": {"type": "string", "const": "2.1.0"},
     "runs": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
         "required": ["tool", "results"],
@@ -30,8 +31,17 @@
                     "type": "array",
                     "items": {
                       "type": "object",
-                      "required": ["id"],
-                      "properties": {"id": {"type": "string"}, "name": {"type": "string"}}
+                      "required": ["id", "name", "help", "helpUri"],
+                      "properties": {
+                        "id": {"type": "string", "minLength": 1},
+                        "name": {"type": "string", "minLength": 1},
+                        "help": {
+                          "type": "object",
+                          "required": ["text"],
+                          "properties": {"text": {"type": "string", "minLength": 1}}
+                        },
+                        "helpUri": {"type": "string", "minLength": 1}
+                      }
                     }
                   }
                 }
@@ -42,11 +52,37 @@
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["ruleId", "level", "message"],
+              "required": ["ruleId", "level", "message", "locations", "partialFingerprints"],
               "properties": {
                 "ruleId": {"type": "string"},
                 "level": {"type": "string", "enum": ["none", "note", "warning", "error"]},
-                "message": {"type": "object", "required": ["text"], "properties": {"text": {"type": "string"}}}
+                "message": {"type": "object", "required": ["text"], "properties": {"text": {"type": "string"}}},
+                "locations": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "required": ["physicalLocation"],
+                    "properties": {
+                      "physicalLocation": {
+                        "type": "object",
+                        "required": ["artifactLocation"],
+                        "properties": {
+                          "artifactLocation": {
+                            "type": "object",
+                            "required": ["uri"],
+                            "properties": {"uri": {"type": "string", "minLength": 1}}
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "partialFingerprints": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "additionalProperties": {"type": "string", "minLength": 1}
+                }
               }
             }
           }

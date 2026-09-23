@@ -36,6 +36,7 @@ _SARIF_LEVEL = {
     "non-conformant": "error",
     "partial": "warning",
     "insufficient_evidence": "warning",
+    "not_assessed": "note",
 }
 _OSCAL_STATE = {
     "conformant": "satisfied",
@@ -441,18 +442,81 @@ def render_oscal(assertions: list[Assertion]) -> dict[str, Any]:
     }
 
 
-def render_sarif(assertions: list[Assertion]) -> dict[str, Any]:
-    rules = [{"id": control} for control in sorted({a.control for a in assertions})]
+def _sarif_help_uri(control: str) -> str:
+    """A stable, deterministic reference URL for the control's family page (`docs/reference/catalog/`,
+    published at the site under the same path). SARIF's `helpUri` is a citation, not a runtime
+    dependency: it does not need to resolve for the check that reads it, the same way a JSON Schema
+    `$id` does not (`spec/report/vendor/README.md`)."""
+    family = control.split("-", 1)[0]
+    return f"https://agent-conformance.org/reference/catalog/{family}"
+
+
+def _sarif_rule_help_text(control: str, spec: ControlSpec | None) -> str:
+    if spec is None:
+        return f"AgentCE control {control}."
+    return spec.title
+
+
+def _sarif_fingerprint(a: Assertion) -> str:
+    """A fingerprint derived only from the assertion's own content -- control, subject, outcome, and
+    the evaluation window/population that produced it -- so two independent offline runs over the same
+    evidence produce byte-identical fingerprints (no clock, host, or run counter)."""
+    payload = "|".join(
+        [
+            a.control,
+            a.subject,
+            a.outcome,
+            a.window[0],
+            a.window[1],
+            str(a.population[0]),
+            str(a.population[1]),
+        ]
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def render_sarif(
+    assertions: list[Assertion], *, catalogs: list[Catalog] | None = None
+) -> dict[str, Any]:
+    """Render ``results.sarif`` (SPEC §9) as a document a code-scanning consumer can actually use: every
+    rule carries catalog-sourced ``name``/``help``/``helpUri``, every result carries a synthetic
+    ``locations`` entry (the subject is not a source file, so the location is a stable pseudo-path for
+    that subject) and a content-derived ``partialFingerprints`` (stable across independent runs, so
+    findings de-dup across scans), and ``not_assessed`` surfaces at a level distinct from
+    ``insufficient_evidence`` so a reader -- and a code-scanning gate -- can tell unproven apart from
+    thin evidence instead of one being silent."""
+    by_control = _control_index(catalogs or [])
+    controls = sorted({a.control for a in assertions})
+    rules = [
+        {
+            "id": control,
+            "name": control,
+            "help": {"text": _sarif_rule_help_text(control, by_control.get(control))},
+            "helpUri": _sarif_help_uri(control),
+        }
+        for control in controls
+    ]
     results = [
         {
             "ruleId": a.control,
             "level": _SARIF_LEVEL[a.outcome],
             "message": {"text": f"{a.control} on {a.subject}: {a.outcome}"},
+            "locations": [
+                {
+                    "physicalLocation": {
+                        "artifactLocation": {
+                            "uri": f"agentce/subjects/{_safe(a.subject)}"
+                        }
+                    }
+                }
+            ],
+            "partialFingerprints": {"agentceOutcomeHash/v1": _sarif_fingerprint(a)},
         }
         for a in sorted(assertions, key=lambda x: (x.subject, x.control))
         if a.outcome in _SARIF_LEVEL
     ]
     return {
+        "$schema": "https://agent-conformance.org/spec/report/results-sarif.schema.json",
         "version": "2.1.0",
         "runs": [
             {
@@ -728,7 +792,7 @@ def write_report(
         ),
     )
     write_json("oscal-ar.json", render_oscal(assertions))
-    write_json("results.sarif", render_sarif(assertions))
+    write_json("results.sarif", render_sarif(assertions, catalogs=catalogs))
 
     subjects = sorted({a.subject for a in assertions})
     for subject in subjects:
@@ -837,6 +901,22 @@ def validate_oscal_ar_nist(document: dict[str, Any]) -> list[str]:
     return problems
 
 
+def validate_sarif_2_1_0(document: dict[str, Any]) -> list[str]:
+    """Validate ``document`` against the vendored, real OASIS SARIF 2.1.0 schema (SPEC §9: "validate
+    offline against vendored schemas"), not just the bounded local profile; return a list of problems,
+    empty on success."""
+    schema = _load_schema("sarif-2.1.0")
+    errors = sorted(
+        jsonschema.Draft4Validator(schema).iter_errors(document),
+        key=lambda e: list(e.absolute_path),
+    )
+    problems = []
+    for error in errors:
+        location = "/".join(str(p) for p in error.absolute_path) or "<root>"
+        problems.append(f"{location}: {error.message}")
+    return problems
+
+
 def validate_report(out_dir: Path) -> list[str]:
     """Validate every emitted artifact against its vendored schema; return a list of problems."""
     problems: list[str] = []
@@ -857,6 +937,11 @@ def validate_report(out_dir: Path) -> list[str]:
             problems += [
                 f"oscal-ar.json (NIST OSCAL 1.1.2): {p}"
                 for p in validate_oscal_ar_nist(instance)
+            ]
+        if filename == "results.sarif":
+            problems += [
+                f"results.sarif (OASIS SARIF 2.1.0): {p}"
+                for p in validate_sarif_2_1_0(instance)
             ]
     for filename in ("report.md", "report.html"):
         path = out_dir / filename
