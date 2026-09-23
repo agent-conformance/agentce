@@ -23,6 +23,7 @@ import { ExitCode } from "./exitCodes";
 import { buildGraph } from "./graph";
 import { ingest } from "./ingest";
 import { integrityResultToJson, verifyBundle } from "./integrity";
+import { DEFAULT_LANGUAGE } from "./messages";
 import { computeVectorFile } from "./numerics";
 import { type Profile, loadProfile } from "./profile";
 import { writeQuarantine } from "./quarantine";
@@ -514,11 +515,12 @@ function cmdReport(argv: string[]): CommandResult {
   const parsed = JSON.parse(readFileSync(source, "utf-8"));
   const assertions: Assertion[] = Array.isArray(parsed) ? parsed.map(assertionFromJson) : [];
   const counts = aggregate(assertions);
+  const language = flagValue(argv, "language") ?? DEFAULT_LANGUAGE;
   let rendering: string;
   if (format === "md") {
-    rendering = renderReportMd(assertions, counts);
+    rendering = renderReportMd(assertions, counts, language);
   } else if (format === "html") {
-    rendering = renderReportHtml(assertions, counts);
+    rendering = renderReportHtml(assertions, counts, language);
   } else if (format === "oscal") {
     rendering = `${JSON.stringify(sortKeysDeep(renderOscal(assertions)), null, 2)}\n`;
   } else if (format === "sarif") {
