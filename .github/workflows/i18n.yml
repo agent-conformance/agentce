@@ -1,0 +1,207 @@
+# i18n infrastructure guard: the nine declared UI locales (SPEC fixed decision) actually route on
+# the built site, the landing page's own theme control works, the ICU message catalogue in spec/ is
+# vendored byte-identical into the engine, every message key referenced in code is defined and every
+# defined key is referenced, and the report's language never leaks into a canonical machine-readable
+# output. Every action is pinned by commit SHA (AGENTS.md quality gates).
+name: i18n
+
+on:
+  push:
+    branches: [main, "phase/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  i18n:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: The Astro config declares all nine locales and a default (C1)
+        run: |
+          env -u VIRTUAL_ENV uv run --project engines/python --frozen python3 - <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          text = Path("website/astro.config.mjs").read_text(encoding="utf-8")
+          codes = ["en", "es", "fr", "ja", "zh-Hans", "pl", "pt-BR", "uk", "ru"]
+
+          problems = []
+          if not re.search(r"\blocales\s*:", text):
+              problems.append("astro.config.mjs: no 'locales:' key in the Starlight integration config")
+          if not re.search(r"\bdefaultLocale\s*:", text):
+              problems.append("astro.config.mjs: no 'defaultLocale:' key in the Starlight integration config")
+
+          missing = []
+          for code in codes:
+              pattern = r"""(['"]""" + re.escape(code) + r"""['"]|\b""" + re.escape(code) + r"""\s*:)"""
+              if not re.search(pattern, text):
+                  missing.append(code)
+          if missing:
+              problems.append(f"astro.config.mjs: missing locale code(s) (as a quoted lang value or an object key): {missing}")
+
+          if problems:
+              print("RED:", file=sys.stderr)
+              for p in problems:
+                  print(" ", p, file=sys.stderr)
+              sys.exit(1)
+          print("GREEN: astro.config.mjs declares all nine locales and a defaultLocale")
+          sys.exit(0)
+          PY
+
+      - name: The landing page offers its own dark/light/auto theme control (C2)
+        run: |
+          env -u VIRTUAL_ENV uv run --project engines/python --frozen python3 - <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          paths = [
+              Path("website/src/layouts/BaseLayout.astro"),
+              Path("website/src/pages/index.astro"),
+          ]
+          text = "\n".join(p.read_text(encoding="utf-8") for p in paths if p.exists())
+
+          problems = []
+          if not re.search(r"<(button|select)\b", text, re.IGNORECASE):
+              problems.append(
+                  "no <button>/<select> control element in BaseLayout.astro or index.astro "
+                  "-- the landing page has no theme control of its own"
+              )
+          if not re.search(r"localStorage\.setItem\(\s*['\"]starlight-theme['\"]", text):
+              problems.append(
+                  "no localStorage.setItem('starlight-theme', ...) writer found -- only a reader "
+                  "(getItem) exists, so the page can sync a choice made elsewhere but never set one"
+              )
+          missing_states = [
+              s for s in ("dark", "light", "auto") if not re.search(r"""['"]""" + s + r"""['"]""", text)
+          ]
+          if missing_states:
+              problems.append(f"theme states not found as literal option values: {missing_states}")
+
+          if problems:
+              print("RED:", file=sys.stderr)
+              for p in problems:
+                  print(" ", p, file=sys.stderr)
+              sys.exit(1)
+          print("GREEN: a {dark,light,auto} theme control exists on the landing page")
+          sys.exit(0)
+          PY
+
+      - name: A language-neutral ICU catalogue lives in spec/ and is vendored with a sync test (C3)
+        run: |
+          set -u
+          problems=()
+
+          i18n_hits=$(find spec -type f -not -path '*/.venv/*' -not -path '*/node_modules/*' \
+            -not -path '*/__pycache__/*' 2>/dev/null | grep -iE '(i18n|messages|locales|strings)')
+          if [ -z "$i18n_hits" ]; then
+            problems+=("spec/: no i18n/messages/locales catalog file or directory exists under spec/")
+          fi
+
+          icu_hits=$(grep -rlE '\{[a-zA-Z_]+,\s*(plural|select),' \
+            --include="*.py" --include="*.json" --include="*.yaml" --include="*.yml" --include="*.ts" --include="*.mjs" . 2>/dev/null \
+            | grep -v -E "node_modules|\.venv|/dist/|\.gradle|/build/")
+          if [ -z "$icu_hits" ]; then
+            problems+=("no ICU MessageFormat ({var, plural,...} / {var, select,...}) syntax found anywhere in the repository")
+          fi
+
+          sync_hits=$(grep -rlE 'spec.*(messages|i18n|locales)|(messages|i18n|locales).*spec' \
+            --include="*.py" engines/*/tests 2>/dev/null)
+          if [ -z "$sync_hits" ]; then
+            problems+=("no test vendors/sync-checks a spec/ message catalog against a per-engine copy (the no-ml-denylist/schema pattern)")
+          fi
+
+          if [ "${#problems[@]}" -ne 0 ]; then
+            echo "RED:" >&2
+            printf '  %s\n' "${problems[@]}" >&2
+            exit 1
+          fi
+          echo "GREEN: a language-neutral ICU message catalog lives in spec/ and is vendored per engine with a sync test"
+
+      - name: Every message key referenced in code is defined, and every defined key is used (C4)
+        run: |
+          uv run --project tools --frozen python tools/i18n_key_check.py --self-test
+          uv run --project tools --frozen python tools/i18n_key_check.py
+
+      - name: Canonical outputs are unaffected by OS locale or --report-language (C5)
+        working-directory: engines/python
+        run: uv sync --frozen
+      - name: Canonical outputs are unaffected by OS locale or --report-language (C5, run)
+        run: |
+          set -u
+          WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+
+          run_one() {
+            local outdir="$1" report_lang="$2" locale_val="$3"
+            LC_ALL="$locale_val" LANG="$locale_val" \
+            env -u VIRTUAL_ENV uv run --project engines/python --frozen agentce assess \
+              --bundle corpus/quickstart/evidence --profile corpus/quickstart/applicability.yaml \
+              --domain corpus/quickstart/domain.linkml.yaml --catalog eu-ai-act@2026.09 \
+              --catalog-dir spec/catalogs/base/eu-ai-act --report-language "$report_lang" --out "$outdir" \
+              >"$outdir.out" 2>"$outdir.err"
+            echo $?
+          }
+
+          exA1=$(run_one "$WORK/locC" en C)
+          exA2=$(run_one "$WORK/locUTF" en en_US.UTF-8)
+          exB1=$(run_one "$WORK/langEN" en C)
+          exB2=$(run_one "$WORK/langDE" de C)
+
+          problems=()
+          for ex in "$exA1" "$exA2" "$exB1" "$exB2"; do
+            [ "$ex" -eq 0 ] || problems+=("agentce assess exited $ex, not 0 (fixture setup itself failed)")
+          done
+
+          if [ "${#problems[@]}" -eq 0 ]; then
+            for pair in "locC locUTF" "langEN langDE"; do
+              a=${pair% *}; b=${pair#* }
+              for f in assertions.json oscal-ar.json results.sarif; do
+                if ! diff -q "$WORK/$a/$f" "$WORK/$b/$f" >/dev/null 2>&1; then
+                  problems+=("$pair: $f differs (canonical output is NOT locale-independent)")
+                fi
+              done
+            done
+            if diff -q "$WORK/langEN/report.md" "$WORK/langDE/report.md" >/dev/null 2>&1; then
+              problems+=("fixture invalid: report.md did not change with --report-language (en vs de)")
+            fi
+          fi
+
+          if [ "${#problems[@]}" -ne 0 ]; then
+            echo "FAIL:" >&2
+            printf '  %s\n' "${problems[@]}" >&2
+            exit 1
+          fi
+          echo "GREEN: assertions.json/oscal-ar.json/results.sarif are byte-identical across LC_ALL/LANG (C vs en_US.UTF-8) and --report-language (en vs de); report.md legitimately differs by language"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install website dependencies
+        working-directory: website
+        run: pnpm install --frozen-lockfile
+      - name: Install the pinned Playwright browser
+        working-directory: website
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build the static site
+        working-directory: website
+        run: pnpm build
+      - name: Built-site locale routing, lang, hreflang, and sitemap (self-test, then the built site) (C6)
+        working-directory: website
+        run: |
+          node scripts/check-i18n-site.mjs --self-test
+          node scripts/check-i18n-site.mjs
+      - name: The landing-page theme control persists across reload and navigation (self-test, then the built site) (C7)
+        working-directory: website
+        run: |
+          node scripts/check-theme-persistence.mjs --self-test
+          node scripts/check-theme-persistence.mjs
