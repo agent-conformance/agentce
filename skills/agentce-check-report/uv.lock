@@ -18,7 +18,7 @@ dependencies = [
     { name = "regex" },
 ]
 wheels = [
-    { filename = "agent_conformance-0.1.0-py3-none-any.whl", hash = "sha256:1c70cf041487801afb3a7810e12a402e49141d5850df38f68827bb70088dd9af" },
+    { filename = "agent_conformance-0.1.0-py3-none-any.whl", hash = "sha256:01ebdcdbb843e113862ea9a2d57a1aa9d2f06b9c899dbcb87fa7fa68344cafd7" },
 ]
 
 [package.metadata]
