@@ -1,7 +1,7 @@
 """Policy-as-code: severity/family on every assertion, and ``--fail-on`` gates the exit code on a
 tiny, deterministic expression -- never ``eval`` (SPEC §8.5, §7; finding #29's CI guard).
 
-Runs the real CLI in-process (never a stub) against the committed quickstart bundle. The hostile-
+Runs the real CLI in-process against the committed quickstart bundle. The hostile-
 expression cases prove the parser itself never reaches Python's ``eval``/``exec``/``os.system``: a
 sentinel file is created only if the injected code actually ran, and no shell is involved at all
 (argv is passed as a Python list), so a passing test here means the engine's own parser -- not shell

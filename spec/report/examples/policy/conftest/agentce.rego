@@ -7,7 +7,7 @@
 # (SPEC §8.5): deny any assertion that is non-conformant or insufficient_evidence
 # on a high-severity control. Adjust the severity/family comparisons below to match
 # your own gating policy; both fields are present on every record (never omitted,
-# never a constant placeholder).
+# never a fixed, invented value).
 package agentce
 
 import future.keywords.in
