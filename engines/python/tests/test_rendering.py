@@ -7,7 +7,17 @@ from pathlib import Path
 
 from agentce import messages
 from agentce.assertions import Assertion, EvidencePointer, aggregate
+from agentce.catalog import Catalog
 from agentce.report import render_report_html, render_report_md, write_report
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_BASE_CATALOG = Catalog(
+    id="eu-ai-act",
+    version="2026.09",
+    directory=_REPO_ROOT / "spec/catalogs/base/eu-ai-act",
+    controls=[],
+    shapes={},
+)
 
 
 def _assertions(subject: str = "s") -> list[Assertion]:
@@ -67,7 +77,7 @@ def test_report_language_recorded_and_assertions_stable(tmp_path: Path) -> None:
             out,
             _assertions(),
             bundle_digest="sha256:0",
-            catalogs=["eu-ai-act@2026.09"],
+            catalogs=[_BASE_CATALOG],
             report_language=language,
         )
     manifest = json.loads((de / "manifest.json").read_text())
