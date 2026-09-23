@@ -120,7 +120,9 @@ public final class Conformance {
         Coverage.computeCoverage(ingested.accepted, profile, bundle.root);
         Applicability.resolve(profile, ingested.accepted, List.of());
         List<Assertions.Assertion> assertions = Assess.assessSubjects(ingested.accepted, profile, cat.catalogs, domain);
-        Report.writeReport(outDir, assertions, bundle.digest, cat.labels, ECS_OPERATOR, List.of("conformance", pid), List.of(), "en");
+        Report.writeReport(
+                outDir, assertions, bundle.digest, cat.labels, ECS_OPERATOR, List.of("conformance", pid), List.of(),
+                "en", cat.catalogs);
     }
 
     /** Run every corpus project through the engine and return the implementation report. */

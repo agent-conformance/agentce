@@ -33,7 +33,10 @@ public final class Report {
     private static final byte[] NAMESPACE_URL = uuidToBytes(UUID.fromString("6ba7b811-9dad-11d1-80b4-00c04fd430c8"));
 
     private static final Map<String, String> SARIF_LEVEL = Map.of(
-            "non-conformant", "error", "partial", "warning", "insufficient_evidence", "warning");
+            "non-conformant", "error",
+            "partial", "warning",
+            "insufficient_evidence", "warning",
+            "not_assessed", "note");
     private static final Map<String, String> OSCAL_STATE = Map.of(
             "conformant", "satisfied",
             "non-conformant", "not-satisfied",
@@ -96,6 +99,48 @@ public final class Report {
             out.append(Character.isLetterOrDigit(c) || c == '-' || c == '.' || c == '_' ? c : '_');
         }
         return out.toString();
+    }
+
+    /** Every control, keyed by id, across every resolved catalog -- so a finding can carry its
+     * control's title (SPEC §9.3). A later catalog in the list (an overlay) wins over an earlier one
+     * (the base) for the same control id. */
+    private static Map<String, Catalog.ControlSpec> controlIndex(List<Catalog> catalogs) {
+        Map<String, Catalog.ControlSpec> index = new LinkedHashMap<>();
+        for (Catalog catalog : catalogs) {
+            for (Catalog.ControlSpec control : catalog.controls) {
+                index.put(control.id, control);
+            }
+        }
+        return index;
+    }
+
+    /** A stable, deterministic reference URL for the control's family page (docs/reference/catalog/,
+     * published at the site under the same path). SARIF's {@code helpUri} is a citation, not a runtime
+     * dependency: it does not need to resolve for the check that reads it, the same way a JSON Schema
+     * {@code $id} does not (spec/report/vendor/README.md). */
+    private static String sarifHelpUri(String control) {
+        String family = control.split("-", 2)[0];
+        return "https://agent-conformance.org/reference/catalog/" + family;
+    }
+
+    private static String sarifRuleHelpText(String control, Catalog.ControlSpec spec) {
+        return spec != null ? spec.title : "AgentCE control " + control + ".";
+    }
+
+    /** A fingerprint derived only from the assertion's own content -- control, subject, outcome, and
+     * the evaluation window/population that produced it -- so two independent offline runs over the
+     * same evidence produce byte-identical fingerprints (no clock, host, or run counter). */
+    private static String sarifFingerprint(Assertions.Assertion a) {
+        String payload = String.join(
+                "|",
+                a.control,
+                a.subject,
+                a.outcome,
+                a.window[0],
+                a.window[1],
+                String.valueOf(a.population[0]),
+                String.valueOf(a.population[1]));
+        return Canonical.sha256Hex(payload.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String outcomeLabel(Map<String, String> cat, String outcome) {
@@ -347,8 +392,17 @@ public final class Report {
         return root;
     }
 
-    public static ObjectNode renderSarif(List<Assertions.Assertion> assertions) {
+    /** Render {@code results.sarif} (SPEC §9) as a document a code-scanning consumer can actually use:
+     * every rule carries catalog-sourced {@code name}/{@code help}/{@code helpUri}, every result carries
+     * a synthetic {@code locations} entry (the subject is not a source file, so the location is a
+     * stable pseudo-path for that subject) and a content-derived {@code partialFingerprints} (stable
+     * across independent runs, so findings de-dup across scans), and {@code not_assessed} surfaces at a
+     * level distinct from {@code insufficient_evidence} so a reader -- and a code-scanning gate -- can
+     * tell unproven apart from thin evidence instead of one being silent. */
+    public static ObjectNode renderSarif(List<Assertions.Assertion> assertions, List<Catalog> catalogs) {
+        Map<String, Catalog.ControlSpec> byControl = controlIndex(catalogs);
         ObjectNode root = Json.nodes().objectNode();
+        root.put("$schema", "https://agent-conformance.org/spec/report/results-sarif.schema.json");
         root.put("version", "2.1.0");
         ArrayNode runs = root.putArray("runs");
         ObjectNode run = runs.addObject();
@@ -362,7 +416,11 @@ public final class Report {
             controlIds.add(a.control);
         }
         for (String control : controlIds) {
-            rules.addObject().put("id", control);
+            ObjectNode rule = rules.addObject();
+            rule.put("id", control);
+            rule.put("name", control);
+            rule.putObject("help").put("text", sarifRuleHelpText(control, byControl.get(control)));
+            rule.put("helpUri", sarifHelpUri(control));
         }
         ArrayNode results = run.putArray("results");
         for (Assertions.Assertion a : sortedBySubjectControl(assertions)) {
@@ -371,9 +429,20 @@ public final class Report {
                 r.put("ruleId", a.control);
                 r.put("level", SARIF_LEVEL.get(a.outcome));
                 r.putObject("message").put("text", a.control + " on " + a.subject + ": " + a.outcome);
+                ObjectNode location = r.putArray("locations").addObject();
+                location.putObject("physicalLocation")
+                        .putObject("artifactLocation")
+                        .put("uri", "agentce/subjects/" + safe(a.subject));
+                r.putObject("partialFingerprints").put("agentceOutcomeHash/v1", sarifFingerprint(a));
             }
         }
         return root;
+    }
+
+    /** {@link #renderSarif(List, List)} for a bare re-render with no catalog objects available (SPEC
+     * §9.4): still a valid, if less informative, SARIF document. */
+    public static ObjectNode renderSarif(List<Assertions.Assertion> assertions) {
+        return renderSarif(assertions, List.of());
     }
 
     public static ObjectNode renderEvidencePack(String subject, List<Assertions.Assertion> assertions, String role) {
@@ -455,10 +524,14 @@ public final class Report {
         return manifest;
     }
 
-    /** Write every report artifact for {@code assertions} and return the reproducibility manifest. */
+    /** Write every report artifact for {@code assertions} and return the reproducibility manifest.
+     * {@code catalogObjects} are the resolved catalog objects (not just their {@code id@version}
+     * labels in {@code catalogs}), so {@code results.sarif} can carry catalog-sourced rule metadata
+     * (SPEC §9); an empty list still yields a valid, if less informative, SARIF document. */
     public static ObjectNode writeReport(
             Path outDir, List<Assertions.Assertion> assertions, String bundleDigest, List<String> catalogs,
-            String operator, List<String> invocation, List<String> supersedes, String reportLanguage) {
+            String operator, List<String> invocation, List<String> supersedes, String reportLanguage,
+            List<Catalog> catalogObjects) {
         Assertions.checkDc5(assertions);
         try {
             Files.createDirectories(outDir);
@@ -474,7 +547,7 @@ public final class Report {
             outputs.put("report.md", writeText(outDir, "report.md", renderReportMd(assertions, counts, reportLanguage)));
             outputs.put("report.html", writeText(outDir, "report.html", renderReportHtml(assertions, counts, reportLanguage)));
             outputs.put("oscal-ar.json", writeJson(outDir, "oscal-ar.json", renderOscal(assertions)));
-            outputs.put("results.sarif", writeJson(outDir, "results.sarif", renderSarif(assertions)));
+            outputs.put("results.sarif", writeJson(outDir, "results.sarif", renderSarif(assertions, catalogObjects)));
 
             TreeSet<String> subjects = new TreeSet<>(Json::byteCompare);
             for (Assertions.Assertion a : assertions) {
