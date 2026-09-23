@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .bundle import Bundle
+from .errors import InputError
 from .quarantine import QuarantineReason, QuarantineRecord
 from .schema import event_types, validate_event
 
@@ -83,6 +84,13 @@ def ingest(
                         )
                     )
                     continue
+                except RecursionError as exc:
+                    raise InputError(
+                        "input.event_structure_too_deep",
+                        "an evidence event line is nested too deeply to parse safely.",
+                        "flatten the event's structure; reference deeply nested content by an "
+                        "opaque locator instead (SPEC R12).",
+                    ) from exc
                 if not isinstance(event, dict):
                     result.quarantined.append(
                         QuarantineRecord(

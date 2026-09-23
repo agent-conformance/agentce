@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import yaml
+from .safe_yaml import load_untrusted_yaml
 
 
 @dataclass
@@ -74,7 +74,12 @@ class Profile:
 
     @classmethod
     def load(cls, path: Path) -> Profile:
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        data = (
+            load_untrusted_yaml(
+                path, key="input.profile_invalid", what="the applicability profile"
+            )
+            or {}
+        )
         if not isinstance(data, dict):
             return cls()
         return cls.from_dict(data)

@@ -84,6 +84,31 @@ MESSAGE_KEYS: dict[str, Entry] = {
         "a stream file's digest does not match the manifest.",
         "regenerate the manifest after any change to the stream files.",
     ),
+    "input.bundle_manifest_file_too_large": Entry(
+        "error",
+        "a manifest-listed file is over the per-file size limit.",
+        "split large evidence into more, smaller files, or reference bulk content by an opaque "
+        "locator instead of inlining it (SPEC R12).",
+    ),
+    "input.profile_invalid": Entry(
+        "error",
+        "the applicability profile is not safe YAML: a disallowed construct, or a structure "
+        "nested too deeply to parse safely.",
+        "remove custom YAML tags and flatten deep nesting; regenerate the profile from "
+        "`agentce init`.",
+    ),
+    "input.domain_binding_invalid": Entry(
+        "error",
+        "the domain binding is not safe YAML: a disallowed construct, or a structure nested too "
+        "deeply to parse safely.",
+        "remove custom YAML tags and flatten deep nesting in the domain binding file.",
+    ),
+    "input.event_structure_too_deep": Entry(
+        "error",
+        "an evidence event line is nested too deeply to parse safely.",
+        "flatten the event's structure; reference deeply nested content by an opaque locator "
+        "instead (SPEC R12).",
+    ),
     "input.catalog_missing": Entry(
         "error",
         "assess was given no catalog to evaluate and the profile declares none.",

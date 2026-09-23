@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import yaml
+from .safe_yaml import load_untrusted_yaml
 
 DECISION_ROOT = "agentce:Decision"
 CONTEXT_ROOT = "agentce:ContextItem"
@@ -57,7 +57,12 @@ class DomainBinding:
 
     @classmethod
     def load(cls, path: Path) -> DomainBinding:
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        data = (
+            load_untrusted_yaml(
+                path, key="input.domain_binding_invalid", what="the domain binding"
+            )
+            or {}
+        )
         if not isinstance(data, dict):
             return cls.empty()
         return cls.from_dict(data)
