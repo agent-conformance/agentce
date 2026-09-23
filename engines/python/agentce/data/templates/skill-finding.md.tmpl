@@ -1,0 +1,45 @@
+# {{control}} — {{title}}
+
+- Outcome: {{outcome}} (severity: {{severity}}, rung {{rung}}, mode {{mode}})
+- Window: {{window.start}} .. {{window.end}}
+{{#clauses}}
+- Clause: `{{framework}} {{clause}}` ({{relation}}){{#verified_against_text}} — verified against the standard text{{/verified_against_text}}{{^verified_against_text}} — unverified against the standard text{{/verified_against_text}}
+{{/clauses}}
+{{#expectations}}
+- Expected: {{text}}
+{{/expectations}}
+
+## Evidence
+
+- Required: {{#evidence_gap.required}}`{{event}}`/{{class}} {{/evidence_gap.required}}
+- Observed: {{#evidence_gap.observed}}`{{event}}`/{{class}} {{/evidence_gap.observed}}
+- Missing: {{#evidence_gap.missing}}`{{event}}`/{{class}} {{/evidence_gap.missing}}
+{{#violations}}
+- Violation: {{constraint}} at `{{path}}` ({{message_key}})
+{{/violations}}
+{{#evidence}}
+- Evidence cited: `{{ref}}` ({{digest}})
+{{/evidence}}
+{{#tool_calls}}
+- Tool called: `{{.}}`
+{{/tool_calls}}
+
+## How to fix
+
+{{#remediation.techniques}}
+- Technique (`{{style}}`): `{{ref}}`
+{{/remediation.techniques}}
+
+## Acceptance
+
+- Expected transition: {{acceptance.expected_transition.from}} to {{acceptance.expected_transition.to}}
+- Criteria: {{acceptance.criteria}}
+- Re-verify command: see `REVERIFY.md` beside this note.
+
+## Guardrails ({{guardrails_ref}})
+
+Do not mark this finding resolved without re-running the command in `REVERIFY.md` and seeing it
+change this finding's outcome. Cite the clause above exactly as written, together with its
+verification status — never state or imply a clause is verified against the standard text unless it
+says so. Make the minimal change that satisfies the expectation text above; never fabricate or edit
+evidence.

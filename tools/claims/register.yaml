@@ -412,3 +412,12 @@ claims:
         hand-typed one-liners, and missing tabs each fail) and then checks the built site, where the tabs
         must equal what the switch renders and no built page may show the one-liner of an unpublished
         channel.
+  - id: skill.ide-sarif-viewer
+    text: >-
+      Reading a generated skill's findings through an IDE's SARIF viewer is planned and not yet built:
+      it depends on the SARIF code-scanning enrichment `results.sarif` does not yet carry; the
+      generated skill folder (`assess --emit skill`) and the canonical `--json` CLI are the extension
+      point today.
+    status: roadmap
+    pages:
+      - skills/README.md

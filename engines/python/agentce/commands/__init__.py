@@ -78,9 +78,16 @@ _log = get_logger()
 REPORT_FORMATS = ("md", "html", "oscal", "sarif", "public", "pack")
 #: Every token `assess --emit` accepts: the six `report --format` has always rendered one at a time,
 #: plus report.py's newer renderers (SPEC §9). Kept identical to `report.EMIT_FORMATS`; a test holds
-#: the two equal. `remediation` is assess-only (Appendix A2 (C)) -- deliberately not in
-#: `REPORT_FORMATS`, so `report --format` never accepts it.
-EMIT_FORMATS = REPORT_FORMATS + ("junit", "csv", "oscal_xml", "pdf", "remediation")
+#: the two equal. `remediation` and `skill` are assess-only (Appendix A2 (C)) -- deliberately not in
+#: `REPORT_FORMATS`, so `report --format` never accepts either.
+EMIT_FORMATS = REPORT_FORMATS + (
+    "junit",
+    "csv",
+    "oscal_xml",
+    "pdf",
+    "remediation",
+    "skill",
+)
 #: Where a command writes, or reads a project from, when the caller names no directory: the working
 #: directory for a project (``init``, ``doctor``) and ``./out`` for a run's output (``assess``,
 #: ``quickstart``), so the first command a newcomer types needs no flag.
