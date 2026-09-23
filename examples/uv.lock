@@ -46,10 +46,13 @@ version = "0.1.0"
 source = { editable = "../engines/python-emit" }
 
 [package.metadata]
+requires-dist = [{ name = "agentce-adapter-otel-genai", marker = "extra == 'otel'", editable = "../adapters/otel-genai" }]
+provides-extras = ["otel"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "agent-conformance", editable = "../engines/python" },
+    { name = "agentce-adapter-otel-genai", editable = "../adapters/otel-genai" },
     { name = "mypy", specifier = ">=1.11,<2" },
     { name = "pytest", specifier = ">=8,<9" },
     { name = "ruff", specifier = ">=0.6,<0.13" },
