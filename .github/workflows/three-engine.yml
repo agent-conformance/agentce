@@ -65,6 +65,26 @@ jobs:
         working-directory: conformance
         run: uv run --frozen python engine_docs_check.py --engines typescript,java
 
+  validate-schemas:
+    name: validate oscal-ar.json against the vendored NIST OSCAL 1.1.2 schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # oscal-ar.json is a canonical output, byte-identical across the three engines (the `compare`
+      # job above proves that once #13's widened comparator lands); validating the Python reference
+      # engine's copy against the real, vendored NIST schema therefore validates all three.
+      - name: Quickstart, then validate every artifact -- including oscal-ar.json against NIST 1.1.2
+        working-directory: engines/python
+        run: |
+          uv run --frozen agentce quickstart --out /tmp/validate-schemas-out
+          uv run --frozen agentce report --validate /tmp/validate-schemas-out
+
   numeric-temporal-edge-vectors:
     name: numeric and temporal edge vectors
     runs-on: ubuntu-latest
