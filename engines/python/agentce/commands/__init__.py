@@ -16,7 +16,9 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -37,7 +39,7 @@ from ..applicability import resolve as resolve_applicability
 from ..assess import assess_subjects, evaluated_nothing
 from ..bundle import load_bundle
 from ..catalog import Catalog, lint_catalog, load_catalog
-from ..collect import EnvSecretManager, load_config, run_collect
+from ..collect import EnvSecretManager, SourceSpec, load_config, run_collect
 from ..config import resolve as resolve_config
 from ..conformance import run_ecs
 from ..coverage import compute_coverage
@@ -69,7 +71,7 @@ from ..state import StateDir, window_end
 from ..result import CommandResult
 from ..store import GraphStore
 from .. import signing
-from ..canonical import canonicalize
+from ..canonical import canonical_string, canonicalize
 
 _log = get_logger()
 
@@ -797,6 +799,177 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
     return result
 
 
+def _adapt_export(
+    adapters_root: Path,
+    adapter: str,
+    export_path: Path,
+    *,
+    subject: str,
+    source_class: str,
+    source: str | None = None,
+    engine: str | None = None,
+) -> list[dict[str, Any]]:
+    """Adapt ``export_path`` through ``adapter``, in that adapter's own environment.
+
+    Every v1 adapter package shares the name ``agentce_adapters``, so it cannot be imported directly
+    alongside another; this shells out to ``adapters/_ingest.py`` in the adapter's own ``uv`` project,
+    mirroring the engine conformance suite's own subprocess pattern for the identical reason.
+    """
+    adapter_dir = adapters_root / adapter
+    if not adapter_dir.is_dir():
+        raise InputError(
+            "input.adapter_not_found",
+            f"no adapter directory at {adapter_dir}.",
+            "pass --adapters-root pointing at the adapters checkout, or check the adapter name.",
+        )
+    script = adapters_root / "_ingest.py"
+    cmd = [
+        "uv",
+        "run",
+        "--project",
+        str(adapter_dir),
+        "--frozen",
+        "--quiet",
+        "python",
+        str(script),
+        str(adapter_dir),
+        str(export_path),
+        "--subject",
+        subject,
+        "--source-class",
+        source_class,
+    ]
+    if source:
+        cmd += ["--source", source]
+    if engine:
+        cmd += ["--engine", engine]
+    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    if proc.returncode != 0:
+        raise InputError(
+            "input.ingest_failed",
+            f"adapter {adapter!r} could not adapt {export_path}: "
+            f"{(proc.stderr or proc.stdout).strip()[-400:]}",
+            "check the export file matches the adapter's expected shape.",
+        )
+    try:
+        payload = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise InputError(
+            "input.ingest_failed",
+            f"adapter {adapter!r} printed a non-JSON result for {export_path}: {exc}.",
+            "check the export file matches the adapter's expected shape.",
+        ) from exc
+    if "error" in payload:
+        raise InputError(
+            "input.ingest_failed",
+            f"adapter {adapter!r}: {payload['error']}",
+            "check the export file matches the adapter's expected shape.",
+        )
+    return list(payload["events"])
+
+
+def _write_event_bundle(
+    out_dir: Path, events: list[dict[str, Any]], *, adapter: str
+) -> None:
+    """Write ``events`` to an evidence bundle at ``out_dir`` (``events/*.jsonl`` + ``manifest.json``)."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    events_dir = out_dir / "events"
+    events_dir.mkdir(exist_ok=True)
+    stream = events_dir / "stream.jsonl"
+    stream.write_text(
+        "".join(canonical_string(event) + "\n" for event in events), encoding="utf-8"
+    )
+    digest = hashlib.sha256(stream.read_bytes()).hexdigest()
+    source_classes = {
+        str(event["source"]): str(event["agentcesourceclass"]) for event in events
+    }
+    manifest = {
+        "agentce_bundle_version": 1,
+        "sources": [
+            {"id": source, "adapter": adapter, "class": cls}
+            for source, cls in sorted(source_classes.items())
+        ],
+        "files": [{"path": "events/stream.jsonl", "sha256": digest}],
+    }
+    (out_dir / "manifest.json").write_text(
+        json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def cmd_ingest(ns: argparse.Namespace) -> CommandResult:
+    result = CommandResult(command="ingest")
+    in_path = _require_file(
+        _opt_str(ns, "in_path"), key="in", what="the adapter export file"
+    )
+    out = _opt_str(ns, "out")
+    if not out:
+        raise InputError(
+            "input.out_missing",
+            "ingest needs an output bundle path.",
+            "pass --out <bundle>.",
+        )
+    adapter = _opt_str(ns, "adapter")
+    if not adapter:
+        raise InputError(
+            "input.adapter_missing",
+            "ingest needs an adapter.",
+            "pass --adapter, e.g. --adapter otel-genai.",
+        )
+    adapters_root = Path(_opt_str(ns, "adapters_root") or "adapters")
+    subject = _opt_str(ns, "subject") or DEFAULT_SUBJECT
+    source_class = _opt_str(ns, "source_class") or "self_report"
+    source = _opt_str(ns, "source")
+    engine = _opt_str(ns, "engine")
+
+    events = _adapt_export(
+        adapters_root,
+        adapter,
+        in_path,
+        subject=subject,
+        source_class=source_class,
+        source=source,
+        engine=engine,
+    )
+    if not events:
+        raise InputError(
+            "input.ingest_empty",
+            f"adapter {adapter!r} produced no events from {in_path}.",
+            "check the export file actually contains records the adapter recognizes.",
+        )
+    out_dir = Path(out)
+    _write_event_bundle(out_dir, events, adapter=adapter)
+    result.data.update(
+        {
+            "in": str(in_path),
+            "out": str(out_dir),
+            "adapter": adapter,
+            "events": len(events),
+        }
+    )
+    result.note(
+        f"ingested {len(events)} event(s) from {in_path} via {adapter} into {out_dir}"
+    )
+    return result
+
+
+@dataclass
+class _SubprocessExportAdapter:
+    """The engine's ``ExportAdapter`` (SPEC §5.4): runs a source's named adapter as a subprocess."""
+
+    adapters_root: Path
+
+    def adapt(self, source: SourceSpec, export_path: Path) -> list[dict[str, Any]]:
+        return _adapt_export(
+            self.adapters_root,
+            source.adapter,
+            export_path,
+            subject=source.subject or DEFAULT_SUBJECT,
+            source_class=source.source_class or "self_report",
+            source=source.id,
+            engine=source.engine,
+        )
+
+
 def cmd_collect(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="collect")
     config_path = _require_file(
@@ -811,11 +984,13 @@ def cmd_collect(ns: argparse.Namespace) -> CommandResult:
             "pass --out <bundle>, or --dry-run to plan only.",
         )
     config = load_config(config_path)
+    adapters_root = Path(_opt_str(ns, "adapters_root") or "adapters")
     outcome = run_collect(
         config,
         out_dir=Path(out) if out else None,
         dry_run=dry_run,
         secret_manager=EnvSecretManager(),
+        export_adapter=None if dry_run else _SubprocessExportAdapter(adapters_root),
     )
     result.data.update({"config": str(config_path), "dry_run": dry_run})
     if out is not None:
@@ -828,13 +1003,16 @@ def cmd_collect(ns: argparse.Namespace) -> CommandResult:
             "no credentials resolved"
         )
     else:
+        complete_count = sum(
+            1 for s in outcome.report["sources"] if s.get("completeness") == "complete"
+        )
         incomplete = sum(
             1
             for s in outcome.report["sources"]
             if s.get("completeness") == "incomplete"
         )
         result.note(
-            f"collected 0 of {len(config.sources)} source(s); {incomplete} incomplete"
+            f"collected {complete_count} of {len(config.sources)} source(s); {incomplete} incomplete"
         )
     if not outcome.complete:
         result.add_code(int(ExitCode.FINDINGS))

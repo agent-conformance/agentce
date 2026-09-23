@@ -383,6 +383,120 @@ def test_collect_dry_run(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> 
     assert (tmp_path / "b" / "manifest.json").is_file()
 
 
+def _fake_adapter_run(events: list[dict[str, Any]]) -> Callable[..., Any]:
+    def fake_run(cmd: list[str], **_kwargs: Any) -> Any:
+        import subprocess as _subprocess
+
+        return _subprocess.CompletedProcess(
+            args=cmd, returncode=0, stdout=json.dumps({"events": events}), stderr=""
+        )
+
+    return fake_run
+
+
+def test_ingest_writes_a_bundle_validate_accepts(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from agentce import commands
+
+    export = tmp_path / "export.json"
+    export.write_text("{}", encoding="utf-8")
+    event = {
+        "@context": "https://agent-conformance.org/contexts/evidence/v1",
+        "source": "urn:otel:credit-underwriter",
+        "agentcesourceclass": "self_report",
+    }
+    monkeypatch.setattr(commands.subprocess, "run", _fake_adapter_run([event]))
+    out = tmp_path / "bundle"
+    code, env = run(
+        [
+            "ingest",
+            "--in",
+            str(export),
+            "--out",
+            str(out),
+            "--adapter",
+            "otel-genai",
+            "--adapters-root",
+            str(_REPO_ROOT / "adapters"),
+            "--json",
+        ],
+        capsys,
+    )
+    assert code == 0
+    assert env["events"] == 1
+    assert (out / "manifest.json").is_file()
+    assert (out / "events" / "stream.jsonl").is_file()
+
+
+def test_ingest_missing_adapter_is_input_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    export = tmp_path / "export.json"
+    export.write_text("{}", encoding="utf-8")
+    code, env = run(
+        ["ingest", "--in", str(export), "--out", str(tmp_path / "b"), "--json"], capsys
+    )
+    assert code == 3
+    assert env["error"]["key"] == "input.adapter_missing"
+
+
+def test_ingest_unknown_adapter_directory_is_input_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    export = tmp_path / "export.json"
+    export.write_text("{}", encoding="utf-8")
+    code, env = run(
+        [
+            "ingest",
+            "--in",
+            str(export),
+            "--out",
+            str(tmp_path / "b"),
+            "--adapter",
+            "no-such-adapter",
+            "--adapters-root",
+            str(tmp_path / "adapters"),
+            "--json",
+        ],
+        capsys,
+    )
+    assert code == 3
+    assert env["error"]["key"] == "input.adapter_not_found"
+
+
+def test_collect_real_run_completes_a_source_with_an_export(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from agentce import commands
+
+    export = tmp_path / "export.json"
+    export.write_text("{}", encoding="utf-8")
+    event = {"source": "urn:otel:x", "agentcesourceclass": "self_report"}
+    monkeypatch.setattr(commands.subprocess, "run", _fake_adapter_run([event]))
+    cfg = tmp_path / "collect.yaml"
+    cfg.write_text(
+        "job:\n  id: job-1\n  principal: spiffe://corp/jobs/c\n"
+        f"sources:\n  - id: urn:otel:x\n    adapter: otel-genai\n    export: {export}\n",
+        encoding="utf-8",
+    )
+    code, env = run(
+        [
+            "collect",
+            "--config",
+            str(cfg),
+            "--out",
+            str(tmp_path / "b"),
+            "--adapters-root",
+            str(_REPO_ROOT / "adapters"),
+            "--json",
+        ],
+        capsys,
+    )
+    assert code == 0
+    assert all(s["completeness"] == "complete" for s in env["sources"])
+
+
 def test_catalog_no_action(capsys: pytest.CaptureFixture[str]) -> None:
     code, env = run(["catalog", "--json"], capsys)
     assert code == 3

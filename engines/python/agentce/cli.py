@@ -158,12 +158,15 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser(
         "collect",
         parents=[common],
-        help="plan a scheduled collection job; no source connector exists yet",
+        help="run a scheduled collection job over sources with a local export, or plan one",
         description=(
-            "Plan a scheduled collection job from a config. --dry-run lists what would be collected "
-            "and resolves no credential. A real run has no source connector yet (on the roadmap): "
-            "it records every source incomplete, reason 'no source connector in the reference "
-            "collector', and exits 1. To get evidence into a bundle today, emit it with agentce-emit."
+            "Plan or run a scheduled collection job from a config. --dry-run lists what would be "
+            "collected and resolves no credential. A real run adapts every source that names a local "
+            "export (already written by its own pipeline, e.g. an OTel Collector's file exporter, "
+            "SPEC 5.4) and records it complete; a source with no export, or whose export cannot be "
+            "adapted, is recorded incomplete, reason 'no source connector in the reference collector', "
+            "and the run exits 1. To get evidence into a bundle today without a config, emit it with "
+            "agentce-emit, or adapt one export file directly with `agentce ingest`."
         ),
     )
     p.add_argument("--config", help="the collection config file")
@@ -174,7 +177,46 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="plan only; write nothing",
     )
+    p.add_argument(
+        "--adapters-root",
+        dest="adapters_root",
+        help="the adapters checkout a source's `export` is resolved through (default: ./adapters)",
+    )
     p.set_defaults(func=commands.cmd_collect)
+
+    p = sub.add_parser(
+        "ingest",
+        parents=[common],
+        help="adapt a real adapter export into an evidence bundle",
+        description=(
+            "Turn an already-exported adapter payload (e.g. an OTLP/JSON trace export, or one an "
+            "OTel Collector's file exporter wrote, SPEC 5.4) into an evidence bundle `agentce "
+            "validate` accepts -- no live collect connector needed."
+        ),
+    )
+    p.add_argument("--in", dest="in_path", help="the adapter export file")
+    p.add_argument("--out", help="the output bundle directory")
+    p.add_argument("--adapter", help="the adapter to use, e.g. otel-genai")
+    p.add_argument(
+        "--adapters-root",
+        dest="adapters_root",
+        help="the adapters checkout (default: ./adapters)",
+    )
+    p.add_argument(
+        "--subject",
+        help="the assessed subject id (default: agentce:subject/local)",
+    )
+    p.add_argument(
+        "--source-class",
+        dest="source_class",
+        help="self_report | enforcement_point | independent_system (default: self_report)",
+    )
+    p.add_argument("--source", help="override the per-event source URI")
+    p.add_argument(
+        "--engine",
+        help="the underlying engine, for adapters that need one (e.g. policy-engines)",
+    )
+    p.set_defaults(func=commands.cmd_ingest)
 
     p = sub.add_parser("catalog", parents=[common], help="catalog tools")
     csub = p.add_subparsers(dest="catalog_action", metavar="<action>")
