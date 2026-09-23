@@ -24,6 +24,7 @@ _TREES: list[tuple[Path, Path]] = [
     ),
     (bundled.quickstart_dir(), _REPO_ROOT / "corpus" / "quickstart"),
     (bundled.templates_dir(), _REPO_ROOT / "spec" / "report" / "templates"),
+    (bundled.i18n_dir(), _REPO_ROOT / "spec" / "i18n"),
 ]
 
 

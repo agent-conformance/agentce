@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from . import i18n_format
 from .assertions import Assertion, aggregate
 
 #: A control failed for at least one subject.
@@ -60,7 +61,7 @@ def gap_text(gap: dict[str, Any], catalogue: dict[str, str]) -> str:
     label = catalogue.get(f"outcome.{gap['outcome']}", gap["outcome"])
     text = f"{label}: {', '.join(gap['controls'])}"
     if gap["more"]:
-        text += f" ({catalogue['report.gaps_more'].replace('{n}', str(gap['more']))})"
+        text += f" ({i18n_format.format_message(catalogue['report.gaps_more'], n=gap['more'])})"
     return text
 
 
@@ -86,6 +87,6 @@ def cli_lines(
         )
     lines.append(
         f"{catalogue['report.next_step_heading']}: {catalogue[f'next.{verdict}']} "
-        + catalogue["report.see_report"].replace("{dir}", report_dir)
+        + i18n_format.format_message(catalogue["report.see_report"], dir=report_dir)
     )
     return lines
