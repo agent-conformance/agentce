@@ -402,6 +402,7 @@ function runAssess(options: AssessOptions): CommandResult {
   writeReport(out, evaluated, {
     bundleDigest: bundle.digest,
     catalogs: catalogLabels,
+    catalogObjects: catalogs,
     operator: process.env.AGENTCE_OPERATOR ?? "unknown",
     invocation: [options.invocationCommand, scrubPath(bundleDir), scrubPath(profilePath)],
     supersedes,
