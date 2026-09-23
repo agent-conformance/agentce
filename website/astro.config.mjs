@@ -15,6 +15,22 @@ export default defineConfig({
       description:
         'A deterministic, model-free, vendor-neutral standard for assessing how AI agents behave — with reproducible evidence.',
       customCss: ['./src/styles/tokens.css'],
+      // English is the single normative language (SPEC) and the only complete content today; the other
+      // eight are declared so Starlight's own i18n routing exists (per-locale pages, lang/hreflang
+      // metadata, a localized sitemap) and falls back to English content page-by-page until a community
+      // translation lands with reviewer sign-off. No machine translation ships as part of declaring them.
+      defaultLocale: 'root',
+      locales: {
+        root: { label: 'English', lang: 'en' },
+        es: { label: 'Español', lang: 'es' },
+        fr: { label: 'Français', lang: 'fr' },
+        ja: { label: '日本語', lang: 'ja' },
+        'zh-hans': { label: '简体中文', lang: 'zh-Hans' },
+        pl: { label: 'Polski', lang: 'pl' },
+        'pt-br': { label: 'Português do Brasil', lang: 'pt-BR' },
+        uk: { label: 'Українська', lang: 'uk' },
+        ru: { label: 'Русский', lang: 'ru' },
+      },
       social: [
         {
           icon: 'github',
