@@ -136,7 +136,6 @@ def render_report_md(
     summary = verdict.summarize(assertions)
     lines = [f"# {cat['report.title']}", ""]
     lines += _verdict_md(summary, cat)
-    lines += _provenance_md(catalogs or [], invocation)
     lines += [f"## {cat['report.summary_heading']}", ""]
     lines += [
         f"- {_outcome_label(cat, outcome)}: {count}"
@@ -150,6 +149,7 @@ def render_report_md(
             f"- `{a.control}` @ `{a.subject}` -> **{_outcome_label(cat, a.outcome)}** "
             f"(rung {a.rung}, {a.mode}; {a.population[1]}/{a.population[0]} failed)"
         )
+    lines += [""] + _provenance_md(catalogs or [], invocation)
     return "\n".join(lines) + "\n"
 
 
@@ -210,7 +210,6 @@ def render_report_html(
         f"<title>{title}</title><style>{_HTML_STYLE}</style></head><body>"
         f"<main><h1>{title}</h1>"
         f"{_verdict_html(verdict.summarize(assertions), cat)}"
-        f"{_provenance_html(catalogs or [], invocation)}"
         f'<section aria-labelledby="summary"><h2 id="summary">'
         f"{html.escape(cat['report.summary_heading'])}</h2><ul>{summary}</ul></section>"
         f'<section aria-labelledby="assertions"><h2 id="assertions">'
@@ -219,6 +218,7 @@ def render_report_html(
         '<thead><tr><th scope="col">Control</th><th scope="col">Subject</th>'
         '<th scope="col">Outcome</th></tr></thead>'
         f"<tbody>{body_rows}</tbody></table></section>"
+        f"{_provenance_html(catalogs or [], invocation)}"
         f"<footer><p>{html.escape(cat['report.affected_persons'])}</p></footer>"
         "</main></body></html>\n"
     )
