@@ -2,16 +2,20 @@
 
 How to make an AI-agent deployment emit canonical AgentCE evidence. This guide's snippets are taken
 from `examples/` (SPEC §13.4 AX-7); every `examples/<style>/` is a runnable script that produces a
-bundle `agentce validate` accepts with zero quarantines. None of them imports an agent framework: see
-[Run an example](#run-an-example).
+bundle `agentce validate` accepts with zero quarantines. Five of them really import and run their named
+framework end to end; see [Run an example](#run-an-example).
 
 ## One line to set up the emitter (SPEC §13.4 AX-3)
 
 Create the emitter with a single call. It is a no-op until you switch it on with `AGENTCE_EMIT=1`, so
-it never changes what the agent does until you want evidence. That call only returns the emitter: it
-does not hook LangGraph, the OpenAI Agents SDK, CrewAI, Google ADK, or the Claude Agent SDK, so an agent
-that calls it and nothing else emits no events. Capturing evidence automatically from those frameworks
-is on the roadmap and is not built; today you emit at each chokepoint yourself.
+it never changes what the agent does until you want evidence. That call alone hooks nothing: an agent
+that calls it and nothing else emits no events. Two ways to fill that in exist today. Emit at each
+chokepoint yourself (below) — every framework example under `examples/` does this, each from its own
+callback or event hook that turns that framework's real payloads into `emit_*` calls. Or, for a
+framework that already produces OTel-shaped spans, register `agentce_emit.instrument()`'s
+`AgentCESpanProcessor` with its tracer so those spans become events through the existing `otel-genai`
+mapping, without writing a chokepoint-by-chokepoint hook yourself. Fully automatic capture from the one
+line alone, with no per-framework wiring at all, is on the roadmap and is not built.
 
 ```python
 import agentce_emit
@@ -43,11 +47,13 @@ agentce validate --bundle evidence
 
 ## Run an example
 
-Each `examples/<style>/run.sh <bundle-dir>` runs a scripted example and writes a bundle. The examples
-are named for an implementation style, but none of them imports or runs that framework: each is the
-same framework-free scenario, emitting through `agentce_emit` the evidence an agent of that style would
-produce, and the framework-specific capture is on the roadmap. `examples/custom-loop` has no framework to
-import by design.
+Each `examples/<style>/run.sh <bundle-dir>` runs a scripted example and writes a bundle. Five of the six
+are named for an implementation style and really import and run that framework end to end, offline and
+keyless against a scripted deterministic model or transport, each in its own environment with the
+framework's own dependencies; the events in the bundle come from that framework's real callback data.
+`examples/custom-loop` has no framework to import by design and emits through `agentce_emit` the
+evidence a hand-rolled agent of that style would produce; fully automatic, zero-wiring capture for any
+of the styles is on the roadmap.
 
 ```bash
 examples/langgraph/run.sh /tmp/bundle
