@@ -330,6 +330,191 @@ jobs:
           sys.exit(0)
           PY
           exit $?
+      - name: A conformant-is-not-certified disclaimer appears near the hero
+        run: |
+          set -u
+
+          # Fresh-clone-safe bootstrap (same pattern as the preceding steps): node_modules is
+          # gitignored and populated here from the local pnpm content-addressable store with
+          # --offline (no network). A setup/build failure here is never the defect this check
+          # exists to find, so it gets its own exit code (3), distinct from both the defect's
+          # exit (1) and GREEN's exit (0).
+          rm -rf website/dist
+          pnpm install --offline --frozen-lockfile
+          install_exit=$?
+          if [ "$install_exit" -ne 0 ]; then
+            echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          pnpm -C website build
+          build_exit=$?
+          if [ "$build_exit" -ne 0 ]; then
+            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          python3 - "website/dist/index.html" <<'PY'
+          import re, sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          if not path.is_file():
+              print(f"{path}: not found -- build did not produce it (setup problem)", file=sys.stderr)
+              sys.exit(3)
+          html = path.read_text(encoding="utf-8")
+
+          # The hero is the first <section> in the rendered page -- true across every one of
+          # Appendix A3's three redesign options, none of which relocates the hero or drops
+          # <section> as its wrapper. "Near the hero" is operationalized as the hero section plus
+          # the section immediately after it.
+          sections = re.findall(r"<section\b.*?</section>", html, re.S | re.I)
+          if not sections:
+              print("no <section> elements found in the rendered page -- structure changed more than expected", file=sys.stderr)
+              sys.exit(3)
+
+          hero = sections[0]
+          zone = hero + (sections[1] if len(sections) > 1 else "")
+
+          def text_of(block):
+              return re.sub(r"<[^>]+>", " ", block)
+
+          zone_text = text_of(zone)
+          disclaimer = re.search(r"conform\w*.{0,80}certif\w*|certif\w*.{0,80}conform\w*", zone_text, re.I | re.S)
+          if not disclaimer:
+              print(
+                  "RED: no 'conformant is not certified'-style disclaimer found near the hero "
+                  "(no text within the hero section or the section immediately after it ties a "
+                  "'conform...' root to a 'certif...' root within 80 characters)",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          print("GREEN: a conformant-is-not-certified disclaimer is present near the hero")
+          sys.exit(0)
+          PY
+          exit $?
+      - name: The hero names its audience (build, buy, audit)
+        run: |
+          set -u
+
+          rm -rf website/dist
+          pnpm install --offline --frozen-lockfile
+          install_exit=$?
+          if [ "$install_exit" -ne 0 ]; then
+            echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          pnpm -C website build
+          build_exit=$?
+          if [ "$build_exit" -ne 0 ]; then
+            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          python3 - "website/dist/index.html" <<'PY'
+          import re, sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          if not path.is_file():
+              print(f"{path}: not found -- build did not produce it (setup problem)", file=sys.stderr)
+              sys.exit(3)
+          html = path.read_text(encoding="utf-8")
+
+          sections = re.findall(r"<section\b.*?</section>", html, re.S | re.I)
+          if not sections:
+              print("no <section> elements found in the rendered page -- structure changed more than expected", file=sys.stderr)
+              sys.exit(3)
+
+          hero = sections[0]
+
+          def text_of(block):
+              return re.sub(r"<[^>]+>", " ", block)
+
+          hero_text = text_of(hero)
+          required = ["build", "buy", "audit"]
+          missing = [w for w in required if not re.search(rf"\b{w}\b", hero_text, re.I)]
+          if missing:
+              print(
+                  f"RED: the hero never names the audience -- missing whole-word terms {missing} "
+                  f"(want all of {required}, naming the build/buy/audit audience)",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          print("GREEN: the hero names its audience (build/buy/audit all present)")
+          sys.exit(0)
+          PY
+          exit $?
+      - name: Hero headline and subhead stay within their word limits
+        run: |
+          set -u
+
+          rm -rf website/dist
+          pnpm install --offline --frozen-lockfile
+          install_exit=$?
+          if [ "$install_exit" -ne 0 ]; then
+            echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          pnpm -C website build
+          build_exit=$?
+          if [ "$build_exit" -ne 0 ]; then
+            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          python3 - "website/dist/index.html" <<'PY'
+          import re, sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          if not path.is_file():
+              print(f"{path}: not found -- build did not produce it (setup problem)", file=sys.stderr)
+              sys.exit(3)
+          html = path.read_text(encoding="utf-8")
+
+          sections = re.findall(r"<section\b.*?</section>", html, re.S | re.I)
+          if not sections:
+              print("no <section> elements found in the rendered page -- structure changed more than expected", file=sys.stderr)
+              sys.exit(3)
+
+          hero = sections[0]
+
+          # "The headline" and "the subhead" are located structurally: the page's sole <h1>
+          # (scripts/check-site.mjs already requires exactly one per page) and the first <p>
+          # immediately after it -- stable across a redesign that renames every class and id.
+          h1_match = re.search(r"<h1\b[^>]*>(.*?)</h1>", hero, re.S | re.I)
+          if not h1_match:
+              print("no <h1> found inside the hero section -- structure changed more than expected", file=sys.stderr)
+              sys.exit(3)
+          headline_text = re.sub(r"<[^>]+>", " ", h1_match.group(1)).strip()
+          headline_words = headline_text.split()
+
+          after_h1 = hero[h1_match.end():]
+          p_match = re.search(r"<p\b[^>]*>(.*?)</p>", after_h1, re.S | re.I)
+          if not p_match:
+              print("no <p> found after the hero <h1> -- cannot locate the subhead", file=sys.stderr)
+              sys.exit(3)
+          subhead_text = re.sub(r"<[^>]+>", " ", p_match.group(1)).strip()
+          subhead_words = subhead_text.split()
+
+          problems = []
+          if len(headline_words) > 10:
+              problems.append(f"headline is {len(headline_words)} words (limit 10): {' '.join(headline_words)!r}")
+          if len(subhead_words) > 25:
+              problems.append(f"subhead is {len(subhead_words)} words (limit 25): {' '.join(subhead_words)!r}")
+
+          if problems:
+              print("RED:", file=sys.stderr)
+              for p in problems:
+                  print(f"  {p}", file=sys.stderr)
+              sys.exit(1)
+          print(f"GREEN: headline is {len(headline_words)} words (<=10), subhead is {len(subhead_words)} words (<=25)")
+          sys.exit(0)
+          PY
+          exit $?
 
   docs-doctest:
     runs-on: ubuntu-latest
