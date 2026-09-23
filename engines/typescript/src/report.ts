@@ -15,6 +15,7 @@ import { arch, platform } from "node:os";
 import { dirname, join } from "node:path";
 import { type Assertion, aggregate, assertionToJson, checkDc5 } from "./assertions";
 import { canonicalize } from "./canonical";
+import { DEFAULT_LANGUAGE, catalogue } from "./messages";
 import { byteCompare, sortKeysDeep } from "./util";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
@@ -63,14 +64,37 @@ function bySubjectControl(a: Assertion, b: Assertion): number {
   return byteCompare(a.subject, b.subject) || byteCompare(a.control, b.control);
 }
 
-export function renderReportMd(assertions: Assertion[], counts: Record<string, number>): string {
-  const lines = ["# AgentCE conformance report", "", "## Outcome summary", ""];
+/** Escape a string for safe interpolation into HTML text or attribute content. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
+//: A self-contained stylesheet (no external references), mirroring the Python/Java renderers.
+const HTML_STYLE =
+  "body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}" +
+  "h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}" +
+  "table{border-collapse:collapse;width:100%}" +
+  "th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}" +
+  "th{background:#f0f0f0}";
+
+export function renderReportMd(
+  assertions: Assertion[],
+  counts: Record<string, number>,
+  language: string = DEFAULT_LANGUAGE,
+): string {
+  const cat = catalogue(language);
+  const lines = [`# ${cat["report.title"]}`, "", `## ${cat["report.summary_heading"]}`, ""];
   for (const [outcome, count] of Object.entries(counts)) {
     lines.push(`- ${outcome}: ${count}`);
   }
-  lines.push("", "## Assertions", "");
+  lines.push("", `## ${cat["report.assertions_heading"]}`, "");
   if (assertions.length === 0) {
-    lines.push("_No controls were evaluated._");
+    lines.push(`_${cat["report.no_controls"]}_`);
   }
   for (const a of [...assertions].sort(bySubjectControl)) {
     lines.push(
@@ -81,15 +105,31 @@ export function renderReportMd(assertions: Assertion[], counts: Record<string, n
   return `${lines.join("\n")}\n`;
 }
 
-export function renderReportHtml(assertions: Assertion[], counts: Record<string, number>): string {
+/** Render a self-contained, escaped, WCAG 2.2 AA report page (SPEC §9.3): a strict CSP meta tag, no
+ * external references, one `h1`, a `main` landmark, and every catalog- or evidence-derived string
+ * rendered as escaped text, never as markup. */
+export function renderReportHtml(
+  assertions: Assertion[],
+  counts: Record<string, number>,
+  language: string = DEFAULT_LANGUAGE,
+): string {
+  const cat = catalogue(language);
+  const title = escapeHtml(cat["report.title"] as string);
   const summary = Object.entries(counts)
-    .map(([o, c]) => `<li>${o}: ${c}</li>`)
+    .map(([o, c]) => `<li>${escapeHtml(o)}: ${c}</li>`)
     .join("");
   const rows = [...assertions]
     .sort(bySubjectControl)
-    .map((a) => `<tr><td>${a.control}</td><td>${a.subject}</td><td>${a.outcome}</td></tr>`)
+    .map(
+      (a) =>
+        `<tr><td>${escapeHtml(a.control)}</td><td>${escapeHtml(a.subject)}</td>` +
+        `<td>${escapeHtml(a.outcome)}</td></tr>`,
+    )
     .join("");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>AgentCE conformance report</title></head><body><h1>AgentCE conformance report</h1><h2>Outcome summary</h2><ul>${summary}</ul><h2>Assertions</h2><table><tr><th>Control</th><th>Subject</th><th>Outcome</th></tr>${rows}</table></body></html>\n`;
+  const bodyRows =
+    rows || `<tr><td colspan="3">${escapeHtml(cat["report.no_controls"] as string)}</td></tr>`;
+  const csp = "default-src 'none'; style-src 'unsafe-inline'; img-src 'none'";
+  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${csp}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1><section aria-labelledby="summary"><h2 id="summary">${escapeHtml(cat["report.summary_heading"] as string)}</h2><ul>${summary}</ul></section><section aria-labelledby="assertions"><h2 id="assertions">${escapeHtml(cat["report.assertions_heading"] as string)}</h2><table><tr><th>Control</th><th>Subject</th><th>Outcome</th></tr>${bodyRows}</table></section></main></body></html>\n`;
 }
 
 export function renderOscal(assertions: Assertion[]): Record<string, unknown> {
@@ -167,6 +207,7 @@ export interface ManifestOptions {
   operator: string;
   invocation: string[];
   supersedes: string[];
+  reportLanguage?: string;
 }
 
 export function buildManifest(options: ManifestOptions): Record<string, unknown> {
@@ -193,6 +234,7 @@ export function buildManifest(options: ManifestOptions): Record<string, unknown>
       operator: options.operator,
       host_fingerprint: `sha256:${host}`,
       invocation: options.invocation,
+      report_language: options.reportLanguage ?? DEFAULT_LANGUAGE,
     },
   };
   if (options.supersedes.length > 0) {
@@ -207,6 +249,7 @@ export interface WriteReportOptions {
   operator?: string;
   invocation?: string[];
   supersedes?: string[];
+  reportLanguage?: string;
 }
 
 /** Write every report artifact for `assertions` and return the reproducibility manifest. */
@@ -230,10 +273,11 @@ export function writeReport(
     outputs[name] = digestBytes(data);
   };
 
+  const language = options.reportLanguage ?? DEFAULT_LANGUAGE;
   const counts = aggregate(assertions);
   writeJson("assertions.json", assertions.map(assertionToJson));
-  writeTextFile("report.md", renderReportMd(assertions, counts));
-  writeTextFile("report.html", renderReportHtml(assertions, counts));
+  writeTextFile("report.md", renderReportMd(assertions, counts, language));
+  writeTextFile("report.html", renderReportHtml(assertions, counts, language));
   writeJson("oscal-ar.json", renderOscal(assertions));
   writeJson("results.sarif", renderSarif(assertions));
 
@@ -258,6 +302,7 @@ export function writeReport(
     operator: options.operator ?? "unknown",
     invocation: options.invocation ?? [],
     supersedes: options.supersedes ?? [],
+    reportLanguage: language,
   });
   writeFileSync(join(outDir, "manifest.json"), JSON.stringify(sortKeysDeep(manifest), null, 2));
   return manifest;
