@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>theme control — good fixture</title>
+    <script is="inline">
+      (() => {
+        try {
+          const stored = localStorage.getItem('starlight-theme');
+          const theme = stored === 'light' || stored === 'dark' ? stored : 'dark';
+          document.documentElement.dataset.theme = theme;
+        } catch (e) {
+          /* ignore */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <select id="theme-select" aria-label="Theme">
+      <option value="dark">Dark</option>
+      <option value="light">Light</option>
+      <option value="auto" selected>Auto</option>
+    </select>
+    <a id="next" href="page2.html">Next page</a>
+    <script is="inline">
+      (() => {
+        const KEY = 'starlight-theme';
+        const parse = (v) => (v === 'dark' || v === 'light' ? v : 'auto');
+        const stored = () => {
+          try {
+            return parse(localStorage.getItem(KEY));
+          } catch (e) {
+            return 'auto';
+          }
+        };
+        const resolve = (theme) => (theme === 'auto' ? 'dark' : theme);
+        const apply = (theme) => {
+          document.documentElement.dataset.theme = resolve(theme);
+        };
+        const store = (theme) => {
+          try {
+            localStorage.setItem(KEY, theme === 'light' || theme === 'dark' ? theme : '');
+          } catch (e) {
+            /* ignore */
+          }
+        };
+        apply(stored());
+        const select = document.getElementById('theme-select');
+        select.value = stored();
+        select.addEventListener('change', (e) => {
+          const theme = parse(e.currentTarget.value);
+          store(theme);
+          apply(theme);
+        });
+      })();
+    </script>
+  </body>
+</html>

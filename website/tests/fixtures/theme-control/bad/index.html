@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>theme control — bad fixture (present but disconnected)</title>
+    <script is="inline">
+      document.documentElement.dataset.theme = 'dark';
+    </script>
+  </head>
+  <body>
+    <!-- The control exists in markup, matching a structural check, but no script wires its
+         change event to localStorage or data-theme -- the negative case the contract names. -->
+    <select id="theme-select" aria-label="Theme">
+      <option value="dark">Dark</option>
+      <option value="light">Light</option>
+      <option value="auto" selected>Auto</option>
+    </select>
+    <a id="next" href="page2.html">Next page</a>
+  </body>
+</html>
