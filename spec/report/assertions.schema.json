@@ -14,7 +14,7 @@
     "assertion": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["control", "control_version", "subject", "outcome", "rung", "mode", "window", "population"],
+      "required": ["control", "control_version", "subject", "outcome", "rung", "mode", "window", "population", "severity", "family"],
       "properties": {
         "control": {"type": "string"},
         "control_version": {"type": "string"},
@@ -22,6 +22,8 @@
         "outcome": {"$ref": "#/$defs/outcome"},
         "rung": {"type": "integer", "minimum": 0, "maximum": 4},
         "mode": {"type": "string", "enum": ["automated", "semi-automated", "manual"]},
+        "severity": {"type": "string", "enum": ["low", "medium", "high"]},
+        "family": {"type": "string", "pattern": "^[A-Z]{2,4}$"},
         "window": {
           "type": "object",
           "additionalProperties": false,

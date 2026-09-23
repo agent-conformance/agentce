@@ -60,6 +60,8 @@ class Assertion:
     mode: str
     window: tuple[str, str]
     population: tuple[int, int]
+    severity: str
+    family: str
     expectations: list[dict[str, str]] = field(default_factory=list)
     violations: list[dict[str, str]] = field(default_factory=list)
     evidence: list[EvidencePointer] = field(default_factory=list)
@@ -81,6 +83,8 @@ class Assertion:
                 "applicable": self.population[0],
                 "failed": self.population[1],
             },
+            "severity": self.severity,
+            "family": self.family,
         }
         if self.expectations:
             record["expectations"] = self.expectations
@@ -116,6 +120,8 @@ class Assertion:
                 int(population.get("applicable", 0)),
                 int(population.get("failed", 0)),
             ),
+            severity=str(data.get("severity", "")),
+            family=str(data.get("family", "")),
             expectations=list(data.get("expectations", [])),
             violations=list(data.get("violations", [])),
             evidence=[EvidencePointer.from_json(e) for e in data.get("evidence", [])],

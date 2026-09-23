@@ -10,6 +10,7 @@
           "verified": false
         }
       ],
+      "family": "DAT",
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -17,6 +18,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -33,6 +35,7 @@
           "verified": false
         }
       ],
+      "family": "DAT",
       "mode": "semi-automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -40,6 +43,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -56,6 +60,7 @@
           "verified": false
         }
       ],
+      "family": "DAT",
       "mode": "semi-automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -63,6 +68,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -79,6 +85,7 @@
           "verified": false
         }
       ],
+      "family": "DAT",
       "mode": "manual",
       "outcome": "not_assessed",
       "population": {
@@ -86,6 +93,7 @@
         "failed": 0
       },
       "rung": 3,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -110,6 +118,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "DOC",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -117,6 +126,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "high",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -142,6 +152,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "DOC",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -149,6 +160,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -174,6 +186,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "DOC",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -181,6 +194,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -206,6 +220,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "DOC",
       "mode": "semi-automated",
       "outcome": "conformant",
       "population": {
@@ -213,6 +228,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -230,6 +246,7 @@
           "verified": false
         }
       ],
+      "family": "DOC",
       "mode": "manual",
       "outcome": "not_assessed",
       "population": {
@@ -237,6 +254,7 @@
         "failed": 0
       },
       "rung": 3,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -253,6 +271,7 @@
           "verified": false
         }
       ],
+      "family": "INC",
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -260,6 +279,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -281,6 +301,7 @@
           "verified": false
         }
       ],
+      "family": "INC",
       "mode": "automated",
       "outcome": "not_applicable",
       "population": {
@@ -288,6 +309,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "high",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -304,6 +326,7 @@
           "verified": false
         }
       ],
+      "family": "INC",
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -311,6 +334,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -335,6 +359,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "INC",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -342,6 +367,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "high",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -367,6 +393,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "INT",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -374,6 +401,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "high",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -399,6 +427,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "INT",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -406,6 +435,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "high",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -431,6 +461,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "INT",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -438,6 +469,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "high",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -463,6 +495,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "INT",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -470,6 +503,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "high",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -487,6 +521,7 @@
           "verified": false
         }
       ],
+      "family": "OVS",
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -494,6 +529,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -518,6 +554,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "OVS",
       "mode": "automated",
       "outcome": "non-conformant",
       "population": {
@@ -525,6 +562,7 @@
         "failed": 1
       },
       "rung": 2,
+      "severity": "high",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "violations": [
@@ -563,6 +601,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "OVS",
       "mode": "automated",
       "outcome": "non-conformant",
       "population": {
@@ -570,6 +609,7 @@
         "failed": 1
       },
       "rung": 2,
+      "severity": "high",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "violations": [
@@ -603,6 +643,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "OVS",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -610,6 +651,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "high",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -627,6 +669,7 @@
           "verified": false
         }
       ],
+      "family": "OVS",
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -634,6 +677,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -658,6 +702,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "OVS",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -665,6 +710,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "high",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -682,6 +728,7 @@
           "verified": false
         }
       ],
+      "family": "OVS",
       "mode": "semi-automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -689,6 +736,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -705,6 +753,7 @@
           "verified": false
         }
       ],
+      "family": "OVS",
       "mode": "semi-automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -712,6 +761,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -728,6 +778,7 @@
           "verified": false
         }
       ],
+      "family": "OVS",
       "mode": "manual",
       "outcome": "not_assessed",
       "population": {
@@ -735,6 +786,7 @@
         "failed": 0
       },
       "rung": 3,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -759,6 +811,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "REC",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -766,6 +819,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "high",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -791,6 +845,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "REC",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -798,6 +853,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -815,6 +871,7 @@
           "verified": false
         }
       ],
+      "family": "REC",
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -822,6 +879,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -851,6 +909,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "REC",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -858,6 +917,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -875,6 +935,7 @@
           "verified": false
         }
       ],
+      "family": "REC",
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -882,6 +943,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -906,6 +968,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "REC",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -913,6 +976,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "high",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -938,6 +1002,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "ROB",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -945,6 +1010,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "high",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -962,6 +1028,7 @@
           "verified": false
         }
       ],
+      "family": "ROB",
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -969,6 +1036,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -993,6 +1061,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "ROB",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -1000,6 +1069,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -1025,6 +1095,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "ROB",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -1032,6 +1103,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "high",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -1057,6 +1129,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "ROB",
       "mode": "semi-automated",
       "outcome": "conformant",
       "population": {
@@ -1064,6 +1137,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -1089,6 +1163,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "ROB",
       "mode": "semi-automated",
       "outcome": "conformant",
       "population": {
@@ -1096,6 +1171,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -1113,6 +1189,7 @@
           "verified": false
         }
       ],
+      "family": "ROB",
       "mode": "semi-automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -1120,6 +1197,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -1136,6 +1214,7 @@
           "verified": false
         }
       ],
+      "family": "RSK",
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -1143,6 +1222,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -1159,6 +1239,7 @@
           "verified": false
         }
       ],
+      "family": "RSK",
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -1166,6 +1247,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -1182,6 +1264,7 @@
           "verified": false
         }
       ],
+      "family": "RSK",
       "mode": "semi-automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -1189,6 +1272,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -1205,6 +1289,7 @@
           "verified": false
         }
       ],
+      "family": "RSK",
       "mode": "manual",
       "outcome": "not_assessed",
       "population": {
@@ -1212,6 +1297,7 @@
         "failed": 0
       },
       "rung": 3,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -1228,6 +1314,7 @@
           "verified": false
         }
       ],
+      "family": "RSK",
       "mode": "manual",
       "outcome": "not_assessed",
       "population": {
@@ -1235,6 +1322,7 @@
         "failed": 0
       },
       "rung": 3,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -1251,6 +1339,7 @@
           "verified": false
         }
       ],
+      "family": "TRN",
       "mode": "automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -1258,6 +1347,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -1282,6 +1372,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "TRN",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -1289,6 +1380,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "high",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -1306,6 +1398,7 @@
           "verified": false
         }
       ],
+      "family": "TRN",
       "mode": "semi-automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -1313,6 +1406,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -1337,6 +1431,7 @@
         }
       ],
       "evidence_strength": "strong",
+      "family": "TRN",
       "mode": "automated",
       "outcome": "conformant",
       "population": {
@@ -1344,6 +1439,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -1361,6 +1457,7 @@
           "verified": false
         }
       ],
+      "family": "TRN",
       "mode": "semi-automated",
       "outcome": "insufficient_evidence",
       "population": {
@@ -1368,6 +1465,7 @@
         "failed": 0
       },
       "rung": 2,
+      "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",

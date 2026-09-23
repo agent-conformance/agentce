@@ -29,6 +29,8 @@ def _assertion(control: str, outcome: str, subject: str = "s") -> Assertion:
         mode="automated",
         window=("2026-01-01T00:00:00Z", "2026-04-01T00:00:00Z"),
         population=(1, 1 if outcome == "non-conformant" else 0),
+        severity="high",
+        family=control.split("-", 1)[0] if "-" in control else control,
         evidence=evidence,
     )
 

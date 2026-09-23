@@ -108,6 +108,12 @@ function evidence(eventsByIri: Map<string, Event>, focusNodes: string[]): Eviden
  * never invented, and never set true by the engine itself; only a human with access to the licensed
  * standard text may flip that flag in the catalog source (human action H4).
  */
+/** The control's family: the letter prefix of its own id (SPEC §7.1; mirrors the Python reference). */
+function familyOf(controlId: string): string {
+  const dash = controlId.indexOf("-");
+  return dash === -1 ? controlId : controlId.slice(0, dash);
+}
+
 function crosswalkFor(control: ControlSpec): Array<Record<string, string | boolean>> {
   const raw = control.raw.crosswalk;
   if (!Array.isArray(raw)) {
@@ -140,6 +146,8 @@ function assertControl(
     rung: control.rung,
     mode: control.mode,
     window: win,
+    severity: control.severity,
+    family: familyOf(control.id),
     crosswalk: crosswalkFor(control),
   };
   if (!roleApplies(roles, control.appliesToRoles)) {

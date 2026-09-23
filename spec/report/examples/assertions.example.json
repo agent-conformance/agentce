@@ -7,6 +7,8 @@
     "rung": 2,
     "mode": "automated",
     "window": {"start": "2026-06-01T00:00:00.000Z", "end": "2026-09-01T00:00:00.000Z"},
+    "severity": "high",
+    "family": "OVS",
     "expectations": [
       {"id": "E1", "result": "passed"},
       {"id": "E2", "result": "failed"},

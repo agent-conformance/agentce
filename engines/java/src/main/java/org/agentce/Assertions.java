@@ -56,6 +56,8 @@ public final class Assertions {
         public String mode;
         public String[] window;
         public int[] population;
+        public String severity = "";
+        public String family = "";
         public List<JsonNode> expectations = new ArrayList<>();
         public List<JsonNode> violations = new ArrayList<>();
         public List<EvidencePointer> evidence = new ArrayList<>();
@@ -78,6 +80,8 @@ public final class Assertions {
             ObjectNode pop = record.putObject("population");
             pop.put("applicable", population[0]);
             pop.put("failed", population[1]);
+            record.put("severity", severity != null ? severity : "");
+            record.put("family", family != null ? family : "");
             if (!expectations.isEmpty()) {
                 ArrayNode a = record.putArray("expectations");
                 expectations.forEach(a::add);
@@ -138,6 +142,8 @@ public final class Assertions {
             population != null && population.get("applicable") != null ? population.get("applicable").asInt() : 0,
             population != null && population.get("failed") != null ? population.get("failed").asInt() : 0
         };
+        a.severity = text(data, "severity");
+        a.family = text(data, "family");
         JsonNode expectations = data.get("expectations");
         if (expectations != null && expectations.isArray()) {
             expectations.forEach(a.expectations::add);
@@ -168,7 +174,7 @@ public final class Assertions {
     /** Build an assertion with the required base fields; optional fields are set on the returned object. */
     public static Assertion make(
             String control, String controlVersion, String subject, String outcome, int rung, String mode,
-            String[] window, int[] population) {
+            String[] window, int[] population, String severity, String family) {
         Assertion a = new Assertion();
         a.control = control;
         a.controlVersion = controlVersion;
@@ -178,6 +184,8 @@ public final class Assertions {
         a.mode = mode;
         a.window = window;
         a.population = population;
+        a.severity = severity;
+        a.family = family;
         return a;
     }
 

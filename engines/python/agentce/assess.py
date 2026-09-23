@@ -94,6 +94,12 @@ def _evidence(
     return pointers
 
 
+def _family(control_id: str) -> str:
+    """The control's family: the letter prefix of its own id (SPEC §7.1; ``control.schema.json``
+    documents the id pattern ``^[A-Z]{2,4}-[0-9]{2}$`` as "family prefix and two-digit number")."""
+    return control_id.split("-", 1)[0] if "-" in control_id else control_id
+
+
 def _crosswalk(control: ControlSpec) -> list[dict[str, Any]]:
     """Carry each control's own crosswalk entries into every assertion built for it (SPEC §7.3).
 
@@ -128,6 +134,8 @@ def _assert_control(
         "rung": control.rung,
         "mode": control.mode,
         "window": window,
+        "severity": control.severity,
+        "family": _family(control.id),
         "crosswalk": _crosswalk(control),
     }
     if not _role_applies(roles, control.applies_to_roles):

@@ -42,6 +42,8 @@ export interface Assertion {
   mode: string;
   window: [string, string];
   population: [number, number];
+  severity: string;
+  family: string;
   expectations: Array<Record<string, string>>;
   violations: Array<Record<string, string>>;
   evidence: EvidencePointer[];
@@ -55,7 +57,16 @@ export interface Assertion {
 export function makeAssertion(
   fields: Pick<
     Assertion,
-    "control" | "controlVersion" | "subject" | "outcome" | "rung" | "mode" | "window" | "population"
+    | "control"
+    | "controlVersion"
+    | "subject"
+    | "outcome"
+    | "rung"
+    | "mode"
+    | "window"
+    | "population"
+    | "severity"
+    | "family"
   > &
     Partial<Assertion>,
 ): Assertion {
@@ -81,6 +92,8 @@ export function assertionToJson(assertion: Assertion): Record<string, unknown> {
     mode: assertion.mode,
     window: { start: assertion.window[0], end: assertion.window[1] },
     population: { applicable: assertion.population[0], failed: assertion.population[1] },
+    severity: assertion.severity,
+    family: assertion.family,
   };
   if (assertion.expectations.length > 0) {
     record.expectations = assertion.expectations;
@@ -134,6 +147,8 @@ export function assertionFromJson(data: unknown): Assertion {
     mode: String(d.mode ?? ""),
     window: [String(window.start ?? ""), String(window.end ?? "")],
     population: [Number(population.applicable ?? 0), Number(population.failed ?? 0)],
+    severity: String(d.severity ?? ""),
+    family: String(d.family ?? ""),
     expectations: Array.isArray(d.expectations)
       ? (d.expectations as Array<Record<string, string>>)
       : [],

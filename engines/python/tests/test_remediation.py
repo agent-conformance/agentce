@@ -35,6 +35,8 @@ _DAT01_TEMPLATE = Assertion(
     mode="automated",
     window=_WINDOW,
     population=(3, 0),
+    severity="medium",
+    family="DAT",
 )
 
 
@@ -60,6 +62,8 @@ def test_findings_exclude_conformant_and_not_applicable(catalog) -> None:
             mode="automated",
             window=_WINDOW,
             population=(0, 0),
+            severity="high",
+            family="OVS",
         ),
     ]
     package = render_remediation_package(
@@ -139,6 +143,8 @@ def test_not_assessed_reason_reflects_rung(catalog) -> None:
         mode="manual",
         window=_WINDOW,
         population=(0, 0),
+        severity="low",
+        family="DOC",
     )
     package = render_remediation_package(
         subject,

@@ -22,6 +22,8 @@ def _assertion(
         mode="automated",
         window=("2026-01-01T00:00:00Z", "2026-04-01T00:00:00Z"),
         population=(1, 0 if outcome == "conformant" else 1),
+        severity="high",
+        family=control.split("-", 1)[0] if "-" in control else control,
         evidence=[
             EvidencePointer(ref=r, digest="sha256:ab", source_class="enforcement_point")
             for r in (evidence or [])
