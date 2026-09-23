@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>theme control — good fixture — page 2</title>
+    <script is="inline">
+      (() => {
+        try {
+          const stored = localStorage.getItem('starlight-theme');
+          const theme = stored === 'light' || stored === 'dark' ? stored : 'dark';
+          document.documentElement.dataset.theme = theme;
+        } catch (e) {
+          /* ignore */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <p>second page — no theme control here, only Starlight's own reads the same key</p>
+  </body>
+</html>
