@@ -189,6 +189,12 @@ allow:
     class: legitimate
     justification: "Honest status: placeholder rows for prEN 18229-1 (draft; no clause identifiers exist to cite yet)."
 
+  - path: tools/framework_examples_check.py
+    pattern: stub
+    count: 1
+    class: legitimate
+    justification: "A bad-fixture agent.py body used by the self-test to prove the check fails an example that never imports its named framework."
+
   - path: tools/pyproject.toml
     pattern: placeholder
     count: 2
