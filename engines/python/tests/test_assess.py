@@ -77,6 +77,30 @@ def test_assessment_report_is_dc5_valid(tmp_path: Path) -> None:
     assert (tmp_path / "assertions.json").is_file()
 
 
+def test_crosswalk_is_carried_from_the_control_and_never_verified() -> None:
+    """SPEC §7.3: the assertion carries each control's own crosswalk entries, ``verified`` taken
+    from ``verified_against_text`` -- and the engine never sets ``verified`` true itself."""
+    import yaml
+
+    catalog = load_catalog(_BASE)
+    domain = DomainBinding.load(_BASE / "test" / "domain.yaml")
+    assertions = assess_subjects(
+        _events("OVS-03/passed.jsonl"), _profile(), [catalog], domain
+    )
+    doc01 = next(a for a in assertions if a.control == "DOC-01")
+    source = yaml.safe_load(
+        (_BASE / "controls" / "DOC-01.yaml").read_text(encoding="utf-8")
+    )
+    source_entry = source["crosswalk"][0]
+    assert doc01.crosswalk
+    entry = doc01.crosswalk[0]
+    assert entry["framework"] == source_entry["framework"]
+    assert entry["clause"] == source_entry["clause"]
+    assert entry["verified"] is source_entry["verified_against_text"]
+    assert entry["verified"] is False
+    assert all(e.get("verified") is not True for a in assertions for e in a.crosswalk)
+
+
 def test_role_mismatch_is_not_applicable() -> None:
     catalog = load_catalog(_BASE)
     domain = DomainBinding.load(_BASE / "test" / "domain.yaml")

@@ -91,7 +91,8 @@
             "required": ["framework", "clause"],
             "properties": {
               "framework": {"type": "string"},
-              "clause": {"type": "string"}
+              "clause": {"type": "string"},
+              "verified": {"type": "boolean"}
             }
           }
         }

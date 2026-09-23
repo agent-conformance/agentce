@@ -23,6 +23,7 @@ _EN: dict[str, str] = {
     "report.gaps_more": "+{n} more",
     "report.next_step_heading": "Next step",
     "report.see_report": "See report.md in {dir} for every control.",
+    "report.crosswalk_unverified": "(clause reference unverified)",
     "verdict.non-conformant": "Non-conformant \u2014 at least one applicable control failed.",
     "verdict.incomplete": (
         "Incomplete \u2014 no control failed, but not every applicable control is demonstrated."
