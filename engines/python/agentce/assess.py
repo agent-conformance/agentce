@@ -37,19 +37,24 @@ def _class_ok(observed: str, required: str) -> bool:
     return required in ("any", "self_report") or observed == required
 
 
+def requirement_met(events: list[dict[str, Any]], requirement: dict[str, str]) -> bool:
+    """Whether ``events`` carries at least one event satisfying one ``minimum_evidence`` entry --
+    factored out of :func:`_has_minimum_evidence` so the remediation renderer (SPEC §7) can report,
+    per requirement, which of a control's minimum-evidence entries this subject's own events did and
+    did not satisfy, using the exact same rule the assessment itself used to reach its outcome."""
+    event_type = requirement.get("event")
+    required_class = requirement.get("class", "any")
+    return any(
+        _event_type(e) == event_type
+        and _class_ok(str(e.get("agentcesourceclass", "")), required_class)
+        for e in events
+    )
+
+
 def _has_minimum_evidence(
     events: list[dict[str, Any]], minimum: list[dict[str, str]]
 ) -> bool:
-    for requirement in minimum:
-        event_type = requirement.get("event")
-        required_class = requirement.get("class", "any")
-        if not any(
-            _event_type(e) == event_type
-            and _class_ok(str(e.get("agentcesourceclass", "")), required_class)
-            for e in events
-        ):
-            return False
-    return True
+    return all(requirement_met(events, requirement) for requirement in minimum)
 
 
 def _event_type(event: dict[str, Any]) -> str:
@@ -166,10 +171,11 @@ def evaluated_nothing(assertions: list[Assertion]) -> bool:
     return not any(a.outcome in VERDICT_OUTCOMES for a in assertions)
 
 
-def _index_by_subject(
+def index_by_subject(
     accepted: list[dict[str, Any]],
 ) -> dict[str, list[dict[str, Any]]]:
-    """Group ``accepted`` by subject id in one pass over the list."""
+    """Group ``accepted`` by subject id in one pass over the list (also used by the remediation
+    renderer, SPEC §7, to recover the same per-subject event list an assessment run judged)."""
     index: dict[str, list[dict[str, Any]]] = {}
     for event in accepted:
         index.setdefault(str(event.get("subject", "")), []).append(event)
@@ -184,7 +190,7 @@ def assess_subjects(
 ) -> list[Assertion]:
     """Evaluate every catalog control against every subject and return the assertions."""
     assertions: list[Assertion] = []
-    events_by_subject = _index_by_subject(accepted)
+    events_by_subject = index_by_subject(accepted)
     for subject in profile.subjects:
         subject_events = events_by_subject.get(subject.id, [])
         store = build_graph(subject_events, domain=domain)
