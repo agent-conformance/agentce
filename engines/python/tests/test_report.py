@@ -686,6 +686,7 @@ def test_write_report_emit_new_formats(tmp_path: Path) -> None:
         "report.junit.xml",
         "report.csv",
         "oscal-ar.xml",
+        "oscal-ar.json",  # the source object oscal-ar.xml serializes; written alongside it
         "report.pdf",
         "public-statement.md",
     ):
@@ -694,7 +695,7 @@ def test_write_report_emit_new_formats(tmp_path: Path) -> None:
         tmp_path / "public-statement.md"
     ).read_text(encoding="utf-8")
     assert (tmp_path / "report.pdf").read_bytes().startswith(b"%PDF-")
-    for name in ("report.md", "report.html", "oscal-ar.json", "results.sarif"):
+    for name in ("report.md", "report.html", "results.sarif"):
         assert not (tmp_path / name).exists(), name
 
 

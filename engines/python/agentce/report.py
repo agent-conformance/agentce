@@ -1124,7 +1124,9 @@ def write_report(
     oscal_doc: dict[str, Any] | None = None
     if wants("oscal") or wants("oscal_xml"):
         oscal_doc = render_oscal(assertions)
-    if wants("oscal") and oscal_doc is not None:
+    if (wants("oscal") or wants("oscal_xml")) and oscal_doc is not None:
+        # oscal-ar.xml is a serialization of this same object (SPEC §9.4): write the JSON source
+        # alongside it even when only `oscal_xml` was requested, so the two never diverge.
         write_json("oscal-ar.json", oscal_doc)
     if wants("oscal_xml") and oscal_doc is not None:
         write_text("oscal-ar.xml", render_oscal_xml(oscal_doc))
