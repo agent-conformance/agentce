@@ -124,6 +124,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="comma-separated report formats to render (default: the fixed bundle: html, md, "
         "oscal, pack, sarif); one or more of: " + ", ".join(commands.EMIT_FORMATS),
     )
+    p.add_argument(
+        "--fail-on",
+        dest="fail_on",
+        help="gate the exit code on a tiny deterministic expression over assertion fields "
+        "(control, subject, outcome, severity, family, rung, mode), e.g. "
+        '\'outcome=="non-conformant" and severity=="high"\' (comparisons joined by and/or; '
+        "never a general expression language). Replaces the default any-non-conformant rule "
+        "when given.",
+    )
     p.set_defaults(func=commands.cmd_assess)
 
     p = sub.add_parser(

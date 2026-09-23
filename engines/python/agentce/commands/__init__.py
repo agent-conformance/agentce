@@ -47,6 +47,7 @@ from ..domain import DomainBinding
 from ..environment import inspect_environment
 from ..errors import AgentceError, InputError
 from ..exit_codes import ExitCode
+from ..fail_on import parse_fail_on
 from ..graph import build_graph
 from ..ingest import ingest
 from ..integrity import IntegrityStatus, verify_bundle
@@ -357,6 +358,10 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     # --emit is validated before any output is written (below, before ingest/quarantine): an unknown
     # token must never leave a partial or misleading result behind.
     emit = _parse_emit(_opt_str(ns, "emit"))
+    # --fail-on is parsed (never eval'd) before any output is written too: a hostile or malformed
+    # expression is refused at exit 3 before any assertion is evaluated against it (SPEC §7).
+    fail_on_raw = _opt_str(ns, "fail_on")
+    fail_on_predicate = parse_fail_on(fail_on_raw) if fail_on_raw is not None else None
     # Resolve the catalogs before any output is written: a run that cannot name what it evaluates
     # against — or cannot verify it — must leave nothing behind that looks like a result.
     profile_obj = Profile.load(profile)
@@ -487,7 +492,14 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         result.data["limitations"] = limitations
         for limitation in limitations:
             result.note(limitation)
-    if non_conformant:
+    if fail_on_predicate is not None:
+        # A policy-scoped gate replaces the default any-non-conformant rule: the exit code reflects
+        # only the assertions the expression names, never the whole run (SPEC §8.5, finding #29).
+        fail_on_matches = sum(1 for a in evaluated if fail_on_predicate(a))
+        result.data["fail_on"] = {"expression": fail_on_raw, "matched": fail_on_matches}
+        if fail_on_matches:
+            result.add_code(int(ExitCode.FINDINGS))
+    elif non_conformant:
         result.add_code(int(ExitCode.FINDINGS))
     if evaluated_nothing(evaluated):
         raise _nothing_evaluated(profile_obj, ingested.accepted, len(evaluated))
