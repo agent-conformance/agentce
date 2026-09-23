@@ -111,13 +111,10 @@ function writeGoodFixture(root) {
   writeFileSync(join(root, 'sitemap-0.xml'), `<?xml version="1.0"?><urlset>${urls}</urlset>`);
 }
 
-function writeBadFixture(root) {
-  // A single-locale fixture: only English is built, with no hreflang alternates and no sitemap — the
-  // state astro.config.mjs was in before C1's fix (Starlight i18n routing never turned on).
-  const dir = join(root, 'docs', 'getting-started');
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'index.html'), `<!doctype html><html lang="en"><head></head><body>ok</body></html>`);
-}
+// A single-locale fixture: only English is built, with no hreflang alternates and no sitemap — the
+// state astro.config.mjs was in before C1's fix (Starlight i18n routing never turned on). Committed
+// (not generated) so `--dir` can point a RED-at-base-style reproduction at it directly.
+const badFixtureDir = resolve(websiteDir, 'tests', 'fixtures', 'i18n-site-bad');
 
 async function runGate({ dir }) {
   const problems = check(dir ? resolve(dir) : distDir);
@@ -134,12 +131,10 @@ function selfTest() {
   const tmp = mkdtempSync(join(tmpdir(), 'agentce-i18n-site-'));
   try {
     const good = join(tmp, 'good');
-    const bad = join(tmp, 'bad');
     writeGoodFixture(good);
-    writeBadFixture(bad);
 
     const goodProblems = check(good);
-    const badProblems = check(bad);
+    const badProblems = check(badFixtureDir);
 
     const failures = [];
     if (goodProblems.length !== 0) failures.push(`good fixture: expected no problems, got ${JSON.stringify(goodProblems)}`);
@@ -150,7 +145,7 @@ function selfTest() {
       for (const f of failures) console.error(`  - ${f}`);
       process.exit(1);
     }
-    console.log(`SELF-TEST OK — the gate passes a fully-localized site and reports ${badProblems.length} problem(s) on a single-locale fixture.`);
+    console.log(`SELF-TEST OK — the gate passes a fully-localized site and reports ${badProblems.length} problem(s) on the committed single-locale fixture.`);
     process.exit(0);
   } finally {
     rmSync(tmp, { recursive: true, force: true });

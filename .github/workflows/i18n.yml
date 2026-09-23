@@ -117,6 +117,9 @@ jobs:
             --include="*.py" engines/*/tests 2>/dev/null)
           if [ -z "$sync_hits" ]; then
             problems+=("no test vendors/sync-checks a spec/ message catalog against a per-engine copy (the no-ml-denylist/schema pattern)")
+          elif [ -d engines/python ]; then
+            ( cd engines/python && env -u VIRTUAL_ENV uv run --frozen pytest -q -k "i18n and test_vendored_tree_matches_its_original" ) \
+              || problems+=("engines/python's i18n vendoring sync test does not pass -- the vendored copy is not byte-identical to spec/i18n")
           fi
 
           if [ "${#problems[@]}" -ne 0 ]; then
