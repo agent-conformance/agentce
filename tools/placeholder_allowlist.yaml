@@ -99,6 +99,12 @@ allow:
     class: legitimate
     justification: "Describes the release dry-run's stub registry (records that no publish call was ever made)."
 
+  - path: website/src/content/docs/explanation/verification.md
+    pattern: stub
+    count: 1
+    class: legitimate
+    justification: "The published copy of docs/verification.md (docs/build.py --publish); same real sentence describing the release dry-run's stub registry."
+
   - path: engines/java/src/main/java/org/agentce/Cli.java
     pattern: not-implemented
     count: 2
