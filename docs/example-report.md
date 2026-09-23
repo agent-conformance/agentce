@@ -14,7 +14,7 @@ This is the report the vendored quickstart project renders end to end with defau
 
 Top gaps:
 
-- insufficient evidence: DAT-01, DAT-02, DAT-03, INC-01, INC-03 (+14 more)
+- insufficient evidence: DAT-01, DAT-02, DAT-03, INC-01, INC-03 (+14 more gaps)
 - not assessed: DAT-04, DOC-05, OVS-09, RSK-04, RSK-05
 
 Next step: Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.
