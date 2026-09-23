@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from . import canonical
+from .bundle import confine_to_root, safe_is_file
 
 GENESIS_PREV = "0" * 64
 DEFAULT_CLOCK_SKEW_SECONDS = 300  # 5 minutes (SPEC §6.6 timestamp trust)
@@ -189,7 +190,8 @@ def _is_signed(block: dict[str, Any] | None, bundle_root: Path | None) -> bool:
         return False
     if bundle_root is None:
         return True
-    return (bundle_root / sig_ref).is_file()
+    path = confine_to_root(bundle_root, sig_ref)
+    return path is not None and safe_is_file(path)
 
 
 def verify_bundle(

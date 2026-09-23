@@ -18,6 +18,7 @@ from decimal import ROUND_HALF_EVEN, Decimal
 from pathlib import Path
 from typing import Any
 
+from .bundle import confine_to_root, safe_is_file
 from .profile import CoverageDenominator, Profile
 
 STATUS_COVERED = "covered"
@@ -47,8 +48,8 @@ def _denominator_counts(
     bundle_root: Path | None,
 ) -> dict[str, int]:
     if denominator.manifest and bundle_root is not None:
-        path = bundle_root / denominator.manifest
-        if path.is_file():
+        path = confine_to_root(bundle_root, denominator.manifest)
+        if path is not None and safe_is_file(path):
             data = json.loads(path.read_text(encoding="utf-8"))
             declared = data.get("counts") or data.get("expected") or {}
             if isinstance(declared, dict):

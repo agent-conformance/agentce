@@ -54,30 +54,45 @@ class Bundle:
         return "sha256:" + canonical.sha256_hex(self.manifest)
 
 
-def _safe_member(root: Path, rel: str) -> Path:
-    if rel.startswith("/") or ".." in Path(rel).parts:
-        raise InputError(
-            "input.bundle_manifest_path",
-            f"manifest lists an unsafe path {rel!r}.",
-            "the manifest must list only paths inside the bundle.",
-        )
-    member = root / rel
+def safe_is_file(path: Path) -> bool:
+    """``path.is_file()``, but an OS-level hazard a confined path can still hit at access time (a
+    symlink loop, a name too long for the filesystem) is treated as "not present", never left to
+    propagate as an unexpected error."""
     try:
-        resolved_member = member.resolve(strict=False)
+        return path.is_file()
+    except (OSError, RuntimeError, ValueError):
+        return False
+
+
+def confine_to_root(root: Path, rel: str) -> Path | None:
+    """Resolve ``rel`` against ``root``; return the path only if it stays inside ``root`` after
+    symlinks resolve, else ``None``. Every bundle-adjacent reference an adversarial evidence bundle
+    can carry -- the primary manifest's own file list, a coverage denominator's manifest, an
+    integrity block's ``sig_ref`` -- is confined through this one function, so a symlink escape, a
+    literal ``..``/absolute path, a symlink loop, an embedded NUL byte, or a path segment too long
+    for the filesystem are refused the same deliberate way everywhere, never left to surface as an
+    unexpected error."""
+    if not rel or rel.startswith("/") or ".." in Path(rel).parts:
+        return None
+    candidate = root / rel
+    try:
+        resolved = candidate.resolve(strict=False)
         resolved_root = root.resolve(strict=False)
-    except OSError as exc:
+    except (OSError, RuntimeError, ValueError):
+        return None
+    if resolved != resolved_root and not resolved.is_relative_to(resolved_root):
+        return None
+    return candidate
+
+
+def _safe_member(root: Path, rel: str) -> Path:
+    member = confine_to_root(root, rel)
+    if member is None:
         raise InputError(
             "input.bundle_manifest_path",
-            f"manifest path {rel!r} could not be resolved: {exc}.",
-            "the manifest must list only paths inside the bundle.",
-        ) from exc
-    if resolved_member != resolved_root and not resolved_member.is_relative_to(
-        resolved_root
-    ):
-        raise InputError(
-            "input.bundle_manifest_path",
-            f"manifest lists {rel!r}, which resolves outside the bundle root "
-            "(a symlink or junction escapes it).",
+            f"manifest lists an unsafe path {rel!r}: it is absolute, contains '..', resolves "
+            "outside the bundle root (a symlink or junction escapes it), or cannot be safely "
+            "resolved.",
             "the manifest must list only paths that stay inside the bundle after symlinks resolve.",
         )
     return member
@@ -119,13 +134,20 @@ def load_bundle(bundle_dir: Path) -> Bundle:
             )
         rel = str(entry["path"])
         member = _safe_member(bundle_dir, rel)
-        if not member.is_file():
+        if not safe_is_file(member):
             raise InputError(
                 "input.bundle_manifest_mismatch",
                 f"manifest lists {rel!r}, which is missing from the bundle.",
                 "regenerate the bundle so its files match the manifest.",
             )
-        size = member.stat().st_size
+        try:
+            size = member.stat().st_size
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise InputError(
+                "input.bundle_manifest_mismatch",
+                f"manifest lists {rel!r}, which could not be safely accessed: {exc}.",
+                "regenerate the bundle so its files match the manifest.",
+            ) from exc
         if size > DEFAULT_MAX_MANIFEST_FILE_BYTES:
             raise InputError(
                 "input.bundle_manifest_file_too_large",
