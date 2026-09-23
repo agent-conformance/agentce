@@ -5,12 +5,17 @@ build-backend = "hatchling.build"
 [project]
 name = "agentce-emit"
 version = "0.1.0"
-description = "Evidence emitter for the Agent Conformance Engine: one-line agent-side emission of canonical CloudEvents + JSON-LD evidence (SPEC 13.1, 13.4). Standard library only."
+description = "Evidence emitter for the Agent Conformance Engine: one-line agent-side emission of canonical CloudEvents + JSON-LD evidence (SPEC 13.1, 13.4). Standard library only; the 'otel' extra adds the AgentCESpanProcessor bridge."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
 authors = [{ name = "Agent Conformance Engine maintainers" }]
 classifiers = ["Development Status :: 2 - Pre-Alpha"]
+
+[project.optional-dependencies]
+# AgentCESpanProcessor (SPEC 13.4 AX-3) drains through the existing otel-genai mapping; lazily
+# imported, so the core emitter stays standard-library-only without this extra installed.
+otel = ["agentce-adapter-otel-genai"]
 
 [project.urls]
 Homepage = "https://agent-conformance.org"
@@ -20,13 +25,17 @@ Repository = "https://github.com/agent-conformance/agentce"
 packages = ["agentce_emit"]
 
 # The engine is a test-only dependency: the one-line-emit test validates the emitted bundle with
-# `agentce validate`. The emitter itself has no runtime dependency (standard library only).
+# `agentce validate`. The adapter is also test-only here (dev group): AgentCESpanProcessor lazily
+# imports it at runtime, gated by the 'otel' extra above, so the core emitter stays
+# standard-library-only when that extra is not installed.
 [tool.uv.sources]
 agent-conformance = { path = "../python", editable = true }
+agentce-adapter-otel-genai = { path = "../../adapters/otel-genai", editable = true }
 
 [dependency-groups]
 dev = [
   "agent-conformance",
+  "agentce-adapter-otel-genai",
   "pytest>=8,<9",
   "mypy>=1.11,<2",
   "ruff>=0.6,<0.13",
