@@ -1,0 +1,12 @@
+{
+  "errors.input.catalog_missing.cause": "no catalog was named.",
+  "errors.input.catalog_missing.fix": "pass --catalog.",
+  "errors.warning.pilot_window.cause": "the window is short.",
+  "errors.warning.pilot_window.fix": "widen the window.",
+  "report.title": "Conformance report",
+  "report.severity_high": "High",
+  "report.gaps_more": "{n, plural, one {(+# more)} other {(+# more)}}",
+  "verdict.conformant": "Conformant",
+  "outcome.conformant": "conformant",
+  "report.orphan": "Nothing refers to this key."
+}
