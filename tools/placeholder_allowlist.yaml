@@ -430,3 +430,15 @@ allow:
     count: 1
     class: legitimate
     justification: "The Install check's own detection pattern for an unfinished published one-liner; it names the word it forbids."
+
+  - path: spec/report/vendor/oscal-assessment-results-nist-1.1.2.schema.json
+    pattern: placeholder
+    count: 12
+    class: legitimate
+    justification: "Vendored NIST OSCAL 1.1.2 assessment-results JSON Schema: NIST's own field descriptions use the word 'placeholder' (e.g. a subject's defined UUID as a placeholder reference); third-party text we do not edit."
+
+  - path: engines/python/agentce/data/schemas/oscal-assessment-results-nist-1.1.2.schema.json
+    pattern: placeholder
+    count: 12
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/report/vendor/oscal-assessment-results-nist-1.1.2.schema.json, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
