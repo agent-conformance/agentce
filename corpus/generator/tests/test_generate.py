@@ -129,7 +129,9 @@ def test_full_set_structure(tmp_path: Path) -> None:
     assert {p["variant"] for p in core} == set(generate.FULL_VARIANTS)
 
 
-def test_held_out_and_adversarial_recipes_are_disjoint_from_core(tmp_path: Path) -> None:
+def test_held_out_and_adversarial_recipes_are_disjoint_from_core(
+    tmp_path: Path,
+) -> None:
     """A held-out or adversarial project must never be a relabelled twin of a core project sharing
     its (domain, style, variant) recipe -- otherwise the subset is not a genuine blind check."""
     _out, manifest = tmp_path / "f", generate.build_corpus(tmp_path / "f", "full")
