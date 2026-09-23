@@ -29,10 +29,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
-import yaml
-
 from .canonical import canonical_string
 from .errors import InputError
+from .safe_yaml import load_untrusted_yaml
 
 #: How a source's credential is referenced (never its value).
 _CREDENTIAL_VIAS = frozenset({"secret_ref", "env"})
@@ -138,8 +137,10 @@ def load_config(path: Path) -> CollectConfig:
     """Parse and validate a collection config (SPEC §5.4 B8); raise :class:`InputError` on any problem."""
     fix = "see docs/integrate.md for the collect config shape."
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as exc:
+        raw = load_untrusted_yaml(
+            path, key="input.collect_config", what="the collect config"
+        )
+    except OSError as exc:
         raise InputError(
             "input.collect_config", f"cannot read {path}: {exc}.", fix
         ) from exc

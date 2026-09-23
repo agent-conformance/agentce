@@ -63,6 +63,13 @@ def main(argv: list[str] | None = None) -> int:
     except TypeError as exc:
         print(json.dumps({"error": f"{adapter_name} adapt() rejected its arguments: {exc}"}))
         return 1
+    except RecursionError:
+        print(
+            json.dumps(
+                {"error": f"the export is nested too deeply for {adapter_name} to parse safely"}
+            )
+        )
+        return 1
     print(json.dumps({"events": result.events}))
     return 0
 
