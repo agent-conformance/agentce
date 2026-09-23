@@ -36,6 +36,47 @@ uv run --project engines/python agentce assess --bundle corpus/quickstart/eviden
 uv run --project engines/python agentce report --validate ./out
 ```
 
+## Or use a reusable CI artifact
+
+For GitHub or GitLab, a ready-made artifact wraps the commands above into one line, pinned by commit
+SHA (never a floating tag), that uploads `results.sarif` to code scanning and writes a job summary or
+job artifact:
+
+```yaml
+# GitHub: a composite Action
+- uses: agent-conformance/agentce/.github/actions/assess@45ca972c172dc8e00a9f1f892c196b5cb884a1d2
+  with:
+    bundle: evidence
+    profile: applicability.yaml
+    domain: domain.linkml.yaml
+    fail-on: "severity>=high"
+```
+
+```yaml
+# GitHub: a workflow_call reusable workflow
+jobs:
+  assess:
+    uses: agent-conformance/agentce/.github/workflows/reusable-assess.yml@45ca972c172dc8e00a9f1f892c196b5cb884a1d2
+    with:
+      agentce-ref: 45ca972c172dc8e00a9f1f892c196b5cb884a1d2
+      bundle: evidence
+      profile: applicability.yaml
+      domain: domain.linkml.yaml
+```
+
+```yaml
+# GitLab: a CI/CD component
+include:
+  - component: gitlab.com/agent-conformance/agentce/agentce-assess@45ca972c172dc8e00a9f1f892c196b5cb884a1d2
+    inputs:
+      bundle: evidence
+      profile: applicability.yaml
+      domain: domain.linkml.yaml
+```
+
+See the [composite Action's own README](https://github.com/agent-conformance/agentce/blob/main/.github/actions/assess/README.md)
+for the full input list. Replace the example commit SHA with the one you want to pin to.
+
 ## Gate on the result
 
 Commands return documented exit codes, so a pipeline can fail a change on a non-conformant result or an
