@@ -103,6 +103,11 @@ MESSAGE_KEYS: dict[str, Entry] = {
         "deeply to parse safely.",
         "remove custom YAML tags and flatten deep nesting in the domain binding file.",
     ),
+    "input.coverage_denominator_manifest_invalid": Entry(
+        "error",
+        "a coverage denominator's manifest file is nested too deeply to parse safely.",
+        "flatten the denominator manifest's structure; it exceeds the engine's safe nesting depth.",
+    ),
     "input.event_structure_too_deep": Entry(
         "error",
         "an evidence event line is nested too deeply to parse safely.",
