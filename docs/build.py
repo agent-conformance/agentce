@@ -98,7 +98,7 @@ def _links(text: str) -> list[str]:
 # --- Generators (reference pages from the sources). ---
 
 
-def _command_specs() -> list[tuple[str, str, str]]:
+def _command_rows() -> list[tuple[str, str, str]]:
     """(name, summary, help text) for every real CLI subcommand, sorted by name."""
     from agentce.cli import build_parser
 
@@ -120,9 +120,9 @@ def _command_specs() -> list[tuple[str, str, str]]:
 
 
 def _command_pages() -> dict[Path, str]:
-    specs = _command_specs()
+    entries = _command_rows()
     pages: dict[Path, str] = {}
-    for name, summary, help_text in specs:
+    for name, summary, help_text in entries:
         pages[REFERENCE / "commands" / f"{name}.md"] = (
             f"# `agentce {name}`\n\n"
             f"{summary[:1].upper() + summary[1:] if summary else ''}.\n\n"
@@ -132,7 +132,7 @@ def _command_pages() -> dict[Path, str]:
             "Exit codes follow the [common CLI scheme](index.md#exit-codes).\n"
         )
     rows = "\n".join(
-        f"| [`agentce {name}`]({name}.md) | {summary} |" for name, summary, _ in specs
+        f"| [`agentce {name}`]({name}.md) | {summary} |" for name, summary, _ in entries
     )
     pages[REFERENCE / "commands" / "index.md"] = (
         "# CLI commands\n\n"
@@ -149,28 +149,28 @@ def _command_pages() -> dict[Path, str]:
     return pages
 
 
-def _adapter_specs() -> list[tuple[str, str]]:
+def _adapter_rows() -> list[tuple[str, str]]:
     """(name, intro paragraphs) for every adapter with a README, sorted by name."""
-    specs: list[tuple[str, str]] = []
+    entries: list[tuple[str, str]] = []
     for adapter in sorted((REPO_ROOT / "adapters").iterdir()):
         readme = adapter / "README.md"
         if not adapter.is_dir() or not readme.is_file():
             continue
-        specs.append((adapter.name, _first_paragraphs(readme.read_text("utf-8"))))
-    return specs
+        entries.append((adapter.name, _first_paragraphs(readme.read_text("utf-8"))))
+    return entries
 
 
 def _adapter_pages() -> dict[Path, str]:
-    specs = _adapter_specs()
+    entries = _adapter_rows()
     pages: dict[Path, str] = {}
-    for name, intro in specs:
+    for name, intro in entries:
         pages[REFERENCE / "adapters" / f"{name}.md"] = (
             f"# `{name}` adapter\n\n"
             f"{intro}\n\n"
             f"See the [adapter README](../../../adapters/{name}/README.md) for the full "
             "source-to-event mapping, fixtures, and the support matrix.\n"
         )
-    rows = "\n".join(f"| [`{name}`]({name}.md) |" for name, _ in specs)
+    rows = "\n".join(f"| [`{name}`]({name}.md) |" for name, _ in entries)
     pages[REFERENCE / "adapters" / "index.md"] = (
         "# Source adapters\n\n"
         "Each adapter is a pure function from a source export to canonical AgentCE evidence events "
@@ -202,7 +202,7 @@ def _first_paragraphs(readme: str, limit: int = 2) -> str:
     return "\n\n".join(paragraphs)
 
 
-def _family_specs() -> dict[str, list]:
+def _family_groups() -> dict[str, list]:
     """Every base-catalog control, grouped by family id."""
     import yaml
 
@@ -220,7 +220,7 @@ def _family_specs() -> dict[str, list]:
 
 
 def _family_pages() -> dict[Path, str]:
-    by_family = _family_specs()
+    by_family = _family_groups()
     pages: dict[Path, str] = {}
     for family in sorted(by_family):
         controls = sorted(by_family[family], key=lambda c: c.id)
@@ -258,7 +258,7 @@ def _family_pages() -> dict[Path, str]:
     return pages
 
 
-def _evidence_specs() -> dict[str, dict]:
+def _evidence_classes() -> dict[str, dict]:
     """Every class in the evidence model, keyed by name, sorted."""
     import yaml
 
@@ -296,7 +296,7 @@ def _evidence_body_text(body: dict) -> str:
 
 
 def _evidence_pages() -> dict[Path, str]:
-    classes = _evidence_specs()
+    classes = _evidence_classes()
     pages: dict[Path, str] = {}
     for name, body in classes.items():
         pages[REFERENCE / "evidence" / f"{name}.md"] = (
@@ -317,13 +317,13 @@ def _evidence_pages() -> dict[Path, str]:
     return pages
 
 
-def _report_schema_specs() -> list[tuple[str, dict, str]]:
+def _report_schema_rows() -> list[tuple[str, dict, str]]:
     """(filename, parsed schema, canonical IRI path) for every report schema, sorted by filename."""
     manifest = json.loads(
         (REPO_ROOT / "website" / "iri-manifest.json").read_text("utf-8")
     )
     by_source = {entry["source"]: entry["path"] for entry in manifest}
-    specs: list[tuple[str, dict, str]] = []
+    entries: list[tuple[str, dict, str]] = []
     for path in sorted((REPO_ROOT / "spec" / "report").glob("*.schema.json")):
         source_rel = f"spec/report/{path.name}"
         iri_path = by_source.get(source_rel)
@@ -332,8 +332,8 @@ def _report_schema_specs() -> list[tuple[str, dict, str]]:
                 f"{source_rel} is not served at a canonical IRI "
                 "(add it to website/iri-manifest.json)"
             )
-        specs.append((path.name, json.loads(path.read_text("utf-8")), iri_path))
-    return specs
+        entries.append((path.name, json.loads(path.read_text("utf-8")), iri_path))
+    return entries
 
 
 def _schema_type(spec: dict) -> str:
@@ -375,9 +375,9 @@ def _schema_body_text(schema: dict, schema_link: str) -> str:
 
 
 def _report_schema_pages() -> dict[Path, str]:
-    specs = _report_schema_specs()
+    entries = _report_schema_rows()
     pages: dict[Path, str] = {}
-    for filename, schema, _iri_path in specs:
+    for filename, schema, _iri_path in entries:
         slug = filename[: -len(".schema.json")]
         title = schema.get("title") or filename
         rel_link = f"../../../spec/report/{filename}"
@@ -386,7 +386,7 @@ def _report_schema_pages() -> dict[Path, str]:
         )
     rows = "\n".join(
         f"| [`{filename}`]({filename[: -len('.schema.json')]}.md) | {_md_cell(schema.get('title') or '')} |"
-        for filename, schema, _ in specs
+        for filename, schema, _ in entries
     )
     pages[REFERENCE / "report-schemas" / "index.md"] = (
         "# Report schemas\n\n"
@@ -429,10 +429,10 @@ def _frontmatter(title: str, description: str) -> str:
 
 
 def _site_command_pages() -> dict[Path, str]:
-    specs = _command_specs()
+    entries = _command_rows()
     target = SITE_REFERENCE / "commands"
     pages: dict[Path, str] = {}
-    for name, summary, help_text in specs:
+    for name, summary, help_text in entries:
         description = summary or f"The `agentce {name}` command."
         body = (
             f"{summary[:1].upper() + summary[1:] if summary else ''}.\n\n"
@@ -446,7 +446,7 @@ def _site_command_pages() -> dict[Path, str]:
         )
     rows = "\n".join(
         f"| [`agentce {name}`](/reference/commands/{name}/) | {_md_cell(summary)} |"
-        for name, summary, _ in specs
+        for name, summary, _ in entries
     )
     pages[target / "index.md"] = _frontmatter(
         "CLI commands",
@@ -466,10 +466,10 @@ def _site_command_pages() -> dict[Path, str]:
 
 
 def _site_adapter_pages() -> dict[Path, str]:
-    specs = _adapter_specs()
+    entries = _adapter_rows()
     target = SITE_REFERENCE / "adapters"
     pages: dict[Path, str] = {}
-    for name, intro in specs:
+    for name, intro in entries:
         github_readme = f"https://github.com/agent-conformance/agentce/blob/main/adapters/{name}/README.md"
         body = (
             f"{intro}\n\n"
@@ -480,7 +480,7 @@ def _site_adapter_pages() -> dict[Path, str]:
             _frontmatter(f"{name} adapter", _md_cell(intro)[:150]) + body
         )
     rows = "\n".join(
-        f"| [`{name}`](/reference/adapters/{name}/) |" for name, _ in specs
+        f"| [`{name}`](/reference/adapters/{name}/) |" for name, _ in entries
     )
     pages[target / "index.md"] = _frontmatter(
         "Source adapters",
@@ -495,7 +495,7 @@ def _site_adapter_pages() -> dict[Path, str]:
 
 
 def _site_catalog_pages() -> dict[Path, str]:
-    by_family = _family_specs()
+    by_family = _family_groups()
     target = SITE_REFERENCE / "catalog"
     pages: dict[Path, str] = {}
     for family in sorted(by_family):
@@ -543,7 +543,7 @@ def _site_catalog_pages() -> dict[Path, str]:
 
 
 def _site_evidence_pages() -> dict[Path, str]:
-    classes = _evidence_specs()
+    classes = _evidence_classes()
     target = SITE_REFERENCE / "evidence"
     pages: dict[Path, str] = {}
     for name, body in classes.items():
@@ -572,10 +572,10 @@ def _site_evidence_pages() -> dict[Path, str]:
 
 
 def _site_report_schema_pages() -> dict[Path, str]:
-    specs = _report_schema_specs()
+    entries = _report_schema_rows()
     target = SITE_REFERENCE / "report-schemas"
     pages: dict[Path, str] = {}
-    for filename, schema, iri_path in specs:
+    for filename, schema, iri_path in entries:
         slug = filename[: -len(".schema.json")]
         title = schema.get("title") or filename
         body = f"{title}.\n\n" + _schema_body_text(schema, iri_path)
@@ -584,7 +584,7 @@ def _site_report_schema_pages() -> dict[Path, str]:
     rows = "\n".join(
         f"| [`{filename}`](/reference/report-schemas/{filename[: -len('.schema.json')]}/) | "
         f"{_md_cell(schema.get('title') or '')} |"
-        for filename, schema, _ in specs
+        for filename, schema, _ in entries
     )
     pages[target / "index.md"] = _frontmatter(
         "Report schemas", "Every JSON Schema AgentCE's outputs validate against."

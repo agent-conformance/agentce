@@ -33,7 +33,7 @@ def test_a_page_exists_for_every_command_adapter_and_family() -> None:
 
 def test_a_page_exists_for_every_evidence_class_and_report_schema() -> None:
     pages = {p.relative_to(build.DOCS).as_posix() for p in build.generate()}
-    for name in build._evidence_specs():
+    for name in build._evidence_classes():
         assert f"reference/evidence/{name}.md" in pages
     for path in (build.REPO_ROOT / "spec" / "report").glob("*.schema.json"):
         slug = path.name[: -len(".schema.json")]
@@ -47,14 +47,14 @@ def test_published_pages_are_current() -> None:
 
 def test_published_pages_cover_every_command_control_class_and_schema() -> None:
     pages = {p.relative_to(build.SITE_DOCS).as_posix() for p in build.generate_site()}
-    for name, _summary, _help in build._command_specs():
+    for name, _summary, _help in build._command_rows():
         assert f"reference/commands/{name}.md" in pages
-    for name in build._evidence_specs():
+    for name in build._evidence_classes():
         assert f"reference/evidence/{name}.md" in pages
-    for filename, _schema, _iri in build._report_schema_specs():
+    for filename, _schema, _iri in build._report_schema_rows():
         slug = filename[: -len(".schema.json")]
         assert f"reference/report-schemas/{slug}.md" in pages
-    for family in build._family_specs():
+    for family in build._family_groups():
         assert f"reference/catalog/{family}.md" in pages
     for slug in ("threat-model", "verification", "errors"):
         assert f"explanation/{slug}.md" in pages
