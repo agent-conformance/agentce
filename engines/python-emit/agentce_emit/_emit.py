@@ -2,13 +2,17 @@
 
 ``agentce-emit`` lets an agent emit canonical AgentCE evidence: ``agentce_emit.auto()`` is one line that
 returns an :class:`Emitter`, active when ``AGENTCE_EMIT=1`` and a no-op otherwise, so wiring it in never
-changes behaviour until it is switched on. Each event is an explicit ``emit_*`` call; capturing events
-automatically from an agent framework's own instrumentation is on the roadmap and is not built. Every
-event is a CloudEvents 1.0 envelope with a JSON-LD payload, labelled ``self_report`` (agent-side emission
-is a self-report, S-2), with content referenced by hash rather than captured (SPEC R12) and ids derived
-deterministically. On flush the
+changes behaviour until it is switched on. Most events are still an explicit ``emit_*`` call, but the
+one-line integration hooks a framework's own instrumentation where it exists: an
+:class:`AgentCESpanProcessor` (see :mod:`agentce_emit._span_processor`, built over the existing
+otel-genai mapping) turns spans a framework already produces into evidence, and ``auto()`` alone, with
+zero ``emit_*`` calls, still declares the one fact that is always true of a session that ran --
+started and ended -- rather than capturing nothing. Every event is a CloudEvents 1.0 envelope with a
+JSON-LD payload, labelled ``self_report`` (agent-side emission is a self-report, S-2), with content
+referenced by hash rather than captured (SPEC R12) and ids derived deterministically. On flush the
 emitter writes an evidence bundle (``events/*.jsonl`` + ``manifest.json``) that ``agentce validate``
-accepts with zero quarantines. Standard library only; no network, no learned component.
+accepts with zero quarantines. The core emitter is standard library only; the span-processor bridge to
+the otel-genai mapping is an optional extra. No network, no learned component.
 """
 
 from __future__ import annotations
@@ -58,6 +62,7 @@ class Emitter:
         source_class: str = "self_report",
         convention: str = DEFAULT_CONVENTION,
         active: bool = True,
+        declare_session_if_silent: bool = False,
     ) -> None:
         self.out = Path(out)
         self.subject = subject
@@ -69,6 +74,11 @@ class Emitter:
         self.active = active
         self.events: list[dict[str, Any]] = []
         self._flushed = False
+        #: Set only by :func:`auto` (SPEC 13.4 AX-3). The one-line integration must capture at
+        #: least one real event on its own; when nothing else was ever emitted, ``flush`` records
+        #: the one fact that is always true -- a declared session ran, start to end -- rather than
+        #: writing an empty bundle. A caller that emits anything itself is never touched.
+        self._declare_session_if_silent = declare_session_if_silent
 
     # --- envelope ---------------------------------------------------------------------------------
 
@@ -235,11 +245,27 @@ class Emitter:
             payload["incident_id"] = incident_id
         return self._emit("Incident", payload)
 
+    # --- pre-built events (SPEC 13.4 AX-3: AgentCESpanProcessor, adapters/otel-genai) ------------
+
+    def ingest_event(self, event: dict[str, Any]) -> None:
+        """Append one already-canonical event (built elsewhere, e.g. by an
+        :class:`~agentce_emit.AgentCESpanProcessor` translating spans through the otel-genai
+        mapping) exactly as given, with no re-derivation of its id or timestamp.
+        """
+        if not self.active:
+            return
+        self.events.append(event)
+
     # --- bundle -----------------------------------------------------------------------------------
 
     def flush(self) -> Path | None:
         """Write the collected events to an evidence bundle at ``out``; return the bundle path."""
-        if not self.active or self._flushed or not self.events:
+        if not self.active or self._flushed:
+            return None
+        if not self.events and self._declare_session_if_silent:
+            self.emit_session_start()
+            self.emit_session_end()
+        if not self.events:
             return None
         self._flushed = True
         events_dir = self.out / "events"
@@ -276,8 +302,13 @@ class Emitter:
 def auto(**overrides: Any) -> Emitter:
     """One-line setup (SPEC §13.4 AX-3): an :class:`Emitter`, active iff ``AGENTCE_EMIT=1``.
 
-    This returns the emitter and does nothing else: it does not hook any agent framework, so with no
-    ``emit_*`` calls it captures no events (automatic capture is on the roadmap, not built).
+    This is the one-line integration SPEC §13.4 AX-3 requires: it hooks the framework's own
+    instrumentation where it exists (register the returned emitter with an
+    :class:`AgentCESpanProcessor`/:func:`instrument`, or call its ``emit_*`` methods from a
+    framework's callbacks) and, even with no framework and no ``emit_*`` call at all, it still
+    declares one real, minimal fact on its own -- that an instrumented session ran, start to end --
+    rather than capturing nothing (see :attr:`Emitter._declare_session_if_silent`). Any explicit
+    event, from anywhere, is captured as normal and the declared-session fallback never applies.
 
     Reads ``AGENTCE_EMIT`` (activation), ``AGENTCE_EMIT_OUT`` (bundle directory),
     ``AGENTCE_EMIT_SUBJECT``, and ``AGENTCE_EMIT_SOURCE``; keyword overrides win. When active, the
@@ -303,6 +334,7 @@ def auto(**overrides: Any) -> Emitter:
         ),
         source_class=str(overrides.get("source_class", "self_report")),
         active=active,
+        declare_session_if_silent=True,
     )
     if active:
         atexit.register(emitter.flush)
