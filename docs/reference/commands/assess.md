@@ -10,6 +10,7 @@ usage: agentce assess [-h] [--json] [--debug] [--quiet] [--bundle BUNDLE]
                       [--allow-unverified-catalog] [--manual MANUAL]
                       [--probes PROBES] [--out OUT] [--state STATE]
                       [--report-language REPORT_LANGUAGE] [--emit EMIT]
+                      [--fail-on FAIL_ON]
 
 options:
   -h, --help            show this help message and exit
@@ -41,6 +42,13 @@ options:
                         fixed bundle: html, md, oscal, pack, sarif); one or
                         more of: md, html, oscal, sarif, public, pack, junit,
                         csv, oscal_xml, pdf, remediation
+  --fail-on FAIL_ON     gate the exit code on a tiny deterministic expression
+                        over assertion fields (control, subject, outcome,
+                        severity, family, rung, mode), e.g. 'outcome=="non-
+                        conformant" and severity=="high"' (comparisons joined
+                        by and/or; never a general expression language).
+                        Replaces the default any-non-conformant rule when
+                        given.
 
 global options:
   --json                emit machine-readable JSON on stdout
