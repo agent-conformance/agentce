@@ -16,3 +16,25 @@ the path below applies; it is documented now so it is ready.
 4. Work happens on feature branches; `main` is merged deliberately.
 5. Never commit secrets, credentials, personal data, or customer material. Test data is synthetic by
    construction.
+
+## Running the checks
+
+There is no root Python or Node project: every package under `engines/`, `adapters/`, `corpus/`,
+`conformance/`, `spec/`, `skills/`, `tools/`, and `examples/` is its own independent `uv` project
+with its own lockfile, and only `website/` is registered at the `pnpm` workspace root — so a bare
+`pytest` or `ruff` typed at the repository root has nothing to run against and fails. Run a
+package's checks from inside it. The reference engine, `engines/python`:
+
+```bash
+cd engines/python && uv run pytest -q
+```
+
+```bash
+cd engines/python && uv run ruff check . && uv run ruff format --check .
+```
+
+Every other Python package follows the same shape (`cd <package> && uv run pytest -q` /
+`uv run ruff check .`); Node packages that define their own `lint`/`test` scripts run the
+equivalent `pnpm --dir <package> test`. A step that genuinely cannot run offline in this harness
+(a one-time `uv sync`/`pnpm install`, or a step needing a live service) is marked with a `no-run`
+fence-suffix and a reason rather than left to fail silently.
