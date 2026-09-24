@@ -374,6 +374,30 @@ def test_validate_report_flags_missing_artifacts(tmp_path: Path) -> None:
     assert any("assertions.json" in p for p in problems)
 
 
+def test_extra_outputs_are_written_and_recorded_in_manifest(tmp_path: Path) -> None:
+    manifest = write_report(
+        tmp_path,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog("c", "1")],
+        extra_outputs={"runtime_drift.jsonl": b'{"subject": "x"}\n'},
+    )
+    assert (tmp_path / "runtime_drift.jsonl").read_bytes() == b'{"subject": "x"}\n'
+    assert "runtime_drift.jsonl" in manifest["outputs"]
+    assert validate_report(tmp_path) == []
+
+
+def test_no_extra_outputs_means_no_such_artifact(tmp_path: Path) -> None:
+    manifest = write_report(
+        tmp_path,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog("c", "1")],
+    )
+    assert not (tmp_path / "runtime_drift.jsonl").exists()
+    assert "runtime_drift.jsonl" not in manifest["outputs"]
+
+
 # --- render_junit -----------------------------------------------------------------------------
 
 

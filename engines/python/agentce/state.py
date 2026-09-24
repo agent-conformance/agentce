@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .assertions import Assertion
 from .errors import InputError
 
 STATE_VERSION = 1
@@ -56,6 +57,7 @@ class StateDir:
     bundle_digests: list[str] = field(default_factory=list)
     last_report_digest: str | None = None
     last_window_end: str | None = None
+    last_outcomes: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: Path) -> StateDir:
@@ -73,12 +75,17 @@ class StateDir:
                 ),
                 f"run `agentce state migrate --state {path}` before re-assessing.",
             )
+        # `last_outcomes` is a purely additive field (introduced after `state_version` 1 was fixed):
+        # a state directory written before it, or with no prior tracked pair, has no such key, and
+        # `{}` here means exactly that -- "no prior outcome recorded" -- never a version mismatch.
+        raw_outcomes = data.get("last_outcomes", {})
         return cls(
             path=path,
             version=version,
             bundle_digests=list(data.get("bundle_digests", [])),
             last_report_digest=data.get("last_report_digest"),
             last_window_end=data.get("last_window_end"),
+            last_outcomes=dict(raw_outcomes) if isinstance(raw_outcomes, dict) else {},
         )
 
     def save(self) -> None:
@@ -88,6 +95,7 @@ class StateDir:
             "bundle_digests": sorted(set(self.bundle_digests)),
             "last_report_digest": self.last_report_digest,
             "last_window_end": self.last_window_end,
+            "last_outcomes": dict(sorted(self.last_outcomes.items())),
         }
         (self.path / STATE_FILE).write_text(
             json.dumps(payload, sort_keys=True, indent=2) + "\n", encoding="utf-8"
@@ -111,6 +119,37 @@ class StateDir:
                     stream = _stream(event)
                     late[stream] = late.get(stream, 0) + 1
         return [self.last_report_digest], dict(sorted(late.items()))
+
+    def drift(self, assertions: list[Assertion]) -> list[dict[str, Any]]:
+        """Diff this run's outcomes against the last one recorded for each ``(subject, control)``
+        pair (SPEC.md:249 DC-9/HR-10, SPEC.md:166 Art. 72); update ``last_outcomes`` in place for
+        :meth:`record`/:meth:`save` to persist, and return the drift entries, sorted by
+        ``(subject, control)`` for determinism.
+
+        A pair with no prior recorded outcome (a brand-new state directory, a pre-16.2 one, or a pair
+        never seen before) reports no drift for that pair -- there is nothing yet to compare against;
+        it is only added to ``last_outcomes`` so the *next* run can compare. Re-running the identical
+        bundle digest re-evaluates to the identical outcomes, so it also reports no drift, without any
+        special-cased no-op check."""
+        entries: list[dict[str, Any]] = []
+        updated = dict(self.last_outcomes)
+        for assertion in sorted(assertions, key=lambda a: (a.subject, a.control)):
+            key = f"{assertion.subject}|{assertion.control}"
+            prior = self.last_outcomes.get(key)
+            prior_outcome = prior.get("outcome") if isinstance(prior, dict) else None
+            if prior_outcome is not None and prior_outcome != assertion.outcome:
+                entries.append(
+                    {
+                        "subject": assertion.subject,
+                        "control": assertion.control,
+                        "previous_outcome": prior_outcome,
+                        "outcome": assertion.outcome,
+                        "evidence": sorted({e.ref for e in assertion.evidence}),
+                    }
+                )
+            updated[key] = {"outcome": assertion.outcome}
+        self.last_outcomes = updated
+        return entries
 
     def record(
         self, bundle_digest: str, manifest_path: Path, new_window_end: str
