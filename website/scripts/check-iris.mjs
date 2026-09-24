@@ -20,6 +20,7 @@ const ORIGIN = 'https://agent-conformance.org';
 // Canonical IRIs that spec/ references as identifiers, not as served documents.
 const KNOWN_NON_RESOURCE = new Map([
   ['/catalogs/base/eu-ai-act', 'catalog provenance source identifier (catalog.yaml provenance.source)'],
+  ['/catalogs/base/nist-ai-rmf', 'catalog provenance source identifier (catalog.yaml provenance.source)'],
   ['/oscal/component-definition', 'UUID5 namespace for OSCAL component identifiers'],
 ]);
 
