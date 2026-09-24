@@ -1142,3 +1142,28 @@ jobs:
       - name: Accessibility gate can fail (axe self-test over the inaccessible fixture)
         working-directory: website
         run: node scripts/check-a11y.mjs --self-test
+
+  a11y-statement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install dependencies
+        working-directory: website
+        run: pnpm install --frozen-lockfile
+      - name: Build the static site
+        working-directory: website
+        run: pnpm build
+      - name: Accessibility statement, VPAT, and manual test protocol source is present and complete (self-test, then the real source)
+        run: |
+          python3 website/scripts/check-a11y-docs.py --self-test
+          python3 website/scripts/check-a11y-docs.py
+      - name: Accessibility statement, VPAT, and manual test protocol are built, linked, and complete (self-test, then the real site)
+        working-directory: website
+        run: |
+          node scripts/check-a11y-statement.mjs --self-test
+          node scripts/check-a11y-statement.mjs
