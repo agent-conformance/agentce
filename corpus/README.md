@@ -31,3 +31,16 @@ output on any machine (HR-1). Each project carries its authored ground truth in 
 and a narrative `README.md`; the corpus test suite proves those outcomes against the reference engine,
 so the precision/recall gate (SPEC §11.6) sees recall 1.0 on seeded faults and a false-positive rate of
 0.0 on known-pass controls.
+
+## Full corpus
+
+`--set full` emits the full corpus (SPEC §11.2): three domains crossed with the implementation styles
+and seven variants (minus the recipes reserved for the held-out and adversarial subsets), plus
+multi-agent, held-out, and adversarial projects — roughly 130 projects in all:
+
+```
+uv run --project corpus python -m corpus.generator --set full --out out/corpus-full
+```
+
+Every project in the full set carries the same authored ground truth, applicability profile, domain
+binding, and deviation register as the Phase-1 subset, and is covered by the same determinism guarantee.
