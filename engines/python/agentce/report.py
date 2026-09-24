@@ -1787,7 +1787,12 @@ def _validate_csv(path: Path) -> list[str]:
 #: The optional new artifacts (SPEC §9): validated when a run actually produced them (`--emit`, or for
 #: `runtime_drift.jsonl`, `--state`), unlike `_ARTIFACT_SCHEMAS`'s entries, which every run has always
 #: written and whose absence is itself a problem.
-_OPTIONAL_ARTIFACTS = ("report.junit.xml", "oscal-ar.xml", "report.csv", "runtime_drift.jsonl")
+_OPTIONAL_ARTIFACTS = (
+    "report.junit.xml",
+    "oscal-ar.xml",
+    "report.csv",
+    "runtime_drift.jsonl",
+)
 
 
 def _recorded_outputs(out_dir: Path) -> dict[str, str]:

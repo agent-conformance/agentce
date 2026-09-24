@@ -26,7 +26,10 @@ def _assertion(
         population=(1, 0),
         severity="high",
         family=control.split("-", 1)[0],
-        evidence=[EvidencePointer(ref=r, digest="sha256:" + "a" * 64, source_class="x") for r in evidence],
+        evidence=[
+            EvidencePointer(ref=r, digest="sha256:" + "a" * 64, source_class="x")
+            for r in evidence
+        ],
     )
 
 
@@ -121,7 +124,9 @@ def test_drift_is_silent_on_an_unchanged_outcome(tmp_path: Path) -> None:
 def test_drift_reports_a_changed_outcome_with_its_evidence(tmp_path: Path) -> None:
     state = StateDir.load(tmp_path / "s")
     state.drift([_assertion("x", "INC-02", "conformant", evidence=("e1",))])
-    entries = state.drift([_assertion("x", "INC-02", "non-conformant", evidence=("e2",))])
+    entries = state.drift(
+        [_assertion("x", "INC-02", "non-conformant", evidence=("e2",))]
+    )
     assert entries == [
         {
             "subject": "x",
