@@ -46,6 +46,25 @@
   --radius: 10px;
   --radius-sm: 6px;
 
+  /* Modular type scale (rem, ~1.25 ratio) — headings and lede copy pick a step instead of
+   * inventing a one-off font-size at the call site. */
+  --step-1: 0.875rem;
+  --step-2: 1rem;
+  --step-3: 1.25rem;
+  --step-4: 1.5rem;
+  --step-5: 2rem;
+  --step-6: 2.75rem;
+
+  /* Modular spacing scale (rem) — section padding and grid/flex gaps pick a step instead of a
+   * one-off rem value. */
+  --space-1: 0.5rem;
+  --space-2: 0.75rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2rem;
+  --space-6: 3rem;
+  --space-7: 4rem;
+
   /* Starlight overrides so the docs inherit the same identity. */
   --sl-font: var(--font-body);
   --sl-font-mono: var(--font-mono);
