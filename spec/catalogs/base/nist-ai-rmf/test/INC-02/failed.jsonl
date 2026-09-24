@@ -1,0 +1,1 @@
+{"id":"inc1","source":"urn:src:register","subject":"spiffe://corp/agents/a","time":"2026-01-01T00:00:00Z","type":"org.agent-conformance.evidence.Incident.v1","agentcesourceclass":"independent_system","data":{"@type":"Incident"}}
