@@ -2,6 +2,10 @@
 #   - leak-guard: no private term in added file content or a commit message, and no commit-denylisted
 #     term in a commit message -- matched against salted digests, so neither list is ever disclosed.
 #   - spec-validators: the evidence vocabulary and the worked examples stay internally consistent.
+#   - catalog-lint: every base catalog lints clean (schema, shapes, test-case outcomes, provenance);
+#     a catalog built from a companion crosswalk file substantiates every crosswalk claim it makes; the
+#     bring-your-own catalog-authoring toolkit rejects a forbidden SHACL construct; and every documented
+#     command on the catalog-authoring page actually runs against the real CLI.
 # Every action is pinned by commit SHA. Minimal permissions and the default `pull_request` trigger
 # (never the privileged target-context variant, and no secrets) so this runs safely on fork pull
 # requests too: the guard reads only committed salted digests, never the private lists.
@@ -51,3 +55,36 @@ jobs:
         run: uv run --project spec/vocab --frozen python spec/vocab/check_vocab.py
       - name: Validate the worked examples against their schemas (validate_examples.py)
         run: uv run --project spec --frozen python spec/validate_examples.py
+
+  catalog-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Lint every base catalog (schema, shapes, test-case outcomes)
+        run: |
+          for dir in spec/catalogs/base/*/; do
+            uv run --project engines/python --frozen agentce catalog lint --require-provenance "$dir"
+          done
+      - name: nist-ai-rmf substantiates every crosswalk claim it makes (self-test, then the real catalog)
+        run: |
+          uv run --project tools --frozen python -m nist_catalog_substantiation_check --self-test
+          uv run --project tools --frozen python -m nist_catalog_substantiation_check \
+            spec/catalogs/base/nist-ai-rmf spec/catalogs/base/eu-ai-act/crosswalk/nist-ai-rmf.yaml
+      - name: Catalog-authoring toolkit rejects a forbidden SHACL construct (self-test)
+        run: uv run --project tools --frozen python -m catalog_authoring_check --self-test
+      - name: Documented catalog-authoring commands actually run (doc-test harness, page-scoped and site-wide)
+        run: |
+          uv run --project tools --frozen python -m docs_doctest_check --self-test
+          uv run --project tools --frozen python -c "
+          import sys; sys.path.insert(0, 'tools')
+          from docs_doctest_check import extract
+          from pathlib import Path
+          p = Path('website/src/content/docs/docs/catalog-authoring.md')
+          blocks = [b for b in extract(str(p), p.read_text()) if not b.error and b.no_run_reason is None]
+          assert len(blocks) >= 4, f'only {len(blocks)} runnable blocks'
+          "
+          uv run --project tools --frozen python -m docs_doctest_check
