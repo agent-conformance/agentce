@@ -486,3 +486,28 @@ jobs:
         run: uv run --project tools --frozen python tools/reusable_ci_artifacts_check.py --self-test
       - name: The composite action, the reusable workflow, and the GitLab component are real
         run: uv run --project tools --frozen python tools/reusable_ci_artifacts_check.py
+
+  contributor-lane:
+    # A newcomer's first three trust signals: CONTRIBUTING.md's documented commands genuinely test
+    # the code (observed by running them and requiring them to catch a seeded broken test and a
+    # seeded lint violation in the reference engine, never by parsing the shell), a real Code of
+    # Conduct with no fabricated enforcement contact, and real GitHub issue/pull-request templates.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Sync the reference engine (engines/python)
+        working-directory: engines/python
+        run: uv sync --frozen
+      - name: contributing_doctest_check self-test
+        run: uv run --project tools --frozen python tools/contributing_doctest_check.py --self-test
+      - name: CONTRIBUTING.md's documented commands genuinely run pytest and ruff
+        run: uv run --project tools --frozen python tools/contributing_doctest_check.py
+      - name: code_of_conduct_check self-test
+        run: uv run --project tools --frozen python tools/code_of_conduct_check.py --self-test
+      - name: Code of Conduct and contribution templates are real
+        run: uv run --project tools --frozen python tools/code_of_conduct_check.py
