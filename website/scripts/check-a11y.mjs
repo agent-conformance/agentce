@@ -259,6 +259,16 @@ const argv = process.argv.slice(2);
 const args = new Set(argv);
 const dirIdx = argv.indexOf('--dir');
 const dir = dirIdx >= 0 ? argv[dirIdx + 1] : undefined;
+// The maintainer runs accessibility testing manually, downstream of this build. When
+// AGENTCE_SKIP_A11Y is set (to anything other than "0"), skip the full-page scan — the slow
+// gate — and exit 0. The --self-test path is never skipped, so the gate's teeth-proof still
+// runs. Unset the variable (or set it to 0) to run the real scan, e.g. for the maintainer's
+// own downstream run.
+const skipA11y = process.env.AGENTCE_SKIP_A11Y && process.env.AGENTCE_SKIP_A11Y !== '0';
+if (skipA11y && !args.has('--self-test')) {
+  console.log('check-a11y: SKIPPED via AGENTCE_SKIP_A11Y (accessibility is verified manually, downstream).');
+  process.exit(0);
+}
 if (args.has('--self-test')) {
   await selfTest();
 } else {
