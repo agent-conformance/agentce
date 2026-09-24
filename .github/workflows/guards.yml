@@ -6,6 +6,8 @@
 #     a catalog built from a companion crosswalk file substantiates every crosswalk claim it makes; the
 #     bring-your-own catalog-authoring toolkit rejects a forbidden SHACL construct; and every documented
 #     command on the catalog-authoring page actually runs against the real CLI.
+#   - runtime-conformance: a state-tracked series of real `agentce assess --state` runs detects
+#     per-(subject, control) outcome drift and captures the incident evidence that caused it.
 # Every action is pinned by commit SHA. Minimal permissions and the default `pull_request` trigger
 # (never the privileged target-context variant, and no secrets) so this runs safely on fork pull
 # requests too: the guard reads only committed salted digests, never the private lists.
@@ -88,3 +90,23 @@ jobs:
           assert len(blocks) >= 4, f'only {len(blocks)} runnable blocks'
           "
           uv run --project tools --frozen python -m docs_doctest_check
+
+  runtime-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Negative cases discriminate (self-test)
+        working-directory: conformance
+        run: uv run --frozen python runtime_conformance_check.py --self-test
+      - name: The real three-step drift scenario, twice, for determinism
+        working-directory: conformance
+        run: uv run --frozen python runtime_conformance_check.py
+      - name: This guard job is really wired (self-test, then the real check)
+        working-directory: conformance
+        run: |
+          uv run --frozen python runtime_conformance_check.py --check-guard --self-test
+          uv run --frozen python runtime_conformance_check.py --check-guard
