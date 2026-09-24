@@ -21,10 +21,16 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # A bare pull_request checkout puts GitHub's synthetic, sign-off-less test-merge commit
+          # (refs/pull/N/merge) at HEAD, which would always fail this check for a reason that has
+          # nothing to do with the contributor's own commits. Pin HEAD to the real PR head instead.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0 # need the base commit to enumerate the pushed/PR commit range
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
+      - name: Fetch main (so an unresolvable base can fall back to a merge-base, never a silent pass)
+        run: git fetch --no-tags origin main:refs/remotes/origin/main
       - name: dco_check self-test (proves detection has teeth)
         run: python tools/dco_check.py --self-test
       - name: Determine the commit range
