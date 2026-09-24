@@ -440,3 +440,36 @@ claims:
         On every pull request, builds the site and checks that the accessibility statement, VPAT, and
         manual test protocol pages are built, linked from the site's own navigation, and still carry
         every required structural element (self-tested first against a good/bad fixture set).
+  - id: catalog.second-base-catalog
+    text: >-
+      A second standards-body base catalog, NIST AI RMF, is a real catalog that loads through the same
+      `agentce catalog lint` / `agentce assess --catalog` path as the EU AI Act catalog, with its own
+      signature and provenance digest, no engine code change. It currently substantiates the six control
+      subcategories the existing EU-AI-Act-to-NIST-AI-RMF crosswalk already maps with runtime evidence;
+      full AI RMF coverage is roadmap.
+    status: built
+    pages:
+      - website/src/content/docs/docs/catalog-authoring.md
+    check:
+      workflow: .github/workflows/guards.yml
+      job: catalog-lint
+      description: >-
+        Lints every base catalog (including nist-ai-rmf) with provenance required, and runs a
+        dedicated substantiation checker confirming every crosswalk entry the catalog carries is
+        unverified-by-design and maps to a control the companion crosswalk file actually substantiates.
+  - id: catalog.bring-your-own
+    text: >-
+      A third party can author a control catalog for their own standard or internal rule set, lint it,
+      sign it, and load it with `--catalog-dir`, without forking or changing any of the three engines.
+      The authoring toolkit rejects a SHACL shape that uses a forbidden SPARQL- or script-based
+      construct by a specific, stable message key rather than accepting it silently.
+    status: built
+    pages:
+      - website/src/content/docs/docs/catalog-authoring.md
+    check:
+      workflow: .github/workflows/guards.yml
+      job: catalog-lint
+      description: >-
+        Runs the catalog-authoring toolkit's self-test (a clean synthetic catalog lints; the same
+        catalog with an sh:sparql shape is rejected by name) and the doc-test harness against the
+        catalog-authoring page's commands.
