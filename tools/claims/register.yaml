@@ -421,3 +421,22 @@ claims:
     status: roadmap
     pages:
       - skills/README.md
+  - id: a11y.statement-vpat
+    text: >-
+      The website publishes an EU-model accessibility statement, a VPAT 2.5 mapped to EN 301 549
+      clauses 9 (Web), 10 (Non-web documents), and 11 (Software), and a manual accessibility test
+      protocol (screen reader, keyboard-only, 200%-400% zoom/reflow, forced-colors). Every VPAT
+      criterion honestly reads "Not Evaluated" with the automated axe-core evidence recorded in
+      Remarks, until a person runs the manual protocol and records a real conformance level.
+    status: built
+    pages:
+      - website/src/content/docs/docs/accessibility-statement.md
+      - website/src/content/docs/docs/vpat.md
+      - website/src/content/docs/docs/accessibility-testing-protocol.md
+    check:
+      workflow: .github/workflows/website.yml
+      job: a11y-statement
+      description: >-
+        On every pull request, builds the site and checks that the accessibility statement, VPAT, and
+        manual test protocol pages are built, linked from the site's own navigation, and still carry
+        every required structural element (self-tested first against a good/bad fixture set).
