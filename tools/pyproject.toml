@@ -10,7 +10,14 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-py-modules = ["claims_check", "docs_doctest_check", "governance_check", "placeholder_sweep"]
+py-modules = [
+  "catalog_authoring_check",
+  "claims_check",
+  "docs_doctest_check",
+  "governance_check",
+  "nist_catalog_substantiation_check",
+  "placeholder_sweep",
+]
 
 [dependency-groups]
 dev = [
