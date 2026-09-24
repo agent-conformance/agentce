@@ -422,6 +422,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     state: StateDir | None = None
     supersedes: list[str] = []
     late_events: dict[str, int] = {}
+    runtime_drift: list[dict[str, Any]] = []
     new_window_end = window_end(profile_obj, ingested.accepted)
     if state_arg is not None:
         state = StateDir.load(
@@ -430,6 +431,10 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         supersedes, late_events = state.plan(
             loaded.digest, ingested.accepted, new_window_end
         )
+        # Runtime/continuous conformance (SPEC.md:249 DC-9/HR-10): diff this run's per-(subject,
+        # control) outcomes against the state directory's last recorded ones before write_report, so
+        # a drifted pair's runtime_drift.jsonl line and its manifest digest land in the same run.
+        runtime_drift = state.drift(evaluated)
     command_name = _opt_str(ns, "command_name") or "assess"
     invocation = (
         ["quickstart"]
@@ -454,6 +459,13 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         reverify_argv += ["--catalog-dir", _scrub_path(catalog_dir)]
     if domain_path is not None:
         reverify_argv += ["--domain", _scrub_path(domain_path)]
+    extra_outputs: dict[str, bytes] | None = None
+    if runtime_drift:
+        extra_outputs = {
+            "runtime_drift.jsonl": (
+                "\n".join(json.dumps(e, sort_keys=True) for e in runtime_drift) + "\n"
+            ).encode("utf-8")
+        }
     write_report(
         out_dir,
         evaluated,
@@ -467,6 +479,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         emit=emit,
         events=ingested.accepted,
         reverify_command=reverify_argv,
+        extra_outputs=extra_outputs,
     )
     if state is not None:
         state.record(loaded.digest, out_dir / "manifest.json", new_window_end)
@@ -495,6 +508,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     if state is not None:
         result.data["supersedes"] = supersedes
         result.data["late_events"] = late_events
+        result.data["runtime_drift"] = runtime_drift
     if limitations:
         # The override is never silent: it is on stderr for the operator and in the manifest and the
         # claim for every later reader (SPEC §8.7).

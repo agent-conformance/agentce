@@ -1417,6 +1417,7 @@ def write_report(
     emit: frozenset[str] | None = None,
     events: list[dict[str, Any]] | None = None,
     reverify_command: list[str] | None = None,
+    extra_outputs: dict[str, bytes] | None = None,
 ) -> dict[str, Any]:
     """Write every report artifact for ``assertions`` and return the reproducibility manifest.
 
@@ -1433,7 +1434,13 @@ def write_report(
 
     ``events`` (the accepted, ingested events ``remediation`` was computed from) and
     ``reverify_command`` (the actual re-verify argv, SPEC §7) feed the ``remediation`` emission only;
-    both default to a safe empty fallback so every other caller is unaffected."""
+    both default to a safe empty fallback so every other caller is unaffected.
+
+    ``extra_outputs`` writes each ``name: bytes`` pair verbatim through the same accounting every
+    other artifact uses (its digest lands in the returned manifest's ``outputs`` map), for artifacts
+    a caller computes itself outside the formats above -- today only the incremental-state caller's
+    ``runtime_drift.jsonl`` (SPEC.md:249 DC-9/HR-10). Never gated by ``emit``: like ``assertions.json``,
+    a caller that passes one always gets it written."""
     check_dc5(
         assertions
     )  # DC-5: refuse a supporting verdict without an evidence pointer
@@ -1475,6 +1482,9 @@ def write_report(
         return token in emit
 
     write_json("assertions.json", [a.to_json() for a in assertions])
+
+    for name, data in (extra_outputs or {}).items():
+        write_bytes(name, data)
 
     if wants("md"):
         write_text(
@@ -1734,6 +1744,19 @@ def _validate_xml_wellformed(path: Path) -> list[str]:
     return []
 
 
+def _validate_jsonl(path: Path) -> list[str]:
+    """Every non-blank line of ``path`` parses as its own JSON object."""
+    problems = []
+    for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            json.loads(line)
+        except json.JSONDecodeError as exc:
+            problems.append(f"{path.name}: line {i} is not valid JSON ({exc.msg})")
+    return problems
+
+
 def _validate_csv(path: Path) -> list[str]:
     """A ``report.csv`` is valid iff it parses as CSV, carries every column in
     :data:`CSV_COLUMNS`, and every row has the same field count as the header -- enough to accept a
@@ -1761,10 +1784,10 @@ def _validate_csv(path: Path) -> list[str]:
     return problems
 
 
-#: The optional new artifacts (SPEC §9): validated when a run's `--emit` produced them, unlike
-#: `_ARTIFACT_SCHEMAS`'s entries, which every run has always written and whose absence is itself a
-#: problem.
-_OPTIONAL_ARTIFACTS = ("report.junit.xml", "oscal-ar.xml", "report.csv")
+#: The optional new artifacts (SPEC §9): validated when a run actually produced them (`--emit`, or for
+#: `runtime_drift.jsonl`, `--state`), unlike `_ARTIFACT_SCHEMAS`'s entries, which every run has always
+#: written and whose absence is itself a problem.
+_OPTIONAL_ARTIFACTS = ("report.junit.xml", "oscal-ar.xml", "report.csv", "runtime_drift.jsonl")
 
 
 def _recorded_outputs(out_dir: Path) -> dict[str, str]:
@@ -1836,6 +1859,8 @@ def validate_report(out_dir: Path) -> list[str]:
             continue  # optional: only present, and only validated, when `--emit` requested it
         if filename == "report.csv":
             problems += _validate_csv(path)
+        elif filename == "runtime_drift.jsonl":
+            problems += _validate_jsonl(path)
         else:
             problems += _validate_xml_wellformed(path)
     return problems
