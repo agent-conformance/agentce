@@ -7,27 +7,27 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
 const features = [
   {
-    title: 'Deterministic',
+    title: 'Same verdict on every machine',
     body: 'No learned component decides an outcome. The same evidence and rules produce the same verdict on every run, on every machine.',
   },
   {
-    title: 'Model-free evidence',
+    title: 'It never guesses',
     body: 'The engine reads structured evidence and evaluates it against explicit rules. What it cannot verify, it reports as insufficient — it never guesses.',
   },
   {
-    title: 'Vendor-neutral',
+    title: 'A result means the same everywhere',
     body: 'One specification and one control catalog. Agents and frameworks are assessed on the same terms, so a result means the same thing everywhere.',
   },
   {
-    title: 'Reproducible',
+    title: 'Reproduce it byte for byte',
     body: 'Reports have a canonical byte form. Independent engines in Python, TypeScript, and Java produce byte-identical assertions.json over the simulated corpus.',
   },
   {
-    title: 'Verifiable',
+    title: 'Check the evidence yourself',
     body: 'Implementation reports and catalogs are signed and content-addressed. Evidence checks out against its source — claims you can confirm, not take on faith.',
   },
   {
-    title: 'CI-ready',
+    title: 'Gate every change, offline',
     body: 'Scriptable, exit-code driven, and runnable with networking disabled. Assess an agent on every change before it reaches production.',
   },
 ];
@@ -121,6 +121,10 @@ const faqs = [
         <a class="button" href="https://github.com/agent-conformance/agentce">View on GitHub</a>
       </div>
       <p class="disclaimer">A conformant result is not a certification.</p>
+      <div class="try-it">
+        <p class="try-it-label">Copy it and run it yourself, offline:</p>
+        <pre class="try-it-cmd"><code>$ agentce quickstart --out ./out</code></pre>
+      </div>
     </div>
 
     <figure class="terminal" aria-label="Running an assessment with the command-line engine">
@@ -219,7 +223,7 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
 
   <section class="band" aria-labelledby="features-title">
     <div class="inner">
-      <h2 id="features-title">Built to be trusted, not just believed.</h2>
+      <h2 id="features-title">What you get once evidence replaces assurances.</h2>
       <ul class="feature-grid">
         {
           features.map((f) => (
@@ -314,10 +318,9 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
         Run the bundled example end to end, then point the engine at your own agent. Everything is open
         source and Apache-2.0 licensed.
       </p>
-      <div class="actions">
-        <a class="button primary" href="/docs/getting-started/">Read the docs</a>
-        <a class="button" href="https://github.com/agent-conformance/agentce">Browse the source</a>
-      </div>
+      <p class="band-lede cta-links">
+        <a href="/docs/getting-started/">Read the docs</a> or <a href="https://github.com/agent-conformance/agentce">browse the source</a> — everything here is real, and yours to run.
+      </p>
     </div>
   </section>
 
@@ -325,33 +328,33 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
     .inner {
       max-width: var(--measure);
       margin: 0 auto;
-      padding: 0 1.5rem;
+      padding: 0 var(--space-4);
     }
     .band {
-      padding: 4rem 0;
+      padding: var(--space-7) 0;
       border-top: 1px solid var(--border);
     }
     .band h2 {
       font-family: var(--font-display);
       font-size: clamp(1.5rem, 3.5vw, 2.1rem);
       letter-spacing: -0.02em;
-      margin: 0 0 2rem;
+      margin: 0 0 var(--space-5);
       max-width: 24ch;
     }
     .band-lede {
       color: var(--text-muted);
       font-size: 1.1rem;
       max-width: 60ch;
-      margin: -1rem 0 2rem;
+      margin: -1rem 0 var(--space-5);
     }
 
     /* Hero */
     .hero {
       max-width: var(--measure);
       margin: 0 auto;
-      padding: 4.5rem 1.5rem 3rem;
+      padding: 4.5rem var(--space-4) var(--space-6);
       display: grid;
-      gap: 3rem;
+      gap: var(--space-6);
       grid-template-columns: 1fr;
       align-items: center;
     }
@@ -365,7 +368,7 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
       font-weight: 600;
       font-size: 0.9rem;
       letter-spacing: 0.02em;
-      margin: 0 0 1rem;
+      margin: 0 0 var(--space-3);
     }
     .hero h1 {
       font-family: var(--font-display);
@@ -379,17 +382,36 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
       font-size: clamp(1.05rem, 2vw, 1.2rem);
       color: var(--text-muted);
       max-width: 60ch;
-      margin: 0 0 2rem;
+      margin: 0 0 var(--space-5);
     }
     .actions {
       display: flex;
-      gap: 0.75rem;
+      gap: var(--space-2);
       flex-wrap: wrap;
     }
     .disclaimer {
-      margin: 1rem 0 0;
+      margin: var(--space-3) 0 0;
       font-size: 0.85rem;
       color: var(--text-muted);
+    }
+    .try-it {
+      margin-top: var(--space-4);
+    }
+    .try-it-label {
+      margin: 0 0 0.4rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .try-it-cmd {
+      margin: 0;
+      display: inline-block;
+      padding: 0.6rem 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-raised);
+      font-family: var(--font-mono);
+      font-size: 0.86rem;
+      color: var(--text);
     }
     .button {
       display: inline-flex;
@@ -426,7 +448,7 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
     .terminal-bar {
       display: flex;
       gap: 0.4rem;
-      padding: 0.75rem 1rem;
+      padding: var(--space-2) var(--space-3);
       border-bottom: 1px solid var(--border);
       background: var(--bg-subtle);
     }
@@ -463,13 +485,13 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
     /* Narrative */
     .narrative-grid {
       display: grid;
-      gap: 2rem;
+      gap: var(--space-5);
       grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
     }
     .narrative-grid h3 {
       font-family: var(--font-display);
       font-size: 1.05rem;
-      margin: 0 0 0.5rem;
+      margin: 0 0 var(--space-1);
       color: var(--accent-strong);
     }
     .narrative-grid p {
@@ -489,7 +511,7 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
     .feature-grid h3 {
       font-family: var(--font-display);
       font-size: 1.15rem;
-      margin: 0 0 0.5rem;
+      margin: 0 0 var(--space-1);
     }
     .feature-grid p {
       margin: 0;
@@ -505,14 +527,14 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
       margin: 0;
       padding: 0;
       display: grid;
-      gap: 1rem;
+      gap: var(--space-3);
     }
     .artifact-list li {
       display: flex;
       flex-wrap: wrap;
       align-items: baseline;
-      gap: 0.5rem 1rem;
-      padding: 1rem 1.25rem;
+      gap: var(--space-1) var(--space-3);
+      padding: var(--space-3) 1.25rem;
       border: 1px solid var(--border);
       border-radius: var(--radius);
       background: var(--bg-raised);
@@ -533,11 +555,11 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
       margin: 0;
       padding: 0;
       display: grid;
-      gap: 1rem;
+      gap: var(--space-3);
       grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
     }
     .proof-list li {
-      padding: 1rem 1.25rem;
+      padding: var(--space-3) 1.25rem;
       border: 1px solid var(--border);
       border-radius: var(--radius);
       background: var(--bg-raised);
@@ -561,9 +583,9 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
     /* Show, don't tell */
     .action-grid {
       display: grid;
-      gap: 1.5rem;
+      gap: var(--space-4);
       grid-template-columns: 1fr;
-      margin-bottom: 1.5rem;
+      margin-bottom: var(--space-4);
     }
     @media (min-width: 60rem) {
       .action-grid {
@@ -610,7 +632,7 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
     .faq-list {
       margin: 0;
       display: grid;
-      gap: 1.5rem;
+      gap: var(--space-4);
     }
     .faq-item {
       border-top: 1px solid var(--border);
@@ -624,7 +646,7 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
       font-family: var(--font-display);
       font-weight: 600;
       font-size: 1.05rem;
-      margin: 0 0 0.5rem;
+      margin: 0 0 var(--space-1);
     }
     .faq-item dd {
       margin: 0;
@@ -639,8 +661,8 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
       flex-direction: column;
       align-items: center;
     }
-    .cta .actions {
-      justify-content: center;
+    .cta-links {
+      margin: 0;
     }
   </style>
 </BaseLayout>
