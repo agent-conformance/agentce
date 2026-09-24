@@ -72,6 +72,27 @@ def _signoff_emails(body: str) -> list[str]:
     return out
 
 
+ZERO_SHA = "0" * 40
+
+
+def _resolve_base(base: str, cwd: str | Path | None = None) -> str | None:
+    """Resolve `base` to a real commit. `base` is unusable when it is empty, the all-zero sentinel
+    GitHub sends as `before` on a new branch's first push, or any other ref that does
+    not exist in this clone -- in every one of those cases, fall back to the merge-base with the
+    remote default branch, so only commits genuinely new to this branch are ever checked. Returns
+    None only when even that fallback fails, so the caller can refuse to silently pass rather than
+    treat an unresolvable range as an empty, and therefore compliant, one."""
+    if base and base != ZERO_SHA:
+        ok = _git(["rev-parse", "--verify", "--quiet", f"{base}^{{commit}}"], cwd=cwd)
+        if ok:
+            return ok.strip()
+    for candidate in ("origin/main", "origin/HEAD", "main"):
+        mb = _git(["merge-base", "HEAD", candidate], cwd=cwd)
+        if mb.strip():
+            return mb.strip()
+    return None
+
+
 def violations(commits: list[dict[str, str]]) -> list[str]:
     """Return one 'dco.<key> <sha>: <reason>' string per offending commit; empty means clean."""
     out = []
@@ -161,6 +182,54 @@ def self_test() -> int:
             pinned,
         )
 
+        # A GitHub pull_request event's default checkout puts a synthetic, sign-off-less
+        # test-merge commit at HEAD (refs/pull/N/merge); prove this check would flag one if it
+        # were ever left in range -- CI avoids that by checking out the real PR head instead
+        # (see .github/workflows/ci.yml), never by weakening this check.
+        _git(["reset", "-q", "--hard", base], cwd=repo)
+        commit(
+            "feat: a real change\n\nSigned-off-by: Ada Lovelace <ada@example.test>",
+            "Ada Lovelace",
+            "ada@example.test",
+        )
+        real_head = _git(["rev-parse", "HEAD"], cwd=repo).strip()
+        commit(f"Merge {real_head} into {base}", "GitHub", "noreply@github.com")
+        with_merge = violations(_commits(f"{base}..HEAD", cwd=repo))
+        assert len(with_merge) == 1 and with_merge[0].startswith(KEY_MISSING), (
+            "a sign-off-less synthetic merge commit left in range must be flagged",
+            with_merge,
+        )
+        without_merge = violations(_commits(f"{base}..{real_head}", cwd=repo))
+        assert not without_merge, (
+            "the real PR head range, excluding the merge commit, must be clean"
+        )
+
+    # _resolve_base must never let an unresolvable range read as compliant: with no usable base and
+    # no default-branch ref to fall back to, it must fail closed (None), not silently return "".
+    with tempfile.TemporaryDirectory() as td2:
+        lone = Path(td2)
+        _git(["init", "-q", "-b", "feature"], cwd=lone)
+        _git(["config", "user.name", "sandbox"], cwd=lone)
+        _git(["config", "user.email", "sandbox@example.test"], cwd=lone)
+        subprocess.run(
+            ["git", "commit", "-q", "--allow-empty", "-m", "root"],
+            cwd=str(lone),
+            check=True,
+        )
+        assert _resolve_base("deadbeef" * 5, cwd=lone) is None, (
+            "an unresolvable base with no fallback ref must resolve to None, never a silent pass"
+        )
+        assert _resolve_base(ZERO_SHA, cwd=lone) is None, (
+            "the all-zero sentinel with no fallback ref must resolve to None, never a silent pass"
+        )
+        # With a default-branch ref present, an unresolvable base correctly falls back to it.
+        _git(["branch", "main"], cwd=lone)
+        resolved = _resolve_base("deadbeef" * 5, cwd=lone)
+        assert resolved == _git(["rev-parse", "main"], cwd=lone).strip(), (
+            "an unresolvable base must fall back to the merge-base with the default branch",
+            resolved,
+        )
+
     print(
         "DCO-CHECK SELF-TEST PASSED (matching sign-off accepted; missing/mismatched refused, "
         "email-pinned not name-pinned)"
@@ -178,7 +247,16 @@ def main(argv: list[str] | None = None) -> int:
         if not base:
             print("dco_check.py --diff requires a base commit", file=sys.stderr)
             return 2
-        return _report(violations(_commits(f"{base}..HEAD")), f"{base}..HEAD")
+        resolved = _resolve_base(base)
+        if resolved is None:
+            print(
+                f"dco_check.py --diff: cannot resolve {base!r} to a commit, and no merge-base "
+                f"with the default branch is available either -- refusing to treat an "
+                f"unresolvable range as compliant",
+                file=sys.stderr,
+            )
+            return 3
+        return _report(violations(_commits(f"{resolved}..HEAD")), f"{resolved}..HEAD")
     if "--range" in argv:
         i = argv.index("--range")
         spec = argv[i + 1] if i + 1 < len(argv) else ""
