@@ -50,6 +50,7 @@ export default defineConfig({
             { label: 'The Conformance Spec', slug: 'docs/specification' },
             { label: 'Running Assessments', slug: 'docs/running-assessments' },
             { label: 'Authoring a Catalog', slug: 'docs/catalog-authoring' },
+            { label: 'Runtime and Continuous Conformance', slug: 'docs/runtime-conformance' },
             { label: 'CI Integration', slug: 'docs/ci-integration' },
             { label: 'Contributing', slug: 'docs/contributing' },
           ],
