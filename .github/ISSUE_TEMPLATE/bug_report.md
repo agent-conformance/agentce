@@ -5,6 +5,8 @@ title: ""
 labels: bug
 ---
 
+Reporting a security vulnerability? See `SECURITY.md` — do not file it here.
+
 ## What happened
 
 ## What you expected
