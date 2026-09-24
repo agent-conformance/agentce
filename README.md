@@ -1,6 +1,4 @@
-# Agent Conformance Engine (AgentCE)
-
-Deterministic conformance evidence for AI agents.
+# (AgentCE)
 
 **Status:** under development — not yet ready for use.
 
