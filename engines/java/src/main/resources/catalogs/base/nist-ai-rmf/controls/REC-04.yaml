@@ -1,0 +1,29 @@
+id: REC-04
+version: "2026.09"
+title: Consequential decisions are recorded with actor and time
+description: >
+  Every consequential decision is recorded with the acting agent and a source timestamp, so the
+  determination can be reconstructed from the record (AI RMF GOVERN 4.2 accountability).
+crosswalk:
+  - {framework: nist-ai-rmf, clause: "GOVERN 4.2", relation: implements, verified_against_text: false}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: self_report
+  minimum_evidence:
+    - {event: Decision, class: any}
+  shape: shapes/REC-04.ttl
+expectations:
+  - {id: R1, text: "The consequential decision records the acting agent."}
+  - {id: R2, text: "The consequential decision records a source timestamp."}
+severity: medium
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+false_positive_modes:
+  - "A decision emitted by a source whose clock is marked time_suspect."
+test_cases:
+  - {id: pass, expected: passed, fixture: test/REC-04/passed.jsonl}
+  - {id: fail, expected: failed, fixture: test/REC-04/failed.jsonl}
+  - {id: na, expected: inapplicable, fixture: test/REC-04/inapplicable.jsonl}

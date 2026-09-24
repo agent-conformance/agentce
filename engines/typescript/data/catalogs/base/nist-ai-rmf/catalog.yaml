@@ -1,0 +1,28 @@
+# NIST AI RMF base catalog (SPEC §7.3): a second standards-body catalog proving the catalog-swap
+# mechanism end to end, not only in principle. Scope: the 6 controls the existing crosswalk
+# (spec/catalogs/base/eu-ai-act/crosswalk/nist-ai-rmf.yaml) already substantiates with a non-empty
+# `controls:` list -- REC-04, OVS-08, ROB-02, TRN-03, INC-01, INC-02 -- reusing each control's
+# existing SHACL shape verbatim (the detection logic is framework-neutral; only the crosswalk target
+# changes from an EU AI Act article to a NIST AI RMF subcategory). This is narrower than full AI RMF
+# coverage: GOVERN and MAP obligations the crosswalk marks organisational (`controls: []`) are out of
+# scope, tracked as roadmap, same as the crosswalk file's own documented rationale.
+id: nist-ai-rmf
+version: "2026.09"
+title: "NIST AI Risk Management Framework (AI RMF 1.0) base catalog"
+# Provenance (SPEC 14.5 CP-3): the catalog's origin and a content digest over every catalog file
+# except the detached signature and this file. `agentce catalog lint --require-provenance` recomputes
+# the digest, so a rebranded catalog whose rules differ shows its origin or fails validation.
+provenance:
+  source: https://agent-conformance.org/catalogs/base/nist-ai-rmf
+  version: "2026.09"
+  digest: sha256:2a97080ec31144724721af6381b90b5a07118de99d2839287c5a3b847b3bf684
+families: [REC, OVS, ROB, TRN, INC]
+precision_policy:
+  demote_below: "0.98"   # a rung-2 rule below this precision on the corpus is demoted (SPEC 11.6)
+controls:
+  - controls/INC-01.yaml
+  - controls/INC-02.yaml
+  - controls/OVS-08.yaml
+  - controls/REC-04.yaml
+  - controls/ROB-02.yaml
+  - controls/TRN-03.yaml

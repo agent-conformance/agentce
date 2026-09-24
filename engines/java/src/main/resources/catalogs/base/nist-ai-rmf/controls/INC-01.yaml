@@ -1,0 +1,30 @@
+id: INC-01
+version: "2026.09"
+title: Adverse outcomes are linked to their consequential decision
+description: >
+  Every adverse outcome is linked to the consequential decision that produced it, so post-deployment
+  performance monitoring can surface anomalies as they occur (AI RMF MEASURE 2.3).
+crosswalk:
+  - {framework: nist-ai-rmf, clause: "MEASURE 2.3", relation: implements, verified_against_text: false}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: self_report
+  minimum_evidence:
+    - {event: Decision, class: self_report}
+    - {event: Outcome, class: any}
+  shape: shapes/INC-01.ttl
+expectations:
+  - {id: S1, text: "Adverse outcomes are linked to their consequential decision."}
+severity: medium
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+tolerance_rationale: "INC-01 is a structural expectation with no tolerated exceptions."
+false_positive_modes:
+  - "A condition declared as an accepted deviation in the applicability profile."
+test_cases:
+  - {id: pass, expected: passed, fixture: test/INC-01/passed.jsonl}
+  - {id: fail, expected: failed, fixture: test/INC-01/failed.jsonl}
+  - {id: na, expected: inapplicable, fixture: test/INC-01/inapplicable.jsonl}
