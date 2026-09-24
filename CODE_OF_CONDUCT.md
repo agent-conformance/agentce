@@ -28,3 +28,8 @@ Instances of unacceptable behavior may be reported once a real contact is confir
 here; that confirmation is still pending, so no contact address is published yet. Until then, do
 not rely on this section to reach a project representative. All maintainers are obligated to
 respect the privacy and security of the reporter of any incident.
+
+## Attribution
+
+This Code of Conduct is adapted from the Contributor Covenant, version 2.1, available at
+https://www.contributor-covenant.org/version/2/1/code_of_conduct.html.
