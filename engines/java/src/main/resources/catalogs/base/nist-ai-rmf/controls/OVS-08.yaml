@@ -1,0 +1,31 @@
+id: OVS-08
+version: "2026.09"
+title: Oversight coverage of consequential decisions is complete
+description: >
+  Every consequential decision that requires review-before oversight carries a recorded approval
+  decision (AI RMF MEASURE 2.6 safety, MANAGE 2.3 deactivation/override mechanisms).
+crosswalk:
+  - {framework: nist-ai-rmf, clause: "MEASURE 2.6", relation: implements, verified_against_text: false}
+  - {framework: nist-ai-rmf, clause: "MANAGE 2.3", relation: implements, verified_against_text: false}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: semi-automated
+  rung: 2
+  min_source_class: self_report
+  minimum_evidence:
+    - {event: Decision, class: self_report}
+    - {event: ApprovalDecided, class: any}
+  shape: shapes/OVS-08.ttl
+expectations:
+  - {id: S1, text: "Oversight coverage of consequential decisions is complete."}
+severity: medium
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+tolerance_rationale: "OVS-08 is a structural expectation with no tolerated exceptions."
+false_positive_modes:
+  - "A condition declared as an accepted deviation in the applicability profile."
+test_cases:
+  - {id: pass, expected: passed, fixture: test/OVS-08/passed.jsonl}
+  - {id: fail, expected: failed, fixture: test/OVS-08/failed.jsonl}
+  - {id: na, expected: inapplicable, fixture: test/OVS-08/inapplicable.jsonl}
