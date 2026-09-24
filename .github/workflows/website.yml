@@ -848,6 +848,276 @@ jobs:
           sys.exit(1)
           PY
           exit $?
+      - name: The value grid and section headers are outcome-led, CTAs collapse, and a copy-paste quickstart is present
+        run: |
+          set -u
+
+          # Fresh-clone-safe bootstrap (the contracts/F42.md pattern): node_modules is gitignored
+          # and absent from RED capture's fresh clone of base_sha, so it is populated here from the
+          # local pnpm content-addressable store with --offline (no network) rather than assumed
+          # present. The build then runs at the repo root because build-iris.mjs resolves the
+          # canonical-IRI sources relative to it. Three disjoint exit codes so a setup/build failure
+          # can never masquerade as the defect: 3 = setup, 1 = defect present, 0 = GREEN.
+          rm -rf website/dist
+          pnpm install --offline --frozen-lockfile
+          install_exit=$?
+          if [ "$install_exit" -ne 0 ]; then
+            echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          pnpm -C website build
+          build_exit=$?
+          if [ "$build_exit" -ne 0 ]; then
+            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          python3 - "website/dist/index.html" <<'PY'
+          import re, sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          if not path.is_file():
+              print(f"{path}: not found -- build did not produce it (setup problem)", file=sys.stderr)
+              sys.exit(3)
+          html = path.read_text(encoding="utf-8")
+
+          # "The rendered page" is scoped to <main id="main">...</main> -- the landmark every page
+          # gets from BaseLayout.astro:63, which wraps index.astro's entire slotted content and
+          # excludes the shared header/footer navigation (BaseLayout.astro:57-60,69-73, plain text
+          # links, never styled as buttons) -- so this count can never be inflated by site-wide nav.
+          main_m = re.search(r"<main\b[^>]*>(.*?)</main>", html, re.I | re.S)
+          if not main_m:
+              print("no <main> element found in the rendered page -- structure changed more than expected", file=sys.stderr)
+              sys.exit(3)
+          main = main_m.group(1)
+
+          MAX_CTAS = 2
+          anchors = re.findall(r'<a\b([^>]*)>(.*?)</a>', main, re.I | re.S)
+          ctas = []
+          for attrs, inner in anchors:
+              cm = re.search(r'class\s*=\s*"([^"]*)"', attrs, re.I)
+              classes = [c.lower() for c in (cm.group(1).split() if cm else [])]
+              if "button" in classes:
+                  href_m = re.search(r'href\s*=\s*"([^"]*)"', attrs, re.I)
+                  text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", inner)).strip()
+                  ctas.append((text, href_m.group(1) if href_m else None))
+
+          if len(ctas) > MAX_CTAS:
+              print(
+                  f"RED: {len(ctas)} call-to-action buttons found in <main> (want <= {MAX_CTAS}, collapsed): {ctas}",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          print(f"GREEN: {len(ctas)} call-to-action button(s) in <main> (<= {MAX_CTAS}): {ctas}")
+          sys.exit(0)
+          PY
+          exit $?
+      - name: A clean, copy-paste-able quickstart command exists apart from the decorative terminal transcript
+        run: |
+          set -u
+
+          # Fresh-clone-safe bootstrap: see C1 for the full rationale. Three disjoint exit codes:
+          # 3 = setup, 1 = defect present, 0 = GREEN.
+          rm -rf website/dist
+          pnpm install --offline --frozen-lockfile
+          install_exit=$?
+          if [ "$install_exit" -ne 0 ]; then
+            echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          pnpm -C website build
+          build_exit=$?
+          if [ "$build_exit" -ne 0 ]; then
+            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          python3 - "website/dist/index.html" <<'PY'
+          import html as html_mod
+          import re, sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          if not path.is_file():
+              print(f"{path}: not found -- build did not produce it (setup problem)", file=sys.stderr)
+              sys.exit(3)
+          doc = path.read_text(encoding="utf-8")
+
+          pre_blocks = re.findall(r"<pre\b[^>]*>(.*?)</pre>", doc, re.I | re.S)
+
+          # A "copy-paste quickstart" block is a <pre> whose first line -- once a leading '$'
+          # prompt is stripped -- is a real 'agentce' invocation (or its install), AND that is
+          # never mixed with the decorative terminal's simulated-run narration (checkmarks, an
+          # arrow, "Assessing"/"Assessment complete" prose) -- so the existing illustrative
+          # transcript (which does contain a real 'agentce' invocation, but only interleaved with
+          # fabricated output a copy would also grab) cannot itself satisfy this check.
+          NOISE = ("assessing", "assessment complete", "✓", "→")
+          COMMAND_START = re.compile(
+              r"^(agentce\b|pipx\s+install\s+agentce\b|pip3?\s+install\s+agentce\b|"
+              r"uvx\s+agentce\b|uv\s+run\s+agentce\b|npx\s+agentce\b|npm\s+i(?:nstall)?\s+.*agentce\b)",
+              re.I,
+          )
+
+          candidates = []
+          for block in pre_blocks:
+              text = html_mod.unescape(re.sub(r"<[^>]+>", "", block))
+              lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+              if not lines:
+                  continue
+              first = re.sub(r"^\$\s*", "", lines[0])
+              is_clean = not any(marker in text.lower() for marker in NOISE)
+              is_command = bool(COMMAND_START.match(first)) and len(lines) <= 4
+              candidates.append((lines[0], is_clean, is_command))
+              if is_clean and is_command:
+                  print(f"GREEN: a copy-paste quickstart command block is present ({lines[0]!r})")
+                  sys.exit(0)
+
+          print(
+              "RED: no <pre> block is a clean, copy-paste-able quickstart command (a runnable "
+              "'agentce ...'/install invocation with no simulated-run narration mixed in):",
+              file=sys.stderr,
+          )
+          for first_line, is_clean, is_command in candidates:
+              print(f"  block starting {first_line!r}: clean={is_clean} command-like={is_command}", file=sys.stderr)
+          if not candidates:
+              print("  (no <pre> block found at all)", file=sys.stderr)
+          sys.exit(1)
+          PY
+          exit $?
+      - name: tokens.css defines a real modular type scale and a real modular spacing scale
+        run: |
+          set -u
+
+          # Source-inspection only: no build needed, tokens.css is read directly. Two disjoint
+          # exit codes: 3 = the file itself is missing (setup, not the defect), 1 = the file exists
+          # but lacks a real scale, 0 = GREEN.
+          python3 - "website/src/styles/tokens.css" <<'PY'
+          import re, sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          if not path.is_file():
+              print(f"{path}: not found -- setup problem, not the defect", file=sys.stderr)
+              sys.exit(3)
+          css = path.read_text(encoding="utf-8")
+
+          # Every declared custom property (name, value). Classification is by the VALUE's shape,
+          # not just the name prefix: --text-muted/--text-faint already exist today as colours
+          # (hex values), so a name-prefix-only match on "text-" would wrongly count them as type
+          # scale steps. A token counts only if its own value looks like a length (rem/em/px/%/
+          # vw/vh/clamp()/calc()) and does NOT look like a colour (#hex/rgb()/hsl()/color-mix()).
+          decl_re = re.compile(r'--([a-zA-Z][\w-]*)\s*:\s*([^;]+);')
+          TYPE_PREFIX = re.compile(r'^(font-size|text|step|type-scale|fs)(-|$)', re.I)
+          SPACE_PREFIX = re.compile(r'^(space|spacing)(-|$)', re.I)
+          COLOR_RE = re.compile(r'#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|color-mix\(', re.I)
+          LENGTH_RE = re.compile(r'\d+(\.\d+)?(rem|em|px|%|vw|vh|vmin|vmax)\b|clamp\(|calc\(', re.I)
+
+          type_tokens, space_tokens = [], []
+          for name, value in decl_re.findall(css):
+              v = value.strip()
+              if COLOR_RE.search(v) or not LENGTH_RE.search(v):
+                  continue
+              if TYPE_PREFIX.match(name):
+                  type_tokens.append(name)
+              elif SPACE_PREFIX.match(name):
+                  space_tokens.append(name)
+
+          MIN = 5
+          problems = []
+          if len(type_tokens) < MIN:
+              problems.append(
+                  f"only {len(type_tokens)} modular type-scale custom properties found (need >= {MIN} "
+                  f"stepped, length-valued tokens, e.g. --step-*/--font-size-*/--text-*): {type_tokens}"
+              )
+          if len(space_tokens) < MIN:
+              problems.append(
+                  f"only {len(space_tokens)} modular spacing-scale custom properties found (need >= {MIN} "
+                  f"stepped, length-valued tokens, e.g. --space-*): {space_tokens}"
+              )
+
+          if problems:
+              print("RED:", file=sys.stderr)
+              for p in problems:
+                  print(f"  {p}", file=sys.stderr)
+              sys.exit(1)
+          print(f"GREEN: {len(type_tokens)} type-scale tokens {type_tokens} and {len(space_tokens)} spacing-scale tokens {space_tokens}")
+          sys.exit(0)
+          PY
+          exit $?
+      - name: The old attribute-led value-grid headings and features-band header are gone
+        run: |
+          set -u
+
+          # Fresh-clone-safe bootstrap: see C1 for the full rationale. Three disjoint exit codes:
+          # 3 = setup, 1 = defect present, 0 = GREEN.
+          rm -rf website/dist
+          pnpm install --offline --frozen-lockfile
+          install_exit=$?
+          if [ "$install_exit" -ne 0 ]; then
+            echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          pnpm -C website build
+          build_exit=$?
+          if [ "$build_exit" -ne 0 ]; then
+            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          python3 - "website/dist/index.html" <<'PY'
+          import html as html_mod
+          import re, sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          if not path.is_file():
+              print(f"{path}: not found -- build did not produce it (setup problem)", file=sys.stderr)
+              sys.exit(3)
+          doc = path.read_text(encoding="utf-8")
+
+          heading_re = re.compile(r"<h[1-6]\b[^>]*>(.*?)</h[1-6]>", re.I | re.S)
+          all_headings = heading_re.findall(doc)
+          if len(all_headings) < 5:
+              print(f"only {len(all_headings)} heading elements found on the whole page -- structure changed more than expected", file=sys.stderr)
+              sys.exit(3)
+
+          # Ground truth: the literal attribute-led strings the report itself cites as symptomatic
+          # ('Deterministic', 'Model-free [evidence]', 'Built to be trusted[, not just believed.]')
+          # -- the CURRENT six value-grid headings and the CURRENT features-band section header,
+          # read from website/src/pages/index.astro's own `features` array (lines 8-33, rendered at
+          # line 113) and its features-band <h2> (line 108), not invented. None of these seven exact
+          # strings should still be the entire text of any heading anywhere on the fixed page.
+          OLD_HEADINGS = {
+              "deterministic",
+              "model-free evidence",
+              "vendor-neutral",
+              "reproducible",
+              "verifiable",
+              "ci-ready",
+              "built to be trusted, not just believed.",
+          }
+
+          found = []
+          for h in all_headings:
+              text = html_mod.unescape(re.sub(r"<[^>]+>", "", h))
+              text = re.sub(r"\s+", " ", text).strip()
+              if text.lower() in OLD_HEADINGS:
+                  found.append(text)
+
+          if found:
+              print(
+                  f"RED: {len(found)}/{len(OLD_HEADINGS)} literal attribute-led headings are still present verbatim: {found}",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          print("GREEN: none of the old attribute-led value-grid headings or the 'Built to be trusted' section header is present verbatim any longer")
+          sys.exit(0)
+          PY
+          exit $?
 
   docs-doctest:
     runs-on: ubuntu-latest
