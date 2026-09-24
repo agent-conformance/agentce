@@ -25,6 +25,9 @@ MIN_SECTION_CHARS = 60
 MIN_TEMPLATE_BYTES = 30
 
 SECTION_PATTERNS = {
+    # This repository's Code of Conduct titles its intro section "Our Commitment" rather than the
+    # more common alternate wording some Contributor-Covenant-derived documents use; either framing
+    # is a real, substantive intro section, and this checker only recognises this repository's own.
     "commitment": re.compile(r"^#{1,3}\s*.*commitment", re.IGNORECASE),
     "standards": re.compile(r"^#{1,3}\s*.*standards", re.IGNORECASE),
     "enforcement": re.compile(r"^#{1,3}\s*.*enforcement", re.IGNORECASE),
