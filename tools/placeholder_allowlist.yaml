@@ -15,6 +15,12 @@
 # name every pattern.
 version: 1
 allow:
+  - path: .github/ISSUE_TEMPLATE/bug_report.md
+    pattern: empty-md-section
+    count: 2
+    class: legitimate
+    justification: "Issue template: 'What happened' and 'What you expected' are blank form fields a reporter fills in per issue."
+
   - path: .github/pull_request_template.md
     pattern: empty-md-section
     count: 1
@@ -194,6 +200,24 @@ allow:
     count: 6
     class: legitimate
     justification: "Honest status: placeholder rows for prEN 18229-1 (draft; no clause identifiers exist to cite yet)."
+
+  - path: tools/code_of_conduct_check.py
+    pattern: placeholder
+    count: 3
+    class: legitimate
+    justification: "The checker's own pending-contact regex and its messages name the word it scans CODE_OF_CONDUCT.md for; not a placeholder left in this file."
+
+  - path: tools/code_of_conduct_check.py
+    pattern: tbd
+    count: 1
+    class: legitimate
+    justification: "One alternative in the same pending-contact regex; scanned-for text, not a placeholder in this file."
+
+  - path: tools/code_of_conduct_check.py
+    pattern: todo
+    count: 1
+    class: legitimate
+    justification: "One alternative in the same pending-contact regex; scanned-for text, not a placeholder in this file."
 
   - path: tools/framework_examples_check.py
     pattern: stub
