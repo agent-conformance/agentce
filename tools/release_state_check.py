@@ -46,10 +46,13 @@ CHANNELS = (
 # The state file and this checker hold the patterns themselves; the engine-docs test feeds sample page
 # text (including npx commands) to the documentation checker, which is what it tests. The Install check
 # plants one-liners on purpose to prove it rejects them, and its known-bad build fixture shows one.
+# tools/quickstart_copypaste_check.py holds the same command patterns for the same reason: it is the
+# landing page's own copy-paste-command detector, not a rendered one-liner.
 EXEMPT = frozenset(
     {
         str(STATE),
         "tools/release_state_check.py",
+        "tools/quickstart_copypaste_check.py",
         "conformance/tests/test_engine_docs_check.py",
         "website/scripts/check-install.mjs",
         "website/tests/fixtures/install-leaky-dist/docs/install/index.html",
