@@ -473,3 +473,22 @@ claims:
         Runs the catalog-authoring toolkit's self-test (a clean synthetic catalog lints; the same
         catalog with an sh:sparql shape is rejected by name) and the doc-test harness against the
         catalog-authoring page's commands.
+  - id: runtime-conformance
+    text: >-
+      Re-running `agentce assess --state <dir>` over an accumulating evidence stream -- a chronological
+      series of real, point-in-time assessments, never a persistent watch or daemon process -- detects
+      per-(subject, control) outcome drift and captures the incident evidence that caused it,
+      deterministically.
+    status: built
+    pages:
+      - website/src/content/docs/docs/runtime-conformance.md
+    check:
+      workflow: .github/workflows/guards.yml
+      job: runtime-conformance
+      description: >-
+        Runs a real three-step assess scenario (conformant, an identical no-op re-run, then a new
+        incident that flips the outcome) through the installed CLI, twice from independent fresh state
+        directories, and requires assertions.json and runtime_drift.jsonl to be byte-identical at every
+        step; also proves the negative cases (idempotent re-run, a pre-upgrade state directory, and
+        per-pair discrimination) and that the guard job itself runs both the self-test and the real
+        scenario.
