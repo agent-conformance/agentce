@@ -516,6 +516,339 @@ jobs:
           PY
           exit $?
 
+      - name: The rendered page carries a real og:image social card
+        run: |
+          set -u
+
+          # Fresh-clone-safe bootstrap (the contracts/F42.md pattern): node_modules is gitignored
+          # and absent from a fresh clone -- exactly what RED capture builds from -- so it is
+          # populated here from the local pnpm content-addressable store with `--offline` (no
+          # network) instead of copying a pre-existing node_modules. The build runs at the repo
+          # root (website is the repo's sole pnpm workspace member). A setup/build failure here is
+          # never the defect this check exists to find, so it gets its own exit code (3), distinct
+          # from both the defect's exit (1) and GREEN's exit (0).
+          rm -rf website/dist
+          pnpm install --offline --frozen-lockfile
+          install_exit=$?
+          if [ "$install_exit" -ne 0 ]; then
+            echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          pnpm -C website build
+          build_exit=$?
+          if [ "$build_exit" -ne 0 ]; then
+            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          python3 - "website/dist" <<'PY'
+          import re, sys
+          from pathlib import Path
+          from urllib.parse import urlparse
+
+          dist = Path(sys.argv[1])
+          index = dist / "index.html"
+          if not index.is_file():
+              print(f"{index}: not found -- build did not produce the landing page", file=sys.stderr)
+              sys.exit(3)
+
+          html = index.read_text(encoding="utf-8")
+          head_m = re.search(r"<head[^>]*>(.*?)</head>", html, re.I | re.S)
+          head = head_m.group(1) if head_m else html
+
+          problems = []
+          m = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]*>', head, re.I)
+          image_path = None
+          if not m:
+              problems.append("no <meta property=\"og:image\" ...> in the rendered <head>")
+          else:
+              cm = re.search(r'content=["\']([^"\']+)["\']', m.group(0), re.I)
+              if not cm or not cm.group(1).strip():
+                  problems.append("og:image meta present but content= is empty")
+              else:
+                  image_path = cm.group(1).strip()
+
+          if image_path:
+              parsed = urlparse(image_path)
+              rel = parsed.path.lstrip("/") if parsed.scheme else image_path.lstrip("/")
+              asset = dist / rel
+              if not asset.is_file() or asset.stat().st_size == 0:
+                  problems.append(f"og:image content is {image_path!r} but {asset} does not exist (or is empty) in the built site")
+
+          if problems:
+              print("RED:", file=sys.stderr)
+              for p in problems:
+                  print(f"  {p}", file=sys.stderr)
+              sys.exit(1)
+          print(f"GREEN: og:image is declared ({image_path}) and its asset exists in the built site")
+          sys.exit(0)
+          PY
+          exit $?
+
+      - name: The landing page carries a linked proof strip
+        run: |
+          set -u
+          rm -rf website/dist
+          pnpm install --offline --frozen-lockfile
+          install_exit=$?
+          if [ "$install_exit" -ne 0 ]; then
+            echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          pnpm -C website build
+          build_exit=$?
+          if [ "$build_exit" -ne 0 ]; then
+            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          python3 - "website/dist" <<'PY'
+          import re, sys
+          from pathlib import Path
+
+          dist = Path(sys.argv[1])
+          index = dist / "index.html"
+          if not index.is_file():
+              print(f"{index}: not found -- build did not produce the landing page", file=sys.stderr)
+              sys.exit(3)
+          html = index.read_text(encoding="utf-8")
+
+          section_re = re.compile(r"<section\b[^>]*>(.*?)</section>", re.I | re.S)
+          heading_re = re.compile(r"<h[1-4][^>]*>(.*?)</h[1-4]>", re.I | re.S)
+          strip_tags = lambda s: re.sub(r"<[^>]+>", " ", s)
+
+          found_landmark = False
+          proof_links = []
+          for block in section_re.findall(html):
+              headings = " ".join(strip_tags(h) for h in heading_re.findall(block))
+              aria = " ".join(re.findall(r'aria-label(?:ledby)?="([^"]*)"', block, re.I))
+              label_text = (headings + " " + aria).lower()
+              if "proof" in label_text:
+                  found_landmark = True
+                  for href in re.findall(r'<a\b[^>]*\bhref="([^"]*)"', block, re.I):
+                      href = href.strip()
+                      if href and href != "#" and not href.lower().startswith("javascript:"):
+                          proof_links.append(href)
+
+          MIN_LINKS = 5
+          problems = []
+          if not found_landmark:
+              problems.append("no section with a heading or aria-label naming it a 'proof' strip")
+          elif len(proof_links) < MIN_LINKS:
+              problems.append(
+                  f"a 'proof' section exists but carries only {len(proof_links)} real (non-placeholder) "
+                  f"links, need >= {MIN_LINKS} distinct verifiable claims"
+              )
+
+          if problems:
+              print("RED:", file=sys.stderr)
+              for p in problems:
+                  print(f"  {p}", file=sys.stderr)
+              sys.exit(1)
+          print(f"GREEN: a labelled proof-strip section exists with {len(proof_links)} real linked claims")
+          sys.exit(0)
+          PY
+          exit $?
+
+      - name: The landing page carries an FAQ answering skeptical objections
+        run: |
+          set -u
+          rm -rf website/dist
+          pnpm install --offline --frozen-lockfile
+          install_exit=$?
+          if [ "$install_exit" -ne 0 ]; then
+            echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          pnpm -C website build
+          build_exit=$?
+          if [ "$build_exit" -ne 0 ]; then
+            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          python3 - "website/dist" <<'PY'
+          import re, sys
+          from pathlib import Path
+
+          dist = Path(sys.argv[1])
+          index = dist / "index.html"
+          if not index.is_file():
+              print(f"{index}: not found -- build did not produce the landing page", file=sys.stderr)
+              sys.exit(3)
+          html = index.read_text(encoding="utf-8")
+
+          section_re = re.compile(r"<section\b[^>]*>(.*?)</section>", re.I | re.S)
+          heading_re = re.compile(r"<h[1-4][^>]*>(.*?)</h[1-4]>", re.I | re.S)
+          strip_tags = lambda s: re.sub(r"<[^>]+>", " ", s)
+
+          faq_text = None
+          for block in section_re.findall(html):
+              headings = " ".join(strip_tags(h) for h in heading_re.findall(block))
+              aria = " ".join(re.findall(r'aria-label(?:ledby)?="([^"]*)"', block, re.I))
+              label_text = (headings + " " + aria).lower()
+              if re.search(r"\bfaq\b|frequently asked|objections?\b", label_text):
+                  faq_text = strip_tags(block).lower()
+                  break
+
+          problems = []
+          if faq_text is None:
+              problems.append(
+                  "no section identifiable as an FAQ/objections block (heading or aria-label "
+                  "containing 'FAQ', 'frequently asked', or 'objection')"
+              )
+          else:
+              required_themes = {
+                  "certified?": r"certif",
+                  "model?": r"\bmodel\b|\bai\b|machine.?learning|\bllm\b",
+                  "network?": r"\bnetwork\b|offline|internet",
+                  "determinism?": r"determinis|reproducib",
+              }
+              missing = [name for name, pat in required_themes.items() if not re.search(pat, faq_text)]
+              if missing:
+                  problems.append(f"FAQ/objections section found but does not address: {', '.join(missing)}")
+
+          if problems:
+              print("RED:", file=sys.stderr)
+              for p in problems:
+                  print(f"  {p}", file=sys.stderr)
+              sys.exit(1)
+          print("GREEN: an FAQ/objections section exists and addresses certified?/model?/network?/determinism?")
+          sys.exit(0)
+          PY
+          exit $?
+
+      - name: The landing page pairs a real report excerpt with its machine record
+        run: |
+          set -u
+
+          rm -rf website/dist
+          pnpm install --offline --frozen-lockfile
+          install_exit=$?
+          if [ "$install_exit" -ne 0 ]; then
+            echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          pnpm -C website build
+          build_exit=$?
+          if [ "$build_exit" -ne 0 ]; then
+            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            exit 3
+          fi
+
+          python3 - "website/dist" <<'PY'
+          import re, sys
+          from pathlib import Path
+
+          dist = Path(sys.argv[1])
+          index = dist / "index.html"
+          if not index.is_file():
+              print(f"{index}: not found -- build did not produce the landing page", file=sys.stderr)
+              sys.exit(3)
+          html = index.read_text(encoding="utf-8")
+
+          # Capture each <section ...> block together with its own opening-tag attributes (unlike
+          # C2/C3's scan, which only sees a section's inner content) so an aria-label placed
+          # directly on the <section> tag itself -- not only an inner heading's id/aria-labelledby
+          # target -- counts as a label for this section.
+          section_re = re.compile(r"<section\b([^>]*)>(.*?)</section>", re.I | re.S)
+          heading_re = re.compile(r"<h[1-6][^>]*>(.*?)</h[1-6]>", re.I | re.S)
+          strip_tags = lambda s: re.sub(r"<[^>]+>", " ", s)
+
+          ARTIFACT_NAMES = ("assertions.json", "results.sarif", "oscal-ar.json")
+
+
+          def is_show_dont_tell_label(text):
+              t = text.lower()
+              if re.search(r"show[\s,]*don.?t\s+tell", t):
+                  return True
+              if "see it in action" in t or re.search(r"\bin action\b", t):
+                  return True
+              # A label that itself names the pairing (e.g. "a real finding, and its machine
+              # record") without using either fixed phrase above.
+              return bool(re.search(r"\bfinding\b", t) and re.search(r"\b(machine|record)\b", t))
+
+
+          def has_human_part(block):
+              # A labelled human-readable finding/report excerpt: an element whose class/
+              # aria-label/data attribute, or its own heading, names it as the human side of the
+              # pairing -- content that would come from report.md/report.html, never bare
+              # unlabelled prose.
+              for m in re.finditer(r"<[a-z0-9]+\b([^>]*)>", block, re.I):
+                  attrs = m.group(1)
+                  if re.search(r'\b(class|aria-label|data-[a-z-]+)="[^"]*\bhuman\b', attrs, re.I):
+                      return True
+                  if re.search(r'\b(class|aria-label|data-[a-z-]+)="[^"]*report.?excerpt', attrs, re.I):
+                      return True
+              for h in heading_re.findall(block):
+                  htext = strip_tags(h).lower()
+                  if "human" in htext or "report excerpt" in htext:
+                      return True
+              return False
+
+
+          def machine_chunks(block):
+              # A machine-record excerpt is either a <pre>/<code> block, or any element explicitly
+              # labelled as the machine side (class/aria-label/data attribute naming it
+              # "machine"); the full matched tag (attributes plus inner text) is kept for the
+              # latter so a filename reference sitting in a caption/label beside a <pre> -- not
+              # only inside it -- still counts.
+              chunks = []
+              for tag_re in (
+                  re.compile(r"<pre\b[^>]*>(.*?)</pre>", re.I | re.S),
+                  re.compile(r"<code\b[^>]*>(.*?)</code>", re.I | re.S),
+              ):
+                  chunks.extend(tag_re.findall(block))
+              for m in re.finditer(r"<([a-z0-9]+)\b([^>]*\bmachine\b[^>]*)>(.*?)</\1>", block, re.I | re.S):
+                  chunks.append(m.group(0))
+              return chunks
+
+
+          problems = []
+          found_section = False
+          for attrs, block in section_re.findall(html):
+              headings = " ".join(strip_tags(h) for h in heading_re.findall(block))
+              aria = " ".join(re.findall(r'aria-label(?:ledby)?="([^"]*)"', attrs + " " + block, re.I))
+              if not is_show_dont_tell_label(headings + " " + aria):
+                  continue
+              found_section = True
+              human_ok = has_human_part(block)
+              mchunks = machine_chunks(block)
+              hit_names = sorted({n for n in ARTIFACT_NAMES for c in mchunks if n in c.lower()})
+              machine_ok = bool(hit_names)
+              if human_ok and machine_ok:
+                  print(
+                      "GREEN: a labelled show-don't-tell section pairs a human-readable finding "
+                      f"with a machine-record excerpt referencing {hit_names}"
+                  )
+                  sys.exit(0)
+              missing = []
+              if not human_ok:
+                  missing.append("no labelled human-readable finding/report excerpt in this section")
+              if not machine_ok:
+                  missing.append(
+                      "no machine-record excerpt (pre/code or labelled machine element) in this "
+                      "section referencing assertions.json/results.sarif/oscal-ar.json"
+                  )
+              problems.append("a show-don't-tell-labelled section exists but: " + "; ".join(missing))
+
+          if not found_section:
+              problems.append(
+                  "no section with a heading or aria-label conveying 'show, don't tell' / 'see it "
+                  "in action' / a human-finding-beside-machine-record pairing"
+              )
+
+          print("RED:", file=sys.stderr)
+          for p in problems:
+              print(f"  {p}", file=sys.stderr)
+          sys.exit(1)
+          PY
+          exit $?
+
   docs-doctest:
     runs-on: ubuntu-latest
     steps:
