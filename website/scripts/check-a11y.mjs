@@ -48,6 +48,7 @@ const REQUIRED_SELFTEST_RULES = [
   'image-alt',
   'scrollable-region-focusable',
   'target-size',
+  'autocomplete-valid',
 ];
 
 const MIME = {
