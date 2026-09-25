@@ -104,7 +104,8 @@ def test_incompatible_state_version_refuses(tmp_path: Path) -> None:
     with pytest.raises(InputError) as exc:
         StateDir.load(state_dir)
     assert exc.value.key == "input.state_version_incompatible"
-    assert "migrate" in exc.value.fix
+    assert "no migration command" in exc.value.fix
+    assert "move or delete the state directory" in exc.value.fix
 
 
 def test_drift_reports_nothing_for_a_first_tracked_pair(tmp_path: Path) -> None:
