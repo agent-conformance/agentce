@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "conformance/registry/implementation-report.schema.json",
+  "title": "AgentCE implementation report",
+  "description": "The shape of a report record accepted into conformance/reports/ (SPEC 11.5, 14.5 CP-1); not yet a public, served artifact -- see docs/adr/0020-catalog-registry.md.",
+  "type": "object",
+  "required": ["engine", "claim", "no_ml", "golden"],
+  "additionalProperties": true,
+  "properties": {
+    "engine": {
+      "type": "object",
+      "required": ["impl", "version", "package_digest"],
+      "properties": {
+        "impl": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "package_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "claim": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The conformance claim this report makes, e.g. 'full' or 'partial'."
+    },
+    "no_ml": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The no-learned-components dependency-denylist result, e.g. 'pass' or 'fail'."
+    },
+    "golden": {
+      "type": "object",
+      "required": ["revision", "digest"],
+      "description": "signature is intentionally not schema-required: a golden revision with no signature at all is a distinct, existing 'unverified' outcome (registry_check.py's own signature-presence check), not a structural-shape defect.",
+      "properties": {
+        "revision": { "type": "string", "minLength": 1 },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "signature": {
+          "type": "object",
+          "required": ["payloadType", "payload", "signatures"],
+          "description": "A DSSE envelope over the golden-revision attestation, when present."
+        }
+      }
+    }
+  }
+}
