@@ -75,14 +75,22 @@ _DEFAULT_CMD_TIMEOUT_S = 300
 _LEVEL_LABELS = {0: "Absent", 1: "Asserted", 2: "Partial", 3: "Complete"}
 
 
+_GENERIC_LANDMARKS = frozenset({".", "readme.md", "license", "license.md", "licence"})
+
+
 def _evidence_resolves(evidence_ref: str | None, root: Path) -> bool:
     """True iff at least one ``;``-separated segment of ``evidence_ref``, read up to its first
-    whitespace and any trailing ``::symbol`` anchor, exists as a real path under ``root``. Every
-    level-3 entry's real `evidence_ref` mixes plain paths with non-path asides (a CLI flag name, a
-    parenthetical annotation, a doc anchor) in the same field -- "at least one segment resolves" is
-    what a human reading the field actually means by "pointing at the real check/evidence", and was
-    verified by hand against all 22 of today's real level-3 entries before being written here: every
-    one carries at least one segment that is a plain, existing repository path."""
+    whitespace and any trailing ``::symbol`` anchor, is an existing *file* (never a bare directory, and
+    never a generic repository landmark such as ``README.md`` or ``.``) under ``root``. Every level-3
+    entry's real `evidence_ref` mixes plain paths with non-path asides (a CLI flag name, a
+    parenthetical annotation, a doc anchor) in the same field -- "at least one segment resolves to a
+    specific file" is what a human reading the field actually means by "pointing at the real
+    check/evidence", and was verified by hand against all 22 of today's real level-3 entries before
+    being written here: every one carries at least one segment that is a plain, existing, non-landmark
+    file. Requiring a *file* (not `Path.exists()`, which a bare directory also satisfies) and excluding
+    generic landmarks closes the otherwise-trivial way to earn Complete for an unrelated capability by
+    citing `.`, `README.md`, or a bare directory that exists in every checkout and proves nothing about
+    the specific claim being scored."""
     if not evidence_ref:
         return False
     for segment in evidence_ref.split(";"):
@@ -91,7 +99,9 @@ def _evidence_resolves(evidence_ref: str | None, root: Path) -> bool:
             continue
         token = segment.split()[0] if segment.split() else segment
         token = token.split("::")[0]
-        if token and (root / token).exists():
+        if not token or token.lower() in _GENERIC_LANDMARKS:
+            continue
+        if (root / token).is_file():
             return True
     return False
 
@@ -262,6 +272,7 @@ def _self_test_scoring() -> list[str]:
         root = Path(tmp)
         real_file = root / "real_evidence.txt"
         real_file.write_text("proof", encoding="utf-8")
+        (root / "real_dir").mkdir()
 
         cases: dict[str, dict[str, Any]] = {
             "no test, level_target 3 -> capped at Asserted (1)": {
@@ -289,6 +300,27 @@ def _self_test_scoring() -> list[str]:
             "test passes, level_target 3, evidence_ref null -> capped at Partial (2)": {
                 "entry": _entry(
                     "SELF-4", level_target=3, cmd="true", evidence_ref=None
+                ),
+                "expect_score": 2,
+            },
+            "test passes, level_target 3, evidence_ref is a generic landmark (README.md) "
+            "-> capped at Partial (2), never earns Complete for free": {
+                "entry": _entry(
+                    "SELF-10", level_target=3, cmd="true", evidence_ref="README.md"
+                ),
+                "expect_score": 2,
+            },
+            "test passes, level_target 3, evidence_ref is a bare, existing directory (landmark '.') "
+            "-> capped at Partial (2), a directory is not a specific proof": {
+                "entry": _entry(
+                    "SELF-11", level_target=3, cmd="true", evidence_ref="."
+                ),
+                "expect_score": 2,
+            },
+            "test passes, level_target 3, evidence_ref is a real but non-landmark existing "
+            "directory -> capped at Partial (2), Path.exists() is not enough, must be a file": {
+                "entry": _entry(
+                    "SELF-12", level_target=3, cmd="true", evidence_ref="real_dir"
                 ),
                 "expect_score": 2,
             },
@@ -373,6 +405,36 @@ def _self_test_determinism() -> list[str]:
             print(
                 "acf_score self-test: two runs produce a byte-identical canonical scorecard"
             )
+    return failures
+
+
+def _self_test_canonical_format() -> list[str]:
+    """`_self_test_determinism` only proves two calls of `canonical_bytes` agree with *each other* --
+    a `canonical_bytes` mutated to drop `sort_keys=True`, drop `indent=2`, or drop the trailing
+    newline would still pass that case, since both calls would be equally wrong. This case instead
+    compares `canonical_bytes`'s real output against an independently written `json.dumps(...,
+    indent=2, sort_keys=True) + "\\n"` expression -- not a call into the function under test -- so a
+    regression in the format itself is caught, and proves key order in the input never affects the
+    output bytes (the concrete property "canonical" is meant to guarantee)."""
+    failures: list[str] = []
+    scorecard = {"b": 1, "a": 2, "capabilities": []}
+    got = canonical_bytes(scorecard)
+    expected = (json.dumps(scorecard, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    if got != expected:
+        failures.append(
+            f"canonical_bytes: not indent=2/sort_keys=True/trailing-newline JSON "
+            f"(got {got[:80]!r})"
+        )
+    reordered = {"a": 2, "capabilities": [], "b": 1}
+    if canonical_bytes(scorecard) != canonical_bytes(reordered):
+        failures.append(
+            "canonical_bytes: two inputs differing only in key order produced different bytes"
+        )
+    if not failures:
+        print(
+            "acf_score self-test: canonical_bytes is really sort_keys=True, indent=2, "
+            "trailing-newline JSON, independent of input key order"
+        )
     return failures
 
 
@@ -498,6 +560,7 @@ def self_test() -> int:
     failures: list[str] = []
     failures += _self_test_scoring()
     failures += _self_test_determinism()
+    failures += _self_test_canonical_format()
     failures += _self_test_ratchet()
     failures += _self_test_human_table()
     failures += _self_test_gate()
@@ -510,25 +573,72 @@ def self_test() -> int:
 
 
 def _gate(scorecard: dict[str, Any], committed_path: Path, *, write: bool) -> int:
-    """The ratchet gate: refuse (return 1, printing one `acf.score_regression` violation per
-    capability) if `scorecard` scores any capability below `committed_path`'s recorded score for the
-    same id; otherwise return 0, additionally overwriting `committed_path` when `write` is set.
-    Factored out of `main()` so the exit-code behavior itself -- not just `compare_against_committed`'s
-    return value -- is directly self-testable without touching argv or the module-level `_ROOT`/
-    `_SCORECARD` globals."""
+    """The ratchet gate. Without `--write` (the plain CI invocation), a missing, empty, or malformed
+    `committed_path` is itself a violation -- not a silent pass -- because outside a deliberate `--write`
+    bootstrap this repository always has a committed baseline; a baseline that vanished, was hand-zeroed,
+    or was left with `capabilities: []` is far more likely to be an accidental or hostile reset than a
+    fresh project with nothing to ratchet against yet (`compare_against_committed` alone cannot tell the
+    two apart, so `_gate` enforces the distinction using `write` as the one deliberate escape hatch).
+    Otherwise: refuse (return 1, printing one `acf.score_regression` violation per capability) if
+    `scorecard` scores any capability below the committed file's recorded score for the same id; refuse
+    (`acf.scorecard_stale`) if no score fell but the committed file's bytes no longer match a fresh
+    run (an evidence_ref, outcome, or dimension summary drifted without `--write` re-recording it);
+    otherwise return 0, additionally overwriting `committed_path` when `write` is set. Factored out of
+    `main()` so the exit-code behavior itself -- not just `compare_against_committed`'s return value --
+    is directly self-testable without touching argv or the module-level `_ROOT`/`_SCORECARD` globals."""
+    if not committed_path.exists():
+        if not write:
+            print(
+                f"VIOLATION [acf.score_baseline_missing]: {committed_path} does not exist -- the "
+                "ratchet requires an existing, well-formed baseline outside a deliberate --write "
+                "bootstrap",
+                file=sys.stderr,
+            )
+            return 1
+        # write=True with no prior file is the deliberate, one-time bootstrap path; fall through.
+    else:
+        try:
+            committed = json.loads(committed_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            print(
+                f"VIOLATION [acf.score_baseline_malformed]: {committed_path} is not valid JSON: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+        if not committed.get("capabilities"):
+            print(
+                f"VIOLATION [acf.score_baseline_empty]: {committed_path} carries no capabilities -- "
+                "an emptied baseline is treated as a regression, never a clean slate",
+                file=sys.stderr,
+            )
+            return 1
+
     violations = compare_against_committed(scorecard, committed_path)
     if violations:
         for violation in violations:
             print(f"VIOLATION [acf.score_regression]: {violation}", file=sys.stderr)
         return 1
+
+    fresh_bytes = canonical_bytes(scorecard)
     if write:
-        committed_path.write_bytes(canonical_bytes(scorecard))
+        committed_path.write_bytes(fresh_bytes)
         print(f"acf score: wrote {committed_path}", file=sys.stderr)
-    else:
+        return 0
+
+    if committed_path.exists() and fresh_bytes != committed_path.read_bytes():
         print(
-            "acf score: ratchet ok, no capability's committed score fell",
+            "VIOLATION [acf.scorecard_stale]: the committed scorecard no longer matches a fresh run "
+            "of the current matrix and repository state -- run acf_score.py --write and commit the "
+            "refreshed file",
             file=sys.stderr,
         )
+        return 1
+
+    print(
+        "acf score: ratchet ok, no capability's committed score fell, and the committed scorecard "
+        "matches a fresh run",
+        file=sys.stderr,
+    )
     return 0
 
 
@@ -538,11 +648,44 @@ def _self_test_gate() -> list[str]:
     including the `--write` path, which must not write when there was a regression. Gutting `_gate`'s
     `if violations: ... return 1` branch (leaving CI to silently publish a regression) is exactly what
     this case exists to catch, the same defect class the human-table self-test catches for
-    `render_human_table`."""
+    `render_human_table`. Also proves the baseline-integrity floor: outside `--write`, a missing,
+    empty, or malformed committed file is a violation, never a silent pass; and the staleness check --
+    a committed file whose per-id scores all match but whose bytes have drifted from a fresh run is
+    caught too, not just a falling score."""
     failures: list[str] = []
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         scorecard = {"capabilities": [{"id": "GATE-1", "score": 2}]}
+
+        missing = root / "missing.json"
+        exit_code = _gate(scorecard, missing, write=False)
+        if exit_code == 0:
+            failures.append("_gate: a missing baseline (write=False) returned exit 0")
+        if missing.exists():
+            failures.append(
+                "_gate: a missing baseline (write=False) unexpectedly created the file"
+            )
+
+        bootstrap = root / "bootstrap.json"
+        exit_code = _gate(scorecard, bootstrap, write=True)
+        if exit_code != 0 or not bootstrap.exists():
+            failures.append(
+                "_gate: a missing baseline with --write did not bootstrap cleanly"
+            )
+        elif bootstrap.read_bytes() != canonical_bytes(scorecard):
+            failures.append("_gate: --write bootstrap did not persist canonical bytes")
+
+        empty_caps = root / "empty-caps.json"
+        empty_caps.write_text(json.dumps({"capabilities": []}), encoding="utf-8")
+        if _gate(scorecard, empty_caps, write=False) == 0:
+            failures.append(
+                "_gate: a committed file with capabilities: [] returned exit 0"
+            )
+
+        malformed = root / "malformed.json"
+        malformed.write_text("{not json", encoding="utf-8")
+        if _gate(scorecard, malformed, write=False) == 0:
+            failures.append("_gate: a malformed committed file returned exit 0")
 
         regressed = root / "regressed.json"
         regressed.write_text(
@@ -568,14 +711,29 @@ def _self_test_gate() -> list[str]:
             )
 
         clean = root / "clean.json"
-        clean.write_text(
-            json.dumps({"capabilities": [{"id": "GATE-1", "score": 2}]}),
-            encoding="utf-8",
-        )
+        clean.write_bytes(canonical_bytes(scorecard))
         exit_code = _gate(scorecard, clean, write=False)
         if exit_code != 0:
             failures.append(
-                "_gate: no regression (committed==fresh) returned nonzero exit"
+                "_gate: no regression and an up-to-date committed file returned nonzero exit"
+            )
+
+        stale = root / "stale.json"
+        stale.write_text(
+            json.dumps(
+                {
+                    "capabilities": [
+                        {"id": "GATE-1", "score": 2, "evidence_ref": "stale"}
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        exit_code = _gate(scorecard, stale, write=False)
+        if exit_code == 0:
+            failures.append(
+                "_gate: a committed file whose score matches but whose bytes are stale "
+                "returned exit 0"
             )
 
         write_ok = root / "clean-write.json"
@@ -596,8 +754,10 @@ def _self_test_gate() -> list[str]:
 
     if not failures:
         print(
-            "acf_score self-test: main()'s own gate exits nonzero on a real regression, exits 0 "
-            "otherwise, and --write never persists a regression"
+            "acf_score self-test: main()'s own gate requires an existing, well-formed, up-to-date "
+            "baseline outside --write; exits nonzero on a missing, empty, malformed, stale, or "
+            "regressed baseline; exits 0 when clean or improving; and --write never persists a "
+            "regression"
         )
     return failures
 

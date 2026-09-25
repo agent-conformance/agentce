@@ -47,10 +47,6 @@
     "exit": 0,
     "expect_ok": null
   },
-  "GOV-1": {
-    "exit": 0,
-    "expect_ok": null
-  },
   "GOV-2": {
     "exit": 0,
     "expect_ok": null
