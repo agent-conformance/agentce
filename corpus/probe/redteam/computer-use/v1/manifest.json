@@ -1,0 +1,88 @@
+{
+  "id": "computer-use-attack-resistance",
+  "version": "2026.09",
+  "modality": "computer-use",
+  "description": "Synthetic computer-use red-team probe corpus (SPEC 7.2). Frozen; hashes and sign-off recorded. Never regenerated in place.",
+  "sign_off": {
+    "reviewer": "AgentCE corpus maintainer",
+    "date": "2026-09-24",
+    "note": "Synthetic cases authored for conformance; no real prompts or PII."
+  },
+  "cases": [
+    {
+      "id": "attack-00",
+      "file": "cases/attack-00.json",
+      "prompt_sha256": "2121e392ce76663c0030b1ea591e0047d369df27b3309b4df4b99425d02dc245"
+    },
+    {
+      "id": "attack-01",
+      "file": "cases/attack-01.json",
+      "prompt_sha256": "9b29d0de51a1e69e257e1a2fb1543930261d36b2776f0896823d9377e60fd843"
+    },
+    {
+      "id": "attack-02",
+      "file": "cases/attack-02.json",
+      "prompt_sha256": "0a8f7e8df189183a02a8ece3994ddd2d9cb3fda962402b997f1aa3a91e220870"
+    },
+    {
+      "id": "safe-00",
+      "file": "cases/safe-00.json",
+      "prompt_sha256": "b8547ddc23390bbf87d7852f874a3fa1446b863199fa869ffbdb6f59647b044a"
+    },
+    {
+      "id": "safe-01",
+      "file": "cases/safe-01.json",
+      "prompt_sha256": "30c229084f48f4fb2ed50e994d10d98f2e7f2358dd2dfe0cd697e72a4c374582"
+    },
+    {
+      "id": "safe-02",
+      "file": "cases/safe-02.json",
+      "prompt_sha256": "d41475b6b32052b6db1b2424d2b73ead11a1fb6e55e95e1be0f017bd5b47b51e"
+    },
+    {
+      "id": "safe-03",
+      "file": "cases/safe-03.json",
+      "prompt_sha256": "42156b9ea4c72be1425e5dbaed20227fe98c54d7cd1237e309cba535c9aebd81"
+    },
+    {
+      "id": "safe-04",
+      "file": "cases/safe-04.json",
+      "prompt_sha256": "40fabb3ff12aa88a5620769dcd8e054d4fdd17efc70a62b78768be59ec59ab89"
+    },
+    {
+      "id": "safe-05",
+      "file": "cases/safe-05.json",
+      "prompt_sha256": "b75c7bb9ef66982a09c4083e7f0fc0d899c1f80f03cf26f3a183e43a16eba85e"
+    },
+    {
+      "id": "safe-06",
+      "file": "cases/safe-06.json",
+      "prompt_sha256": "dc7a27b07c3ee388821e7af49f6d047da020845a0f12b02463f7fe0eb0a2719d"
+    },
+    {
+      "id": "safe-07",
+      "file": "cases/safe-07.json",
+      "prompt_sha256": "90314c84809d177632e017f0d39ed59ebff60a8d43aa5b360e484e9f19d8f7e9"
+    },
+    {
+      "id": "safe-08",
+      "file": "cases/safe-08.json",
+      "prompt_sha256": "e7dd0764c7bb3e339b70b3a8f28f110bbe1e2234777a7c46d9478d602a8a133f"
+    },
+    {
+      "id": "safe-09",
+      "file": "cases/safe-09.json",
+      "prompt_sha256": "aefbfe4f830295c86d96c25f8d1622eed7b829ecd2212a38fe76948bba7a132c"
+    },
+    {
+      "id": "safe-10",
+      "file": "cases/safe-10.json",
+      "prompt_sha256": "a7d1ebf7901839f6d7d1af6aba1ac3aa304c7617323c76d6ec6deead7b3c7a35"
+    },
+    {
+      "id": "safe-11",
+      "file": "cases/safe-11.json",
+      "prompt_sha256": "40af6b2f63fc1e894b28b49f2a11aecb592d193b6d757d4e8abb518621ab10e8"
+    }
+  ]
+}
