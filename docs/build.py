@@ -400,13 +400,19 @@ def _report_schema_pages() -> dict[Path, str]:
 
 
 #: Every control catalog directory this documentation covers, keyed by a short id used in filenames
-#: and headings: the EU AI Act base catalog plus its four sector/conduct overlays (SPEC §7.3).
+#: and headings: the EU AI Act base catalog plus its four sector/conduct overlays, and the NIST AI
+#: RMF base catalog (SPEC §7.3). NIST AI RMF's own six controls reuse an EU AI Act control id and
+#: SHACL shape verbatim (item 16.1's crosswalk-substantiated subset), so ``_control_pages`` and
+#: ``_site_control_pages`` merge catalog membership per control id rather than generating one page
+#: per (catalog, control) pair -- two catalogs sharing a control id must not silently overwrite one
+#: another's page.
 _CATALOG_DIRS = {
     "eu-ai-act": REPO_ROOT / "spec" / "catalogs" / "base" / "eu-ai-act",
     "conduct": REPO_ROOT / "spec" / "catalogs" / "overlays" / "conduct",
     "employment": REPO_ROOT / "spec" / "catalogs" / "overlays" / "employment",
     "finance": REPO_ROOT / "spec" / "catalogs" / "overlays" / "finance",
     "insurance": REPO_ROOT / "spec" / "catalogs" / "overlays" / "insurance",
+    "nist-ai-rmf": REPO_ROOT / "spec" / "catalogs" / "base" / "nist-ai-rmf",
 }
 
 
@@ -428,8 +434,11 @@ def _control_rows() -> list[tuple[str, str, str, Any]]:
     return sorted(entries, key=lambda entry: entry[3].id)
 
 
-def _control_body_text(catalog_title: str, catalog_kind: str, control) -> str:
-    """The prose and field table for one control (no heading)."""
+def _control_body_text(catalogs: list[tuple[str, str]], control) -> str:
+    """The prose and field table for one control (no heading). ``catalogs`` lists every (title, kind)
+    pair the control appears under -- more than one when a catalog reuses another catalog's control
+    id and SHACL shape verbatim (SPEC §7.3; e.g. the NIST AI RMF base catalog's crosswalk-
+    substantiated subset, item 16.1)."""
     clauses = sorted(
         {
             str(cross.get("clause", ""))
@@ -437,13 +446,14 @@ def _control_body_text(catalog_title: str, catalog_kind: str, control) -> str:
             if cross.get("clause")
         }
     )
+    catalog_cell = "; ".join(f"{title} ({kind})" for title, kind in catalogs)
     lines = [
         f"{control.title}.\n",
         "| Field | Value |\n|---|---|\n"
         f"| Severity | {control.severity} |\n"
         f"| Mode | {control.mode} |\n"
         f"| Rung | {control.rung} |\n"
-        f"| Catalog | {catalog_title} ({catalog_kind}) |\n",
+        f"| Catalog | {catalog_cell} |\n",
     ]
     if clauses:
         lines.append(
@@ -453,15 +463,35 @@ def _control_body_text(catalog_title: str, catalog_kind: str, control) -> str:
     return "\n".join(lines)
 
 
+def _control_catalog_memberships(
+    entries: list[tuple[str, str, str, Any]],
+) -> tuple[dict[str, list[tuple[str, str]]], dict[str, Any]]:
+    """Group ``_control_rows()``'s (catalog key, title, kind, control) rows by control id: which
+    catalogs carry each id (in ``_CATALOG_DIRS`` order, de-duplicated) and one representative control
+    object per id (the SHACL shape and fields are identical across catalogs that share an id, per
+    SPEC §7.3's crosswalk-reuse model, so any one entry's control object is equally correct)."""
+    catalogs_by_id: dict[str, list[tuple[str, str]]] = {}
+    control_by_id: dict[str, Any] = {}
+    for _key, title, kind, control in entries:
+        memberships = catalogs_by_id.setdefault(control.id, [])
+        if (title, kind) not in memberships:
+            memberships.append((title, kind))
+        control_by_id[control.id] = control
+    return catalogs_by_id, control_by_id
+
+
 def _control_pages() -> dict[Path, str]:
     entries = _control_rows()
+    catalogs_by_id, control_by_id = _control_catalog_memberships(entries)
     pages: dict[Path, str] = {}
+    for control_id, catalogs in catalogs_by_id.items():
+        control = control_by_id[control_id]
+        slug = control_id.lower()
+        pages[REFERENCE / "controls" / f"{slug}.md"] = (
+            f"# {control_id}\n\n" + _control_body_text(catalogs, control)
+        )
     by_catalog: dict[str, list] = {}
     for key, title, kind, control in entries:
-        slug = control.id.lower()
-        pages[REFERENCE / "controls" / f"{slug}.md"] = (
-            f"# {control.id}\n\n" + _control_body_text(title, kind, control)
-        )
         by_catalog.setdefault(key, []).append((title, control))
     sections: list[str] = []
     for key in sorted(by_catalog):
@@ -478,9 +508,12 @@ def _control_pages() -> dict[Path, str]:
         )
     pages[REFERENCE / "controls" / "index.md"] = (
         "# Controls\n\n"
-        f"Every control across the EU AI Act base catalog and its overlays (SPEC §7.3), "
-        f"{len(entries)} in total, generated from the catalog YAML. One page per control, grouped "
-        "here by catalog.\n\n" + "\n".join(sections)
+        f"Every control across the EU AI Act base catalog and its overlays, and the NIST AI RMF "
+        f"base catalog's crosswalk-substantiated subset (SPEC §7.3), {len(catalogs_by_id)} distinct "
+        "controls in total, generated from the catalog YAML. One page per distinct control id, "
+        "grouped here by catalog; a control id more than one catalog carries verbatim (NIST AI "
+        "RMF reuses six EU AI Act control ids and shapes unchanged) is listed once per catalog "
+        "below but links to the one page shared by both.\n\n" + "\n".join(sections)
     )
     return pages
 
@@ -838,16 +871,22 @@ def _site_report_schema_pages() -> dict[Path, str]:
 
 def _site_control_pages() -> dict[Path, str]:
     entries = _control_rows()
+    catalogs_by_id, control_by_id = _control_catalog_memberships(entries)
     target = SITE_REFERENCE / "controls"
     pages: dict[Path, str] = {}
-    by_catalog: dict[str, list] = {}
-    for key, title, kind, control in entries:
-        slug = control.id.lower()
-        body = _control_body_text(title, kind, control)
+    for control_id, catalogs in catalogs_by_id.items():
+        control = control_by_id[control_id]
+        slug = control_id.lower()
+        body = _control_body_text(catalogs, control)
+        catalog_titles = ", ".join(title for title, _kind in catalogs)
         pages[target / f"{slug}.md"] = (
-            _frontmatter(control.id, _md_cell(f"{control.title} ({title}).")[:150])
+            _frontmatter(
+                control_id, _md_cell(f"{control.title} ({catalog_titles}).")[:150]
+            )
             + body
         )
+    by_catalog: dict[str, list] = {}
+    for key, title, kind, control in entries:
         by_catalog.setdefault(key, []).append((title, control))
     sections: list[str] = []
     for key in sorted(by_catalog):
@@ -865,11 +904,17 @@ def _site_control_pages() -> dict[Path, str]:
         )
     pages[target / "index.md"] = _frontmatter(
         "Controls",
-        f"Every control across the EU AI Act base catalog and its overlays, {len(entries)} in total.",
+        "Every control across the EU AI Act base catalog and its overlays, and the NIST AI RMF "
+        f"base catalog's crosswalk-substantiated subset, {len(catalogs_by_id)} distinct controls "
+        "in total.",
     ) + (
-        f"Every control across the EU AI Act base catalog and its overlays (SPEC §7.3), "
-        f"{len(entries)} in total, generated from the catalog YAML. One page per control, grouped "
-        "here by catalog.\n\n" + "\n".join(sections)
+        f"Every control across the EU AI Act base catalog and its overlays, and the NIST AI RMF "
+        f"base catalog's crosswalk-substantiated subset (SPEC §7.3), {len(catalogs_by_id)} "
+        "distinct controls in total, generated from the catalog YAML. One page per distinct "
+        "control id, grouped here by catalog; a control id more than one catalog carries verbatim "
+        "(NIST AI RMF reuses six EU AI Act control ids and shapes unchanged) is listed once per "
+        "catalog below but links to the one page shared by both.\n\n"
+        + "\n".join(sections)
     )
     return pages
 

@@ -1,9 +1,9 @@
 ---
 title: Controls
-description: Every control across the EU AI Act base catalog and its overlays, 60 in total.
+description: Every control across the EU AI Act base catalog and its overlays, and the NIST AI RMF base catalog's crosswalk-substantiated subset, 60 distinct controls in total.
 ---
 
-Every control across the EU AI Act base catalog and its overlays (SPEC §7.3), 60 in total, generated from the catalog YAML. One page per control, grouped here by catalog.
+Every control across the EU AI Act base catalog and its overlays, and the NIST AI RMF base catalog's crosswalk-substantiated subset (SPEC §7.3), 60 distinct controls in total, generated from the catalog YAML. One page per distinct control id, grouped here by catalog; a control id more than one catalog carries verbatim (NIST AI RMF reuses six EU AI Act control ids and shapes unchanged) is listed once per catalog below but links to the one page shared by both.
 
 ## Conduct overlay
 
@@ -89,3 +89,14 @@ Every control across the EU AI Act base catalog and its overlays (SPEC §7.3), 6
 | Control | Title | Severity | Mode | Rung |
 |---|---|---|---|---|
 | [`INS-01`](/reference/controls/ins-01/) | Adverse-action notices are issued within the sector window | high | manual | 3 |
+
+## NIST AI Risk Management Framework (AI RMF 1.0) base catalog
+
+| Control | Title | Severity | Mode | Rung |
+|---|---|---|---|---|
+| [`INC-01`](/reference/controls/inc-01/) | Adverse outcomes are linked to their consequential decision | medium | automated | 2 |
+| [`INC-02`](/reference/controls/inc-02/) | Serious incidents are recorded with an accountable actor (by role) | high | automated | 2 |
+| [`OVS-08`](/reference/controls/ovs-08/) | Oversight coverage of consequential decisions is complete | medium | semi-automated | 2 |
+| [`REC-04`](/reference/controls/rec-04/) | Consequential decisions are recorded with actor and time | medium | automated | 2 |
+| [`ROB-02`](/reference/controls/rob-02/) | No untrusted content influences consequential decisions | medium | automated | 2 |
+| [`TRN-03`](/reference/controls/trn-03/) | Affected persons informed and explanation reconstructable | medium | semi-automated | 2 |

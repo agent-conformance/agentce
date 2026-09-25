@@ -1,6 +1,6 @@
 # Controls
 
-Every control across the EU AI Act base catalog and its overlays (SPEC §7.3), 60 in total, generated from the catalog YAML. One page per control, grouped here by catalog.
+Every control across the EU AI Act base catalog and its overlays, and the NIST AI RMF base catalog's crosswalk-substantiated subset (SPEC §7.3), 60 distinct controls in total, generated from the catalog YAML. One page per distinct control id, grouped here by catalog; a control id more than one catalog carries verbatim (NIST AI RMF reuses six EU AI Act control ids and shapes unchanged) is listed once per catalog below but links to the one page shared by both.
 
 ## Conduct overlay
 
@@ -86,3 +86,14 @@ Every control across the EU AI Act base catalog and its overlays (SPEC §7.3), 6
 | Control | Title | Severity | Mode | Rung |
 |---|---|---|---|---|
 | [`INS-01`](ins-01.md) | Adverse-action notices are issued within the sector window | high | manual | 3 |
+
+## NIST AI Risk Management Framework (AI RMF 1.0) base catalog
+
+| Control | Title | Severity | Mode | Rung |
+|---|---|---|---|---|
+| [`INC-01`](inc-01.md) | Adverse outcomes are linked to their consequential decision | medium | automated | 2 |
+| [`INC-02`](inc-02.md) | Serious incidents are recorded with an accountable actor (by role) | high | automated | 2 |
+| [`OVS-08`](ovs-08.md) | Oversight coverage of consequential decisions is complete | medium | semi-automated | 2 |
+| [`REC-04`](rec-04.md) | Consequential decisions are recorded with actor and time | medium | automated | 2 |
+| [`ROB-02`](rob-02.md) | No untrusted content influences consequential decisions | medium | automated | 2 |
+| [`TRN-03`](trn-03.md) | Affected persons informed and explanation reconstructable | medium | semi-automated | 2 |

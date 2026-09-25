@@ -1,6 +1,6 @@
 ---
 title: REC-04
-description: Consequential decisions are recorded with actor and time (EU AI Act base catalog).
+description: Consequential decisions are recorded with actor and time (EU AI Act base catalog, NIST AI Risk Management Framework (AI RMF 1.0) base catalog).
 ---
 
 Consequential decisions are recorded with actor and time.
@@ -10,6 +10,6 @@ Consequential decisions are recorded with actor and time.
 | Severity | medium |
 | Mode | automated |
 | Rung | 2 |
-| Catalog | EU AI Act base catalog (base) |
+| Catalog | EU AI Act base catalog (base); NIST AI Risk Management Framework (AI RMF 1.0) base catalog (base) |
 
-Crosswalked to clause(s) Art. 12, Art. 19. Clause numbers only are cited; standard text is never reproduced.
+Crosswalked to clause(s) GOVERN 4.2. Clause numbers only are cited; standard text is never reproduced.

@@ -91,6 +91,7 @@ jobs:
               "spec/catalogs/overlays/employment",
               "spec/catalogs/overlays/finance",
               "spec/catalogs/overlays/insurance",
+              "spec/catalogs/base/nist-ai-rmf",
           ]
           real_ids = set()
           for d in catalog_dirs:
