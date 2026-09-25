@@ -1,8 +1,11 @@
 """Repository check: `conformance/acf/matrix.yaml` validates against its own schema, carries exactly the
 36 named capabilities of the Agent Conformance Framework's seven dimensions (no more, no fewer, no wrong
-name), and every entry id is unique. This proves the matrix's schema and structural validity, not (yet)
-that every entry's `test.cmd` actually passes -- that live-execution proof is a separate, later mechanism
-built on top of the same matrix once its corpus fixtures exist.
+name), and every entry id is unique. `--check-fixtures` additionally proves every entry's `test` actually
+runs: its `fixture` path (when set) exists, its `cmd` reproduces the same outcome on two separate runs
+(catching a flaky or order-dependent command), and that outcome matches a committed golden record --
+`conformance/acf/fixtures-golden.json` -- so a capability's proof can never be "fixed" by quietly recording
+its current, broken behaviour as the new golden (`check_golden_no_failures` rejects a golden that bakes in
+a non-zero exit or a missing `expect` match).
 
 Every rejection carries a stable `key` (this script's own convention, mirroring
 `tools/workflow_pins_check.py`'s discriminating self-test) so a caller can tell which structural rule
@@ -27,7 +30,9 @@ import copy
 import json
 import os
 import re
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -37,7 +42,9 @@ import yaml
 _ROOT = Path(__file__).resolve().parent.parent
 _MATRIX = _ROOT / "conformance" / "acf" / "matrix.yaml"
 _SCHEMA = _ROOT / "conformance" / "acf" / "matrix.schema.json"
+_GOLDEN = _ROOT / "conformance" / "acf" / "fixtures-golden.json"
 _FRAMEWORK_DOC_ENV = "AGENTCE_ACF_FRAMEWORK_DOC"
+_DEFAULT_CMD_TIMEOUT_S = 300
 
 
 def _framework_doc_path() -> Path | None:
@@ -213,6 +220,260 @@ def check_framework_doc_sync() -> list[str]:
     return problems
 
 
+def load_golden(path: Path = _GOLDEN) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+class Outcome:
+    """The {exit, expect_ok} signal a `test.cmd` run produces -- exactly the pass/fail proof the
+    matrix schema's own `test` field description defines, carrying no wall-clock-derived data (no
+    duration, no timestamp), so two runs of a genuinely deterministic command always match."""
+
+    __slots__ = ("exit", "expect_ok")
+
+    def __init__(self, exit_code: int, expect_ok: bool | None) -> None:
+        self.exit = exit_code
+        self.expect_ok = expect_ok
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"exit": self.exit, "expect_ok": self.expect_ok}
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, Outcome) and (self.exit, self.expect_ok) == (
+            other.exit,
+            other.expect_ok,
+        )
+
+    def __repr__(self) -> str:
+        return f"Outcome(exit={self.exit}, expect_ok={self.expect_ok})"
+
+
+def run_entry_test(
+    test: dict[str, Any], *, cwd: Path, timeout_s: int = _DEFAULT_CMD_TIMEOUT_S
+) -> Outcome:
+    """Run one matrix entry's `test.cmd` as the schema describes: one shell command, from the
+    repository root (or a caller-chosen root for self-test fixtures)."""
+    proc = subprocess.run(
+        test["cmd"],
+        shell=True,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        timeout=timeout_s,
+        check=False,
+    )
+    expect = test.get("expect")
+    if expect is None:
+        expect_ok = None
+    else:
+        expect_ok = expect in (proc.stdout + proc.stderr)
+    return Outcome(proc.returncode, expect_ok)
+
+
+def check_golden_no_failures(golden: dict[str, Any]) -> list[Problem]:
+    """A committed golden record may never bake in a failure -- that would let a broken `test.cmd` be
+    "fixed" by recording its current broken behaviour as the new expected outcome instead of fixing it."""
+    problems: list[Problem] = []
+    for entry_id, record in golden.items():
+        if record.get("exit") != 0 or record.get("expect_ok") is False:
+            problems.append(
+                Problem("matrix.golden_records_failure", f"{entry_id}: {record!r}")
+            )
+    return problems
+
+
+def check_fixtures(
+    matrix: dict[str, Any],
+    golden: dict[str, Any],
+    *,
+    root: Path,
+    timeout_s: int = _DEFAULT_CMD_TIMEOUT_S,
+) -> list[Problem]:
+    """For every entry with a `test`: its `fixture` path (when set) exists under `root`; its `cmd`
+    reproduces the identical {exit, expect_ok} outcome on two separate runs (catching a flaky or
+    order-dependent command -- the check's proof of the standard's order/locale/clock determinism
+    invariant, applied to the outcome a reader actually cares about rather than to incidental raw output
+    such as a pytest timing line, which is never part of `Outcome` and so can never cause a false
+    mismatch); and that outcome matches the committed golden record (catching drift -- a capability that
+    silently regressed, or a golden that has gone stale)."""
+    problems = check_golden_no_failures(golden)
+    already_flagged = {p.detail.split(":", 1)[0] for p in problems}
+
+    entries = matrix.get("entries", [])
+    for entry in entries:
+        test = entry.get("test")
+        if test is None:
+            continue
+        entry_id = entry["id"]
+        if entry_id in already_flagged:
+            # Already rejected by check_golden_no_failures -- one problem per entry, naming the
+            # most specific cause, not a cascade of consequential mismatches.
+            continue
+
+        fixture = test.get("fixture")
+        if fixture is not None and not (root / fixture).exists():
+            problems.append(
+                Problem("matrix.fixture_missing", f"{entry_id}: {fixture!r}")
+            )
+            continue
+
+        try:
+            run1 = run_entry_test(test, cwd=root, timeout_s=timeout_s)
+            run2 = run_entry_test(test, cwd=root, timeout_s=timeout_s)
+        except subprocess.TimeoutExpired:
+            problems.append(
+                Problem("matrix.test_timeout", f"{entry_id}: exceeded {timeout_s}s")
+            )
+            continue
+
+        if run1 != run2:
+            problems.append(
+                Problem(
+                    "matrix.nondeterministic",
+                    f"{entry_id}: run1={run1!r} run2={run2!r}",
+                )
+            )
+            continue
+
+        golden_record = golden.get(entry_id)
+        if golden_record is None:
+            problems.append(Problem("matrix.golden_missing", entry_id))
+            continue
+
+        golden_outcome = Outcome(golden_record["exit"], golden_record["expect_ok"])
+        if run1 != golden_outcome:
+            problems.append(
+                Problem(
+                    "matrix.golden_mismatch",
+                    f"{entry_id}: golden={golden_outcome!r} actual={run1!r}",
+                )
+            )
+
+    return problems
+
+
+def record_golden(
+    matrix: dict[str, Any], *, root: Path, timeout_s: int = _DEFAULT_CMD_TIMEOUT_S
+) -> dict[str, Any]:
+    """Run every entry's `test.cmd` once and return the {id: {exit, expect_ok}} golden record. A
+    maintenance helper only (`--record-golden`) -- its output is committed by hand and never
+    regenerated at eval or CI time; `check_fixtures` is what verifies against the committed file."""
+    golden: dict[str, Any] = {}
+    for entry in matrix.get("entries", []):
+        test = entry.get("test")
+        if test is None:
+            continue
+        golden[entry["id"]] = run_entry_test(
+            test, cwd=root, timeout_s=timeout_s
+        ).as_dict()
+    return golden
+
+
+def _fixture_case_matrix(
+    entry_id: str, cmd: str, fixture: str | None, expect: str | None
+) -> dict[str, Any]:
+    return {
+        "version": 1,
+        "entries": [
+            {
+                "id": entry_id,
+                "dimension": "coverage",
+                "capability": "Self-test capability",
+                "statement": "Self-test only.",
+                "level_target": 3,
+                "test": {"cmd": cmd, "fixture": fixture, "expect": expect},
+                "evidence_ref": "self-test",
+            }
+        ],
+    }
+
+
+def _self_test_fixtures() -> list[str]:
+    """Proves `check_fixtures` actually discriminates: a missing fixture path, a command whose
+    outcome differs between two back-to-back runs, a golden that no longer matches real behaviour, a
+    golden with no record at all, and a golden that bakes in a failure are each rejected; a genuinely
+    deterministic, matching entry passes. Uses synthetic entries in a throwaway tempdir, never the
+    real matrix -- so this self-test carries its own fixtures and never touches the repository."""
+    failures: list[str] = []
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "real_fixture").mkdir()
+
+        counter = root / "counter-nondeterministic"
+        counter.write_text("0", encoding="utf-8")
+        flip_cmd = (
+            f'python3 -c "import pathlib; p = pathlib.Path({str(counter)!r}); '
+            'n = int(p.read_text()); p.write_text(str(n + 1)); raise SystemExit(n % 2)"'
+        )
+
+        cases: dict[str, dict[str, Any]] = {
+            "deterministic entry, fixture present, golden matches": {
+                "matrix": _fixture_case_matrix(
+                    "SELF-1", "python3 -c \"print('ok')\"", "real_fixture", "ok"
+                ),
+                "golden": {"SELF-1": {"exit": 0, "expect_ok": True}},
+                "should_fail": False,
+            },
+            "fixture path does not exist": {
+                "matrix": _fixture_case_matrix(
+                    "SELF-2", "true", "does/not/exist", None
+                ),
+                "golden": {"SELF-2": {"exit": 0, "expect_ok": None}},
+                "should_fail": True,
+            },
+            "command's outcome differs between two runs": {
+                "matrix": _fixture_case_matrix("SELF-3", flip_cmd, None, None),
+                "golden": {"SELF-3": {"exit": 0, "expect_ok": None}},
+                "should_fail": True,
+            },
+            "deterministic entry, but golden disagrees with real behaviour": {
+                "matrix": _fixture_case_matrix(
+                    "SELF-4",
+                    "python3 -c \"print('actual')\"",
+                    None,
+                    "expected-substring",
+                ),
+                "golden": {"SELF-4": {"exit": 0, "expect_ok": True}},
+                "should_fail": True,
+            },
+            "golden itself bakes in a failure": {
+                "matrix": _fixture_case_matrix("SELF-5", "true", None, None),
+                "golden": {"SELF-5": {"exit": 1, "expect_ok": None}},
+                "should_fail": True,
+            },
+            "entry has no golden record at all": {
+                "matrix": _fixture_case_matrix("SELF-6", "true", None, None),
+                "golden": {},
+                "should_fail": True,
+            },
+            "command exceeds its timeout": {
+                "matrix": _fixture_case_matrix("SELF-7", "sleep 5", None, None),
+                "golden": {"SELF-7": {"exit": 0, "expect_ok": None}},
+                "should_fail": True,
+                "timeout_s": 1,
+            },
+        }
+
+        for name, case in cases.items():
+            problems = check_fixtures(
+                case["matrix"],
+                case["golden"],
+                root=root,
+                timeout_s=case.get("timeout_s", 30),
+            )
+            failed = bool(problems)
+            if failed != case["should_fail"]:
+                failures.append(
+                    f"{name}: expected should_fail={case['should_fail']}, got problems={problems!r}"
+                )
+
+    if not failures:
+        print(
+            f"acf_matrix_check self-test: {len(cases)} fixture-reproduction cases discriminate"
+        )
+    return failures
+
+
 # --- Self-test: proves the schema and structural rules actually discriminate. ---
 
 
@@ -381,6 +642,13 @@ def self_test() -> int:
         print(
             "acf_matrix_check self-test: framework document not present (public clone) -- doc-sync skipped"
         )
+
+    fixture_failures = _self_test_fixtures()
+    for failure in fixture_failures:
+        print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
+    if fixture_failures:
+        return 1
+
     return 0
 
 
@@ -388,10 +656,47 @@ def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument(
+        "--check-fixtures",
+        action="store_true",
+        help=(
+            "Run every matrix entry's test.cmd twice against the committed golden record "
+            "(conformance/acf/fixtures-golden.json), proving it exists, reproduces deterministically, "
+            "and matches. Not wired into public CI yet; run by hand or by a local gate."
+        ),
+    )
+    parser.add_argument(
+        "--record-golden",
+        action="store_true",
+        help=(
+            "Maintenance-only: run every matrix entry's test.cmd once and overwrite "
+            "conformance/acf/fixtures-golden.json. Never run by CI or --check-fixtures; the "
+            "committed file is what --check-fixtures verifies against."
+        ),
+    )
     parsed = parser.parse_args(args)
 
     if parsed.self_test:
         return self_test()
+
+    if parsed.record_golden:
+        golden = record_golden(load_matrix(), root=_ROOT)
+        _GOLDEN.write_text(
+            json.dumps(golden, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        print(f"acf fixtures: recorded golden for {len(golden)} entries -> {_GOLDEN}")
+        return 0
+
+    if parsed.check_fixtures:
+        problems = check_fixtures(load_matrix(), load_golden(), root=_ROOT)
+        for problem in problems:
+            print(f"VIOLATION [{problem.key}]: {problem.detail}", file=sys.stderr)
+        if problems:
+            return 1
+        print(
+            f"acf fixtures: ok, {len(load_golden())} entries reproduced deterministically"
+        )
+        return 0
 
     schema = load_schema()
     data = load_matrix()

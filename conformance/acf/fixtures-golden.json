@@ -1,0 +1,142 @@
+{
+  "ASR-1": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "ASR-2": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "ASR-3": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "ASR-4": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "ASR-5": {
+    "exit": 0,
+    "expect_ok": true
+  },
+  "ASR-6": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "ASR-7": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "COV-1": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "COV-2": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "COV-3": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "COV-4": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "COV-5": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "GOV-1": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "GOV-2": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "GOV-3": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "GOV-4": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "INT-1": {
+    "exit": 0,
+    "expect_ok": true
+  },
+  "INT-2": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "INT-3": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "INT-4": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "INT-5": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "LIF-1": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "LIF-2": {
+    "exit": 0,
+    "expect_ok": true
+  },
+  "LIF-3": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "LIF-4": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "OPE-1": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "OPE-2": {
+    "exit": 0,
+    "expect_ok": true
+  },
+  "OPE-3": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "OPE-4": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "RIG-1": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "RIG-2": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "RIG-3": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "RIG-4": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "RIG-5": {
+    "exit": 0,
+    "expect_ok": null
+  },
+  "RIG-6": {
+    "exit": 0,
+    "expect_ok": null
+  }
+}
