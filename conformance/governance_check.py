@@ -8,7 +8,9 @@ Emits ``{"program", "notice_linked", "registry_refuses", "offline_ecs", "signing
 * ``registry_refuses`` -- the implementation-report registry refuses an unverifiable report;
 * ``offline_ecs`` -- the offline distribution bundle builds and runs the ECS with networking disabled;
 * ``signing_offline`` -- every release signing profile verifies offline against the vendored trust root;
-* ``terms_clean`` -- no tracked file carries a private-terms marker.
+* ``terms_clean`` -- no tracked file carries a private-terms marker, scanned against
+  ``AGENTCE_PRIVATE_TERMS`` if set, else the real private list when present on disk, else the small
+  default fixture under ``conformance/fixtures/`` (see ``_private_terms_path`` for the exact order).
 
 Only the JSON is written to stdout (the sub-checks are called as functions, never their CLIs), so::
 
