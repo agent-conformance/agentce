@@ -18,16 +18,21 @@ TOKENS = Path("website/src/styles/tokens.css")
 MIN_RATIO = 4.5
 PAIRS = [
     ("--accent-contrast", "--accent"),
+    ("--accent-contrast", "--accent-strong"),
     ("--text", "--bg"),
     ("--text-muted", "--bg"),
     ("--text-faint", "--bg"),
     ("--accent-strong", "--bg"),
 ]
-LIGHT_BLOCK = re.compile(r"^:root\s*\{(.*?)^\}", re.S | re.M)
-DARK_BLOCKS = {
-    "dark (auto)": re.compile(r":root:not\(\[data-theme='light'\]\)\s*\{(.*?)\}", re.S),
-    "dark (explicit)": re.compile(r"^:root\[data-theme='dark'\]\s*\{(.*?)^\}", re.S | re.M),
+TRACKED = {t for pair in PAIRS for t in pair}
+THEME_SELECTORS = {
+    ":root": "light",
+    ":root:not([data-theme='light'])": "dark (auto)",
+    ":root[data-theme='dark']": "dark (explicit)",
 }
+RULE = re.compile(r"([^{}]+)\{([^{}]*)\}")
+DECL = re.compile(r"(--[\w-]+)\s*:\s*([^;}]+?)\s*(?:;|$)")
+HEX = re.compile(r"#[0-9a-fA-F]{6}")
 
 
 def channel(v: int) -> float:
@@ -46,18 +51,29 @@ def ratio(a: str, b: str) -> float:
     return (hi + 0.05) / (lo + 0.05)
 
 
-def declarations(block: str) -> dict:
-    return dict(re.findall(r"(--[\w-]+)\s*:\s*(#[0-9a-fA-F]{6})\s*;", block))
+def resolve(css: str):
+    """Return ({theme: {token: hex}}, [problems]) applying every theme rule in source order, so a later
+    override wins exactly as it would in the browser. Comments are ignored; a tracked token declared as
+    anything but a six-digit hex colour is a problem, because its contrast cannot be computed here."""
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+    themes = {name: {} for name in THEME_SELECTORS.values()}
+    problems = []
+    for selector, body in RULE.findall(css):
+        theme = THEME_SELECTORS.get(re.sub(r"\s+", "", selector.split(";")[-1]).replace('"', "'"))
+        if theme is None:
+            continue
+        for token, value in DECL.findall(body):
+            if token not in TRACKED:
+                continue
+            if HEX.fullmatch(value):
+                themes[theme][token] = value
+            else:
+                problems.append(f"{theme}: {token} is declared as {value!r}, not a six-digit hex colour")
+    return themes, problems
 
 
 def failures(css: str) -> list:
-    themes = {}
-    m = LIGHT_BLOCK.search(css)
-    themes["light"] = declarations(m.group(1)) if m else {}
-    for name, rx in DARK_BLOCKS.items():
-        m = rx.search(css)
-        themes[name] = declarations(m.group(1)) if m else {}
-    bad = []
+    themes, bad = resolve(css)
     for theme, tokens in themes.items():
         for fg, bg in PAIRS:
             if fg not in tokens or bg not in tokens:
@@ -81,13 +97,21 @@ def run() -> int:
 
 def self_test() -> int:
     good = TOKENS.read_text(encoding="utf-8") if TOKENS.exists() else ""
+
+    def edit(pattern: str, repl: str) -> str:
+        return re.sub(pattern, repl, good, count=1, flags=re.DOTALL | re.MULTILINE)
+
+    cases = [
+        ("real tokens pass", good, 0),
+        ("pre-fix light accent fails", edit(r"(^:root\s*\{.*?--accent:\s*)#[0-9a-fA-F]{6}", r"\g<1>#0d9488"), 1),
+        ("dark CTA regression fails", edit(r"(^:root\[data-theme='dark'\]\s*\{.*?--accent-contrast:\s*)#[0-9a-fA-F]{6}", r"\g<1>#2dd4bf"), 1),
+        ("CTA hover regression fails", edit(r"(^:root\[data-theme='dark'\]\s*\{.*?--accent-strong:\s*)#[0-9a-fA-F]{6}", r"\g<1>#0d9488"), 1),
+        ("a later override block wins and fails", good + "\n:root { --accent: #0d9488; }\n", 1),
+        ("a commented-out declaration is ignored", good + "\n/* :root { --accent: #ffffff; } */\n", 0),
+        ("a non-hex redeclaration is refused", good + "\n:root { --accent: var(--other); }\n", 1),
+        ("missing blocks fail", "", 1),
+    ]
     failed = 0
-    cases = [("real tokens pass", good, 0)]
-    # The pre-fix light accent (3.75:1 under white text) must be refused, in the light theme only.
-    cases.append(("low-contrast light CTA fails", re.sub(r"(^:root\s*\{.*?--accent:\s*)#[0-9a-fA-F]{6}", r"\g<1>#0d9488", good, count=1, flags=re.S | re.M), 1))
-    # A dark-theme regression must be refused in the explicit block too.
-    cases.append(("low-contrast dark CTA fails", re.sub(r"(^:root\[data-theme='dark'\]\s*\{.*?--accent-contrast:\s*)#[0-9a-fA-F]{6}", r"\g<1>#2dd4bf", good, count=1, flags=re.S | re.M), 1))
-    cases.append(("missing block fails", "", 1))
     for label, css, want in cases:
         got = 1 if failures(css) else 0
         if got != want:
