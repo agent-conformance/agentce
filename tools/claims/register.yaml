@@ -492,3 +492,59 @@ claims:
         step; also proves the negative cases (idempotent re-run, a pre-upgrade state directory, and
         per-pair discrimination) and that the guard job itself runs both the self-test and the real
         scenario.
+  - id: integrations.framework-breadth
+    text: >-
+      Thirteen example framework/SDK integrations -- LangGraph, the OpenAI Agents SDK, CrewAI, Google
+      ADK, the Claude Agent SDK, AutoGen, LlamaIndex, Semantic Kernel, Bedrock Agents, and Vertex
+      Agents (ten agent examples) plus MCP server, A2A mesh, and a custom loop (three protocol/style
+      examples) -- each really import and run their named SDK, offline and keyless, against a scripted
+      deterministic model or transport.
+    status: built
+    pages:
+      - website/src/content/docs/docs/trace-store-connectors.md
+    check:
+      workflow: .github/workflows/ci.yml
+      job: integration-breadth
+      description: >-
+        Runs tools/framework_examples_check.py: every example's agent.py really imports its named
+        framework at the top level, running it end to end produces a bundle the engine ingests with
+        zero quarantines and the required event types, the no-ml dependency boundary holds with real
+        frameworks installed, and the five new examples' chokepoint symbol is documented and genuinely
+        used, not merely named in prose.
+  - id: integrations.trace-store-connectors
+    text: >-
+      A realistic export shaped exactly as Langfuse, Phoenix/Arize, Datadog LLM Observability, and
+      LangSmith each actually produce it round-trips into canonical AgentCE events through the existing
+      otel-genai adapter, zero quarantines, proven per vendor by a committed fixture; a documented
+      OpenTelemetry Collector recipe wires the fan-out that carries such an export into AgentCE's
+      ingest path in a real deployment.
+    status: built
+    pages:
+      - website/src/content/docs/docs/trace-store-connectors.md
+    check:
+      workflow: .github/workflows/ci.yml
+      job: integration-breadth
+      description: >-
+        Runs tools/trace_store_ingest_check.py: each of the four new fixtures ingests and validates
+        with zero quarantines through the unmodified otel-genai adapter, the support matrix stays
+        consistent, and each Collector recipe shares the byte-identical base otlp receiver, carries a
+        file exporter alongside its cited vendor exporter, and names a dated source.
+  - id: integrations.grc-connectors
+    text: >-
+      Documented recipes connect an AgentCE assessment to four GRC platforms: RegScale and ServiceNow
+      GRC consume the engine's existing, schema-validated OSCAL Assessment Results output directly
+      through their own native OSCAL import; Vanta and Drata, which have no native OSCAL import,
+      receive a new deterministic evidence-export transform shaped to their generic evidence-submission
+      APIs.
+    status: built
+    pages:
+      - website/src/content/docs/docs/grc-connectors.md
+    check:
+      workflow: .github/workflows/ci.yml
+      job: integration-breadth
+      description: >-
+        Runs tools/grc/evidence_export.py's self-test (a real assertions.json produces a byte-identical
+        evidence.json across two runs; malformed input is refused, never partially written) and
+        tools/grc_connectors_check.py (a real OSCAL Assessment Results document validates against the
+        vendored NIST schema; the docs page names evidence_export.py's real module path and output
+        field names, not just prose).

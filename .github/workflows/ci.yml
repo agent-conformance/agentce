@@ -285,6 +285,56 @@ jobs:
       - name: ingest, collect, and the collector component all work
         run: uv run --project engines/python --frozen python tools/collect_ingest_check.py
 
+  integration-breadth:
+    # Item 16.3: AutoGen, LlamaIndex, Semantic Kernel, Bedrock Agents, and Vertex Agents each really
+    # run their named SDK offline and keyless; Langfuse, Phoenix/Arize, Datadog LLM Observability, and
+    # LangSmith telemetry round-trips into canonical events through the existing otel-genai adapter;
+    # RegScale, ServiceNow, Vanta, and Drata each have a real, cited connector recipe. Each new
+    # example syncs its own isolated uv environment on demand (via its own run.sh, matching the
+    # python-tests job's existing five-framework-example pattern); this job installs none of them
+    # itself.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Sync the engine
+        working-directory: engines/python
+        run: uv sync --frozen
+      - name: Sync tools
+        working-directory: tools
+        run: uv sync --frozen
+      - name: Sync the otel-genai adapter
+        working-directory: adapters/otel-genai
+        run: uv sync --frozen
+      - name: framework_examples_check self-test
+        run: uv run --project engines/python --frozen python tools/framework_examples_check.py --self-test
+      - name: All ten framework examples really run their framework, offline and keyless
+        run: uv run --project engines/python --frozen python tools/framework_examples_check.py
+      - name: framework_examples_check chokepoint documentation
+        run: uv run --project engines/python --frozen python tools/framework_examples_check.py --doc-symbols-only
+      - name: trace_store_ingest_check self-test
+        run: uv run --project engines/python --frozen python tools/trace_store_ingest_check.py --self-test
+      - name: Langfuse, Phoenix, Datadog, and LangSmith telemetry round-trips into AgentCE
+        run: uv run --project engines/python --frozen python tools/trace_store_ingest_check.py
+      - name: trace_store_ingest_check recipes self-test
+        run: uv run --project engines/python --frozen python tools/trace_store_ingest_check.py --recipes-only --self-test
+      - name: The Collector recipes are real and structurally sound
+        run: uv run --project engines/python --frozen python tools/trace_store_ingest_check.py --recipes-only
+      - name: grc/evidence_export.py self-test
+        run: uv run --project tools --frozen python tools/grc/evidence_export.py --self-test
+      - name: grc_connectors_check self-test
+        run: uv run --project engines/python --frozen python tools/grc_connectors_check.py --self-test
+      - name: RegScale/ServiceNow's OSCAL path and Vanta/Drata's evidence-export path both hold
+        run: uv run --project engines/python --frozen python tools/grc_connectors_check.py
+      - name: integration_breadth_check self-test
+        run: uv run --project tools --frozen python -m integration_breadth_check --self-test
+      - name: integration_breadth_check (real, aggregated)
+        run: uv run --project tools --frozen python -m integration_breadth_check
+
   evidence-input-hardening:
     # An evidence bundle's manifest, YAML files, and event lines are adversarial input (SPEC §8.1,
     # §8.7; docs/threat-model.md "Untrusted evidence-bundle input hardening"). A manifest-listed path

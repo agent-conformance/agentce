@@ -15,6 +15,7 @@ py-modules = [
   "claims_check",
   "docs_doctest_check",
   "governance_check",
+  "integration_breadth_check",
   "nist_catalog_substantiation_check",
   "placeholder_sweep",
 ]
