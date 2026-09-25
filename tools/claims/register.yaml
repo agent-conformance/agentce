@@ -616,6 +616,24 @@ claims:
         against catalog-registry.schema.json, recomputes each entry's digest from the real catalog
         directory on disk, verifies the signature against the vendored trust root, and refuses a
         digest-mismatched fixture entry.
+  - id: evaluator.acf-scorecard
+    text: >-
+      AgentCE publishes its own honest score against the Agent Conformance Framework's seven
+      dimensions on a 0-3 maturity scale (an unverifiable claim scores below an honest partial), with
+      a resolvable evidence pointer for every capability scored Complete, deterministically
+      recomputed and gated so a published score can never silently fall.
+    status: built
+    pages:
+      - conformance/acf/README.md
+    check:
+      workflow: .github/workflows/ci.yml
+      job: domain-depth
+      description: >-
+        Runs acf_matrix_check.py --self-test and --check-fixtures (every tested capability's proof
+        reproduces its committed golden outcome twice in a row) and acf_score.py --self-test (the
+        scoring rule, serialization determinism, and the score-only-rises ratchet each discriminate)
+        and acf_score.py (recomputes the live scorecard and refuses, exit 1, if any capability's score
+        fell versus the committed conformance/acf/scorecard.json).
   - id: governance.implementation-report-registry
     text: >-
       Every accepted implementation report validates against a JSON Schema before its golden-revision
