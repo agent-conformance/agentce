@@ -108,6 +108,17 @@ def _terms_clean() -> bool:
     terms_path = _private_terms_path()
     if not terms_path.is_file() or terms_path.stat().st_size == 0:
         return False
+    exclude_pathspecs = [":(exclude)LICENSE*", ":(exclude,glob)**/LICENSE*"]
+    try:
+        terms_rel = terms_path.resolve().relative_to(REPO_ROOT.resolve())
+    except ValueError:
+        terms_rel = None
+    if terms_rel is not None:
+        # The terms list itself necessarily contains the very phrases it bans (that is
+        # what makes it a terms list); scanning it against itself is a guaranteed,
+        # meaningless self-match, not a real leak. Exclude it the same way LICENSE files
+        # are excluded above.
+        exclude_pathspecs.append(f":(exclude){terms_rel.as_posix()}")
     proc = subprocess.run(
         [
             "git",
@@ -118,8 +129,7 @@ def _terms_clean() -> bool:
             str(terms_path),
             "--",
             ".",
-            ":(exclude)LICENSE*",
-            ":(exclude,glob)**/LICENSE*",
+            *exclude_pathspecs,
         ],
         cwd=REPO_ROOT,
         capture_output=True,
