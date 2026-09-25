@@ -41,6 +41,10 @@ def test_fixtures_present() -> None:
         "otel-genai-chat",
         "otel-genai-errors-and-skips",
         "otel-genai-legacy-tokens",
+        "datadog",
+        "langfuse",
+        "langsmith",
+        "phoenix",
     }
 
 

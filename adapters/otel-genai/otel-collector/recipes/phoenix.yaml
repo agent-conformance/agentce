@@ -1,0 +1,40 @@
+# A Collector recipe (item 16.3, trace-store ingestion) that fans the shared `otlp` receiver in
+# ../config.yaml out to a Phoenix/Arize collector endpoint as well as to the local `file` exporter
+# AgentCE's otel-genai adapter reads (see ../config.yaml's header comment for that half of the story).
+# Phoenix is built on OpenInference (the `openinference:*` convention family already named in
+# ../../support-matrix.yaml); its OTLP ingest endpoint is configured by the deployment, conventionally
+# `PHOENIX_COLLECTOR_ENDPOINT`, and it accepts the OpenInference `openinference.span.kind`/`llm.*`/
+# `input.value`/`output.value` attribute family exactly like adapters/otel-genai/fixtures/phoenix
+# demonstrates. Source: https://arize.com/docs/phoenix/tracing/how-to-tracing/instrument-otel
+# (retrieved 2026-09-24).
+#
+# Run it: `otelcol-contrib --config adapters/otel-genai/otel-collector/recipes/phoenix.yaml`, with
+# `PHOENIX_COLLECTOR_ENDPOINT` set in the environment (self-hosted Phoenix, or `https://app.phoenix.arize.com`
+# for the hosted product, with `PHOENIX_API_KEY` added to the exporter's headers). The `file` exporter's
+# output is the same OTLP/JSON export shape as adapters/otel-genai/fixtures/phoenix/input.json, so a
+# `collect` config source can name its path as its `export` exactly as adapters/fixtures/collect-dry-run.yaml
+# does for the base recipe.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  otlphttp/phoenix:
+    endpoint: ${PHOENIX_COLLECTOR_ENDPOINT}
+  file:
+    path: /var/lib/agentce/exports/otel-genai/phoenix-traces.json
+    format: json
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/phoenix, file]

@@ -1,0 +1,4 @@
+{
+  "subject": "spiffe://corp/agents/fraud-detection-agent",
+  "source_class": "self_report"
+}

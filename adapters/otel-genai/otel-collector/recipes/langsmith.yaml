@@ -1,0 +1,41 @@
+# A Collector recipe (item 16.3, trace-store ingestion) that fans the shared `otlp` receiver in
+# ../config.yaml out to LangSmith's OTLP endpoint as well as to the local `file` exporter AgentCE's
+# otel-genai adapter reads (see ../config.yaml's header comment for that half of the story). LangSmith
+# exposes an OTLP endpoint at `https://api.smith.langchain.com/otel`, documented as consuming the
+# OpenLLMetry/`gen_ai.*` semantic convention -- the same convention family
+# adapters/otel-genai/fixtures/langsmith demonstrates -- authenticated by an API-key header.
+# Source: https://docs.smith.langchain.com/observability/how_to_guides/trace_with_opentelemetry
+# (retrieved 2026-09-24).
+#
+# Run it: `otelcol-contrib --config adapters/otel-genai/otel-collector/recipes/langsmith.yaml`, with
+# `LANGSMITH_API_KEY` and `LANGSMITH_PROJECT` set in the environment. The `file` exporter's output is
+# the same OTLP/JSON export shape as adapters/otel-genai/fixtures/langsmith/input.json, so a `collect`
+# config source can name its path as its `export` exactly as adapters/fixtures/collect-dry-run.yaml
+# does for the base recipe.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  otlphttp/langsmith:
+    endpoint: https://api.smith.langchain.com/otel
+    headers:
+      x-api-key: ${LANGSMITH_API_KEY}
+      Langsmith-Project: ${LANGSMITH_PROJECT}
+  file:
+    path: /var/lib/agentce/exports/otel-genai/langsmith-traces.json
+    format: json
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/langsmith, file]

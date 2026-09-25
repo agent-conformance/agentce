@@ -1,0 +1,62 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {"key": "service.name", "value": {"stringValue": "checkout-copilot"}}
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {"name": "opentelemetry.instrumentation.openai", "version": "0.32.0"},
+          "schemaUrl": "https://opentelemetry.io/schemas/1.36.0",
+          "spans": [
+            {
+              "traceId": "5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b",
+              "spanId": "1a2b3c4d5e6f7a8b",
+              "name": "chat gpt-4o",
+              "startTimeUnixNano": "1735500000000000000",
+              "endTimeUnixNano": "1735500002000000000",
+              "attributes": [
+                {"key": "gen_ai.operation.name", "value": {"stringValue": "chat"}},
+                {"key": "gen_ai.system", "value": {"stringValue": "openai"}},
+                {"key": "gen_ai.request.model", "value": {"stringValue": "gpt-4o"}},
+                {"key": "gen_ai.response.model", "value": {"stringValue": "gpt-4o-2024-11-20"}},
+                {"key": "gen_ai.usage.input_tokens", "value": {"intValue": "612"}},
+                {"key": "gen_ai.usage.output_tokens", "value": {"intValue": "128"}},
+                {"key": "gen_ai.input.messages", "value": {"stringValue": "[redacted-by-exporter]"}},
+                {"key": "gen_ai.output.messages", "value": {"stringValue": "[redacted-by-exporter]"}},
+                {"key": "gen_ai.conversation.id", "value": {"stringValue": "conv-checkout-482"}},
+                {"key": "langfuse.session.id", "value": {"stringValue": "conv-checkout-482"}},
+                {"key": "gen_ai.agent.id", "value": {"stringValue": "spiffe://corp/agents/checkout-copilot"}},
+                {"key": "gen_ai.agent.name", "value": {"stringValue": "checkout-copilot"}}
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b",
+              "spanId": "2b3c4d5e6f7a8b9c",
+              "parentSpanId": "1a2b3c4d5e6f7a8b",
+              "name": "execute_tool apply_discount_code",
+              "startTimeUnixNano": "1735500002500000000",
+              "endTimeUnixNano": "1735500002800000000",
+              "attributes": [
+                {"key": "gen_ai.operation.name", "value": {"stringValue": "execute_tool"}},
+                {"key": "gen_ai.tool.name", "value": {"stringValue": "apply_discount_code"}},
+                {"key": "gen_ai.tool.server", "value": {"stringValue": "https://internal/tools/discounts"}},
+                {"key": "gen_ai.tool.protocol", "value": {"stringValue": "http"}},
+                {"key": "gen_ai.tool.call.arguments", "value": {"stringValue": "[redacted-by-exporter]"}},
+                {"key": "gen_ai.tool.call.result", "value": {"stringValue": "[redacted-by-exporter]"}},
+                {"key": "gen_ai.conversation.id", "value": {"stringValue": "conv-checkout-482"}},
+                {"key": "langfuse.session.id", "value": {"stringValue": "conv-checkout-482"}},
+                {"key": "gen_ai.agent.id", "value": {"stringValue": "spiffe://corp/agents/checkout-copilot"}},
+                {"key": "gen_ai.agent.name", "value": {"stringValue": "checkout-copilot"}}
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
