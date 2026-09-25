@@ -45,6 +45,12 @@ allow:
     class: legitimate
     justification: "Synthetic all-zero MCP tool-call id in the adapter test's expected output."
 
+  - path: conformance/acf_matrix_check.py
+    pattern: placeholder
+    count: 5
+    class: legitimate
+    justification: "Names the self-test's deliberately-gameable fixture (one filler entry per dimension) used to prove the ACF matrix's 36-capability binding check rejects a minimal placeholder matrix."
+
   - path: conformance/release.py
     pattern: stub
     count: 4

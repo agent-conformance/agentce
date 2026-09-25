@@ -354,7 +354,7 @@ entries:
   - id: GOV-2
     dimension: governance
     capability: "A conformance program & marks"
-    statement: "An implementation can be verified 'AgentCE-conformant' against a published program with a real marks/attestation regime, backed by a signed implementation report."
+    statement: "An implementation's conformance claim can be checked against a published program with a real listing/attestation regime, backed by a signed implementation report."
     level_target: 2
     test:
       cmd: "test -f governance/CONFORMANCE-PROGRAM.md && cd conformance && uv run --frozen python registry_check.py --self-test"

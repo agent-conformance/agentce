@@ -12,10 +12,12 @@ prose.
 The 36-capability canonical list below is hardcoded, not parsed from the framework document, because
 that document lives outside this repository's tracked tree and this check must also run correctly from a
 plain public clone (public CI, a verifier's clean clone, an end user's checkout) that never has it
-present. When the document *is* present locally, `check_framework_doc_sync` additionally confirms the
-canonical list has not drifted from its wording; that half is best-effort and silently skipped
-otherwise, matching this codebase's existing pattern for optional local-only checks (see
-`tools/governance_check.py`'s `PRIVATE_TERMS` handling).
+present. This file never names that document's location: `check_framework_doc_sync` reads it only from
+an environment-variable override, unset by default, so a plain clone's tracked source carries no
+reference to a companion tree it does not have. When a caller (a maintainer's own working copy) sets the
+override, that half additionally confirms the canonical list has not drifted from the document's wording;
+otherwise it is silently skipped, matching this codebase's existing pattern for optional local-only
+checks (see `conformance/governance_check.py`'s `PRIVATE_TERMS` handling).
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -34,7 +37,15 @@ import yaml
 _ROOT = Path(__file__).resolve().parent.parent
 _MATRIX = _ROOT / "conformance" / "acf" / "matrix.yaml"
 _SCHEMA = _ROOT / "conformance" / "acf" / "matrix.schema.json"
-_FRAMEWORK_DOC = _ROOT / "SPECS" / "AGENT-CONFORMANCE-FRAMEWORK.md"
+_FRAMEWORK_DOC_ENV = "AGENTCE_ACF_FRAMEWORK_DOC"
+
+
+def _framework_doc_path() -> Path | None:
+    """The companion framework document's path, from an environment-variable override only -- never a
+    hardcoded default -- so this tracked file names no path outside the repository."""
+    override = os.environ.get(_FRAMEWORK_DOC_ENV)
+    return Path(override) if override else None
+
 
 _SEVEN_DIMENSIONS = (
     "coverage",
@@ -179,9 +190,10 @@ def check_framework_doc_sync() -> list[str]:
     """Best-effort: when the private framework document is present, confirm the hardcoded canonical
     capability list has not drifted from its wording. Returns problem strings; empty (including when
     the document is absent) means either "in sync" or "not checkable here"."""
-    if not _FRAMEWORK_DOC.exists():
+    doc_path = _framework_doc_path()
+    if doc_path is None or not doc_path.exists():
         return []
-    text = _FRAMEWORK_DOC.read_text(encoding="utf-8")
+    text = doc_path.read_text(encoding="utf-8")
     start = text.find("## The seven dimensions")
     if start == -1:
         return ["framework doc present but 'The seven dimensions' heading not found"]
@@ -360,7 +372,8 @@ def self_test() -> int:
         for doc_problem in doc_sync_problems:
             print(f"SELF-TEST FAIL: framework doc sync: {doc_problem}", file=sys.stderr)
         return 1
-    if _FRAMEWORK_DOC.exists():
+    doc_path = _framework_doc_path()
+    if doc_path is not None and doc_path.exists():
         print(
             "acf_matrix_check self-test: canonical list in sync with the framework document"
         )
