@@ -20,7 +20,8 @@
 //                                            (must report none). Exit 0 iff the gate discriminates; a
 //                                            stubbed or toothless gate exits 1.
 import { createServer } from 'node:http';
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync, mkdtempSync, copyFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve, extname, relative, sep, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -214,8 +215,7 @@ async function runGate({ report, dir }) {
     process.exit(1);
   }
   const { pages, scans, findings } = await scanDir(root);
-  const withViolations = findings.filter((f) => f.violations.length > 0);
-  const total = withViolations.reduce((n, f) => n + f.violations.length, 0);
+  const { total, withViolations, exitCode } = verdict(findings, report);
   console.log(`A11Y coverage: ${pages} pages × ${THEMES.length} themes = ${scans} axe scans (tags: ${WCAG_TAGS.join(', ')}).`);
   if (total === 0) {
     console.log('A11Y CHECK OK — axe reported no WCAG 2.2 AA violations in either theme.');
@@ -223,7 +223,39 @@ async function runGate({ report, dir }) {
   }
   console.error(`A11Y ${report ? 'report' : 'CHECK FAILED'}: ${total} violation instance(s) across ${withViolations.length} page/theme(s):`);
   for (const f of withViolations) for (const line of formatViolations(f.pageId, f.theme, f.violations)) console.error(line);
-  process.exit(report ? 0 : 1);
+  process.exit(exitCode);
+}
+
+// The enforce path's decision: any violation fails the build unless --report was asked for.
+function verdict(findings, report) {
+  const withViolations = findings.filter((f) => f.violations.length > 0);
+  const total = withViolations.reduce((n, f) => n + f.violations.length, 0);
+  return { total, withViolations, exitCode: total > 0 && !report ? 1 : 0 };
+}
+
+// Drive the real enforce path (scanDir + verdict) over a two-page directory holding one seeded-bad and
+// one clean page, so a neutered scan or a swapped fixture cannot pass the self-test.
+async function enforceProbe(bad, good) {
+  const tmp = mkdtempSync(join(tmpdir(), 'a11y-probe-'));
+  try {
+    copyFileSync(bad, join(tmp, 'bad.html'));
+    copyFileSync(good, join(tmp, 'good.html'));
+    const { pages, scans, findings } = await scanDir(tmp);
+    const problems = [];
+    if (pages !== 2 || scans !== 2 * THEMES.length) problems.push(`the probe covered ${pages} page(s) / ${scans} scan(s), expected 2 / ${2 * THEMES.length}`);
+    for (const theme of THEMES) {
+      const b = findings.find((f) => f.pageId === '/bad.html' && f.theme === theme);
+      const g = findings.find((f) => f.pageId === '/good.html' && f.theme === theme);
+      if (!b || b.violations.length === 0) problems.push(`the seeded-bad page reported no violations in the ${theme} theme`);
+      if (!g || g.violations.length !== 0) problems.push(`the clean page reported violations in the ${theme} theme`);
+    }
+    if (verdict(findings, false).exitCode !== 1) problems.push('the enforce path did not fail on a page with violations');
+    if (verdict(findings, true).exitCode !== 0) problems.push('--report did not exit 0 on a page with violations');
+    if (verdict(findings.filter((f) => f.pageId === '/good.html'), false).exitCode !== 0) problems.push('the enforce path failed on a clean page');
+    return { pages, scans, problems };
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
 }
 
 async function selfTest() {
@@ -242,6 +274,10 @@ async function selfTest() {
   console.log(`SELF-TEST: accessible fixture   → ${goodViol.length} violation type(s): ${goodViol.map((v) => v.id).sort().join(', ') || '(none)'}`);
 
   const problems = [];
+  for (const r of REQUIRED_SELFTEST_RULES) console.log(`SELF-TEST: required rule ${r} ${badIds.includes(r) ? 'reported' : 'MISSING'} on the inaccessible fixture`);
+  const probe = await enforceProbe(bad, good);
+  console.log(`SELF-TEST: enforce path probe → ${probe.pages} pages × ${THEMES.length} themes = ${probe.scans} axe scans`);
+  problems.push(...probe.problems);
   if (badViol.length === 0) problems.push('the inaccessible fixture produced no axe violations — the gate is toothless');
   if (missing.length) problems.push(`the inaccessible fixture did not trigger required rule(s): ${missing.join(', ')}`);
   if (goodViol.length !== 0) problems.push(`the accessible control fixture produced ${goodViol.length} violation(s) — the gate reports false positives`);
