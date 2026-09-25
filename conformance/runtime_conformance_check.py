@@ -195,8 +195,17 @@ def _drift_lines(out: Path) -> list[dict[str, Any]]:
     ]
 
 
+def _drift_bytes(out: Path) -> bytes:
+    path = out / "runtime_drift.jsonl"
+    return path.read_bytes() if path.is_file() else b""
+
+
 def _assertions(out: Path) -> list[dict[str, Any]]:
     return json.loads((out / "assertions.json").read_text(encoding="utf-8"))
+
+
+def _assertions_bytes(out: Path) -> bytes:
+    return (out / "assertions.json").read_bytes()
 
 
 def _inc02(assertions: list[dict[str, Any]], subject: str) -> dict[str, Any] | None:
@@ -238,9 +247,27 @@ def run_scenario(work: Path) -> dict[str, Any]:
     env3 = _assess(bundle3, profile, out3, state)
 
     return {
-        "step1": {"env": env1, "drift": _drift_lines(out1), "assertions": _assertions(out1)},
-        "step2": {"env": env2, "drift": _drift_lines(out2), "assertions": _assertions(out2)},
-        "step3": {"env": env3, "drift": _drift_lines(out3), "assertions": _assertions(out3)},
+        "step1": {
+            "env": env1,
+            "drift": _drift_lines(out1),
+            "assertions": _assertions(out1),
+            "drift_bytes": _drift_bytes(out1),
+            "assertions_bytes": _assertions_bytes(out1),
+        },
+        "step2": {
+            "env": env2,
+            "drift": _drift_lines(out2),
+            "assertions": _assertions(out2),
+            "drift_bytes": _drift_bytes(out2),
+            "assertions_bytes": _assertions_bytes(out2),
+        },
+        "step3": {
+            "env": env3,
+            "drift": _drift_lines(out3),
+            "assertions": _assertions(out3),
+            "drift_bytes": _drift_bytes(out3),
+            "assertions_bytes": _assertions_bytes(out3),
+        },
     }
 
 
@@ -289,9 +316,9 @@ def check_scenario() -> str | None:
 
     problems = _scenario_problems(result_a)
     for step in ("step1", "step2", "step3"):
-        if result_a[step]["assertions"] != result_b[step]["assertions"]:
+        if result_a[step]["assertions_bytes"] != result_b[step]["assertions_bytes"]:
             problems.append(f"{step}: assertions.json was not byte-identical across two fresh runs")
-        if result_a[step]["drift"] != result_b[step]["drift"]:
+        if result_a[step]["drift_bytes"] != result_b[step]["drift_bytes"]:
             problems.append(f"{step}: runtime_drift.jsonl was not byte-identical across two fresh runs")
     return "; ".join(problems) if problems else None
 
