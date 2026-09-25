@@ -1,0 +1,60 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {"key": "service.name", "value": {"stringValue": "research-copilot"}}
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {"name": "opentelemetry.instrumentation.openai", "version": "0.29.2"},
+          "schemaUrl": "https://opentelemetry.io/schemas/1.36.0",
+          "spans": [
+            {
+              "traceId": "7f8091a2b3c4d5e6f708192a3b4c5d6e",
+              "spanId": "5e6f7a8b9c0d1e2f",
+              "name": "chat gpt-4.1-mini",
+              "startTimeUnixNano": "1735800000000000000",
+              "endTimeUnixNano": "1735800001800000000",
+              "attributes": [
+                {"key": "gen_ai.operation.name", "value": {"stringValue": "chat"}},
+                {"key": "gen_ai.system", "value": {"stringValue": "openai"}},
+                {"key": "gen_ai.request.model", "value": {"stringValue": "gpt-4.1-mini"}},
+                {"key": "gen_ai.response.model", "value": {"stringValue": "gpt-4.1-mini-2025-04-14"}},
+                {"key": "gen_ai.usage.input_tokens", "value": {"intValue": "730"}},
+                {"key": "gen_ai.usage.output_tokens", "value": {"intValue": "95"}},
+                {"key": "gen_ai.input.messages", "value": {"stringValue": "[redacted-by-exporter]"}},
+                {"key": "gen_ai.output.messages", "value": {"stringValue": "[redacted-by-exporter]"}},
+                {"key": "gen_ai.conversation.id", "value": {"stringValue": "conv-research-315"}},
+                {"key": "gen_ai.agent.id", "value": {"stringValue": "spiffe://corp/agents/research-copilot"}},
+                {"key": "gen_ai.agent.name", "value": {"stringValue": "research-copilot"}}
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "7f8091a2b3c4d5e6f708192a3b4c5d6e",
+              "spanId": "6f7a8b9c0d1e2f3a",
+              "parentSpanId": "5e6f7a8b9c0d1e2f",
+              "name": "execute_tool web_search",
+              "startTimeUnixNano": "1735800001900000000",
+              "endTimeUnixNano": "1735800002100000000",
+              "attributes": [
+                {"key": "gen_ai.operation.name", "value": {"stringValue": "execute_tool"}},
+                {"key": "gen_ai.tool.name", "value": {"stringValue": "web_search"}},
+                {"key": "gen_ai.tool.server", "value": {"stringValue": "https://internal/tools/search"}},
+                {"key": "gen_ai.tool.protocol", "value": {"stringValue": "http"}},
+                {"key": "gen_ai.tool.call.arguments", "value": {"stringValue": "[redacted-by-exporter]"}},
+                {"key": "gen_ai.tool.call.result", "value": {"stringValue": "[redacted-by-exporter]"}},
+                {"key": "gen_ai.conversation.id", "value": {"stringValue": "conv-research-315"}},
+                {"key": "gen_ai.agent.id", "value": {"stringValue": "spiffe://corp/agents/research-copilot"}},
+                {"key": "gen_ai.agent.name", "value": {"stringValue": "research-copilot"}}
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

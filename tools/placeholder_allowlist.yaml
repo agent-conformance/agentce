@@ -221,9 +221,9 @@ allow:
 
   - path: tools/framework_examples_check.py
     pattern: stub
-    count: 1
+    count: 3
     class: legitimate
-    justification: "A bad-fixture agent.py body used by the self-test to prove the check fails an example that never imports its named framework."
+    justification: "Synthetic bad-fixture agent.py bodies the self-test writes to prove the check fails an example that never imports its named framework, and a chokepoint symbol named only in a docstring with no real use in the body -- never a stub left in this check itself."
 
   - path: tools/pyproject.toml
     pattern: placeholder

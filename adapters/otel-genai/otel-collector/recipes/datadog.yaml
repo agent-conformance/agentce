@@ -1,0 +1,38 @@
+# A Collector recipe (item 16.3, trace-store ingestion) that fans the shared `otlp` receiver in
+# ../config.yaml out to a local Datadog Agent as well as to the local `file` exporter AgentCE's
+# otel-genai adapter reads (see ../config.yaml's header comment for that half of the story). Datadog
+# LLM Observability has native support for the OTel GenAI semantic convention (`gen_ai.*`-convention
+# spans, the same family adapters/otel-genai/fixtures/datadog demonstrates): the Datadog Agent runs its
+# own OTLP receiver on ports 4317 (gRPC) and 4318 (HTTP), and its own `datadog` exporter forwards from
+# there to Datadog -- this Collector only needs to reach the local Agent, not Datadog's ingest directly.
+# Source: https://docs.datadoghq.com/llm_observability/setup/otel/ (retrieved 2026-09-24).
+#
+# Run it: `otelcol-contrib --config adapters/otel-genai/otel-collector/recipes/datadog.yaml`, with the
+# Datadog Agent already running locally with OTLP ingestion enabled (`otlp_config.receiver` in
+# `datadog.yaml`, the Agent's own config). The `file` exporter's output is the same OTLP/JSON export
+# shape as adapters/otel-genai/fixtures/datadog/input.json, so a `collect` config source can name its
+# path as its `export` exactly as adapters/fixtures/collect-dry-run.yaml does for the base recipe.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  otlphttp/datadog:
+    endpoint: http://localhost:4318
+  file:
+    path: /var/lib/agentce/exports/otel-genai/datadog-traces.json
+    format: json
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/datadog, file]
