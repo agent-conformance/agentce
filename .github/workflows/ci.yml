@@ -569,7 +569,7 @@ jobs:
     # bundle carrying every signed base catalog and verifying each offline, and the catalog and
     # implementation-report registries, each validated against a JSON Schema.
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install uv
@@ -608,3 +608,15 @@ jobs:
       - name: registry_check self-test (the implementation-report registry, now schema-validated too)
         working-directory: conformance
         run: uv run --frozen python registry_check.py --self-test
+      - name: acf_matrix_check self-test (the ACF matrix schema and structural rules discriminate)
+        working-directory: conformance
+        run: uv run --frozen python acf_matrix_check.py --self-test
+      - name: acf_matrix_check --check-fixtures (every capability's test reproduces its golden outcome)
+        working-directory: conformance
+        run: uv run --frozen python acf_matrix_check.py --check-fixtures
+      - name: acf_score self-test (the scoring rule, serialization determinism, and the ratchet discriminate)
+        working-directory: conformance
+        run: uv run --frozen python acf_score.py --self-test
+      - name: acf_score (the honest ACF scorecard; the score-only-rises ratchet against the committed baseline)
+        working-directory: conformance
+        run: uv run --frozen python acf_score.py

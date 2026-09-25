@@ -1,0 +1,543 @@
+{
+  "capabilities": [
+    {
+      "capability": "Standards & rulesets",
+      "capped_reason": null,
+      "dimension": "coverage",
+      "evidence_ref": "spec/catalogs/base/{eu-ai-act,nist-ai-rmf}; tools/catalog_authoring_check.py",
+      "id": "COV-1",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Agent frameworks / runtimes",
+      "capped_reason": null,
+      "dimension": "coverage",
+      "evidence_ref": "tools/framework_examples_check.py; examples/<style>/",
+      "id": "COV-2",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Languages / SDKs",
+      "capped_reason": null,
+      "dimension": "coverage",
+      "evidence_ref": null,
+      "id": "COV-3",
+      "level_label": "Partial",
+      "level_target": 2,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 2
+    },
+    {
+      "capability": "Evidence sources / ingestion",
+      "capped_reason": null,
+      "dimension": "coverage",
+      "evidence_ref": null,
+      "id": "COV-4",
+      "level_label": "Partial",
+      "level_target": 2,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 2
+    },
+    {
+      "capability": "Agent modalities",
+      "capped_reason": null,
+      "dimension": "coverage",
+      "evidence_ref": null,
+      "id": "COV-5",
+      "level_label": "Partial",
+      "level_target": 2,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 2
+    },
+    {
+      "capability": "Evaluation depth",
+      "capped_reason": null,
+      "dimension": "rigor",
+      "evidence_ref": "conformance/ecs.py; conformance/precision_gate.py",
+      "id": "RIG-1",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Determinism (order/locale/clock-independent)",
+      "capped_reason": null,
+      "dimension": "rigor",
+      "evidence_ref": "conformance/numerics.py; engines/python/tests/test_late_event.py",
+      "id": "RIG-2",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Model-free (no learned component decides an outcome)",
+      "capped_reason": null,
+      "dimension": "rigor",
+      "evidence_ref": "tools/no_ml_check.py",
+      "id": "RIG-3",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Insufficient-evidence honesty",
+      "capped_reason": null,
+      "dimension": "rigor",
+      "evidence_ref": "engines/python/tests/test_exit_codes.py; docs/errors.md",
+      "id": "RIG-4",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Provenance & signing",
+      "capped_reason": null,
+      "dimension": "rigor",
+      "evidence_ref": "conformance/dev_trust.py; engines/python/tests/test_signing.py",
+      "id": "RIG-5",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Self-proof (the evaluator proves itself)",
+      "capped_reason": null,
+      "dimension": "rigor",
+      "evidence_ref": "conformance/ecs.py; conformance/precision_gate.py; corpus/",
+      "id": "RIG-6",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Output formats (machine/human/GRC/CI)",
+      "capped_reason": null,
+      "dimension": "interoperability",
+      "evidence_ref": "conformance/render_check.py; spec/report/",
+      "id": "INT-1",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": true
+      },
+      "score": 3
+    },
+    {
+      "capability": "CI/CD surface",
+      "capped_reason": null,
+      "dimension": "interoperability",
+      "evidence_ref": null,
+      "id": "INT-2",
+      "level_label": "Partial",
+      "level_target": 2,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 2
+    },
+    {
+      "capability": "Policy-as-code gating",
+      "capped_reason": null,
+      "dimension": "interoperability",
+      "evidence_ref": "engines/python/tests/test_policy_gating.py; --fail-on",
+      "id": "INT-3",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Downstream & GRC consumers",
+      "capped_reason": null,
+      "dimension": "interoperability",
+      "evidence_ref": null,
+      "id": "INT-4",
+      "level_label": "Partial",
+      "level_target": 2,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 2
+    },
+    {
+      "capability": "AI-native consumption",
+      "capped_reason": null,
+      "dimension": "interoperability",
+      "evidence_ref": "engines/python/tests/test_skill_emit.py; assess --emit skill",
+      "id": "INT-5",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Pre-production assessment",
+      "capped_reason": null,
+      "dimension": "lifecycle",
+      "evidence_ref": "tools/assess_smoke_check.py; agentce quickstart",
+      "id": "LIF-1",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Runtime / continuous conformance",
+      "capped_reason": null,
+      "dimension": "lifecycle",
+      "evidence_ref": "conformance/runtime_conformance_check.py",
+      "id": "LIF-2",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": true
+      },
+      "score": 3
+    },
+    {
+      "capability": "Run-to-run delta",
+      "capped_reason": null,
+      "dimension": "lifecycle",
+      "evidence_ref": "engines/python/agentce/commands/__init__.py::cmd_diff; engines/python/tests/test_cli.py",
+      "id": "LIF-3",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Remediation & re-verify",
+      "capped_reason": null,
+      "dimension": "lifecycle",
+      "evidence_ref": "engines/python/tests/test_remediation.py",
+      "id": "LIF-4",
+      "level_label": "Partial",
+      "level_target": 2,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 2
+    },
+    {
+      "capability": "Retention & audit trail",
+      "capped_reason": null,
+      "dimension": "lifecycle",
+      "evidence_ref": null,
+      "id": "LIF-5",
+      "level_label": "Asserted",
+      "level_target": 1,
+      "outcome": null,
+      "score": 1
+    },
+    {
+      "capability": "Offline / self-hosted",
+      "capped_reason": null,
+      "dimension": "operability",
+      "evidence_ref": "tools/offline_bundle.py",
+      "id": "OPE-1",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Air-gapped",
+      "capped_reason": null,
+      "dimension": "operability",
+      "evidence_ref": "conformance/offline_bundle.py::_discover_signed_catalogs; tools/offline_bundle.py",
+      "id": "OPE-2",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": true
+      },
+      "score": 3
+    },
+    {
+      "capability": "Data residency & minimization",
+      "capped_reason": null,
+      "dimension": "operability",
+      "evidence_ref": "engines/python/tests/test_manifest_privacy.py",
+      "id": "OPE-3",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Scale & performance at realistic deployment sizes",
+      "capped_reason": null,
+      "dimension": "operability",
+      "evidence_ref": null,
+      "id": "OPE-4",
+      "level_label": "Asserted",
+      "level_target": 1,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 1
+    },
+    {
+      "capability": "Tested and bug-free (real CI: lint, type, tests, coverage)",
+      "capped_reason": null,
+      "dimension": "assurance",
+      "evidence_ref": ".github/workflows/ci.yml",
+      "id": "ASR-1",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Secure supply chain (SBOM, VEX, signed & reproducible releases, SHA-pinned actions)",
+      "capped_reason": null,
+      "dimension": "assurance",
+      "evidence_ref": "tools/workflow_pins_check.py; conformance/release.py",
+      "id": "ASR-2",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "A maintained threat model",
+      "capped_reason": null,
+      "dimension": "assurance",
+      "evidence_ref": null,
+      "id": "ASR-3",
+      "level_label": "Partial",
+      "level_target": 2,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 2
+    },
+    {
+      "capability": "No-network guarantee proven, not asserted",
+      "capped_reason": null,
+      "dimension": "assurance",
+      "evidence_ref": ".github/workflows/ci.yml (no-network job); tools/installed_artifacts_check.py",
+      "id": "ASR-4",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Vulnerability disclosure & response",
+      "capped_reason": null,
+      "dimension": "assurance",
+      "evidence_ref": null,
+      "id": "ASR-5",
+      "level_label": "Partial",
+      "level_target": 2,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": true
+      },
+      "score": 2
+    },
+    {
+      "capability": "Support, versioning & stability policy",
+      "capped_reason": null,
+      "dimension": "assurance",
+      "evidence_ref": "governance/VERSIONING.md; governance/SUPPORT.md; tools/release_state_check.py",
+      "id": "ASR-6",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "Clear licensing",
+      "capped_reason": null,
+      "dimension": "assurance",
+      "evidence_ref": "tools/spdx_check.py; NOTICE",
+      "id": "ASR-7",
+      "level_label": "Complete",
+      "level_target": 3,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 3
+    },
+    {
+      "capability": "A neutral home (foundation / working group)",
+      "capped_reason": null,
+      "dimension": "governance",
+      "evidence_ref": null,
+      "id": "GOV-1",
+      "level_label": "Asserted",
+      "level_target": 1,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 1
+    },
+    {
+      "capability": "A conformance program & marks",
+      "capped_reason": null,
+      "dimension": "governance",
+      "evidence_ref": "governance/CONFORMANCE-PROGRAM.md; conformance/registry_check.py",
+      "id": "GOV-2",
+      "level_label": "Partial",
+      "level_target": 2,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 2
+    },
+    {
+      "capability": "Extensibility (extension points, not forks \u2014 CP-6)",
+      "capped_reason": null,
+      "dimension": "governance",
+      "evidence_ref": "tools/catalog_authoring_check.py",
+      "id": "GOV-3",
+      "level_label": "Partial",
+      "level_target": 2,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 2
+    },
+    {
+      "capability": "A contributor ecosystem (external PRs, third-party catalogs/adapters/formats as contributions)",
+      "capped_reason": null,
+      "dimension": "governance",
+      "evidence_ref": "tools/dco_check.py; CONTRIBUTING.md",
+      "id": "GOV-4",
+      "level_label": "Partial",
+      "level_target": 2,
+      "outcome": {
+        "exit": 0,
+        "expect_ok": null
+      },
+      "score": 2
+    }
+  ],
+  "dimension_summary": {
+    "assurance": {
+      "count": 7,
+      "mean": 2.7143
+    },
+    "coverage": {
+      "count": 5,
+      "mean": 2.4
+    },
+    "governance": {
+      "count": 4,
+      "mean": 1.75
+    },
+    "interoperability": {
+      "count": 5,
+      "mean": 2.6
+    },
+    "lifecycle": {
+      "count": 5,
+      "mean": 2.4
+    },
+    "operability": {
+      "count": 4,
+      "mean": 2.5
+    },
+    "rigor": {
+      "count": 6,
+      "mean": 3.0
+    }
+  },
+  "generated_from": "conformance/acf/matrix.yaml",
+  "overall": {
+    "count": 36,
+    "max": 3,
+    "mean": 2.5278,
+    "min": 1
+  },
+  "version": 1
+}
