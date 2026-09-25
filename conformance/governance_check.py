@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -31,7 +32,32 @@ from agentce import signing
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GOVERNANCE = REPO_ROOT / "governance"
 NOTICE = REPO_ROOT / "NOTICE"
-PRIVATE_TERMS = REPO_ROOT / "SPECS" / "harness" / "private-terms.txt"
+
+#: The real private-terms list lives in a private tree this repository's own git excludes entirely, so
+#: a public clone never has it. The terms-clean scan's input is resolved in three steps, each
+#: overriding the next: (1) ``AGENTCE_PRIVATE_TERMS``, an explicit override any caller (harness or CI)
+#: may set; (2) the real private list, when that private tree happens to be checked out alongside this
+#: repository (a maintainer's own working copy during development), so nothing about that existing
+#: behaviour changes; (3) the small, public-shippable default at
+#: ``conformance/fixtures/default-private-terms.txt`` -- distinct from, and much shorter than, the
+#: real list -- so the test that exercises this scan can actually run in a public clone's own CI
+#: instead of being permanently skipped there.
+_REAL_PRIVATE_TERMS = REPO_ROOT / "SPECS" / "harness" / "private-terms.txt"
+_DEFAULT_PRIVATE_TERMS = (
+    REPO_ROOT / "conformance" / "fixtures" / "default-private-terms.txt"
+)
+
+
+def _private_terms_path() -> Path:
+    override = os.environ.get("AGENTCE_PRIVATE_TERMS")
+    if override:
+        return Path(override)
+    if _REAL_PRIVATE_TERMS.is_file():
+        return _REAL_PRIVATE_TERMS
+    return _DEFAULT_PRIVATE_TERMS
+
+
+PRIVATE_TERMS = _private_terms_path()
 
 _GOVERNANCE_FILES = [
     "README.md",
