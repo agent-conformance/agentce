@@ -47,6 +47,7 @@ const REQUIRED_SELFTEST_RULES = [
   'html-has-lang',
   'image-alt',
   'scrollable-region-focusable',
+  'target-size',
 ];
 
 const MIME = {
