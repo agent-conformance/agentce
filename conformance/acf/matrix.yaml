@@ -83,7 +83,7 @@ entries:
       cmd: "cd conformance && uv run --frozen python numerics.py --engines python,typescript,java"
       fixture: "spec/rules/numerics-vectors"
       expect: null
-    evidence_ref: "conformance/numerics.py; engines/python/tests/test_late_event.py"
+    evidence_ref: "conformance/numerics.py; conformance/tests/test_numerics.py"
   - id: RIG-3
     dimension: rigor
     capability: "Model-free (no learned component decides an outcome)"
