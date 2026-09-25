@@ -6,9 +6,10 @@ Spec refs: SPEC §8.7, §13.4 AX-3, AX-4
 ## Context
 
 `examples/<style>/` (SPEC §13.4 AX-4) exists to show a real agent framework producing AgentCE
-evidence. Making that real means each of `langgraph`, `openai-agents`, `crewai`, `google-adk`, and
-`claude-agent-sdk` actually imports and runs its named framework — offline, keyless, against a
-scripted deterministic model — instead of a framework-free stand-in.
+evidence. Making that real means each of `langgraph`, `openai-agents`, `crewai`, `google-adk`,
+`claude-agent-sdk`, `autogen`, `llamaindex`, `semantic-kernel`, `bedrock-agents`, and `vertex-agents`
+actually imports and runs its named framework — offline, keyless, against a scripted deterministic
+model or transport — instead of a framework-free stand-in.
 
 `tools/no_ml_check.py` (SPEC §8.7, HR-1/HR-2) scans every `uv.lock`, `pnpm-lock.yaml`, and
 `gradle.lockfile` in the repository, unconditionally, for any package on
@@ -26,25 +27,40 @@ them. Left as-is, giving these examples real dependencies would fail the no-ml s
 lockfiles existed — not because the engine gained a learned-component dependency, but because the
 scan does not yet distinguish "an engine tree" from "a framework example being exercised for real."
 
+Of the five later framework examples (item 16.3, P2 breadth): `llamaindex` requires `llama-index-core`
+(already denylisted by name) and transitively resolves `nltk`; `semantic-kernel` requires `openai` as
+a hard transitive dependency of its own connector layer. Both need the same named exemption. The other
+three do not: `autogen` (the `autogen-agentchat`/`autogen-core` base packages, with no default LLM
+connector extra installed), `bedrock-agents` (`boto3`, not on the denylist), and `vertex-agents`
+(`google-genai`, a distinct distribution name from the denylisted `vertexai`/`google-generativeai`)
+each resolve cleanly with no denylisted package, confirmed by running the scan against their real
+lockfiles — so they are scanned like any other lockfile and earn no exemption line, per this decision's
+own "a sixth example is scanned by default" rule below.
+
 ## Decision
 
-1. **Each of the five framework examples gets its own uv project**
+1. **Each framework example gets its own uv project**
    (`examples/<style>/pyproject.toml` + its own `uv.lock`), declared exactly like
    `adapters/*`/`engines/*` already are: `[tool.uv.sources]` points `agentce-emit` at
-   `../../engines/python-emit` (editable), and the one named framework package is a normal
-   dependency. This isolates each framework's transitive tree from the shared `examples/` root
-   (still used by `custom-loop`, `mcp-server`, and `a2a-mesh`, which have no framework dependency and
-   stay on the no-ml scan's clean side) and from every engine/adapter/conformance/tools tree.
+   `../../engines/python-emit` (editable), and the one named framework package (or SDK, for
+   `bedrock-agents`/`vertex-agents`) is a normal dependency. This isolates each framework's
+   transitive tree from the shared `examples/` root (still used by `custom-loop`, `mcp-server`, and
+   `a2a-mesh`, which have no framework dependency and stay on the no-ml scan's clean side) and from
+   every engine/adapter/conformance/tools tree.
 
 2. **`tools/no_ml_check.py` gains one new, narrowly-named constant**,
-   `FRAMEWORK_EXAMPLE_LOCKS`, listing the five exact lockfile paths this decision creates
-   (`examples/langgraph/uv.lock`, `examples/crewai/uv.lock`, `examples/openai-agents/uv.lock`,
-   `examples/google-adk/uv.lock`, `examples/claude-agent-sdk/uv.lock`). A lockfile on that list is
-   skipped by the scan; every other lockfile in the repository, including the shared
-   `examples/uv.lock` and every `engines/*`, `adapters/*`, `conformance/*`, and `tools/*` lockfile, is
-   scanned exactly as before. The list is paths, not a directory prefix or a glob over `examples/**`,
-   so a sixth example added later is scanned by default and must earn its own exemption line here and
-   in this ADR — the boundary cannot silently widen.
+   `FRAMEWORK_EXAMPLE_LOCKS`, listing the exact lockfile paths whose real, resolved dependency tree
+   needs the exemption (`examples/langgraph/uv.lock`, `examples/crewai/uv.lock`,
+   `examples/openai-agents/uv.lock`, `examples/google-adk/uv.lock`,
+   `examples/claude-agent-sdk/uv.lock`, `examples/llamaindex/uv.lock`,
+   `examples/semantic-kernel/uv.lock`). A lockfile on that list is skipped by the scan; every other
+   lockfile in the repository, including the shared `examples/uv.lock`, every `engines/*`,
+   `adapters/*`, `conformance/*`, and `tools/*` lockfile, and `examples/autogen/uv.lock`,
+   `examples/bedrock-agents/uv.lock`, and `examples/vertex-agents/uv.lock` (whose real dependency
+   trees resolve nothing on the denylist, so they need no exemption), is scanned exactly as before.
+   The list is paths, not a directory prefix or a glob over `examples/**`, so a new example is
+   scanned by default and must earn its own exemption line here and in this ADR — the boundary
+   cannot silently widen.
 
 3. **The exemption is a named allowlist, never a loosened rule.** `no_ml_check.py --self-test` proves
    a denylisted package is still caught in a lockfile that is *not* on the list (including a lockfile
@@ -80,9 +96,11 @@ scan does not yet distinguish "an engine tree" from "a framework example being e
   TypeScript or Java engines, which have no equivalent example directories today.
 - **Performance.** Negligible — one more `in` check per discovered lockfile.
 - **Coverage stays honest.** Every engine, adapter, conformance, and tools lockfile — and the shared
-  `examples/uv.lock` — is still scanned unconditionally. The five framework-example lockfiles are the
-  only lockfiles in the repository permitted to resolve a denylisted package, and only because their
-  packages are the subject of the example, never a dependency an assessment run relies on.
+  `examples/uv.lock` — is still scanned unconditionally, as are `examples/autogen/uv.lock`,
+  `examples/bedrock-agents/uv.lock`, and `examples/vertex-agents/uv.lock` (clean of any denylisted
+  package). The `FRAMEWORK_EXAMPLE_LOCKS` lockfiles are the only lockfiles in the repository permitted
+  to resolve a denylisted package, and only because their packages are the subject of the example,
+  never a dependency an assessment run relies on.
 
 ## Verification (the checks that prove the decision holds)
 
@@ -91,7 +109,7 @@ scan does not yet distinguish "an engine tree" from "a framework example being e
   `examples/` root) and asserts it is still caught; plants one at a `FRAMEWORK_EXAMPLE_LOCKS` path and
   asserts it is exempt there and only there.
 - The `no-ml` CI job (`.github/workflows/no-ml.yml`) runs the same scan, unconditionally, on every
-  push and pull request — unchanged by this decision except for the five named exemptions.
+  push and pull request — unchanged by this decision except for the named exemptions.
 - Each framework example's own `pyproject.toml`/`uv.lock` is reviewed the same way any dependency
   change is (SPEC §8.7 note; AGENTS.md "Dependencies and security hygiene"): a real, aged release of
   the named framework, nothing else added without a stated reason.
