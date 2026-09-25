@@ -8,13 +8,17 @@ the path below applies; it is documented now so it is ready.
 1. Fork the repository and branch from `main`.
 2. Every commit requires a Developer Certificate of Origin sign-off (`git commit -s`): the
    `Signed-off-by` trailer's email must exactly match your own commit author email. This is the same
-   rule for every author, checked by the `dco` job on every pull request — including a pull request
-   opened by an automated dependency-update bot such as Dependabot, which signs off under the
-   identical rule (see `docs/adr/0019-external-contributor-lane.md`).
-3. Open a pull request against `main`. Every required status check must pass before a maintainer
+   rule for every author, checked by the `dco` job on every pull request (see
+   `docs/adr/0019-external-contributor-lane.md`).
+3. Automated dependency-update pull requests get no exemption. A bot's commit passes only when its
+   `Signed-off-by` email matches the bot's own author email exactly. Dependabot's default commits
+   fail this rule: they are authored from the bot's `users.noreply.github.com` address but signed off
+   as `support@github.com`, so the `dco` job refuses them. A wanted update from such a pull request
+   reaches `main` as a maintainer's own re-authored, signed-off commit.
+4. Open a pull request against `main`. Every required status check must pass before a maintainer
    reviews it.
-4. Work happens on feature branches; `main` is merged deliberately.
-5. Never commit secrets, credentials, personal data, or customer material. Test data is synthetic by
+5. Work happens on feature branches; `main` is merged deliberately.
+6. Never commit secrets, credentials, personal data, or customer material. Test data is synthetic by
    construction.
 
 ## Running the checks
