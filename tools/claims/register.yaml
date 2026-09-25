@@ -494,14 +494,15 @@ claims:
         scenario.
   - id: integrations.framework-breadth
     text: >-
-      Thirteen example framework/SDK integrations -- LangGraph, the OpenAI Agents SDK, CrewAI, Google
-      ADK, the Claude Agent SDK, AutoGen, LlamaIndex, Semantic Kernel, Bedrock Agents, and Vertex
-      Agents (ten agent examples) plus MCP server, A2A mesh, and a custom loop (three protocol/style
-      examples) -- each really import and run their named SDK, offline and keyless, against a scripted
-      deterministic model or transport.
+      Ten example framework/SDK integrations -- LangGraph, the OpenAI Agents SDK, CrewAI, Google ADK,
+      the Claude Agent SDK, AutoGen, LlamaIndex, Semantic Kernel, Bedrock Agents, and Vertex Agents --
+      each really import and run their named SDK, offline and keyless, against a scripted
+      deterministic model or transport. Three further `examples/` scripts (MCP server, A2A mesh, and a
+      hand-rolled custom loop) round the directory out to thirteen runnable examples but emit evidence
+      directly through `agentce_emit` rather than importing a distinct third-party SDK.
     status: built
     pages:
-      - website/src/content/docs/docs/trace-store-connectors.md
+      - docs/integrate.md
     check:
       workflow: .github/workflows/ci.yml
       job: integration-breadth
