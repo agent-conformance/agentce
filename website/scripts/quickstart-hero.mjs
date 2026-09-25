@@ -168,7 +168,7 @@ const UNIVERSAL = /\b(?:every|all)\b|100\s?%|\bfully\b/i;
 const SUBJECT = /\b(?:controls?|verdicts?)\b/i;
 const ABSOLUTE = /100\s?%|\bfully\b|across the board/i;
 const WINDOW = 100;
-const TYPED_TALLY = /\d+ conformant\b[^.]{0,60}\d+ (?:insufficient|not assessed)/i;
+const TYPED_TALLY = /\d+ conformant\b[^.]{0,60}\d+ (?:insufficient|not assessed)|\bamong \d+\b|\b\d+ (?:assertions|records)\b/i;
 
 /**
  * Whether the text asserts that everything conforms: every/all/100%/fully together with control(s) or
@@ -200,7 +200,7 @@ export function checkPage(page, run, kind = KINDS.hero) {
   const b = page.indexOf(kind.end);
   const outside = a >= 0 && b > a ? page.slice(0, a) + page.slice(b) : page;
   if (TYPED_TALLY.test(outside.replace(/\s+/g, ' '))) {
-    problems.push(`${kind.prefix}.typed_tally: a tally is typed outside the generated region; only the marked region may carry one`);
+    problems.push(`${kind.prefix}.typed_tally: a tally is typed outside the generated region; only the marked region may carry a tally or a count of the run's assertions`);
   }
   const fresh = spliceRegion(page, kind.render(run), kind);
   if (fresh === null) problems.push(`${kind.prefix}.markers_missing: the quickstart-run markers are absent from the page`);
@@ -252,6 +252,8 @@ function selfTest() {
     ['a claim split over a wrapped line is refused', `${md}\nEvery base-catalog control\nis conformant.\n`, run, KINDS.tally, ['tally.blanket_claim']],
     ['a tally typed outside the region is refused', `${md}\nA run ends with 25 conformant, 19 insufficient evidence.\n`, run, KINDS.tally, ['tally.typed_tally']],
     ['a tally typed outside the hero region is refused', `${hero}\n<p>25 conformant, 19 insufficient evidence, 5 not assessed</p>`, run, KINDS.hero, ['hero.typed_tally']],
+    ['a count of assertions typed outside the hero region is refused', `${hero}\n<pre>// assertions.json — one record among 49</pre>`, run, KINDS.hero, ['hero.typed_tally']],
+    ['a count typed as "N assertions" outside the region is refused', `${md}\nThe run wrote 49 assertions.\n`, run, KINDS.tally, ['tally.typed_tally']],
     ['an honest partial tally is not a blanket claim', `${md}\n3 of 5 controls are conformant.\n`, run, KINDS.tally, []],
     [
       'a blanket claim is allowed when the run is all-conformant',
