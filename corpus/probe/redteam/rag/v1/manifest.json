@@ -1,0 +1,88 @@
+{
+  "id": "rag-attack-resistance",
+  "version": "2026.09",
+  "modality": "rag",
+  "description": "Synthetic rag red-team probe corpus (SPEC 7.2). Frozen; hashes and sign-off recorded. Never regenerated in place.",
+  "sign_off": {
+    "reviewer": "AgentCE corpus maintainer",
+    "date": "2026-09-24",
+    "note": "Synthetic cases authored for conformance; no real prompts or PII."
+  },
+  "cases": [
+    {
+      "id": "attack-00",
+      "file": "cases/attack-00.json",
+      "prompt_sha256": "1b0b1a9516cd90da1e710221eba710bc939ff1f62c529446012cb74f0114ad1b"
+    },
+    {
+      "id": "attack-01",
+      "file": "cases/attack-01.json",
+      "prompt_sha256": "31abda3e019410ece88f1770c5700ed430b453bcdcdbe7c38eb83778ecd3c20a"
+    },
+    {
+      "id": "attack-02",
+      "file": "cases/attack-02.json",
+      "prompt_sha256": "7caa8f2dd48dd7a19b6d474425314ab7c9ea3426bac899aaa92ed9c39684ef36"
+    },
+    {
+      "id": "safe-00",
+      "file": "cases/safe-00.json",
+      "prompt_sha256": "e805157728d2687fa4110117af0eb6fad22a17052009a232805f0f6341d960f0"
+    },
+    {
+      "id": "safe-01",
+      "file": "cases/safe-01.json",
+      "prompt_sha256": "f1b1fd7e9e021d8dc2c61c012ed0e8c016a464b3bb34ec4daca3d136b9592e39"
+    },
+    {
+      "id": "safe-02",
+      "file": "cases/safe-02.json",
+      "prompt_sha256": "3e1f0b4ba3e3d121507033afc77c9c13132fb0a12758fe37a8683745873245af"
+    },
+    {
+      "id": "safe-03",
+      "file": "cases/safe-03.json",
+      "prompt_sha256": "8c175413abb0384102fc5256fbea709b45623894f40f69d6f41ad74b90dbe6f5"
+    },
+    {
+      "id": "safe-04",
+      "file": "cases/safe-04.json",
+      "prompt_sha256": "2552c144e927ffa4359bdf584b64986a5da9573e772c6202f80ef366fe3815cb"
+    },
+    {
+      "id": "safe-05",
+      "file": "cases/safe-05.json",
+      "prompt_sha256": "d98498ebf67e4f4d4b984d56f1db7fa1a1d03e8d56fc57afbcb365598fab5a38"
+    },
+    {
+      "id": "safe-06",
+      "file": "cases/safe-06.json",
+      "prompt_sha256": "fefbfcb42ede4ee09cac28966977d23a45d70f71c3bd33479d6a2ba611aceb8b"
+    },
+    {
+      "id": "safe-07",
+      "file": "cases/safe-07.json",
+      "prompt_sha256": "eccc43a6948dffcb50ef46e27b8ba0339dcd8b3a9d12b6dacf0df0e2686f3df7"
+    },
+    {
+      "id": "safe-08",
+      "file": "cases/safe-08.json",
+      "prompt_sha256": "d356ef6dd645de1b483d60f223d15524020fd9f026f17290ac1d69717b0033e6"
+    },
+    {
+      "id": "safe-09",
+      "file": "cases/safe-09.json",
+      "prompt_sha256": "c96b89820f690e9867ed86c8e75fc2ce55a75f1bd8139b5cbff2c546896da8a7"
+    },
+    {
+      "id": "safe-10",
+      "file": "cases/safe-10.json",
+      "prompt_sha256": "af5f90aee8fccd058b5ec0b0a037d7b41d823a1b6c9028e1bdd16cdc60247491"
+    },
+    {
+      "id": "safe-11",
+      "file": "cases/safe-11.json",
+      "prompt_sha256": "ad29dcd504322b9e820ddb8de479cf1201cc3bbd7df9086025ac1261f89cbeab"
+    }
+  ]
+}

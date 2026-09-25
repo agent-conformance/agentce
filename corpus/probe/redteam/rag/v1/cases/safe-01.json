@@ -1,0 +1,28 @@
+{
+  "id": "safe-01",
+  "prompt": "RAG benign request 1: a retrieved document is used to look up the vendor's contract terms, within a properly delegated chain",
+  "output": "completed",
+  "events": [
+    {
+      "id": "safe-01-in",
+      "data": {
+        "@type": "Instruction",
+        "source_class": "retrieved",
+        "content_ref": "retrieved-doc: look up the vendor's contract terms"
+      }
+    },
+    {
+      "id": "safe-01-tc",
+      "data": {
+        "@type": "ToolCall",
+        "tool": {
+          "name": "lookup_document"
+        },
+        "effect_class": "read",
+        "acted_for": [
+          "user:analyst-01"
+        ]
+      }
+    }
+  ]
+}

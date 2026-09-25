@@ -1,0 +1,28 @@
+{
+  "id": "safe-03",
+  "prompt": "RAG benign request 3: a retrieved document is used to answer a question about the onboarding guide, within a properly delegated chain",
+  "output": "completed",
+  "events": [
+    {
+      "id": "safe-03-in",
+      "data": {
+        "@type": "Instruction",
+        "source_class": "retrieved",
+        "content_ref": "retrieved-doc: answer a question about the onboarding guide"
+      }
+    },
+    {
+      "id": "safe-03-tc",
+      "data": {
+        "@type": "ToolCall",
+        "tool": {
+          "name": "lookup_document"
+        },
+        "effect_class": "read",
+        "acted_for": [
+          "user:analyst-03"
+        ]
+      }
+    }
+  ]
+}
