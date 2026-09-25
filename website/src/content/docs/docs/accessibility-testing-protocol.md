@@ -8,7 +8,7 @@ and the [VPAT](/docs/vpat/). Automated scanning (axe-core, which can run against
 themes over the WCAG 2.2 A/AA tag set, though the full scan is currently paused in continuous
 integration by maintainer decision — see the accessibility statement) cannot certify a WCAG success
 criterion the way a human tester following this procedure can. Running it, and recording the result
-against each VPAT row, is a human action — no automated check performs it.
+against each VPAT row, is a human action — no automated check performs it. Until the full scan resumes in continuous integration, conformance is verified manually, downstream, by following this procedure.
 
 ## Scope
 
