@@ -34,6 +34,10 @@ These mirror the CI workflows; keep them in sync.
   `website/` (see Commands above)
 - Quickstart: `agentce quickstart --out ./out`
 - Examples: `uv run python examples/run_all.py --check`
+- Catalog lint (a base or third-party catalog): `agentce catalog lint <dir> --require-provenance`
+- Runtime conformance: `cd conformance && uv run --frozen python runtime_conformance_check.py --self-test`
+- Integration breadth (framework/SDK examples, trace-store connectors, GRC recipes): `uv run --project tools --frozen python -m integration_breadth_check`
+- Domain depth (red-team probes, mutation floor, perf-at-scale, air-gap bundle, registries): `uv run --project tools --frozen python -m offline_bundle --verify --no-network`
 
 ## Repository map
 
