@@ -24,32 +24,62 @@ SOURCES = [
     "tools/claims/register.yaml",
 ]
 
-SKIP_RE = re.compile(r"AGENTCE_SKIP_A11Y:\s*[\"']?([^\s\"']*)[\"']?\s*$", re.MULTILINE)
-SCAN = re.compile(r"\b(scan(s|ned|ning)?|axe(-core)?)\b", re.I)
-CI = re.compile(r"\b(ci|continuous integration|every (change|commit|push|pull request)|(every|all|each) (built )?pages?)\b", re.I)
-RUNS = re.compile(r"\b(runs|ran|running|scans|scanned|scanning|executes?|executed|enforced|enforces)\b", re.I)
-PAUSE = re.compile(r"\b(paused|skipped|resum\w*|not run|does not run|no longer|disabled)\b", re.I)
-ALWAYS = re.compile(r"\b(never|always|not paused|not skipped|isn'?t paused)\b", re.I)
-ACK = re.compile(r"paused\b.{0,60}\b(ci|continuous integration)|\b(ci|continuous integration)\b.{0,60}\bpaused|manually,?\s+downstream", re.I)
+SKIP_RE = re.compile(r"AGENTCE_SKIP_A11Y\s*[:=]\s*[\"']?([^\s\"'#]*)")
+SCAN = re.compile(r"\b(scan\w*|axe\S*|automated (rules engine|gate|checks?|tests?)|a11y gate)\b", re.IGNORECASE)
+CI = re.compile(
+    r"\b(ci|continuous integration|every (change|commit|push|pull request)|(every|all|each) (built |published )?pages?)\b",
+    re.IGNORECASE,
+)
+HONEST = re.compile(
+    r"\b(paused|skipped|not run|no longer|disabled|last full run|self-test|manual\w*)\b|(until|once|when|if)\b[^.]{0,60}\bresum",
+    re.IGNORECASE,
+)
+NEGATED = re.compile(r"\b(never|not|isn'?t|aren'?t|no longer)\s+(\w+\s+)?(paused|skipped|disabled)\b|\balways\b", re.IGNORECASE)
+PAUSE_ACK = re.compile(r"(?<!not )(?<!never )\bpaused\b", re.IGNORECASE)
+MANUAL_ACK = re.compile(r"\bmanual\w*\b[^.]{0,80}\bdownstream\b|\bdownstream\b[^.]{0,80}\bmanual\w*\b", re.IGNORECASE)
 
 
-def paused(workflow_text: str) -> bool:
-    return any(v not in ("", "0") for v in SKIP_RE.findall(workflow_text))
+def scan_step_paused(workflow_text: str) -> bool:
+    """True unless the a11y job visibly runs the full-page scan with no skip in effect."""
+    m = re.search(r"^  a11y:\n(.*?)(?=^  \S|\Z)", workflow_text, re.MULTILINE | re.DOTALL)
+    if not m:
+        return True
+    job = m.group(1)
+    if any(v not in ("", "0") for v in SKIP_RE.findall(job)):
+        return True
+    steps = re.split(r"^      - ", job, flags=re.MULTILINE)
+    full = [st for st in steps if "check-a11y.mjs" in st and "--self-test" not in st]
+    return not full or any(re.search(r"^\s+if:", st, re.MULTILINE) for st in full)
+
+
+def sentences(raw: str):
+    block: list = []
+    for line in raw.split("\n") + [""]:
+        starts_new = not line.strip() or re.match(r"\s*(#|\||[-*]\s|\d+\.\s)", line)
+        if starts_new and block:
+            yield from re.split(r"(?<=[.!?])\s+|\s+-\s+|\s*\|\s*", re.sub(r"\s+", " ", " ".join(block)))
+            block = []
+        if line.strip():
+            if re.match(r"\s*#", line):
+                yield re.sub(r"\s+", " ", line)
+            else:
+                block.append(line)
 
 
 def defects(workflow_text: str, docs: dict) -> list:
-    if not paused(workflow_text):
+    if not scan_step_paused(workflow_text):
         return []
     bad = []
     for name, raw in docs.items():
-        text = re.sub(r"\s+", " ", raw)
-        for sentence in re.split(r"(?<=[.!?;])\s+|\s+-\s+|\s*\|\s*", text):
-            if SCAN.search(sentence) and CI.search(sentence):
-                if (RUNS.search(sentence) and not PAUSE.search(sentence)) or ALWAYS.search(sentence):
-                    bad.append(f"{name}: asserts the full scan runs in CI / on every page: {sentence[:100]!r}")
-                    break
-        if not ACK.search(text):
-            bad.append(f"{name}: does not say the full scan is paused and verified manually, downstream")
+        sents = list(sentences(raw))
+        for sentence in sents:
+            if SCAN.search(sentence) and CI.search(sentence) and (not HONEST.search(sentence) or NEGATED.search(sentence)):
+                bad.append(f"{name}: asserts the full scan runs in CI / on every page: {sentence[:100]!r}")
+                break
+        acked = any(PAUSE_ACK.search(x) and re.search(r"\bci\b|continuous integration", x, re.IGNORECASE) and not NEGATED.search(x) for x in sents)
+        manual = any(MANUAL_ACK.search(x) and not NEGATED.search(x) for x in sents)
+        if not (acked and manual):
+            bad.append(f"{name}: does not say the full scan is paused in CI and verified manually, downstream")
     return bad
 
 
@@ -67,17 +97,34 @@ def run(root: Path) -> int:
 
 
 def self_test() -> int:
-    good = "The full-page scan is currently paused in CI; conformance is verified manually, downstream."
-    wf = 'env:\n  AGENTCE_SKIP_A11Y: "1"\n'
+    good = "The full-page scan is currently paused in CI. Conformance is verified manually, downstream."
+    wf = "  a11y:\n    steps:\n      - name: Gate\n        env:\n          AGENTCE_SKIP_A11Y: \"1\"\n        run: node scripts/check-a11y.mjs\n"
+    live = "  a11y:\n    steps:\n      - name: Gate\n        run: node scripts/check-a11y.mjs\n"
+    stale_vpat = "| 1.1.1 Non-text Content | Not Evaluated | Automated axe-core WCAG 2.2 AA scan (every page, both themes, in CI) reports no violations for this rule. |"
+    stale_stmt = "An automated rules engine (axe-core) scans every published page\nin both the light and dark themes on every change and currently reports zero violations."
+    stale_protocol = "Automated scanning (axe-core, run in continuous integration on every page in both themes)."
     cases = [
         ("good passes", wf, good, 0),
-        ("stale claim fails", wf, good + " Axe runs in CI on every page.", 1),
-        ("reordered claim fails", wf, good + " In CI, on every page, the scan runs.", 1),
-        ("scanned wording fails", wf, good + " Every page is scanned in CI.", 1),
+        ("honest self-test wording passes", wf, good + " The gate's self-test still runs in CI on every change.", 0),
+        ("honest past tense passes", wf, good + " Its last full run reported no violations across every page.", 0),
+        ("honest conditional passes", wf, good + " Until the scan resumes in CI on every page, testing is manual.", 0),
+        ("stale VPAT row fails", wf, good + "\n" + stale_vpat, 1),
+        ("stale statement fails", wf, good + "\n\n" + stale_stmt, 1),
+        ("stale protocol wording fails", wf, good + "\n\n" + stale_protocol, 1),
+        ("reordered claim fails", wf, good + " In CI, on every page, the scan is run.", 1),
+        ("passive claim fails", wf, good + " Every page is scanned in CI.", 1),
         ("negated pause fails", wf, good + " The scan is never paused in CI on any page.", 1),
+        ("negated acknowledgement fails", wf, "The scan is not paused in CI. Testing is manual, downstream.", 1),
         ("missing acknowledgement fails", wf, "Accessibility notes.", 1),
-        ("'false' value still counts as paused", 'AGENTCE_SKIP_A11Y: "false"\n', "Axe runs in CI on every page.", 1),
-        ("unpaused scan needs no acknowledgement", "env: {}\n", "Axe runs in CI on every page.", 0),
+        ("acknowledgement without manual half fails", wf, "The scan is paused in CI.", 1),
+        ("heading text does not bleed into a claim", wf, good + "\n\n## Scan\nEvery page is listed below.", 0),
+        ("'false' value counts as paused", wf.replace('"1"', '"false"'), "Axe runs in CI on every page.", 1),
+        ("inline skip counts as paused", "  a11y:\n    steps:\n      - run: AGENTCE_SKIP_A11Y=1 node scripts/check-a11y.mjs\n", "Axe runs in CI on every page.", 1),
+        ("skip with a trailing comment counts as paused", wf.replace('"1"', '1 # pause'), "Axe runs in CI on every page.", 1),
+        ("templated skip counts as paused", wf.replace('"1"', "${{ vars.SKIP }}"), "Axe runs in CI on every page.", 1),
+        ("a conditional scan step counts as paused", "  a11y:\n    steps:\n      - name: Gate\n        if: false\n        run: node scripts/check-a11y.mjs\n", "Axe runs in CI on every page.", 1),
+        ("a missing scan step counts as paused", "  a11y:\n    steps:\n      - run: node scripts/check-a11y.mjs --self-test\n", "Axe runs in CI on every page.", 1),
+        ("a live scan step needs no acknowledgement", live, "Axe runs in CI on every page.", 0),
     ]
     failed = 0
     for label, workflow, doc, want in cases:
