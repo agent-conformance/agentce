@@ -58,10 +58,12 @@ These mirror the CI workflows; keep them in sync.
 - Conventional Commits: `feat(engine): …`, `fix(adapter/otel-genai): …`, `docs(adr): …`.
 - Every commit needs a Developer Certificate of Origin sign-off (`git commit -s`): the
   `Signed-off-by` trailer's email must exactly match the commit author's own email. The maintainer's
-  and the project's own automated commits use one fixed identity; an external contributor's fork
-  commit, or a dependency-update bot's, signs off as itself under the same DCO rule — see
-  `CONTRIBUTING.md` for the external-pull-request path. A `dco` check on every pull request enforces
-  this for every author.
+  and the project's own automated commits use one fixed identity: any commit presenting the
+  maintainer's name or addresses, and every commit on the automation's own working branch, must use
+  it exactly. An external contributor's fork commit, or a dependency-update bot's, signs off as itself
+  under the same DCO rule and reaches `main` only through a pull request — see `CONTRIBUTING.md` for
+  the external-pull-request path (Dependabot's default sign-off does not match its author and fails
+  it). A `dco` check on every pull request enforces this for every author.
 - One logical change per commit. Commit messages describe the change, never the tooling that
   produced it. No co-author trailers and no generated-by lines.
 
