@@ -34,6 +34,7 @@ network, no learned component.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -48,6 +49,12 @@ LINKED_TREES = ("engines", "corpus", "spec")
 MIN_BLOCKS = 4
 BLOCK_TIMEOUT_S = 150
 MIN_REASON_CHARS = 8
+# Per-page floor (finding #41 rework): the corpus-wide MIN_BLOCKS alone lets a contributor strip every
+# block from one page (e.g. ci-integration.md) as long as enough blocks remain elsewhere. This manifest
+# names every page that currently documents at least one runnable command and requires it to keep at
+# least that many; a page can never be silenced by deleting its examples. Regenerate it (see
+# `_generate_min_blocks_manifest` below) whenever a page's documented commands legitimately change.
+MIN_BLOCKS_MANIFEST_PATH = ROOT / "tools" / "docs_doctest_min_blocks.json"
 
 RUNNABLE = {"bash", "sh", "console"}
 # Every language tag that means "a shell session" to a reader. A fence with one of these that is not a
@@ -193,18 +200,38 @@ def run_block(block: Block, repo: Path) -> tuple[int, str]:
     return proc.returncode, (proc.stderr or proc.stdout)[-500:]
 
 
-def check(pages_dir: Path, repo: Path, min_blocks: int = MIN_BLOCKS) -> int:
-    """Run every block under ``pages_dir``; return 0 iff all ran clean and enough of them ran."""
+def _load_min_blocks_manifest(path: Path = MIN_BLOCKS_MANIFEST_PATH) -> dict[str, int]:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def check(
+    pages_dir: Path,
+    repo: Path,
+    min_blocks: int = MIN_BLOCKS,
+    manifest: dict[str, int] | None = None,
+) -> int:
+    """Run every block under ``pages_dir``; return 0 iff all ran clean, enough of them ran overall, and
+    every page named in the min-blocks manifest kept at least its required count (so deleting one page's
+    examples cannot pass just because other pages still carry enough blocks). The manifest keys pages by
+    path relative to ``pages_dir`` (e.g. ``ci-integration.md``), not to ``repo``, so it still matches when
+    a contract check runs this against a throwaway copy of the docs tree rather than the original."""
+    if manifest is None:
+        manifest = _load_min_blocks_manifest()
     ran = skipped = 0
+    page_counts: dict[str, int] = {}
     failures: list[str] = []
     for page in sorted([*pages_dir.rglob("*.md"), *pages_dir.rglob("*.mdx")]):
         rel = str(page.relative_to(repo)) if page.is_relative_to(repo) else str(page)
+        page_key = str(page.relative_to(pages_dir))
         for block in extract(rel, page.read_text(encoding="utf-8")):
             where = f"{block.page}:{block.line}"
             if block.error:
                 failures.append(f"{where}: {block.error}")
             elif block.no_run_reason is not None:
                 skipped += 1
+                page_counts[page_key] = page_counts.get(page_key, 0) + 1
                 if len(block.no_run_reason) < MIN_REASON_CHARS:
                     failures.append(
                         f"{where}: `no-run` needs a reason of at least {MIN_REASON_CHARS} characters on the fence line"
@@ -216,6 +243,7 @@ def check(pages_dir: Path, repo: Path, min_blocks: int = MIN_BLOCKS) -> int:
                     )
             else:
                 ran += 1
+                page_counts[page_key] = page_counts.get(page_key, 0) + 1
                 code, tail = run_block(block, repo)
                 if code != 0:
                     failures.append(f"{where}: exit {code}\n{tail}")
@@ -226,6 +254,13 @@ def check(pages_dir: Path, repo: Path, min_blocks: int = MIN_BLOCKS) -> int:
         failures.append(
             f"only {ran} block(s) ran, expected at least {min_blocks}: a block was removed instead of fixed"
         )
+    for page_name, need in sorted(manifest.items()):
+        got = page_counts.get(page_name, 0)
+        if got < need:
+            failures.append(
+                f"{page_name}: only {got} block(s) ran/skipped, expected at least {need}: "
+                "this page's examples may have been deleted instead of fixed"
+            )
     for failure in failures:
         print("FAIL", failure, file=sys.stderr)
     return 1 if failures else 0
@@ -355,17 +390,95 @@ def self_test() -> int:
                     f"  wanted exit {want_exit} with {want_text!r}; got exit {got}\n{err}",
                     file=sys.stderr,
                 )
+
+        # Per-page floor (#41 rework): two pages, each with its own runnable block, both below the
+        # OVERALL floor's reach (the corpus-wide count stays comfortably above `min_blocks` even after
+        # one page is wiped) -- only a PER-PAGE requirement can catch "every block stripped from one
+        # page". First prove the intact tree passes, then prove wiping one named page fails it, by name.
+        pp_dir = Path(tmp) / "per-page-floor"
+        pp_dir.mkdir()
+        kept, wiped = pp_dir / "kept.md", pp_dir / "wiped.md"
+        kept.write_text(
+            f"{_FIX}bash\ntrue\n{_FIX}\n{_FIX}bash\ntrue\n{_FIX}\n", encoding="utf-8"
+        )
+        wiped.write_text(f"{_FIX}bash\ntrue\n{_FIX}\n", encoding="utf-8")
+        pp_manifest = {"kept.md": 1, "wiped.md": 1}
+        got, err = _capture(pp_dir, 1, manifest=pp_manifest)
+        good = got == 0
+        print(
+            f"self-test per-page-floor-intact-tree-passes: {'ok' if good else 'FAIL'}"
+        )
+        ok = ok and good
+
+        wiped.write_text(
+            "Just prose; the example was deleted, not fixed.\n", encoding="utf-8"
+        )
+        got, err = _capture(pp_dir, 1, manifest=pp_manifest)
+        # The corpus-wide floor (1) is still met by kept.md alone -- only the per-page manifest entry
+        # for wiped.md, by its exact name, can catch this.
+        good = (
+            got == 1 and "wiped.md" in err and "examples may have been deleted" in err
+        )
+        print(
+            f"self-test per-page-floor-catches-single-page-wipe: {'ok' if good else 'FAIL'}"
+        )
+        if not good:
+            ok = False
+            print(f"  got exit {got}\n{err}", file=sys.stderr)
+
+        # The real, checked-in manifest must name only pages that exist and still meet their own floor
+        # today, and must not have quietly gone empty (a manifest with zero entries is not a floor).
+        real_manifest = _load_min_blocks_manifest()
+        if not real_manifest:
+            ok = False
+            print(
+                "self-test real-manifest-non-empty: FAIL (no entries)", file=sys.stderr
+            )
+        else:
+            print(f"self-test real-manifest-non-empty: ok ({len(real_manifest)} pages)")
+        manifest_pages_ok = True
+        for page, need in real_manifest.items():
+            p = ROOT / PAGES / page
+            if not p.exists():
+                ok = manifest_pages_ok = False
+                print(
+                    f"self-test real-manifest-pages-meet-floor: FAIL ({page} missing)",
+                    file=sys.stderr,
+                )
+                continue
+            got_blocks = sum(
+                1
+                for b in extract(page, p.read_text(encoding="utf-8"))
+                if b.error is None
+            )
+            if got_blocks < need:
+                ok = manifest_pages_ok = False
+                print(
+                    f"self-test real-manifest-pages-meet-floor: FAIL ({page} has {got_blocks}, needs {need})",
+                    file=sys.stderr,
+                )
+        if manifest_pages_ok:
+            print("self-test real-manifest-pages-meet-floor: ok")
+
     print("docs_doctest_check self-test:", "ok" if ok else "FAILED")
     return 0 if ok else 1
 
 
-def _capture(pages: Path, floor: int) -> tuple[int, str]:
+def _capture(
+    pages: Path, floor: int, manifest: dict[str, int] | None = None
+) -> tuple[int, str]:
     import contextlib
     import io
 
+    # Isolate the pre-existing single-synthetic-page fixtures from the real, checked-in min-blocks
+    # manifest (they exercise unrelated rules and never intend to satisfy it): default to an EMPTY
+    # manifest here rather than `check()`'s own real-manifest default, which only the dedicated
+    # per-page-floor cases and the real-manifest self-checks below opt into explicitly.
+    if manifest is None:
+        manifest = {}
     buf = io.StringIO()
     with contextlib.redirect_stderr(buf):
-        code = check(pages, ROOT, floor)
+        code = check(pages, ROOT, floor, manifest=manifest)
     return code, buf.getvalue()
 
 
