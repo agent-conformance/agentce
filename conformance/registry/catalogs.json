@@ -1,0 +1,26 @@
+{
+  "catalogs": [
+    {
+      "id": "eu-ai-act",
+      "version": "2026.09",
+      "digest": "sha256:e1985104a239563f1e43e02ff845af64bc2adc9b2d01693041eee637400e7b28",
+      "source_path": "spec/catalogs/base/eu-ai-act",
+      "signing": {
+        "signature_file": "catalog.sig.json",
+        "trust_root": "vendored-dev",
+        "keyid": "sha256:d0f46a3992ebb4e34819dad2bfa533bfcef4f68ab9532cf1e451e2272332cf86"
+      }
+    },
+    {
+      "id": "nist-ai-rmf",
+      "version": "2026.09",
+      "digest": "sha256:510fd44b9e5b3245c0d301ecbbb2a6ab2f857fda97e313afcd832e4dac393ed2",
+      "source_path": "spec/catalogs/base/nist-ai-rmf",
+      "signing": {
+        "signature_file": "catalog.sig.json",
+        "trust_root": "vendored-dev",
+        "keyid": "sha256:d0f46a3992ebb4e34819dad2bfa533bfcef4f68ab9532cf1e451e2272332cf86"
+      }
+    }
+  ]
+}
