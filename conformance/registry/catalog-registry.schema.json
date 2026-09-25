@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "conformance/registry/catalog-registry.schema.json",
+  "title": "AgentCE catalog registry",
+  "description": "One entry per published, signed AgentCE base catalog (technical validation machinery; not yet a public, served artifact -- see docs/adr/0020-catalog-registry.md).",
+  "type": "object",
+  "required": ["catalogs"],
+  "additionalProperties": false,
+  "properties": {
+    "catalogs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/catalogEntry" }
+    }
+  },
+  "$defs": {
+    "catalogEntry": {
+      "type": "object",
+      "required": ["id", "version", "digest", "source_path", "signing"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The catalog id (matches catalog.yaml's own id, and its source directory name)."
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The catalog's version (matches catalog.yaml's version)."
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "signing.digest_tree over the catalog directory, excluding the detached signature file."
+        },
+        "source_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repository-relative path to the catalog directory."
+        },
+        "signing": { "$ref": "#/$defs/signingMetadata" }
+      }
+    },
+    "signingMetadata": {
+      "type": "object",
+      "required": ["signature_file", "trust_root", "keyid"],
+      "additionalProperties": false,
+      "properties": {
+        "signature_file": {
+          "type": "string",
+          "description": "The detached-signature filename inside the catalog directory."
+        },
+        "trust_root": {
+          "type": "string",
+          "description": "Which trust root the signature verifies against."
+        },
+        "keyid": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "The content-addressed id of the signing key, as recorded in the trust root."
+        }
+      }
+    }
+  }
+}
