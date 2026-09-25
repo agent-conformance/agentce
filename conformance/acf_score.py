@@ -438,9 +438,9 @@ def _self_test_ratchet() -> list[str]:
 
 
 def _self_test_human_table() -> list[str]:
-    """`render_human_table` is a real, load-bearing part of the emitted scorecard (EVAL.md P17.4:
-    "canonical JSON + human table"), not decoration -- prove it actually reflects the data rather than
-    being able to pass as a stub (an empty string, or a table with no evidence column) while every other
+    """`render_human_table` is a real, load-bearing part of the emitted scorecard ("canonical JSON +
+    human table"), not decoration -- prove it actually reflects the data rather than being able to
+    silently regress to an empty string, or a table with no evidence column, while every other
     self-test case stays green."""
     failures: list[str] = []
     with tempfile.TemporaryDirectory() as tmp:
@@ -489,7 +489,7 @@ def _self_test_human_table() -> list[str]:
     if not failures:
         print(
             "acf_score self-test: the human table carries every capability, its evidence_ref, and the "
-            "dimension/overall summary -- not a stub"
+            "dimension/overall summary -- not a blank or gutted renderer"
         )
     return failures
 
@@ -536,8 +536,8 @@ def _self_test_gate() -> list[str]:
     """Proves `main()`'s own exit-code contract, not just `compare_against_committed`'s return value:
     a real regression must make the whole run exit nonzero, and a clean or improving run must exit 0 --
     including the `--write` path, which must not write when there was a regression. Gutting `_gate`'s
-    `if violations: ... return 1` branch (leaving CI to silently publish a regression) is exactly the
-    kind of stub this case exists to catch, the same defect class the human-table self-test catches for
+    `if violations: ... return 1` branch (leaving CI to silently publish a regression) is exactly what
+    this case exists to catch, the same defect class the human-table self-test catches for
     `render_human_table`."""
     failures: list[str] = []
     with tempfile.TemporaryDirectory() as tmp:
