@@ -41,7 +41,7 @@ These mirror the CI workflows; keep them in sync.
 - `engines/` — one engine per language plus its alias and emitter packages.
 - `adapters/` — source adapters, each with fixtures and a support matrix.
 - `corpus/` — simulated projects, the deterministic generator, small rule fixtures, and dataset pins.
-- `conformance/` — the conformance suite runner and published implementation reports.
+- `conformance/` — the conformance suite runner, published implementation reports, and the catalog and implementation-report registries.
 - `skills/` — the approved agent skills and their evaluation tasks.
 - `examples/` — one small runnable agent per style plus a server and a mesh example.
 - `docs/` — documentation, including architecture decision records.

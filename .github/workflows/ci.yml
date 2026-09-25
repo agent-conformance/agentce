@@ -561,3 +561,50 @@ jobs:
         run: uv run --project tools --frozen python tools/code_of_conduct_check.py --self-test
       - name: Code of Conduct and contribution templates are real
         run: uv run --project tools --frozen python tools/code_of_conduct_check.py
+
+  domain-depth:
+    # Item 16.4: richer red-team/modality probe coverage (computer-use, voice, RAG) with recall 1.0
+    # proven by set identity, the evaluator's mutation-score floor read from the real, committed
+    # mutation.json, a fresh performance measurement or documented ADR gap on every run, the air-gap
+    # bundle carrying every signed base catalog and verifying each offline, and the catalog and
+    # implementation-report registries, each validated against a JSON Schema.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Sync the reference engine (engines/python)
+        working-directory: engines/python
+        run: uv sync --frozen
+      - name: Sync conformance
+        working-directory: conformance
+        run: uv sync --frozen
+      - name: Sync tools
+        working-directory: tools
+        run: uv sync --frozen
+      - name: redteam_probe_check self-test (computer-use, voice, and RAG probe corpora; recall 1.0)
+        working-directory: conformance
+        run: uv run --frozen python redteam_probe_check.py --self-test
+      - name: mutation_check self-test (the Phase-1 mutation-score floor, read from mutation.json)
+        working-directory: conformance
+        run: uv run --frozen python mutation_check.py --self-test
+      - name: perf_gate_check self-test
+        working-directory: conformance
+        run: uv run --frozen python perf_gate_check.py --self-test
+      - name: perf_gate_check (a fresh measurement or the documented ADR gap, on this run)
+        working-directory: conformance
+        run: uv run --frozen python perf_gate_check.py
+      - name: test_offline_bundle.py (multi-catalog build/verify, including the tampered-catalog cases)
+        working-directory: conformance
+        run: uv run --frozen python -m pytest tests/test_offline_bundle.py -q -k "not governance_gate"
+      - name: The air-gap bundle builds fresh and verifies offline, with networking disabled
+        run: uv run --project tools --frozen python -m offline_bundle --verify --no-network
+      - name: catalog_registry_check self-test (the catalog registry, both catalogs, schema-validated)
+        working-directory: conformance
+        run: uv run --frozen python catalog_registry_check.py --self-test
+      - name: registry_check self-test (the implementation-report registry, now schema-validated too)
+        working-directory: conformance
+        run: uv run --frozen python registry_check.py --self-test

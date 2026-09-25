@@ -2,7 +2,8 @@
 
 Implements the conformance-program tooling around the Engine Conformance Suite (SPEC §11.5–11.6). The
 ECS runner itself is the engine's `agentce conformance run` (item 1.11); this directory holds the
-release gates and, in later phases, the published implementation reports and their registry checks.
+release gates, the published implementation reports and their registry checks, and the catalog and
+implementation-report registries themselves (`registry/`, see [`registry/README.md`](registry/README.md)).
 
 ## Precision/recall gate (SPEC §11.6)
 
@@ -26,3 +27,49 @@ not the whole catalog. The gate prints its scored-control set (`scored_controls`
 scope is computed live against the corpus and catalog on disk, never hard-coded. Widening the
 authored ground truth to more controls is tracked as future corpus work, through the deterministic
 generator.
+
+## Depth & scale checks (item 16.4)
+
+Four checkers extend the release gates above with richer coverage, a mutation-testing regression
+floor, a fresh performance measurement, and a hardened air-gap bundle:
+
+- [`redteam_probe_check.py`](redteam_probe_check.py) scores the three red-team probe corpora under
+  `corpus/probe/redteam/{computer-use,voice,rag}/v1/` — each a modality beyond tool-calling/multi-agent
+  prompt injection — and proves recall 1.0 by exact case-id identity, with zero false positives, using
+  the engine's existing `absence`, `policy_violation`, and `structural` oracles unmodified:
+
+  ```
+  cd conformance && uv run python redteam_probe_check.py --self-test
+  cd conformance && uv run python redteam_probe_check.py
+  ```
+
+- [`mutation_check.py`](mutation_check.py) gates the evaluator core's mutation score at the Phase-1
+  floor (`≥ 0.75`, SPEC §4 P1.5), reading the real, committed `engines/python/mutation.json`, and also
+  runs `redteam_probe_check.py`'s full corpus verification. Its bare (no-flag) mode re-runs the real
+  `engines/python/mutation.py` harness inside a throwaway `git worktree`, so a hard kill mid-sweep can
+  never leave the tracked evaluator source mutated:
+
+  ```
+  cd conformance && uv run python mutation_check.py --self-test
+  cd conformance && uv run python mutation_check.py
+  ```
+
+- [`perf_gate_check.py`](perf_gate_check.py) is a thin wrapper around `perf.py`'s own `--run`/`--check`
+  (the Phase-3 `P3.7` measured-or-ADR pattern, unmodified): a fresh performance measurement or a
+  documented ADR gap (`docs/adr/0009-performance.md`) is recorded on every run:
+
+  ```
+  cd conformance && uv run python perf_gate_check.py --self-test
+  cd conformance && uv run python perf_gate_check.py
+  ```
+
+- [`offline_bundle.py`](offline_bundle.py)'s `build_bundle`/`verify_bundle` are generalized to
+  auto-discover and carry every signed base catalog under `spec/catalogs/base/*` (both EU AI Act and
+  NIST AI RMF), each independently verified offline; a partial or corrupted multi-catalog bundle fails
+  loudly, naming the failing catalog id. The `tools`-side wrapper
+  ([`tools/offline_bundle.py`](../tools/offline_bundle.py)) builds a fresh bundle to a temp directory
+  and verifies it offline, then cleans up:
+
+  ```
+  uv run --project tools --frozen python -m offline_bundle --verify --no-network
+  ```
