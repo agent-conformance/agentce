@@ -426,8 +426,11 @@ claims:
       The website publishes an EU-model accessibility statement, a VPAT 2.5 mapped to EN 301 549
       clauses 9 (Web), 10 (Non-web documents), and 11 (Software), and a manual accessibility test
       protocol (screen reader, keyboard-only, 200%-400% zoom/reflow, forced-colors). Every VPAT
-      criterion honestly reads "Not Evaluated" with the automated axe-core evidence recorded in
-      Remarks, until a person runs the manual protocol and records a real conformance level.
+      criterion honestly reads "Not Evaluated" with whatever axe-core evidence exists recorded in
+      Remarks, until a person runs the manual protocol and records a real conformance level. The
+      full-page axe-core scan itself is currently paused in continuous integration by maintainer
+      decision (its self-test still runs on every change); accessibility conformance is verified
+      manually, downstream, until the scan resumes or the manual protocol completes.
     status: built
     pages:
       - website/src/content/docs/docs/accessibility-statement.md

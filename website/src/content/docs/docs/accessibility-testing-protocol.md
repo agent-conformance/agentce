@@ -4,10 +4,11 @@ description: The manual test procedure a human tester runs to complete the VPAT 
 ---
 
 This is the manual test procedure referenced by the [accessibility statement](/docs/accessibility-statement/)
-and the [VPAT](/docs/vpat/). Automated scanning (axe-core, run in continuous integration on every page in
-both themes against the WCAG 2.2 A/AA tag set) cannot certify a WCAG success criterion the way a human
-tester following this procedure can. Running it, and recording the result against each VPAT row, is a
-human action — no automated check performs it.
+and the [VPAT](/docs/vpat/). Automated scanning (axe-core, which can run against every page in both
+themes over the WCAG 2.2 A/AA tag set, though the full scan is currently paused in continuous
+integration by maintainer decision — see the accessibility statement) cannot certify a WCAG success
+criterion the way a human tester following this procedure can. Running it, and recording the result
+against each VPAT row, is a human action — no automated check performs it.
 
 ## Scope
 
