@@ -1167,6 +1167,10 @@ jobs:
         run: |
           python3 website/scripts/check-a11y-docs.py --self-test
           python3 website/scripts/check-a11y-docs.py
+      - name: Accessibility claims match what the a11y job actually runs (self-test, then the real sources)
+        run: |
+          python3 website/scripts/check-a11y-claims.py --self-test
+          python3 website/scripts/check-a11y-claims.py
       - name: Accessibility statement, VPAT, and manual test protocol are built, linked, and complete (self-test, then the real site)
         working-directory: website
         run: |
