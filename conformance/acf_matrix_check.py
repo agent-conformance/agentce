@@ -662,7 +662,7 @@ def main(argv: list[str] | None = None) -> int:
         help=(
             "Run every matrix entry's test.cmd twice against the committed golden record "
             "(conformance/acf/fixtures-golden.json), proving it exists, reproduces deterministically, "
-            "and matches. Not wired into public CI yet; run by hand or by a local gate."
+            "and matches. Wired into the domain-depth CI job on every push and pull request."
         ),
     )
     parser.add_argument(
