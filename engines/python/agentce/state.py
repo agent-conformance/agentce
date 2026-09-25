@@ -6,7 +6,8 @@ same bundle digest is a no-op (SPEC §8.2 #8). When a new bundle differs — mos
 late-arriving evidence lands inside an already-assessed window — the engine re-assesses and the new
 report lists the prior one in ``supersedes`` (HR-10); a window is never silently closed. The directory
 carries a ``state_version``; an engine that meets an incompatible version refuses with exit code 3 and
-names the migration command, never silently re-ingesting.
+names the real recovery path (there is no migration command: start a fresh state directory), never
+silently re-ingesting.
 
 Late events (those whose source timestamp falls at or before the previously assessed window end) are
 counted per integrity stream. The manifest schema (``spec/report/manifest.schema.json``) does not yet
@@ -73,7 +74,12 @@ class StateDir:
                     f"the state directory at {path} is state_version {version}, "
                     f"but this engine writes state_version {STATE_VERSION}."
                 ),
-                f"run `agentce state migrate --state {path}` before re-assessing.",
+                (
+                    "there is no migration command: move or delete the state directory and re-run "
+                    "with --state pointing at a fresh, empty directory (this discards the prior "
+                    "bundle/outcome history recorded there, so late-arriving evidence and drift are "
+                    "tracked only from that point forward)."
+                ),
             )
         # `last_outcomes` is a purely additive field (introduced after `state_version` 1 was fixed):
         # a state directory written before it, or with no prior tracked pair, has no such key, and
