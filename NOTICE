@@ -11,3 +11,42 @@ under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
 CONDITIONS OF ANY KIND, either express or implied.
 
 SPDX-License-Identifier: Apache-2.0
+
+--------------------------------------------------------------------------------
+Third-party content and attribution
+--------------------------------------------------------------------------------
+
+This project incorporates, references, or is adapted from the following third-party
+material. Each item's own license or terms govern that item; nothing below expands
+or narrows the Apache-2.0 license this repository's own code and catalogs are
+licensed under (see LICENSE), and none of it is an endorsement claim.
+
+* NIST AI Risk Management Framework (AI RMF 1.0, NIST AI 100-1). The base catalog at
+  `spec/catalogs/base/nist-ai-rmf/` is derived from this framework, published by the
+  U.S. National Institute of Standards and Technology, a U.S. government agency. As
+  a work of the U.S. federal government, NIST AI 100-1 is in the public domain
+  within the United States (17 U.S.C. § 105); it may carry different terms outside
+  the United States. This project's catalog reuses only the framework's category
+  and subcategory structure and cites clause identifiers -- it never reproduces the
+  standard's text.
+
+* NIST OSCAL Assessment Results schema, version 1.1.2. Vendored unmodified at
+  `spec/report/vendor/oscal-assessment-results-nist-1.1.2.schema.json` (see
+  `spec/report/vendor/README.md` for its source URL and retrieval date), published
+  by the U.S. National Institute of Standards and Technology under the NIST Software
+  and Data licensing terms (https://www.nist.gov/open/license). As a work of the
+  U.S. federal government it is in the public domain within the United States.
+
+* OASIS SARIF (Static Analysis Results Interchange Format) schema, version 2.1.0
+  (errata01), an OASIS Standard. Vendored unmodified at
+  `spec/report/vendor/sarif-2.1.0.schema.json` (see `spec/report/vendor/README.md`
+  for its source URL and retrieval date). Copyright OASIS Open 2016-2020; the SARIF
+  specification and its schema are made available under the OASIS IPR Policy
+  (https://www.oasis-open.org/policies-guidelines/ipr/) for implementation without
+  royalty.
+
+* Contributor Covenant, version 2.1. `CODE_OF_CONDUCT.md` is adapted from the
+  Contributor Covenant, available at
+  https://www.contributor-covenant.org/version/2/1/code_of_conduct.html, licensed
+  under a Creative Commons Attribution 4.0 International license
+  (https://creativecommons.org/licenses/by/4.0/).
