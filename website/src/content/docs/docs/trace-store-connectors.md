@@ -6,7 +6,7 @@ description: Langfuse, Phoenix/Arize, Datadog LLM Observability, and LangSmith t
 If your agent's telemetry already lives in a trace store — Langfuse, Phoenix/Arize, Datadog LLM
 Observability, or LangSmith — you do not need a new adapter to get it into AgentCE. All four already
 export OpenTelemetry GenAI semantic-convention (`gen_ai.*`) or OpenInference-convention spans, and
-[`adapters/otel-genai`](/docs/reference/) is convention-based, not vendor-based (SPEC 12): it detects
+[`adapters/otel-genai`](/reference/adapters/otel-genai/) is convention-based, not vendor-based (SPEC 12): it detects
 the convention per span, from the OTLP schema URL or the OpenInference instrumentation scope, and maps
 it to canonical AgentCE evidence events. It does not know the name of the product that produced the
 export.
