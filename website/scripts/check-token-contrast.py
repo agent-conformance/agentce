@@ -30,8 +30,8 @@ THEME_SELECTORS = {
     ":root:not([data-theme='light'])": "dark (auto)",
     ":root[data-theme='dark']": "dark (explicit)",
 }
-RULE = re.compile(r"([^{}]+)\{([^{}]*)\}")
 DECL = re.compile(r"(--[\w-]+)\s*:\s*([^;}]+?)\s*(?:;|$)")
+DARK_WRAPPER = "@media(prefers-color-scheme:dark)"
 HEX = re.compile(r"#[0-9a-fA-F]{6}")
 
 
@@ -51,22 +51,41 @@ def ratio(a: str, b: str) -> float:
     return (hi + 0.05) / (lo + 0.05)
 
 
+def rules(css: str):
+    """Yield (enclosing at-rule headers, selector, body) for every leaf rule, in source order."""
+    stack, buf = [], ""
+    for ch in css:
+        if ch == "{":
+            stack.append(re.sub(r"\s+", "", buf.split(";")[-1]).replace('"', "'"))
+            buf = ""
+        elif ch == "}":
+            if stack:
+                selector = stack.pop()
+                yield tuple(stack), selector, buf
+            buf = ""
+        else:
+            buf += ch
+
+
 def resolve(css: str):
     """Return ({theme: {token: hex}}, [problems]) applying every theme rule in source order, so a later
-    override wins exactly as it would in the browser. Comments are ignored; a tracked token declared as
-    anything but a six-digit hex colour is a problem, because its contrast cannot be computed here."""
+    override wins exactly as it would in the browser. Comments are ignored. A tracked token declared as
+    anything but a six-digit hex colour, under an unrecognised selector, or inside an at-rule other than
+    the single prefers-color-scheme wrapper around the auto-dark selector is a problem: its effective
+    contrast cannot be computed here, so the check fails closed."""
     css = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
     themes = {name: {} for name in THEME_SELECTORS.values()}
     problems = []
-    for selector, body in RULE.findall(css):
-        theme = THEME_SELECTORS.get(re.sub(r"\s+", "", selector.split(";")[-1]).replace('"', "'"))
+    for context, selector, body in rules(css):
+        theme = THEME_SELECTORS.get(selector)
+        allowed = context == () or (context == (DARK_WRAPPER,) and theme == "dark (auto)")
         for token, value in DECL.findall(body):
             if token not in TRACKED:
                 continue
-            if theme is None:
-                problems.append(f"unrecognised selector {selector.split(';')[-1].strip()!r} declares {token}; declare palette tokens only in the three theme blocks")
-                continue
-            if HEX.fullmatch(value):
+            if theme is None or not allowed:
+                where = " inside " + " > ".join(context) if context else ""
+                problems.append(f"{selector!r}{where} declares {token}; declare palette tokens only in the three theme blocks")
+            elif HEX.fullmatch(value):
                 themes[theme][token] = value
             else:
                 problems.append(f"{theme}: {token} is declared as {value!r}, not a six-digit hex colour")
@@ -113,6 +132,9 @@ def self_test() -> int:
         ("an explicit light-theme override fails closed", good + "\n:root[data-theme='light'] { --accent: #0d9488; }\n", 1),
         ("a selector list declaring a token fails closed", good + "\nhtml:root, :host { --accent: #0d9488; }\n", 1),
         ("an unrelated selector without palette tokens passes", good + "\n.card { color: red; }\n", 0),
+        ("a prefers-contrast rescue fails closed", good + "\n@media (prefers-contrast: more) { :root[data-theme='dark'] { --text-faint: #8595a9; } }\n", 1),
+        ("a layer rescue fails closed", good + "\n@layer x { :root { --text-faint: #ffffff; } }\n", 1),
+        ("an at-rule without palette tokens passes", good + "\n@media (min-width: 50em) { .card { color: red; } }\n", 0),
         ("missing blocks fail", "", 1),
     ]
     failed = 0
