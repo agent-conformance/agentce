@@ -548,3 +548,85 @@ claims:
         tools/grc_connectors_check.py (a real OSCAL Assessment Results document validates against the
         vendored NIST schema; the docs page names evidence_export.py's real module path and output
         field names, not just prose).
+  - id: evaluator.redteam-probe-library
+    text: >-
+      The probe library spans computer-use, voice, and RAG-specific agent-modality attack scenarios
+      beyond tool-calling/multi-agent, each with at least three attack-case variants a probe proves it
+      catches by exact case-id identity (recall 1.0) with zero false positives on any safe case,
+      alongside the existing >= 0.75 (Phase 1) mutation-score floor on the evaluator core, checked
+      against the real, committed engines/python/mutation.json score.
+    status: built
+    pages:
+      - conformance/README.md
+    check:
+      workflow: .github/workflows/ci.yml
+      job: domain-depth
+      description: >-
+        Runs redteam_probe_check.py --self-test (loads corpus/probe/redteam/{computer-use,voice,rag}/v1
+        via the real agentce.probe.load_corpus/evaluate_probe, asserts recall 1.0 by exact case-id set
+        identity against each manifest's attack-* ids, and asserts every modality-specific structural
+        marker) and mutation_check.py --self-test (reads the tracked engines/python/mutation.json score
+        and asserts it is >= 0.75).
+  - id: operability.performance-at-scale
+    text: >-
+      A fresh performance measurement (a synthetic-stream extrapolation to the SPEC 8.6 scale targets)
+      or a documented ADR gap is recorded on every run, the same measured-or-ADR pattern Phase 3
+      established -- this records a result each run, it does not itself raise the measured scale or
+      newly demonstrate at-scale performance beyond Phase 3.
+    status: built
+    pages:
+      - conformance/README.md
+    check:
+      workflow: .github/workflows/ci.yml
+      job: domain-depth
+      description: >-
+        Runs perf_gate_check.py --self-test then perf_gate_check.py: a fresh perf.py --run (no --out
+        override) followed by perf.py --check, which passes on a within-targets recorded run or on
+        docs/adr/0009-performance.md's presence, and prints which path it took.
+  - id: operability.air-gap-bundle
+    text: >-
+      The offline distribution bundle builds and verifies offline against the vendored trust root with
+      networking disabled, carrying every published, signed base catalog (EU AI Act and NIST AI RMF);
+      this proves the release, catalog, and ECS-run offline path, not a fresh dependency install into a
+      clean environment -- that remains the container/quickstart path exercised at GA.
+    status: built
+    pages:
+      - conformance/README.md
+    check:
+      workflow: .github/workflows/ci.yml
+      job: domain-depth
+      description: >-
+        Runs conformance/tests/test_offline_bundle.py (build/verify, the multi-catalog assertion, and
+        the tampered-second-catalog and missing-catalog negative cases) and the tools-side wrapper,
+        uv run --project tools --frozen python -m offline_bundle --verify --no-network, which builds a
+        fresh bundle to a temp directory and verifies it offline under dead proxies.
+  - id: governance.catalog-registry
+    text: >-
+      Every published, signed base catalog is listed in a machine-validated registry that recomputes
+      its digest and refuses a rebranded or edited entry.
+    status: built
+    pages:
+      - conformance/registry/README.md
+    check:
+      workflow: .github/workflows/ci.yml
+      job: domain-depth
+      description: >-
+        Runs catalog_registry_check.py --self-test: validates conformance/registry/catalogs.json
+        against catalog-registry.schema.json, recomputes each entry's digest from the real catalog
+        directory on disk, verifies the signature against the vendored trust root, and refuses a
+        digest-mismatched fixture entry.
+  - id: governance.implementation-report-registry
+    text: >-
+      Every accepted implementation report validates against a JSON Schema before its golden-revision
+      signature and conformance claim are checked, and a schema-invalid report is refused before
+      signature verification is attempted.
+    status: built
+    pages:
+      - conformance/registry/README.md
+    check:
+      workflow: .github/workflows/ci.yml
+      job: domain-depth
+      description: >-
+        Runs registry_check.py --self-test: a well-formed report is listed, a report with an
+        unverifiable golden digest is refused, and a report missing the schema-required claim field is
+        refused with a distinct schema-invalid status before signature verification is attempted.
