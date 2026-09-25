@@ -21,12 +21,21 @@ import json
 from pathlib import Path
 from typing import Any
 
+import jsonschema
+
 import dev_trust
 from agentce import signing
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REPORTS_DIR = REPO_ROOT / "conformance" / "reports"
+SCHEMA_FILE = (
+    REPO_ROOT / "conformance" / "registry" / "implementation-report.schema.json"
+)
 GOLDEN_PREDICATE = "https://agent-conformance.org/attestation/golden/v1"
+
+
+def load_schema() -> dict[str, Any]:
+    return json.loads(SCHEMA_FILE.read_text(encoding="utf-8"))
 
 
 def _attested_digest(verified: signing.Verified) -> str | None:
@@ -40,8 +49,29 @@ def _attested_digest(verified: signing.Verified) -> str | None:
     return None
 
 
-def evaluate_report(record: dict[str, Any], trust: signing.TrustRoot) -> dict[str, Any]:
-    """Decide whether one implementation report is listed, and why not when it is not."""
+def evaluate_report(
+    record: dict[str, Any],
+    trust: signing.TrustRoot,
+    *,
+    schema: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Decide whether one implementation report is listed, and why not when it is not.
+
+    A schema-validation step runs first (P16.8): a structurally malformed record -- missing a
+    schema-required field such as ``claim`` -- is refused with a distinct ``schema-invalid`` status
+    before signature verification is even attempted, never reaching the golden-signature branch.
+    """
+    schema = schema if schema is not None else load_schema()
+    try:
+        jsonschema.validate(instance=record, schema=schema)
+    except jsonschema.ValidationError as exc:
+        return {
+            "engine": record.get("engine"),
+            "status": "schema-invalid",
+            "listed": False,
+            "reasons": [f"schema validation failed: {exc.message}"],
+        }
+
     reasons: list[str] = []
     golden = record.get("golden")
     golden = golden if isinstance(golden, dict) else {}
@@ -139,6 +169,16 @@ def self_test() -> int:
     if refused["listed"] or refused["status"] != "unverified":
         print(
             "REGISTRY SELF-TEST FAILED: a report with an unverifiable golden digest was listed"
+        )
+        return 1
+
+    malformed = _sample_report(good_digest)
+    del malformed["claim"]
+    schema_invalid = evaluate_report(malformed, trust)
+    if schema_invalid["listed"] or schema_invalid["status"] != "schema-invalid":
+        print(
+            "REGISTRY SELF-TEST FAILED: a report missing its schema-required 'claim' field "
+            f"was not refused as schema-invalid (got status={schema_invalid['status']!r})"
         )
         return 1
 
