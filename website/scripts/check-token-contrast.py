@@ -60,10 +60,11 @@ def resolve(css: str):
     problems = []
     for selector, body in RULE.findall(css):
         theme = THEME_SELECTORS.get(re.sub(r"\s+", "", selector.split(";")[-1]).replace('"', "'"))
-        if theme is None:
-            continue
         for token, value in DECL.findall(body):
             if token not in TRACKED:
+                continue
+            if theme is None:
+                problems.append(f"unrecognised selector {selector.split(';')[-1].strip()!r} declares {token}; declare palette tokens only in the three theme blocks")
                 continue
             if HEX.fullmatch(value):
                 themes[theme][token] = value
@@ -109,6 +110,9 @@ def self_test() -> int:
         ("a later override block wins and fails", good + "\n:root { --accent: #0d9488; }\n", 1),
         ("a commented-out declaration is ignored", good + "\n/* :root { --accent: #ffffff; } */\n", 0),
         ("a non-hex redeclaration is refused", good + "\n:root { --accent: var(--other); }\n", 1),
+        ("an explicit light-theme override fails closed", good + "\n:root[data-theme='light'] { --accent: #0d9488; }\n", 1),
+        ("a selector list declaring a token fails closed", good + "\nhtml:root, :host { --accent: #0d9488; }\n", 1),
+        ("an unrelated selector without palette tokens passes", good + "\n.card { color: red; }\n", 0),
         ("missing blocks fail", "", 1),
     ]
     failed = 0

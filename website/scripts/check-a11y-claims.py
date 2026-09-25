@@ -25,13 +25,13 @@ SOURCES = [
 ]
 
 SKIP_RE = re.compile(r"AGENTCE_SKIP_A11Y\s*[:=]\s*[\"']?([^\s\"'#]*)")
-SCAN = re.compile(r"\b(scan\w*|axe\S*|automated (rules engine|gate|checks?|tests?)|a11y gate)\b", re.IGNORECASE)
+SCAN = re.compile(r"\b(scan\w*|axe\S*|automated (rules engine|gate|checks?|tests?)|(a11y|accessibility) (gate|checks?|tests?))\b", re.IGNORECASE)
 CI = re.compile(
     r"\b(ci|continuous integration|every (change|commit|push|pull request)|(every|all|each) (built |published )?pages?)\b",
     re.IGNORECASE,
 )
 HONEST = re.compile(
-    r"\b(paused|skipped|not run|no longer|disabled|last full run|self-test|manual\w*)\b|(until|once|when|if)\b[^.]{0,60}\bresum",
+    r"\b(paused|skipped|not run|does not|no longer|disabled|last full run)\b|(until|once|when|if)\b[^.]{0,60}\bresum",
     re.IGNORECASE,
 )
 NEGATED = re.compile(r"\b(never|not|isn'?t|aren'?t|no longer)\s+(\w+\s+)?(paused|skipped|disabled)\b|\balways\b", re.IGNORECASE)
@@ -45,7 +45,7 @@ def scan_step_paused(workflow_text: str) -> bool:
     if not m:
         return True
     job = m.group(1)
-    if any(v not in ("", "0") for v in SKIP_RE.findall(job)):
+    if any(v not in ("", "0") for v in SKIP_RE.findall(workflow_text)) or re.search(r"^    if:", job, re.MULTILINE):
         return True
     steps = re.split(r"^      - ", job, flags=re.MULTILINE)
     full = [st for st in steps if "check-a11y.mjs" in st and "--self-test" not in st]
@@ -100,8 +100,10 @@ def self_test() -> int:
     good = "The full-page scan is currently paused in CI. Conformance is verified manually, downstream."
     wf = "  a11y:\n    steps:\n      - name: Gate\n        env:\n          AGENTCE_SKIP_A11Y: \"1\"\n        run: node scripts/check-a11y.mjs\n"
     live = "  a11y:\n    steps:\n      - name: Gate\n        run: node scripts/check-a11y.mjs\n"
-    stale_vpat = "| 1.1.1 Non-text Content | Not Evaluated | Automated axe-core WCAG 2.2 AA scan (every page, both themes, in CI) reports no violations for this rule. |"
+    stale_vpat = "| 1.1.1 Non-text Content | Not Evaluated | Automated axe-core WCAG 2.2 AA scan (every page, both themes, in CI) reports no violations for this rule; not yet manually verified. |"
+    stale_vpat2 = "| 1.4.3 Contrast (Minimum) | Not Evaluated | Automated axe-core `color-contrast` rule reports no violations across every page and theme; not yet manually verified. |"
     stale_stmt = "An automated rules engine (axe-core) scans every published page\nin both the light and dark themes on every change and currently reports zero violations."
+    stale_stmt2 = "It is checked by an automated accessibility gate that runs in\ncontinuous integration on every page, in both themes, on every change to this site."
     stale_protocol = "Automated scanning (axe-core, run in continuous integration on every page in both themes)."
     cases = [
         ("good passes", wf, good, 0),
@@ -109,7 +111,13 @@ def self_test() -> int:
         ("honest past tense passes", wf, good + " Its last full run reported no violations across every page.", 0),
         ("honest conditional passes", wf, good + " Until the scan resumes in CI on every page, testing is manual.", 0),
         ("stale VPAT row fails", wf, good + "\n" + stale_vpat, 1),
+        ("stale VPAT contrast row fails", wf, good + "\n" + stale_vpat2, 1),
         ("stale statement fails", wf, good + "\n\n" + stale_stmt, 1),
+        ("stale statement gate sentence fails", wf, good + "\n\n" + stale_stmt2, 1),
+        ("scan in CI with a manual-testing aside fails", wf, good + " Axe scans every page in CI; manual testing complements it.", 1),
+        ("scan in CI mentioning its self-test fails", wf, good + " The scan runs in CI on every page and its self-test proves it has teeth.", 1),
+        ("job-level if counts as paused", "  a11y:\n    if: false\n    steps:\n      - run: node scripts/check-a11y.mjs\n", "Axe runs in CI on every page.", 1),
+        ("workflow-level skip counts as paused", "env:\n  AGENTCE_SKIP_A11Y: 1\njobs:\n  a11y:\n    steps:\n      - run: node scripts/check-a11y.mjs\n", "Axe runs in CI on every page.", 1),
         ("stale protocol wording fails", wf, good + "\n\n" + stale_protocol, 1),
         ("reordered claim fails", wf, good + " In CI, on every page, the scan is run.", 1),
         ("passive claim fails", wf, good + " Every page is scanned in CI.", 1),
