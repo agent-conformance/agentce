@@ -599,7 +599,7 @@ jobs:
         run: uv run --frozen python perf_gate_check.py
       - name: test_offline_bundle.py (multi-catalog build/verify, including the tampered-catalog cases)
         working-directory: conformance
-        run: uv run --frozen python -m pytest tests/test_offline_bundle.py -q -k "not governance_gate"
+        run: uv run --frozen python -m pytest tests/test_offline_bundle.py -q
       - name: The air-gap bundle builds fresh and verifies offline, with networking disabled
         run: uv run --project tools --frozen python -m offline_bundle --verify --no-network
       - name: catalog_registry_check self-test (the catalog registry, both catalogs, schema-validated)
