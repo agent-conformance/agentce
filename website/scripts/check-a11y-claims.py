@@ -31,7 +31,8 @@ CI = re.compile(
     re.IGNORECASE,
 )
 HONEST = re.compile(
-    r"\b(paused|skipped|not run|does not|no longer|disabled|last full run)\b|(until|once|when|if)\b[^.]{0,60}\bresum",
+    r"\bpaused\b|\blast full run\b|\b(scan|scanning|gate)\b[^.]{0,30}\b(skipped|disabled)\b|\bscan\w* itself does not\b"
+    r"|(until|once|when|if)\b[^.]{0,60}\bresum",
     re.IGNORECASE,
 )
 NEGATED = re.compile(r"\b(never|not|isn'?t|aren'?t|no longer)\s+(\w+\s+)?(paused|skipped|disabled)\b|\balways\b", re.IGNORECASE)
@@ -111,6 +112,8 @@ def self_test() -> int:
         ("honest past tense passes", wf, good + " Its last full run reported no violations across every page.", 0),
         ("honest conditional passes", wf, good + " Until the scan resumes in CI on every page, testing is manual.", 0),
         ("stale VPAT row fails", wf, good + "\n" + stale_vpat, 1),
+        ("reworded VPAT row with an incidental 'does not' fails", wf, good + "\n| 1.1.1 Non-text Content | Not Evaluated | Automated axe-core WCAG 2.2 AA scan (every page, both themes, in CI) does not report violations for this rule. |", 1),
+        ("'no page is skipped' fails", wf, good + " Axe scans every page in CI and no page is skipped.", 1),
         ("stale VPAT contrast row fails", wf, good + "\n" + stale_vpat2, 1),
         ("stale statement fails", wf, good + "\n\n" + stale_stmt, 1),
         ("stale statement gate sentence fails", wf, good + "\n\n" + stale_stmt2, 1),

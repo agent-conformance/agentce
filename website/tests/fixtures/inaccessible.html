@@ -26,6 +26,8 @@
       <p style="color: #000000; background: #ffffff">
         <a href="#a" style="display: inline-block; width: 10px; height: 10px; overflow: hidden">a</a><a href="#b" style="display: inline-block; width: 10px; height: 10px; overflow: hidden">b</a>
       </p>
+      <!-- autocomplete-valid (WCAG 2.1 only): an invalid autocomplete token on a personal-data field. -->
+      <label>Name <input type="text" autocomplete="not-a-real-token" /></label>
       <!-- scrollable-region-focusable: a horizontally scrollable region with no keyboard focus (no
            tabindex), mirroring an un-fixed code block. -->
       <pre style="overflow: auto; width: 180px; white-space: pre; border: 1px solid #000">const verificationTeal = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";</pre>
