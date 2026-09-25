@@ -7,6 +7,6 @@ Affected persons informed and explanation reconstructable.
 | Severity | medium |
 | Mode | semi-automated |
 | Rung | 2 |
-| Catalog | EU AI Act base catalog (base) |
+| Catalog | EU AI Act base catalog (base); NIST AI Risk Management Framework (AI RMF 1.0) base catalog (base) |
 
-Crosswalked to clause(s) Art. 26(11) / 86. Clause numbers only are cited; standard text is never reproduced.
+Crosswalked to clause(s) MEASURE 2.8. Clause numbers only are cited; standard text is never reproduced.
