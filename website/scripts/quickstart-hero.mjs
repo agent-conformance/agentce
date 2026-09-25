@@ -168,6 +168,7 @@ const UNIVERSAL = /\b(?:every|all)\b|100\s?%|\bfully\b/i;
 const SUBJECT = /\b(?:controls?|verdicts?)\b/i;
 const ABSOLUTE = /100\s?%|\bfully\b|across the board/i;
 const WINDOW = 100;
+const TYPED_TALLY = /\d+ conformant\b[^.]{0,60}\d+ (?:insufficient|not assessed)/i;
 
 /**
  * Whether the text asserts that everything conforms: every/all/100%/fully together with control(s) or
@@ -194,6 +195,12 @@ export function checkPage(page, run, kind = KINDS.hero) {
   const allConformant = run.total > 0 && (run.counts.conformant ?? 0) === run.total;
   if (!allConformant && blanketClaim(page)) {
     problems.push(`${kind.prefix}.blanket_claim: the page claims every control is conformant; the run does not`);
+  }
+  const a = page.indexOf(kind.begin);
+  const b = page.indexOf(kind.end);
+  const outside = a >= 0 && b > a ? page.slice(0, a) + page.slice(b) : page;
+  if (TYPED_TALLY.test(outside.replace(/\s+/g, ' '))) {
+    problems.push(`${kind.prefix}.typed_tally: a tally is typed outside the generated region; only the marked region may carry one`);
   }
   const fresh = spliceRegion(page, kind.render(run), kind);
   if (fresh === null) problems.push(`${kind.prefix}.markers_missing: the quickstart-run markers are absent from the page`);
@@ -243,6 +250,8 @@ function selfTest() {
     ['a Markdown page without markers is refused', 'Intro.\n', run, KINDS.tally, ['tally.markers_missing']],
     ['a softened blanket claim is refused', `${md}\nAll controls are conformant across the board.\n`, run, KINDS.tally, ['tally.blanket_claim']],
     ['a claim split over a wrapped line is refused', `${md}\nEvery base-catalog control\nis conformant.\n`, run, KINDS.tally, ['tally.blanket_claim']],
+    ['a tally typed outside the region is refused', `${md}\nA run ends with 25 conformant, 19 insufficient evidence.\n`, run, KINDS.tally, ['tally.typed_tally']],
+    ['a tally typed outside the hero region is refused', `${hero}\n<p>25 conformant, 19 insufficient evidence, 5 not assessed</p>`, run, KINDS.hero, ['hero.typed_tally']],
     ['an honest partial tally is not a blanket claim', `${md}\n3 of 5 controls are conformant.\n`, run, KINDS.tally, []],
     [
       'a blanket claim is allowed when the run is all-conformant',
