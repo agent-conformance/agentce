@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agentce:internal:conformance:acf:matrix-schema",
+  "title": "ACF conformance matrix",
+  "description": "AgentCE's own scorecard input for the Agent Conformance Framework: one entry per named ACF capability, each with a natural-language statement of what level 3 means and, where a capability is verifiable today, an executable test. This is an internal QA artifact of the conformance suite, not a spec vocabulary schema -- it carries no canonical agent-conformance.org IRI and is not vendored into the three engines.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "entries"],
+  "properties": {
+    "version": {"type": "integer", "const": 1},
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/entry"}
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "dimension", "capability", "statement", "level_target"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Z]{2,4}-[0-9]+$",
+          "description": "Stable capability id, e.g. COV-1. The dimension-prefix letters are informative only; `dimension` is the field a consumer must read."
+        },
+        "dimension": {
+          "type": "string",
+          "enum": ["coverage", "rigor", "interoperability", "lifecycle", "operability", "assurance", "governance"],
+          "description": "One of the ACF's seven named dimensions (the framework document's 'The seven dimensions' section, in that same order)."
+        },
+        "capability": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The named sub-capability exactly as it appears in the framework document's dimension bullet (e.g. 'Standards & rulesets')."
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Natural-language statement of what 'covered at level 3 (Complete)' means for a user, for this capability. Self-documenting test definition -- read this to know what the test proves."
+        },
+        "level_target": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "description": "The level this entry's test (when present) proves on a pass. 0=Absent, 1=Asserted, 2=Partial, 3=Complete, per the ACF maturity scale. An entry with no `test` always scores 1 (Asserted) regardless of this field, by the scorer's own anti-hype rule."
+        },
+        "test": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["cmd"],
+          "properties": {
+            "cmd": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One shell command, run from the repository root, that discriminates: exit 0 (and, if `expect` is set, producing output containing `expect`) iff the capability is real at `level_target` today."
+            },
+            "fixture": {
+              "type": ["string", "null"],
+              "description": "The input path the test operates over -- a corpus fixture, a spec/catalog directory, or a repository-level artifact (a doc, a workflow file, a schema). Null when the test needs no fixture input (e.g. it drives an installed CLI against ambient repository state)."
+            },
+            "expect": {
+              "type": ["string", "null"],
+              "description": "A substring the command's combined stdout+stderr must contain on success, beyond a zero exit code. Null when the exit code alone is the signal."
+            }
+          }
+        },
+        "evidence_ref": {
+          "type": ["string", "null"],
+          "description": "Required (non-null) when `level_target` is 3: a human-readable pointer (file path, CI job, or doc anchor) a reader can follow to see the proof, distinct from `test.cmd` which a machine runs."
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"level_target": {"const": 3}}, "required": ["level_target"]},
+          "then": {"required": ["evidence_ref"], "properties": {"evidence_ref": {"type": "string", "minLength": 1}}}
+        }
+      ]
+    }
+  }
+}

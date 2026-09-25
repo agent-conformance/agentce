@@ -1,0 +1,383 @@
+# The ACF conformance matrix: one entry per named capability of the Agent Conformance Framework's
+# seven dimensions (36 capabilities, matching that framework's own bullet lists exactly, in the same
+# order). `statement` says what "level 3 (Complete)" means for a user; `test` is the executable proof,
+# reusing an existing conformance-suite/tools check wherever one already proves the capability, so this
+# matrix never invents a second, competing proof of something already guarded elsewhere. An entry with
+# no `test` always scores 1 (Asserted) by the scorer's own rule.
+#
+# level_target is the level AgentCE claims TODAY, set honestly against the project's own internal
+# coverage tracking -- never rounded up. A capability whose own regression gate cannot fail on a real
+# measurement, or whose registered public claim overstates what its check actually proves, is scored at
+# the level its test can discriminate, not the level its prose claims.
+version: 1
+entries:
+  # --- 1. Coverage ---
+  - id: COV-1
+    dimension: coverage
+    capability: "Standards & rulesets"
+    statement: "A user can assess against more than one standards-body base catalog through the identical CLI path, with no engine code change, and author, lint, and sign a third-party catalog through a documented toolkit."
+    level_target: 3
+    test:
+      cmd: "cd engines/python && uv run --frozen agentce catalog lint ../../spec/catalogs/base/eu-ai-act && uv run --frozen agentce catalog lint ../../spec/catalogs/base/nist-ai-rmf"
+      fixture: "spec/catalogs/base"
+      expect: null
+    evidence_ref: "spec/catalogs/base/{eu-ai-act,nist-ai-rmf}; tools/catalog_authoring_check.py"
+  - id: COV-2
+    dimension: coverage
+    capability: "Agent frameworks / runtimes"
+    statement: "A user's own agent framework has a real, runnable example that imports and executes that framework offline and keyless, proven by AST inspection rather than a hand-maintained list."
+    level_target: 3
+    test:
+      cmd: "uv run --project tools --frozen python tools/framework_examples_check.py --self-test"
+      fixture: "examples"
+      expect: null
+    evidence_ref: "tools/framework_examples_check.py; examples/<style>/"
+  - id: COV-3
+    dimension: coverage
+    capability: "Languages / SDKs"
+    statement: "A user not on Python still gets a byte-identical engine in their own language, verified against the Python reference on the full corpus."
+    level_target: 2
+    test:
+      cmd: "cd conformance && uv run --frozen pytest -q -p no:cacheprovider tests/test_ecs.py"
+      fixture: "corpus"
+      expect: null
+    evidence_ref: null
+  - id: COV-4
+    dimension: coverage
+    capability: "Evidence sources / ingestion"
+    statement: "A user's existing telemetry format round-trips into canonical events through an existing adapter or a documented connector recipe, with zero quarantines, proven by a committed fixture."
+    level_target: 2
+    test:
+      cmd: "uv run --project tools --frozen python -m integration_breadth_check --self-test"
+      fixture: "adapters"
+      expect: null
+    evidence_ref: null
+  - id: COV-5
+    dimension: coverage
+    capability: "Agent modalities"
+    statement: "Tool-use, multi-agent, computer-use, voice, and RAG agents each have red-team probe coverage proving recall 1.0 against a modality-specific attack scenario."
+    level_target: 2
+    test:
+      cmd: "cd conformance && uv run --frozen python redteam_probe_check.py --self-test"
+      fixture: "corpus/probe"
+      expect: null
+    evidence_ref: null
+
+  # --- 2. Rigor ---
+  - id: RIG-1
+    dimension: rigor
+    capability: "Evaluation depth"
+    statement: "A verdict is reachable through structural, statistical, probe-based, and integrity evaluation rungs, not a single heuristic, each with its own test vectors."
+    level_target: 3
+    test:
+      cmd: "cd engines/python && uv run --frozen pytest -q -p no:cacheprovider tests/test_structural.py tests/test_statistical.py tests/test_integrity.py"
+      fixture: null
+      expect: null
+    evidence_ref: "conformance/ecs.py; conformance/precision_gate.py"
+  - id: RIG-2
+    dimension: rigor
+    capability: "Determinism (order/locale/clock-independent)"
+    statement: "The same evidence produces the same verdict regardless of input ordering, system locale, or wall-clock time, proven by dedicated determinism tests, not just assumed."
+    level_target: 3
+    test:
+      cmd: "cd conformance && uv run --frozen python numerics.py --engines python,typescript,java"
+      fixture: "spec/rules/numerics-vectors"
+      expect: null
+    evidence_ref: "conformance/numerics.py; engines/python/tests/test_late_event.py"
+  - id: RIG-3
+    dimension: rigor
+    capability: "Model-free (no learned component decides an outcome)"
+    statement: "No engine, adapter, or evaluation-path dependency resolves to a learned component or an LLM/embedding client, enforced by a denylist scan over every ecosystem's lockfiles."
+    level_target: 3
+    test:
+      cmd: "python3 tools/no_ml_check.py --self-test"
+      fixture: "spec/rules/no-ml-denylist.txt"
+      expect: null
+    evidence_ref: "tools/no_ml_check.py"
+  - id: RIG-4
+    dimension: rigor
+    capability: "Insufficient-evidence honesty"
+    statement: "When evidence is missing, the engine reports insufficient_evidence rather than guessing conformant or non-conformant, with a stable message key naming the gap."
+    level_target: 3
+    test:
+      cmd: "cd engines/python && uv run --frozen pytest -q -p no:cacheprovider tests/test_exit_codes.py"
+      fixture: null
+      expect: null
+    evidence_ref: "engines/python/tests/test_exit_codes.py; docs/errors.md"
+  - id: RIG-5
+    dimension: rigor
+    capability: "Provenance & signing"
+    statement: "A catalog is content-addressed and signature-verified offline against a vendored trust root before it is used, and a rebranded or unsigned catalog is refused."
+    level_target: 3
+    test:
+      cmd: "cd engines/python && uv run --frozen pytest -q -p no:cacheprovider tests/test_signing.py"
+      fixture: null
+      expect: null
+    evidence_ref: "conformance/dev_trust.py; engines/python/tests/test_signing.py"
+  - id: RIG-6
+    dimension: rigor
+    capability: "Self-proof (the evaluator proves itself)"
+    statement: "The engine's own correctness is proven by a conformance suite, cross-engine byte-identity on a full corpus, precision/recall gates, and a reference corpus — not asserted."
+    level_target: 3
+    test:
+      cmd: "cd conformance && uv run --frozen pytest -q -p no:cacheprovider tests/test_ecs.py tests/test_precision_gate.py"
+      fixture: "corpus"
+      expect: null
+    evidence_ref: "conformance/ecs.py; conformance/precision_gate.py; corpus/"
+
+  # --- 3. Interoperability ---
+  - id: INT-1
+    dimension: interoperability
+    capability: "Output formats (machine/human/GRC/CI)"
+    statement: "A single assessment emits machine (canonical JSON, OSCAL, SARIF), human (Markdown/HTML), and CI-native (JUnit-XML, $GITHUB_STEP_SUMMARY) formats from one run."
+    level_target: 3
+    test:
+      cmd: "cd conformance && uv run --frozen python render_check.py"
+      fixture: null
+      expect: "RENDER OK"
+    evidence_ref: "conformance/render_check.py; spec/report/"
+  - id: INT-2
+    dimension: interoperability
+    capability: "CI/CD surface"
+    statement: "A pipeline adopts AgentCE in one line through a reusable, SHA-pinned CI artifact, self-tested against a bad fixture that proves it can fail."
+    level_target: 2
+    test:
+      cmd: "uv run --project tools --frozen python tools/reusable_ci_artifacts_check.py --self-test"
+      fixture: ".github/actions"
+      expect: null
+    evidence_ref: null
+  - id: INT-3
+    dimension: interoperability
+    capability: "Policy-as-code gating"
+    statement: "A pipeline gates its exit code on severity or control family through a tiny, specified, deterministic expression language — never a general eval — over assertions.json."
+    level_target: 3
+    test:
+      cmd: "cd engines/python && uv run --frozen pytest -q -p no:cacheprovider tests/test_policy_gating.py"
+      fixture: null
+      expect: null
+    evidence_ref: "engines/python/tests/test_policy_gating.py; --fail-on"
+  - id: INT-4
+    dimension: interoperability
+    capability: "Downstream & GRC consumers"
+    statement: "A GRC platform ingests an assessment through its native OSCAL import or a documented evidence-export recipe, structurally checked against that platform's real API shape."
+    level_target: 2
+    test:
+      cmd: "uv run --project engines/python --frozen python tools/grc_connectors_check.py --self-test"
+      fixture: "tools/grc"
+      expect: null
+    evidence_ref: null
+  - id: INT-5
+    dimension: interoperability
+    capability: "AI-native consumption"
+    statement: "An AI assistant can read and act on findings through a deterministically generated, injection-hardened skill output, not just a JSON file it must parse itself."
+    level_target: 3
+    test:
+      cmd: "cd engines/python && uv run --frozen pytest -q -p no:cacheprovider tests/test_skill_emit.py"
+      fixture: null
+      expect: null
+    evidence_ref: "engines/python/tests/test_skill_emit.py; assess --emit skill"
+
+  # --- 4. Lifecycle ---
+  - id: LIF-1
+    dimension: lifecycle
+    capability: "Pre-production assessment"
+    statement: "A user runs one command against a fixed evidence bundle before shipping and gets a conformant/non-conformant/insufficient-evidence verdict in minutes."
+    level_target: 3
+    test:
+      cmd: "python3 tools/assess_smoke_check.py --self-test"
+      fixture: "corpus/quickstart"
+      expect: null
+    evidence_ref: "tools/assess_smoke_check.py; agentce quickstart"
+  - id: LIF-2
+    dimension: lifecycle
+    capability: "Runtime / continuous conformance"
+    statement: "Re-running assess over an accumulating evidence stream detects per-(subject, control) outcome drift and captures the incident evidence that caused it, deterministically."
+    level_target: 3
+    test:
+      cmd: "cd conformance && uv run --frozen python runtime_conformance_check.py --self-test"
+      fixture: null
+      expect: "SELF-TEST PASSED"
+    evidence_ref: "conformance/runtime_conformance_check.py"
+  - id: LIF-3
+    dimension: lifecycle
+    capability: "Run-to-run delta"
+    statement: "A user can deterministically diff two assertion sets from different runs and see exactly which (subject, control) outcomes changed."
+    level_target: 3
+    test:
+      cmd: "cd engines/python && uv run --frozen pytest -q -p no:cacheprovider tests/test_cli.py::test_diff_ok tests/test_cli.py::test_diff_missing"
+      fixture: null
+      expect: null
+    evidence_ref: "engines/python/agentce/commands/__init__.py::cmd_diff; engines/python/tests/test_cli.py"
+  - id: LIF-4
+    dimension: lifecycle
+    capability: "Remediation & re-verify"
+    statement: "A failing control's finding names the clause, the expected evidence, the actual gap, and a concrete re-verify command through a deterministically generated remediation package."
+    level_target: 2
+    test:
+      cmd: "cd engines/python && uv run --frozen pytest -q -p no:cacheprovider tests/test_remediation.py"
+      fixture: null
+      expect: null
+    evidence_ref: "engines/python/tests/test_remediation.py"
+  - id: LIF-5
+    dimension: lifecycle
+    capability: "Retention & audit trail"
+    statement: "Every assertion, manifest, and drift record is content-addressed and retained so an auditor can reconstruct what was known at the time of a past verdict."
+    level_target: 1
+    test: null
+    evidence_ref: null
+
+  # --- 5. Operability ---
+  - id: OPE-1
+    dimension: operability
+    capability: "Offline / self-hosted"
+    statement: "A full assessment runs to completion with networking disabled, against locally vendored catalogs and dependencies, with no service call."
+    level_target: 3
+    test:
+      cmd: "uv run --project tools --frozen python -m offline_bundle --verify --no-network"
+      fixture: null
+      expect: null
+    evidence_ref: "tools/offline_bundle.py"
+  - id: OPE-2
+    dimension: operability
+    capability: "Air-gapped"
+    statement: "A hardened, self-contained bundle carrying every signed base catalog builds and verifies with no network access at all, on a machine that never touches the internet."
+    level_target: 3
+    test:
+      cmd: "python3 -c \"import json, tempfile, subprocess; from pathlib import Path; tmp = Path(tempfile.mkdtemp()); r = subprocess.run(['uv','run','--frozen','python','offline_bundle.py','--build','--out',str(tmp)], cwd='conformance', capture_output=True, text=True); assert r.returncode == 0, r.stderr; m = json.loads((tmp/'bundle-manifest.json').read_text()); assert len(m['catalogs']) >= 2, f'only {len(m[\\\"catalogs\\\"])} signed catalogs in the air-gap bundle'; print('AIRGAP CATALOGS', len(m['catalogs']))\""
+      fixture: null
+      expect: "AIRGAP CATALOGS"
+    evidence_ref: "conformance/offline_bundle.py::_discover_signed_catalogs; tools/offline_bundle.py"
+  - id: OPE-3
+    dimension: operability
+    capability: "Data residency & minimization"
+    statement: "A shareable run artifact never carries the invoking user's name, host path, or raw command line by default."
+    level_target: 3
+    test:
+      cmd: "cd engines/python && uv run --frozen pytest -q -p no:cacheprovider tests/test_manifest_privacy.py"
+      fixture: null
+      expect: null
+    evidence_ref: "engines/python/tests/test_manifest_privacy.py"
+  - id: OPE-4
+    dimension: operability
+    capability: "Scale & performance at realistic deployment sizes"
+    statement: "An assessment at a realistic enterprise event/subject scale completes within the SPEC §8.6 budget, measured and recorded, not merely asserted by an ADR's presence."
+    level_target: 1
+    test:
+      cmd: "cd conformance && uv run --frozen python perf_gate_check.py --self-test"
+      fixture: null
+      expect: null
+    evidence_ref: null
+
+  # --- 6. Assurance-tool integrity ---
+  - id: ASR-1
+    dimension: assurance
+    capability: "Tested and bug-free (real CI: lint, type, tests, coverage)"
+    statement: "Every package has real, passing lint, type-check, and test jobs in CI, with a coverage threshold that only rises."
+    level_target: 3
+    test:
+      cmd: "cd engines/python && uv run --frozen ruff check agentce/ && uv run --frozen mypy agentce --no-error-summary"
+      fixture: null
+      expect: null
+    evidence_ref: ".github/workflows/ci.yml"
+  - id: ASR-2
+    dimension: assurance
+    capability: "Secure supply chain (SBOM, VEX, signed & reproducible releases, SHA-pinned actions)"
+    statement: "Every GitHub Action is pinned by commit SHA, releases carry an SBOM and OpenVEX, and artifacts are reproducibly built and signed."
+    level_target: 3
+    test:
+      cmd: "uv run --project tools --frozen python tools/workflow_pins_check.py --self-test"
+      fixture: ".github/workflows"
+      expect: null
+    evidence_ref: "tools/workflow_pins_check.py; conformance/release.py"
+  - id: ASR-3
+    dimension: assurance
+    capability: "A maintained threat model"
+    statement: "The threat model is updated in the same phase as any change to inputs, parsing, integrity, or a new AI-consumed output, and names the attack classes it covers."
+    level_target: 2
+    test:
+      cmd: "test -f docs/threat-model.md && grep -q 'A1\\|A2\\|A3' docs/threat-model.md"
+      fixture: "docs/threat-model.md"
+      expect: null
+    evidence_ref: null
+  - id: ASR-4
+    dimension: assurance
+    capability: "No-network guarantee proven, not asserted"
+    statement: "A dedicated CI job proves an assessment runs with networking disabled, rather than merely stating offline support in prose."
+    level_target: 3
+    test:
+      cmd: "python3 tools/installed_artifacts_check.py --self-test"
+      fixture: null
+      expect: null
+    evidence_ref: ".github/workflows/ci.yml (no-network job); tools/installed_artifacts_check.py"
+  - id: ASR-5
+    dimension: assurance
+    capability: "Vulnerability disclosure & response"
+    statement: "A real, documented vulnerability disclosure channel exists, and a dependency-advisory scan actually runs and blocks the pull request on every push, not merely on request."
+    level_target: 2
+    test:
+      cmd: "grep -q 'security@agent-conformance.org\\|private vulnerability reporting' SECURITY.md && cd .github/workflows && uv run --project ../../tools --frozen python -c \"import yaml; d = yaml.safe_load(open('dependency-review.yml')); on = d.get(True, d.get('on', {})); assert 'pull_request' in on, 'not triggered on pull_request'; job = d['jobs']['review']; step = next(s for s in job['steps'] if 'dependency-review-action' in s.get('uses','')); assert step['with']['fail-on-severity'] == 'high', 'severity gate not high'; print('DEPENDENCY REVIEW WIRED')\""
+      fixture: "SECURITY.md"
+      expect: "DEPENDENCY REVIEW WIRED"
+    evidence_ref: null
+  - id: ASR-6
+    dimension: assurance
+    capability: "Support, versioning & stability policy"
+    statement: "A published versioning and support policy states what changes are breaking, how long a release is supported, and how deprecations are announced."
+    level_target: 3
+    test:
+      cmd: "python3 tools/release_state_check.py && grep -qi 'support' governance/SUPPORT.md && grep -qi 'MAJOR' governance/VERSIONING.md"
+      fixture: "governance"
+      expect: null
+    evidence_ref: "governance/VERSIONING.md; governance/SUPPORT.md; tools/release_state_check.py"
+  - id: ASR-7
+    dimension: assurance
+    capability: "Clear licensing"
+    statement: "Every source file, catalog, and vendored asset carries a resolvable SPDX license, and third-party content is attributed in NOTICE."
+    level_target: 3
+    test:
+      cmd: "uv run --project tools --frozen python tools/spdx_check.py"
+      fixture: null
+      expect: null
+    evidence_ref: "tools/spdx_check.py; NOTICE"
+
+  # --- 7. Governance ---
+  - id: GOV-1
+    dimension: governance
+    capability: "A neutral home (foundation / working group)"
+    statement: "AgentCE is governed by more than one maintainer or organization, so no single party can unilaterally change the standard."
+    level_target: 1
+    test:
+      cmd: "grep -qi 'single maintainer\\|bus factor' governance/*.md 2>/dev/null || grep -qri 'single maintainer\\|bus factor' docs/ 2>/dev/null"
+      fixture: "governance"
+      expect: null
+    evidence_ref: null
+  - id: GOV-2
+    dimension: governance
+    capability: "A conformance program & marks"
+    statement: "An implementation can be verified 'AgentCE-conformant' against a published program with a real marks/attestation regime, backed by a signed implementation report."
+    level_target: 2
+    test:
+      cmd: "test -f governance/CONFORMANCE-PROGRAM.md && cd conformance && uv run --frozen python registry_check.py --self-test"
+      fixture: "governance/CONFORMANCE-PROGRAM.md"
+      expect: null
+    evidence_ref: "governance/CONFORMANCE-PROGRAM.md; conformance/registry_check.py"
+  - id: GOV-3
+    dimension: governance
+    capability: "Extensibility (extension points, not forks — CP-6)"
+    statement: "A third party adds a catalog, adapter, or output format as a pull request against a documented extension point, never a fork of engine code."
+    level_target: 2
+    test:
+      cmd: "uv run --project tools --frozen python -m catalog_authoring_check --self-test"
+      fixture: null
+      expect: null
+    evidence_ref: "tools/catalog_authoring_check.py"
+  - id: GOV-4
+    dimension: governance
+    capability: "A contributor ecosystem (external PRs, third-party catalogs/adapters/formats as contributions)"
+    statement: "An external contributor's correctly signed-off commit is accepted by the identity rail and CI, and CONTRIBUTING.md's own commands are proven to work by a doc-test harness."
+    level_target: 2
+    test:
+      cmd: "python3 tools/dco_check.py --self-test"
+      fixture: null
+      expect: null
+    evidence_ref: "tools/dco_check.py; CONTRIBUTING.md"
