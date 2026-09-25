@@ -17,6 +17,7 @@ py-modules = [
   "governance_check",
   "integration_breadth_check",
   "nist_catalog_substantiation_check",
+  "offline_bundle",
   "placeholder_sweep",
 ]
 
