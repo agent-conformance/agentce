@@ -33,6 +33,10 @@ STALE = [
     "scan (every page, both themes, in CI) reports no violations",
     "rule reports no violations across every page and theme",
     "scan reports no violations; not yet manually verified",
+    "reports no violations for `target-size`",
+    "rule reports no violations; not yet manually verified",
+    "and related rules) reports no violations",
+    "conformant with the automated checks it runs",
 ]
 PAUSED = re.compile(r"\bpaused\b", re.IGNORECASE)
 MANUAL = re.compile(
