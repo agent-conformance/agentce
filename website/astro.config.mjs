@@ -52,6 +52,7 @@ export default defineConfig({
             { label: 'Authoring a Catalog', slug: 'docs/catalog-authoring' },
             { label: 'Runtime and Continuous Conformance', slug: 'docs/runtime-conformance' },
             { label: 'Trace-Store Connectors', slug: 'docs/trace-store-connectors' },
+            { label: 'GRC Connectors', slug: 'docs/grc-connectors' },
             { label: 'CI Integration', slug: 'docs/ci-integration' },
             { label: 'Contributing', slug: 'docs/contributing' },
           ],
