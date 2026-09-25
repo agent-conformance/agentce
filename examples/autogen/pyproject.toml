@@ -1,0 +1,33 @@
+[project]
+name = "agentce-example-autogen"
+version = "0.0.1"
+description = "Runnable autogen example (SPEC 13.4 AX-3/AX-4): really imports and runs autogen-agentchat, offline and keyless against a scripted deterministic model client, and emits the evidence through agentce-emit."
+requires-python = ">=3.12"
+dependencies = [
+  "agentce-emit",
+  "autogen-agentchat",
+  "autogen-core",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+agentce-emit = { path = "../../engines/python-emit", editable = true }
+agent-conformance = { path = "../../engines/python", editable = true }
+
+[dependency-groups]
+dev = [
+  "agent-conformance",
+  "pytest>=8,<9",
+  "mypy>=1.11,<2",
+  "ruff>=0.6,<0.13",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-p no:cacheprovider"
+
+[tool.mypy]
+python_version = "3.12"

@@ -62,6 +62,8 @@ FRAMEWORK_EXAMPLE_LOCKS = frozenset(
         "examples/openai-agents/uv.lock",
         "examples/google-adk/uv.lock",
         "examples/claude-agent-sdk/uv.lock",
+        "examples/llamaindex/uv.lock",
+        "examples/semantic-kernel/uv.lock",
     }
 )
 

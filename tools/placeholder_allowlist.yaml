@@ -502,3 +502,27 @@ allow:
     count: 2
     class: legitimate
     justification: "The llms.txt coverage guard's own check describes what it rejects: a one-line stub, or a link count that looks like a stub rather than a real generated index. Both hits are inside that check's requirements comment and its own RED error message, never a stub left in the workflow itself."
+
+  - path: examples/bedrock-agents/agent.py
+    pattern: dummy
+    count: 2
+    class: legitimate
+    justification: "boto3.client(...) requires some region/credential values to construct; the module docstring and a code comment name these as obviously-fake dummy values that are never used for a real request, since botocore.stub.Stubber's before-call short-circuit means the real HTTP/signing path is never reached."
+
+  - path: examples/bedrock-agents/agent.py
+    pattern: stub
+    count: 5
+    class: legitimate
+    justification: "botocore.stub.Stubber is AWS's own real, first-party, documented offline test double for a boto3 client (a named test double, per this file's class:legitimate examples above) -- every hit names that real class or the _EventStreamStubber subclass built on it, describing what it actually is and why it needs a small per-event validation override, never a placeholder implementation of this example itself."
+
+  - path: examples/semantic-kernel/agent.py
+    pattern: not-implemented
+    count: 1
+    class: legitimate
+    justification: "A code comment explaining that ChatCompletionClientBase's own base-class method is left unoverridden on purpose because its default already raises NotImplementedError for a code path this scripted example never exercises -- describing real framework behaviour, not an unfinished part of this example."
+
+  - path: examples/vertex-agents/agent.py
+    pattern: placeholder
+    count: 2
+    class: legitimate
+    justification: "The module docstring names the offline-credentials token and the project/location strings as obvious placeholders standing in for real values, since this example makes zero real network calls or uses any real credential/project ID."

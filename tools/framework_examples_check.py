@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 """framework_examples_check - prove the five framework examples really run their framework.
 
-Five of the six ``examples/<style>/`` agents (LangGraph, the OpenAI Agents SDK, CrewAI, Google ADK, the
-Claude Agent SDK) are meant to really import and run their named framework end to end, offline and
-keyless, against a scripted deterministic model or transport, each in its own isolated environment. This
-check proves both halves of that:
+Ten of the ``examples/<style>/`` agents (LangGraph, the OpenAI Agents SDK, CrewAI, Google ADK, the
+Claude Agent SDK, AutoGen, LlamaIndex, Semantic Kernel, Bedrock Agents, Vertex Agents) are meant to
+really import and run their named framework end to end, offline and keyless, against a scripted
+deterministic model or transport, each in its own isolated environment. This check proves both halves
+of that:
 
-1. **The example really runs.** For each of the five, ``examples/<style>/agent.py`` imports its named
+1. **The example really runs.** For each of the ten, ``examples/<style>/agent.py`` imports its named
    framework at the top level (never falling back to a "roadmap" label -- that escape hatch is for the
    truth-stage check, ``examples_check.py``, before the build existed), and running the example for real
    through its own ``run.sh`` produces a bundle the engine ingests with zero quarantines and at least the
    ``ModelCall``/``ToolCall``/``Decision``/``SessionStart``/``SessionEnd`` event types -- so a script that
    imports a framework and then does nothing with it cannot pass.
-2. **The dependency boundary holds with the frameworks actually installed.** At least one of the five
-   examples' own lockfiles resolves a package on the no-ml denylist (several of these frameworks require
-   an LLM/embedding client of their own), yet the repository-wide ``no_ml_check.py`` scan still exits 0,
-   because the exemption (``docs/adr/0016``) names exactly those five lockfiles and nothing else.
+2. **The dependency boundary holds with the frameworks actually installed.** Some of the ten examples'
+   own lockfiles resolve a package on the no-ml denylist (several of these frameworks require an
+   LLM/embedding client of their own), yet the repository-wide ``no_ml_check.py`` scan still exits 0,
+   because the exemption (``docs/adr/0016``) names exactly those lockfiles and nothing else.
 
     framework_examples_check.py                 run both checks (the invocation the CI job uses)
     framework_examples_check.py --examples-only run only the real-run/validate check
@@ -38,7 +39,12 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from no_ml_check import DENYLIST, FRAMEWORK_EXAMPLE_LOCKS, load_denylist, packages_in_uv_lock  # noqa: E402
+from no_ml_check import (
+    DENYLIST,
+    FRAMEWORK_EXAMPLE_LOCKS,
+    load_denylist,
+    packages_in_uv_lock,
+)  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -49,8 +55,31 @@ STYLES = {
     "openai-agents": "agents",
     "google-adk": "google",
     "claude-agent-sdk": "claude_agent_sdk",
+    "autogen": "autogen_agentchat",
+    "llamaindex": "llama_index",
+    "semantic-kernel": "semantic_kernel",
+    "bedrock-agents": "boto3",
+    "vertex-agents": "google",
 }
-REQUIRED_EVENT_TYPES = {"SessionStart", "ModelCall", "ToolCall", "Decision", "SessionEnd"}
+REQUIRED_EVENT_TYPES = {
+    "SessionStart",
+    "ModelCall",
+    "ToolCall",
+    "Decision",
+    "SessionEnd",
+}
+
+#: Style -> the real, framework-defined chokepoint/emission symbol item 16.3's five new examples
+#: actually hook (confirmed by reading each installed package's source during implementation, not
+#: predicted in advance -- e.g. AutoGen's currently-maintained autogen-agentchat/autogen-core family
+#: has no register_hook/register_reply API; that name belongs to the legacy pyautogen/ag2 line).
+DOC_SYMBOLS = {
+    "autogen": "ChatCompletionClient",
+    "llamaindex": "response_generator",
+    "semantic-kernel": "FUNCTION_INVOCATION",
+    "bedrock-agents": "invoke_agent",
+    "vertex-agents": "httpx_client",
+}
 
 #: The exact set docs/adr/0016 names, declared independently of no_ml_check.FRAMEWORK_EXAMPLE_LOCKS so a
 #: silent widening of that constant (to smuggle in an unrelated, e.g. engine-tree, path) is itself a
@@ -62,6 +91,8 @@ ADR_0016_EXEMPT_LOCKS = frozenset(
         "examples/openai-agents/uv.lock",
         "examples/google-adk/uv.lock",
         "examples/claude-agent-sdk/uv.lock",
+        "examples/llamaindex/uv.lock",
+        "examples/semantic-kernel/uv.lock",
     }
 )
 
@@ -118,12 +149,18 @@ def check_examples_really_run(root: Path, styles: dict[str, str]) -> list[str]:
             types = {str(e["data"]["@type"]) for e in ingested.accepted}
             missing = REQUIRED_EVENT_TYPES - types
             if missing:
-                problems.append(f"{style}: missing required event types {missing} (got {sorted(types)})")
+                problems.append(
+                    f"{style}: missing required event types {missing} (got {sorted(types)})"
+                )
     return problems
 
 
 def check_no_ml_boundary_holds(
-    root: Path, denylist_path: Path, exempt: frozenset[str], *, expected_exempt: frozenset[str]
+    root: Path,
+    denylist_path: Path,
+    exempt: frozenset[str],
+    *,
+    expected_exempt: frozenset[str],
 ) -> list[str]:
     """The repo-wide no-ml scan stays clean with real framework deps installed, the exemption is doing
     real work (at least one exempted lockfile actually resolves a denylisted package), and the
@@ -163,13 +200,54 @@ def check_no_ml_boundary_holds(
     return []
 
 
+def check_doc_symbols(root: Path, table: dict[str, str]) -> list[str]:
+    """Each style's real chokepoint symbol is documented in the module docstring (or a sibling
+    README.md) *and* used in the executable body -- not merely named in prose (SPEC 13.4 AX-3)."""
+    problems: list[str] = []
+    for style, symbol in table.items():
+        example_dir = root / "examples" / style
+        agent_py = example_dir / "agent.py"
+        if not agent_py.is_file():
+            problems.append(f"{style}: agent.py missing")
+            continue
+        source = agent_py.read_text(encoding="utf-8")
+        try:
+            tree = ast.parse(source)
+        except SyntaxError as exc:
+            problems.append(f"{style}: agent.py does not parse: {exc}")
+            continue
+        docstring = ast.get_docstring(tree) or ""
+        documented = symbol in docstring
+        if not documented:
+            readme = example_dir / "README.md"
+            documented = readme.is_file() and symbol in readme.read_text(
+                encoding="utf-8"
+            )
+        if not documented:
+            problems.append(
+                f"{style}: chokepoint symbol {symbol!r} not named in the module docstring or a README.md"
+            )
+            continue
+        # The symbol must also occur outside the docstring text -- i.e. in the executable body --
+        # so a docstring-only claim (documented but never actually used) cannot pass.
+        if source.count(symbol) <= docstring.count(symbol):
+            problems.append(
+                f"{style}: chokepoint symbol {symbol!r} is documented but never appears in the "
+                "executable body of agent.py"
+            )
+    return problems
+
+
 def check(*, examples: bool = True, no_ml: bool = True) -> int:
     problems: list[str] = []
     if examples:
         problems += check_examples_really_run(ROOT, STYLES)
     if no_ml:
         problems += check_no_ml_boundary_holds(
-            ROOT, DENYLIST, FRAMEWORK_EXAMPLE_LOCKS, expected_exempt=ADR_0016_EXEMPT_LOCKS
+            ROOT,
+            DENYLIST,
+            FRAMEWORK_EXAMPLE_LOCKS,
+            expected_exempt=ADR_0016_EXEMPT_LOCKS,
         )
     for problem in problems:
         print(f"FAIL {problem}", file=sys.stderr)
@@ -184,9 +262,7 @@ def check(*, examples: bool = True, no_ml: bool = True) -> int:
 
 # --- self-test ---------------------------------------------------------------------------------------
 
-_REAL_AGENT = (
-    '"""Runs the framework."""\nimport {module}\n\nif __name__ == "__main__":\n    pass\n'
-)
+_REAL_AGENT = '"""Runs the framework."""\nimport {module}\n\nif __name__ == "__main__":\n    pass\n'
 _UNREAL_AGENT = '"""Stub."""\nimport agentce_emit\n'
 
 
@@ -235,7 +311,9 @@ def self_test() -> int:
             expected_exempt=frozenset({"examples/langgraph/uv.lock"}),
         )
     ok = any("untested" in p for p in problems)
-    print(f"self-test exemption-untested-is-flagged: {'ok' if ok else 'FAIL ' + str(problems)}")
+    print(
+        f"self-test exemption-untested-is-flagged: {'ok' if ok else 'FAIL ' + str(problems)}"
+    )
     results.append(ok)
 
     # A real denylisted package inside the exempted lockfile, with the real (clean) repo behind it,
@@ -253,7 +331,62 @@ def self_test() -> int:
         ROOT, DENYLIST, widened, expected_exempt=ADR_0016_EXEMPT_LOCKS
     )
     ok = any("no longer matches the exact set" in p for p in problems)
-    print(f"self-test widened-exemption-is-caught: {'ok' if ok else 'FAIL ' + str(problems)}")
+    print(
+        f"self-test widened-exemption-is-caught: {'ok' if ok else 'FAIL ' + str(problems)}"
+    )
+    results.append(ok)
+
+    # check_doc_symbols: a symbol named nowhere (no docstring, no README) is flagged, by style.
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        d = root / "examples" / "autogen"
+        d.mkdir(parents=True)
+        (d / "agent.py").write_text(
+            '"""Stub, no chokepoint named."""\nimport autogen_core\n', encoding="utf-8"
+        )
+        problems = check_doc_symbols(root, {"autogen": "ChatCompletionClient"})
+    ok = any("not named in the module docstring" in p for p in problems)
+    print(
+        f"self-test doc-symbol-undocumented-fails: {'ok' if ok else 'FAIL ' + str(problems)}"
+    )
+    results.append(ok)
+
+    # A symbol named only in the docstring, never used in the body, is flagged (a stub docstring).
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        d = root / "examples" / "autogen"
+        d.mkdir(parents=True)
+        (d / "agent.py").write_text(
+            '"""Uses ChatCompletionClient, the real extension point."""\nimport autogen_core\n',
+            encoding="utf-8",
+        )
+        problems = check_doc_symbols(root, {"autogen": "ChatCompletionClient"})
+    ok = any("never appears in the executable body" in p for p in problems)
+    print(
+        f"self-test doc-symbol-unused-in-body-fails: {'ok' if ok else 'FAIL ' + str(problems)}"
+    )
+    results.append(ok)
+
+    # A symbol named in a README.md instead of the docstring, and genuinely used in the body, passes.
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        d = root / "examples" / "autogen"
+        d.mkdir(parents=True)
+        (d / "agent.py").write_text(
+            '"""No chokepoint named here."""\nfrom autogen_core.models import ChatCompletionClient\n',
+            encoding="utf-8",
+        )
+        (d / "README.md").write_text("Hooks ChatCompletionClient.", encoding="utf-8")
+        problems = check_doc_symbols(root, {"autogen": "ChatCompletionClient"})
+    ok = not problems
+    print(
+        f"self-test doc-symbol-readme-fallback-passes: {'ok' if ok else 'FAIL ' + str(problems)}"
+    )
+    results.append(ok)
+
+    # The real repo's five new examples all pass for real.
+    ok = not check_doc_symbols(ROOT, DOC_SYMBOLS)
+    print(f"self-test doc-symbol-real-repo-passes: {'ok' if ok else 'FAIL'}")
     results.append(ok)
 
     passed = all(results)
@@ -268,6 +401,16 @@ def main(argv: list[str]) -> int:
         return check(no_ml=False)
     if argv == ["--no-ml-only"]:
         return check(examples=False)
+    if argv == ["--doc-symbols-only"]:
+        problems = check_doc_symbols(ROOT, DOC_SYMBOLS)
+        for problem in problems:
+            print(f"FAIL {problem}", file=sys.stderr)
+        if problems:
+            return 1
+        print(
+            f"framework_examples_check: ok — all {len(DOC_SYMBOLS)} chokepoint symbols documented and used"
+        )
+        return 0
     if argv:
         print(__doc__)
         return 2

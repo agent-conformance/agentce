@@ -1,0 +1,32 @@
+[project]
+name = "agentce-example-vertex-agents"
+version = "0.0.1"
+description = "Runnable Vertex AI Agents example (SPEC 13.4 AX-3/AX-4): really calls the google-genai client, offline and keyless via a transport-level patch, and emits the evidence through agentce-emit."
+requires-python = ">=3.12"
+dependencies = [
+  "agentce-emit",
+  "google-genai",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+agentce-emit = { path = "../../engines/python-emit", editable = true }
+agent-conformance = { path = "../../engines/python", editable = true }
+
+[dependency-groups]
+dev = [
+  "agent-conformance",
+  "pytest>=8,<9",
+  "mypy>=1.11,<2",
+  "ruff>=0.6,<0.13",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-p no:cacheprovider"
+
+[tool.mypy]
+python_version = "3.12"

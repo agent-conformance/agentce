@@ -1,0 +1,32 @@
+[project]
+name = "agentce-example-bedrock-agents"
+version = "0.0.1"
+description = "Runnable AWS Bedrock Agents example (SPEC 13.4 AX-3/AX-4): really calls the boto3 bedrock-agent-runtime client, offline and keyless via botocore's own Stubber, and emits the evidence through agentce-emit."
+requires-python = ">=3.12"
+dependencies = [
+  "agentce-emit",
+  "boto3",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+agentce-emit = { path = "../../engines/python-emit", editable = true }
+agent-conformance = { path = "../../engines/python", editable = true }
+
+[dependency-groups]
+dev = [
+  "agent-conformance",
+  "pytest>=8,<9",
+  "mypy>=1.11,<2",
+  "ruff>=0.6,<0.13",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-p no:cacheprovider"
+
+[tool.mypy]
+python_version = "3.12"
