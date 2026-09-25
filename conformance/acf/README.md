@@ -33,8 +33,24 @@ AgentCE assesses agents — deterministic, offline, evidence-based, honest about
 - `test` present and fails -> Absent (0): a capability whose own proof does not pass today is not real
   today.
 - `test` present and passes -> `level_target`, unless `level_target` is 3 (Complete) and `evidence_ref`
-  does not resolve to a real, on-disk path, in which case the score is capped at Partial (2). A
-  Complete score always carries a resolvable evidence pointer — no exceptions.
+  does not resolve to a specific, real on-disk *file* (a bare directory or a generic landmark such as
+  `README.md` or `.` does not count), in which case the score is capped at Partial (2). A Complete
+  score always carries a resolvable evidence pointer — no exceptions.
+- The score-only-rises ratchet also requires the committed `scorecard.json` baseline to exist, be
+  well-formed, carry at least one capability, and match a fresh run byte-for-byte; a missing, empty,
+  malformed, or stale baseline is refused the same way a real score regression is, never treated as a
+  clean slate.
+
+## Prerequisites
+
+`acf_matrix_check.py` and `acf_score.py` run every matrix entry's real `test.cmd`, including one
+(`RIG-2`) that scores the shared numeric edge vectors through all three engines. Before running either
+script outside CI, sync every uv package these commands touch (`engines/python`, `conformance`,
+`tools`) and set up the TypeScript and Java toolchains: `corepack enable && pnpm install
+--frozen-lockfile` in `engines/typescript`, and a JDK 21 on `PATH` (the Java engine builds itself on
+first use via `./gradlew installDist`). Without them, `RIG-2` fails for lack of a toolchain, which
+`--check-fixtures` reports as `matrix.golden_mismatch` — indistinguishable, by that message alone, from
+a genuine capability regression.
 
 ## Running it
 

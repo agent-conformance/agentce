@@ -346,10 +346,15 @@ entries:
     capability: "A neutral home (foundation / working group)"
     statement: "AgentCE is governed by more than one maintainer or organization, so no single party can unilaterally change the standard."
     level_target: 1
-    test:
-      cmd: "grep -qi 'single maintainer\\|bus factor' governance/*.md 2>/dev/null || grep -qri 'single maintainer\\|bus factor' docs/ 2>/dev/null"
-      fixture: "governance"
-      expect: null
+    # A grep for governance-risk disclosure text tests the opposite of this capability's own
+    # statement, and cannot verify multi-party governance either way -- an org-structure fact, not
+    # something a repository-local command can prove positively or negatively. Worse, the prior test
+    # checked for the phrase admitting a single maintainer: gaining a second maintainer and removing
+    # that phrase would flip the test from passing to failing, dropping a real governance IMPROVEMENT
+    # to Absent (0) and firing the score-only-rises ratchet on it. `test: null` scores this the anti-
+    # hype way an unverifiable org-structure claim should: capped at Asserted (1) always, which is
+    # also today's real score, so this changes nothing about the number, only removes the trap.
+    test: null
     evidence_ref: null
   - id: GOV-2
     dimension: governance

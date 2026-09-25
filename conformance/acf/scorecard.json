@@ -88,7 +88,7 @@
       "capability": "Determinism (order/locale/clock-independent)",
       "capped_reason": null,
       "dimension": "rigor",
-      "evidence_ref": "conformance/numerics.py; engines/python/tests/test_late_event.py",
+      "evidence_ref": "conformance/numerics.py; conformance/tests/test_numerics.py",
       "id": "RIG-2",
       "level_label": "Complete",
       "level_target": 3,
@@ -453,10 +453,7 @@
       "id": "GOV-1",
       "level_label": "Asserted",
       "level_target": 1,
-      "outcome": {
-        "exit": 0,
-        "expect_ok": null
-      },
+      "outcome": null,
       "score": 1
     },
     {
