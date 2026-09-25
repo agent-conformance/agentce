@@ -79,10 +79,10 @@ export class StateDir {
       throw new InputError(
         "input.state_version_incompatible",
         `the state directory at ${path} is state_version ${version}, but this engine writes state_version ${STATE_VERSION}.`,
-        `there is no migration command: move or delete the state directory and re-run ` +
-          `with --state pointing at a fresh, empty directory (this discards the prior ` +
-          `bundle/outcome history recorded there, so late-arriving evidence and drift are ` +
-          `tracked only from that point forward).`,
+        "there is no migration command: move or delete the state directory and re-run " +
+          "with --state pointing at a fresh, empty directory (this discards the prior " +
+          "bundle/outcome history recorded there, so late-arriving evidence and drift are " +
+          "tracked only from that point forward).",
       );
     }
     state.version = version;
