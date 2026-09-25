@@ -23,17 +23,45 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 import release
 from agentce import signing
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CATALOG_DIR = REPO_ROOT / "spec" / "catalogs" / "base" / "eu-ai-act"
+BASE_CATALOGS_DIR = REPO_ROOT / "spec" / "catalogs" / "base"
+CATALOG_DIR = BASE_CATALOGS_DIR / "eu-ai-act"
 PROJECT_DIR = REPO_ROOT / "corpus" / "quickstart"
 TRUST_ROOT = signing.vendored_trust_path()
 CATALOG_ID = "eu-ai-act@2026.09"
 
 #: A dead proxy: any accidental network call fails, proving the verify step runs offline.
 _DEAD_PROXY = "http://127.0.0.1:9"
+
+
+def _discover_signed_catalogs() -> list[Path]:
+    """Every base catalog under ``spec/catalogs/base/*`` carrying a detached signature.
+
+    Auto-discovery by the presence of ``catalog.sig.json`` (rather than a hardcoded single catalog)
+    is what makes a new signed base catalog automatically included in the bundle (P16.7).
+    """
+    if not BASE_CATALOGS_DIR.is_dir():
+        return []
+    return sorted(
+        (
+            path
+            for path in BASE_CATALOGS_DIR.iterdir()
+            if path.is_dir() and (path / signing.CATALOG_SIGNATURE_NAME).is_file()
+        ),
+        key=lambda path: path.name,
+    )
+
+
+def _catalog_version(directory: Path) -> str:
+    meta = (
+        yaml.safe_load((directory / "catalog.yaml").read_text(encoding="utf-8")) or {}
+    )
+    return str(meta.get("version", ""))
 
 
 def _agentce() -> str:
@@ -55,8 +83,23 @@ def build_bundle(out_dir: Path) -> dict[str, Any]:
         dry_run=True, profiles=list(release.ALL_PROFILES), offline=True, out_dir=out_dir
     )
 
-    # The signed base catalog and the vendored trust root, so verification is fully offline.
-    shutil.copytree(CATALOG_DIR, out_dir / "catalogs" / "eu-ai-act")
+    # Every signed base catalog, auto-discovered, and the vendored trust root, so verification of
+    # each is fully offline (P16.7: item 16.1's NIST AI RMF catalog is included automatically).
+    catalogs_out = out_dir / "catalogs"
+    catalogs_out.mkdir()
+    catalog_entries: list[dict[str, str]] = []
+    for catalog_dir in _discover_signed_catalogs():
+        dest = catalogs_out / catalog_dir.name
+        shutil.copytree(catalog_dir, dest)
+        catalog_entries.append(
+            {
+                "id": catalog_dir.name,
+                "version": _catalog_version(dest),
+                "digest": signing.digest_tree(
+                    dest, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME})
+                ),
+            }
+        )
     (out_dir / "trust").mkdir()
     shutil.copy2(TRUST_ROOT, out_dir / "trust" / "dev-root.json")
 
@@ -73,13 +116,21 @@ def build_bundle(out_dir: Path) -> dict[str, Any]:
     }
     _write_json(out_dir / "DEPENDENCIES.json", dependencies)
 
-    (out_dir / "VERIFY.md").write_text(_verify_instructions(), encoding="utf-8")
+    catalog_ids = [entry["id"] for entry in catalog_entries]
+    (out_dir / "VERIFY.md").write_text(
+        _verify_instructions(catalog_ids), encoding="utf-8"
+    )
 
     components = _component_digests(out_dir)
+    eu_ai_act = next(
+        (entry for entry in catalog_entries if entry["id"] == "eu-ai-act"), None
+    )
     manifest = {
         "agentce_offline_bundle_version": 1,
         "engine": {"impl": "agentce", "spec_version": _spec_version()},
-        "catalog": {
+        # Kept byte-identical for back-compat: the single catalog every earlier bundle carried.
+        "catalog": eu_ai_act
+        or {
             "id": "eu-ai-act",
             "version": "2026.09",
             "digest": signing.digest_tree(
@@ -87,10 +138,12 @@ def build_bundle(out_dir: Path) -> dict[str, Any]:
                 exclude=frozenset({signing.CATALOG_SIGNATURE_NAME}),
             ),
         },
+        # New: every discovered, signed base catalog the bundle actually carries.
+        "catalogs": catalog_entries,
         "components": components,
         "verify": [
             "agentce verify --release .",
-            "agentce verify --catalog catalogs/eu-ai-act",
+            *[f"agentce verify --catalog catalogs/{cid}" for cid in catalog_ids],
             "agentce assess --bundle project/evidence --catalog-dir catalogs/eu-ai-act ...",
         ],
     }
@@ -131,7 +184,14 @@ def _run(
 
 
 def verify_bundle(out_dir: Path, *, no_network: bool) -> dict[str, Any]:
-    """Verify the bundle offline; return the per-step results."""
+    """Verify the bundle offline; return the per-step results.
+
+    Reads ``bundle-manifest.json``'s ``"catalogs"`` list first, then verifies every catalog it
+    names: each discovered-at-build-time catalog must still be present at verify time, and its
+    signature must still verify against the vendored trust root offline. Problems are aggregated
+    per catalog, naming the failing catalog id, rather than a single undifferentiated failure — a
+    partial or corrupted multi-catalog bundle cannot pass by accident (punch list #10).
+    """
     agentce = _agentce()
     problems: list[str] = []
 
@@ -145,15 +205,32 @@ def verify_bundle(out_dir: Path, *, no_network: bool) -> dict[str, Any]:
             f"release signatures did not verify: {release_check.stderr.strip()}"
         )
 
-    catalog_check = _run(
-        [agentce, "verify", "--catalog", "catalogs/eu-ai-act", "--json"],
-        no_network=no_network,
-        cwd=out_dir,
-    )
-    if catalog_check.returncode != 0:
-        problems.append(
-            f"catalog signature did not verify: {catalog_check.stderr.strip()}"
+    manifest_path = out_dir / "bundle-manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        problems.append(f"bundle-manifest.json is missing or unreadable: {exc}")
+        manifest = {}
+
+    for entry in manifest.get("catalogs") or []:
+        catalog_id = str(entry.get("id", "<unknown>"))
+        catalog_dir = out_dir / "catalogs" / catalog_id
+        if not catalog_dir.is_dir():
+            problems.append(
+                f"catalog {catalog_id}: discovered at build time but missing from the "
+                f"bundle at verify time ({catalog_dir})"
+            )
+            continue
+        catalog_check = _run(
+            [agentce, "verify", "--catalog", f"catalogs/{catalog_id}", "--json"],
+            no_network=no_network,
+            cwd=out_dir,
         )
+        if catalog_check.returncode != 0:
+            problems.append(
+                f"catalog {catalog_id}: signature did not verify: "
+                f"{catalog_check.stderr.strip()}"
+            )
 
     report_dir = out_dir / "_verify-report"
     assess = _run(
@@ -192,14 +269,21 @@ def verify_bundle(out_dir: Path, *, no_network: bool) -> dict[str, Any]:
     }
 
 
-def _verify_instructions() -> str:
+def _verify_instructions(catalog_ids: list[str]) -> str:
+    catalog_lines = "\n".join(
+        f"agentce verify --catalog catalogs/{catalog_id}" for catalog_id in catalog_ids
+    )
     return (
         "# Offline verification\n\n"
-        "This bundle installs and runs with networking disabled. With the engine's pinned\n"
-        "dependencies installed from a local index (see `DEPENDENCIES.json` and `sbom.cdx.json`):\n\n"
+        "This bundle verifies its release, catalog, and corpus signatures and runs the Engine\n"
+        "Conformance Suite with networking disabled, using the already-installed engine. It does\n"
+        "not perform a fresh dependency install into a clean environment from the bundled pins —\n"
+        "see `DEPENDENCIES.json` and `sbom.cdx.json` for the pinned dependency set a fresh install\n"
+        "would use, and the container/quickstart path for that install.\n\n"
+        "Bundled catalogs: " + ", ".join(catalog_ids) + ".\n\n"
         "```\n"
         "agentce verify --release .\n"
-        "agentce verify --catalog catalogs/eu-ai-act\n"
+        f"{catalog_lines}\n"
         "agentce assess --bundle project/evidence --profile project/applicability.yaml \\\n"
         "  --domain project/domain.linkml.yaml --catalog eu-ai-act@2026.09 \\\n"
         "  --catalog-dir catalogs/eu-ai-act --out ./report\n"
