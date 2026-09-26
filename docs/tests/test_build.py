@@ -43,9 +43,10 @@ def test_a_page_exists_for_every_evidence_class_and_report_schema() -> None:
 def test_a_page_exists_for_every_control_across_every_catalog() -> None:
     pages = {p.relative_to(build.DOCS).as_posix() for p in build.generate()}
     rows = build._control_rows()
-    assert (
-        len(rows) == 60
-    )  # 49 base + 8 conduct + 1 each of employment/finance/insurance
+    # 49 EU AI Act base + 6 NIST AI RMF base + 8 conduct + 1 each of employment/finance/insurance
+    assert len(rows) == 66
+    # The NIST AI RMF catalog reuses six EU AI Act control ids (SPEC §7.3), so 60 distinct controls.
+    assert len({control.id for *_, control in rows}) == 60
     for _key, _title, _kind, control in rows:
         assert f"reference/controls/{control.id.lower()}.md" in pages
     assert "reference/controls/index.md" in pages
