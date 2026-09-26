@@ -1,0 +1,27 @@
+---
+// The landing page lives at "/" outside Starlight's route tree and is English-only, so a localized
+// docs page must not link its title to a locale root ("/es") that has no page.
+const { siteTitle } = Astro.locals.starlightRoute;
+---
+
+<a href="/" class="site-title sl-flex">
+  <span translate="no">{siteTitle}</span>
+</a>
+
+<style>
+  @layer starlight.core {
+    .site-title {
+      align-items: center;
+      gap: var(--sl-nav-gap);
+      font-size: var(--sl-text-h4);
+      font-weight: 600;
+      color: var(--sl-color-text-accent);
+      text-decoration: none;
+      white-space: nowrap;
+      min-width: 0;
+    }
+    span {
+      overflow: hidden;
+    }
+  }
+</style>
