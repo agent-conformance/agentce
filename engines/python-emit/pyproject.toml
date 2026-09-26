@@ -36,7 +36,7 @@ agentce-adapter-otel-genai = { path = "../../adapters/otel-genai", editable = tr
 dev = [
   "agent-conformance",
   "agentce-adapter-otel-genai",
-  "pytest>=8,<9",
+  "pytest>=9.0.3,<10",
   "mypy>=1.11,<2",
   "ruff>=0.6,<0.13",
 ]
