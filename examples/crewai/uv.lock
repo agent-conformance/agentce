@@ -41,7 +41,7 @@ dev = [
     { name = "hypothesis", specifier = ">=6,<7" },
     { name = "mypy", specifier = ">=1.11,<2" },
     { name = "pyshacl", specifier = ">=0.26,<0.31" },
-    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest", specifier = ">=9.0.3,<10" },
     { name = "pytest-cov", specifier = ">=5,<7" },
     { name = "ruff", specifier = ">=0.6,<0.13" },
     { name = "types-jsonschema", specifier = ">=4.21" },
@@ -63,7 +63,7 @@ dev = [
     { name = "agent-conformance", editable = "../../engines/python" },
     { name = "agentce-adapter-otel-genai", editable = "../../adapters/otel-genai" },
     { name = "mypy", specifier = ">=1.11,<2" },
-    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest", specifier = ">=9.0.3,<10" },
     { name = "ruff", specifier = ">=0.6,<0.13" },
 ]
 
