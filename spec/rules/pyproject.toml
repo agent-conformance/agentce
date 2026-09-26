@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8,<9", "agent-conformance"]
+dev = ["pytest>=9.0.3,<10", "agent-conformance"]
 
 [tool.uv]
 package = false
