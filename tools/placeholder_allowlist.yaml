@@ -117,6 +117,12 @@ allow:
     class: legitimate
     justification: "The Java engine's documented scope is conformance/assess/report/validate/quickstart on the existing ECS path; every other verb returns a stable input_error envelope rather than a guess, which is the honest §8.5 boundary, not an open gap. No engine-parity work commits Java to the remaining Python-only verbs (verify, collect, ingest, catalog, diff, sign, readiness, doctor, init, config)."
 
+  - path: engines/java/src/test/java/org/agentce/ReportTest.java
+    pattern: placeholder
+    count: 6
+    class: legitimate
+    justification: "Test names and comments cover sanitizeForMarkdown/sanitizeForHtml's placeholder parameter and the whitespace-only-input-renders-a-placeholder property, mirroring the Python reference's test_sanitize.py; not an unfinished stub."
+
   - path: engines/java/src/test/resources/testdata/ingest-bundle/events/log.jsonl
     pattern: zero-digest
     count: 2
@@ -200,6 +206,12 @@ allow:
     count: 1
     class: legitimate
     justification: "report.md/report.html are derived, locale-varying renderings, not part of the byte-identical canonical set (assertions.json, oscal-ar.json, results.sarif, packs/*/pack.json); the catalog-joined, risk-ranked human-report enrichment is scoped to the Python reference engine only. This test documents that known, deliberate boundary rather than tracking pending work."
+
+  - path: engines/typescript/src/report.test.ts
+    pattern: placeholder
+    count: 5
+    class: legitimate
+    justification: "Test names and comments cover sanitizeForMarkdown/sanitizeForHtml's placeholder parameter and the whitespace-only-input-renders-a-placeholder property, mirroring the Python reference's test_sanitize.py; not an unfinished stub."
 
   - path: engines/typescript/testdata/ingest-bundle/events/log.jsonl
     pattern: zero-digest
