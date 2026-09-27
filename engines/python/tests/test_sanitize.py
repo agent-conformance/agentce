@@ -558,36 +558,12 @@ _BLOCK_MARKER_PAYLOADS = [
 ]
 
 
-def _blind_spots_with(event: str, subject: str) -> dict[str, object]:
-    return {
-        "blind_spots": [
-            {
-                "event": event,
-                "class": "self_report",
-                "ladder_rung": 1,
-                "owner_key": "agent_team",
-                "step_kind": "code_change",
-                "supplying_adapters": [],
-                "checks_unlocked": 1,
-                "unlocked_checks": [],
-                "needed_by": 0,
-                "needed_by_checks": [],
-            }
-        ],
-        "no_population": [
-            {
-                "subject": subject,
-                "catalog": "cat",
-                "control": "C-1",
-                "control_version": "1",
-            }
-        ],
-    }
-
-
 def test_blind_spot_and_no_population_labels_cannot_open_a_markdown_block() -> None:
     for payload in _BLOCK_MARKER_PAYLOADS:
-        md = render_report_md([], {}, blind_spots=_blind_spots_with(payload, payload))
+        # Reuse _report_fields (already builds this exact blind_spots/no_population shape for the
+        # render-level property above) rather than a second, near-duplicate fixture builder.
+        _activity, blind_spots, _assertions = _report_fields(payload)
+        md = render_report_md([], {}, blind_spots=blind_spots)
         label_lines = [
             line
             for line in md.splitlines()
