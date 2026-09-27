@@ -94,7 +94,9 @@ class ReportTest {
                 outDir, assertions, "sha256:abc", List.of("base/eu-ai-act@1"), "ecs", List.of("conformance", "p1"),
                 List.of(), "en", List.of());
 
-        for (String name : List.of("assertions.json", "report.md", "report.html", "oscal-ar.json", "results.sarif", "manifest.json")) {
+        for (String name : List.of(
+                "assertions.json", "activity.json", "report.md", "report.html", "oscal-ar.json", "results.sarif",
+                "manifest.json")) {
             assertTrue(Files.exists(outDir.resolve(name)), name + " should exist");
         }
         assertEquals("agentce-java", manifest.get("engine").get("impl").textValue());

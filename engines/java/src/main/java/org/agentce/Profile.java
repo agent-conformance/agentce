@@ -45,6 +45,8 @@ public final class Profile {
         public List<String> declaredDecisionTypes = new ArrayList<>();
         public Map<String, String> declaredOversight = new LinkedHashMap<>();
         public List<String> declaredComponents = new ArrayList<>();
+        public List<String> declaredTools = new ArrayList<>();
+        public List<String> declaredModels = new ArrayList<>();
     }
 
     /** The independent coverage-denominator source ids of a subject. */
@@ -90,6 +92,12 @@ public final class Profile {
             if (c.isObject() && c.has("name")) {
                 subject.declaredComponents.add(c.get("name").asText());
             }
+        }
+        for (JsonNode t : arr(raw, "declared_tools")) {
+            subject.declaredTools.add(t.asText());
+        }
+        for (JsonNode m : arr(raw, "declared_models")) {
+            subject.declaredModels.add(m.asText());
         }
         for (JsonNode entry : arr(raw, "evidence_sources")) {
             if (entry.isObject() && entry.has("source")) {

@@ -169,6 +169,125 @@ public final class Report {
                 .replace("'", "&#x27;");
     }
 
+    /** {@code "label 3, label 2"} for every nonzero count, in the node's (fixed) field order; {@code
+     * "0"} when every count is zero -- shared by the Markdown, HTML, and terminal renderings. {@code
+     * labelOf} translates a key to its catalogue label; a key with no translation (the effect
+     * classes, which are stable identifiers, not prose) stands for itself. */
+    private static String activityTallyText(ObjectNode counts, Map<String, String> labelOf) {
+        List<String> parts = new ArrayList<>();
+        var it = counts.fields();
+        while (it.hasNext()) {
+            Map.Entry<String, JsonNode> e = it.next();
+            int n = e.getValue().asInt();
+            if (n != 0) {
+                String label = labelOf != null ? labelOf.getOrDefault(e.getKey(), e.getKey()) : e.getKey();
+                parts.add(label + " " + n);
+            }
+        }
+        return parts.isEmpty() ? "0" : String.join(", ", parts);
+    }
+
+    private static List<String> activityUndeclaredLines(JsonNode undeclared, Map<String, String> cat) {
+        List<String> tools = new ArrayList<>();
+        undeclared.get("tools").forEach(n -> tools.add(n.asText()));
+        List<String> models = new ArrayList<>();
+        undeclared.get("models").forEach(n -> models.add(n.asText()));
+        if (tools.isEmpty() && models.isEmpty()) {
+            return List.of(cat.get("report.activity_none_undeclared"));
+        }
+        List<String> lines = new ArrayList<>();
+        if (!tools.isEmpty()) {
+            lines.add(cat.get("report.activity_undeclared_tools_label") + ": " + String.join(", ", tools));
+        }
+        if (!models.isEmpty()) {
+            lines.add(cat.get("report.activity_undeclared_models_label") + ": " + String.join(", ", models));
+        }
+        return lines;
+    }
+
+    /** {@code (label, value)} for every counted-facts row -- the one place the row set and order is
+     * decided, shared by the Markdown, HTML, and terminal renderings. */
+    private static List<Map.Entry<String, String>> activityRows(ObjectNode activity, Map<String, String> cat) {
+        Map<String, String> recorderLabels = new LinkedHashMap<>();
+        for (String k : Activity.RECORDER_CLASSES) recorderLabels.put(k, cat.get("report.activity_recorder_" + k));
+        Map<String, String> deniedLabels = new LinkedHashMap<>();
+        for (String k : Activity.DENIED_KINDS) deniedLabels.put(k, cat.get("report.activity_denied_" + k));
+
+        List<String> agentNames = new ArrayList<>();
+        activity.get("agents").forEach(n -> agentNames.add(n.asText()));
+        List<String> modelNames = new ArrayList<>();
+        activity.get("models").forEach(n -> modelNames.add(n.get("name").asText()));
+        List<String> toolNames = new ArrayList<>();
+        activity.get("tools").forEach(n -> toolNames.add(n.get("name").asText()));
+
+        List<Map.Entry<String, String>> rows = new ArrayList<>();
+        rows.add(Map.entry(
+                cat.get("report.activity_agents_label"),
+                agentNames.isEmpty() ? cat.get("report.activity_none_agents") : String.join(", ", agentNames)));
+        rows.add(Map.entry(
+                cat.get("report.activity_models_label"), modelNames.isEmpty() ? "0" : String.join(", ", modelNames)));
+        rows.add(Map.entry(
+                cat.get("report.activity_tools_label"), toolNames.isEmpty() ? "0" : String.join(", ", toolNames)));
+        rows.add(Map.entry(
+                cat.get("report.activity_actions_label"),
+                activityTallyText((ObjectNode) activity.get("actions_by_effect_class"), null)));
+        rows.add(Map.entry(
+                cat.get("report.activity_approvals_label"),
+                activityTallyText((ObjectNode) activity.get("approvals_by_recorder"), recorderLabels)));
+        rows.add(Map.entry(
+                cat.get("report.activity_denied_label"),
+                activityTallyText((ObjectNode) activity.get("denied_or_blocked"), deniedLabels)));
+        return rows;
+    }
+
+    /** The lines that lead the report body (before the verdict, SPEC's evidence-first framing): what
+     * the records show your agents did, regardless of how they measure up. */
+    private static List<String> activityMd(ObjectNode activity, Map<String, String> cat) {
+        List<String> lines = new ArrayList<>();
+        lines.add("## " + cat.get("report.activity_heading"));
+        lines.add("");
+        for (Map.Entry<String, String> row : activityRows(activity, cat)) {
+            lines.add("- " + row.getKey() + ": " + row.getValue());
+        }
+        lines.add("");
+        lines.add("### " + cat.get("report.activity_undeclared_heading"));
+        lines.add("");
+        for (String line : activityUndeclaredLines(activity.get("undeclared"), cat)) {
+            lines.add("- " + line);
+        }
+        lines.add("");
+        return lines;
+    }
+
+    private static String activityHtml(ObjectNode activity, Map<String, String> cat) {
+        StringBuilder items = new StringBuilder();
+        for (Map.Entry<String, String> row : activityRows(activity, cat)) {
+            items.append("<li>").append(esc(row.getKey())).append(": ").append(esc(row.getValue())).append("</li>");
+        }
+        StringBuilder undeclared = new StringBuilder();
+        for (String line : activityUndeclaredLines(activity.get("undeclared"), cat)) {
+            undeclared.append("<p>").append(esc(line)).append("</p>");
+        }
+        return "<section aria-labelledby=\"activity\"><h2 id=\"activity\">" + esc(cat.get("report.activity_heading"))
+                + "</h2><ul>" + items + "</ul>"
+                + "<h3>" + esc(cat.get("report.activity_undeclared_heading")) + "</h3>" + undeclared
+                + "</section>";
+    }
+
+    /** The lines a command prints for {@code activity}: agents, tools, models, and anything not yet
+     * declared -- the same node {@link #activityMd}/{@link #activityHtml} render. */
+    public static List<String> activityCliLines(ObjectNode activity, Map<String, String> cat) {
+        List<String> lines = new ArrayList<>();
+        for (Map.Entry<String, String> row : activityRows(activity, cat)) {
+            lines.add(row.getKey() + ": " + row.getValue());
+        }
+        lines.add(cat.get("report.activity_undeclared_heading") + ":");
+        for (String line : activityUndeclaredLines(activity.get("undeclared"), cat)) {
+            lines.add("  " + line);
+        }
+        return lines;
+    }
+
     private static List<Assertions.Assertion> sortedBySubjectControl(List<Assertions.Assertion> assertions) {
         List<Assertions.Assertion> sorted = new ArrayList<>(assertions);
         sorted.sort((a, b) -> {
@@ -179,10 +298,20 @@ public final class Report {
     }
 
     public static String renderReportMd(List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language) {
+        return renderReportMd(assertions, counts, language, null);
+    }
+
+    public static String renderReportMd(
+            List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language, ObjectNode activity) {
         Map<String, String> cat = Messages.catalogue(language);
         List<String> lines = new ArrayList<>();
         lines.add("# " + cat.get("report.title"));
         lines.add("");
+        // The records lead the report (SPEC's evidence-first framing, 18.4): what happened, before
+        // how it measures up.
+        if (activity != null) {
+            lines.addAll(activityMd(activity, cat));
+        }
         Verdict.Summary verdict = Verdict.summarize(assertions);
         lines.add("## " + cat.get("report.verdict_heading"));
         lines.add("");
@@ -250,6 +379,11 @@ public final class Report {
     }
 
     public static String renderReportHtml(List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language) {
+        return renderReportHtml(assertions, counts, language, null);
+    }
+
+    public static String renderReportHtml(
+            List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language, ObjectNode activity) {
         Map<String, String> cat = Messages.catalogue(language);
         String title = esc(cat.get("report.title"));
         StringBuilder summary = new StringBuilder();
@@ -278,6 +412,7 @@ public final class Report {
                 + "content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\">"
                 + "<title>" + title + "</title><style>" + HTML_STYLE + "</style></head><body>"
                 + "<main><h1>" + title + "</h1>"
+                + (activity != null ? activityHtml(activity, cat) : "")
                 + verdictHtml(Verdict.summarize(assertions), cat)
                 + "<section aria-labelledby=\"summary\"><h2 id=\"summary\">"
                 + esc(cat.get("report.summary_heading")) + "</h2><ul>" + summary + "</ul></section>"
@@ -532,20 +667,40 @@ public final class Report {
             Path outDir, List<Assertions.Assertion> assertions, String bundleDigest, List<String> catalogs,
             String operator, List<String> invocation, List<String> supersedes, String reportLanguage,
             List<Catalog> catalogObjects) {
+        return writeReport(
+                outDir, assertions, bundleDigest, catalogs, operator, invocation, supersedes, reportLanguage,
+                catalogObjects, null);
+    }
+
+    /** {@code activity} is {@link Activity#summarizeActivity}'s node over the run's accepted events
+     * and resolved profile (18.4), feeding {@code activity.json} and the "what your agents did"
+     * report section; computed by the caller, once, since it is also needed for the terminal summary
+     * and the {@code --json} envelope. {@code null} gets the honest answer for a profile that
+     * declares nothing. */
+    public static ObjectNode writeReport(
+            Path outDir, List<Assertions.Assertion> assertions, String bundleDigest, List<String> catalogs,
+            String operator, List<String> invocation, List<String> supersedes, String reportLanguage,
+            List<Catalog> catalogObjects, ObjectNode activity) {
         Assertions.checkDc5(assertions);
         try {
             Files.createDirectories(outDir);
             Map<String, String> outputs = new LinkedHashMap<>();
+            ObjectNode activityNode = activity != null ? activity : Activity.summarizeActivity(List.of(), new Profile());
 
             ArrayNode assertionsJson = Json.nodes().arrayNode();
             for (Assertions.Assertion a : assertions) {
                 assertionsJson.add(a.toJson());
             }
             outputs.put("assertions.json", writeJson(outDir, "assertions.json", assertionsJson));
+            outputs.put("activity.json", writeJson(outDir, "activity.json", activityNode));
 
             Map<String, Integer> counts = Assertions.aggregate(assertions);
-            outputs.put("report.md", writeText(outDir, "report.md", renderReportMd(assertions, counts, reportLanguage)));
-            outputs.put("report.html", writeText(outDir, "report.html", renderReportHtml(assertions, counts, reportLanguage)));
+            outputs.put(
+                    "report.md",
+                    writeText(outDir, "report.md", renderReportMd(assertions, counts, reportLanguage, activityNode)));
+            outputs.put(
+                    "report.html",
+                    writeText(outDir, "report.html", renderReportHtml(assertions, counts, reportLanguage, activityNode)));
             outputs.put("oscal-ar.json", writeJson(outDir, "oscal-ar.json", renderOscal(assertions)));
             outputs.put("results.sarif", writeJson(outDir, "results.sarif", renderSarif(assertions, catalogObjects)));
 

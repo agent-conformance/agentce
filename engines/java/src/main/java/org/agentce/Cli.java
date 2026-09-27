@@ -493,10 +493,11 @@ public final class Cli {
 
         String operatorEnv = System.getenv("AGENTCE_OPERATOR");
         List<String> invocation = List.of(options.invocationCommand(), scrubPath(bundleDir), scrubPath(profilePath));
+        ObjectNode activity = Activity.summarizeActivity(ingested.accepted, profileObj);
         Report.writeReport(
                 out, evaluated, bundle.digest, resolved.labels(),
                 operatorEnv != null ? operatorEnv : "unknown",
-                invocation, supersedes, Messages.DEFAULT_LANGUAGE, resolved.catalogs());
+                invocation, supersedes, Messages.DEFAULT_LANGUAGE, resolved.catalogs(), activity);
         if (state != null) {
             state.record(bundle.digest, out.resolve("manifest.json"), newWindowEnd);
         }
@@ -535,6 +536,7 @@ public final class Cli {
             gap.controls().forEach(controlsArr::add);
             gapNode.put("more", gap.more());
         }
+        result.data.set("activity", activity);
         if (options.state() != null) {
             ArrayNode supersedesArr = result.data.putArray("supersedes");
             supersedes.forEach(supersedesArr::add);
@@ -544,6 +546,9 @@ public final class Cli {
         }
         if (evaluatedNothing(evaluated)) {
             throw nothingEvaluated(profileObj, ingested.accepted, evaluated.size());
+        }
+        for (String line : Report.activityCliLines(activity, Messages.catalogue(Messages.DEFAULT_LANGUAGE))) {
+            result.note(line);
         }
         result.note("verdict: " + summary.verdict());
         result.note("assessed " + evaluated.size() + " (control, subject) pairs; " + nonConformant + " non-conformant");

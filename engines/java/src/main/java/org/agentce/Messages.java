@@ -51,6 +51,25 @@ public final class Messages {
         m.put("outcome.not_applicable", "not applicable");
         m.put("outcome.not_assessed", "not assessed");
         m.put("outcome.insufficient_evidence", "insufficient evidence");
+        m.put("report.activity_heading", "What your agents did");
+        m.put("report.activity_agents_label", "Agents");
+        m.put("report.activity_models_label", "Models");
+        m.put("report.activity_tools_label", "Tools");
+        m.put("report.activity_actions_label", "Actions by effect class");
+        m.put("report.activity_approvals_label", "Approvals recorded by");
+        m.put("report.activity_denied_label", "Denied or blocked");
+        m.put("report.activity_none_agents", "no agent identity found in the records");
+        m.put("report.activity_none_undeclared", "every tool and model your agents used is declared");
+        m.put("report.activity_undeclared_heading", "Not yet declared in your profile");
+        m.put("report.activity_undeclared_tools_label", "Tools");
+        m.put("report.activity_undeclared_models_label", "Models");
+        m.put("report.activity_recorder_enforcement_point", "a system that could have stopped it");
+        m.put("report.activity_recorder_independent_system", "a system the agent cannot edit");
+        m.put("report.activity_recorder_self_report", "the agent's own account");
+        m.put("report.activity_denied_approval_rejected", "a human rejected it");
+        m.put("report.activity_denied_authz_denied", "blocked by an authorization check");
+        m.put("report.activity_denied_policy_denied", "blocked by policy");
+        m.put("report.activity_denied_refused", "the agent refused");
         return m;
     }
 
