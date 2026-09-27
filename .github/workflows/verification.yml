@@ -27,11 +27,13 @@ jobs:
           done
       - name: Lint and type-check the runner
         run: |
-          uv run --project tools --frozen ruff check verification/run verification/selftest.py
-          uv run --project tools --frozen ruff format --check verification/run verification/selftest.py
-          uv run --project tools --frozen mypy --strict verification/run verification/selftest.py
+          uv run --project tools --frozen ruff check verification/run verification/selftest.py verification/probe.py
+          uv run --project tools --frozen ruff format --check verification/run verification/selftest.py verification/probe.py
+          uv run --project tools --frozen mypy --strict verification/run verification/selftest.py verification/probe.py
       - name: The registry check rejects bad gates
         run: ./verification/run --lint-registry --demo-reject
+      - name: The runner reports fail, skipped and pass honestly on registries the probe writes
+        run: python3 verification/probe.py
       - name: Quick tier
         run: ./verification/run --quick
       - name: Every gate turns RED on its seeded fault and GREEN after restore
