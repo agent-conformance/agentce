@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import locale
+import os
+import random
 from typing import Any
 
 from agentce.activity import summarize_activity
@@ -156,3 +159,65 @@ def test_non_dict_data_and_unrelated_event_types_are_ignored() -> None:
     assert activity["agents"] == [SUBJECT]
     assert activity["tools"] == []
     assert activity["models"] == []
+
+
+def _mixed_events() -> list[dict[str, Any]]:
+    return [
+        _event(
+            "ModelCall",
+            model={"provider": "openai", "name": "gpt-x", "version_or_digest": "1"},
+        ),
+        _event(
+            "ModelCall",
+            model={"provider": "anthropic", "name": "claude", "version_or_digest": "2"},
+        ),
+        _event(
+            "ToolCall",
+            tool={"name": "search", "server": "mcp://s", "protocol": "mcp"},
+            effect_class="read",
+        ),
+        _event(
+            "ToolCall",
+            tool={"name": "transfer_funds", "server": "mcp://s", "protocol": "mcp"},
+            effect_class="irreversible",
+        ),
+        _event("ApprovalDecided", source_class="independent_system", outcome="reject"),
+        _event("PolicyDecision", decision="deny"),
+        _event("AuthzCheck", allowed=False),
+        _event("Refusal"),
+    ]
+
+
+def test_activity_is_order_independent() -> None:
+    events = _mixed_events()
+    profile = _profile(declared_tools=["search"])
+    forward = summarize_activity(events, profile)
+    reversed_events = list(reversed(events))
+    shuffled_events = list(events)
+    random.Random(0).shuffle(shuffled_events)
+    assert summarize_activity(reversed_events, profile) == forward
+    assert summarize_activity(shuffled_events, profile) == forward
+
+
+def test_activity_is_locale_and_clock_independent() -> None:
+    events = _mixed_events()
+    profile = _profile(declared_tools=["search"])
+    baseline = summarize_activity(events, profile)
+
+    old_tz = os.environ.get("TZ")
+    old_locale = locale.setlocale(locale.LC_ALL)
+    try:
+        os.environ["TZ"] = "Pacific/Kiritimati"
+        for candidate in ("de_DE.UTF-8", "de_DE", "C"):
+            try:
+                locale.setlocale(locale.LC_ALL, candidate)
+                break
+            except locale.Error:
+                continue
+        assert summarize_activity(events, profile) == baseline
+    finally:
+        if old_tz is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = old_tz
+        locale.setlocale(locale.LC_ALL, old_locale)

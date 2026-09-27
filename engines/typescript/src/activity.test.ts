@@ -148,3 +148,23 @@ test("non-dict data and unrelated event types are ignored", () => {
   assert.deepEqual(activity.tools, []);
   assert.deepEqual(activity.models, []);
 });
+
+test("summarizeActivity is order independent", () => {
+  const events = [
+    event("ModelCall", { model: { provider: "openai", name: "gpt-x", version_or_digest: "1" } }),
+    event("ToolCall", {
+      tool: { name: "search", server: "s", protocol: "mcp" },
+      effect_class: "read",
+    }),
+    event("ToolCall", {
+      tool: { name: "transfer_funds", server: "s", protocol: "mcp" },
+      effect_class: "irreversible",
+    }),
+    event("ApprovalDecided", { outcome: "reject" }, "independent_system"),
+    event("PolicyDecision", { decision: "deny" }),
+  ];
+  const profile = profileWith(["search"]);
+  const forward = summarizeActivity(events, profile);
+  const reversed = summarizeActivity([...events].reverse(), profile);
+  assert.deepEqual(reversed, forward);
+});

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -176,5 +177,29 @@ class ActivityTest {
         assertEquals(List.of(SUBJECT), texts(activity.get("agents")));
         assertEquals(0, activity.get("tools").size());
         assertEquals(0, activity.get("models").size());
+    }
+
+    @Test
+    void summarizeActivityIsOrderIndependent() {
+        List<JsonNode> events = List.of(
+                event("ModelCall", obj("model", obj("provider", "openai", "name", "gpt-x", "version_or_digest", "1"))),
+                event(
+                        "ToolCall",
+                        obj("tool", obj("name", "search", "server", "s", "protocol", "mcp"), "effect_class", "read")),
+                event(
+                        "ToolCall",
+                        obj(
+                                "tool",
+                                obj("name", "transfer_funds", "server", "s", "protocol", "mcp"),
+                                "effect_class",
+                                "irreversible")),
+                event("ApprovalDecided", obj("outcome", "reject"), "independent_system"),
+                event("PolicyDecision", obj("decision", "deny")));
+        Profile profile = profileWith(List.of("search"));
+        ObjectNode forward = Activity.summarizeActivity(events, profile);
+        List<JsonNode> reversed = new ArrayList<>(events);
+        Collections.reverse(reversed);
+        ObjectNode backward = Activity.summarizeActivity(reversed, profile);
+        assertEquals(forward, backward);
     }
 }
