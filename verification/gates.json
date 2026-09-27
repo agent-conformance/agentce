@@ -187,12 +187,12 @@
       "tier": "quick",
       "cwd": ".",
       "cmd": ["bash", "verification/gates/what_they_did_engines.sh"],
-      "requires": ["uv", "pnpm", "jq", "java"],
+      "requires": ["uv", "pnpm", "java"],
       "timeout_s": 900,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
-        "pass": "each engine writes activity.json alongside assertions.json, counting agents, models, tools, actions by effect class, approvals by who recorded them, and actions denied or blocked from only the accepted events; a tool or model the events show that no subject declares appears under undeclared, honestly, with no profile edits needed to prove it; the three engines produce byte-identical activity.json for the same bundle and profile",
-        "fail": "an engine omits activity.json, one of the counted facts is wrong or missing a fixed key, an observed but undeclared tool or model is silently dropped from undeclared, or the engines disagree on the same input"
+        "pass": "each engine writes activity.json alongside assertions.json, counting agents, models, tools, actions by effect class, approvals by who recorded them, and actions denied or blocked from only the accepted events; a tool or model the events show that no subject declares appears under undeclared, honestly, with no profile edits needed to prove it; each engine's activity.json is byte-identical to the committed golden (what_they_did_golden.json), not merely to the other two engines",
+        "fail": "an engine omits activity.json, one of the counted facts is wrong or missing a fixed key, an observed but undeclared tool or model is silently dropped from undeclared, or any engine's output differs from the committed golden"
       },
       "faults": [
         {
