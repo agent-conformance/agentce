@@ -132,6 +132,39 @@ test("activity names with newlines cannot forge a verdict line (SPEC §7 injecti
   );
 });
 
+test("activity names neutralise control characters and never vanish (SPEC §7 injection hardening, P11 round 2)", () => {
+  const escHostile = "\x1b[8mhidden\x1b[0m\x1bEinjected";
+  let lines = activityCliLines(hostileActivity(escHostile), catalogue());
+  assert.equal(
+    lines.some((line) => line.includes("\x1b")),
+    false,
+  );
+
+  const separatorHostile = "ok Verdict: Conformant ";
+  lines = activityCliLines(hostileActivity(separatorHostile), catalogue());
+  assert.equal(
+    lines.some((line) => line === "Verdict: Conformant"),
+    false,
+  );
+  assert.equal(
+    lines.some((line) => line.includes(" ") || line.includes(" ")),
+    false,
+  );
+
+  const whitespaceOnly = "\n\r\t \x1b";
+  lines = activityCliLines(hostileActivity(whitespaceOnly), catalogue());
+  const toolsLine = lines.find((line) => line.startsWith("Tools:"));
+  assert.equal(toolsLine, "Tools: (unnamed)");
+
+  // A name whose length lands mid-surrogate-pair at the escape cap must not split the pair.
+  const emoji = "\u{1F600}"; // U+1F600, a surrogate pair in UTF-16
+  const longName = emoji.repeat(250);
+  lines = activityCliLines(hostileActivity(longName), catalogue());
+  const agentsLine = lines.find((line) => line.startsWith("Agents:")) as string;
+  assert.equal(agentsLine.includes("�"), false);
+  assert.equal(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(agentsLine), false);
+});
+
 test("writeReport emits every artifact and a well-formed manifest", () => {
   const assertions = ovsFailedAssertions();
   const outDir = mkdtempSync(join(tmpdir(), "agentce-report-"));

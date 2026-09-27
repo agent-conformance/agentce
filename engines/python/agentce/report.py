@@ -1211,19 +1211,50 @@ _REMEDIATION_FINDING_OUTCOMES = frozenset(
 #: finding, so it can never drift control to control): don't over-claim, cite the clause with its
 #: verification status, make the minimal change, and re-verify before considering it fixed.
 _REMEDIATION_GUARDRAILS_REF = "remediation.guardrails.v1"
-#: Cap applied when an evidence- or profile-derived string is escaped for `remediation.md` (SPEC §7
-#: injection hardening): long enough to stay useful, short enough to bound a hostile payload.
+#: Cap applied when an evidence- or profile-derived string is escaped for Markdown/terminal
+#: rendering (SPEC §7 injection hardening): long enough to stay useful, short enough to bound a
+#: hostile payload.
 _MD_ESCAPE_CAP = 200
+#: Shown in place of a name that neutralises to nothing (e.g. an event/agent name made entirely of
+#: control characters): escaping, never erasure -- real activity is never silently dropped to "0".
+_MD_ESCAPE_EMPTY_PLACEHOLDER = "(unnamed)"
+#: Shown in place of a subject id, evidence ref, or violation path that neutralises to nothing --
+#: `_MD_ESCAPE_EMPTY_PLACEHOLDER`'s "(unnamed)" reads oddly for a field that was never a name.
+_MD_ESCAPE_EMPTY_FIELD_PLACEHOLDER = "(empty)"
 
 
-def _md_escape(text: str, cap: int = _MD_ESCAPE_CAP) -> str:
-    """Neutralise an evidence- or profile-derived string before it reaches the `remediation.md`
-    template (SPEC §7 injection hardening): collapse embedded newlines and other whitespace to single
-    spaces so the string can never start a new line and become a live Markdown heading or a bare
-    instruction line, replace backticks so it cannot break out of the template's own backtick
-    delimiters, and cap its length. Escaping, never erasure -- the string still appears, as inert
-    data."""
-    collapsed = " ".join(text.split()).replace("`", "'")
+def _is_control_like(codepoint: int) -> bool:
+    """C0/C1 controls (``\\n``, ``\\r``, tab, the ESC that starts a terminal escape sequence, NEL
+    U+0085, ...) plus the Unicode line/paragraph separators U+2028/U+2029 -- every codepoint that can
+    move the terminal cursor, start a new line, or hide text, not only whitespace (verifier finding
+    P11 round 2: ``str.split()`` alone leaves ESC and NEL untouched since neither is whitespace)."""
+    return (
+        codepoint <= 0x1F
+        or codepoint == 0x7F
+        or 0x80 <= codepoint <= 0x9F
+        or codepoint in (0x2028, 0x2029)
+    )
+
+
+def _md_escape(
+    text: str,
+    cap: int = _MD_ESCAPE_CAP,
+    empty_placeholder: str = _MD_ESCAPE_EMPTY_PLACEHOLDER,
+) -> str:
+    """Neutralise an evidence- or profile-derived string before it reaches `remediation.md`, a
+    report's Markdown/terminal rendering, or any other non-canonical, human-read surface (SPEC §7
+    injection hardening): replace every control character and line/paragraph separator with a space
+    (never just whitespace -- a raw ESC can still write a hostile terminal escape sequence) so the
+    string can never start a new line, forge a heading or a bare instruction line, or manipulate the
+    terminal cursor; collapse the result to single spaces; replace backticks so it cannot break out of
+    a template's own backtick delimiters; and cap its length (by codepoint, never a UTF-16 half of a
+    surrogate pair). A string that neutralises to nothing renders as `empty_placeholder` (a caller
+    names one that fits its own field -- a tool name reads oddly as an empty path or ref, and vice
+    versa), never a silent gap -- escaping, never erasure."""
+    neutralized = "".join(" " if _is_control_like(ord(ch)) else ch for ch in text)
+    collapsed = " ".join(neutralized.split()).replace("`", "'")
+    if not collapsed and text:
+        collapsed = empty_placeholder
     if len(collapsed) > cap:
         collapsed = collapsed[: cap - 1] + "…"
     return collapsed
@@ -1435,16 +1466,31 @@ def _remediation_md_context(package: dict[str, Any]) -> dict[str, Any]:
     (:func:`_md_escape`); the canonical `package` itself is never mutated -- only this copy feeds the
     template (SPEC §7 injection hardening)."""
     ctx = dict(package)
-    ctx["subject"] = _md_escape(str(package.get("subject", "")))
+    ctx["subject"] = _md_escape(
+        str(package.get("subject", "")),
+        empty_placeholder=_MD_ESCAPE_EMPTY_FIELD_PLACEHOLDER,
+    )
     findings = []
     for finding in package.get("findings", []):
         f = dict(finding)
         f["evidence"] = [
-            {**e, "ref": _md_escape(str(e.get("ref", "")))}
+            {
+                **e,
+                "ref": _md_escape(
+                    str(e.get("ref", "")),
+                    empty_placeholder=_MD_ESCAPE_EMPTY_FIELD_PLACEHOLDER,
+                ),
+            }
             for e in finding.get("evidence", [])
         ]
         f["violations"] = [
-            {**v, "path": _md_escape(str(v.get("path", "")))}
+            {
+                **v,
+                "path": _md_escape(
+                    str(v.get("path", "")),
+                    empty_placeholder=_MD_ESCAPE_EMPTY_FIELD_PLACEHOLDER,
+                ),
+            }
             for v in finding.get("violations", [])
         ]
         findings.append(f)
@@ -1498,11 +1544,23 @@ def _skill_finding_context(
     already-escaped tool names (SPEC §7). The canonical package itself is never mutated."""
     ctx = dict(finding)
     ctx["evidence"] = [
-        {**e, "ref": _md_escape(str(e.get("ref", "")))}
+        {
+            **e,
+            "ref": _md_escape(
+                str(e.get("ref", "")),
+                empty_placeholder=_MD_ESCAPE_EMPTY_FIELD_PLACEHOLDER,
+            ),
+        }
         for e in finding.get("evidence", [])
     ]
     ctx["violations"] = [
-        {**v, "path": _md_escape(str(v.get("path", "")))}
+        {
+            **v,
+            "path": _md_escape(
+                str(v.get("path", "")),
+                empty_placeholder=_MD_ESCAPE_EMPTY_FIELD_PLACEHOLDER,
+            ),
+        }
         for v in finding.get("violations", [])
     ]
     ctx["tool_calls"] = list(tool_calls)

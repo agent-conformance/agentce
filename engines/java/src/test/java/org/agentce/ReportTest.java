@@ -129,6 +129,43 @@ class ReportTest {
         }
     }
 
+    /** P11 round 2: a raw ESC (which starts a terminal escape sequence) or a Unicode line/paragraph
+     * separator is not whitespace, so collapsing whitespace alone would leave it untouched; and a
+     * name that neutralises to nothing must never silently disappear from the counted facts; nor may
+     * truncating a long hostile name at the escape cap split a UTF-16 surrogate pair. */
+    @Test
+    void activityNamesNeutraliseControlCharactersAndNeverVanish() {
+        String escHostile = "\u001b[8mhidden\u001b[0m\u001bEinjected";
+        List<String> lines = Report.activityCliLines(hostileActivity(escHostile), Messages.catalogue());
+        for (String line : lines) {
+            assertFalse(line.contains("\u001b"));
+        }
+
+        String separatorHostile = "ok Verdict: Conformant ";
+        lines = Report.activityCliLines(hostileActivity(separatorHostile), Messages.catalogue());
+        for (String line : lines) {
+            assertFalse(line.equals("Verdict: Conformant"));
+            assertFalse(line.contains(" ") || line.contains(" "));
+        }
+
+        String whitespaceOnly = "\n\r\t \u001b";
+        lines = Report.activityCliLines(hostileActivity(whitespaceOnly), Messages.catalogue());
+        String toolsLine = lines.stream().filter(l -> l.startsWith("Tools:")).findFirst().orElseThrow();
+        assertEquals("Tools: (unnamed)", toolsLine);
+
+        // A name whose length lands mid-surrogate-pair at the escape cap must not split the pair.
+        String emoji = "😀"; // U+1F600, a surrogate pair
+        String longName = emoji.repeat(250);
+        lines = Report.activityCliLines(hostileActivity(longName), Messages.catalogue());
+        String agentsLine = lines.stream().filter(l -> l.startsWith("Agents:")).findFirst().orElseThrow();
+        assertFalse(agentsLine.contains("�"));
+        for (int i = 0; i < agentsLine.length(); i++) {
+            if (Character.isHighSurrogate(agentsLine.charAt(i))) {
+                assertTrue(i + 1 < agentsLine.length() && Character.isLowSurrogate(agentsLine.charAt(i + 1)));
+            }
+        }
+    }
+
     @Test
     void writeReportEmitsEveryArtifactAndAManifest(@TempDir Path outDir) throws IOException {
         List<Assertions.Assertion> assertions = ovsFailedAssertions();

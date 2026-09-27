@@ -174,16 +174,45 @@ public final class Report {
      * injection hardening): long enough to stay useful, short enough to bound a hostile payload. */
     private static final int MD_ESCAPE_CAP = 200;
 
+    /** Shown in place of a name that neutralises to nothing: escaping, never erasure -- real
+     * activity is never silently dropped to "0". */
+    private static final String MD_ESCAPE_EMPTY_PLACEHOLDER = "(unnamed)";
+
+    /** C0/C1 controls (newline, tab, the ESC that starts a terminal escape sequence, NEL U+0085,
+     * ...; {@link Character#isISOControl(int)} covers exactly this range) plus the Unicode
+     * line/paragraph separators U+2028/U+2029 -- every codepoint that can move the terminal cursor,
+     * start a new line, or hide text, not only whitespace. */
+    private static boolean isControlLike(int codepoint) {
+        return Character.isISOControl(codepoint) || codepoint == 0x2028 || codepoint == 0x2029;
+    }
+
     /** Neutralise an event-derived string (agent, model, or tool name) before it reaches {@code
      * report.md} or the terminal (SPEC §7 injection hardening, mirroring the Python reference's
-     * {@code _md_escape}): collapse embedded newlines and other whitespace to single spaces so the
-     * string can never start a new line and forge a bare instruction line (or a fake {@code
-     * Verdict:} line) above the real content, replace backticks so it cannot break out of Markdown
-     * code spans, and cap its length. Escaping, never erasure -- the string still appears, as inert
-     * data. */
+     * {@code _md_escape}): replace every control character and line/paragraph separator with a space
+     * (never just whitespace -- a raw ESC can still write a hostile terminal escape sequence),
+     * collapse the result to single spaces, replace backticks so it cannot break out of Markdown
+     * code spans, and cap its length by codepoint (never a UTF-16 half of a surrogate pair). A
+     * string that neutralises to nothing renders as {@link #MD_ESCAPE_EMPTY_PLACEHOLDER}, never a
+     * silent gap. */
     private static String mdEscape(String text) {
-        String collapsed = String.join(" ", text.trim().split("\\s+")).replace("`", "'");
-        return collapsed.length() > MD_ESCAPE_CAP ? collapsed.substring(0, MD_ESCAPE_CAP - 1) + "…" : collapsed;
+        StringBuilder neutralized = new StringBuilder();
+        text.codePoints().forEach(cp -> neutralized.appendCodePoint(isControlLike(cp) ? ' ' : cp));
+        String collapsed =
+                String.join(" ", neutralized.toString().trim().split("\\s+")).replace("`", "'");
+        if (collapsed.isEmpty() && !text.isEmpty()) {
+            collapsed = MD_ESCAPE_EMPTY_PLACEHOLDER;
+        }
+        if (collapsed.length() <= MD_ESCAPE_CAP) {
+            // Java char length (UTF-16 units) is always >= codepoint count, so this is a safe,
+            // cheap sufficient condition to skip the codepoint-array build below for the common
+            // (short, uncapped) name.
+            return collapsed;
+        }
+        int[] codepoints = collapsed.codePoints().toArray();
+        if (codepoints.length > MD_ESCAPE_CAP) {
+            collapsed = new String(codepoints, 0, MD_ESCAPE_CAP - 1) + "…";
+        }
+        return collapsed;
     }
 
     /** {@code "label 3, label 2"} for every nonzero count, in the node's (fixed) field order; {@code

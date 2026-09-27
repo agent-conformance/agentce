@@ -83,19 +83,49 @@ function escapeHtml(s: string): string {
  * injection hardening): long enough to stay useful, short enough to bound a hostile payload. */
 const MD_ESCAPE_CAP = 200;
 
+/** Shown in place of a name that neutralises to nothing: escaping, never erasure -- real activity
+ * is never silently dropped to "0". */
+const MD_ESCAPE_EMPTY_PLACEHOLDER = "(unnamed)";
+
+/** C0/C1 controls (newline, tab, the ESC that starts a terminal escape sequence, NEL U+0085, ...)
+ * plus the Unicode line/paragraph separators U+2028/U+2029 -- every codepoint that can move the
+ * terminal cursor, start a new line, or hide text, not only whitespace. */
+function isControlLike(codepoint: number): boolean {
+  return (
+    codepoint <= 0x1f ||
+    codepoint === 0x7f ||
+    (codepoint >= 0x80 && codepoint <= 0x9f) ||
+    codepoint === 0x2028 ||
+    codepoint === 0x2029
+  );
+}
+
 /** Neutralise an event-derived string (agent, model, or tool name) before it reaches `report.md` or
- * the terminal (SPEC §7 injection hardening, mirroring the Python reference's `_md_escape`): collapse
- * embedded newlines and other whitespace to single spaces so the string can never start a new line
- * and forge a bare instruction line (or a fake `Verdict:` line) above the real content, replace
- * backticks so it cannot break out of Markdown code spans, and cap its length. Escaping, never
- * erasure -- the string still appears, as inert data. */
+ * the terminal (SPEC §7 injection hardening, mirroring the Python reference's `_md_escape`): replace
+ * every control character and line/paragraph separator with a space (never just whitespace -- a raw
+ * ESC can still write a hostile terminal escape sequence), collapse the result to single spaces,
+ * replace backticks so it cannot break out of Markdown code spans, and cap its length by codepoint
+ * (`Array.from`, never a UTF-16 half of a surrogate pair). A string that neutralises to nothing
+ * renders as `MD_ESCAPE_EMPTY_PLACEHOLDER`, never a silent gap. */
 function mdEscape(text: string, cap: number = MD_ESCAPE_CAP): string {
-  const collapsed = text
+  const neutralized = Array.from(text)
+    .map((ch) => (isControlLike(ch.codePointAt(0) as number) ? " " : ch))
+    .join("");
+  let collapsed = neutralized
     .split(/\s+/)
     .filter((w) => w.length > 0)
     .join(" ")
     .replace(/`/g, "'");
-  return collapsed.length > cap ? `${collapsed.slice(0, cap - 1)}…` : collapsed;
+  if (collapsed.length === 0 && text.length > 0) {
+    collapsed = MD_ESCAPE_EMPTY_PLACEHOLDER;
+  }
+  if (collapsed.length <= cap) {
+    // UTF-16 length is always >= codepoint count, so this is a safe, cheap sufficient condition
+    // to skip the codepoint-array build below for the common (short, uncapped) name.
+    return collapsed;
+  }
+  const codepoints = Array.from(collapsed);
+  return codepoints.length > cap ? `${codepoints.slice(0, cap - 1).join("")}…` : collapsed;
 }
 
 //: A self-contained stylesheet (no external references), mirroring the Python/Java renderers.

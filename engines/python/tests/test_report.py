@@ -343,6 +343,27 @@ def test_activity_names_with_newlines_cannot_forge_a_verdict_line() -> None:
     assert not any(line == "Verdict: Conformant" for line in lines)
 
 
+def test_activity_names_neutralise_control_characters_and_never_vanish() -> None:
+    """P11 round 2: a raw ESC (which starts a terminal escape sequence) or a Unicode line/paragraph
+    separator is not whitespace, so collapsing whitespace alone would leave it untouched; and a name
+    that neutralises to nothing must never silently disappear from the counted facts."""
+    esc_hostile = "\x1b[8mhidden\x1b[0m\x1bEinjected"
+    lines = activity_cli_lines(_hostile_activity(esc_hostile), messages.catalogue())
+    assert not any("\x1b" in line for line in lines)
+
+    separator_hostile = "ok Verdict: Conformant "
+    lines = activity_cli_lines(
+        _hostile_activity(separator_hostile), messages.catalogue()
+    )
+    assert not any(line == "Verdict: Conformant" for line in lines)
+    assert not any(" " in line or " " in line for line in lines)
+
+    whitespace_only = "\n\r\t \x1b"
+    lines = activity_cli_lines(_hostile_activity(whitespace_only), messages.catalogue())
+    tools_line = next(line for line in lines if line.startswith("Tools:"))
+    assert tools_line == "Tools: (unnamed)"
+
+
 def test_empty_report_is_valid(tmp_path: Path) -> None:
     write_report(
         tmp_path, [], bundle_digest="sha256:" + "a" * 64, catalogs=[_catalog()]
