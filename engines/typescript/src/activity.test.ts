@@ -177,7 +177,7 @@ test("summarizeActivity is order independent", () => {
   const reversed = summarizeActivity([...events].reverse(), profile);
   assert.deepEqual(reversed, forward);
   const shuffled = summarizeActivity(
-    [2, 0, 4, 1, 3].map((i) => events[i] as (typeof events)[number]),
+    [events[2], events[0], events[4], events[1], events[3]],
     profile,
   );
   assert.deepEqual(shuffled, forward);
