@@ -532,3 +532,9 @@ allow:
     count: 2
     class: legitimate
     justification: "The module docstring names the offline-credentials token and the project/location strings as obvious placeholders standing in for real values, since this example makes zero real network calls or uses any real credential/project ID."
+
+  - path: engines/python/tests/test_baseline_lens.py
+    pattern: placeholder
+    count: 3
+    class: legitimate
+    justification: "The test names the catalog status value 'placeholder' that the draft-standard crosswalk files carry, to prove the baseline never cites a placeholder row; it is not an unfinished part of the test."
