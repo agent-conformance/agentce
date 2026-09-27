@@ -599,8 +599,14 @@ def _records_subject(declared: Profile | None) -> str:
     """The subject a records folder is assessed as: the one subject an adopter's own profile declares,
     else the engine's default. A folder is one subject; a profile declaring several cannot say which of
     them the records are about."""
-    if declared is None or not declared.subjects:
+    if declared is None:
         return DEFAULT_SUBJECT
+    if not declared.subjects:
+        raise InputError(
+            "input.profile_invalid",
+            "the profile declares no subject, so the records have no agent to be about.",
+            "declare one subject in the profile, or leave out --profile to use the default one.",
+        )
     if len(declared.subjects) > 1:
         raise InputError(
             "input.records_subject_ambiguous",

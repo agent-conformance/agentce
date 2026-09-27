@@ -240,15 +240,27 @@ def scan(folder: Path, *, subject: str, exclude: Path | None = None) -> ScannedR
     skip: list[Path] = []
     if exclude is not None:
         out = exclude.resolve()
-        skip.append(out / BUNDLE_DIR)
+        stale = out / BUNDLE_DIR
+        skip.append(stale)
+        if (
+            folder.is_relative_to(stale)
+            or stale.is_symlink()
+            or (stale.is_dir() and not (stale / "manifest.json").is_file())
+        ):
+            raise InputError(
+                "input.records_out_collides",
+                f"{BUNDLE_DIR!r} in the output folder is where the run's bundle is rebuilt, and it "
+                "holds the records or is not a previous run's bundle; writing there would overwrite records.",
+                "choose an output folder outside the records folder with --out, or an empty one.",
+            )
         if out.is_relative_to(folder):
             if out == folder or (
-                out.exists() and not (out / BUNDLE_DIR).is_dir() and any(out.iterdir())
+                out.exists() and not stale.is_dir() and any(out.iterdir())
             ):
                 raise InputError(
                     "input.records_out_collides",
-                    f"the output folder {out.name!r} lies inside the records folder and holds files "
-                    "that are not a previous run's output; writing there would overwrite records.",
+                    f"the output folder {out.name!r} is the records folder or lies inside it and holds "
+                    "files that are not a previous run's output; writing there would overwrite records.",
                     "choose an output folder outside the records folder with --out, or an empty one.",
                 )
             skip.append(out)

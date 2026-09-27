@@ -548,6 +548,43 @@ def test_an_output_folder_above_the_records_folder_still_finds_the_records(
     assert traces.is_dir()
 
 
+def test_an_output_folder_that_would_overwrite_the_records_is_refused_and_nothing_is_deleted(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = tmp_path / "out"
+    bundle = _records(out / "records-bundle")
+    inside = _records(out / "records-bundle" / "traces")
+    before = {p: p.read_bytes() for p in bundle.rglob("*") if p.is_file()}
+    for folder, out_arg in ((bundle, str(out)), (inside, str(out))):
+        code, env = _run(["assess", str(folder), "--out", out_arg], capsys)
+        assert code == 3 and env["error"]["key"] == "input.records_out_collides"
+    monkeypatch.chdir(bundle)
+    code, env = _run(["assess", ".", "--out", "."], capsys)
+    assert code == 3 and env["error"]["key"] == "input.records_out_collides"
+    assert {p: p.read_bytes() for p in bundle.rglob("*") if p.is_file()} == before
+
+
+def test_a_profile_that_declares_no_subject_is_refused_before_anything_is_written(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    empty = tmp_path / "none.yaml"
+    empty.write_text("profile_version: 1\nsubjects: []\n", encoding="utf-8")
+    out = tmp_path / "out"
+    code, env = _run(
+        [
+            "assess",
+            str(_records(tmp_path / "records")),
+            "--profile",
+            str(empty),
+            "--out",
+            str(out),
+        ],
+        capsys,
+    )
+    assert code == 3 and env["error"]["key"] == "input.profile_invalid"
+    assert not out.exists()
+
+
 def test_hidden_directories_are_not_walked(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
