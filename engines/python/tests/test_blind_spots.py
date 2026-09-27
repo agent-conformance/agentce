@@ -333,6 +333,40 @@ def test_a_blind_spot_unlocking_more_checks_ranks_first_even_when_discovered_lat
     assert unlocked == [2, 1]
 
 
+def test_a_tied_checks_unlocked_blind_spot_with_more_needed_by_ranks_first() -> None:
+    """The secondary sort key (needed_by) is real too, not just the primary one: these two groups
+    tie on checks_unlocked=1, and the one discovered first (AEvent) has the lower needed_by -- so a
+    missing or discovery-order tie-break would leave AEvent first, and only an actual sort by
+    needed_by puts BEvent (needed_by=2) first as RFC 0008's fixed ranking order requires."""
+    a_unlock = _control("C-25", [{"event": "AEvent", "class": "any"}])
+    a_needed = _control(
+        "C-26",
+        [{"event": "AEvent", "class": "any"}, {"event": "XEvent", "class": "any"}],
+    )
+    b_unlock = _control("C-27", [{"event": "BEvent", "class": "any"}])
+    b_needed_1 = _control(
+        "C-28",
+        [{"event": "BEvent", "class": "any"}, {"event": "YEvent", "class": "any"}],
+    )
+    b_needed_2 = _control(
+        "C-29",
+        [{"event": "BEvent", "class": "any"}, {"event": "ZEvent", "class": "any"}],
+    )
+    catalog = _catalog([a_unlock, a_needed, b_unlock, b_needed_1, b_needed_2])
+    assertions = [
+        _assertion(a_unlock, outcome="insufficient_evidence", population=(1, 0)),
+        _assertion(a_needed, outcome="insufficient_evidence", population=(1, 0)),
+        _assertion(b_unlock, outcome="insufficient_evidence", population=(1, 0)),
+        _assertion(b_needed_1, outcome="insufficient_evidence", population=(1, 0)),
+        _assertion(b_needed_2, outcome="insufficient_evidence", population=(1, 0)),
+    ]
+    result = compute_blind_spots(assertions, _profile(), [catalog], [])
+    top_two = result["blind_spots"][:2]
+    assert [b["event"] for b in top_two] == ["BEvent", "AEvent"]
+    assert [b["checks_unlocked"] for b in top_two] == [1, 1]
+    assert [b["needed_by"] for b in top_two] == [2, 1]
+
+
 def test_is_order_independent_over_assess_subjects_own_order() -> None:
     """A deterministic pure function of its arguments (given assertions in its one true order, RFC
     0008 Sec.6) -- calling it twice with the same input gives the same output."""
