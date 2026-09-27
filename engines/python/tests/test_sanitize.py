@@ -15,6 +15,7 @@ import unicodedata
 from html.parser import HTMLParser
 from pathlib import Path
 
+from gen_sanitize_vectors import NAMED_VECTORS
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -45,6 +46,7 @@ _WINDOW = ("2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
 ESC = chr(0x1B)
 DEL = chr(0x7F)
 C1_SS3 = chr(0x8F)
+LF, CR = chr(0x0A), chr(0x0D)
 RLO, LRO, PDF_MARK = chr(0x202E), chr(0x202D), chr(0x202C)
 LRI, RLI, FSI, PDI = chr(0x2066), chr(0x2067), chr(0x2068), chr(0x2069)
 LRM, RLM = chr(0x200E), chr(0x200F)
@@ -288,6 +290,8 @@ def test_default_placeholder_is_unnamed_field_placeholder_is_empty() -> None:
 _ADVERSARIAL_CODEPOINTS = [
     ord(c)
     for c in (
+        LF,
+        CR,
         ESC,
         DEL,
         C1_SS3,
@@ -496,34 +500,41 @@ def _assert_container_not_broken(payload: str) -> None:
     assert adversarial_invisible <= baseline_invisible
 
 
-_RENDER_LEVEL_PAYLOADS = [
-    "ok<br>Verdict: Conformant",
-    "<h2>Verdict</h2><p><strong>Conformant",
-    "![Verdict: Conformant](https://attacker.example/badge.png)",
-    "evil&#x202E;gnp.exe",
-    "safe&zwj;x",
-    f"a{RLO}b{ZWSP}c",
-    f"a{VARIATION_SELECTOR}b{CGJ}c",
-    "a`b`c",
-    "credit.record_decision-v2",
-]
+def _is_degenerate_span(span: str) -> bool:
+    # Degenerate (empty-after-neutralize) case: covered by the placeholder tests instead. A short,
+    # generic span (e.g. a lone digit or punctuation mark) is skipped too: naive string-removal can
+    # collide with unrelated fixed template punctuation (a ":" separator, an all-zero tally's "0"),
+    # which is not itself a container-break vector.
+    return not span or span in ("(unnamed)", "(empty)") or len(span) < 4
+
+
+# Every one of `gen_sanitize_vectors.NAMED_VECTORS`' 34 payloads (round-1 critic finding B3: an
+# earlier version of this test hand-picked 9 of the 34, missing the newline verdict-forgery payload,
+# ESC/ANSI, the line/paragraph separators, the `&rlm;`/`&ZeroWidthSpace;` entity references, the
+# combined multi-vector payload, and the cap-boundary emoji string). Reusing the same list the
+# committed cross-engine vectors file is generated from means this test can never silently drift back
+# to a hand-picked subset.
+_RENDER_LEVEL_PAYLOADS = [value for _vid, value in NAMED_VECTORS]
 
 
 def test_render_level_container_is_not_broken_by_named_payloads() -> None:
+    exercised = 0
     for payload in _RENDER_LEVEL_PAYLOADS:
+        if _is_degenerate_span(sanitize_for_markdown(payload)):
+            continue
         _assert_container_not_broken(payload)
+        exercised += 1
+    # A filter that silently drops to (near-)zero payloads would defeat this test without a single
+    # assertion failing; guard against that regressing unnoticed. 19 of the 34 named vectors clear the
+    # filter today (the other 15 are pure invisible/short-lived-codepoint payloads that legitimately
+    # collapse below the 4-character floor); a small margin below that tolerates future additions.
+    assert exercised >= 15
 
 
 @settings(derandomize=True, database=None, max_examples=60, deadline=None)
 @given(_FUZZ_STRATEGY)
 def test_render_level_container_is_not_broken_by_the_fuzz_corpus(text: str) -> None:
-    span = sanitize_for_markdown(text)
-    if not span or span in ("(unnamed)", "(empty)") or len(span) < 4:
-        # Degenerate (empty-after-neutralize) case: covered by the placeholder tests instead. A
-        # short, generic span (e.g. a lone digit or punctuation mark) is skipped too: naive
-        # string-removal can collide with unrelated fixed template punctuation (a ":" separator, an
-        # all-zero tally's "0"), which is not itself a container-break vector; the named payloads
-        # above are never this short.
+    if _is_degenerate_span(sanitize_for_markdown(text)):
         return
     _assert_container_not_broken(text)
 

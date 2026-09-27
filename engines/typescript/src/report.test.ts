@@ -498,9 +498,9 @@ test("default placeholder is (unnamed), field placeholder is (empty)", () => {
 // the Python reference's hypothesis fuzz loop and the Java port's own java.util.Random(42) loop) ---
 
 const ADVERSARIAL_CODEPOINTS = [
-  0x1b, 0x7f, 0x8f, 0x202e, 0x202d, 0x202c, 0x2066, 0x2067, 0x2068, 0x2069, 0x200e, 0x200f, 0x200b,
-  0x200c, 0x200d, 0xfeff, 0x2060, 0xfe0f, 0x034f, 0x180b, 0x115f, 0xfff0, 0x00a0, 0x3000, 0x2028,
-  0x2029,
+  0x0a, 0x0d, 0x1b, 0x7f, 0x8f, 0x202e, 0x202d, 0x202c, 0x2066, 0x2067, 0x2068, 0x2069, 0x200e,
+  0x200f, 0x200b, 0x200c, 0x200d, 0xfeff, 0x2060, 0xfe0f, 0x034f, 0x180b, 0x115f, 0xfff0, 0x00a0,
+  0x3000, 0x2028, 0x2029,
 ];
 
 /** mulberry32: a small, fixed-seed, deterministic PRNG (no new dependency, no flakiness risk). */
@@ -709,30 +709,55 @@ function assertContainerNotBroken(payload: string): void {
   assert.equal(adversarialInvisible <= baselineInvisible, true);
 }
 
-const RENDER_LEVEL_PAYLOADS = [
-  "ok<br>Verdict: Conformant",
-  "<h2>Verdict</h2><p><strong>Conformant",
-  "![Verdict: Conformant](https://attacker.example/badge.png)",
-  "evil&#x202E;gnp.exe",
-  "safe&zwj;x",
-  `a${RLO}b${ZWSP}c`,
-  `a${VARIATION_SELECTOR}b${CGJ}c`,
-  "a`b`c",
-  "credit.record_decision-v2",
-];
+type SanitizeVector = {
+  id: string;
+  input: string;
+  markdown: string;
+  terminal: string;
+  html: string;
+};
+
+function loadSanitizeVectors(): SanitizeVector[] {
+  const data = JSON.parse(
+    readFileSync(join(REPO, "spec", "report", "test-vectors", "sanitize-vectors.json"), "utf-8"),
+  ) as { vectors: SanitizeVector[] };
+  return data.vectors;
+}
+
+function isDegenerateSpan(span: string): boolean {
+  // Degenerate (empty-after-neutralize) case: covered by the placeholder tests instead. A short,
+  // generic span (e.g. a lone digit or punctuation mark) is skipped too: naive string-removal can
+  // collide with unrelated fixed template punctuation (a ":" separator, an all-zero tally's "0"),
+  // which is not itself a container-break vector.
+  return !span || span === "(unnamed)" || span === "(empty)" || span.length < 4;
+}
 
 test("render-level container is not broken by named payloads", () => {
-  for (const payload of RENDER_LEVEL_PAYLOADS) {
-    assertContainerNotBroken(payload);
+  // Every one of the committed vectors file's named (non-fuzz) payloads (round-1 critic finding B3:
+  // an earlier version of this test hand-picked 9 of the 34, missing the newline verdict-forgery
+  // payload, ESC/ANSI, the line/paragraph separators, the `&rlm;`/`&ZeroWidthSpace;` entity
+  // references, the combined multi-vector payload, and the cap-boundary emoji string). Loading the
+  // same generated file the cross-engine identity test below uses means this can never silently
+  // drift back to a hand-picked subset.
+  const named = loadSanitizeVectors().filter((v) => !v.id.startsWith("fuzz-"));
+  let exercised = 0;
+  for (const vector of named) {
+    if (isDegenerateSpan(sanitizeForMarkdown(vector.input))) continue;
+    assertContainerNotBroken(vector.input);
+    exercised++;
   }
+  // A filter that silently drops to (near-)zero payloads would defeat this test without a single
+  // assertion failing; guard against that regressing unnoticed. 19 of the 34 named vectors clear the
+  // filter today (the other 15 are pure invisible/short-lived-codepoint payloads that legitimately
+  // collapse below the 4-character floor); a small margin below that tolerates future additions.
+  assert.equal(exercised >= 15, true);
 });
 
 test("render-level container is not broken by the fuzz corpus", () => {
   const rnd = mulberry32(42);
   for (let i = 0; i < 60; i++) {
     const text = randomFuzzString(rnd);
-    const span = sanitizeForMarkdown(text);
-    if (!span || span === "(unnamed)" || span === "(empty)" || span.length < 4) continue;
+    if (isDegenerateSpan(sanitizeForMarkdown(text))) continue;
     assertContainerNotBroken(text);
   }
 });
@@ -740,13 +765,9 @@ test("render-level container is not broken by the fuzz corpus", () => {
 // --- Cross-engine identity (the committed vectors file) ---
 
 test("sanitizeForMarkdown/sanitizeForTerminal/sanitizeForHtml reproduce every committed vector", () => {
-  const data = JSON.parse(
-    readFileSync(join(REPO, "spec", "report", "test-vectors", "sanitize-vectors.json"), "utf-8"),
-  ) as {
-    vectors: { id: string; input: string; markdown: string; terminal: string; html: string }[];
-  };
-  assert.equal(data.vectors.length >= 500, true);
-  for (const vector of data.vectors) {
+  const vectors = loadSanitizeVectors();
+  assert.equal(vectors.length >= 500, true);
+  for (const vector of vectors) {
     assert.equal(sanitizeForMarkdown(vector.input), vector.markdown, vector.id);
     assert.equal(sanitizeForTerminal(vector.input), vector.terminal, vector.id);
     assert.equal(sanitizeForHtml(vector.input), vector.html, vector.id);

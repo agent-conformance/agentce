@@ -119,7 +119,7 @@ allow:
 
   - path: engines/java/src/test/java/org/agentce/ReportTest.java
     pattern: placeholder
-    count: 6
+    count: 7
     class: legitimate
     justification: "Test names and comments cover sanitizeForMarkdown/sanitizeForHtml's placeholder parameter and the whitespace-only-input-renders-a-placeholder property, mirroring the Python reference's test_sanitize.py; not an unfinished stub."
 
@@ -209,7 +209,7 @@ allow:
 
   - path: engines/typescript/src/report.test.ts
     pattern: placeholder
-    count: 5
+    count: 6
     class: legitimate
     justification: "Test names and comments cover sanitizeForMarkdown/sanitizeForHtml's placeholder parameter and the whitespace-only-input-renders-a-placeholder property, mirroring the Python reference's test_sanitize.py; not an unfinished stub."
 

@@ -518,8 +518,8 @@ class ReportTest {
     // reference's hypothesis fuzz loop and the TypeScript port's own hand-rolled PRNG loop) ---
 
     private static final int[] ADVERSARIAL_CODEPOINTS = {
-        0x1B, 0x7F, 0x8F, 0x202E, 0x202D, 0x202C, 0x2066, 0x2067, 0x2068, 0x2069, 0x200E, 0x200F,
-        0x200B, 0x200C, 0x200D, 0xFEFF, 0x2060, 0xFE0F, 0x034F, 0x180B, 0x115F, 0xFFF0, 0x00A0,
+        0x0A, 0x0D, 0x1B, 0x7F, 0x8F, 0x202E, 0x202D, 0x202C, 0x2066, 0x2067, 0x2068, 0x2069, 0x200E,
+        0x200F, 0x200B, 0x200C, 0x200D, 0xFEFF, 0x2060, 0xFE0F, 0x034F, 0x180B, 0x115F, 0xFFF0, 0x00A0,
         0x3000, 0x2028, 0x2029,
     };
 
@@ -702,23 +702,47 @@ class ReportTest {
         assertTrue(adversarialInvisible <= baselineInvisible);
     }
 
-    private static final String[] RENDER_LEVEL_PAYLOADS = {
-        "ok<br>Verdict: Conformant",
-        "<h2>Verdict</h2><p><strong>Conformant",
-        "![Verdict: Conformant](https://attacker.example/badge.png)",
-        "evil&#x202E;gnp.exe",
-        "safe&zwj;x",
-        "a" + RLO + "b" + ZWSP + "c",
-        "a" + VARIATION_SELECTOR + "b" + CGJ + "c",
-        "a`b`c",
-        "credit.record_decision-v2",
-    };
+    private static boolean isDegenerateSpan(String span) {
+        // Degenerate (empty-after-neutralize) case: covered by the placeholder tests instead. A
+        // short, generic span (e.g. a lone digit or punctuation mark) is skipped too: naive
+        // string-removal can collide with unrelated fixed template punctuation (a ":" separator, an
+        // all-zero tally's "0"), which is not itself a container-break vector.
+        return span.isEmpty() || span.equals("(unnamed)") || span.equals("(empty)") || span.length() < 4;
+    }
+
+    private static List<String> loadNamedVectorInputs() throws IOException {
+        JsonNode data = Json.parseFile(TestPaths.repoRoot().resolve("spec/report/test-vectors/sanitize-vectors.json"));
+        List<String> inputs = new ArrayList<>();
+        for (JsonNode vector : data.get("vectors")) {
+            if (!vector.get("id").asText().startsWith("fuzz-")) {
+                inputs.add(vector.get("input").asText());
+            }
+        }
+        return inputs;
+    }
 
     @Test
-    void renderLevelContainerIsNotBrokenByNamedPayloads() {
-        for (String payload : RENDER_LEVEL_PAYLOADS) {
+    void renderLevelContainerIsNotBrokenByNamedPayloads() throws IOException {
+        // Every one of the committed vectors file's named (non-fuzz) payloads (round-1 critic
+        // finding B3: an earlier version of this test hand-picked 9 of the 34, missing the newline
+        // verdict-forgery payload, ESC/ANSI, the line/paragraph separators, the `&rlm;`/
+        // `&ZeroWidthSpace;` entity references, the combined multi-vector payload, and the
+        // cap-boundary emoji string). Loading the same generated file the cross-engine identity test
+        // below uses means this can never silently drift back to a hand-picked subset.
+        int exercised = 0;
+        for (String payload : loadNamedVectorInputs()) {
+            if (isDegenerateSpan(Report.sanitizeForMarkdown(payload))) {
+                continue;
+            }
             assertContainerNotBroken(payload);
+            exercised++;
         }
+        // A filter that silently drops to (near-)zero payloads would defeat this test without a
+        // single assertion failing; guard against that regressing unnoticed. 19 of the 34 named
+        // vectors clear the filter today (the other 15 are pure invisible/short-lived-codepoint
+        // payloads that legitimately collapse below the 4-character floor); a small margin below that
+        // tolerates future additions.
+        assertTrue(exercised >= 15);
     }
 
     @Test
@@ -726,8 +750,7 @@ class ReportTest {
         Random rnd = new Random(42);
         for (int i = 0; i < 60; i++) {
             String text = randomFuzzString(rnd);
-            String span = Report.sanitizeForMarkdown(text);
-            if (span.isEmpty() || span.equals("(unnamed)") || span.equals("(empty)") || span.length() < 4) {
+            if (isDegenerateSpan(Report.sanitizeForMarkdown(text))) {
                 continue;
             }
             assertContainerNotBroken(text);
