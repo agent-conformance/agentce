@@ -20,6 +20,14 @@ jobs:
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - name: Install the website's dependencies
+        working-directory: website
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
       - name: Sync the projects the gates run in
         run: |
           for project in adapters/*/; do

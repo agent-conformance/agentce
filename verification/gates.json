@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.3.0",
+  "suite_version": "0.4.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -133,6 +133,41 @@
         }
       ],
       "fix_hint": "Run the gate's command: the engine tests are engines/python/tests/test_records_assess.py, the installed-package check is tools/installed_artifacts_check.py records; the carried adapter is re-synced with `cp adapters/otel-genai/src/agentce_adapters/otel_genai.py engines/python/agentce/records/otel_genai.py`."
+    },
+    {
+      "id": "VG-LOCKED-COPY",
+      "title": "The built landing page and the README carry the approved product copy, and the wording it replaced is gone",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": ["bash", "verification/gates/locked_copy.sh"],
+      "requires": ["python3", "pnpm"],
+      "timeout_s": 900,
+      "invariant": "Examples are the source of truth for documentation snippets; rendered outputs come from the corpus",
+      "rubric": {
+        "pass": "the website builds, and the built landing page shows the approved tagline as its eyebrow, the approved headline as its heading and the approved subline as its lead paragraph, word for word; the README states the tagline, headline and subline in that order under its title and keeps its status and licence lines; none of the retired wording appears on either",
+        "fail": "the site does not build, a hero element carries other words, the retired wording is still on the page or in the README, or the README loses its status or licence line"
+      },
+      "faults": [
+        {
+          "description": "the landing headline goes back to the retired wording",
+          "file": "website/src/pages/index.astro",
+          "search": "Check how your AI agents behave against the AI rules and standards you follow, then fix the gaps.",
+          "replace": "Assess any AI agent against the same standard."
+        },
+        {
+          "description": "the landing lead paragraph is reworded",
+          "file": "website/src/pages/index.astro",
+          "search": "gets a skill for the fixes.",
+          "replace": "gets a plugin for the fixes."
+        },
+        {
+          "description": "the README drops the tagline",
+          "file": "README.md",
+          "search": "**Open, repeatable checks of AI agent behavior against AI rules and standards.**\n",
+          "replace": ""
+        }
+      ],
+      "fix_hint": "Run the gate's command and read the FAIL lines; the approved strings are the constants in tools/locked_copy_check.py, and the landing page is website/src/pages/index.astro."
     }
   ]
 }

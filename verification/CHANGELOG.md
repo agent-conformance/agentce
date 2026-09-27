@@ -3,6 +3,11 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.4.0
+
+- Added `VG-LOCKED-COPY`: the website builds, and the built landing page and the README carry the approved
+  tagline, headline and subline word for word, with the wording they replaced gone.
+
 ## 0.3.0
 
 - Added `VG-FIRST-REPORT-TIME`: an installed package turns a folder of OpenTelemetry GenAI or OpenInference

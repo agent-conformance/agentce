@@ -2,7 +2,7 @@
 //
 // Runs after `astro build`, alongside build-iris.mjs. The card reuses the site's own favicon mark
 // (the "certification-neutral mark" Appendix A4 calls for) rather than an abstract illustration, and
-// the same headline the hero uses, so the card a reader sees before they ever click through is
+// the tagline the hero opens with, so the card a reader sees before they ever click through is
 // consistent with the page it links to. Rendered deterministically from the committed SVG with sharp
 // (already a website dependency) — no external image service, no network.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -33,7 +33,8 @@ const svg = `
     </g>
   </g>
   <text x="96" y="336" font-family="Space Grotesk, ui-sans-serif, sans-serif" font-size="64" font-weight="700" fill="#e2e8f0">Agent Conformance</text>
-  <text x="96" y="404" font-family="Inter, ui-sans-serif, sans-serif" font-size="34" fill="#94a3b8">Assess any AI agent against the same standard.</text>
+  <text x="96" y="404" font-family="Inter, ui-sans-serif, sans-serif" font-size="34" fill="#94a3b8">Open, repeatable checks of AI agent behavior</text>
+  <text x="96" y="450" font-family="Inter, ui-sans-serif, sans-serif" font-size="34" fill="#94a3b8">against AI rules and standards.</text>
   <text x="96" y="546" font-family="Inter, ui-sans-serif, sans-serif" font-size="26" fill="#5eead4">agent-conformance.org</text>
 </svg>
 `.trim();
