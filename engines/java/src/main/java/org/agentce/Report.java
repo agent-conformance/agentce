@@ -170,54 +170,187 @@ public final class Report {
                 .replace("'", "&#x27;");
     }
 
-    /** Cap applied when an event-derived string is escaped for Markdown/terminal rendering (SPEC §7
-     * injection hardening): long enough to stay useful, short enough to bound a hostile payload. */
-    private static final int MD_ESCAPE_CAP = 200;
+    /** Cap applied when a record-derived string is sanitised for Markdown/terminal/HTML rendering
+     * (SPEC §7 injection hardening): long enough to stay useful, short enough to bound a hostile
+     * payload. */
+    private static final int SANITIZE_CAP = 200;
 
     /** Shown in place of a name that neutralises to nothing: escaping, never erasure -- real
      * activity is never silently dropped to "0". */
-    private static final String MD_ESCAPE_EMPTY_PLACEHOLDER = "(unnamed)";
+    private static final String SANITIZE_EMPTY_NAME_PLACEHOLDER = "(unnamed)";
 
-    /** C0/C1 controls (newline, tab, the ESC that starts a terminal escape sequence, NEL U+0085,
-     * ...; {@link Character#isISOControl(int)} covers exactly this range) plus the Unicode
-     * line/paragraph separators U+2028/U+2029 -- every codepoint that can move the terminal cursor,
-     * start a new line, or hide text, not only whitespace. */
-    private static boolean isControlLike(int codepoint) {
-        return Character.isISOControl(codepoint) || codepoint == 0x2028 || codepoint == 0x2029;
+    /** Shown in place of a subject id, evidence ref, or violation path that neutralises to nothing --
+     * {@link #SANITIZE_EMPTY_NAME_PLACEHOLDER}'s "(unnamed)" reads oddly for a field that was never a
+     * name. */
+    private static final String SANITIZE_EMPTY_FIELD_PLACEHOLDER = "(empty)";
+
+    /** The complete, current Unicode {@code Default_Ignorable_Code_Point} property, as (first, last)
+     * inclusive codepoint ranges -- hard-coded once and identical across all three engines,
+     * independent of any engine's own Unicode database version ({@code Cf} alone misses variation
+     * selectors, CGJ, the Mongolian free variation selectors, the Hangul fillers, and every
+     * reserved-for-future-use DICP range). Mirrors {@code engines/python/agentce/report.py}'s
+     * {@code _DICP_RANGES} exactly. */
+    private static final int[][] DICP_RANGES = {
+        {0x00AD, 0x00AD},
+        {0x034F, 0x034F},
+        {0x061C, 0x061C},
+        {0x115F, 0x1160},
+        {0x17B4, 0x17B5},
+        {0x180B, 0x180F},
+        {0x200B, 0x200F},
+        {0x202A, 0x202E},
+        {0x2060, 0x206F},
+        {0x3164, 0x3164},
+        {0xFE00, 0xFE0F},
+        {0xFEFF, 0xFEFF},
+        {0xFFA0, 0xFFA0},
+        {0xFFF0, 0xFFF8},
+        {0x1BCA0, 0x1BCA3},
+        {0x1D173, 0x1D17A},
+        {0xE0000, 0xE0FFF},
+    };
+
+    static boolean isDicpCodepoint(int codepoint) {
+        for (int[] range : DICP_RANGES) {
+            if (codepoint >= range[0] && codepoint <= range[1]) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    /** Neutralise an event-derived string (agent, model, or tool name) before it reaches {@code
-     * report.md} or the terminal (SPEC §7 injection hardening, mirroring the Python reference's
-     * {@code _md_escape}): replace every control character and line/paragraph separator with a space
-     * (never just whitespace -- a raw ESC can still write a hostile terminal escape sequence),
-     * collapse the result to single spaces, replace backticks and angle brackets with visually
-     * similar but inert characters (round 3: a {@code <br>}/{@code <h2>} in a hostile name would
-     * otherwise pass through as live HTML when the Markdown is rendered by a browser and forge its
-     * own heading/line break -- never escaped as {@code &lt;}/{@code &gt;}, which would defeat
-     * plain-text/terminal readability), and cap its length by codepoint (never a UTF-16 half of a
-     * surrogate pair). A string that neutralises to nothing renders as
-     * {@link #MD_ESCAPE_EMPTY_PLACEHOLDER}, never a silent gap. */
-    private static String mdEscape(String text) {
-        StringBuilder neutralized = new StringBuilder();
-        text.codePoints().forEach(cp -> neutralized.appendCodePoint(isControlLike(cp) ? ' ' : cp));
-        String collapsed = String.join(" ", neutralized.toString().trim().split("\\s+"))
-                .replace("`", "'")
-                .replace("<", "‹")
-                .replace(">", "›");
+    /** Whether any codepoint in {@code text} is in the drop-set {@link #neutralize} uses (category
+     * {@code Cf} or the hard-coded {@code Default_Ignorable_Code_Point} table above). */
+    public static boolean hasInvisibleCodepoint(String text) {
+        return text.codePoints().anyMatch(cp -> Character.getType(cp) == Character.FORMAT || isDicpCodepoint(cp));
+    }
+
+    /** Fold every run of the literal space character or a {@code Zs}-category codepoint (NBSP,
+     * ideographic space, ...) into a single ASCII space -- one explicit, per-engine-identical
+     * definition of "collapsible whitespace" (category-based, not Java's own differing built-in
+     * {@code isWhitespace}, which is exactly what let NBSP/U+3000 diverge across engines before). */
+    private static String collapseWhitespace(String text) {
+        StringBuilder out = new StringBuilder();
+        boolean inWs = false;
+        int i = 0;
+        while (i < text.length()) {
+            int cp = text.codePointAt(i);
+            i += Character.charCount(cp);
+            if (cp == ' ' || Character.getType(cp) == Character.SPACE_SEPARATOR) {
+                if (!inWs) {
+                    out.append(' ');
+                    inWs = true;
+                }
+            } else {
+                out.appendCodePoint(cp);
+                inWs = false;
+            }
+        }
+        return out.toString();
+    }
+
+    /** The one shared core every sanitiser target calls first (SPEC §7 injection hardening,
+     * mirroring the Python reference's {@code _neutralize}): replace every {@code Cc}/{@code Co}/
+     * {@code Cs}/{@code Zl}/{@code Zp} codepoint with a literal space; drop every {@code Cf}-or-
+     * {@code Default_Ignorable_Code_Point} codepoint entirely (never a space -- removing a
+     * zero-width character preserves the string's visual intent); collapse collapsible whitespace to
+     * single spaces; trim leading and trailing whitespace; cap by codepoint (never a UTF-16 half of a
+     * surrogate pair), computed here on the neutralized-but-not-yet-HTML-escaped text, before any
+     * HTML-entity expansion a caller applies on top; then render {@code placeholder} if the result is
+     * empty but {@code text} was not. */
+    private static String neutralize(String text, int cap, String placeholder) {
+        StringBuilder kept = new StringBuilder();
+        text.codePoints().forEach(cp -> {
+            int type = Character.getType(cp);
+            if (type == Character.CONTROL
+                    || type == Character.PRIVATE_USE
+                    || type == Character.SURROGATE
+                    || type == Character.LINE_SEPARATOR
+                    || type == Character.PARAGRAPH_SEPARATOR) {
+                kept.append(' ');
+            } else if (type == Character.FORMAT || isDicpCodepoint(cp)) {
+                // Dropped entirely (never a space): by definition invisible/zero-width.
+            } else {
+                kept.appendCodePoint(cp);
+            }
+        });
+        String collapsed = collapseWhitespace(kept.toString()).strip();
+        int codepointCount = collapsed.codePointCount(0, collapsed.length());
+        if (codepointCount > cap) {
+            int[] codepoints = collapsed.codePoints().toArray();
+            collapsed = new String(codepoints, 0, cap - 1) + "…";
+        }
         if (collapsed.isEmpty() && !text.isEmpty()) {
-            collapsed = MD_ESCAPE_EMPTY_PLACEHOLDER;
-        }
-        if (collapsed.length() <= MD_ESCAPE_CAP) {
-            // Java char length (UTF-16 units) is always >= codepoint count, so this is a safe,
-            // cheap sufficient condition to skip the codepoint-array build below for the common
-            // (short, uncapped) name.
-            return collapsed;
-        }
-        int[] codepoints = collapsed.codePoints().toArray();
-        if (codepoints.length > MD_ESCAPE_CAP) {
-            collapsed = new String(codepoints, 0, MD_ESCAPE_CAP - 1) + "…";
+            collapsed = placeholder;
         }
         return collapsed;
+    }
+
+    /** The six substitutions {@link #sanitizeForMarkdown} applies on top of {@link #neutralize}'s
+     * output -- see {@code engines/python/agentce/report.py}'s {@code _MARKDOWN_SUBSTITUTIONS} for
+     * the full rationale (breaks code-span/HTML/link/image/entity-reference syntax; deliberately not
+     * a broader "fullwidth every punctuation character" rule). */
+    private static final String[][] MARKDOWN_SUBSTITUTIONS = {
+        {"`", "'"},
+        {"<", "‹"},
+        {">", "›"},
+        {"[", "［"},
+        {"]", "］"},
+        {"&", "＆"},
+    };
+
+    /** Neutralise a record-derived string before it reaches {@code report.md}'s Markdown rendering or
+     * the terminal (SPEC §7 injection hardening; mirrors the Python reference's
+     * {@code sanitize_for_markdown}). */
+    public static String sanitizeForMarkdown(String text, String placeholder, int cap) {
+        String neutralized = neutralize(text, cap, placeholder);
+        for (String[] sub : MARKDOWN_SUBSTITUTIONS) {
+            neutralized = neutralized.replace(sub[0], sub[1]);
+        }
+        return neutralized;
+    }
+
+    public static String sanitizeForMarkdown(String text, String placeholder) {
+        return sanitizeForMarkdown(text, placeholder, SANITIZE_CAP);
+    }
+
+    public static String sanitizeForMarkdown(String text) {
+        return sanitizeForMarkdown(text, SANITIZE_EMPTY_NAME_PLACEHOLDER, SANITIZE_CAP);
+    }
+
+    /** A documented alias for {@link #sanitizeForMarkdown}, not a second implementation -- see the
+     * Python reference's own {@code sanitize_for_terminal} docstring for why. */
+    public static String sanitizeForTerminal(String text, String placeholder, int cap) {
+        return sanitizeForMarkdown(text, placeholder, cap);
+    }
+
+    public static String sanitizeForTerminal(String text, String placeholder) {
+        return sanitizeForMarkdown(text, placeholder);
+    }
+
+    public static String sanitizeForTerminal(String text) {
+        return sanitizeForMarkdown(text);
+    }
+
+    /** Neutralise a record-derived string for HTML rendering: {@link #neutralize} first, then
+     * {@link #esc} on the result -- nothing else (mirrors the Python reference's
+     * {@code sanitize_for_html}). */
+    public static String sanitizeForHtml(String text, String placeholder, int cap) {
+        return esc(neutralize(text, cap, placeholder));
+    }
+
+    public static String sanitizeForHtml(String text, String placeholder) {
+        return sanitizeForHtml(text, placeholder, SANITIZE_CAP);
+    }
+
+    public static String sanitizeForHtml(String text) {
+        return sanitizeForHtml(text, SANITIZE_EMPTY_NAME_PLACEHOLDER, SANITIZE_CAP);
+    }
+
+    /** {@link #sanitizeForMarkdown} with the field placeholder rather than the name placeholder
+     * (mirrors the Python reference's {@code _sanitize_field}). */
+    private static String sanitizeField(String text) {
+        return sanitizeForMarkdown(text, SANITIZE_EMPTY_FIELD_PLACEHOLDER);
     }
 
     /** {@code "label 3, label 2"} for every nonzero count, in the node's (fixed) field order; {@code
@@ -249,18 +382,18 @@ public final class Report {
         List<String> lines = new ArrayList<>();
         if (!tools.isEmpty()) {
             lines.add(cat.get("report.activity_undeclared_tools_label") + ": "
-                    + tools.stream().map(Report::mdEscape).collect(Collectors.joining(", ")));
+                    + tools.stream().map(Report::sanitizeForMarkdown).collect(Collectors.joining(", ")));
         }
         if (!models.isEmpty()) {
             lines.add(cat.get("report.activity_undeclared_models_label") + ": "
-                    + models.stream().map(Report::mdEscape).collect(Collectors.joining(", ")));
+                    + models.stream().map(Report::sanitizeForMarkdown).collect(Collectors.joining(", ")));
         }
         return lines;
     }
 
     /** {@code (label, value)} for every counted-facts row -- the one place the row set and order is
      * decided, shared by the Markdown, HTML, and terminal renderings. Agent, model, and tool names
-     * are event-derived strings (SPEC §7 injection hardening), escaped with {@link #mdEscape} before
+     * are event-derived strings (SPEC §7 injection hardening), escaped with {@link #sanitizeForMarkdown} before
      * joining so a hostile name (embedded newlines) can never start a new Markdown/terminal line --
      * this section renders before the verdict. */
     private static List<Map.Entry<String, String>> activityRows(ObjectNode activity, Map<String, String> cat) {
@@ -270,11 +403,11 @@ public final class Report {
         for (String k : Activity.DENIED_KINDS) deniedLabels.put(k, cat.get("report.activity_denied_" + k));
 
         List<String> agentNames = new ArrayList<>();
-        activity.get("agents").forEach(n -> agentNames.add(mdEscape(n.asText())));
+        activity.get("agents").forEach(n -> agentNames.add(sanitizeForMarkdown(n.asText())));
         List<String> modelNames = new ArrayList<>();
-        activity.get("models").forEach(n -> modelNames.add(mdEscape(n.get("name").asText())));
+        activity.get("models").forEach(n -> modelNames.add(sanitizeForMarkdown(n.get("name").asText())));
         List<String> toolNames = new ArrayList<>();
-        activity.get("tools").forEach(n -> toolNames.add(mdEscape(n.get("name").asText())));
+        activity.get("tools").forEach(n -> toolNames.add(sanitizeForMarkdown(n.get("name").asText())));
 
         List<Map.Entry<String, String>> rows = new ArrayList<>();
         rows.add(Map.entry(
@@ -358,15 +491,6 @@ public final class Report {
         return "request".equals(stepKind) ? "a request to " + ownerLabel : "a code change for " + ownerLabel;
     }
 
-    /** Neutralise a blind-spot field before it reaches Markdown/the terminal (SPEC §7 injection
-     * hardening, mirroring {@link #mdEscape}'s use in {@code activityRows}): {@code event}/
-     * {@code class} come from the catalog, but a {@code no_population} entry's {@code subject} can be
-     * records-derived, and the section renders right after activity and before the verdict (RFC 0008
-     * Sec.7) -- the same position P11 (item 18.4 rework) forged a fake verdict line through. */
-    private static String bsEscape(String value) {
-        return mdEscape(value);
-    }
-
     /** {@code (label, value)} for every blind spot, in the module's own ranked order (never re-sorted
      * here). */
     private static List<Map.Entry<String, String>> blindSpotRows(ArrayNode blindSpots) {
@@ -375,12 +499,12 @@ public final class Report {
             String ownerLabel = BLIND_SPOT_OWNER_LABEL.get(bs.get("owner_key").asText());
             String step = blindSpotStepText(bs.get("step_kind").asText(), ownerLabel);
             List<String> adapterNames = new ArrayList<>();
-            bs.get("supplying_adapters").forEach(n -> adapterNames.add(bsEscape(n.asText())));
+            bs.get("supplying_adapters").forEach(n -> adapterNames.add(sanitizeField(n.asText())));
             String adapters = adapterNames.isEmpty() ? "no adapter today" : String.join(", ", adapterNames);
             String value = "unlocks " + bs.get("checks_unlocked").asInt() + " check(s), needed by "
                     + bs.get("needed_by").asInt() + " more; rung " + bs.get("ladder_rung").asInt() + " -- " + step
                     + ". Adapters that can supply this: " + adapters + ".";
-            String label = bsEscape(bs.get("event").asText()) + " (" + bsEscape(bs.get("class").asText()) + ")";
+            String label = sanitizeField(bs.get("event").asText()) + " (" + sanitizeField(bs.get("class").asText()) + ")";
             rows.add(Map.entry(label, value));
         }
         return rows;
@@ -389,9 +513,10 @@ public final class Report {
     private static List<Map.Entry<String, String>> noPopulationRows(ArrayNode noPopulation) {
         List<Map.Entry<String, String>> rows = new ArrayList<>();
         for (JsonNode entry : noPopulation) {
-            String control = bsEscape(entry.get("control").asText());
-            String label = control + " on " + bsEscape(entry.get("subject").asText()) + " ("
-                    + bsEscape(entry.get("catalog").asText()) + "@" + bsEscape(entry.get("control_version").asText())
+            String control = sanitizeField(entry.get("control").asText());
+            String label = control + " on " + sanitizeField(entry.get("subject").asText()) + " ("
+                    + sanitizeField(entry.get("catalog").asText()) + "@"
+                    + sanitizeField(entry.get("control_version").asText())
                     + ")";
             String value = "The records show every kind of evidence " + control + " asks for, but not enough of "
                     + "it in the shape the control expects -- a --domain binding may be needed to identify the "
@@ -534,7 +659,9 @@ public final class Report {
             lines.add("_" + cat.get("report.no_controls") + "_");
         }
         for (Assertions.Assertion a : sortedBySubjectControl(assertions)) {
-            lines.add("- `" + a.control + "` @ `" + a.subject + "` -> **" + outcomeLabel(cat, a.outcome) + "** "
+            String control = sanitizeForMarkdown(a.control);
+            String subject = sanitizeForMarkdown(a.subject);
+            lines.add("- `" + control + "` @ `" + subject + "` -> **" + outcomeLabel(cat, a.outcome) + "** "
                     + "(rung " + a.rung + ", " + a.mode + "; " + a.population[1] + "/" + a.population[0] + " failed)");
             for (JsonNode entry : a.crosswalk) {
                 lines.add("  - " + crosswalkText(entry, cat));
@@ -592,7 +719,8 @@ public final class Report {
                 }
                 clauses.append(esc(crosswalkText(a.crosswalk.get(i), cat)));
             }
-            rows.append("<tr><td>").append(esc(a.control)).append("</td><td>").append(esc(a.subject)).append("</td>")
+            rows.append("<tr><td>").append(sanitizeForHtml(a.control)).append("</td><td>")
+                    .append(sanitizeForHtml(a.subject)).append("</td>")
                     .append("<td>").append(esc(outcomeLabel(cat, a.outcome))).append("</td>")
                     .append("<td>").append(clauses).append("</td></tr>");
         }

@@ -2,6 +2,7 @@ package org.agentce;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -10,8 +11,12 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -245,5 +250,492 @@ class ReportTest {
         assertTrue(manifest.get("outputs").has("assertions.json"));
         String onDisk = Files.readString(outDir.resolve("manifest.json"));
         assertTrue(onDisk.startsWith("{\n  \"agentce_manifest_version\": 1,"), "manifest is Python-style pretty JSON");
+    }
+
+    // --- The unified sanitiser (SPEC §7 injection hardening; contracts/P18-18.20.md): named
+    // adversarial payloads built from explicit code points, never a raw literal, so no control,
+    // bidi-override, or zero-width character ever appears in this source file itself (matching
+    // engines/python/tests/test_sanitize.py's own convention). Mirrors that file one-for-one, ported
+    // idiomatically; `neutralize` itself is private (as in the TypeScript port), so these tests go
+    // through `sanitizeForMarkdown`/`sanitizeForHtml`'s default cap (200) and name placeholder
+    // ("(unnamed)"), which match `_neutralize`'s own defaults exactly. ---
+
+    private static String cp(int codepoint) {
+        return new String(Character.toChars(codepoint));
+    }
+
+    private static final String ESC = cp(0x1B);
+    private static final String DEL = cp(0x7F);
+    private static final String C1_SS3 = cp(0x8F);
+    private static final String RLO = cp(0x202E);
+    private static final String LRO = cp(0x202D);
+    private static final String PDF_MARK = cp(0x202C);
+    private static final String LRI = cp(0x2066);
+    private static final String RLI = cp(0x2067);
+    private static final String FSI = cp(0x2068);
+    private static final String PDI = cp(0x2069);
+    private static final String LRM = cp(0x200E);
+    private static final String RLM = cp(0x200F);
+    private static final String ZWSP = cp(0x200B);
+    private static final String ZWNJ = cp(0x200C);
+    private static final String ZWJ = cp(0x200D);
+    private static final String BOM = cp(0xFEFF);
+    private static final String WJ = cp(0x2060);
+    private static final String VARIATION_SELECTOR = cp(0xFE0F);
+    private static final String ASTRAL_VARIATION_SELECTOR = cp(0xE0100);
+    private static final String CGJ = cp(0x034F);
+    private static final String MONGOLIAN_FVS = cp(0x180B);
+    private static final String HANGUL_FILLER = cp(0x115F);
+    private static final String RESERVED_DICP = cp(0xFFF0);
+    private static final String NBSP = cp(0x00A0);
+    private static final String IDEOGRAPHIC_SPACE = cp(0x3000);
+    private static final String EN_SPACE = cp(0x2002);
+    private static final String LINE_SEP = cp(0x2028);
+    private static final String PARA_SEP = cp(0x2029);
+    private static final String EMOJI = cp(0x1F600);
+    private static final String NONCHARACTER = cp(0xFDD0); // permanently reserved, never assigned
+
+    private static String unescapeHtmlEntities(String s) {
+        return s.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"")
+                .replace("&#x27;", "'").replace("&amp;", "&");
+    }
+
+    // --- `_neutralize` core (via `sanitizeForMarkdown`'s default cap/placeholder) ---
+
+    @Test
+    void neutralizeReplacesControlAndDelAndC1WithASpace() {
+        assertEquals("a b c d", Report.sanitizeForMarkdown("a" + ESC + "b" + DEL + "c" + C1_SS3 + "d"));
+    }
+
+    @Test
+    void neutralizeRemovesTheCfBidiAndZeroWidthRangeByCategory() {
+        String payload = "a" + RLO + LRO + PDF_MARK + LRI + RLI + FSI + PDI + LRM + RLM
+                + "b" + ZWSP + ZWNJ + ZWJ + BOM + WJ + "c";
+        assertEquals("abc", Report.sanitizeForMarkdown(payload));
+    }
+
+    @Test
+    void neutralizeRemovesDefaultIgnorableCodepointsCfDoesNotCover() {
+        for (String ch : new String[] {
+            VARIATION_SELECTOR, ASTRAL_VARIATION_SELECTOR, CGJ, MONGOLIAN_FVS, HANGUL_FILLER, RESERVED_DICP
+        }) {
+            assertEquals("ab", Report.sanitizeForMarkdown("a" + ch + "b"), ch);
+            assertNotEquals(Character.FORMAT, (byte) Character.getType(ch.codePointAt(0)), ch + " is Cf");
+        }
+    }
+
+    @Test
+    void neutralizeFoldsZsAndLiteralSpaceRunsToOneSpace() {
+        assertEquals("a b", Report.sanitizeForMarkdown("a" + NBSP + NBSP + "b"));
+        assertEquals("a b", Report.sanitizeForMarkdown("a" + IDEOGRAPHIC_SPACE + "b"));
+        assertEquals("a b", Report.sanitizeForMarkdown("a" + EN_SPACE + "   b"));
+        assertEquals("a b", Report.sanitizeForMarkdown("a    b"));
+    }
+
+    @Test
+    void neutralizeTreatsLineAndParagraphSeparatorAsSpace() {
+        assertEquals("a b c", Report.sanitizeForMarkdown("a" + LINE_SEP + "b" + PARA_SEP + "c"));
+    }
+
+    @Test
+    void neutralizeTrimsLeadingAndTrailingWhitespace() {
+        assertEquals("hello world", Report.sanitizeForMarkdown("   hello world   "));
+    }
+
+    @Test
+    void neutralizeRendersPlaceholderForWhitespaceOnlyInput() {
+        assertEquals("(unnamed)", Report.sanitizeForMarkdown("   "));
+        assertEquals("(unnamed)", Report.sanitizeForMarkdown(ZWSP + ZWNJ));
+    }
+
+    @Test
+    void neutralizeOfEmptyInputStaysEmpty() {
+        assertEquals("", Report.sanitizeForMarkdown(""));
+    }
+
+    @Test
+    void neutralizeDoesNotFilterUnassignedCnCodepoints() {
+        assertEquals(Character.UNASSIGNED, (byte) Character.getType(NONCHARACTER.codePointAt(0)));
+        assertEquals("a" + NONCHARACTER + "b", Report.sanitizeForMarkdown("a" + NONCHARACTER + "b"));
+    }
+
+    @Test
+    void neutralizeTreatsLoneSurrogateAsCsAndDoesNotCrash() {
+        String lone = String.valueOf((char) 0xD800);
+        assertEquals(Character.SURROGATE, (byte) Character.getType(0xD800));
+        assertEquals("a b", Report.sanitizeForMarkdown("a" + lone + "b"));
+    }
+
+    @Test
+    void neutralizeCapsByCodepointNeverSplittingASurrogatePair() {
+        String payload = "x".repeat(197) + EMOJI + "y".repeat(100);
+        String out = Report.sanitizeForMarkdown(payload);
+        assertEquals(200, out.codePointCount(0, out.length()));
+        assertTrue(out.endsWith("…"));
+        assertTrue(out.contains(EMOJI));
+        for (int i = 0; i < out.length(); i++) {
+            if (Character.isHighSurrogate(out.charAt(i))) {
+                assertTrue(i + 1 < out.length() && Character.isLowSurrogate(out.charAt(i + 1)));
+            }
+        }
+    }
+
+    @Test
+    void neutralizeCapsBeforeHtmlEscapingNeverCuttingAnEntity() {
+        String payload = "<".repeat(250);
+        String md = Report.sanitizeForMarkdown(payload);
+        assertEquals(200, md.codePointCount(0, md.length()));
+        String page = Report.sanitizeForHtml(payload);
+        assertTrue(page.replace("&lt;", "").indexOf("&l") < 0);
+        long ltCount = (page.length() - page.replace("&lt;", "").length()) / "&lt;".length();
+        assertTrue(ltCount <= 200);
+    }
+
+    // --- Markdown target ---
+
+    @Test
+    void sanitizeForMarkdownNeutralisesBacktickAndAngleBrackets() {
+        String out = Report.sanitizeForMarkdown("a`b`<c>");
+        assertFalse(out.contains("`"));
+        assertFalse(out.contains("<"));
+        assertFalse(out.contains(">"));
+    }
+
+    @Test
+    void sanitizeForMarkdownBreaksLinkAndImageSyntax() {
+        String out = Report.sanitizeForMarkdown("![Verdict: Conformant](https://attacker.example/badge.png)");
+        assertFalse(out.contains("["));
+        assertFalse(out.contains("]"));
+    }
+
+    @Test
+    void sanitizeForMarkdownBreaksHtmlXmlEntityReferences() {
+        for (String payload : new String[] {"evil&#x202E;gnp.exe", "safe&zwj;x", "a&rlm;b", "a&ZeroWidthSpace;b"}) {
+            String out = Report.sanitizeForMarkdown(payload);
+            assertFalse(out.contains("&"), payload);
+            assertFalse(Report.hasInvisibleCodepoint(unescapeHtmlEntities(out)), payload);
+        }
+    }
+
+    @Test
+    void sanitizeForMarkdownDoesNotEscapeEmphasisOrPipeOrHash() {
+        String out = Report.sanitizeForMarkdown("*bold* _em_ ~~strike~~ | # not-a-heading");
+        assertEquals("*bold* _em_ ~~strike~~ | # not-a-heading", out);
+    }
+
+    @Test
+    void sanitizeForTerminalIsByteIdenticalToSanitizeForMarkdown() {
+        for (String payload : new String[] {"plain", "a`b`<c>[d](e)&f", RLO + "evil" + ZWSP, "", "   "}) {
+            assertEquals(Report.sanitizeForMarkdown(payload), Report.sanitizeForTerminal(payload));
+        }
+    }
+
+    // --- HTML target ---
+
+    @Test
+    void sanitizeForHtmlEscapesHtmlSpecialCharacters() {
+        String out = Report.sanitizeForHtml("<img src=x onerror=\"alert(1)\">'&");
+        assertFalse(out.contains("<"));
+        assertFalse(out.contains(">"));
+        Matcher m = Pattern.compile("&").matcher(out);
+        while (m.find()) {
+            assertTrue(Pattern.compile("&(amp|lt|gt|quot|#x27);").matcher(out.substring(m.start())).lookingAt());
+        }
+    }
+
+    @Test
+    void sanitizeForHtmlStripsBidiAndZeroWidthBeforeEscaping() {
+        String out = Report.sanitizeForHtml("a" + RLO + "b" + ZWSP + "c");
+        assertFalse(Report.hasInvisibleCodepoint(unescapeHtmlEntities(out)));
+    }
+
+    @Test
+    void sanitizeForHtmlDoesNotApplyMarkdownSubstitutions() {
+        String out = Report.sanitizeForHtml("a`b[c]d");
+        assertTrue(out.contains("`"));
+        assertTrue(out.contains("["));
+        assertTrue(out.contains("]"));
+    }
+
+    // --- Placeholders ---
+
+    @Test
+    void defaultPlaceholderIsUnnamedFieldPlaceholderIsEmpty() {
+        assertEquals("", Report.sanitizeForMarkdown(""));
+        assertEquals("(unnamed)", Report.sanitizeForMarkdown("   "));
+        assertEquals("(unnamed)", Report.sanitizeForHtml("   "));
+        assertEquals("(empty)", Report.sanitizeForHtml("   ", "(empty)"));
+    }
+
+    // --- Fixed-seed fuzz loop (java.util.Random(42), no new dependency -- mirrors the Python
+    // reference's hypothesis fuzz loop and the TypeScript port's own hand-rolled PRNG loop) ---
+
+    private static final int[] ADVERSARIAL_CODEPOINTS = {
+        0x1B, 0x7F, 0x8F, 0x202E, 0x202D, 0x202C, 0x2066, 0x2067, 0x2068, 0x2069, 0x200E, 0x200F,
+        0x200B, 0x200C, 0x200D, 0xFEFF, 0x2060, 0xFE0F, 0x034F, 0x180B, 0x115F, 0xFFF0, 0x00A0,
+        0x3000, 0x2028, 0x2029,
+    };
+
+    private static int randomFuzzCodepoint(Random rnd) {
+        int choice = rnd.nextInt(3);
+        if (choice == 0) {
+            return 0x20 + rnd.nextInt(0x7E - 0x20 + 1);
+        }
+        if (choice == 1) {
+            return ADVERSARIAL_CODEPOINTS[rnd.nextInt(ADVERSARIAL_CODEPOINTS.length)];
+        }
+        while (true) {
+            int candidate = 0x20 + rnd.nextInt(0x2FFFF - 0x20);
+            if (candidate >= 0xD800 && candidate <= 0xDFFF) {
+                continue;
+            }
+            int type = Character.getType(candidate);
+            if (type == Character.LOWERCASE_LETTER
+                    || type == Character.UPPERCASE_LETTER
+                    || type == Character.OTHER_LETTER
+                    || type == Character.DECIMAL_DIGIT_NUMBER
+                    || type == Character.OTHER_PUNCTUATION
+                    || type == Character.MATH_SYMBOL
+                    || type == Character.SPACE_SEPARATOR) {
+                return candidate;
+            }
+        }
+    }
+
+    private static String randomFuzzString(Random rnd) {
+        int len = rnd.nextInt(41);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < len; i++) {
+            sb.appendCodePoint(randomFuzzCodepoint(rnd));
+        }
+        return sb.toString();
+    }
+
+    @Test
+    void fuzzSanitizeForMarkdownUniversalProperties() {
+        Random rnd = new Random(42);
+        for (int i = 0; i < 500; i++) {
+            String text = randomFuzzString(rnd);
+            String out = Report.sanitizeForMarkdown(text);
+            assertFalse(out.contains("`"));
+            assertFalse(out.contains("<"));
+            assertFalse(out.contains(">"));
+            assertFalse(out.contains("["));
+            assertFalse(out.contains("]"));
+            assertFalse(out.contains("&"));
+            for (int codePoint : out.codePoints().toArray()) {
+                int type = Character.getType(codePoint);
+                assertFalse(type == Character.CONTROL || type == Character.PRIVATE_USE || type == Character.SURROGATE);
+            }
+            assertFalse(Report.hasInvisibleCodepoint(out));
+            assertFalse(out.contains(LINE_SEP));
+            assertFalse(out.contains(PARA_SEP));
+            assertTrue(out.codePointCount(0, out.length()) <= 200);
+            if (out.isEmpty()) {
+                assertEquals("", text);
+            }
+        }
+    }
+
+    @Test
+    void fuzzSanitizeForHtmlUniversalProperties() {
+        Random rnd = new Random(42);
+        for (int i = 0; i < 500; i++) {
+            String out = Report.sanitizeForHtml(randomFuzzString(rnd));
+            assertFalse(Report.hasInvisibleCodepoint(unescapeHtmlEntities(out)));
+            Matcher m = Pattern.compile("&").matcher(out);
+            while (m.find()) {
+                assertTrue(Pattern.compile("&(amp|lt|gt|quot|#x27);").matcher(out.substring(m.start())).lookingAt());
+            }
+            assertFalse(out.contains("<"));
+            assertFalse(out.contains(">"));
+        }
+    }
+
+    @Test
+    void fuzzSanitizeForTerminalMatchesSanitizeForMarkdown() {
+        Random rnd = new Random(42);
+        for (int i = 0; i < 500; i++) {
+            String text = randomFuzzString(rnd);
+            assertEquals(Report.sanitizeForMarkdown(text), Report.sanitizeForTerminal(text));
+        }
+    }
+
+    // --- Render-level property (report.md/report.html/CLI can't have their container broken) ---
+
+    private static ObjectNode renderLevelBlindSpots(String value) {
+        ObjectNode out = Json.nodes().objectNode();
+        ObjectNode bs = out.putArray("blind_spots").addObject();
+        bs.put("event", value);
+        bs.put("class", value);
+        bs.put("ladder_rung", 1);
+        bs.put("owner_key", "agent_team");
+        bs.put("step_kind", "code_change");
+        bs.putArray("supplying_adapters").add(value);
+        bs.put("checks_unlocked", 1);
+        bs.putArray("unlocked_checks");
+        bs.put("needed_by", 0);
+        bs.putArray("needed_by_checks");
+        ObjectNode noPop = out.putArray("no_population").addObject();
+        noPop.put("subject", value);
+        noPop.put("catalog", value);
+        noPop.put("control", value);
+        noPop.put("control_version", value);
+        return out;
+    }
+
+    private static Assertions.Assertion renderLevelAssertion(String value) {
+        Assertions.Assertion a = new Assertions.Assertion();
+        a.control = value;
+        a.controlVersion = "1";
+        a.subject = value;
+        a.outcome = "conformant";
+        a.rung = 2;
+        a.mode = "automated";
+        a.window = new String[] {"2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"};
+        a.population = new int[] {0, 0};
+        return a;
+    }
+
+    private record RenderResult(String md, String html, List<String> cliLines) {}
+
+    private static RenderResult renderAll(String value) {
+        ObjectNode activity = hostileActivity(value);
+        ObjectNode blindSpots = renderLevelBlindSpots(value);
+        List<Assertions.Assertion> assertions = List.of(renderLevelAssertion(value));
+        Map<String, Integer> counts = Map.of("conformant", 1);
+        String md = Report.renderReportMd(assertions, counts, "en", activity, blindSpots);
+        String html = Report.renderReportHtml(assertions, counts, "en", activity, blindSpots);
+        List<String> cliLines = new ArrayList<>(Report.activityCliLines(activity, Messages.catalogue()));
+        cliLines.addAll(Report.blindSpotsCliLines(blindSpots));
+        return new RenderResult(md, html, cliLines);
+    }
+
+    private static List<String> tagSkeleton(String html) {
+        List<String> tokens = new ArrayList<>();
+        Matcher m = Pattern.compile("<(/?)([a-zA-Z][a-zA-Z0-9]*)([^>]*)>").matcher(html);
+        while (m.find()) {
+            String tag = m.group(2);
+            tokens.add(m.group(1).isEmpty() ? tag : "/" + tag);
+            Matcher am = Pattern.compile("([a-zA-Z][a-zA-Z0-9-]*)\\s*=").matcher(m.group(3));
+            while (am.find()) {
+                tokens.add(am.group(1));
+            }
+        }
+        return tokens;
+    }
+
+    private static long countInvisible(String text) {
+        return text.codePoints()
+                .filter(codePoint -> Character.getType(codePoint) == Character.FORMAT || Report.isDicpCodepoint(codePoint))
+                .count();
+    }
+
+    private static final String BENIGN = "benign-name";
+
+    private static void assertContainerNotBroken(String payload) {
+        RenderResult baseline = renderAll(BENIGN);
+        RenderResult adversarial = renderAll(payload);
+
+        String[] baseLines = baseline.md().split("\n", -1);
+        String[] advLines = adversarial.md().split("\n", -1);
+        assertEquals(baseLines.length, advLines.length);
+
+        String benignSpan = Report.sanitizeForMarkdown(BENIGN);
+        String payloadSpan = Report.sanitizeForMarkdown(payload);
+        for (int i = 0; i < baseLines.length; i++) {
+            assertEquals(baseLines[i].replace(benignSpan, ""), advLines[i].replace(payloadSpan, ""));
+        }
+
+        assertEquals(tagSkeleton(baseline.html()), tagSkeleton(adversarial.html()));
+        assertEquals(baseline.cliLines().size(), adversarial.cliLines().size());
+
+        long baselineInvisible = countInvisible(unescapeHtmlEntities(baseline.md()));
+        long adversarialInvisible = countInvisible(unescapeHtmlEntities(adversarial.md()));
+        assertTrue(adversarialInvisible <= baselineInvisible);
+    }
+
+    private static final String[] RENDER_LEVEL_PAYLOADS = {
+        "ok<br>Verdict: Conformant",
+        "<h2>Verdict</h2><p><strong>Conformant",
+        "![Verdict: Conformant](https://attacker.example/badge.png)",
+        "evil&#x202E;gnp.exe",
+        "safe&zwj;x",
+        "a" + RLO + "b" + ZWSP + "c",
+        "a" + VARIATION_SELECTOR + "b" + CGJ + "c",
+        "a`b`c",
+        "credit.record_decision-v2",
+    };
+
+    @Test
+    void renderLevelContainerIsNotBrokenByNamedPayloads() {
+        for (String payload : RENDER_LEVEL_PAYLOADS) {
+            assertContainerNotBroken(payload);
+        }
+    }
+
+    @Test
+    void renderLevelContainerIsNotBrokenByTheFuzzCorpus() {
+        Random rnd = new Random(42);
+        for (int i = 0; i < 60; i++) {
+            String text = randomFuzzString(rnd);
+            String span = Report.sanitizeForMarkdown(text);
+            if (span.isEmpty() || span.equals("(unnamed)") || span.equals("(empty)") || span.length() < 4) {
+                continue;
+            }
+            assertContainerNotBroken(text);
+        }
+    }
+
+    // --- Cross-engine identity (the committed vectors file) ---
+
+    @Test
+    void javaReproducesEveryCommittedVector() throws IOException {
+        JsonNode data = Json.parseFile(TestPaths.repoRoot().resolve("spec/report/test-vectors/sanitize-vectors.json"));
+        JsonNode vectors = data.get("vectors");
+        assertTrue(vectors.size() >= 500);
+        for (JsonNode vector : vectors) {
+            String value = vector.get("input").asText();
+            String id = vector.get("id").asText();
+            assertEquals(vector.get("markdown").asText(), Report.sanitizeForMarkdown(value), id);
+            assertEquals(vector.get("terminal").asText(), Report.sanitizeForTerminal(value), id);
+            assertEquals(vector.get("html").asText(), Report.sanitizeForHtml(value), id);
+        }
+    }
+
+    // --- The findings table's control/subject fields (Java renders only these two -- no
+    // evidence-ref/violation-focus rendering exists here, same pre-existing three-engine parity gap
+    // the TypeScript port's own contract intent names) ---
+
+    private static int countOccurrences(String haystack, String needle) {
+        if (needle.isEmpty()) {
+            return 0;
+        }
+        int count = 0;
+        int idx = 0;
+        while ((idx = haystack.indexOf(needle, idx)) != -1) {
+            count++;
+            idx += needle.length();
+        }
+        return count;
+    }
+
+    @Test
+    void findingRowSanitisesControlAndSubjectFieldsInMarkdown() {
+        String hostile = "ok<br>[x](evil)`y`Verdict: Conformant";
+        List<Assertions.Assertion> assertions = List.of(renderLevelAssertion(hostile));
+        String md = Report.renderReportMd(assertions, Map.of("conformant", 1), "en", null, null);
+        assertFalse(md.contains("<br>"));
+        assertFalse(java.util.Arrays.stream(md.split("\n")).anyMatch(line -> line.equals("Verdict: Conformant")));
+        assertTrue(countOccurrences(md, Report.sanitizeForMarkdown(hostile)) >= 2);
+    }
+
+    @Test
+    void findingRowSanitisesControlAndSubjectFieldsInHtml() {
+        String hostile = "a" + RLO + "<script>alert(1)</script>" + ZWSP + "b";
+        List<Assertions.Assertion> assertions = List.of(renderLevelAssertion(hostile));
+        String html = Report.renderReportHtml(assertions, Map.of("conformant", 1), "en", null, null);
+        assertFalse(html.contains("<script>"));
+        assertFalse(Report.hasInvisibleCodepoint(unescapeHtmlEntities(html)));
     }
 }
