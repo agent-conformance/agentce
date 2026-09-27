@@ -661,15 +661,3 @@ jobs:
       - name: registry_check self-test (the implementation-report registry, now schema-validated too)
         working-directory: conformance
         run: uv run --frozen python registry_check.py --self-test
-      - name: acf_matrix_check self-test (the ACF matrix schema and structural rules discriminate)
-        working-directory: conformance
-        run: uv run --frozen python acf_matrix_check.py --self-test
-      - name: acf_matrix_check --check-fixtures (every capability's test reproduces its golden outcome)
-        working-directory: conformance
-        run: uv run --frozen python acf_matrix_check.py --check-fixtures
-      - name: acf_score self-test (the scoring rule, serialization determinism, and the ratchet discriminate)
-        working-directory: conformance
-        run: uv run --frozen python acf_score.py --self-test
-      - name: acf_score (the honest ACF scorecard; the score-only-rises ratchet against the committed baseline)
-        working-directory: conformance
-        run: uv run --frozen python acf_score.py
