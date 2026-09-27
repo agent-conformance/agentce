@@ -47,11 +47,18 @@ public final class Activity {
         return node != null && node.isTextual() ? node.textValue() : fallback;
     }
 
-    /** A tuple key that sorts the same way Python's {@code sorted()} sorts tuples: elementwise, by byte
-     * order, earlier elements taking priority. {@code \u0000} cannot appear in a name field and always
-     * sorts before every other byte, so it safely marks the tuple boundary. */
-    private static String tupleKey(String... parts) {
-        return String.join("\u0000", parts);
+    /** Compares tuples the way Python's {@code sorted()} compares tuples: elementwise, by byte order,
+     * earlier elements taking priority. A joined-string key (e.g. on {@code "\u0000"}) cannot serve as
+     * a map key here: two different tuples can join to the same string (a name containing the join
+     * character collides with an adjacent field boundary), which would silently drop one tuple as a
+     * duplicate and could disagree with the other engines' output. */
+    private static int compareTuple(List<String> a, List<String> b) {
+        int n = Math.min(a.size(), b.size());
+        for (int i = 0; i < n; i++) {
+            int c = Json.byteCompare(a.get(i), b.get(i));
+            if (c != 0) return c;
+        }
+        return Integer.compare(a.size(), b.size());
     }
 
     /** Return the counted facts {@code events} show, compared against what {@code profile} declares.
@@ -62,8 +69,8 @@ public final class Activity {
      * which is the correct first-run answer, not a false positive. */
     public static ObjectNode summarizeActivity(List<JsonNode> events, Profile profile) {
         Set<String> agents = new TreeSet<>(Json::byteCompare);
-        TreeMap<String, String[]> models = new TreeMap<>(Json::byteCompare);
-        TreeMap<String, String[]> tools = new TreeMap<>(Json::byteCompare);
+        TreeMap<List<String>, String[]> models = new TreeMap<>(Activity::compareTuple);
+        TreeMap<List<String>, String[]> tools = new TreeMap<>(Activity::compareTuple);
         Set<String> observedTools = new LinkedHashSet<>();
         Set<String> observedModels = new LinkedHashSet<>();
         var actionsByEffectClass = new java.util.LinkedHashMap<String, Integer>();
@@ -89,7 +96,7 @@ public final class Activity {
                         observedModels.add(name);
                         String provider = textOr(model.get("provider"), "");
                         String versionOrDigest = textOr(model.get("version_or_digest"), "");
-                        models.put(tupleKey(provider, name, versionOrDigest), new String[] {provider, name, versionOrDigest});
+                        models.put(List.of(provider, name, versionOrDigest), new String[] {provider, name, versionOrDigest});
                     }
                 }
                 case "ToolCall" -> {
@@ -99,7 +106,7 @@ public final class Activity {
                         observedTools.add(name);
                         String server = textOr(tool.get("server"), "");
                         String protocol = textOr(tool.get("protocol"), "");
-                        tools.put(tupleKey(name, server, protocol), new String[] {name, server, protocol});
+                        tools.put(List.of(name, server, protocol), new String[] {name, server, protocol});
                     }
                     JsonNode effectClass = data.get("effect_class");
                     String key = effectClass != null && effectClass.isTextual()

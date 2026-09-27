@@ -110,7 +110,7 @@ export function summarizeActivity(events: Event[], profile: Profile): Activity {
         const name = model.name;
         observedModels.add(name);
         const key = [String(model.provider ?? ""), name, String(model.version_or_digest ?? "")];
-        models.set(key.join("\u0000"), key);
+        models.set(JSON.stringify(key), key);
       }
     } else if (etype === "ToolCall") {
       const tool = data.tool;
@@ -118,7 +118,7 @@ export function summarizeActivity(events: Event[], profile: Profile): Activity {
         const name = tool.name;
         observedTools.add(name);
         const key = [name, String(tool.server ?? ""), String(tool.protocol ?? "")];
-        tools.set(key.join("\u0000"), key);
+        tools.set(JSON.stringify(key), key);
       }
       const effectClass = data.effect_class;
       const key =
