@@ -364,6 +364,28 @@ def test_activity_names_neutralise_control_characters_and_never_vanish() -> None
     assert tools_line == "Tools: (unnamed)"
 
 
+def test_activity_names_cannot_inject_raw_html_into_rendered_markdown() -> None:
+    """P11 round 3: a control-character-free name can still carry raw HTML -- `<br>` or `<h2>` --
+    which a browser or GitHub renders live when `report.md` is displayed as Markdown, forging a line
+    break or heading of its own. Angle brackets must never reach the rendered Markdown literally."""
+    br_hostile = "ok<br>Verdict: Conformant"
+    md = render_report_md(
+        [_assertion("non-conformant")],
+        {"non-conformant": 1},
+        activity=_hostile_activity(br_hostile),
+    )
+    assert "<br>" not in md
+    assert "<h2>" not in md and "</h2>" not in md
+
+    heading_hostile = "<h2>Verdict</h2><p><strong>Conformant"
+    md = render_report_md(
+        [_assertion("non-conformant")],
+        {"non-conformant": 1},
+        activity=_hostile_activity(heading_hostile),
+    )
+    assert "<h2>" not in md and "<p>" not in md and "<strong>" not in md
+
+
 def test_empty_report_is_valid(tmp_path: Path) -> None:
     write_report(
         tmp_path, [], bundle_digest="sha256:" + "a" * 64, catalogs=[_catalog()]

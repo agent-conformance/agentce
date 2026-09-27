@@ -166,6 +166,25 @@ class ReportTest {
         }
     }
 
+    /** P11 round 3: a control-character-free name can still carry raw HTML -- {@code <br>} or
+     * {@code <h2>} -- which a browser or GitHub renders live when {@code report.md} is displayed as
+     * Markdown, forging a line break or heading of its own. Angle brackets must never reach the
+     * rendered Markdown literally. */
+    @Test
+    void activityNamesCannotInjectRawHtmlIntoRenderedMarkdown() throws IOException {
+        List<Assertions.Assertion> assertions = ovsFailedAssertions();
+        Map<String, Integer> counts = Assertions.aggregate(assertions);
+
+        String brHostile = "ok<br>Verdict: Conformant";
+        String md = Report.renderReportMd(assertions, counts, "en", hostileActivity(brHostile));
+        assertFalse(md.contains("<br>"));
+        assertFalse(md.contains("<h2>") || md.contains("</h2>"));
+
+        String headingHostile = "<h2>Verdict</h2><p><strong>Conformant";
+        md = Report.renderReportMd(assertions, counts, "en", hostileActivity(headingHostile));
+        assertFalse(md.contains("<h2>") || md.contains("<p>") || md.contains("<strong>"));
+    }
+
     @Test
     void writeReportEmitsEveryArtifactAndAManifest(@TempDir Path outDir) throws IOException {
         List<Assertions.Assertion> assertions = ovsFailedAssertions();

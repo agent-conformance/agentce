@@ -104,9 +104,12 @@ function isControlLike(codepoint: number): boolean {
  * the terminal (SPEC §7 injection hardening, mirroring the Python reference's `_md_escape`): replace
  * every control character and line/paragraph separator with a space (never just whitespace -- a raw
  * ESC can still write a hostile terminal escape sequence), collapse the result to single spaces,
- * replace backticks so it cannot break out of Markdown code spans, and cap its length by codepoint
- * (`Array.from`, never a UTF-16 half of a surrogate pair). A string that neutralises to nothing
- * renders as `MD_ESCAPE_EMPTY_PLACEHOLDER`, never a silent gap. */
+ * replace backticks and angle brackets with visually similar but inert characters (round 3: a
+ * `<br>`/`<h2>` in a hostile name would otherwise pass through as live HTML when the Markdown is
+ * rendered by a browser and forge its own heading/line break -- never escaped as `&lt;`/`&gt;`,
+ * which would defeat plain-text/terminal readability), and cap its length by codepoint (`Array.from`,
+ * never a UTF-16 half of a surrogate pair). A string that neutralises to nothing renders as
+ * `MD_ESCAPE_EMPTY_PLACEHOLDER`, never a silent gap. */
 function mdEscape(text: string, cap: number = MD_ESCAPE_CAP): string {
   const neutralized = Array.from(text)
     .map((ch) => (isControlLike(ch.codePointAt(0) as number) ? " " : ch))
@@ -115,7 +118,9 @@ function mdEscape(text: string, cap: number = MD_ESCAPE_CAP): string {
     .split(/\s+/)
     .filter((w) => w.length > 0)
     .join(" ")
-    .replace(/`/g, "'");
+    .replace(/`/g, "'")
+    .replace(/</g, "‹")
+    .replace(/>/g, "›");
   if (collapsed.length === 0 && text.length > 0) {
     collapsed = MD_ESCAPE_EMPTY_PLACEHOLDER;
   }

@@ -190,15 +190,20 @@ public final class Report {
      * report.md} or the terminal (SPEC §7 injection hardening, mirroring the Python reference's
      * {@code _md_escape}): replace every control character and line/paragraph separator with a space
      * (never just whitespace -- a raw ESC can still write a hostile terminal escape sequence),
-     * collapse the result to single spaces, replace backticks so it cannot break out of Markdown
-     * code spans, and cap its length by codepoint (never a UTF-16 half of a surrogate pair). A
-     * string that neutralises to nothing renders as {@link #MD_ESCAPE_EMPTY_PLACEHOLDER}, never a
-     * silent gap. */
+     * collapse the result to single spaces, replace backticks and angle brackets with visually
+     * similar but inert characters (round 3: a {@code <br>}/{@code <h2>} in a hostile name would
+     * otherwise pass through as live HTML when the Markdown is rendered by a browser and forge its
+     * own heading/line break -- never escaped as {@code &lt;}/{@code &gt;}, which would defeat
+     * plain-text/terminal readability), and cap its length by codepoint (never a UTF-16 half of a
+     * surrogate pair). A string that neutralises to nothing renders as
+     * {@link #MD_ESCAPE_EMPTY_PLACEHOLDER}, never a silent gap. */
     private static String mdEscape(String text) {
         StringBuilder neutralized = new StringBuilder();
         text.codePoints().forEach(cp -> neutralized.appendCodePoint(isControlLike(cp) ? ' ' : cp));
-        String collapsed =
-                String.join(" ", neutralized.toString().trim().split("\\s+")).replace("`", "'");
+        String collapsed = String.join(" ", neutralized.toString().trim().split("\\s+"))
+                .replace("`", "'")
+                .replace("<", "‹")
+                .replace(">", "›");
         if (collapsed.isEmpty() && !text.isEmpty()) {
             collapsed = MD_ESCAPE_EMPTY_PLACEHOLDER;
         }

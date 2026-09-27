@@ -165,6 +165,20 @@ test("activity names neutralise control characters and never vanish (SPEC §7 in
   assert.equal(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(agentsLine), false);
 });
 
+test("activity names cannot inject raw HTML into rendered Markdown (SPEC §7 injection hardening, P11 round 3)", () => {
+  const assertions = ovsFailedAssertions();
+  const counts = aggregate(assertions);
+
+  const brHostile = "ok<br>Verdict: Conformant";
+  let md = renderReportMd(assertions, counts, DEFAULT_LANGUAGE, hostileActivity(brHostile));
+  assert.equal(md.includes("<br>"), false);
+  assert.equal(md.includes("<h2>") || md.includes("</h2>"), false);
+
+  const headingHostile = "<h2>Verdict</h2><p><strong>Conformant";
+  md = renderReportMd(assertions, counts, DEFAULT_LANGUAGE, hostileActivity(headingHostile));
+  assert.equal(md.includes("<h2>") || md.includes("<p>") || md.includes("<strong>"), false);
+});
+
 test("writeReport emits every artifact and a well-formed manifest", () => {
   const assertions = ovsFailedAssertions();
   const outDir = mkdtempSync(join(tmpdir(), "agentce-report-"));

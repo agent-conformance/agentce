@@ -1246,13 +1246,22 @@ def _md_escape(
     injection hardening): replace every control character and line/paragraph separator with a space
     (never just whitespace -- a raw ESC can still write a hostile terminal escape sequence) so the
     string can never start a new line, forge a heading or a bare instruction line, or manipulate the
-    terminal cursor; collapse the result to single spaces; replace backticks so it cannot break out of
-    a template's own backtick delimiters; and cap its length (by codepoint, never a UTF-16 half of a
-    surrogate pair). A string that neutralises to nothing renders as `empty_placeholder` (a caller
-    names one that fits its own field -- a tool name reads oddly as an empty path or ref, and vice
-    versa), never a silent gap -- escaping, never erasure."""
+    terminal cursor; collapse the result to single spaces; replace backticks and angle brackets with
+    visually similar but inert characters so the string can neither break out of a template's own
+    backtick delimiters nor pass through as raw HTML when the Markdown is rendered by a browser or
+    forge a `<h2>`/`<br>` of its own (round 3: a hostile name renders inert here even though it is
+    not, and never has been, escaped as `&lt;`/`&gt;` -- that would defeat plain-text/terminal
+    readability, which angle-bracket substitution keeps); and cap its length (by codepoint, never a
+    UTF-16 half of a surrogate pair). A string that neutralises to nothing renders as
+    `empty_placeholder` (a caller names one that fits its own field -- a tool name reads oddly as an
+    empty path or ref, and vice versa), never a silent gap -- escaping, never erasure."""
     neutralized = "".join(" " if _is_control_like(ord(ch)) else ch for ch in text)
-    collapsed = " ".join(neutralized.split()).replace("`", "'")
+    collapsed = (
+        " ".join(neutralized.split())
+        .replace("`", "'")
+        .replace("<", "‹")
+        .replace(">", "›")
+    )
     if not collapsed and text:
         collapsed = empty_placeholder
     if len(collapsed) > cap:
