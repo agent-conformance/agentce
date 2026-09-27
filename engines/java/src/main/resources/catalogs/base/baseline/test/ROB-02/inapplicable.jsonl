@@ -1,0 +1,1 @@
+{"id":"dm","source":"urn:src:self_report","subject":"spiffe://corp/agents/a","type":"org.agent-conformance.evidence.Decision.v1","agentcesourceclass":"self_report","data":{"@type":"Decision","decision_type":"dom:Minor","agent":{"id":"spiffe://corp/agents/a"},"used":["ctx:input-1"]},"time":"2026-01-01T00:00:00Z"}

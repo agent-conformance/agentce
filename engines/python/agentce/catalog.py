@@ -5,7 +5,9 @@ A catalog is a directory with ``catalog.yaml`` (metadata and the control list), 
 reference). ``lint_catalog`` validates every control against ``control.schema.json`` (which requires
 each automated rule to carry a passed, a failed, and an inapplicable test case), parses each shape,
 and re-runs every test case through the structural evaluator to confirm it produces the outcome it
-claims -- so a broken control or fixture fails linting rather than shipping.
+claims -- so a broken control or fixture fails linting rather than shipping. A catalog that sets
+``min_crosswalk_frameworks: N`` (the baseline does, with 2) also fails linting for any control that
+cites fewer than N distinct standards.
 """
 
 from __future__ import annotations
@@ -237,12 +239,17 @@ def lint_catalog(
     except (yaml.YAMLError, OSError) as exc:
         return [f"{directory}: cannot load catalog ({exc})"]
 
+    meta = (
+        yaml.safe_load((directory / "catalog.yaml").read_text(encoding="utf-8")) or {}
+    )
     if require_provenance:
-        meta = (
-            yaml.safe_load((directory / "catalog.yaml").read_text(encoding="utf-8"))
-            or {}
-        )
         problems.extend(_provenance_problems(directory, meta))
+    floor = meta.get("min_crosswalk_frameworks", 0)
+    if not isinstance(floor, int) or isinstance(floor, bool) or floor < 0:
+        problems.append(
+            "catalog.yaml: min_crosswalk_frameworks must be a non-negative integer"
+        )
+        floor = 0
 
     domain = _load_test_domain(directory)
     for control_file in sorted((directory / "controls").glob("*.yaml")):
@@ -253,6 +260,12 @@ def lint_catalog(
             problems.append(f"{control_file.name}: schema: {exc.message}")
             continue
         control = _control_from_dict(data)
+        cited = {entry["framework"] for entry in data.get("crosswalk", [])}
+        if len(cited) < floor:
+            problems.append(
+                f"catalog.crosswalk_floor: {control.id} cites {len(cited)} standard(s); "
+                f"this catalog requires at least {floor}"
+            )
         if require_verification_flags:
             for entry in data.get("crosswalk", []):
                 if "verified_against_text" not in entry:

@@ -1,0 +1,7 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+
+agentce:INC-01-Shape a sh:NodeShape ;
+  sh:targetClass agentce:ConsequentialDecision ;
+  sh:property [ sh:path agentce:resultedIn ; sh:minCount 1 ; sh:name "S1" ] .

@@ -27,7 +27,8 @@ def test_bundle_builds_and_verifies_offline(tmp_path: Path) -> None:
     # Multi-catalog: every signed base catalog is discovered and bundled, not just eu-ai-act (P16.7).
     manifest = json.loads((out / "bundle-manifest.json").read_text(encoding="utf-8"))
     catalog_ids = {entry["id"] for entry in manifest["catalogs"]}
-    assert catalog_ids == {"eu-ai-act", "nist-ai-rmf"}
+    assert catalog_ids == {"baseline", "eu-ai-act", "nist-ai-rmf"}
+    assert (out / "catalogs" / "baseline" / "catalog.sig.json").is_file()
     assert (out / "catalogs" / "nist-ai-rmf" / "catalog.sig.json").is_file()
     # The singular field stays byte-identical for back-compat: the same eu-ai-act entry.
     eu_ai_act = next(e for e in manifest["catalogs"] if e["id"] == "eu-ai-act")

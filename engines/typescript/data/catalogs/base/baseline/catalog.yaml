@@ -1,0 +1,35 @@
+# Baseline catalog (SPEC §7.3): the checks the standards share, built as a profile of existing
+# standards. Every control cites at least two standards by clause reference (`min_crosswalk_frameworks`,
+# enforced by `agentce catalog lint`), and every citation is one the standards crosswalk files
+# (spec/catalogs/base/eu-ai-act/crosswalk/) or the standard-specific catalogs already cite for that
+# control, so the baseline never adds a requirement of its own. Each control reuses the detection shape and test fixtures of the
+# standard-specific catalogs verbatim; only the citations differ. This is the default lens of an
+# assessment that names no catalog; each standard-specific catalog remains a selectable lens.
+# Clause references only; no standard's text is reproduced, and every reference is unreviewed
+# (`verified_against_text: false`) until a reviewer with a licensed copy confirms it. AIUC-1 is not
+# cited here: its crosswalk maps requirement areas, not clauses, so it cannot count toward the floor.
+id: baseline
+version: "2026.09"
+title: "Baseline catalog: the checks the standards share"
+# Provenance (SPEC 14.5 CP-3): the catalog's origin and a content digest over every catalog file
+# except the detached signature and this file. `agentce catalog lint --require-provenance` recomputes
+# the digest, so a rebranded catalog whose rules differ shows its origin or fails validation.
+provenance:
+  source: https://agent-conformance.org/catalogs/base/baseline
+  version: "2026.09"
+  digest: sha256:3338d1830f17562a53f083b69c7b5c922afa0fcbfcbcf2f231e9e0a0c838c8da
+families: [REC, OVS, ROB, TRN, INC, INT, DOC]
+min_crosswalk_frameworks: 2
+precision_policy:
+  demote_below: "0.98"   # a rung-2 rule below this precision on the corpus is demoted (SPEC 11.6)
+controls:
+  - controls/DOC-01.yaml
+  - controls/INC-01.yaml
+  - controls/INC-02.yaml
+  - controls/INT-01.yaml
+  - controls/OVS-03.yaml
+  - controls/OVS-08.yaml
+  - controls/REC-01.yaml
+  - controls/REC-04.yaml
+  - controls/ROB-02.yaml
+  - controls/TRN-03.yaml

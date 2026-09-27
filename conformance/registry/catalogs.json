@@ -1,6 +1,17 @@
 {
   "catalogs": [
     {
+      "id": "baseline",
+      "version": "2026.09",
+      "digest": "sha256:6043537e7696d9a1767527ec7ddf45c4782f7071f8e3b71f1f3535a3a90f6b54",
+      "source_path": "spec/catalogs/base/baseline",
+      "signing": {
+        "signature_file": "catalog.sig.json",
+        "trust_root": "vendored-dev",
+        "keyid": "sha256:d0f46a3992ebb4e34819dad2bfa533bfcef4f68ab9532cf1e451e2272332cf86"
+      }
+    },
+    {
       "id": "eu-ai-act",
       "version": "2026.09",
       "digest": "sha256:e1985104a239563f1e43e02ff845af64bc2adc9b2d01693041eee637400e7b28",

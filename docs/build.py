@@ -413,6 +413,7 @@ _CATALOG_DIRS = {
     "finance": REPO_ROOT / "spec" / "catalogs" / "overlays" / "finance",
     "insurance": REPO_ROOT / "spec" / "catalogs" / "overlays" / "insurance",
     "nist-ai-rmf": REPO_ROOT / "spec" / "catalogs" / "base" / "nist-ai-rmf",
+    "baseline": REPO_ROOT / "spec" / "catalogs" / "base" / "baseline",
 }
 
 
