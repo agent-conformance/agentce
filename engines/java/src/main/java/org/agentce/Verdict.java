@@ -54,10 +54,14 @@ public final class Verdict {
         return new Summary(verdict, counts, gaps);
     }
 
-    /** One gap as text: {@code insufficient evidence: DAT-01, DAT-02 (+14 more)}. */
+    /** One gap as text: {@code insufficient evidence: DAT-01, DAT-02 (+14 more)}. Each control id is
+     * sanitised (SPEC §7 injection hardening; {@code contracts/P18-18.21.md}): mid-line, after the
+     * fixed label prefix, so no backtick-wrap is needed here (unlike the summary tally). */
     public static String gapText(Gap gap, Map<String, String> cat) {
         String label = cat.getOrDefault("outcome." + gap.outcome(), gap.outcome());
-        String text = label + ": " + String.join(", ", gap.controls());
+        String controls = gap.controls().stream().map(Report::sanitizeForMarkdown)
+                .collect(java.util.stream.Collectors.joining(", "));
+        String text = label + ": " + controls;
         if (gap.more() > 0) {
             text += " (" + cat.get("report.gaps_more").replace("{n}", String.valueOf(gap.more())) + ")";
         }

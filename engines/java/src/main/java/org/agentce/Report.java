@@ -639,7 +639,9 @@ public final class Report {
         lines.add("## " + cat.get("report.summary_heading"));
         lines.add("");
         for (Map.Entry<String, Integer> e : counts.entrySet()) {
-            lines.add("- " + outcomeLabel(cat, e.getKey()) + ": " + e.getValue());
+            // List-item first content: backtick-wrapped (SPEC §7 injection hardening;
+            // `contracts/P18-18.21.md`).
+            lines.add("- `" + sanitizeForMarkdown(outcomeLabel(cat, e.getKey())) + "`: " + e.getValue());
         }
         lines.add("");
         lines.add("## " + cat.get("report.assertions_heading"));
@@ -650,10 +652,13 @@ public final class Report {
         for (Assertions.Assertion a : sortedBySubjectControl(assertions)) {
             String control = sanitizeForMarkdown(a.control);
             String subject = sanitizeForMarkdown(a.subject);
-            lines.add("- `" + control + "` @ `" + subject + "` -> **" + outcomeLabel(cat, a.outcome) + "** "
-                    + "(rung " + a.rung + ", " + a.mode + "; " + a.population[1] + "/" + a.population[0] + " failed)");
+            lines.add("- `" + control + "` @ `" + subject + "` -> **"
+                    + sanitizeForMarkdown(outcomeLabel(cat, a.outcome)) + "** "
+                    + "(rung " + a.rung + ", " + sanitizeForMarkdown(a.mode) + "; "
+                    + a.population[1] + "/" + a.population[0] + " failed)");
             for (JsonNode entry : a.crosswalk) {
-                lines.add("  - " + crosswalkText(entry, cat));
+                // List-item first content: backtick-wrapped.
+                lines.add("  - `" + sanitizeForMarkdown(crosswalkText(entry, cat)) + "`");
             }
         }
         return String.join("\n", lines) + "\n";
@@ -697,7 +702,7 @@ public final class Report {
         String title = esc(cat.get("report.title"));
         StringBuilder summary = new StringBuilder();
         for (Map.Entry<String, Integer> e : counts.entrySet()) {
-            summary.append("<li>").append(esc(outcomeLabel(cat, e.getKey()))).append(": ").append(e.getValue()).append("</li>");
+            summary.append("<li>").append(sanitizeForHtml(outcomeLabel(cat, e.getKey()))).append(": ").append(e.getValue()).append("</li>");
         }
         StringBuilder rows = new StringBuilder();
         for (Assertions.Assertion a : sortedBySubjectControl(assertions)) {
@@ -706,11 +711,11 @@ public final class Report {
                 if (i > 0) {
                     clauses.append("; ");
                 }
-                clauses.append(esc(crosswalkText(a.crosswalk.get(i), cat)));
+                clauses.append(sanitizeForHtml(crosswalkText(a.crosswalk.get(i), cat)));
             }
             rows.append("<tr><td>").append(sanitizeForHtml(a.control)).append("</td><td>")
                     .append(sanitizeForHtml(a.subject)).append("</td>")
-                    .append("<td>").append(esc(outcomeLabel(cat, a.outcome))).append("</td>")
+                    .append("<td>").append(sanitizeForHtml(outcomeLabel(cat, a.outcome))).append("</td>")
                     .append("<td>").append(clauses).append("</td></tr>");
         }
         String bodyRows = rows.length() > 0
