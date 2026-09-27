@@ -710,10 +710,18 @@ class ReportTest {
         return span.isEmpty() || span.equals("(unnamed)") || span.equals("(empty)") || span.length() < 4;
     }
 
+    private static JsonNode cachedVectorsFile;
+
+    private static JsonNode loadVectorsFile() throws IOException {
+        if (cachedVectorsFile == null) {
+            cachedVectorsFile = Json.parseFile(TestPaths.repoRoot().resolve("spec/report/test-vectors/sanitize-vectors.json"));
+        }
+        return cachedVectorsFile;
+    }
+
     private static List<String> loadNamedVectorInputs() throws IOException {
-        JsonNode data = Json.parseFile(TestPaths.repoRoot().resolve("spec/report/test-vectors/sanitize-vectors.json"));
         List<String> inputs = new ArrayList<>();
-        for (JsonNode vector : data.get("vectors")) {
+        for (JsonNode vector : loadVectorsFile().get("vectors")) {
             if (!vector.get("id").asText().startsWith("fuzz-")) {
                 inputs.add(vector.get("input").asText());
             }
@@ -761,8 +769,7 @@ class ReportTest {
 
     @Test
     void javaReproducesEveryCommittedVector() throws IOException {
-        JsonNode data = Json.parseFile(TestPaths.repoRoot().resolve("spec/report/test-vectors/sanitize-vectors.json"));
-        JsonNode vectors = data.get("vectors");
+        JsonNode vectors = loadVectorsFile().get("vectors");
         assertTrue(vectors.size() >= 500);
         for (JsonNode vector : vectors) {
             String value = vector.get("input").asText();

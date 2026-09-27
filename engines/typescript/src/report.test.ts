@@ -717,11 +717,16 @@ type SanitizeVector = {
   html: string;
 };
 
+let cachedSanitizeVectors: SanitizeVector[] | undefined;
+
 function loadSanitizeVectors(): SanitizeVector[] {
-  const data = JSON.parse(
-    readFileSync(join(REPO, "spec", "report", "test-vectors", "sanitize-vectors.json"), "utf-8"),
-  ) as { vectors: SanitizeVector[] };
-  return data.vectors;
+  if (!cachedSanitizeVectors) {
+    const data = JSON.parse(
+      readFileSync(join(REPO, "spec", "report", "test-vectors", "sanitize-vectors.json"), "utf-8"),
+    ) as { vectors: SanitizeVector[] };
+    cachedSanitizeVectors = data.vectors;
+  }
+  return cachedSanitizeVectors;
 }
 
 function isDegenerateSpan(span: string): boolean {
