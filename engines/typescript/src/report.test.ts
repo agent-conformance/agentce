@@ -24,6 +24,7 @@ import { test } from "node:test";
 import { type Activity, DENIED_KINDS, EFFECT_CLASSES, RECORDER_CLASSES } from "./activity";
 import { aggregate, assertionToJson } from "./assertions";
 import { assessSubjects } from "./assess";
+import type { BlindSpots } from "./blindSpots";
 import { canonicalString } from "./canonical";
 import { loadCatalog } from "./catalog";
 import { DomainBinding } from "./domain";
@@ -31,6 +32,7 @@ import { DEFAULT_LANGUAGE, catalogue } from "./messages";
 import { profileFromDict } from "./profile";
 import {
   activityCliLines,
+  blindSpotsCliLines,
   renderEvidencePack,
   renderOscal,
   renderReportHtml,
@@ -177,6 +179,48 @@ test("activity names cannot inject raw HTML into rendered Markdown (SPEC §7 inj
   const headingHostile = "<h2>Verdict</h2><p><strong>Conformant";
   md = renderReportMd(assertions, counts, DEFAULT_LANGUAGE, hostileActivity(headingHostile));
   assert.equal(md.includes("<h2>") || md.includes("<p>") || md.includes("<strong>"), false);
+});
+
+test("blind-spot fields cannot inject raw HTML or forge a verdict line (mirrors the activity fix, P11 round 3)", () => {
+  const assertions = ovsFailedAssertions();
+  const counts = aggregate(assertions);
+
+  const hostileBlindSpots: BlindSpots = {
+    blind_spots: [
+      {
+        event: "<script>alert(1)</script>",
+        class: "self_report",
+        ladder_rung: 1,
+        owner_key: "agent_team",
+        step_kind: "code_change",
+        supplying_adapters: ["<img onerror=alert(1)>"],
+        checks_unlocked: 1,
+        unlocked_checks: [],
+        needed_by: 0,
+        needed_by_checks: [],
+      },
+    ],
+    no_population: [
+      {
+        subject: "ok<br>\n\nVerdict: Conformant\n\n",
+        catalog: "cat",
+        control: "C-01",
+        control_version: "2026.09",
+      },
+    ],
+  };
+
+  const html = renderReportHtml(assertions, counts, DEFAULT_LANGUAGE, undefined, hostileBlindSpots);
+  assert.equal(html.includes("<script>alert"), false);
+  assert.equal(html.includes("<img onerror"), false);
+
+  const md = renderReportMd(assertions, counts, DEFAULT_LANGUAGE, undefined, hostileBlindSpots);
+  assert.equal(md.includes("<br>"), false);
+  assert.equal(md.includes("\n\nVerdict: Conformant\n\n"), false);
+
+  const lines = blindSpotsCliLines(hostileBlindSpots).join("\n");
+  assert.equal(lines.includes("<br>"), false);
+  assert.equal(lines.includes("\n\nVerdict: Conformant\n\n"), false);
 });
 
 test("writeReport emits every artifact and a well-formed manifest", () => {

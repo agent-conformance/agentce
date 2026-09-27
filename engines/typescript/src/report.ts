@@ -267,23 +267,33 @@ function blindSpotStepText(stepKind: string, ownerLabel: string): string {
   return stepKind === "request" ? `a request to ${ownerLabel}` : `a code change for ${ownerLabel}`;
 }
 
+/** Neutralise a blind-spot field before it reaches Markdown/the terminal (SPEC §7 injection
+ * hardening, mirroring `mdEscape`'s use in `activityRows`): `event`/`class` come from the catalog,
+ * but a `no_population` entry's `subject` can be records-derived, and the section renders right
+ * after activity and before the verdict (RFC 0008 Sec.7) -- the same position P11 (item 18.4 rework)
+ * forged a fake verdict line through. */
+function bsEscape(value: string): string {
+  return mdEscape(value);
+}
+
 /** `(label, value)` for every blind spot, in the module's own ranked order (never re-sorted here). */
 function blindSpotRows(blindSpots: BlindSpot[]): [string, string][] {
   return blindSpots.map((bs) => {
     const ownerLabel = OWNER_LABEL[bs.owner_key] as string;
     const step = blindSpotStepText(bs.step_kind, ownerLabel);
-    const adapters = bs.supplying_adapters.join(", ") || "no adapter today";
+    const adapters = bs.supplying_adapters.map((a) => bsEscape(a)).join(", ") || "no adapter today";
     const value =
       `unlocks ${bs.checks_unlocked} check(s), needed by ${bs.needed_by} more; ` +
       `rung ${bs.ladder_rung} -- ${step}. Adapters that can supply this: ${adapters}.`;
-    return [`${bs.event} (${bs.class})`, value];
+    return [`${bsEscape(bs.event)} (${bsEscape(bs.class)})`, value];
   });
 }
 
 function noPopulationRows(noPopulation: CheckRef[]): [string, string][] {
   return noPopulation.map((entry) => [
-    `${entry.control} on ${entry.subject} (${entry.catalog}@${entry.control_version})`,
-    `The records show every kind of evidence ${entry.control} asks for, but not enough of it in the shape the control expects -- a --domain binding may be needed to identify the relevant decisions; see the control's documentation for what it needs.`,
+    `${bsEscape(entry.control)} on ${bsEscape(entry.subject)} ` +
+      `(${bsEscape(entry.catalog)}@${bsEscape(entry.control_version)})`,
+    `The records show every kind of evidence ${bsEscape(entry.control)} asks for, but not enough of it in the shape the control expects -- a --domain binding may be needed to identify the relevant decisions; see the control's documentation for what it needs.`,
   ]);
 }
 

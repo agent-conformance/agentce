@@ -358,6 +358,15 @@ public final class Report {
         return "request".equals(stepKind) ? "a request to " + ownerLabel : "a code change for " + ownerLabel;
     }
 
+    /** Neutralise a blind-spot field before it reaches Markdown/the terminal (SPEC §7 injection
+     * hardening, mirroring {@link #mdEscape}'s use in {@code activityRows}): {@code event}/
+     * {@code class} come from the catalog, but a {@code no_population} entry's {@code subject} can be
+     * records-derived, and the section renders right after activity and before the verdict (RFC 0008
+     * Sec.7) -- the same position P11 (item 18.4 rework) forged a fake verdict line through. */
+    private static String bsEscape(String value) {
+        return mdEscape(value);
+    }
+
     /** {@code (label, value)} for every blind spot, in the module's own ranked order (never re-sorted
      * here). */
     private static List<Map.Entry<String, String>> blindSpotRows(ArrayNode blindSpots) {
@@ -366,12 +375,13 @@ public final class Report {
             String ownerLabel = BLIND_SPOT_OWNER_LABEL.get(bs.get("owner_key").asText());
             String step = blindSpotStepText(bs.get("step_kind").asText(), ownerLabel);
             List<String> adapterNames = new ArrayList<>();
-            bs.get("supplying_adapters").forEach(n -> adapterNames.add(n.asText()));
+            bs.get("supplying_adapters").forEach(n -> adapterNames.add(bsEscape(n.asText())));
             String adapters = adapterNames.isEmpty() ? "no adapter today" : String.join(", ", adapterNames);
             String value = "unlocks " + bs.get("checks_unlocked").asInt() + " check(s), needed by "
                     + bs.get("needed_by").asInt() + " more; rung " + bs.get("ladder_rung").asInt() + " -- " + step
                     + ". Adapters that can supply this: " + adapters + ".";
-            rows.add(Map.entry(bs.get("event").asText() + " (" + bs.get("class").asText() + ")", value));
+            String label = bsEscape(bs.get("event").asText()) + " (" + bsEscape(bs.get("class").asText()) + ")";
+            rows.add(Map.entry(label, value));
         }
         return rows;
     }
@@ -379,9 +389,10 @@ public final class Report {
     private static List<Map.Entry<String, String>> noPopulationRows(ArrayNode noPopulation) {
         List<Map.Entry<String, String>> rows = new ArrayList<>();
         for (JsonNode entry : noPopulation) {
-            String control = entry.get("control").asText();
-            String label = control + " on " + entry.get("subject").asText() + " (" + entry.get("catalog").asText()
-                    + "@" + entry.get("control_version").asText() + ")";
+            String control = bsEscape(entry.get("control").asText());
+            String label = control + " on " + bsEscape(entry.get("subject").asText()) + " ("
+                    + bsEscape(entry.get("catalog").asText()) + "@" + bsEscape(entry.get("control_version").asText())
+                    + ")";
             String value = "The records show every kind of evidence " + control + " asks for, but not enough of "
                     + "it in the shape the control expects -- a --domain binding may be needed to identify the "
                     + "relevant decisions; see the control's documentation for what it needs.";

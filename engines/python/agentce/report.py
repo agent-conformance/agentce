@@ -331,6 +331,17 @@ def _blind_spot_step_text(step_kind: str, owner_label: str, cat: dict[str, str])
     )
 
 
+def _bs_escape(value: str) -> str:
+    """Neutralise a blind-spot field before it reaches ``report.md``/the terminal (SPEC §7 injection
+    hardening): ``event``/``class`` come from the catalog, but a ``no_population`` entry's ``subject``
+    can be records-derived (the records-folder auto-derived-profile path, RFC 0008 Sec.9) -- the same
+    "renders right after activity, before the verdict" position P11 (item 18.4 rework) forged a fake
+    verdict line through. ``_blind_spots_html`` escapes independently via ``_li_items``/``html.escape``
+    on the same already-``_bs_escape``d text, matching how ``_activity_rows`` escapes once for all
+    three renderings."""
+    return _md_escape(value, empty_placeholder=_MD_ESCAPE_EMPTY_FIELD_PLACEHOLDER)
+
+
 def _blind_spot_rows(
     blind_spots: list[dict[str, Any]], cat: dict[str, str]
 ) -> list[tuple[str, str]]:
@@ -342,7 +353,8 @@ def _blind_spot_rows(
         owner_label = _blind_spot_owner_label(bs["owner_key"], cat)
         step = _blind_spot_step_text(bs["step_kind"], owner_label, cat)
         adapters = (
-            ", ".join(bs["supplying_adapters"]) or cat["report.blind_spots_no_adapters"]
+            ", ".join(_bs_escape(a) for a in bs["supplying_adapters"])
+            or cat["report.blind_spots_no_adapters"]
         )
         value = i18n_format.format_message(
             cat["report.blind_spots_row"],
@@ -352,7 +364,8 @@ def _blind_spot_rows(
             step=step,
             adapters=adapters,
         )
-        rows.append((f"{bs['event']} ({bs['class']})", value))
+        label = f"{_bs_escape(bs['event'])} ({_bs_escape(bs['class'])})"
+        rows.append((label, value))
     return rows
 
 
@@ -363,10 +376,11 @@ def _no_population_rows(
     sentence (RFC 0008 Sec.4) -- no rung, owner, or step, since none is knowable for this case."""
     return [
         (
-            f"{entry['control']} on {entry['subject']} "
-            f"({entry['catalog']}@{entry['control_version']})",
+            f"{_bs_escape(entry['control'])} on {_bs_escape(entry['subject'])} "
+            f"({_bs_escape(entry['catalog'])}@{_bs_escape(entry['control_version'])})",
             i18n_format.format_message(
-                cat["report.blind_spots_no_population_text"], control=entry["control"]
+                cat["report.blind_spots_no_population_text"],
+                control=_bs_escape(entry["control"]),
             ),
         )
         for entry in no_population

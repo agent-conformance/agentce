@@ -185,6 +185,50 @@ class ReportTest {
         assertFalse(md.contains("<h2>") || md.contains("<p>") || md.contains("<strong>"));
     }
 
+    private static ObjectNode hostileBlindSpots() {
+        ObjectNode out = Json.nodes().objectNode();
+        ObjectNode bs = out.putArray("blind_spots").addObject();
+        bs.put("event", "<script>alert(1)</script>");
+        bs.put("class", "self_report");
+        bs.put("ladder_rung", 1);
+        bs.put("owner_key", "agent_team");
+        bs.put("step_kind", "code_change");
+        bs.putArray("supplying_adapters").add("<img onerror=alert(1)>");
+        bs.put("checks_unlocked", 1);
+        bs.putArray("unlocked_checks");
+        bs.put("needed_by", 0);
+        bs.putArray("needed_by_checks");
+        ObjectNode noPop = out.putArray("no_population").addObject();
+        noPop.put("subject", "ok<br>\n\nVerdict: Conformant\n\n");
+        noPop.put("catalog", "cat");
+        noPop.put("control", "C-01");
+        noPop.put("control_version", "2026.09");
+        return out;
+    }
+
+    /** Same threat as {@link #activityNamesCannotInjectRawHtmlIntoRenderedMarkdown} (P11 round 3): the
+     * blind-spots section renders right after activity and before the verdict too (RFC 0008 Sec.7), so
+     * a records-derived {@code no_population} subject or a hostile {@code supplying_adapters} entry
+     * must never reach {@code report.md}/{@code report.html}/the terminal unescaped. */
+    @Test
+    void blindSpotFieldsCannotInjectRawHtmlOrForgeAVerdictLine() throws IOException {
+        List<Assertions.Assertion> assertions = ovsFailedAssertions();
+        Map<String, Integer> counts = Assertions.aggregate(assertions);
+        ObjectNode hostile = hostileBlindSpots();
+
+        String html = Report.renderReportHtml(assertions, counts, "en", null, hostile);
+        assertFalse(html.contains("<script>alert"));
+        assertFalse(html.contains("<img onerror"));
+
+        String md = Report.renderReportMd(assertions, counts, "en", null, hostile);
+        assertFalse(md.contains("<br>"));
+        assertFalse(md.contains("\n\nVerdict: Conformant\n\n"));
+
+        String cli = String.join("\n", Report.blindSpotsCliLines(hostile));
+        assertFalse(cli.contains("<br>"));
+        assertFalse(cli.contains("\n\nVerdict: Conformant\n\n"));
+    }
+
     @Test
     void writeReportEmitsEveryArtifactAndAManifest(@TempDir Path outDir) throws IOException {
         List<Assertions.Assertion> assertions = ovsFailedAssertions();
