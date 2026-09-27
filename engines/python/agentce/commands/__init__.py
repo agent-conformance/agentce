@@ -38,6 +38,7 @@ from .. import (
 from ..activity import summarize_activity
 from ..applicability import resolve as resolve_applicability
 from ..assess import assess_subjects, evaluated_nothing
+from ..blind_spots import compute_blind_spots
 from ..records import (
     BUNDLE_DIR,
     DERIVED_PROFILE_FILE,
@@ -66,7 +67,9 @@ from ..profile import Profile
 from ..quarantine import counts_by_reason, write_quarantine
 from ..assertions import Assertion, aggregate
 from ..report import (
+    ASSESS_DEFAULT_EMIT,
     activity_cli_lines,
+    blind_spots_cli_lines,
     render_evidence_pack,
     render_oscal,
     render_public_statement,
@@ -346,10 +349,10 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
 
 def _parse_emit(raw: str | None) -> frozenset[str] | None:
     """Parse and validate ``--emit``'s comma-separated token list (SPEC §9). ``None`` when the flag
-    is absent, so ``write_report`` renders its legacy fixed bundle unchanged. Every token is validated
-    here, before any output is written: an assessment that names a format it cannot produce must
-    leave nothing behind that looks like a result (mirrors ``cmd_report``'s ``input.report_format``
-    check for the single-format ``--format`` flag)."""
+    is absent, so ``cmd_assess`` resolves its own default (:data:`agentce.report.ASSESS_DEFAULT_EMIT`).
+    Every token is validated here, before any output is written: an assessment that names a format it
+    cannot produce must leave nothing behind that looks like a result (mirrors ``cmd_report``'s
+    ``input.report_format`` check for the single-format ``--format`` flag)."""
     if raw is None:
         return None
     tokens = [t.strip() for t in raw.split(",") if t.strip()]
@@ -528,6 +531,13 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             ).encode("utf-8")
         }
     activity = summarize_activity(ingested.accepted, profile_obj)
+    blind_spots = compute_blind_spots(
+        evaluated, profile_obj, catalogs, ingested.accepted
+    )
+    # `assess`'s own default (unlike `write_report`'s frozen `emit=None` bundle, SPEC's evidence-first
+    # framing, RFC 0008 Sec.8): the skill is emitted by every default run of the command a user
+    # actually runs; an explicit `--emit` still names exactly what it names.
+    resolved_emit = emit if emit is not None else ASSESS_DEFAULT_EMIT
     write_report(
         out_dir,
         evaluated,
@@ -538,11 +548,12 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         supersedes=supersedes,
         report_language=_opt_str(ns, "report_language") or "en",
         limitations=limitations,
-        emit=emit,
+        emit=resolved_emit,
         events=ingested.accepted,
         reverify_command=reverify_argv,
         extra_outputs=extra_outputs,
         activity=activity,
+        blind_spots=blind_spots,
     )
     if state is not None:
         state.record(loaded.digest, out_dir / "manifest.json", new_window_end)
@@ -555,9 +566,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "profile": str(profile),
             "catalogs": catalog_labels,
             "out": out,
-            "emit": sorted(emit)
-            if emit is not None
-            else ["html", "md", "oscal", "pack", "sarif"],
+            "emit": sorted(resolved_emit),
             "accepted": len(ingested.accepted),
             "quarantined": len(ingested.quarantined),
             "streams": len(integrity_results),
@@ -567,6 +576,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "assertions": len(evaluated),
             "summary": summary,
             "activity": activity,
+            "blind_spots": blind_spots,
         }
     )
     if scanned is not None:
@@ -597,6 +607,8 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         raise _nothing_evaluated(profile_obj, ingested.accepted, len(evaluated))
     catalogue = messages.catalogue(_opt_str(ns, "report_language") or "en")
     for line in activity_cli_lines(activity, catalogue):
+        result.note(line)
+    for line in blind_spots_cli_lines(blind_spots, catalogue):
         result.note(line)
     for line in _verdict_lines(ns, summary, out):
         result.note(line)

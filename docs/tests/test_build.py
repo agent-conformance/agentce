@@ -66,12 +66,12 @@ def test_a_page_exists_for_every_canonical_iri_not_already_a_report_schema() -> 
         slug = build._iri_slug(entry["path"])
         assert f"reference/iris/{slug}.md" in pages
     assert "reference/iris/index.md" in pages
-    # Every one of the 20 canonical IRI paths appears verbatim in the explorer page.
+    # Every one of the 21 canonical IRI paths appears verbatim in the explorer page.
     explorer = generated[build.REFERENCE / "iris" / "index.md"]
     manifest = build.json.loads(
         (build.REPO_ROOT / "website" / "iri-manifest.json").read_text("utf-8")
     )
-    assert len(manifest) == 20
+    assert len(manifest) == 21
     for entry in manifest:
         assert entry["path"] in explorer
 

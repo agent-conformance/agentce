@@ -33,8 +33,14 @@ def _role_applies(roles: set[str], applies_to_roles: list[str]) -> bool:
     return bool(roles & targets)
 
 
+#: `_class_ok` treats a required class of `any` and `self_report` identically: either is satisfied by
+#: any observed class. `agentce.blind_spots` groups on this same equivalence (RFC 0008 Sec.2) and
+#: shares this constant so the two definitions of "self-report-equivalent" cannot drift apart.
+SELF_REPORT_EQUIVALENT_CLASSES = frozenset({"any", "self_report"})
+
+
 def _class_ok(observed: str, required: str) -> bool:
-    return required in ("any", "self_report") or observed == required
+    return required in SELF_REPORT_EQUIVALENT_CLASSES or observed == required
 
 
 def requirement_met(events: list[dict[str, Any]], requirement: dict[str, str]) -> bool:

@@ -48,10 +48,10 @@ options:
   --report-language REPORT_LANGUAGE
                         message-key catalogue for the report; does not affect
                         assertions.json (SPEC 9.3)
-  --emit EMIT           comma-separated report formats to render (default: the
-                        fixed bundle: html, md, oscal, pack, sarif); one or
-                        more of: md, html, oscal, sarif, public, pack, junit,
-                        csv, oscal_xml, pdf, remediation, skill
+  --emit EMIT           comma-separated report formats to render (default:
+                        html, md, oscal, pack, sarif, skill); one or more of:
+                        md, html, oscal, sarif, public, pack, junit, csv,
+                        oscal_xml, pdf, remediation, skill
   --fail-on FAIL_ON     gate the exit code on a tiny deterministic expression
                         over assertion fields (control, subject, outcome,
                         severity, family, rung, mode), e.g. 'outcome=="non-

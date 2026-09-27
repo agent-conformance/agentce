@@ -19,6 +19,7 @@ py-modules = [
   "nist_catalog_substantiation_check",
   "offline_bundle",
   "placeholder_sweep",
+  "support_matrix_sync_check",
 ]
 
 [dependency-groups]

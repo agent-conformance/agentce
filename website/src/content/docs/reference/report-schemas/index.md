@@ -10,6 +10,7 @@ One page per JSON Schema in `spec/report/` (SPEC §9), the schemas every engine 
 | [`activity.schema.json`](/reference/report-schemas/activity/) | AgentCE activity summary |
 | [`applicability-statement.schema.json`](/reference/report-schemas/applicability-statement/) | AgentCE applicability statement |
 | [`assertions.schema.json`](/reference/report-schemas/assertions/) | AgentCE assertions |
+| [`blind-spots.schema.json`](/reference/report-schemas/blind-spots/) | AgentCE blind spots |
 | [`claim.schema.json`](/reference/report-schemas/claim/) | AgentCE conformance claim |
 | [`deviation-register.schema.json`](/reference/report-schemas/deviation-register/) | AgentCE deviation register |
 | [`integrity-result.schema.json`](/reference/report-schemas/integrity-result/) | AgentCE integrity result |

@@ -133,8 +133,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--emit",
-        help="comma-separated report formats to render (default: the fixed bundle: html, md, "
-        "oscal, pack, sarif); one or more of: " + ", ".join(commands.EMIT_FORMATS),
+        help="comma-separated report formats to render (default: "
+        + ", ".join(sorted(commands.ASSESS_DEFAULT_EMIT))
+        + "); one or more of: "
+        + ", ".join(commands.EMIT_FORMATS),
     )
     p.add_argument(
         "--fail-on",

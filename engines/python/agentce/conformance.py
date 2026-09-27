@@ -30,6 +30,7 @@ from .activity import summarize_activity
 from .applicability import resolve as resolve_applicability
 from .assess import assess_subjects
 from .assertions import aggregate
+from .blind_spots import compute_blind_spots
 from .bundle import load_bundle
 from .catalog import Catalog, load_catalog
 from .coverage import compute_coverage
@@ -122,6 +123,9 @@ def _assess_project(
         invocation=["conformance", pid],
         events=ingested.accepted,
         activity=summarize_activity(ingested.accepted, profile),
+        blind_spots=compute_blind_spots(
+            assertions, profile, catalogs, ingested.accepted
+        ),
     )
     counts = aggregate(assertions)
     return {"id": pid, "assertions": len(assertions), "outcomes": counts}

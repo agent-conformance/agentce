@@ -12,8 +12,10 @@ from pathlib import Path
 import pytest
 
 from agentce.assertions import Assertion, EvidencePointer
-from agentce.catalog import Catalog, load_catalog
+from agentce.blind_spots import compute_blind_spots
+from agentce.catalog import Catalog, ControlSpec, load_catalog
 from agentce.errors import AgentceError
+from agentce.profile import Profile, Subject
 from agentce.report import (
     CSV_COLUMNS,
     EMIT_FORMATS,
@@ -22,6 +24,7 @@ from agentce.report import (
     render_oscal,
     render_oscal_xml,
     render_pdf,
+    render_report_html,
     render_sarif,
     render_step_summary,
     validate_oscal_ar_nist,
@@ -66,6 +69,7 @@ def test_vendored_report_schemas_match_spec() -> None:
         "assertions",
         "manifest",
         "activity",
+        "blind-spots",
         "oscal-assessment-results",
         "results-sarif",
     ):
@@ -88,6 +92,7 @@ def test_write_report_produces_valid_artifacts(tmp_path: Path) -> None:
     for name in (
         "assertions.json",
         "activity.json",
+        "blind-spots.json",
         "report.md",
         "report.html",
         "oscal-ar.json",
@@ -137,6 +142,169 @@ def test_report_leads_with_what_your_agents_did(tmp_path: Path) -> None:
         },
         "undeclared": {"models": [], "tools": []},
     }
+
+
+def _minimum_evidence_control(
+    control_id: str, event: str, cls: str = "any"
+) -> ControlSpec:
+    return ControlSpec(
+        id=control_id,
+        version="2026.09",
+        title=control_id,
+        applies_to_roles=["both"],
+        mode="automated",
+        rung=2,
+        severity="high",
+        min_source_class="any",
+        minimum_evidence=[{"event": event, "class": cls}],
+        shape_path=None,
+        tolerance={"kind": "count", "max": 0},
+        test_cases=[],
+    )
+
+
+def test_blind_spots_section_renders_after_activity_before_verdict(
+    tmp_path: Path,
+) -> None:
+    control = _minimum_evidence_control("BSP-01", "PolicyDecision")
+    catalog = Catalog(
+        id="cat",
+        version="2026.09",
+        directory=_BASE_CATALOG_DIR,
+        controls=[control],
+        shapes={},
+    )
+    assertion = Assertion(
+        control=control.id,
+        control_version=control.version,
+        subject="spiffe://corp/agents/a",
+        outcome="insufficient_evidence",
+        rung=2,
+        mode="automated",
+        window=_WINDOW,
+        population=(1, 0),
+        severity="high",
+        family="BSP",
+    )
+    profile = Profile(subjects=[Subject(id="spiffe://corp/agents/a")])
+    blind_spots = compute_blind_spots([assertion], profile, [catalog], [])
+    write_report(
+        tmp_path,
+        [assertion],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[catalog],
+        blind_spots=blind_spots,
+    )
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
+    html_body = (tmp_path / "report.html").read_text(encoding="utf-8")
+    assert (
+        md.index("What your agents did")
+        < md.index("Where your records can't show it yet")
+        < md.index("## Verdict")
+    )
+    assert 'id="blind-spots"' in html_body
+    assert "platform or security" in md
+    assert "request" in md
+    assert validate_report(tmp_path) == []
+    on_disk = json.loads((tmp_path / "blind-spots.json").read_text(encoding="utf-8"))
+    assert on_disk == blind_spots
+
+
+def test_blind_spots_defaults_to_the_honest_empty_answer(tmp_path: Path) -> None:
+    write_report(
+        tmp_path,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+    )
+    on_disk = json.loads((tmp_path / "blind-spots.json").read_text(encoding="utf-8"))
+    assert on_disk == {"blind_spots": [], "no_population": []}
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "every check either has enough evidence" in md
+
+
+def test_no_population_entry_renders_the_one_fixed_generic_sentence(
+    tmp_path: Path,
+) -> None:
+    control = _minimum_evidence_control("BSP-02", "Decision")
+    catalog = Catalog(
+        id="cat",
+        version="2026.09",
+        directory=_BASE_CATALOG_DIR,
+        controls=[control],
+        shapes={},
+    )
+    assertion = Assertion(
+        control=control.id,
+        control_version=control.version,
+        subject="spiffe://corp/agents/a",
+        outcome="insufficient_evidence",
+        rung=2,
+        mode="automated",
+        window=_WINDOW,
+        population=(0, 0),
+        severity="high",
+        family="BSP",
+    )
+    profile = Profile(subjects=[Subject(id="spiffe://corp/agents/a")])
+    events = [
+        {
+            "subject": "spiffe://corp/agents/a",
+            "agentcesourceclass": "self_report",
+            "data": {"@type": "Decision"},
+        }
+    ]
+    blind_spots = compute_blind_spots([assertion], profile, [catalog], events)
+    assert blind_spots["no_population"] == [
+        {
+            "subject": "spiffe://corp/agents/a",
+            "catalog": "cat",
+            "control": "BSP-02",
+            "control_version": "2026.09",
+        }
+    ]
+    write_report(
+        tmp_path,
+        [assertion],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[catalog],
+        blind_spots=blind_spots,
+    )
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "Records that don't show enough, with no single fix" in md
+    assert "BSP-02" in md
+    assert "--domain binding may be needed" in md
+    assert validate_report(tmp_path) == []
+
+
+def test_blind_spots_html_escapes_hostile_strings() -> None:
+    hostile_blind_spots = {
+        "blind_spots": [
+            {
+                "event": "<script>alert(1)</script>",
+                "class": "self_report",
+                "ladder_rung": 1,
+                "owner_key": "agent_team",
+                "step_kind": "code_change",
+                "supplying_adapters": ["<img onerror=alert(1)>"],
+                "checks_unlocked": 1,
+                "unlocked_checks": [],
+                "needed_by": 0,
+                "needed_by_checks": [],
+            }
+        ],
+        "no_population": [
+            {
+                "subject": "<script>alert(2)</script>",
+                "catalog": "cat",
+                "control": "<script>alert(3)</script>",
+                "control_version": "2026.09",
+            }
+        ],
+    }
+    page = render_report_html([], {}, blind_spots=hostile_blind_spots)
+    assert "<script>alert" not in page
+    assert "&lt;script&gt;" in page
 
 
 def test_empty_report_is_valid(tmp_path: Path) -> None:

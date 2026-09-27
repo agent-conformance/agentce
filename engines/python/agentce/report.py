@@ -32,6 +32,7 @@ from . import (
     __version__,
     bundled,
     canonical,
+    i18n_format,
     messages,
     templating,
     verdict,
@@ -42,11 +43,18 @@ from .assess import index_by_subject, requirement_met
 from .catalog import Catalog, ControlSpec, catalog_provenance_digest
 from .profile import Profile
 
+#: The empty, honest answer for a caller with no assertions to explain (write_report's own
+#: docstring): never recomputed from an empty `Profile()`, unlike `activity`'s fallback -- an empty
+#: profile has zero subjects, which would fail `compute_blind_spots`' positional pairing immediately
+#: against any non-empty `assertions` list (RFC 0008 Sec.6).
+_EMPTY_BLIND_SPOTS: dict[str, Any] = {"blind_spots": [], "no_population": []}
+
 #: Always written, regardless of `--emit`: the run's structural core (write_report's docstring).
 _MANDATORY_ARTIFACT_SCHEMAS = {
     "assertions.json": "assertions",
     "manifest.json": "manifest",
     "activity.json": "activity",
+    "blind-spots.json": "blind-spots",
 }
 #: Written only when `--emit` selects the format that produces them: validated when present,
 #: skipped when a narrower `--emit` legitimately left them unwritten.
@@ -310,6 +318,120 @@ def activity_cli_lines(
     return lines
 
 
+def _blind_spot_owner_label(owner_key: str, cat: dict[str, str]) -> str:
+    return cat[f"report.blind_spots_owner_{owner_key}"]
+
+
+def _blind_spot_step_text(step_kind: str, owner_label: str, cat: dict[str, str]) -> str:
+    return i18n_format.format_message(
+        cat[f"report.blind_spots_step_{step_kind}"], owner=owner_label
+    )
+
+
+def _blind_spot_rows(
+    blind_spots: list[dict[str, Any]], cat: dict[str, str]
+) -> list[tuple[str, str]]:
+    """``(label, value)`` for every blind spot, in the module's own ranked order (never re-sorted
+    here): the label names the missing event/class, the value the rung, the step, the owner, and the
+    counts -- the report's rendering of the evidence ladder (RFC 0008 Sec.7)."""
+    rows: list[tuple[str, str]] = []
+    for bs in blind_spots:
+        owner_label = _blind_spot_owner_label(bs["owner_key"], cat)
+        step = _blind_spot_step_text(bs["step_kind"], owner_label, cat)
+        adapters = (
+            ", ".join(bs["supplying_adapters"]) or cat["report.blind_spots_no_adapters"]
+        )
+        value = i18n_format.format_message(
+            cat["report.blind_spots_row"],
+            checks_unlocked=bs["checks_unlocked"],
+            needed_by=bs["needed_by"],
+            ladder_rung=bs["ladder_rung"],
+            step=step,
+            adapters=adapters,
+        )
+        rows.append((f"{bs['event']} ({bs['class']})", value))
+    return rows
+
+
+def _no_population_rows(
+    no_population: list[dict[str, str]], cat: dict[str, str]
+) -> list[tuple[str, str]]:
+    """``(label, value)`` for every ``no_population`` entry: the one fixed, deliberately generic
+    sentence (RFC 0008 Sec.4) -- no rung, owner, or step, since none is knowable for this case."""
+    return [
+        (
+            f"{entry['control']} on {entry['subject']} "
+            f"({entry['catalog']}@{entry['control_version']})",
+            i18n_format.format_message(
+                cat["report.blind_spots_no_population_text"], control=entry["control"]
+            ),
+        )
+        for entry in no_population
+    ]
+
+
+def _blind_spots_md(blind_spots: dict[str, Any], cat: dict[str, str]) -> list[str]:
+    """The not-enough-evidence section (18.4/RFC 0008): what the records can't show yet, ranked by
+    how many checks the one missing requirement would unlock -- right after activity and before the
+    verdict (``VALUE-PROP.md``: "the first report is never empty ... the not-enough-evidence grid
+    comes second")."""
+    rows = _blind_spot_rows(blind_spots["blind_spots"], cat)
+    no_pop_rows = _no_population_rows(blind_spots["no_population"], cat)
+    lines = [f"## {cat['report.blind_spots_heading']}", ""]
+    if not rows and not no_pop_rows:
+        lines += [f"- {cat['report.blind_spots_none']}", ""]
+        return lines
+    lines += [f"- {label}: {value}" for label, value in rows]
+    if no_pop_rows:
+        lines += ["", f"### {cat['report.blind_spots_no_population_heading']}", ""]
+        lines += [f"- {label}: {value}" for label, value in no_pop_rows]
+    lines.append("")
+    return lines
+
+
+def _li_items(rows: list[tuple[str, str]]) -> str:
+    return "".join(
+        f"<li><strong>{html.escape(label)}</strong>: {html.escape(value)}</li>"
+        for label, value in rows
+    )
+
+
+def _blind_spots_html(blind_spots: dict[str, Any], cat: dict[str, str]) -> str:
+    rows = _blind_spot_rows(blind_spots["blind_spots"], cat)
+    no_pop_rows = _no_population_rows(blind_spots["no_population"], cat)
+    if not rows and not no_pop_rows:
+        body = f"<p>{html.escape(cat['report.blind_spots_none'])}</p>"
+    else:
+        body = f"<ul>{_li_items(rows)}</ul>"
+        if no_pop_rows:
+            body += (
+                f"<h3>{html.escape(cat['report.blind_spots_no_population_heading'])}</h3>"
+                f"<ul>{_li_items(no_pop_rows)}</ul>"
+            )
+    return (
+        '<section aria-labelledby="blind-spots"><h2 id="blind-spots">'
+        f"{html.escape(cat['report.blind_spots_heading'])}</h2>{body}</section>"
+    )
+
+
+def blind_spots_cli_lines(
+    blind_spots: dict[str, Any], catalogue: dict[str, str]
+) -> list[str]:
+    """The lines a command prints for ``blind_spots``: the same dictionary
+    :func:`_blind_spots_md`/:func:`_blind_spots_html` render."""
+    rows = _blind_spot_rows(blind_spots["blind_spots"], catalogue)
+    no_pop_rows = _no_population_rows(blind_spots["no_population"], catalogue)
+    lines = [f"{catalogue['report.blind_spots_heading']}:"]
+    if not rows and not no_pop_rows:
+        lines.append(f"  {catalogue['report.blind_spots_none']}")
+        return lines
+    lines += [f"  {label}: {value}" for label, value in rows]
+    if no_pop_rows:
+        lines.append(f"  {catalogue['report.blind_spots_no_population_heading']}:")
+        lines += [f"    {label}: {value}" for label, value in no_pop_rows]
+    return lines
+
+
 def _reproduce_command(invocation: list[str] | None) -> str:
     return "agentce " + " ".join(invocation) if invocation else "agentce quickstart"
 
@@ -372,6 +494,7 @@ def render_report_md(
     catalogs: list[Catalog] | None = None,
     invocation: list[str] | None = None,
     activity: dict[str, Any] | None = None,
+    blind_spots: dict[str, Any] | None = None,
 ) -> str:
     cat = messages.catalogue(language)
     by_control = _control_index(catalogs or [])
@@ -379,9 +502,11 @@ def render_report_md(
     summary = verdict.summarize(assertions)
     lines = [f"# {cat['report.title']}", ""]
     # The records lead the report (SPEC's evidence-first framing, 18.4): what happened, before how
-    # it measures up.
+    # it measures up. What the records can't show yet (18.5) comes right after (VALUE-PROP.md).
     if activity is not None:
         lines += _activity_md(activity, cat)
+    if blind_spots is not None:
+        lines += _blind_spots_md(blind_spots, cat)
     lines += _verdict_md(summary, cat)
     lines += [f"## {cat['report.summary_heading']}", ""]
     lines += [
@@ -460,6 +585,7 @@ def render_report_html(
     catalogs: list[Catalog] | None = None,
     invocation: list[str] | None = None,
     activity: dict[str, Any] | None = None,
+    blind_spots: dict[str, Any] | None = None,
 ) -> str:
     """Render a self-contained, escaped, WCAG 2.2 AA report page (SPEC §9.3): a strict CSP meta tag,
     no external references, one ``h1``, a ``main`` landmark, a print stylesheet, and every string that
@@ -487,6 +613,7 @@ def render_report_html(
         f"<title>{title}</title><style>{_HTML_STYLE}</style></head><body>"
         f"<main><h1>{title}</h1>"
         f"{_activity_html(activity, cat) if activity is not None else ''}"
+        f"{_blind_spots_html(blind_spots, cat) if blind_spots is not None else ''}"
         f"{_verdict_html(verdict.summarize(assertions), cat)}"
         f'<section aria-labelledby="summary"><h2 id="summary">'
         f"{html.escape(cat['report.summary_heading'])}</h2><ul>{summary}</ul></section>"
@@ -1537,6 +1664,10 @@ EMIT_FORMATS = (
 #: What an `emit`-less `write_report` call renders (the engine's original fixed bundle, predating
 #: `--emit`): every non-regression test pins this set exactly.
 _LEGACY_EMIT = frozenset({"md", "html", "oscal", "sarif", "pack"})
+#: `assess`'s own default when `--emit` is absent (RFC 0008 Sec.8): the legacy bundle plus the skill,
+#: so the report a user actually runs always includes the fix-list. `write_report`'s own `emit=None`
+#: contract (above) is unchanged -- this is resolved at the command layer, never inside `write_report`.
+ASSESS_DEFAULT_EMIT = _LEGACY_EMIT | frozenset({"skill"})
 
 
 def write_report(
@@ -1555,6 +1686,7 @@ def write_report(
     reverify_command: list[str] | None = None,
     extra_outputs: dict[str, bytes] | None = None,
     activity: dict[str, Any] | None = None,
+    blind_spots: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Write every report artifact for ``assertions`` and return the reproducibility manifest.
 
@@ -1583,7 +1715,15 @@ def write_report(
     applicability profile) feeds ``activity.json`` and the "what your agents did" report section
     (18.4); computed by the caller, once, since it is also needed for the terminal summary and the
     ``--json`` envelope. A caller that leaves it out gets the honest answer for a profile that
-    declares nothing."""
+    declares nothing.
+
+    ``blind_spots`` (:func:`agentce.blind_spots.compute_blind_spots` over ``assertions``, the
+    resolved profile, and ``catalogs``) feeds ``blind-spots.json`` and the not-enough-evidence report
+    section (18.5); like ``activity``, computed once by the caller and reused for the terminal summary
+    and the ``--json`` envelope. Unlike ``activity``, a caller that leaves it out gets the honest empty
+    answer rather than a silent recomputation: an empty ``Profile()`` has zero subjects, which would
+    fail ``compute_blind_spots``'s positional pairing against any non-empty ``assertions`` (RFC 0008
+    Sec.6), so every real call site must compute and pass its own."""
     check_dc5(
         assertions
     )  # DC-5: refuse a supporting verdict without an evidence pointer
@@ -1628,6 +1768,9 @@ def write_report(
     if activity is None:
         activity = summarize_activity(events or [], Profile())
     write_json("activity.json", activity)
+    if blind_spots is None:
+        blind_spots = _EMPTY_BLIND_SPOTS
+    write_json("blind-spots.json", blind_spots)
 
     for name, data in (extra_outputs or {}).items():
         write_bytes(name, data)
@@ -1642,6 +1785,7 @@ def write_report(
                 catalogs=catalogs,
                 invocation=invocation,
                 activity=activity,
+                blind_spots=blind_spots,
             ),
         )
     if wants("html"):
@@ -1654,6 +1798,7 @@ def write_report(
                 catalogs=catalogs,
                 invocation=invocation,
                 activity=activity,
+                blind_spots=blind_spots,
             ),
         )
 
