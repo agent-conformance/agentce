@@ -58,8 +58,13 @@ def summarize(assertions: list[Assertion]) -> dict[str, Any]:
 
 def gap_text(gap: dict[str, Any], catalogue: dict[str, str]) -> str:
     """One gap as text: ``insufficient evidence: DAT-01, DAT-02 (+14 more)``."""
+    # Function-local import (`report.py` already does `from . import verdict` at module scope; the
+    # reverse there would be a real cycle) -- see `contracts/P18-18.21.md`'s Design section.
+    from .report import sanitize_for_markdown
+
     label = catalogue.get(f"outcome.{gap['outcome']}", gap["outcome"])
-    text = f"{label}: {', '.join(gap['controls'])}"
+    controls = ", ".join(sanitize_for_markdown(c) for c in gap["controls"])
+    text = f"{label}: {controls}"
     if gap["more"]:
         text += f" ({i18n_format.format_message(catalogue['report.gaps_more'], n=gap['more'])})"
     return text
@@ -69,9 +74,11 @@ def cli_lines(
     summary: dict[str, Any], catalogue: dict[str, str], *, report_dir: str
 ) -> list[str]:
     """The lines a command prints for ``summary``: the verdict, the tally, the top gaps, the next step."""
+    from .report import sanitize_for_markdown
+
     verdict = summary["verdict"]
     tally = ", ".join(
-        f"{catalogue.get(f'outcome.{outcome}', outcome)} {count}"
+        f"{sanitize_for_markdown(catalogue.get(f'outcome.{outcome}', outcome))} {count}"
         for outcome, count in summary["counts"].items()
     )
     lines = [

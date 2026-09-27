@@ -83,6 +83,42 @@ def test_top_gaps_are_urgent_first_sorted_distinct_and_capped() -> None:
     )  # seven distinct controls, two subjects each: distinct, not per row
 
 
+def test_gap_text_sanitises_each_control_id() -> None:
+    """Item 18.21: `top_gaps`' controls reach `verdict.gap_text` raw (mid-line, after the fixed
+    label prefix, so no backtick-wrap is needed -- unlike the report's summary tally). Reproduced at
+    base_sha 7ab6d2d: a control id containing a leading `#` forges a nested heading via `## Verdict`'s
+    gap line (contracts/P18-18.21.md)."""
+    from agentce.report import sanitize_for_markdown
+
+    cat = messages.catalogue("en")
+    hostile = "OVS-01`, `injected"
+    gap = {"outcome": "non-conformant", "controls": [hostile], "more": 0}
+    text = verdict.gap_text(gap, cat)
+    assert text.endswith(sanitize_for_markdown(hostile))
+    assert hostile not in text
+    assert "`" not in text
+
+
+def test_cli_lines_tally_fallback_is_sanitised_pre_emptively() -> None:
+    """`cli_lines`' own outcome-fallback expression (`verdict.py`, distinct from `report.py`'s
+    `_outcome_label`) is not reachable through any command today -- `summary["counts"]` always
+    carries the fixed six outcome keys by the time a real run reaches `cli_lines` -- but is sanitised
+    pre-emptively so it can never regress silently if that ever changes (contracts/P18-18.21.md)."""
+    from agentce.report import sanitize_for_markdown
+
+    cat = messages.catalogue("en")
+    hostile = "conformant`\ninjected"
+    summary = {
+        "verdict": verdict.CONFORMANT,
+        "counts": {hostile: 1},
+        "top_gaps": [],
+    }
+    lines = verdict.cli_lines(summary, cat, report_dir="./out")
+    tally_line = next(ln for ln in lines if ln.startswith(cat["report.outcomes_label"]))
+    assert sanitize_for_markdown(hostile) in tally_line
+    assert hostile not in tally_line
+
+
 def test_summary_does_not_depend_on_assertion_order() -> None:
     assertions = _run("conformant", "insufficient_evidence", "not_assessed", "partial")
     assert verdict.summarize(assertions) == verdict.summarize(

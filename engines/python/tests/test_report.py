@@ -1151,3 +1151,84 @@ def test_validate_report_catches_a_recorded_output_that_went_missing(
     (tmp_path / "report.html").unlink()
     problems = validate_report(tmp_path)
     assert any("report.html" in p and "manifest.json" in p for p in problems), problems
+
+
+# --- Item 18.21: the verdict/crosswalk/mode/catalog-label escaping gap --------------------------
+
+import dataclasses  # noqa: E402
+
+_LONE_SURROGATE = "a\ud800b"
+_FORGED_HEADING = "# Verdict: Conformant"
+#: Mid-line fields only need character-level sanitising (no backtick-wrap): the container-break
+#: class they close is an embedded newline that would otherwise start a new physical line with a
+#: block marker (`_neutralize` collapses it to a space instead, `contracts/P18-18.21.md`).
+_FORGED_NEWLINE = "evil\n# Verdict: Conformant"
+
+
+def test_finding_line_sanitises_mode_and_outcome_fallback() -> None:
+    a = dataclasses.replace(_assertion("insufficient_evidence"), mode=_FORGED_NEWLINE)
+    md = render_report_md([a], {"insufficient_evidence": 1})
+    assert not any(
+        ln.startswith("# ") for ln in md.split("## Assertions", 1)[1].splitlines()
+    )
+    html_out = render_report_html([a], {"insufficient_evidence": 1})
+    assert "<h2>Verdict</h2>" not in html_out.split("Assertions</h2>", 1)[-1]
+
+
+def test_finding_line_sanitises_an_unknown_outcome() -> None:
+    a = dataclasses.replace(_assertion("conformant"), outcome=_FORGED_HEADING)
+    md = render_report_md([a], {_FORGED_HEADING: 1})
+    # The summary tally is list-item first content: backtick-wrapped so a leading '#' cannot open a
+    # nested heading (contracts/P18-18.21.md). The finding line's own outcome mention is mid-line
+    # (after the title/control/subject prefix), so it is sanitised but never wrapped.
+    summary = md.split("## Outcome summary", 1)[1].split("## Assertions", 1)[0]
+    tally_lines = [ln for ln in summary.splitlines() if _FORGED_HEADING in ln]
+    assert tally_lines
+    for ln in tally_lines:
+        assert ln.startswith("- `"), ln
+    assertions_section = md.split("## Assertions", 1)[1]
+    assert not any(ln.startswith("# ") for ln in assertions_section.splitlines())
+
+
+def test_crosswalk_citation_is_sanitised_and_backtick_wrapped() -> None:
+    a = dataclasses.replace(
+        _assertion("conformant"),
+        crosswalk=[
+            {
+                "framework": _FORGED_HEADING,
+                "clause": "Art. 1",
+                "relation": "implements",
+                "verified": True,
+            }
+        ],
+    )
+    md = render_report_md([a], {"conformant": 1})
+    crosswalk_lines = [ln for ln in md.splitlines() if ln.startswith("  - `")]
+    assert crosswalk_lines
+    for ln in crosswalk_lines:
+        assert ln[4] == "`", ln
+
+
+def test_provenance_sanitises_catalog_labels() -> None:
+    from agentce.report import _provenance_html, _provenance_md
+
+    labels = [_FORGED_NEWLINE + "@1"]
+    lines = _provenance_md(labels, None)
+    assert not any(ln.startswith("# ") for ln in lines)
+    html_out = _provenance_html(labels, None)
+    assert "<h2>Verdict" not in html_out
+
+
+def test_uuid_and_sarif_fingerprint_do_not_crash_on_a_lone_surrogate() -> None:
+    a = dataclasses.replace(
+        _assertion("non-conformant"), control=_LONE_SURROGATE, subject=_LONE_SURROGATE
+    )
+    # Both must render without raising UnicodeEncodeError (reproduced at base_sha 7ab6d2d): the
+    # OSCAL/SARIF documents' own control/subject fields stay byte-identical to the assertion (C5).
+    oscal = render_oscal([a])
+    sarif = render_sarif([a])
+    assert json.dumps(oscal)
+    assert json.dumps(sarif)
+    finding = oscal["assessment-results"]["results"][0]["findings"][0]
+    assert finding["target"]["target-id"] == _LONE_SURROGATE
+    assert sarif["runs"][0]["results"][0]["ruleId"] == _LONE_SURROGATE

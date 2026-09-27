@@ -26,6 +26,7 @@ from typing import Any
 
 import jsonschema
 import regex
+import yaml
 
 from . import (
     ENGINE_NAME,
@@ -91,7 +92,14 @@ def _package_digest() -> str:
 
 
 def _uuid(*parts: str) -> str:
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, "agentce:" + ":".join(parts)))
+    """A UUID over ``parts``, which can carry a catalog- or evidence-derived control/subject id: hash
+    the sanitised (never the raw canonical-JSON) form, since ``str.encode`` raises on a lone surrogate
+    before any Markdown/HTML sanitiser is ever reached (SPEC §7 injection hardening;
+    `contracts/P18-18.21.md`'s Design section). The OSCAL/SARIF document's own ``control``/``subject``
+    fields are written separately from their raw, unsanitised value (C5 byte-identity) -- only this
+    hash input is protected."""
+    safe_parts = (sanitize_for_markdown(p) for p in parts)
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, "agentce:" + ":".join(safe_parts)))
 
 
 def _safe(name: str) -> str:
@@ -480,7 +488,12 @@ def _provenance_md(catalogs: list[str], invocation: list[str] | None) -> list[st
         "## Provenance",
         "",
         f"- Engine: {ENGINE_NAME} {__version__}",
-        f"- Catalog: {', '.join(catalogs) if catalogs else '(none)'}",
+        "- Catalog: "
+        + (
+            ", ".join(sanitize_for_markdown(c) for c in catalogs)
+            if catalogs
+            else "(none)"
+        ),
         f"- Lenses available: {_lenses_text()}",
         f"- Reproduce: `{_reproduce_command(invocation)}`",
         "",
@@ -501,10 +514,13 @@ def _finding_md(
     subject = sanitize_for_markdown(a.subject)
     lines = [
         f"- **{title}** (`{control}` @ `{subject}`) -> "
-        f"**{_outcome_label(cat, a.outcome)}** "
-        f"(rung {a.rung}, {a.mode}; {a.population[1]}/{a.population[0]} failed)"
+        f"**{sanitize_for_markdown(_outcome_label(cat, a.outcome))}** "
+        f"(rung {a.rung}, {sanitize_for_markdown(a.mode)}; "
+        f"{a.population[1]}/{a.population[0]} failed)"
     ]
-    lines += [f"  - {_crosswalk_text(e, cat)}" for e in a.crosswalk]
+    lines += [
+        f"  - `{sanitize_for_markdown(_crosswalk_text(e, cat))}`" for e in a.crosswalk
+    ]
     if a.evidence:
         refs = ", ".join(f"`{_sanitize_field(e.ref)}`" for e in a.evidence)
         lines.append(f"  - {cat['report.evidence_label']}: {refs}")
@@ -542,7 +558,7 @@ def render_report_md(
     lines += _verdict_md(summary, cat)
     lines += [f"## {cat['report.summary_heading']}", ""]
     lines += [
-        f"- {_outcome_label(cat, outcome)}: {count}"
+        f"- `{sanitize_for_markdown(_outcome_label(cat, outcome))}`: {count}"
         for outcome, count in counts.items()
     ]
     lines += ["", f"## {cat['report.assertions_heading']}", ""]
@@ -571,7 +587,9 @@ _HTML_STYLE = (
 
 
 def _provenance_html(catalogs: list[str], invocation: list[str] | None) -> str:
-    catalog_text = html.escape(", ".join(catalogs) if catalogs else "(none)")
+    catalog_text = (
+        ", ".join(sanitize_for_html(c) for c in catalogs) if catalogs else "(none)"
+    )
     return (
         '<section aria-labelledby="provenance"><h2 id="provenance">Provenance</h2><ul>'
         f"<li>Engine: {html.escape(ENGINE_NAME)} {html.escape(__version__)}</li>"
@@ -609,9 +627,9 @@ def _row_html(a: Assertion, spec: ControlSpec | None, cat: dict[str, str]) -> st
     return (
         f"<tr><td>{sanitize_for_html(_finding_title(a, spec))}</td>"
         f"<td>{sanitize_for_html(a.control)}</td><td>{sanitize_for_html(a.subject)}</td>"
-        f"<td>{html.escape(spec.severity if spec else '')}</td>"
-        f"<td>{html.escape(_outcome_label(cat, a.outcome))}</td>"
-        f"<td>{'; '.join(html.escape(_crosswalk_text(e, cat)) for e in a.crosswalk)}</td>"
+        f"<td>{sanitize_for_html(spec.severity if spec else '')}</td>"
+        f"<td>{sanitize_for_html(_outcome_label(cat, a.outcome))}</td>"
+        f"<td>{'; '.join(sanitize_for_html(_crosswalk_text(e, cat)) for e in a.crosswalk)}</td>"
         f"<td>{'<br>'.join(details)}</td></tr>"
     )
 
@@ -634,7 +652,7 @@ def render_report_html(
     labels = [f"{c.id}@{c.version}" for c in (catalogs or [])]
     title = html.escape(cat["report.title"])
     summary = "".join(
-        f"<li>{html.escape(_outcome_label(cat, o))}: {c}</li>"
+        f"<li>{sanitize_for_html(_outcome_label(cat, o))}: {c}</li>"
         for o, c in counts.items()
     )
     ordered = [
@@ -1052,14 +1070,17 @@ def _sarif_rule_help_text(control: str, spec: ControlSpec | None) -> str:
 def _sarif_fingerprint(a: Assertion) -> str:
     """A fingerprint derived only from the assertion's own content -- control, subject, outcome, and
     the evaluation window/population that produced it -- so two independent offline runs over the same
-    evidence produce byte-identical fingerprints (no clock, host, or run counter)."""
+    evidence produce byte-identical fingerprints (no clock, host, or run counter). The hash input is
+    sanitised (never the raw SARIF document's own field values, which stay byte-identical to the
+    assertion) since ``str.encode`` raises on a lone surrogate (SPEC §7 injection hardening;
+    `contracts/P18-18.21.md`)."""
     payload = "|".join(
         [
-            a.control,
-            a.subject,
-            a.outcome,
-            a.window[0],
-            a.window[1],
+            sanitize_for_markdown(a.control),
+            sanitize_for_markdown(a.subject),
+            sanitize_for_markdown(a.outcome),
+            sanitize_for_markdown(a.window[0]),
+            sanitize_for_markdown(a.window[1]),
             str(a.population[0]),
             str(a.population[1]),
         ]
@@ -1188,9 +1209,12 @@ def render_public_statement(
             row[assertion.outcome] += 1
     lines = ["# Public conformance statement", ""]
     lines.append("## Scope")
-    lines.append("Subjects: " + ", ".join(subjects) if subjects else "Subjects: (none)")
+    subjects_text = ", ".join(f"`{sanitize_for_markdown(s)}`" for s in subjects)
+    lines.append("Subjects: " + subjects_text if subjects else "Subjects: (none)")
     lines.append(
-        f"Catalogs: {', '.join(catalogs)}" if catalogs else "Catalogs: (unspecified)"
+        "Catalogs: " + ", ".join(sanitize_for_markdown(c) for c in catalogs)
+        if catalogs
+        else "Catalogs: (unspecified)"
     )
     lines.append(f"Date: {statement_date}" if statement_date else "Date: (unspecified)")
     lines += [
@@ -1203,12 +1227,17 @@ def render_public_statement(
     for family in sorted(families):
         row = families[family]
         lines.append(
-            f"| {family} | "
+            f"| {sanitize_for_markdown(family)} | "
             + " | ".join(str(row[o]) for o in _STATEMENT_OUTCOMES)
             + " |"
         )
     lines += ["", "## Accepted deviations"]
-    lines.append(", ".join(sorted(deviations)) if deviations else "None.")
+    if deviations:
+        lines.append(
+            ", ".join(f"`{sanitize_for_markdown(d)}`" for d in sorted(deviations))
+        )
+    else:
+        lines.append("None.")
     if "CND" in families:
         lines += ["", "## Conduct", _CONDUCT_LINE]
     lines += [
@@ -1607,26 +1636,100 @@ def render_remediation_package(
     }
 
 
+def _sanitize_evidence_gap(gap: dict[str, Any]) -> dict[str, Any]:
+    """A rebuilt (never mutated-in-place) `evidence_gap`: every `event`/`class` name sanitised, in
+    each of `required`/`observed`/`missing` (SPEC §7 injection hardening; `contracts/P18-18.21.md`)."""
+    return {
+        key: [
+            {
+                **r,
+                "event": _sanitize_field(str(r.get("event", ""))),
+                "class": _sanitize_field(str(r.get("class", ""))),
+            }
+            for r in gap.get(key, [])
+        ]
+        for key in ("required", "observed", "missing")
+    }
+
+
+def _sanitize_finding(finding: dict[str, Any]) -> dict[str, Any]:
+    """A render-only, rebuilt view of one remediation-package finding: every catalog- or
+    evidence-derived string the two templates (`remediation.md.tmpl`, `skill-finding.md.tmpl`)
+    interpolate is sanitised (SPEC §7 injection hardening; `contracts/P18-18.21.md`'s widened
+    surface). Every nested structure is rebuilt (`{**x, k: v}`), never mutated in place, so the
+    canonical `package` a caller still holds is untouched (a shallow-copy risk 18.20 already
+    documented for the top-level dict; this closes it for nested dicts too)."""
+    f = dict(finding)
+    f["control"] = _sanitize_field(str(finding.get("control", "")))
+    f["title"] = _sanitize_field(str(finding.get("title", "")))
+    f["mode"] = _sanitize_field(str(finding.get("mode", "")))
+    window = finding.get("window") or {}
+    f["window"] = {
+        "start": _sanitize_field(str(window.get("start", ""))),
+        "end": _sanitize_field(str(window.get("end", ""))),
+    }
+    f["clauses"] = [
+        {
+            **c,
+            "framework": _sanitize_field(str(c.get("framework", ""))),
+            "clause": _sanitize_field(str(c.get("clause", ""))),
+            "relation": _sanitize_field(str(c.get("relation", ""))),
+        }
+        for c in finding.get("clauses", [])
+    ]
+    f["expectations"] = [
+        {**e, "text": _sanitize_field(str(e.get("text", "")))}
+        for e in finding.get("expectations", [])
+    ]
+    f["evidence_gap"] = _sanitize_evidence_gap(finding.get("evidence_gap") or {})
+    f["evidence"] = [
+        {**e, "ref": _sanitize_field(str(e.get("ref", "")))}
+        for e in finding.get("evidence", [])
+    ]
+    f["violations"] = [
+        {
+            **v,
+            "path": _sanitize_field(str(v.get("path", ""))),
+            "constraint": _sanitize_field(str(v.get("constraint", ""))),
+            "message_key": _sanitize_field(str(v.get("message_key", ""))),
+        }
+        for v in finding.get("violations", [])
+    ]
+    remediation = finding.get("remediation") or {}
+    f["remediation"] = {
+        **remediation,
+        "techniques": [
+            {**t, "ref": _sanitize_field(str(t.get("ref", "")))}
+            for t in remediation.get("techniques", [])
+        ],
+    }
+    acceptance = finding.get("acceptance") or {}
+    f["acceptance"] = {
+        **acceptance,
+        "criteria": _sanitize_field(str(acceptance.get("criteria", ""))),
+    }
+    return f
+
+
 def _remediation_md_context(package: dict[str, Any]) -> dict[str, Any]:
-    """A render-only view of `package`: every evidence- or profile-derived string the template
-    interpolates (the subject id, each finding's evidence refs and violation paths) is sanitised
-    (:func:`_sanitize_field`); the canonical `package` itself is never mutated -- only this copy feeds
-    the template (SPEC §7 injection hardening)."""
+    """A render-only view of `package`: every evidence- or catalog-derived string the template
+    interpolates is sanitised (:func:`_sanitize_field`, :func:`_sanitize_finding`); the canonical
+    `package` itself is never mutated -- only this copy feeds the template (SPEC §7 injection
+    hardening)."""
     ctx = dict(package)
     ctx["subject"] = _sanitize_field(str(package.get("subject", "")))
-    findings = []
-    for finding in package.get("findings", []):
-        f = dict(finding)
-        f["evidence"] = [
-            {**e, "ref": _sanitize_field(str(e.get("ref", "")))}
-            for e in finding.get("evidence", [])
-        ]
-        f["violations"] = [
-            {**v, "path": _sanitize_field(str(v.get("path", "")))}
-            for v in finding.get("violations", [])
-        ]
-        findings.append(f)
-    ctx["findings"] = findings
+    ctx["findings"] = [_sanitize_finding(f) for f in package.get("findings", [])]
+    ctx["not_assessed"] = [
+        {
+            **n,
+            "control": _sanitize_field(str(n.get("control", ""))),
+            "title": _sanitize_field(str(n.get("title", ""))),
+        }
+        for n in package.get("not_assessed", [])
+    ]
+    ctx["deviations_applied"] = [
+        _sanitize_field(str(d)) for d in package.get("deviations_applied", [])
+    ]
     return ctx
 
 
@@ -1672,17 +1775,9 @@ def _skill_finding_context(
     finding: dict[str, Any], tool_calls: list[str]
 ) -> dict[str, Any]:
     """A render-only view of one remediation-package finding for its ``findings/<control>--<n>.md``
-    note: the same sanitising :func:`_remediation_md_context` applies per finding, plus the subject's
+    note: the same sanitising :func:`_sanitize_finding` applies per finding, plus the subject's
     already-sanitised tool names (SPEC §7). The canonical package itself is never mutated."""
-    ctx = dict(finding)
-    ctx["evidence"] = [
-        {**e, "ref": _sanitize_field(str(e.get("ref", "")))}
-        for e in finding.get("evidence", [])
-    ]
-    ctx["violations"] = [
-        {**v, "path": _sanitize_field(str(v.get("path", "")))}
-        for v in finding.get("violations", [])
-    ]
+    ctx = _sanitize_finding(finding)
     ctx["tool_calls"] = list(tool_calls)
     return ctx
 
@@ -1706,13 +1801,25 @@ def render_skill_md(
     """Render the generated skill's ``SKILL.md`` (SPEC §13.3, skill rules S-1..S-10; Appendix A2
     (C)): fixed instructions from the one language-neutral template
     ``spec/report/templates/skill.md.tmpl`` plus this run's pinned versions and assertions digest --
-    never per-run authored prose, so an instruction sentence can never be assembled from evidence."""
+    never per-run authored prose, so an instruction sentence can never be assembled from evidence.
+    ``catalog_version`` is catalog-derived (a hostile ``--catalog-dir`` carries its own ``id``/
+    ``version``) and lands in this file's own YAML frontmatter: sanitising alone is not sufficient (a
+    brace, hash, leading quote, or `!!binary` still breaks ``yaml.safe_load`` on the sanitised value;
+    `contracts/P18-18.21.md`'s Design section), so the sanitised value is re-emitted as a real,
+    double-quoted YAML scalar (never the bare sanitised string the template's unquoted
+    ``catalog_version: {{catalog_version}}`` line would otherwise interpolate)."""
+    quoted_catalog_version = yaml.safe_dump(
+        sanitize_for_markdown(catalog_version),
+        default_style='"',
+        allow_unicode=True,
+        width=float("inf"),
+    ).rstrip("\n")
     return templating.render(
         bundled.skill_template(),
         {
             "spec_version": spec_version,
             "cli_version": cli_version,
-            "catalog_version": catalog_version,
+            "catalog_version": quoted_catalog_version,
             "assertions_digest": assertions_digest,
         },
     )
@@ -1721,8 +1828,15 @@ def render_skill_md(
 def render_reverify_md(argv: list[str]) -> str:
     """Render ``REVERIFY.md`` (SPEC §7): the exact, real re-verify command for this run, from the
     language-neutral template ``spec/report/templates/skill-reverify.md.tmpl``. ``argv`` is the full
-    command line including the program name, e.g. ``["agentce", "assess", "--bundle", ...]``."""
-    return templating.render(bundled.skill_reverify_template(), {"argv": list(argv)})
+    command line including the program name, e.g. ``["agentce", "assess", "--bundle", ...]``. Every
+    token is sanitised before it reaches the template's triple-backtick fence: a fixed flag like
+    ``--catalog-dir`` carries no backtick/newline, so this is a no-op there, but a hostile
+    ``--catalog-dir`` *path* is attacker-influenced and could otherwise close the fence early (SPEC §7
+    injection hardening; `contracts/P18-18.21.md`)."""
+    return templating.render(
+        bundled.skill_reverify_template(),
+        {"argv": [sanitize_for_markdown(a) for a in argv]},
+    )
 
 
 def _skill_finding_filename(control: str, index: int) -> str:

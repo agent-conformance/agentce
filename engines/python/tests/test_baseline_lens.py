@@ -365,8 +365,11 @@ def test_the_default_report_cites_two_standards_for_every_baseline_finding(
     )[1:]
     assert blocks
     for block in blocks:
+        # Item 18.21 backtick-wraps the whole crosswalk citation (list-item first content, SPEC §7
+        # injection hardening; `contracts/P18-18.21.md`), so the framework id no longer follows the
+        # list marker directly.
         cited = re.findall(
-            r"^  - ([a-z0-9-]+) \S.*\(clause reference unverified\)$",
+            r"^  - `([a-z0-9-]+) \S.*\(clause reference unverified\)`$",
             block,
             re.MULTILINE,
         )

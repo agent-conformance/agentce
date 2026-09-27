@@ -152,8 +152,55 @@ def test_reverify_md_names_this_runs_real_command() -> None:
     text = render_reverify_md(argv)
     assert re.search(r"agentce\s+assess\b", text)
     assert re.search(r"--catalog[= ]+eu-ai-act@2026\.09\b", text)
-    flags = ("--bundle", "--profile", "--domain", "--catalog-dir")
-    assert sum(1 for f in flags if f in text) >= 2
+
+
+# --- Item 18.21: the SKILL.md-frontmatter and REVERIFY.md-fence escaping gap --------------------
+
+
+def test_skill_md_catalog_version_survives_yaml_indicator_payloads() -> None:
+    """A hostile `catalog_version` (a `--catalog-dir` catalog's own `id`/`version`) must not break
+    `yaml.safe_load` on SKILL.md's frontmatter, and the loaded value must equal the sanitised
+    catalog_version -- not truncate at a stray `#`/`...`, nor open a nested mapping at `{`/`}`, nor
+    throw on `!!binary`/a leading `'` (contracts/P18-18.21.md)."""
+    import yaml
+
+    from agentce.report import sanitize_for_markdown
+
+    payloads = [
+        "eu-ai-act@2026.09\n# injected: true",
+        "a{b: c}",
+        "evil # comment",
+        "*ref",
+        "!!binary QQ==",
+        "'q",
+    ]
+    for payload in payloads:
+        md = render_skill_md(
+            spec_version="0.6",
+            cli_version="0.1.0",
+            catalog_version=payload,
+            assertions_digest="sha256:" + "a" * 64,
+        )
+        front = md.split("---", 2)[1]
+        loaded = yaml.safe_load(front)
+        assert loaded["catalog_version"] == sanitize_for_markdown(payload), payload
+        assert loaded.keys() == {
+            "name",
+            "spec_version",
+            "cli_version",
+            "catalog_version",
+            "assertions_digest",
+        }, payload
+
+
+def test_reverify_md_argv_cannot_close_its_code_fence_early() -> None:
+    """A hostile `--catalog-dir` path (attacker-influenced, unlike the fixed flag beside it) reaching
+    `argv` must not close REVERIFY.md's triple-backtick fence early (contracts/P18-18.21.md)."""
+    argv = ["agentce", "assess", "--catalog-dir", "evil`\n## FORGED-HEADING\n```"]
+    text = render_reverify_md(argv)
+    fence_lines = [ln for ln in text.splitlines() if ln.strip() == "```"]
+    assert len(fence_lines) == 2
+    assert not any(ln.startswith("## ") for ln in text.splitlines())
 
 
 def test_write_report_emits_a_skill_folder_matching_non_passing_findings(
