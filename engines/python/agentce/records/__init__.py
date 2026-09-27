@@ -127,6 +127,9 @@ class ScannedRecords:
         return root
 
 
+NO_GENAI_SPANS = "spans found, but none is a GenAI operation the adapter maps"
+
+
 def _adapt(payload: bytes, subject: str) -> otel_genai.AdaptResult:
     """Adapt one OTLP/JSON document; raise ``ValueError`` when it is not a trace export."""
     try:
@@ -139,7 +142,7 @@ def _adapt(payload: bytes, subject: str) -> otel_genai.AdaptResult:
         raise ValueError(
             "no spans: not an OpenTelemetry or OpenInference trace export"
             if result.report.spans_seen == 0
-            else "spans found, but none is a GenAI operation the adapter maps"
+            else NO_GENAI_SPANS
         )
     return result
 
@@ -258,9 +261,7 @@ def scan(folder: Path, *, subject: str, exclude: Path | None = None) -> ScannedR
                 for number, reason in got.bad_lines[: MAX_LISTED_LINES - len(bad_lines)]
             ]
 
-    if not read and any(
-        item["reason"].startswith("spans found") for item in unrecognised
-    ):
+    if not read and any(item["reason"] == NO_GENAI_SPANS for item in unrecognised):
         raise InputError(
             "input.records_no_genai_spans",
             "the folder holds OpenTelemetry traces, but none of their spans is a GenAI operation "
@@ -277,11 +278,11 @@ def scan(folder: Path, *, subject: str, exclude: Path | None = None) -> ScannedR
         )
     events = sorted(by_id.values(), key=lambda e: (str(e["time"]), str(e["id"])))
     sources = {str(e["source"]): str(e["agentcesourceclass"]) for e in events}
+    lines: dict[str, list[str]] = {source: [] for source in sources}
+    for e in events:
+        lines[str(e["source"])].append(canonical_string(e) + "\n")
     streams = {
-        source: "".join(
-            canonical_string(e) + "\n" for e in events if e["source"] == source
-        ).encode("utf-8")
-        for source in sources
+        source: "".join(chunk).encode("utf-8") for source, chunk in lines.items()
     }
     for source, data in streams.items():
         if len(data) > bundle.DEFAULT_MAX_MANIFEST_FILE_BYTES:

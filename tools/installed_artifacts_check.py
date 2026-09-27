@@ -793,6 +793,8 @@ CHECKS = {
     "npm": check_npm,
     "jar": check_jar,
 }
+# `all` covers the package kinds; `records` is the first-report gate's own check.
+ALL_KINDS = tuple(k for k in CHECKS if k != "records")
 
 
 def run_all(
@@ -1009,7 +1011,7 @@ def main(argv: list[str] | None = None) -> int:
         return self_test()
     if args.kind is None:
         parser.error("choose python, npm, jar, or all")
-    kinds = [k for k in CHECKS if k != "records"] if args.kind == "all" else [args.kind]
+    kinds = list(ALL_KINDS) if args.kind == "all" else [args.kind]
     results = run_all(kinds, offline=args.offline, require_netns=args.require_netns)
     failed = {k: v for k, v in results.items() if v}
     if args.json:
