@@ -50,6 +50,7 @@ test("the vendored data is byte-identical to the Python engine's copy", () => {
   const pairs: [string, string][] = [
     [join(ENGINE, "data", "catalogs"), join(python, "catalogs")],
     [join(ENGINE, "data", "corpus"), join(python, "corpus")],
+    [join(ENGINE, "data", "support_matrices"), join(python, "support_matrices")],
   ];
   for (const [ours, theirs] of pairs) {
     const a = files(ours);

@@ -16,6 +16,7 @@ import { dirname, join } from "node:path";
 import type { Activity } from "./activity";
 import { DENIED_KINDS, RECORDER_CLASSES, summarizeActivity } from "./activity";
 import { type Assertion, aggregate, assertionToJson, checkDc5 } from "./assertions";
+import type { BlindSpot, BlindSpots, CheckRef } from "./blindSpots";
 import { canonicalize } from "./canonical";
 import type { Catalog, ControlSpec } from "./catalog";
 import { DEFAULT_LANGUAGE, catalogue } from "./messages";
@@ -251,18 +252,114 @@ export function activityCliLines(activity: Activity, catalogue: Record<string, s
   return lines;
 }
 
+const OWNER_LABEL: Record<string, string> = {
+  agent_team: "the agent team",
+  platform_or_security: "platform or security",
+  ticketing_or_iam: "whoever runs ticketing or IAM",
+};
+
+/** No English string is stored in `blind-spots.json` itself (RFC 0008 Sec.7): the artifact carries
+ * only `owner_key`/`step_kind` tokens, and only the rendered report resolves them to text. Unlike
+ * the Python engine, this text is never routed through the message catalogue (RFC 0008 Sec.7: "the
+ * pre-existing, accepted scope boundary that rendered report.md/report.html output has never been a
+ * three-engine byte-identity requirement"). */
+function blindSpotStepText(stepKind: string, ownerLabel: string): string {
+  return stepKind === "request" ? `a request to ${ownerLabel}` : `a code change for ${ownerLabel}`;
+}
+
+/** `(label, value)` for every blind spot, in the module's own ranked order (never re-sorted here). */
+function blindSpotRows(blindSpots: BlindSpot[]): [string, string][] {
+  return blindSpots.map((bs) => {
+    const ownerLabel = OWNER_LABEL[bs.owner_key] as string;
+    const step = blindSpotStepText(bs.step_kind, ownerLabel);
+    const adapters = bs.supplying_adapters.join(", ") || "no adapter today";
+    const value =
+      `unlocks ${bs.checks_unlocked} check(s), needed by ${bs.needed_by} more; ` +
+      `rung ${bs.ladder_rung} -- ${step}. Adapters that can supply this: ${adapters}.`;
+    return [`${bs.event} (${bs.class})`, value];
+  });
+}
+
+function noPopulationRows(noPopulation: CheckRef[]): [string, string][] {
+  return noPopulation.map((entry) => [
+    `${entry.control} on ${entry.subject} (${entry.catalog}@${entry.control_version})`,
+    `The records show every kind of evidence ${entry.control} asks for, but not enough of it in the shape the control expects -- a --domain binding may be needed to identify the relevant decisions; see the control's documentation for what it needs.`,
+  ]);
+}
+
+function blindSpotsMd(blindSpots: BlindSpots): string[] {
+  const rows = blindSpotRows(blindSpots.blind_spots);
+  const noPopRows = noPopulationRows(blindSpots.no_population);
+  const lines = ["## Where your records can't show it yet", ""];
+  if (rows.length === 0 && noPopRows.length === 0) {
+    lines.push("- every check either has enough evidence, or nothing here would unlock more", "");
+    return lines;
+  }
+  for (const [label, value] of rows) lines.push(`- ${label}: ${value}`);
+  if (noPopRows.length > 0) {
+    lines.push("", "### Records that don't show enough, with no single fix", "");
+    for (const [label, value] of noPopRows) lines.push(`- ${label}: ${value}`);
+  }
+  lines.push("");
+  return lines;
+}
+
+function blindSpotsHtml(blindSpots: BlindSpots): string {
+  const rows = blindSpotRows(blindSpots.blind_spots);
+  const noPopRows = noPopulationRows(blindSpots.no_population);
+  let body: string;
+  if (rows.length === 0 && noPopRows.length === 0) {
+    body = "<p>every check either has enough evidence, or nothing here would unlock more</p>";
+  } else {
+    const items = (list: [string, string][]): string =>
+      list
+        .map(
+          ([label, value]) =>
+            `<li><strong>${escapeHtml(label)}</strong>: ${escapeHtml(value)}</li>`,
+        )
+        .join("");
+    body = `<ul>${items(rows)}</ul>`;
+    if (noPopRows.length > 0) {
+      body += `<h3>Records that don't show enough, with no single fix</h3><ul>${items(noPopRows)}</ul>`;
+    }
+  }
+  return `<section aria-labelledby="blind-spots"><h2 id="blind-spots">Where your records can't show it yet</h2>${body}</section>`;
+}
+
+/** The lines a command prints for `blindSpots`: the same dictionary `blindSpotsMd`/`blindSpotsHtml`
+ * render. */
+export function blindSpotsCliLines(blindSpots: BlindSpots): string[] {
+  const rows = blindSpotRows(blindSpots.blind_spots);
+  const noPopRows = noPopulationRows(blindSpots.no_population);
+  const lines = ["Where your records can't show it yet:"];
+  if (rows.length === 0 && noPopRows.length === 0) {
+    lines.push("  every check either has enough evidence, or nothing here would unlock more");
+    return lines;
+  }
+  for (const [label, value] of rows) lines.push(`  ${label}: ${value}`);
+  if (noPopRows.length > 0) {
+    lines.push("  Records that don't show enough, with no single fix:");
+    for (const [label, value] of noPopRows) lines.push(`    ${label}: ${value}`);
+  }
+  return lines;
+}
+
 export function renderReportMd(
   assertions: Assertion[],
   counts: Record<string, number>,
   language: string = DEFAULT_LANGUAGE,
   activity?: Activity,
+  blindSpots?: BlindSpots,
 ): string {
   const cat = catalogue(language);
   const lines = [`# ${cat["report.title"]}`, ""];
   // The records lead the report (SPEC's evidence-first framing, 18.4): what happened, before how it
-  // measures up.
+  // measures up. What the records can't show yet (18.5) comes right after.
   if (activity !== undefined) {
     lines.push(...activityMd(activity, cat));
+  }
+  if (blindSpots !== undefined) {
+    lines.push(...blindSpotsMd(blindSpots));
   }
   lines.push(`## ${cat["report.summary_heading"]}`, "");
   for (const [outcome, count] of Object.entries(counts)) {
@@ -289,6 +386,7 @@ export function renderReportHtml(
   counts: Record<string, number>,
   language: string = DEFAULT_LANGUAGE,
   activity?: Activity,
+  blindSpots?: BlindSpots,
 ): string {
   const cat = catalogue(language);
   const title = escapeHtml(cat["report.title"] as string);
@@ -307,7 +405,8 @@ export function renderReportHtml(
     rows || `<tr><td colspan="3">${escapeHtml(cat["report.no_controls"] as string)}</td></tr>`;
   const csp = "default-src 'none'; style-src 'unsafe-inline'; img-src 'none'";
   const activitySection = activity !== undefined ? activityHtml(activity, cat) : "";
-  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${csp}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1>${activitySection}<section aria-labelledby="summary"><h2 id="summary">${escapeHtml(cat["report.summary_heading"] as string)}</h2><ul>${summary}</ul></section><section aria-labelledby="assertions"><h2 id="assertions">${escapeHtml(cat["report.assertions_heading"] as string)}</h2><table><tr><th>Control</th><th>Subject</th><th>Outcome</th></tr>${bodyRows}</table></section></main></body></html>\n`;
+  const blindSpotsSection = blindSpots !== undefined ? blindSpotsHtml(blindSpots) : "";
+  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${csp}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1>${activitySection}${blindSpotsSection}<section aria-labelledby="summary"><h2 id="summary">${escapeHtml(cat["report.summary_heading"] as string)}</h2><ul>${summary}</ul></section><section aria-labelledby="assertions"><h2 id="assertions">${escapeHtml(cat["report.assertions_heading"] as string)}</h2><table><tr><th>Control</th><th>Subject</th><th>Outcome</th></tr>${bodyRows}</table></section></main></body></html>\n`;
 }
 
 /** A deterministic OSCAL date-time for this run: the earliest evidence-window start across the
@@ -554,6 +653,11 @@ export interface WriteReportOptions {
    * since it is also needed for the terminal summary and the `--json` envelope. A caller that leaves
    * it out gets the honest answer for a profile that declares nothing. */
   activity?: Activity;
+  /** `computeBlindSpots` over `assertions` and the same `profile`/`catalogObjects`/`events` the
+   * caller already has in scope (18.5), feeding `blind-spots.json` and the not-enough-evidence
+   * report section; computed by the caller, once, since it is also needed for the terminal summary
+   * and the `--json` envelope. A caller that leaves it out gets the honest empty answer. */
+  blindSpots?: BlindSpots;
 }
 
 /** Write every report artifact for `assertions` and return the reproducibility manifest. */
@@ -580,10 +684,15 @@ export function writeReport(
   const language = options.reportLanguage ?? DEFAULT_LANGUAGE;
   const counts = aggregate(assertions);
   const activity = options.activity ?? summarizeActivity([], profileFromDict({}));
+  const blindSpots = options.blindSpots ?? { blind_spots: [], no_population: [] };
   writeJson("assertions.json", assertions.map(assertionToJson));
   writeJson("activity.json", activity);
-  writeTextFile("report.md", renderReportMd(assertions, counts, language, activity));
-  writeTextFile("report.html", renderReportHtml(assertions, counts, language, activity));
+  writeJson("blind-spots.json", blindSpots);
+  writeTextFile("report.md", renderReportMd(assertions, counts, language, activity, blindSpots));
+  writeTextFile(
+    "report.html",
+    renderReportHtml(assertions, counts, language, activity, blindSpots),
+  );
   writeJson("oscal-ar.json", renderOscal(assertions));
   writeJson("results.sarif", renderSarif(assertions, options.catalogObjects ?? []));
 

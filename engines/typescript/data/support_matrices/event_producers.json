@@ -1,0 +1,19 @@
+{
+  "SessionStart": {"otel-genai": "self_report"},
+  "SessionEnd": {"otel-genai": "self_report"},
+  "ModelCall": {"otel-genai": "self_report"},
+  "ToolCall": {"otel-genai": "self_report", "mcp-gateway": "enforcement_point"},
+  "ResourceAccess": {"otel-genai": "self_report", "mcp-gateway": "enforcement_point"},
+  "MemoryWrite": {"otel-genai": "self_report"},
+  "MemoryRead": {"otel-genai": "self_report"},
+  "PolicyDecision": {"mcp-gateway": "enforcement_point", "policy-engines": "enforcement_point"},
+  "DelegationIssued": {"mcp-gateway": "enforcement_point", "identity": "enforcement_point"},
+  "ApprovalRequested": {"oversight": "self_report"},
+  "ApprovalDecided": {"oversight": "self_report"},
+  "Override": {"oversight": "self_report"},
+  "Interrupt": {"oversight": "self_report"},
+  "Notice": {"oversight": "self_report"},
+  "AuthzCheck": {"policy-engines": "enforcement_point"},
+  "BundleLoaded": {"supply-chain": "enforcement_point"},
+  "Attestation": {"supply-chain": "enforcement_point"}
+}

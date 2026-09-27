@@ -13,6 +13,7 @@ import { summarizeActivity } from "./activity";
 import { resolve as resolveApplicability } from "./applicability";
 import { type Assertion, aggregate, assertionFromJson, assertionToJson } from "./assertions";
 import { assessSubjects, evaluatedNothing } from "./assess";
+import { computeBlindSpots } from "./blindSpots";
 import { loadBundle } from "./bundle";
 import { catalogsDir as bundledCatalogsDir, quickstartDir } from "./bundled";
 import { type Catalog, loadCatalog } from "./catalog";
@@ -30,6 +31,7 @@ import { type Profile, loadProfile } from "./profile";
 import { writeQuarantine } from "./quarantine";
 import {
   activityCliLines,
+  blindSpotsCliLines,
   renderEvidencePack,
   renderOscal,
   renderReportHtml,
@@ -407,6 +409,7 @@ function runAssess(options: AssessOptions): CommandResult {
   }
 
   const activity = summarizeActivity(ingested.accepted, profileObj);
+  const blindSpots = computeBlindSpots(evaluated, profileObj, catalogs, ingested.accepted);
   writeReport(out, evaluated, {
     bundleDigest: bundle.digest,
     catalogs: catalogLabels,
@@ -415,6 +418,7 @@ function runAssess(options: AssessOptions): CommandResult {
     invocation: [options.invocationCommand, scrubPath(bundleDir), scrubPath(profilePath)],
     supersedes,
     activity,
+    blindSpots,
   });
   if (state !== null) {
     state.record(bundle.digest, join(out, "manifest.json"), newWindowEnd);
@@ -440,6 +444,7 @@ function runAssess(options: AssessOptions): CommandResult {
     top_gaps: summary.topGaps,
   };
   result.data.activity = activity;
+  result.data.blind_spots = blindSpots;
   if (options.state !== undefined) {
     result.data.supersedes = supersedes;
   }
@@ -450,6 +455,9 @@ function runAssess(options: AssessOptions): CommandResult {
     throw nothingEvaluated(profileObj, ingested.accepted, evaluated.length);
   }
   for (const line of activityCliLines(activity, catalogue(DEFAULT_LANGUAGE))) {
+    result.note(line);
+  }
+  for (const line of blindSpotsCliLines(blindSpots)) {
     result.note(line);
   }
   result.note(`verdict: ${summary.verdict}`);

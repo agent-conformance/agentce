@@ -26,6 +26,7 @@ import { summarizeActivity } from "./activity";
 import { resolve as resolveApplicability } from "./applicability";
 import { aggregate } from "./assertions";
 import { assessSubjects } from "./assess";
+import { computeBlindSpots } from "./blindSpots";
 import { loadBundle } from "./bundle";
 import { type Catalog, loadCatalog } from "./catalog";
 import { computeCoverage } from "./coverage";
@@ -126,6 +127,7 @@ function assessProject(
   resolveApplicability(profile, ingested.accepted);
   const assertions = assessSubjects(ingested.accepted, profile, catalogs, domain);
   const activity = summarizeActivity(ingested.accepted, profile);
+  const blindSpots = computeBlindSpots(assertions, profile, catalogs, ingested.accepted);
   writeReport(outDir, assertions, {
     bundleDigest: bundle.digest,
     catalogs: labels,
@@ -133,6 +135,7 @@ function assessProject(
     operator: ECS_OPERATOR,
     invocation: ["conformance", pid],
     activity,
+    blindSpots,
   });
 }
 
