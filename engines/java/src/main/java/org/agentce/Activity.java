@@ -33,11 +33,9 @@ public final class Activity {
     public static final List<String> DENIED_KINDS =
             List.of("approval_rejected", "authz_denied", "policy_denied", "refused");
 
-    private static String eventType(JsonNode event) {
-        JsonNode data = event.get("data");
-        return data != null && data.isObject() && data.get("@type") != null && data.get("@type").isTextual()
-                ? data.get("@type").textValue()
-                : "";
+    private static String eventType(JsonNode data) {
+        JsonNode type = data.get("@type");
+        return type != null && type.isTextual() ? type.textValue() : "";
     }
 
     private static JsonNode eventData(JsonNode event) {
@@ -82,7 +80,7 @@ public final class Activity {
             if (agent != null && agent.isObject() && agent.get("id") != null && agent.get("id").isTextual()) {
                 agents.add(agent.get("id").textValue());
             }
-            String etype = eventType(event);
+            String etype = eventType(data);
             switch (etype) {
                 case "ModelCall" -> {
                     JsonNode model = data.get("model");

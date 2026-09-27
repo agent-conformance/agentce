@@ -61,9 +61,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function eventType(event: Event): string {
-  const data = event.data;
-  return isRecord(data) && typeof data["@type"] === "string" ? data["@type"] : "";
+function eventType(data: Record<string, unknown>): string {
+  return typeof data["@type"] === "string" ? data["@type"] : "";
 }
 
 function eventData(event: Event): Record<string, unknown> | null {
@@ -104,7 +103,7 @@ export function summarizeActivity(events: Event[], profile: Profile): Activity {
     if (isRecord(agent) && typeof agent.id === "string") {
       agents.add(agent.id);
     }
-    const etype = eventType(event);
+    const etype = eventType(data);
     if (etype === "ModelCall") {
       const model = data.model;
       if (isRecord(model) && typeof model.name === "string") {

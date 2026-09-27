@@ -635,8 +635,8 @@ public final class Cli {
         Map<String, Integer> counts = Assertions.aggregate(assertions);
         String rendering;
         switch (format) {
-            case "md" -> rendering = Report.renderReportMd(assertions, counts, Messages.DEFAULT_LANGUAGE);
-            case "html" -> rendering = Report.renderReportHtml(assertions, counts, Messages.DEFAULT_LANGUAGE);
+            case "md" -> rendering = Report.renderReportMd(assertions, counts, Messages.DEFAULT_LANGUAGE, null);
+            case "html" -> rendering = Report.renderReportHtml(assertions, counts, Messages.DEFAULT_LANGUAGE, null);
             case "oscal" -> rendering = Json.pretty(Report.renderOscal(assertions)) + "\n";
             case "sarif" -> rendering = Json.pretty(Report.renderSarif(assertions)) + "\n";
             default -> {

@@ -14,11 +14,12 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { arch, platform } from "node:os";
 import { dirname, join } from "node:path";
 import type { Activity } from "./activity";
-import { DENIED_KINDS, EFFECT_CLASSES, RECORDER_CLASSES } from "./activity";
+import { DENIED_KINDS, RECORDER_CLASSES, summarizeActivity } from "./activity";
 import { type Assertion, aggregate, assertionToJson, checkDc5 } from "./assertions";
 import { canonicalize } from "./canonical";
 import type { Catalog, ControlSpec } from "./catalog";
 import { DEFAULT_LANGUAGE, catalogue } from "./messages";
+import { profileFromDict } from "./profile";
 import { byteCompare, sortKeysDeep } from "./util";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
@@ -494,16 +495,6 @@ export interface WriteReportOptions {
   activity?: Activity;
 }
 
-const EMPTY_ACTIVITY: Activity = {
-  agents: [],
-  models: [],
-  tools: [],
-  actions_by_effect_class: Object.fromEntries(EFFECT_CLASSES.map((c) => [c, 0])),
-  approvals_by_recorder: Object.fromEntries(RECORDER_CLASSES.map((c) => [c, 0])),
-  denied_or_blocked: Object.fromEntries(DENIED_KINDS.map((k) => [k, 0])),
-  undeclared: { models: [], tools: [] },
-};
-
 /** Write every report artifact for `assertions` and return the reproducibility manifest. */
 export function writeReport(
   outDir: string,
@@ -527,7 +518,7 @@ export function writeReport(
 
   const language = options.reportLanguage ?? DEFAULT_LANGUAGE;
   const counts = aggregate(assertions);
-  const activity = options.activity ?? EMPTY_ACTIVITY;
+  const activity = options.activity ?? summarizeActivity([], profileFromDict({}));
   writeJson("assertions.json", assertions.map(assertionToJson));
   writeJson("activity.json", activity);
   writeTextFile("report.md", renderReportMd(assertions, counts, language, activity));

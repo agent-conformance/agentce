@@ -19,15 +19,34 @@ class ActivityTest {
 
     private static final String SUBJECT = "spiffe://corp/agents/a";
 
-    private static JsonNode event(String eventType, String extraJson, String sourceClass) {
-        String json = "{\"id\":\"e-" + eventType + "\",\"subject\":\"" + SUBJECT + "\","
-                + "\"agentcesourceclass\":\"" + sourceClass + "\","
-                + "\"data\":{\"@type\":\"" + eventType + "\",\"agent\":{\"id\":\"" + SUBJECT + "\"}" + extraJson + "}}";
-        return Json.parse(json);
+    /** A small object-tree builder for test fixtures: alternating {@code key, value} pairs, where a
+     * {@code String} value becomes a text node, a {@code boolean} a boolean node, and an {@link
+     * ObjectNode} is nested as-is -- so a fixture reads like the data it represents instead of a
+     * hand-spliced JSON string. */
+    private static ObjectNode obj(Object... kv) {
+        ObjectNode node = Json.nodes().objectNode();
+        for (int i = 0; i < kv.length; i += 2) {
+            String key = (String) kv[i];
+            Object value = kv[i + 1];
+            if (value instanceof String s) {
+                node.put(key, s);
+            } else if (value instanceof Boolean b) {
+                node.put(key, b);
+            } else {
+                node.set(key, (ObjectNode) value);
+            }
+        }
+        return node;
     }
 
-    private static JsonNode event(String eventType, String extraJson) {
-        return event(eventType, extraJson, "self_report");
+    private static JsonNode event(String eventType, ObjectNode extra, String sourceClass) {
+        ObjectNode data = obj("@type", eventType, "agent", obj("id", SUBJECT));
+        data.setAll(extra);
+        return obj("id", "e-" + eventType, "subject", SUBJECT, "agentcesourceclass", sourceClass, "data", data);
+    }
+
+    private static JsonNode event(String eventType, ObjectNode extra) {
+        return event(eventType, extra, "self_report");
     }
 
     private static Profile emptyProfile() {
@@ -35,14 +54,14 @@ class ActivityTest {
     }
 
     private static Profile profileWith(List<String> declaredTools) {
-        StringBuilder tools = new StringBuilder();
-        for (int i = 0; i < declaredTools.size(); i++) {
-            if (i > 0) tools.append(",");
-            tools.append("\"").append(declaredTools.get(i)).append("\"");
-        }
-        String json = "{\"catalogs\":[\"eu-ai-act@2026.09\"],\"subjects\":[{\"id\":\"" + SUBJECT + "\","
-                + "\"role\":\"both\",\"declared_tools\":[" + tools + "]}]}";
-        return Profile.fromDict(Json.parse(json));
+        Profile profile = new Profile();
+        Profile.Subject subject = new Profile.Subject();
+        subject.id = SUBJECT;
+        subject.role = "both";
+        subject.declaredTools.addAll(declaredTools);
+        profile.catalogs.add("eu-ai-act@2026.09");
+        profile.subjects.add(subject);
+        return profile;
     }
 
     private static List<String> texts(JsonNode arr) {
@@ -67,12 +86,18 @@ class ActivityTest {
     @Test
     void countsAgentsModelsAndTools() {
         List<JsonNode> events = List.of(
-                event("ModelCall", ",\"model\":{\"provider\":\"openai\",\"name\":\"gpt-x\",\"version_or_digest\":\"1\"}"),
-                event("ToolCall", ",\"tool\":{\"name\":\"search\",\"server\":\"mcp://s\",\"protocol\":\"mcp\"},\"effect_class\":\"read\""),
+                event("ModelCall", obj("model", obj("provider", "openai", "name", "gpt-x", "version_or_digest", "1"))),
                 event(
                         "ToolCall",
-                        ",\"tool\":{\"name\":\"transfer_funds\",\"server\":\"mcp://s\",\"protocol\":\"mcp\"},\"effect_class\":\"irreversible\""),
-                event("ToolCall", ",\"tool\":{\"name\":\"search\",\"server\":\"mcp://s\",\"protocol\":\"mcp\"}"));
+                        obj("tool", obj("name", "search", "server", "mcp://s", "protocol", "mcp"), "effect_class", "read")),
+                event(
+                        "ToolCall",
+                        obj(
+                                "tool",
+                                obj("name", "transfer_funds", "server", "mcp://s", "protocol", "mcp"),
+                                "effect_class",
+                                "irreversible")),
+                event("ToolCall", obj("tool", obj("name", "search", "server", "mcp://s", "protocol", "mcp"))));
         ObjectNode activity = Activity.summarizeActivity(events, emptyProfile());
         assertEquals(List.of(SUBJECT), texts(activity.get("agents")));
         assertEquals("gpt-x", activity.get("models").get(0).get("name").asText());
@@ -89,9 +114,9 @@ class ActivityTest {
     @Test
     void approvalsCountedByWhoRecordedThem() {
         List<JsonNode> events = List.of(
-                event("ApprovalDecided", ",\"outcome\":\"approve\"", "self_report"),
-                event("ApprovalDecided", ",\"outcome\":\"approve\"", "independent_system"),
-                event("ApprovalDecided", ",\"outcome\":\"reject\"", "independent_system"));
+                event("ApprovalDecided", obj("outcome", "approve"), "self_report"),
+                event("ApprovalDecided", obj("outcome", "approve"), "independent_system"),
+                event("ApprovalDecided", obj("outcome", "reject"), "independent_system"));
         ObjectNode activity = Activity.summarizeActivity(events, emptyProfile());
         ObjectNode approvals = (ObjectNode) activity.get("approvals_by_recorder");
         assertEquals(0, approvals.get("enforcement_point").asInt());
@@ -103,11 +128,11 @@ class ActivityTest {
     @Test
     void deniedOrBlockedCoversTheFourAuthoritySignals() {
         List<JsonNode> events = List.of(
-                event("PolicyDecision", ",\"decision\":\"deny\""),
-                event("PolicyDecision", ",\"decision\":\"allow\""),
-                event("AuthzCheck", ",\"allowed\":false"),
-                event("AuthzCheck", ",\"allowed\":true"),
-                event("Refusal", ",\"reason_class\":\"policy\""));
+                event("PolicyDecision", obj("decision", "deny")),
+                event("PolicyDecision", obj("decision", "allow")),
+                event("AuthzCheck", obj("allowed", false)),
+                event("AuthzCheck", obj("allowed", true)),
+                event("Refusal", obj("reason_class", "policy")));
         ObjectNode activity = Activity.summarizeActivity(events, emptyProfile());
         ObjectNode denied = (ObjectNode) activity.get("denied_or_blocked");
         assertEquals(0, denied.get("approval_rejected").asInt());
@@ -119,8 +144,8 @@ class ActivityTest {
     @Test
     void undeclaredToolAndModelAreHonestNotYetDeclared() {
         List<JsonNode> events = List.of(
-                event("ToolCall", ",\"tool\":{\"name\":\"search\",\"server\":\"s\",\"protocol\":\"mcp\"}"),
-                event("ModelCall", ",\"model\":{\"provider\":\"openai\",\"name\":\"gpt-x\",\"version_or_digest\":\"1\"}"));
+                event("ToolCall", obj("tool", obj("name", "search", "server", "s", "protocol", "mcp"))),
+                event("ModelCall", obj("model", obj("provider", "openai", "name", "gpt-x", "version_or_digest", "1"))));
         ObjectNode activity = Activity.summarizeActivity(events, emptyProfile());
         assertEquals(List.of("gpt-x"), texts(activity.get("undeclared").get("models")));
         assertEquals(List.of("search"), texts(activity.get("undeclared").get("tools")));
@@ -129,8 +154,8 @@ class ActivityTest {
     @Test
     void declaringAToolRemovesItFromUndeclared() {
         List<JsonNode> events = List.of(
-                event("ToolCall", ",\"tool\":{\"name\":\"search\",\"server\":\"s\",\"protocol\":\"mcp\"}"),
-                event("ToolCall", ",\"tool\":{\"name\":\"transfer_funds\",\"server\":\"s\",\"protocol\":\"mcp\"}"));
+                event("ToolCall", obj("tool", obj("name", "search", "server", "s", "protocol", "mcp"))),
+                event("ToolCall", obj("tool", obj("name", "transfer_funds", "server", "s", "protocol", "mcp"))));
         ObjectNode activity = Activity.summarizeActivity(events, profileWith(List.of("search")));
         assertEquals(List.of("transfer_funds"), texts(activity.get("undeclared").get("tools")));
     }
@@ -138,7 +163,7 @@ class ActivityTest {
     @Test
     void declaringEveryToolLeavesNothingUndeclared() {
         List<JsonNode> events =
-                List.of(event("ToolCall", ",\"tool\":{\"name\":\"search\",\"server\":\"s\",\"protocol\":\"mcp\"}"));
+                List.of(event("ToolCall", obj("tool", obj("name", "search", "server", "s", "protocol", "mcp"))));
         ObjectNode activity = Activity.summarizeActivity(events, profileWith(List.of("search")));
         assertTrue(texts(activity.get("undeclared").get("tools")).isEmpty());
     }
@@ -146,8 +171,7 @@ class ActivityTest {
     @Test
     void nonDictDataAndUnrelatedEventTypesAreIgnored() {
         List<JsonNode> events = List.of(
-                Json.parse("{\"id\":\"e1\",\"subject\":\"" + SUBJECT + "\",\"data\":\"not-a-dict\"}"),
-                event("SessionStart", ""));
+                obj("id", "e1", "subject", SUBJECT, "data", "not-a-dict"), event("SessionStart", obj()));
         ObjectNode activity = Activity.summarizeActivity(events, emptyProfile());
         assertEquals(List.of(SUBJECT), texts(activity.get("agents")));
         assertEquals(0, activity.get("tools").size());

@@ -80,8 +80,8 @@ class ReportTest {
                 assertions.add(a);
             }
             Map<String, Integer> counts = Assertions.aggregate(assertions);
-            String md = Report.renderReportMd(assertions, counts, "en");
-            String html = Report.renderReportHtml(assertions, counts, "en");
+            String md = Report.renderReportMd(assertions, counts, "en", null);
+            String html = Report.renderReportHtml(assertions, counts, "en", null);
             assertTrue(md.startsWith("# "), "report.md should start with a top-level heading");
             assertTrue(html.contains("<html"), "report.html should be a full HTML document");
         }
@@ -92,7 +92,7 @@ class ReportTest {
         List<Assertions.Assertion> assertions = ovsFailedAssertions();
         ObjectNode manifest = Report.writeReport(
                 outDir, assertions, "sha256:abc", List.of("base/eu-ai-act@1"), "ecs", List.of("conformance", "p1"),
-                List.of(), "en", List.of());
+                List.of(), "en", List.of(), null);
 
         for (String name : List.of(
                 "assertions.json", "activity.json", "report.md", "report.html", "oscal-ar.json", "results.sarif",

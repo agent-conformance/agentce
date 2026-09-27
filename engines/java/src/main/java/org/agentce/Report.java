@@ -297,10 +297,8 @@ public final class Report {
         return sorted;
     }
 
-    public static String renderReportMd(List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language) {
-        return renderReportMd(assertions, counts, language, null);
-    }
-
+    /** {@code activity} feeds the "what your agents did" section that leads the report (18.4); {@code
+     * null} for a bare re-render with no activity available. */
     public static String renderReportMd(
             List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language, ObjectNode activity) {
         Map<String, String> cat = Messages.catalogue(language);
@@ -378,10 +376,8 @@ public final class Report {
                 + "</p></section>";
     }
 
-    public static String renderReportHtml(List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language) {
-        return renderReportHtml(assertions, counts, language, null);
-    }
-
+    /** {@code activity} feeds the "what your agents did" section that leads the report (18.4); {@code
+     * null} for a bare re-render with no activity available. */
     public static String renderReportHtml(
             List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language, ObjectNode activity) {
         Map<String, String> cat = Messages.catalogue(language);
@@ -662,17 +658,9 @@ public final class Report {
     /** Write every report artifact for {@code assertions} and return the reproducibility manifest.
      * {@code catalogObjects} are the resolved catalog objects (not just their {@code id@version}
      * labels in {@code catalogs}), so {@code results.sarif} can carry catalog-sourced rule metadata
-     * (SPEC §9); an empty list still yields a valid, if less informative, SARIF document. */
-    public static ObjectNode writeReport(
-            Path outDir, List<Assertions.Assertion> assertions, String bundleDigest, List<String> catalogs,
-            String operator, List<String> invocation, List<String> supersedes, String reportLanguage,
-            List<Catalog> catalogObjects) {
-        return writeReport(
-                outDir, assertions, bundleDigest, catalogs, operator, invocation, supersedes, reportLanguage,
-                catalogObjects, null);
-    }
-
-    /** {@code activity} is {@link Activity#summarizeActivity}'s node over the run's accepted events
+     * (SPEC §9); an empty list still yields a valid, if less informative, SARIF document.
+     *
+     * <p>{@code activity} is {@link Activity#summarizeActivity}'s node over the run's accepted events
      * and resolved profile (18.4), feeding {@code activity.json} and the "what your agents did"
      * report section; computed by the caller, once, since it is also needed for the terminal summary
      * and the {@code --json} envelope. {@code null} gets the honest answer for a profile that

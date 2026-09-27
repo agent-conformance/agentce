@@ -6,10 +6,7 @@
       "id": "VG-SUITE-SELFTEST",
       "title": "The runner reports pass, fail, skipped and timeout honestly, and the registry lint rejects bad gates",
       "tier": "quick",
-      "cmd": [
-        "python3",
-        "verification/selftest.py"
-      ],
+      "cmd": ["python3", "verification/selftest.py"],
       "timeout_s": 300,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
@@ -37,22 +34,8 @@
       "title": "An attestation is verified only after its DSSE signature verifies against a trusted key",
       "tier": "quick",
       "cwd": "adapters/supply-chain",
-      "cmd": [
-        "uv",
-        "run",
-        "--frozen",
-        "pytest",
-        "-q",
-        "-o",
-        "addopts=",
-        "-p",
-        "no:cacheprovider",
-        "tests/test_signatures.py",
-        "tests/test_adapter.py"
-      ],
-      "requires": [
-        "uv"
-      ],
+      "cmd": ["uv", "run", "--frozen", "pytest", "-q", "-o", "addopts=", "-p", "no:cacheprovider", "tests/test_signatures.py", "tests/test_adapter.py"],
+      "requires": ["uv"],
       "timeout_s": 600,
       "invariant": "An attestation is reported as verified only after its signature verifies against a trusted key",
       "rubric": {
@@ -80,22 +63,8 @@
       "title": "The baseline catalog cites at least two standards per control, is the default lens, and every report lists the lenses",
       "tier": "quick",
       "cwd": "engines/python",
-      "cmd": [
-        "uv",
-        "run",
-        "--frozen",
-        "pytest",
-        "-q",
-        "-o",
-        "addopts=",
-        "-p",
-        "no:cacheprovider",
-        "tests/test_baseline_lens.py",
-        "tests/test_assess_catalog_resolution.py"
-      ],
-      "requires": [
-        "uv"
-      ],
+      "cmd": ["uv", "run", "--frozen", "pytest", "-q", "-o", "addopts=", "-p", "no:cacheprovider", "tests/test_baseline_lens.py", "tests/test_assess_catalog_resolution.py"],
+      "requires": ["uv"],
       "timeout_s": 600,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
@@ -135,13 +104,8 @@
       "title": "An installed package turns a folder of OpenTelemetry records into a report with no flags, offline, in under five minutes",
       "tier": "quick",
       "cwd": ".",
-      "cmd": [
-        "bash",
-        "verification/gates/first_report_time.sh"
-      ],
-      "requires": [
-        "uv"
-      ],
+      "cmd": ["bash", "verification/gates/first_report_time.sh"],
+      "requires": ["uv"],
       "timeout_s": 900,
       "invariant": "Tests run with no network",
       "rubric": {
@@ -175,14 +139,8 @@
       "title": "The built landing page and the README carry the approved product copy, and the wording it replaced is gone",
       "tier": "quick",
       "cwd": ".",
-      "cmd": [
-        "bash",
-        "verification/gates/locked_copy.sh"
-      ],
-      "requires": [
-        "python3",
-        "pnpm"
-      ],
+      "cmd": ["bash", "verification/gates/locked_copy.sh"],
+      "requires": ["python3", "pnpm"],
       "timeout_s": 900,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
@@ -228,15 +186,8 @@
       "title": "The three engines compute the same 'what your agents did' activity summary, and an undeclared tool honestly surfaces",
       "tier": "quick",
       "cwd": ".",
-      "cmd": [
-        "bash",
-        "verification/gates/what_they_did_engines.sh"
-      ],
-      "requires": [
-        "uv",
-        "pnpm",
-        "jq"
-      ],
+      "cmd": ["bash", "verification/gates/what_they_did_engines.sh"],
+      "requires": ["uv", "pnpm", "jq"],
       "timeout_s": 900,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
