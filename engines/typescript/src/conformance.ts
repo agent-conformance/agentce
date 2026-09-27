@@ -22,6 +22,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { summarizeActivity } from "./activity";
 import { resolve as resolveApplicability } from "./applicability";
 import { aggregate } from "./assertions";
 import { assessSubjects } from "./assess";
@@ -124,12 +125,14 @@ function assessProject(
   computeCoverage(ingested.accepted, profile, bundle.root);
   resolveApplicability(profile, ingested.accepted);
   const assertions = assessSubjects(ingested.accepted, profile, catalogs, domain);
+  const activity = summarizeActivity(ingested.accepted, profile);
   writeReport(outDir, assertions, {
     bundleDigest: bundle.digest,
     catalogs: labels,
     catalogObjects: catalogs,
     operator: ECS_OPERATOR,
     invocation: ["conformance", pid],
+    activity,
   });
 }
 
