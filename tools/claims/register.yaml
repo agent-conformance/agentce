@@ -293,10 +293,10 @@ claims:
         the same workflow proves the same for the Java engine.
   - id: integration.framework-capture
     text: >-
-      Capturing every model/tool/decision automatically from LangGraph, the OpenAI Agents SDK, CrewAI,
+      Capturing every model/tool/decision automatically from LangGraph, the OpenAI Agents SDK,
       Google ADK, and the Claude Agent SDK, from one line and no further code, is planned and not yet
       built; `agentce_emit.auto()` alone still captures no per-event framework activity by itself.
-      Five of the six example agents now really import and run their named framework, but each does so
+      Four of the five example agents now really import and run their named framework, but each does so
       with its own integration code -- a callback/event handler that turns that framework's real
       callback payloads into explicit `emit_*` calls -- not automatic capture from the one line alone.
     status: roadmap
@@ -307,7 +307,7 @@ claims:
       - examples/scenario.py
   - id: examples.frameworks-labelled
     text: >-
-      Each of the six example agents either imports a real package of its own or says in its own source
+      Each of the five example agents either imports a real package of its own or says in its own source
       that automatic framework capture is on the roadmap, and the pages that explain the one-line setup
       say the same for as long as `agentce_emit.auto()` with zero `emit_*` calls records nothing beyond
       the fact that a session ran, never a framework's per-event activity. The examples still run and
@@ -329,7 +329,7 @@ claims:
         Also runs every example and validates its bundle.
   - id: examples.frameworks-really-run
     text: >-
-      Five of the six example agents (LangGraph, the OpenAI Agents SDK, CrewAI, Google ADK, the Claude
+      Four of the five example agents (LangGraph, the OpenAI Agents SDK, Google ADK, the Claude
       Agent SDK) really import and run their named framework end to end, offline and keyless, against a
       scripted deterministic model or transport -- never a live network call, never a real API key --
       and each produces a bundle the engine accepts with zero quarantines. Each example resolves its
@@ -342,7 +342,7 @@ claims:
       workflow: .github/workflows/ci.yml
       job: python-tests
       description: >-
-        On every pull request, runs each of the five framework examples for real through its own run.sh
+        On every pull request, runs each of the four framework examples for real through its own run.sh
         and asserts the agent script imports its named framework (no roadmap-label fallback), the run
         exits 0, and the resulting bundle ingests with zero quarantines and the ModelCall/ToolCall/
         Decision/SessionStart/SessionEnd event types -- proving the framework's own code path ran, not
@@ -497,11 +497,11 @@ claims:
         scenario.
   - id: integrations.framework-breadth
     text: >-
-      Ten example framework/SDK integrations -- LangGraph, the OpenAI Agents SDK, CrewAI, Google ADK,
-      the Claude Agent SDK, AutoGen, LlamaIndex, Semantic Kernel, Bedrock Agents, and Vertex Agents --
+      Eight example framework/SDK integrations -- LangGraph, the OpenAI Agents SDK, Google ADK,
+      the Claude Agent SDK, AutoGen, Semantic Kernel, Bedrock Agents, and Vertex Agents --
       each really import and run their named SDK, offline and keyless, against a scripted
       deterministic model or transport. Three further `examples/` scripts (MCP server, A2A mesh, and a
-      hand-rolled custom loop) round the directory out to thirteen runnable examples but emit evidence
+      hand-rolled custom loop) round the directory out to eleven runnable examples but emit evidence
       directly through `agentce_emit` rather than importing a distinct third-party SDK.
     status: built
     pages:
@@ -513,7 +513,7 @@ claims:
         Runs tools/framework_examples_check.py: every example's agent.py really imports its named
         framework at the top level, running it end to end produces a bundle the engine ingests with
         zero quarantines and the required event types, the no-ml dependency boundary holds with real
-        frameworks installed, and the five new examples' chokepoint symbol is documented and genuinely
+        frameworks installed, and the DOC_SYMBOLS examples' chokepoint symbol is documented and genuinely
         used, not merely named in prose.
   - id: integrations.trace-store-connectors
     text: >-

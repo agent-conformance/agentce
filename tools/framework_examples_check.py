@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""framework_examples_check - prove the five framework examples really run their framework.
+"""framework_examples_check - prove the eight framework examples really run their framework.
 
-Ten of the ``examples/<style>/`` agents (LangGraph, the OpenAI Agents SDK, CrewAI, Google ADK, the
-Claude Agent SDK, AutoGen, LlamaIndex, Semantic Kernel, Bedrock Agents, Vertex Agents) are meant to
+Eight of the ``examples/<style>/`` agents (LangGraph, the OpenAI Agents SDK, Google ADK, the
+Claude Agent SDK, AutoGen, Semantic Kernel, Bedrock Agents, Vertex Agents) are meant to
 really import and run their named framework end to end, offline and keyless, against a scripted
 deterministic model or transport, each in its own isolated environment. This check proves both halves
 of that:
 
-1. **The example really runs.** For each of the ten, ``examples/<style>/agent.py`` imports its named
+1. **The example really runs.** For each of the eight, ``examples/<style>/agent.py`` imports its named
    framework at the top level (never falling back to a "roadmap" label -- that escape hatch is for the
    truth-stage check, ``examples_check.py``, before the build existed), and running the example for real
    through its own ``run.sh`` produces a bundle the engine ingests with zero quarantines and at least the
    ``ModelCall``/``ToolCall``/``Decision``/``SessionStart``/``SessionEnd`` event types -- so a script that
    imports a framework and then does nothing with it cannot pass.
-2. **The dependency boundary holds with the frameworks actually installed.** Some of the ten examples'
+2. **The dependency boundary holds with the frameworks actually installed.** Some of the eight examples'
    own lockfiles resolve a package on the no-ml denylist (several of these frameworks require an
    LLM/embedding client of their own), yet the repository-wide ``no_ml_check.py`` scan still exits 0,
    because the exemption (``docs/adr/0016``) names exactly those lockfiles and nothing else.
@@ -51,12 +51,10 @@ ROOT = Path(__file__).resolve().parent.parent
 #: Style -> the top-level module its agent.py must really import (SPEC 13.4 AX-3/AX-4).
 STYLES = {
     "langgraph": "langgraph",
-    "crewai": "crewai",
     "openai-agents": "agents",
     "google-adk": "google",
     "claude-agent-sdk": "claude_agent_sdk",
     "autogen": "autogen_agentchat",
-    "llamaindex": "llama_index",
     "semantic-kernel": "semantic_kernel",
     "bedrock-agents": "boto3",
     "vertex-agents": "google",
@@ -69,13 +67,12 @@ REQUIRED_EVENT_TYPES = {
     "SessionEnd",
 }
 
-#: Style -> the real, framework-defined chokepoint/emission symbol item 16.3's five new examples
+#: Style -> the real, framework-defined chokepoint/emission symbol item 16.3's new examples
 #: actually hook (confirmed by reading each installed package's source during implementation, not
 #: predicted in advance -- e.g. AutoGen's currently-maintained autogen-agentchat/autogen-core family
 #: has no register_hook/register_reply API; that name belongs to the legacy pyautogen/ag2 line).
 DOC_SYMBOLS = {
     "autogen": "ChatCompletionClient",
-    "llamaindex": "response_generator",
     "semantic-kernel": "FUNCTION_INVOCATION",
     "bedrock-agents": "invoke_agent",
     "vertex-agents": "httpx_client",
@@ -87,11 +84,9 @@ DOC_SYMBOLS = {
 ADR_0016_EXEMPT_LOCKS = frozenset(
     {
         "examples/langgraph/uv.lock",
-        "examples/crewai/uv.lock",
         "examples/openai-agents/uv.lock",
         "examples/google-adk/uv.lock",
         "examples/claude-agent-sdk/uv.lock",
-        "examples/llamaindex/uv.lock",
         "examples/semantic-kernel/uv.lock",
     }
 )
@@ -289,8 +284,8 @@ def self_test() -> int:
     # A missing agent.py is reported by name, not a crash.
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
-        (root / "examples" / "crewai").mkdir(parents=True)
-        problems = check_examples_really_run(root, {"crewai": "crewai"})
+        (root / "examples" / "autogen").mkdir(parents=True)
+        problems = check_examples_really_run(root, {"autogen": "autogen_agentchat"})
     ok = any("agent.py missing" in p for p in problems)
     print(f"self-test missing-agent-fails: {'ok' if ok else 'FAIL ' + str(problems)}")
     results.append(ok)
@@ -384,7 +379,7 @@ def self_test() -> int:
     )
     results.append(ok)
 
-    # The real repo's five new examples all pass for real.
+    # The real repo's new examples all pass for real.
     ok = not check_doc_symbols(ROOT, DOC_SYMBOLS)
     print(f"self-test doc-symbol-real-repo-passes: {'ok' if ok else 'FAIL'}")
     results.append(ok)

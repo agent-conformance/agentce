@@ -7,7 +7,7 @@ C1/C2), trace-store ingestion from where an adopter's telemetry already lives
 (``tools/trace_store_ingest_check.py``, C3/C4), and GRC connector recipes beyond raw OSCAL
 (``tools/grc/evidence_export.py`` and ``tools/grc_connectors_check.py``, C6/C7). This module aggregates
 all four by ``subprocess``-ing into each one's own real environment -- the ``tools`` environment this
-module itself runs in never imports ``agentce`` or any of the five new frameworks, so every sub-check
+module itself runs in never imports ``agentce`` or any of the newer frameworks, so every sub-check
 runs in the environment it actually needs, not this one's.
 
     integration_breadth_check.py             run every sub-check for real (the invocation CI uses)

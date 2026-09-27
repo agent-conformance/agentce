@@ -61,7 +61,7 @@ agentce validate --bundle /tmp/bundle
 ```
 
 `examples/run_all.py --check` runs and validates all of them at once. The styles: `langgraph`,
-`openai-agents`, `claude-agent-sdk`, `google-adk`, `crewai`, `custom-loop`, plus `mcp-server` and
+`openai-agents`, `claude-agent-sdk`, `google-adk`, `custom-loop`, plus `mcp-server` and
 `a2a-mesh`.
 
 ## Prefer enforcement-point evidence

@@ -1,6 +1,6 @@
 # 0021 — Allow-list one unpatched nltk advisory for the llamaindex example only
 
-Status: accepted
+Status: superseded by 0023
 Spec refs: SPEC §13.4 AX-3, AX-4
 
 ## Context

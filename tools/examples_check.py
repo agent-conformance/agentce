@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """examples_check - keep the framework examples and the integration docs honest about what is built.
 
-The six ``examples/<style>/agent.py`` scripts are named for an implementation style (LangGraph, the
-OpenAI Agents SDK, CrewAI, Google ADK, the Claude Agent SDK, a hand-rolled loop). A script that shares one
+The five ``examples/<style>/agent.py`` scripts are named for an implementation style (LangGraph, the
+OpenAI Agents SDK, Google ADK, the Claude Agent SDK, a hand-rolled loop). A script that shares one
 framework-free template and imports none of them proves nothing about that framework, and a page that lets
 a reader think ``agentce_emit.auto()`` captures a framework's evidence by itself is a claim the code cannot
 back. This check ties both to the real behaviour:
@@ -36,7 +36,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 STYLES = (
     "langgraph",
-    "crewai",
     "openai-agents",
     "google-adk",
     "claude-agent-sdk",
@@ -195,8 +194,8 @@ def self_test() -> int:
     results.append(
         _fails(
             "unlabelled-example",
-            {"agents": {"crewai": UNLABELLED_AGENT}},
-            "examples/crewai/agent.py imports no framework",
+            {"agents": {"google-adk": UNLABELLED_AGENT}},
+            "examples/google-adk/agent.py imports no framework",
         )
     )
     results.append(

@@ -24,8 +24,7 @@ data the events actually carry (``event.kwargs``).
 
 ``agentce_emit.auto()`` is active only when ``AGENTCE_EMIT=1`` (set by run.sh); the bundle is flushed
 at process exit. Neither ``autogen_core`` nor ``autogen_agentchat`` performs any network I/O or
-telemetry ping on import or on this scripted run, so no env var is needed to disable one (unlike
-CrewAI's install-telemetry ping); this run makes zero network calls.
+telemetry ping on import or on this scripted run, so no env var is needed to disable one; this run makes zero network calls.
 """
 
 from __future__ import annotations
@@ -174,8 +173,8 @@ class _EvidenceHandler(logging.Handler):
     """Turns AutoGen's own ``EVENT_LOGGER_NAME`` log records into ``agentce_emit`` calls.
 
     Uses only the data ``LLMCallEvent``/``ToolCallEvent`` payloads (``event.kwargs``) actually carry
-    -- the same real-framework-event-payload principle the CrewAI and LangGraph examples apply to
-    their own event/callback systems.
+    -- the same real-framework-event-payload principle the LangGraph example applies to
+    its own event/callback system.
     """
 
     def __init__(self, emitter: agentce_emit.Emitter) -> None:

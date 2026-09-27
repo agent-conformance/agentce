@@ -58,11 +58,9 @@ EXCLUDE_DIRS = frozenset({".venv", "node_modules", ".gradle"})
 FRAMEWORK_EXAMPLE_LOCKS = frozenset(
     {
         "examples/langgraph/uv.lock",
-        "examples/crewai/uv.lock",
         "examples/openai-agents/uv.lock",
         "examples/google-adk/uv.lock",
         "examples/claude-agent-sdk/uv.lock",
-        "examples/llamaindex/uv.lock",
         "examples/semantic-kernel/uv.lock",
     }
 )

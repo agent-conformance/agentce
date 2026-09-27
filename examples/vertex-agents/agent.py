@@ -1,7 +1,7 @@
 """Vertex AI Agents example (SPEC 13.4 AX-3/AX-4): really calls ``google-genai``, offline and keyless.
 
 Vertex AI Agents run against Google's hosted Gemini/Vertex endpoint -- there is no local graph to
-invoke, unlike CrewAI or LangGraph. This script is therefore a real client of ``google-genai``
+invoke, unlike LangGraph. This script is therefore a real client of ``google-genai``
 (``google.genai.Client``), the unified Python SDK that Vertex AI's own docs now point developers to
 for the Gemini/agent model surface (``google-cloud-aiplatform``'s ``vertexai`` module is the legacy
 wrapper; confirmed by reading the installed ``google-genai==2.25.0`` source, which is the package this

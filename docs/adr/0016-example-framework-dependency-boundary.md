@@ -3,6 +3,8 @@
 Status: accepted
 Spec refs: SPEC §8.7, §13.4 AX-3, AX-4
 
+Amendment: ADR 0023 removed the `crewai` and `llamaindex` examples; references to them below are historical.
+
 ## Context
 
 `examples/<style>/` (SPEC §13.4 AX-4) exists to show a real agent framework producing AgentCE
@@ -50,10 +52,10 @@ own "a sixth example is scanned by default" rule below.
 
 2. **`tools/no_ml_check.py` gains one new, narrowly-named constant**,
    `FRAMEWORK_EXAMPLE_LOCKS`, listing the exact lockfile paths whose real, resolved dependency tree
-   needs the exemption (`examples/langgraph/uv.lock`, `examples/crewai/uv.lock`,
+   needs the exemption (`examples/langgraph/uv.lock`,
    `examples/openai-agents/uv.lock`, `examples/google-adk/uv.lock`,
-   `examples/claude-agent-sdk/uv.lock`, `examples/llamaindex/uv.lock`,
-   `examples/semantic-kernel/uv.lock`). A lockfile on that list is skipped by the scan; every other
+   `examples/claude-agent-sdk/uv.lock`,
+   `examples/semantic-kernel/uv.lock`; the `crewai` and `llamaindex` entries were removed by ADR 0023). A lockfile on that list is skipped by the scan; every other
    lockfile in the repository, including the shared `examples/uv.lock`, every `engines/*`,
    `adapters/*`, `conformance/*`, and `tools/*` lockfile, and `examples/autogen/uv.lock`,
    `examples/bedrock-agents/uv.lock`, and `examples/vertex-agents/uv.lock` (whose real dependency

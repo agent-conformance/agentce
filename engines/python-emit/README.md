@@ -14,7 +14,7 @@ em.emit_decision(decision_type="dom:CreditDecision", affects_natural_person=True
 it on.
 `auto()` alone hooks nothing: called with no further code, an agent emits no events. Two ways to fill
 that in exist today. Write an explicit `emit_*` call at each chokepoint (model call, tool call,
-decision) — `examples/langgraph`, `examples/openai-agents`, `examples/crewai`, `examples/google-adk`,
+decision) — `examples/langgraph`, `examples/openai-agents`, `examples/google-adk`,
 and `examples/claude-agent-sdk` each do exactly this, from a callback or event hook that turns that
 real framework's own payloads into `emit_*` calls. Or, for a framework that already produces OTel-shaped
 spans, register `agentce_emit.instrument()`'s `AgentCESpanProcessor` with its tracer and let the
