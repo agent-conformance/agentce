@@ -20,6 +20,11 @@
     "content_type": "application/schema+json"
   },
   {
+    "path": "/spec/report/activity.schema.json",
+    "source": "spec/report/activity.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
     "path": "/spec/report/applicability-statement.schema.json",
     "source": "spec/report/applicability-statement.schema.json",
     "content_type": "application/schema+json"

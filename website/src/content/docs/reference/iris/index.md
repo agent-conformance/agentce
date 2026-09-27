@@ -1,9 +1,9 @@
 ---
 title: Canonical IRIs
-description: Every one of the 19 canonical, dereferenceable IRIs the specification defines.
+description: Every one of the 20 canonical, dereferenceable IRIs the specification defines.
 ---
 
-Every canonical, dereferenceable IRI the specification defines (SPEC §6, §9; `website/iri-manifest.json`), 19 in total: the JSON-LD context, the RDF vocabulary, and every JSON Schema an engine or a report validates against. Each is served byte-identically at its own canonical path and, here, linked to a human-readable page.
+Every canonical, dereferenceable IRI the specification defines (SPEC §6, §9; `website/iri-manifest.json`), 20 in total: the JSON-LD context, the RDF vocabulary, and every JSON Schema an engine or a report validates against. Each is served byte-identically at its own canonical path and, here, linked to a human-readable page.
 
 | IRI | Page | Content type |
 |---|---|---|
@@ -11,6 +11,7 @@ Every canonical, dereferenceable IRI the specification defines (SPEC §6, §9; `
 | `/vocab/evidence/v1` | [/vocab/evidence/v1](/reference/iris/vocab-evidence-v1/) | text/turtle |
 | `/schema/evidence/v1` | [agentce-evidence](/reference/iris/schema-evidence-v1/) | application/schema+json |
 | `/spec/model/applicability-profile.schema.json` | [AgentCE applicability profile](/reference/iris/spec-model-applicability-profile/) | application/schema+json |
+| `/spec/report/activity.schema.json` | [AgentCE activity summary](/reference/report-schemas/activity/) | application/schema+json |
 | `/spec/report/applicability-statement.schema.json` | [AgentCE applicability statement](/reference/report-schemas/applicability-statement/) | application/schema+json |
 | `/spec/report/assertions.schema.json` | [AgentCE assertions](/reference/report-schemas/assertions/) | application/schema+json |
 | `/spec/report/claim.schema.json` | [AgentCE conformance claim](/reference/report-schemas/claim/) | application/schema+json |

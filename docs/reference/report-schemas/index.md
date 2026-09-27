@@ -4,6 +4,7 @@ One page per JSON Schema in `spec/report/` (SPEC §9), the schemas every engine 
 
 | Schema | Title |
 |---|---|
+| [`activity.schema.json`](activity.md) | AgentCE activity summary |
 | [`applicability-statement.schema.json`](applicability-statement.md) | AgentCE applicability statement |
 | [`assertions.schema.json`](assertions.md) | AgentCE assertions |
 | [`claim.schema.json`](claim.md) | AgentCE conformance claim |

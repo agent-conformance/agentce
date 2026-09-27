@@ -8,6 +8,19 @@ This is the report the vendored quickstart project renders end to end with defau
 
 # AgentCE conformance report
 
+## What your agents did
+
+- Agents: spiffe://corp/agents/credit-langgraph
+- Models: 0
+- Tools: credit.record_decision
+- Actions by effect class: write 1
+- Approvals recorded by: 0
+- Denied or blocked: 0
+
+### Not yet declared in your profile
+
+- Tools: credit.record_decision
+
 ## Verdict
 
 **Incomplete — no control failed, but not every applicable control is demonstrated.**
