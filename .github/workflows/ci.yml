@@ -326,6 +326,23 @@ jobs:
           | jq -e '[.events[] | select(.data["@type"] == "Attestation") | .data] as $a
           | ($a | length > 0) and ($a | all(.verification.status != "verified" and .signer == null))'
 
+  support-matrix-sync:
+    # tools/support_matrix_sync_check.py: every adapters/*/support-matrix.yaml stays in sync with the
+    # vendored, per-engine event_producers.json tables (Python/TypeScript/Java) that the blind-spots
+    # ranking (item 18.5) reads for its producer-derived rung and supplying_adapters list -- an adapter
+    # declaring an event the vendored tables don't know, or vice versa, fails this job.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: support_matrix_sync_check self-test
+        run: uv run --project tools --frozen python -m support_matrix_sync_check --self-test
+      - name: Every adapter's support matrix matches the vendored engine tables
+        run: uv run --project tools --frozen python -m support_matrix_sync_check
+
   integration-breadth:
     # Item 16.3: AutoGen, Semantic Kernel, Bedrock Agents, and Vertex Agents each really
     # run their named SDK offline and keyless; Langfuse, Phoenix/Arize, Datadog LLM Observability, and
