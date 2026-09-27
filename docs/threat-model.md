@@ -155,26 +155,33 @@ name observed on an assessed agent) could otherwise smuggle an instruction-shape
 Markdown heading, a bare imperative sentence, a fenced code block -- into that document and have the
 reading assistant treat it as part of the trusted prompt rather than as inert data about the finding.
 
-- **Escaping, not trust separation by format.** Both renderers build their template context by
+- **Sanitising, not trust separation by format.** Both renderers build their template context by
   routing every evidence- or profile-derived field -- the subject id, each evidence ref, each
-  validation path, each tool-call name -- through the same `_md_escape` helper
-  (`engines/python/agentce/report.py:953`, `_remediation_md_context` at line 1166 for the remediation
-  package, `_skill_finding_context` at line 1227 for the skill folder) before it reaches the template
-  (SPEC §7 injection hardening). `_md_escape` collapses embedded newlines and other whitespace to
-  single spaces (so a derived string can never start a new line and become a live heading or a bare
-  instruction line of its own), replaces backticks with `'` (so it cannot break out of the template's
-  own backtick delimiters), and caps the result at `_MD_ESCAPE_CAP` (200) characters. Instruction
-  sentences in the rendered document come only from the template or the signed catalog; everything
-  evidence-derived is escaped and length-capped this way, never trusted verbatim. This is escaping, not
-  erasure -- the string still appears, as inert data.
-- **Same mitigation, two output formats.** `render_remediation_md` (line 1189) and
-  `render_skill_finding_md`/`render_skill_md` (lines 1246/1255) are two templates over the same
-  canonical `remediation-package.json`, and both derive their context through `_md_escape`, so one row
-  covers both F17's and F31's rendered output.
+  validation path, each tool-call name -- through the same `sanitize_for_markdown` function
+  (`engines/python/agentce/report.py:1365`, via the `_sanitize_field` convenience at line 1402;
+  `_remediation_md_context` at line 1610 for the remediation package, `_skill_finding_context` at line
+  1671 for the skill folder) before it reaches the template (SPEC §7 injection hardening).
+  `sanitize_for_markdown` calls the shared `_neutralize` core (line 1316) first -- which collapses
+  embedded newlines, other control characters, and Unicode whitespace to single spaces (so a derived
+  string can never start a new line and become a live heading or a bare instruction line of its own)
+  and drops bidi-override, zero-width, and other `Default_Ignorable_Code_Point` characters entirely --
+  then substitutes backtick, `<`/`>`, `[`/`]`, and `&` for inert lookalikes (so it cannot break out of
+  the template's own backtick delimiters, pass through as raw HTML, or form Markdown link/image/entity
+  syntax of its own), and caps the result at `_SANITIZE_CAP` (200) characters. Instruction sentences in
+  the rendered document come only from the template or the signed catalog; everything evidence-derived
+  is sanitised and length-capped this way, never trusted verbatim. This is sanitising, not erasure --
+  the string still appears, as inert data.
+- **Same mitigation, two output formats.** `render_remediation_md` (line 1633) and
+  `render_skill_finding_md`/`render_skill_md` (lines 1690/1699) are two templates over the same
+  canonical `remediation-package.json`, and both derive their context through `sanitize_for_markdown`,
+  so one row covers both F17's and F31's rendered output.
 - **Proved by hostile fixtures.** `engines/python/tests/test_remediation.py::test_md_escapes_a_hostile_subject_id`
   renders a package whose subject id contains a Markdown heading and a backtick fence and asserts the
   rendered document neutralises both; `engines/python/tests/test_skill_emit.py::test_finding_note_escapes_a_hostile_tool_name`
-  does the equivalent for a hostile tool-call name in a generated skill finding note.
+  does the equivalent for a hostile tool-call name in a generated skill finding note;
+  `engines/python/tests/test_sanitize.py` covers the shared sanitiser directly, including a
+  render-level property test that decodes the rendered Markdown/HTML and asserts no bidi-override or
+  zero-width character survives (item 18.20).
 
 ## Assumptions and residual risk
 

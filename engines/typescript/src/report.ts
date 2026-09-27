@@ -80,58 +80,143 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#x27;");
 }
 
-/** Cap applied when an event-derived string is escaped for Markdown/terminal rendering (SPEC §7
- * injection hardening): long enough to stay useful, short enough to bound a hostile payload. */
-const MD_ESCAPE_CAP = 200;
+/** Cap applied when a record-derived string is sanitised for Markdown/terminal/HTML rendering (SPEC
+ * §7 injection hardening): long enough to stay useful, short enough to bound a hostile payload. */
+const SANITIZE_CAP = 200;
 
 /** Shown in place of a name that neutralises to nothing: escaping, never erasure -- real activity
  * is never silently dropped to "0". */
-const MD_ESCAPE_EMPTY_PLACEHOLDER = "(unnamed)";
+const SANITIZE_EMPTY_NAME_PLACEHOLDER = "(unnamed)";
 
-/** C0/C1 controls (newline, tab, the ESC that starts a terminal escape sequence, NEL U+0085, ...)
- * plus the Unicode line/paragraph separators U+2028/U+2029 -- every codepoint that can move the
- * terminal cursor, start a new line, or hide text, not only whitespace. */
-function isControlLike(codepoint: number): boolean {
-  return (
-    codepoint <= 0x1f ||
-    codepoint === 0x7f ||
-    (codepoint >= 0x80 && codepoint <= 0x9f) ||
-    codepoint === 0x2028 ||
-    codepoint === 0x2029
+/** Shown in place of a subject id, evidence ref, or violation path that neutralises to nothing --
+ * `SANITIZE_EMPTY_NAME_PLACEHOLDER`'s "(unnamed)" reads oddly for a field that was never a name. */
+const SANITIZE_EMPTY_FIELD_PLACEHOLDER = "(empty)";
+
+/** The complete, current Unicode `Default_Ignorable_Code_Point` property, as (first, last) inclusive
+ * codepoint ranges -- hard-coded once and identical across all three engines, independent of any
+ * engine's own Unicode database version (`\p{Cf}` alone misses variation selectors, CGJ, the
+ * Mongolian free variation selectors, the Hangul fillers, and every reserved-for-future-use DICP
+ * range). Mirrors `engines/python/agentce/report.py`'s `_DICP_RANGES` exactly. */
+const DICP_RANGES: [number, number][] = [
+  [0x00ad, 0x00ad],
+  [0x034f, 0x034f],
+  [0x061c, 0x061c],
+  [0x115f, 0x1160],
+  [0x17b4, 0x17b5],
+  [0x180b, 0x180f],
+  [0x200b, 0x200f],
+  [0x202a, 0x202e],
+  [0x2060, 0x206f],
+  [0x3164, 0x3164],
+  [0xfe00, 0xfe0f],
+  [0xfeff, 0xfeff],
+  [0xffa0, 0xffa0],
+  [0xfff0, 0xfff8],
+  [0x1bca0, 0x1bca3],
+  [0x1d173, 0x1d17a],
+  [0xe0000, 0xe0fff],
+];
+
+function isDicpCodepoint(codepoint: number): boolean {
+  return DICP_RANGES.some(([lo, hi]) => codepoint >= lo && codepoint <= hi);
+}
+
+/** Whether any codepoint in `text` is in the drop-set `neutralize` uses (category `Cf` or the
+ * hard-coded `Default_Ignorable_Code_Point` table above). */
+export function hasInvisibleCodepoint(text: string): boolean {
+  return Array.from(text).some(
+    (ch) => /\p{Cf}/u.test(ch) || isDicpCodepoint(ch.codePointAt(0) as number),
   );
 }
 
-/** Neutralise an event-derived string (agent, model, or tool name) before it reaches `report.md` or
- * the terminal (SPEC §7 injection hardening, mirroring the Python reference's `_md_escape`): replace
- * every control character and line/paragraph separator with a space (never just whitespace -- a raw
- * ESC can still write a hostile terminal escape sequence), collapse the result to single spaces,
- * replace backticks and angle brackets with visually similar but inert characters (round 3: a
- * `<br>`/`<h2>` in a hostile name would otherwise pass through as live HTML when the Markdown is
- * rendered by a browser and forge its own heading/line break -- never escaped as `&lt;`/`&gt;`,
- * which would defeat plain-text/terminal readability), and cap its length by codepoint (`Array.from`,
- * never a UTF-16 half of a surrogate pair). A string that neutralises to nothing renders as
- * `MD_ESCAPE_EMPTY_PLACEHOLDER`, never a silent gap. */
-function mdEscape(text: string, cap: number = MD_ESCAPE_CAP): string {
-  const neutralized = Array.from(text)
-    .map((ch) => (isControlLike(ch.codePointAt(0) as number) ? " " : ch))
-    .join("");
-  let collapsed = neutralized
-    .split(/\s+/)
-    .filter((w) => w.length > 0)
-    .join(" ")
-    .replace(/`/g, "'")
-    .replace(/</g, "‹")
-    .replace(/>/g, "›");
-  if (collapsed.length === 0 && text.length > 0) {
-    collapsed = MD_ESCAPE_EMPTY_PLACEHOLDER;
+/** Fold every run of the literal space character or a `\p{Zs}` codepoint (NBSP, ideographic space,
+ * ...) into a single ASCII space -- one explicit, per-engine-identical definition of "collapsible
+ * whitespace". */
+function collapseWhitespace(text: string): string {
+  const parts: string[] = [];
+  let inWs = false;
+  for (const ch of text) {
+    if (ch === " " || /\p{Zs}/u.test(ch)) {
+      if (!inWs) {
+        parts.push(" ");
+        inWs = true;
+      }
+    } else {
+      parts.push(ch);
+      inWs = false;
+    }
   }
-  if (collapsed.length <= cap) {
-    // UTF-16 length is always >= codepoint count, so this is a safe, cheap sufficient condition
-    // to skip the codepoint-array build below for the common (short, uncapped) name.
-    return collapsed;
+  return parts.join("");
+}
+
+/** The one shared core every sanitiser target calls first (SPEC §7 injection hardening, mirroring
+ * the Python reference's `_neutralize`): replace every `Cc`/`Co`/`Cs`/`Zl`/`Zp` codepoint with a
+ * literal space; drop every `Cf`-or-`Default_Ignorable_Code_Point` codepoint entirely (never a space
+ * -- removing a zero-width character preserves the string's visual intent); collapse collapsible
+ * whitespace to single spaces; trim leading and trailing whitespace; cap by codepoint (`Array.from`,
+ * never a UTF-16 half of a surrogate pair), computed here before any HTML-entity expansion a caller
+ * applies on top; then render `placeholder` if the result is empty but `text` was not. */
+function neutralize(text: string, cap: number, placeholder: string): string {
+  const kept: string[] = [];
+  for (const ch of text) {
+    if (/\p{Cc}|\p{Co}|\p{Cs}|\p{Zl}|\p{Zp}/u.test(ch)) {
+      kept.push(" ");
+    } else if (/\p{Cf}/u.test(ch) || isDicpCodepoint(ch.codePointAt(0) as number)) {
+      // Dropped entirely (never a space): by definition invisible/zero-width.
+    } else {
+      kept.push(ch);
+    }
   }
+  let collapsed = collapseWhitespace(kept.join("")).trim();
   const codepoints = Array.from(collapsed);
-  return codepoints.length > cap ? `${codepoints.slice(0, cap - 1).join("")}…` : collapsed;
+  if (codepoints.length > cap) {
+    collapsed = `${codepoints.slice(0, cap - 1).join("")}…`;
+  }
+  if (collapsed.length === 0 && text.length > 0) {
+    collapsed = placeholder;
+  }
+  return collapsed;
+}
+
+/** The six substitutions `sanitizeForMarkdown`/`sanitizeForTerminal` apply on top of `neutralize`'s
+ * output -- see `engines/python/agentce/report.py`'s `_MARKDOWN_SUBSTITUTIONS` for the full
+ * rationale (breaks code-span/HTML/link/image/entity-reference syntax; deliberately not a broader
+ * "fullwidth every punctuation character" rule). */
+const MARKDOWN_SUBSTITUTIONS: [string, string][] = [
+  ["`", "'"],
+  ["<", "‹"],
+  [">", "›"],
+  ["[", "［"],
+  ["]", "］"],
+  ["&", "＆"],
+];
+
+/** Neutralise a record-derived string before it reaches `report.md`'s Markdown rendering or the
+ * terminal (SPEC §7 injection hardening; mirrors the Python reference's `sanitize_for_markdown`). */
+export function sanitizeForMarkdown(
+  text: string,
+  placeholder: string = SANITIZE_EMPTY_NAME_PLACEHOLDER,
+  cap: number = SANITIZE_CAP,
+): string {
+  let neutralized = neutralize(text, cap, placeholder);
+  for (const [oldCh, newCh] of MARKDOWN_SUBSTITUTIONS) {
+    neutralized = neutralized.split(oldCh).join(newCh);
+  }
+  return neutralized;
+}
+
+/** A documented alias for `sanitizeForMarkdown`, not a second implementation -- see the Python
+ * reference's own `sanitize_for_terminal` docstring for why. */
+export const sanitizeForTerminal = sanitizeForMarkdown;
+
+/** Neutralise a record-derived string for HTML rendering: `neutralize` first, then `escapeHtml` on
+ * the result -- nothing else (mirrors the Python reference's `sanitize_for_html`). */
+export function sanitizeForHtml(
+  text: string,
+  placeholder: string = SANITIZE_EMPTY_NAME_PLACEHOLDER,
+  cap: number = SANITIZE_CAP,
+): string {
+  return escapeHtml(neutralize(text, cap, placeholder));
 }
 
 //: A self-contained stylesheet (no external references), mirroring the Python/Java renderers.
@@ -167,13 +252,13 @@ function activityUndeclaredLines(
   if (undeclared.tools.length > 0) {
     lines.push(
       `${cat["report.activity_undeclared_tools_label"]}: ` +
-        `${undeclared.tools.map((name) => mdEscape(name)).join(", ")}`,
+        `${undeclared.tools.map((name) => sanitizeForMarkdown(name)).join(", ")}`,
     );
   }
   if (undeclared.models.length > 0) {
     lines.push(
       `${cat["report.activity_undeclared_models_label"]}: ` +
-        `${undeclared.models.map((name) => mdEscape(name)).join(", ")}`,
+        `${undeclared.models.map((name) => sanitizeForMarkdown(name)).join(", ")}`,
     );
   }
   return lines;
@@ -181,7 +266,7 @@ function activityUndeclaredLines(
 
 /** `(label, value)` for every counted-facts row -- the one place the row set and order is decided,
  * shared by the Markdown, HTML, and terminal renderings. Agent, model, and tool names are
- * event-derived strings (SPEC §7 injection hardening), escaped with `mdEscape` before joining so a
+ * event-derived strings (SPEC §7 injection hardening), escaped with `sanitizeForMarkdown` before joining so a
  * hostile name (embedded newlines) can never start a new Markdown/terminal line -- this section
  * renders before the verdict. */
 function activityRows(activity: Activity, cat: Record<string, string>): [string, string][] {
@@ -194,16 +279,16 @@ function activityRows(activity: Activity, cat: Record<string, string>): [string,
     [
       cat["report.activity_agents_label"] as string,
       activity.agents.length > 0
-        ? activity.agents.map((a) => mdEscape(a)).join(", ")
+        ? activity.agents.map((a) => sanitizeForMarkdown(a)).join(", ")
         : (cat["report.activity_none_agents"] as string),
     ],
     [
       cat["report.activity_models_label"] as string,
-      activity.models.map((m) => mdEscape(m.name)).join(", ") || "0",
+      activity.models.map((m) => sanitizeForMarkdown(m.name)).join(", ") || "0",
     ],
     [
       cat["report.activity_tools_label"] as string,
-      activity.tools.map((t) => mdEscape(t.name)).join(", ") || "0",
+      activity.tools.map((t) => sanitizeForMarkdown(t.name)).join(", ") || "0",
     ],
     [
       cat["report.activity_actions_label"] as string,
@@ -267,13 +352,13 @@ function blindSpotStepText(stepKind: string, ownerLabel: string): string {
   return stepKind === "request" ? `a request to ${ownerLabel}` : `a code change for ${ownerLabel}`;
 }
 
-/** Neutralise a blind-spot field before it reaches Markdown/the terminal (SPEC §7 injection
- * hardening, mirroring `mdEscape`'s use in `activityRows`): `event`/`class` come from the catalog,
- * but a `no_population` entry's `subject` can be records-derived, and the section renders right
- * after activity and before the verdict (RFC 0008 Sec.7) -- the same position P11 (item 18.4 rework)
+/** `sanitizeForMarkdown` with the field placeholder rather than the name placeholder (mirrors the
+ * Python reference's `_sanitize_field`): `event`/`class` come from the catalog, but a
+ * `no_population` entry's `subject` can be records-derived, and the section renders right after
+ * activity and before the verdict (RFC 0008 Sec.7) -- the same position P11 (item 18.4 rework)
  * forged a fake verdict line through. */
-function bsEscape(value: string): string {
-  return mdEscape(value);
+function sanitizeField(value: string): string {
+  return sanitizeForMarkdown(value, SANITIZE_EMPTY_FIELD_PLACEHOLDER);
 }
 
 /** `(label, value)` for every blind spot, in the module's own ranked order (never re-sorted here). */
@@ -281,19 +366,20 @@ function blindSpotRows(blindSpots: BlindSpot[]): [string, string][] {
   return blindSpots.map((bs) => {
     const ownerLabel = OWNER_LABEL[bs.owner_key] as string;
     const step = blindSpotStepText(bs.step_kind, ownerLabel);
-    const adapters = bs.supplying_adapters.map((a) => bsEscape(a)).join(", ") || "no adapter today";
+    const adapters =
+      bs.supplying_adapters.map((a) => sanitizeField(a)).join(", ") || "no adapter today";
     const value =
       `unlocks ${bs.checks_unlocked} check(s), needed by ${bs.needed_by} more; ` +
       `rung ${bs.ladder_rung} -- ${step}. Adapters that can supply this: ${adapters}.`;
-    return [`${bsEscape(bs.event)} (${bsEscape(bs.class)})`, value];
+    return [`${sanitizeField(bs.event)} (${sanitizeField(bs.class)})`, value];
   });
 }
 
 function noPopulationRows(noPopulation: CheckRef[]): [string, string][] {
   return noPopulation.map((entry) => [
-    `${bsEscape(entry.control)} on ${bsEscape(entry.subject)} ` +
-      `(${bsEscape(entry.catalog)}@${bsEscape(entry.control_version)})`,
-    `The records show every kind of evidence ${bsEscape(entry.control)} asks for, but not enough of it in the shape the control expects -- a --domain binding may be needed to identify the relevant decisions; see the control's documentation for what it needs.`,
+    `${sanitizeField(entry.control)} on ${sanitizeField(entry.subject)} ` +
+      `(${sanitizeField(entry.catalog)}@${sanitizeField(entry.control_version)})`,
+    `The records show every kind of evidence ${sanitizeField(entry.control)} asks for, but not enough of it in the shape the control expects -- a --domain binding may be needed to identify the relevant decisions; see the control's documentation for what it needs.`,
   ]);
 }
 
@@ -380,8 +466,10 @@ export function renderReportMd(
     lines.push(`_${cat["report.no_controls"]}_`);
   }
   for (const a of [...assertions].sort(bySubjectControl)) {
+    const control = sanitizeForMarkdown(a.control);
+    const subject = sanitizeForMarkdown(a.subject);
     lines.push(
-      `- \`${a.control}\` @ \`${a.subject}\` -> **${a.outcome}** ` +
+      `- \`${control}\` @ \`${subject}\` -> **${a.outcome}** ` +
         `(rung ${a.rung}, ${a.mode}; ${a.population[1]}/${a.population[0]} failed)`,
     );
   }
@@ -407,7 +495,7 @@ export function renderReportHtml(
     .sort(bySubjectControl)
     .map(
       (a) =>
-        `<tr><td>${escapeHtml(a.control)}</td><td>${escapeHtml(a.subject)}</td>` +
+        `<tr><td>${sanitizeForHtml(a.control)}</td><td>${sanitizeForHtml(a.subject)}</td>` +
         `<td>${escapeHtml(a.outcome)}</td></tr>`,
     )
     .join("");

@@ -143,9 +143,33 @@ allow:
 
   - path: engines/python/agentce/report.py
     pattern: placeholder
-    count: 19
+    count: 22
     class: legitimate
-    justification: "_bs_escape's empty_placeholder parameter and the _MD_ESCAPE_EMPTY_PLACEHOLDER/_MD_ESCAPE_EMPTY_FIELD_PLACEHOLDER fallback strings ('(unnamed)'/'(empty)') name the rendered text for an empty field value; not an unfinished stub."
+    justification: "sanitize_for_markdown/sanitize_for_html's placeholder parameter and the _SANITIZE_EMPTY_NAME_PLACEHOLDER/_SANITIZE_EMPTY_FIELD_PLACEHOLDER fallback strings ('(unnamed)'/'(empty)') name the rendered text for an empty field value; not an unfinished stub."
+
+  - path: engines/python/agentce/commands/__init__.py
+    pattern: placeholder
+    count: 1
+    class: legitimate
+    justification: "_diff_field's docstring explains why an added/removed assertion's None outcome is never passed into the sanitiser's own empty-placeholder logic; not an unfinished stub."
+
+  - path: engines/python/tests/gen_sanitize_vectors.py
+    pattern: placeholder
+    count: 2
+    class: legitimate
+    justification: "The module docstring names the one default placeholder every vector is generated with, and the blind-spot-specific '(unnamed)'/'(empty)' placeholder divergence the vectors file deliberately does not cover; not an unfinished stub."
+
+  - path: engines/python/tests/test_commands.py
+    pattern: placeholder
+    count: 2
+    class: legitimate
+    justification: "A test name and docstring describe the fixed (none) literal an added/removed assertion renders, as distinct from the sanitiser's own empty-placeholder; not an unfinished stub."
+
+  - path: engines/python/tests/test_sanitize.py
+    pattern: placeholder
+    count: 6
+    class: legitimate
+    justification: "Test names, a section comment, and assertions cover sanitize_for_markdown/sanitize_for_html's placeholder parameter and the whitespace-only-input-renders-a-placeholder property; not an unfinished stub."
 
   - path: engines/python/agentce/signing.py
     pattern: not-implemented
