@@ -47,7 +47,7 @@ agentce validate --bundle evidence
 
 ## Run an example
 
-Each `examples/<style>/run.sh <bundle-dir>` runs a scripted example and writes a bundle. Five of the six
+Each `examples/<style>/run.sh <bundle-dir>` runs a scripted example and writes a bundle. Four of the five
 are named for an implementation style and really import and run that framework end to end, offline and
 keyless against a scripted deterministic model or transport, each in its own environment with the
 framework's own dependencies; the events in the bundle come from that framework's real callback data.
