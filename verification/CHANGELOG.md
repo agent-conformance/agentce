@@ -5,9 +5,11 @@ fails if a gate in `gates.json` is not named in this file.
 
 ## 0.5.0
 
-- Added `VG-WHAT-THEY-DID`: the three engines write a byte-identical `activity.json` counting the agents,
-  models, tools, actions by effect class, approvals by who recorded them, and actions denied or blocked a run's
-  records show, and a tool or model the events show that no subject declares honestly surfaces as undeclared.
+- Added `VG-WHAT-THEY-DID`: the three engines write an `activity.json` counting the agents, models, tools,
+  actions by effect class, approvals by who recorded them, and actions denied or blocked a run's records
+  show, and a tool or model the events show that no subject declares honestly surfaces as undeclared. Each
+  engine's output is compared byte-for-byte against a committed golden (`what_they_did_golden.json`), so a
+  computation bug shared by all three engines cannot hide behind cross-engine agreement alone.
 
 ## 0.4.0
 

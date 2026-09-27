@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # Build gate helper for VG-WHAT-THEY-DID: the three engines compute the same "what your agents did"
-# activity summary for the same input and write byte-identical activity.json, and the quickstart
-# bundle's one real tool call -- never declared in its profile -- honestly shows up as undeclared.
+# activity summary for the same input and write byte-identical activity.json, matching a committed
+# golden (so a computation bug shared by all three engines cannot hide behind cross-engine agreement
+# alone), and the quickstart bundle's one real tool call -- never declared in its profile -- honestly
+# shows up as undeclared.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
+gate_dir="$(cd "$(dirname "$0")" && pwd)"
+golden="$gate_dir/what_they_did_golden.json"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 quick="$root/corpus/quickstart"
@@ -21,17 +25,10 @@ for engine in python typescript java; do
     status=1
     continue
   fi
-  undeclared="$(jq -c '.undeclared.tools' "$work/$engine/activity.json")"
-  if [ "$undeclared" != '["credit.record_decision"]' ]; then
-    echo "what-they-did: $engine undeclared.tools was $undeclared, expected [\"credit.record_decision\"]" >&2
+  if ! cmp -s "$golden" "$work/$engine/activity.json"; then
+    echo "what-they-did: $engine activity.json differs from the committed golden $golden" >&2
     status=1
   fi
 done
-for engine in typescript java; do
-  if ! cmp -s "$work/python/activity.json" "$work/$engine/activity.json"; then
-    echo "what-they-did: $engine activity.json differs from python" >&2
-    status=1
-  fi
-done
-[ "$status" -eq 0 ] && echo "what-they-did: three engines identical, undeclared tool honestly surfaced"
+[ "$status" -eq 0 ] && echo "what-they-did: three engines match the golden, undeclared tool honestly surfaced"
 exit "$status"
