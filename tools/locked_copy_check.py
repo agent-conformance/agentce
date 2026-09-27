@@ -143,7 +143,7 @@ def check_landing(html: str) -> list[str]:
     parser = _Hero()
     parser.feed(html)
     found = [(role, _squash(text)) for role, text in parser.found]
-    expected = [(role, text) for role, text in HERO]
+    expected = list(HERO)
     if found == expected:
         return []
     return [
@@ -218,12 +218,9 @@ def self_test() -> list[str]:
     ) -> str:
         copy = "\n\n".join(order)
         tail = "**Status:** x\n\n**License:** y\n"
-        head = (
-            f"# (AgentCE)\n\n{tail}\n{copy}\n"
-            if status_first
-            else f"# (AgentCE)\n\n{copy}\n\n{tail}"
-        )
-        return head
+        if status_first:
+            return f"# (AgentCE)\n\n{tail}\n{copy}\n"
+        return f"# (AgentCE)\n\n{copy}\n\n{tail}"
 
     def hidden(role: str, wrapper: str) -> str:
         return wrapper.format(parts[role])
