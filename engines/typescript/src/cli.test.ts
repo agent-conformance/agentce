@@ -5,7 +5,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -70,6 +70,62 @@ test("assess on the vendored quickstart bundle matches quickstart's own output",
     assert.ok([0, 1].includes(exitCode), `unexpected exit code ${exitCode}`);
     assert.ok((envelope.assertions as number) > 0);
     assert.equal((envelope.summary as { verdict: string }).verdict, "incomplete");
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+/** The quickstart profile with its `catalogs:` list removed, written into `dir`. */
+function profileWithoutCatalogs(dir: string): string {
+  const kept: string[] = [];
+  let inCatalogs = false;
+  for (const line of readFileSync(join(quickstartDir(), "applicability.yaml"), "utf-8").split(
+    "\n",
+  )) {
+    if (line === "catalogs:") {
+      inCatalogs = true;
+    } else if (!(inCatalogs && line.startsWith("  - "))) {
+      inCatalogs = false;
+      kept.push(line);
+    }
+  }
+  const path = join(dir, "no-catalog.yaml");
+  writeFileSync(path, kept.join("\n"));
+  return path;
+}
+
+function manifestCatalogs(out: string): string[] {
+  const manifest = JSON.parse(readFileSync(join(out, "manifest.json"), "utf-8")) as {
+    inputs: { catalogs: Array<{ id: string; version: string }> };
+  };
+  return manifest.inputs.catalogs.map((c) => `${c.id}@${c.version}`);
+}
+
+test("assess with no catalog named evaluates the baseline; an empty --catalog is refused", () => {
+  const out = mkdtempSync(join(tmpdir(), "agentce-cli-assess-default-"));
+  try {
+    const quickstart = quickstartDir();
+    const argv = [
+      "assess",
+      "--bundle",
+      join(quickstart, "evidence"),
+      "--profile",
+      profileWithoutCatalogs(out),
+      "--domain",
+      join(quickstart, "domain.linkml.yaml"),
+    ];
+    const run = runJson([...argv, "--out", join(out, "default")]);
+    assert.ok([0, 1].includes(run.exitCode), `unexpected exit code ${run.exitCode}`);
+    assert.deepEqual(manifestCatalogs(join(out, "default")), ["baseline@2026.09"]);
+    const explicit = runJson([...argv, "--catalog", "eu-ai-act@2026.09", "--out", join(out, "eu")]);
+    assert.ok([0, 1].includes(explicit.exitCode));
+    assert.deepEqual(manifestCatalogs(join(out, "eu")), ["eu-ai-act@2026.09"]);
+    const empty = runJson([...argv, "--catalog", ",", "--out", join(out, "none")]);
+    assert.equal(empty.exitCode, 3);
+    assert.equal(
+      (empty.envelope.error as { message_key: string }).message_key,
+      "input.catalog_missing",
+    );
   } finally {
     rmSync(out, { recursive: true, force: true });
   }

@@ -15,7 +15,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.bundle_manifest_mismatch` | a stream file's digest does not match the manifest. | regenerate the manifest after any change to the stream files. |
 | `input.bundle_manifest_missing` | the evidence bundle has no manifest.json. | an agent writes a bundle by running with the agentce_emit emitter on: set `AGENTCE_EMIT=1 AGENTCE_EMIT_OUT=<dir>` and see docs/integrate.md; to watch one built, run `examples/custom-loop/run.sh <dir>` from a checkout, then `agentce validate --bundle <dir>`. |
 | `input.catalog_mismatch` | a --catalog-dir carries an id@version the --catalog request did not name. | pass --catalog-dir for the catalog you named, or name the id@version the directory carries. |
-| `input.catalog_missing` | assess was given no catalog to evaluate and the profile declares none. | pass --catalog <id@version>, or list the catalogs to apply under `catalogs:` in the profile. |
+| `input.catalog_missing` | --catalog was given but names no catalog. | pass --catalog <id@version>, or leave --catalog out to assess against the baseline. |
 | `input.catalog_not_found` | no base catalog was found under the expected path. | run from the repository root or pass --catalog-dir to a catalog directory. |
 | `input.catalog_unresolved` | a requested catalog id@version does not resolve to any catalog directory. | use an available <id>@<version>, or pass --catalog-dir <dir> for a catalog on disk. |
 | `input.catalog_unverified` | a --catalog-dir catalog is unsigned, or its signature does not verify against the effective trust root. | point --catalog-dir at a catalog whose catalog.sig.json verifies, or pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) for the root that signed it. |

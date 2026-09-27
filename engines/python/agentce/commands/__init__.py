@@ -542,21 +542,6 @@ def _verdict_lines(
     return verdict.cli_lines(summary, catalogue, report_dir=out)
 
 
-def _vendored_catalogs() -> dict[str, Path]:
-    """Every catalog the engine ships (base and sector overlays), keyed ``id@version``."""
-    root = bundled.catalogs_dir()
-    found: dict[str, Path] = {}
-    for catalog_yaml in sorted(root.glob("*/*/catalog.yaml")):
-        if catalog_yaml.parent.parent.name not in ("base", "overlays"):
-            continue
-        try:
-            meta = yaml.safe_load(catalog_yaml.read_text(encoding="utf-8")) or {}
-            found[f"{meta['id']}@{meta['version']}"] = catalog_yaml.parent
-        except (OSError, yaml.YAMLError, KeyError, TypeError):
-            continue
-    return found
-
-
 def _effective_trust_root(ns: argparse.Namespace) -> signing.TrustRoot:
     """The trust root catalog verification consults: ``--trust-root``, else ``AGENTCE_TRUST_ROOT``,
     else the trust root vendored in the engine (SPEC §8.7).
@@ -634,7 +619,9 @@ def _resolve_catalogs(
     that was passed or to a vendored catalog, and every directory that was passed must be one the
     request names. An id that resolves to nothing, a directory the request does not name, or a
     request that names no catalog at all, is an input error: an assessment must not proceed to judge
-    nothing, nor to judge something other than what was asked for.
+    nothing, nor to judge something other than what was asked for. A run that passes no ``--catalog``
+    and no ``--catalog-dir`` and whose profile declares no catalogs evaluates the baseline
+    (``bundled.DEFAULT_LENS``); an explicit but empty ``--catalog`` is still refused.
 
     The returned limitations are the signature checks ``--allow-unverified-catalog`` waived, for the
     manifest and the claim to record; the list is empty on an ordinary run."""
@@ -650,22 +637,22 @@ def _resolve_catalogs(
         ids = []
     else:
         ids = list(profile.catalogs)
+        if not ids and requested is None:
+            ids = [bundled.DEFAULT_LENS]
     if not ids and not loaded:
         raise InputError(
             "input.catalog_missing",
-            "no catalog to evaluate: --catalog and --catalog-dir were not passed and the profile "
-            "declares no catalogs.",
-            "pass --catalog <id@version>, or list the catalogs to apply under `catalogs:` in the "
-            "profile.",
+            "--catalog was given but names no catalog.",
+            "pass --catalog <id@version>, or leave --catalog out to assess against the baseline.",
         )
     unresolved = [i for i in dict.fromkeys(ids) if i not in by_label]
     if unresolved:
-        vendored = _vendored_catalogs()
+        vendored = bundled.vendored_catalogs()
         for label in [u for u in unresolved if u in vendored]:
             by_label[label] = load_catalog(vendored[label])
         unresolved = [u for u in unresolved if u not in vendored]
     if unresolved:
-        available = sorted(set(by_label) | set(_vendored_catalogs()))
+        available = sorted(set(by_label) | set(bundled.vendored_catalogs()))
         raise InputError(
             "input.catalog_unresolved",
             f"no catalog directory resolves {', '.join(repr(u) for u in unresolved)} "

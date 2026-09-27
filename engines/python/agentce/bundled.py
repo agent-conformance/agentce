@@ -15,6 +15,12 @@ from contextlib import ExitStack
 from importlib import resources
 from pathlib import Path
 
+import yaml
+
+#: The catalog an assessment evaluates when nothing names one: the cross-standard baseline, so no
+#: single standard is the default. Each standard-specific catalog stays a selectable lens.
+DEFAULT_LENS = "baseline@2026.09"
+
 
 @functools.cache
 def _data_root() -> Path:
@@ -27,6 +33,29 @@ def _data_root() -> Path:
 def catalogs_dir() -> Path:
     """The vendored catalogs, laid out as ``base/<catalog>/`` and ``overlays/<catalog>/``."""
     return _data_root() / "catalogs"
+
+
+def vendored_catalogs() -> dict[str, Path]:
+    """Every catalog the engine ships (base and sector overlays), keyed ``id@version``."""
+    found: dict[str, Path] = {}
+    for catalog_yaml in sorted(catalogs_dir().glob("*/*/catalog.yaml")):
+        if catalog_yaml.parent.parent.name not in ("base", "overlays"):
+            continue
+        try:
+            meta = yaml.safe_load(catalog_yaml.read_text(encoding="utf-8")) or {}
+            found[f"{meta['id']}@{meta['version']}"] = catalog_yaml.parent
+        except (OSError, yaml.YAMLError, KeyError, TypeError):
+            continue
+    return found
+
+
+def base_lenses() -> list[str]:
+    """The ``id@version`` of every vendored base catalog, in byte order: the lenses a run can choose."""
+    return sorted(
+        label
+        for label, directory in vendored_catalogs().items()
+        if directory.parent.name == "base"
+    )
 
 
 def quickstart_dir() -> Path:

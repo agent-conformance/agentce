@@ -2,8 +2,9 @@
 
 An ``id@version`` — typed with ``--catalog`` or declared in the profile — resolves to a
 ``--catalog-dir`` that was passed or to a catalog vendored under ``spec/catalogs``; an id that
-resolves to neither, or a run that names no catalog at all, is an input error (exit 3) that writes
-nothing. The assess examples the documentation shows must run as written.
+resolves to neither, or an empty ``--catalog``, is an input error (exit 3) that writes nothing; a run
+that names no catalog at all evaluates the baseline. The assess examples the documentation shows
+must run as written.
 """
 
 from __future__ import annotations
@@ -75,6 +76,11 @@ def _assess(
     return code, json.loads(stdout) if stdout.strip() else {}, out
 
 
+def _catalog_labels(out: Path) -> list[str]:
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    return [f"{c['id']}@{c['version']}" for c in manifest["inputs"]["catalogs"]]
+
+
 def _assertion_count(out: Path) -> int:
     return len(json.loads((out / "assertions.json").read_text(encoding="utf-8")))
 
@@ -140,7 +146,7 @@ def test_an_explicit_catalog_id_resolves_without_a_catalog_dir(
     assert _assertion_count(out) > 0
 
 
-def test_a_profile_that_declares_no_catalog_and_none_passed_is_refused(
+def test_a_run_that_names_no_catalog_evaluates_the_baseline(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     declared_cases: list[list[str] | None] = [None, []]
@@ -148,9 +154,29 @@ def test_a_profile_that_declares_no_catalog_and_none_passed_is_refused(
         sub = tmp_path / f"case-{declared}"
         sub.mkdir()
         code, envelope, out = _assess(sub, capsys, _profile(sub, declared))
-        assert code == 3
-        assert envelope["error"]["key"] == "input.catalog_missing"
-        assert not out.exists()
+        assert code == 0
+        assert _catalog_labels(out) == ["baseline@2026.09"]
+        assert _assertion_count(out) > 0
+
+
+def test_an_explicit_catalog_is_never_replaced_by_the_default(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _, _, out = _assess(
+        tmp_path, capsys, _profile(tmp_path, None), "--catalog", _EU_LABEL
+    )
+    assert _catalog_labels(out) == [_EU_LABEL]
+
+
+def test_a_catalog_option_that_names_nothing_is_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code, envelope, out = _assess(
+        tmp_path, capsys, _profile(tmp_path, None), "--catalog", ","
+    )
+    assert code == 3
+    assert envelope["error"]["key"] == "input.catalog_missing"
+    assert not out.exists()
 
 
 def test_a_profile_declaring_an_unresolvable_catalog_is_refused(

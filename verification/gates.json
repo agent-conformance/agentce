@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.1.0",
+  "suite_version": "0.2.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -57,6 +57,47 @@
         }
       ],
       "fix_hint": "Run the gate's command from adapters/supply-chain and read the failing test; the verifier is adapters/supply-chain/src/agentce_adapters/supply_chain.py."
+    },
+    {
+      "id": "VG-BASELINE-LENS",
+      "title": "The baseline catalog cites at least two standards per control, is the default lens, and every report lists the lenses",
+      "tier": "quick",
+      "cwd": "engines/python",
+      "cmd": ["uv", "run", "--frozen", "pytest", "-q", "-o", "addopts=", "-p", "no:cacheprovider", "tests/test_baseline_lens.py", "tests/test_assess_catalog_resolution.py"],
+      "requires": ["uv"],
+      "timeout_s": 600,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every baseline control cites at least two distinct standards by clause reference and each citation is one the clause-level standards crosswalk files or the standard-specific catalogs already cite for that control (never an area-level or draft-standard row); catalog lint rejects a control below the floor; an assessment that names no catalog evaluates baseline@2026.09 and never replaces a catalog that was named; every report names the default lens and lists every base lens with how to choose one; the catalog is byte-identical in the specification tree and each engine bundle",
+        "fail": "a control cites fewer than two standards or an invented, area-level or draft citation, lint accepts one, the default lens is not the baseline or overrides a named catalog, a report lacks the lens list, or a vendored copy differs"
+      },
+      "faults": [
+        {
+          "description": "catalog lint stops enforcing the two-standard floor",
+          "file": "engines/python/agentce/catalog.py",
+          "search": "        if len(cited) < floor:",
+          "replace": "        if False:"
+        },
+        {
+          "description": "an assessment that names no catalog is refused instead of evaluating the baseline",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "            ids = [bundled.DEFAULT_LENS]",
+          "replace": "            ids = []"
+        },
+        {
+          "description": "the report drops its list of available lenses",
+          "file": "engines/python/agentce/report.py",
+          "search": "        f\"- Lenses available: {_lenses_text()}\",\n",
+          "replace": ""
+        },
+        {
+          "description": "one engine's vendored baseline drifts from the specification tree",
+          "file": "engines/typescript/data/catalogs/base/baseline/catalog.yaml",
+          "search": "min_crosswalk_frameworks: 2",
+          "replace": "min_crosswalk_frameworks: 1"
+        }
+      ],
+      "fix_hint": "Run the gate's command from engines/python and read the failing test; the catalog is spec/catalogs/base/baseline and its vendored copies are re-made and re-signed with conformance/dev_trust.py."
     }
   ]
 }

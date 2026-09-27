@@ -28,6 +28,8 @@ public final class Cli {
     private Cli() {}
 
     private static final String DEFAULT_OUT_DIR = "out";
+    /** The catalog an assessment evaluates when nothing names one: the cross-standard baseline. */
+    private static final String DEFAULT_LENS = "baseline@2026.09";
     private static final List<String> REPORT_FORMATS = List.of("md", "html", "oscal", "sarif", "pack");
     private static final Set<String> VERDICT_OUTCOMES = Set.of("conformant", "non-conformant", "insufficient_evidence");
 
@@ -215,7 +217,9 @@ public final class Cli {
      * The catalogs an assessment evaluates, and their {@code id@version} labels (mirrors the Python
      * reference's {@code _resolve_catalogs}). Each {@code --catalog-dir} is loaded as given. Each
      * requested id — the {@code --catalog} list, else the profile's declared {@code catalogs} when no
-     * directory was passed — must resolve to a directory that was passed or to a vendored catalog.
+     * directory was passed — must resolve to a directory that was passed or to a vendored catalog. A
+     * run that passes no {@code --catalog} and no {@code --catalog-dir}, whose profile declares no
+     * catalogs, evaluates the baseline ({@link #DEFAULT_LENS}).
      */
     private static Resolved resolveCatalogs(String requested, Profile profile, List<String> catalogDirs) {
         List<Catalog> loaded = new ArrayList<>();
@@ -239,13 +243,15 @@ public final class Cli {
             ids = new ArrayList<>();
         } else {
             ids = new ArrayList<>(profile.catalogs);
+            if (ids.isEmpty() && requested == null) {
+                ids.add(DEFAULT_LENS);
+            }
         }
         if (ids.isEmpty() && loaded.isEmpty()) {
             throw new InputError(
                     "input.catalog_missing",
-                    "no catalog to evaluate: --catalog and --catalog-dir were not passed and the profile "
-                            + "declares no catalogs.",
-                    "pass --catalog <id@version>, or list the catalogs to apply under `catalogs:` in the profile.");
+                    "--catalog was given but names no catalog.",
+                    "pass --catalog <id@version>, or leave --catalog out to assess against the baseline.");
         }
         List<String> uniqueIds = new ArrayList<>(new LinkedHashSet<>(ids));
         List<String> unresolved = new ArrayList<>();

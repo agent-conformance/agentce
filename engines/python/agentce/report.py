@@ -197,15 +197,26 @@ def _reproduce_command(invocation: list[str] | None) -> str:
     return "agentce " + " ".join(invocation) if invocation else "agentce quickstart"
 
 
+def _lenses_text() -> str:
+    """The lenses a run can choose, the default marked and the way to pick another named -- so no
+    report presents one standard as the only option."""
+    lenses = [
+        f"{lens} (default)" if lens == bundled.DEFAULT_LENS else lens
+        for lens in bundled.base_lenses()
+    ]
+    return f"{', '.join(lenses)}; choose one with --catalog <id@version>"
+
+
 def _provenance_md(catalogs: list[str], invocation: list[str] | None) -> list[str]:
-    """The provenance line every report body carries: engine version, catalog(s), reproduce command
-    (SPEC §9.1) -- so a reader of the report file alone, without opening manifest.json, can see what
-    produced it and how to redo it."""
+    """The provenance line every report body carries: engine version, catalog(s), the lenses
+    available, reproduce command (SPEC §9.1) -- so a reader of the report file alone, without opening
+    manifest.json, can see what produced it and how to redo it."""
     return [
         "## Provenance",
         "",
         f"- Engine: {ENGINE_NAME} {__version__}",
         f"- Catalog: {', '.join(catalogs) if catalogs else '(none)'}",
+        f"- Lenses available: {_lenses_text()}",
         f"- Reproduce: `{_reproduce_command(invocation)}`",
         "",
     ]
@@ -286,6 +297,7 @@ def _provenance_html(catalogs: list[str], invocation: list[str] | None) -> str:
         '<section aria-labelledby="provenance"><h2 id="provenance">Provenance</h2><ul>'
         f"<li>Engine: {html.escape(ENGINE_NAME)} {html.escape(__version__)}</li>"
         f"<li>Catalog: {catalog_text}</li>"
+        f"<li>Lenses available: {html.escape(_lenses_text())}</li>"
         f"<li>Reproduce: <code>{html.escape(_reproduce_command(invocation))}</code></li>"
         "</ul></section>"
     )

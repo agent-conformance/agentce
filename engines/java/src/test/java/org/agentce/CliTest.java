@@ -10,6 +10,8 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -129,6 +131,59 @@ class CliTest {
                 "--out", out.toString());
         assertEquals(3, env.get("exit_code").asInt());
         assertEquals("input.catalog_unresolved", env.get("error").get("message_key").asText());
+    }
+
+    /** The quickstart profile with its {@code catalogs:} list removed, written into {@code dir}. */
+    private static Path profileWithoutCatalogs(Path dir) throws IOException {
+        List<String> kept = new ArrayList<>();
+        boolean inCatalogs = false;
+        for (String line : Files.readAllLines(QUICKSTART.resolve("applicability.yaml"))) {
+            if (line.equals("catalogs:")) {
+                inCatalogs = true;
+            } else if (!(inCatalogs && line.startsWith("  - "))) {
+                inCatalogs = false;
+                kept.add(line);
+            }
+        }
+        Path path = dir.resolve("no-catalog.yaml");
+        Files.write(path, kept);
+        return path;
+    }
+
+    private static List<String> manifestCatalogs(Path out) throws IOException {
+        List<String> labels = new ArrayList<>();
+        for (JsonNode c : Json.parse(Files.readString(out.resolve("manifest.json"))).get("inputs").get("catalogs")) {
+            labels.add(c.get("id").asText() + "@" + c.get("version").asText());
+        }
+        return labels;
+    }
+
+    @Test
+    void assessNamingNoCatalogEvaluatesTheBaselineAndAnEmptyCatalogOptionIsRefused(@TempDir Path dir)
+            throws IOException {
+        Path profile = profileWithoutCatalogs(dir);
+        String[] common = {
+            "assess",
+            "--bundle", QUICKSTART.resolve("evidence").toString(),
+            "--profile", profile.toString(),
+        };
+        JsonNode byDefault = runJson(concat(common, "--out", dir.resolve("default").toString()));
+        assertTrue(byDefault.get("exit_code").asInt() <= 1);
+        assertEquals(List.of("baseline@2026.09"), manifestCatalogs(dir.resolve("default")));
+        JsonNode explicit = runJson(
+                concat(common, "--catalog", "eu-ai-act@2026.09", "--out", dir.resolve("eu").toString()));
+        assertTrue(explicit.get("exit_code").asInt() <= 1);
+        assertEquals(List.of("eu-ai-act@2026.09"), manifestCatalogs(dir.resolve("eu")));
+        JsonNode empty = runJson(concat(common, "--catalog", ",", "--out", dir.resolve("none").toString()));
+        assertEquals(3, empty.get("exit_code").asInt());
+        assertEquals("input.catalog_missing", empty.get("error").get("message_key").asText());
+    }
+
+    private static String[] concat(String[] head, String... tail) {
+        String[] all = new String[head.length + tail.length];
+        System.arraycopy(head, 0, all, 0, head.length);
+        System.arraycopy(tail, 0, all, head.length, tail.length);
+        return all;
     }
 
     @Test

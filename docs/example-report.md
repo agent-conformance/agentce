@@ -213,5 +213,6 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
 
 - Engine: agentce-py 0.1.0
 - Catalog: eu-ai-act@2026.09
+- Lenses available: baseline@2026.09 (default), eu-ai-act@2026.09, nist-ai-rmf@2026.09; choose one with --catalog <id@version>
 - Reproduce: `agentce quickstart`
 

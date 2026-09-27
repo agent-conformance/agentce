@@ -253,7 +253,108 @@ def check_python_artifact(
     )
     if proc.returncode != 0:
         return [_fail(f"{label}: agentce quickstart from an empty directory", proc)]
-    return [f"{label}: {p}" for p in compare_outputs(reference, out)]
+    problems = [f"{label}: {p}" for p in compare_outputs(reference, out)]
+    return problems + _lens_problems(runner, venv, empty, label)
+
+
+def _lens_problems(runner: Runner, venv: Path, empty: Path, label: str) -> list[str]:
+    """The installed engine's lens rules, from an empty directory with the network cut: a run that
+    names no catalog evaluates the baseline and its report lists every lens; a catalog the profile,
+    ``--catalog`` or ``--catalog-dir`` names is evaluated alone; an empty ``--catalog`` is refused."""
+    agentce = str(venv / "bin" / "agentce")
+    proc = runner.run(
+        [
+            str(venv / "bin" / "python"),
+            "-c",
+            "from agentce import bundled; print(bundled.quickstart_dir()); "
+            "print(bundled.catalogs_dir() / 'base' / 'eu-ai-act')",
+        ],
+        empty,
+        offline=True,
+    )
+    if proc.returncode != 0:
+        return [_fail(f"{label}: locate the bundled data", proc)]
+    quickstart, eu_dir = (Path(line) for line in proc.stdout.split())
+    profile = (quickstart / "applicability.yaml").read_text(encoding="utf-8")
+    kept: list[str] = []
+    in_catalogs = False
+    for line in profile.splitlines():
+        if line == "catalogs:":
+            in_catalogs = True
+        elif not (in_catalogs and line.startswith("  - ")):
+            in_catalogs = False
+            kept.append(line)
+    (empty / "no-catalog.yaml").write_text("\n".join(kept) + "\n", encoding="utf-8")
+    base = [
+        agentce,
+        "assess",
+        "--bundle",
+        str(quickstart / "evidence"),
+        "--domain",
+        str(quickstart / "domain.linkml.yaml"),
+    ]
+    cases = [
+        ("default", ["--profile", "no-catalog.yaml"], ["baseline@2026.09"]),
+        (
+            "profile",
+            ["--profile", str(quickstart / "applicability.yaml")],
+            ["eu-ai-act@2026.09"],
+        ),
+        (
+            "explicit",
+            ["--profile", "no-catalog.yaml", "--catalog", "nist-ai-rmf@2026.09"],
+            ["nist-ai-rmf@2026.09"],
+        ),
+        (
+            "catalog-dir",
+            ["--profile", "no-catalog.yaml", "--catalog-dir", str(eu_dir)],
+            ["eu-ai-act@2026.09"],
+        ),
+    ]
+    problems: list[str] = []
+    for name, extra, expected in cases:
+        out = empty / f"lens-{name}"
+        proc = runner.run([*base, *extra, "--out", str(out)], empty, offline=True)
+        if proc.returncode not in (0, 1):
+            problems.append(_fail(f"{label}: assess ({name} lens)", proc))
+            continue
+        manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+        got = [f"{c['id']}@{c['version']}" for c in manifest["inputs"]["catalogs"]]
+        if got != expected:
+            problems.append(
+                f"{label}: the {name} run evaluated {got}, expected {expected}"
+            )
+    default_report = empty / "lens-default" / "report.md"
+    report = (
+        default_report.read_text(encoding="utf-8") if default_report.is_file() else ""
+    )
+    for needle in (
+        "- Lenses available: ",
+        "baseline@2026.09 (default)",
+        "eu-ai-act@2026.09",
+        "nist-ai-rmf@2026.09",
+        "choose one with --catalog <id@version>",
+    ):
+        if needle not in report:
+            problems.append(f"{label}: the default report lacks {needle!r}")
+    proc = runner.run(
+        [
+            *base,
+            "--profile",
+            "no-catalog.yaml",
+            "--catalog",
+            ",",
+            "--out",
+            str(empty / "lens-empty"),
+        ],
+        empty,
+        offline=True,
+    )
+    if proc.returncode != 3 or "input.catalog_missing" not in proc.stdout + proc.stderr:
+        problems.append(
+            f"{label}: an empty --catalog was not refused with input.catalog_missing"
+        )
+    return problems
 
 
 def check_python(runner: Runner, *, offline_install: bool) -> list[str]:

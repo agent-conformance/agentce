@@ -43,6 +43,8 @@ import { summarize } from "./verdict";
 import { engineVersion } from "./version";
 
 const DEFAULT_OUT_DIR = "out";
+/** The catalog an assessment evaluates when nothing names one: the cross-standard baseline. */
+const DEFAULT_LENS = "baseline@2026.09";
 const REPORT_FORMATS = ["md", "html", "oscal", "sarif", "pack"] as const;
 
 function emit(result: CommandResult, json: boolean): void {
@@ -170,7 +172,8 @@ function vendoredCatalogs(): Map<string, string> {
  * The catalogs an assessment evaluates, and their `id@version` labels (mirrors the Python reference's
  * `_resolve_catalogs`). Each `--catalog-dir` is loaded as given. Each requested id — the `--catalog`
  * list, else the profile's declared `catalogs` when no directory was passed — must resolve to a
- * directory that was passed or to a vendored catalog.
+ * directory that was passed or to a vendored catalog. A run that passes no `--catalog` and no
+ * `--catalog-dir`, whose profile declares no catalogs, evaluates the baseline (`DEFAULT_LENS`).
  */
 function resolveCatalogs(
   requested: string | undefined,
@@ -194,13 +197,15 @@ function resolveCatalogs(
     ids = [];
   } else {
     ids = [...profile.catalogs];
+    if (ids.length === 0 && requested === undefined) {
+      ids = [DEFAULT_LENS];
+    }
   }
   if (ids.length === 0 && loaded.length === 0) {
     throw new InputError(
       "input.catalog_missing",
-      "no catalog to evaluate: --catalog and --catalog-dir were not passed and the profile " +
-        "declares no catalogs.",
-      "pass --catalog <id@version>, or list the catalogs to apply under `catalogs:` in the profile.",
+      "--catalog was given but names no catalog.",
+      "pass --catalog <id@version>, or leave --catalog out to assess against the baseline.",
     );
   }
   const uniqueIds = [...new Set(ids)];

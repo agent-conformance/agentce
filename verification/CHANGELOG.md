@@ -3,6 +3,12 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.2.0
+
+- Added `VG-BASELINE-LENS`: the baseline catalog cites at least two standards per control by clause reference
+  (nothing the standards crosswalk files do not already map), is the default lens of an assessment that names no
+  catalog, and every report lists the lenses a run can choose.
+
 ## 0.1.0
 
 - Added the runner `verification/run` with `--quick`, `--full`, `--gate`, `--demo-fault`, `--lint-registry`,
