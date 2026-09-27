@@ -310,9 +310,9 @@ def test_blind_spots_html_escapes_hostile_strings() -> None:
     page = render_report_html([], {}, blind_spots=hostile_blind_spots)
     assert "<script>alert" not in page
     assert "<img onerror" not in page
-    # Blind-spot fields go through `_bs_escape` (same `‹`/`›` substitution P11 round 3 established for
-    # `report.md`/terminal) before `_li_items`' own `html.escape` runs, matching how activity rows are
-    # escaped once for all three renderings -- never literal `&lt;`/`&gt;` entities.
+    # Blind-spot fields go through `_sanitize_field` (same `‹`/`›` substitution P11 round 3
+    # established for `report.md`/terminal) before `_li_items`' own `html.escape` runs, matching how
+    # activity rows are escaped once for all three renderings -- never literal `&lt;`/`&gt;` entities.
     assert "‹script›alert(1)‹/script›" in page
     assert "‹img onerror=alert(1)›" in page
 

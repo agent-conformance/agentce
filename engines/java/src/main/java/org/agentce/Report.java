@@ -225,56 +225,45 @@ public final class Report {
         return text.codePoints().anyMatch(cp -> Character.getType(cp) == Character.FORMAT || isDicpCodepoint(cp));
     }
 
-    /** Fold every run of the literal space character or a {@code Zs}-category codepoint (NBSP,
-     * ideographic space, ...) into a single ASCII space -- one explicit, per-engine-identical
-     * definition of "collapsible whitespace" (category-based, not Java's own differing built-in
-     * {@code isWhitespace}, which is exactly what let NBSP/U+3000 diverge across engines before). */
-    private static String collapseWhitespace(String text) {
-        StringBuilder out = new StringBuilder();
+    /** The one shared core every sanitiser target calls first (SPEC §7 injection hardening,
+     * mirroring the Python reference's {@code _neutralize}): replace every {@code Cc}/{@code Co}/
+     * {@code Cs}/{@code Zl}/{@code Zp} codepoint or {@code Zs} (NBSP, ideographic space, ...) with a
+     * literal space, folding each run into one (one explicit, per-engine-identical definition of
+     * "collapsible whitespace", category-based, not Java's own differing built-in
+     * {@code isWhitespace}, which is exactly what let NBSP/U+3000 diverge across engines before);
+     * drop every {@code Cf}-or-{@code Default_Ignorable_Code_Point} codepoint entirely (never a space
+     * -- removing a zero-width character preserves the string's visual intent); trim leading and
+     * trailing whitespace; cap by codepoint (never a UTF-16 half of a surrogate pair), computed here
+     * on the neutralized-but-not-yet-HTML-escaped text, before any HTML-entity expansion a caller
+     * applies on top; then render {@code placeholder} if the result is empty but {@code text} was
+     * not. */
+    private static String neutralize(String text, int cap, String placeholder) {
+        StringBuilder kept = new StringBuilder();
         boolean inWs = false;
         int i = 0;
         while (i < text.length()) {
             int cp = text.codePointAt(i);
             i += Character.charCount(cp);
-            if (cp == ' ' || Character.getType(cp) == Character.SPACE_SEPARATOR) {
-                if (!inWs) {
-                    out.append(' ');
-                    inWs = true;
-                }
-            } else {
-                out.appendCodePoint(cp);
-                inWs = false;
-            }
-        }
-        return out.toString();
-    }
-
-    /** The one shared core every sanitiser target calls first (SPEC §7 injection hardening,
-     * mirroring the Python reference's {@code _neutralize}): replace every {@code Cc}/{@code Co}/
-     * {@code Cs}/{@code Zl}/{@code Zp} codepoint with a literal space; drop every {@code Cf}-or-
-     * {@code Default_Ignorable_Code_Point} codepoint entirely (never a space -- removing a
-     * zero-width character preserves the string's visual intent); collapse collapsible whitespace to
-     * single spaces; trim leading and trailing whitespace; cap by codepoint (never a UTF-16 half of a
-     * surrogate pair), computed here on the neutralized-but-not-yet-HTML-escaped text, before any
-     * HTML-entity expansion a caller applies on top; then render {@code placeholder} if the result is
-     * empty but {@code text} was not. */
-    private static String neutralize(String text, int cap, String placeholder) {
-        StringBuilder kept = new StringBuilder();
-        text.codePoints().forEach(cp -> {
             int type = Character.getType(cp);
-            if (type == Character.CONTROL
+            if (cp == ' '
+                    || type == Character.CONTROL
                     || type == Character.PRIVATE_USE
                     || type == Character.SURROGATE
                     || type == Character.LINE_SEPARATOR
-                    || type == Character.PARAGRAPH_SEPARATOR) {
-                kept.append(' ');
+                    || type == Character.PARAGRAPH_SEPARATOR
+                    || type == Character.SPACE_SEPARATOR) {
+                if (!inWs) {
+                    kept.append(' ');
+                    inWs = true;
+                }
             } else if (type == Character.FORMAT || isDicpCodepoint(cp)) {
                 // Dropped entirely (never a space): by definition invisible/zero-width.
             } else {
                 kept.appendCodePoint(cp);
+                inWs = false;
             }
-        });
-        String collapsed = collapseWhitespace(kept.toString()).strip();
+        }
+        String collapsed = kept.toString().strip();
         int codepointCount = collapsed.codePointCount(0, collapsed.length());
         if (codepointCount > cap) {
             int[] codepoints = collapsed.codePoints().toArray();
@@ -319,15 +308,9 @@ public final class Report {
     }
 
     /** A documented alias for {@link #sanitizeForMarkdown}, not a second implementation -- see the
-     * Python reference's own {@code sanitize_for_terminal} docstring for why. */
-    public static String sanitizeForTerminal(String text, String placeholder, int cap) {
-        return sanitizeForMarkdown(text, placeholder, cap);
-    }
-
-    public static String sanitizeForTerminal(String text, String placeholder) {
-        return sanitizeForMarkdown(text, placeholder);
-    }
-
+     * Python reference's own {@code sanitize_for_terminal} docstring for why. Only the no-placeholder
+     * form is ever called (every terminal call site uses the default name placeholder); the
+     * placeholder/cap parameters live on {@link #sanitizeForMarkdown} directly. */
     public static String sanitizeForTerminal(String text) {
         return sanitizeForMarkdown(text);
     }

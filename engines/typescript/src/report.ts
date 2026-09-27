@@ -121,56 +121,55 @@ function isDicpCodepoint(codepoint: number): boolean {
   return DICP_RANGES.some(([lo, hi]) => codepoint >= lo && codepoint <= hi);
 }
 
+// Hoisted once (not re-literalised per codepoint inside the hot loops below): a fresh RegExp
+// literal at each call site would otherwise allocate a new RegExp object per codepoint of every
+// sanitised string across the corpus.
+const RE_SPACE_LIKE = /\p{Cc}|\p{Co}|\p{Cs}|\p{Zl}|\p{Zp}/u;
+const RE_FORMAT = /\p{Cf}/u;
+const RE_ZS = /\p{Zs}/u;
+
 /** Whether any codepoint in `text` is in the drop-set `neutralize` uses (category `Cf` or the
  * hard-coded `Default_Ignorable_Code_Point` table above). */
 export function hasInvisibleCodepoint(text: string): boolean {
   return Array.from(text).some(
-    (ch) => /\p{Cf}/u.test(ch) || isDicpCodepoint(ch.codePointAt(0) as number),
+    (ch) => RE_FORMAT.test(ch) || isDicpCodepoint(ch.codePointAt(0) as number),
   );
 }
 
-/** Fold every run of the literal space character or a `\p{Zs}` codepoint (NBSP, ideographic space,
- * ...) into a single ASCII space -- one explicit, per-engine-identical definition of "collapsible
- * whitespace". */
-function collapseWhitespace(text: string): string {
-  const parts: string[] = [];
-  let inWs = false;
-  for (const ch of text) {
-    if (ch === " " || /\p{Zs}/u.test(ch)) {
-      if (!inWs) {
-        parts.push(" ");
-        inWs = true;
-      }
-    } else {
-      parts.push(ch);
-      inWs = false;
-    }
-  }
-  return parts.join("");
-}
-
 /** The one shared core every sanitiser target calls first (SPEC §7 injection hardening, mirroring
- * the Python reference's `_neutralize`): replace every `Cc`/`Co`/`Cs`/`Zl`/`Zp` codepoint with a
- * literal space; drop every `Cf`-or-`Default_Ignorable_Code_Point` codepoint entirely (never a space
- * -- removing a zero-width character preserves the string's visual intent); collapse collapsible
- * whitespace to single spaces; trim leading and trailing whitespace; cap by codepoint (`Array.from`,
- * never a UTF-16 half of a surrogate pair), computed here before any HTML-entity expansion a caller
- * applies on top; then render `placeholder` if the result is empty but `text` was not. */
+ * the Python reference's `_neutralize`): replace every `Cc`/`Co`/`Cs`/`Zl`/`Zp` codepoint or `Zs`
+ * (NBSP, ideographic space, ...) with a literal space, folding each run into one (one explicit,
+ * per-engine-identical definition of "collapsible whitespace"); drop every `Cf`-or-
+ * `Default_Ignorable_Code_Point` codepoint entirely (never a space -- removing a zero-width
+ * character preserves the string's visual intent); trim leading and trailing whitespace; cap by
+ * codepoint (never a UTF-16 half of a surrogate pair), computed here before any HTML-entity
+ * expansion a caller applies on top; then render `placeholder` if the result is empty but `text`
+ * was not. */
 function neutralize(text: string, cap: number, placeholder: string): string {
   const kept: string[] = [];
+  let inWs = false;
   for (const ch of text) {
-    if (/\p{Cc}|\p{Co}|\p{Cs}|\p{Zl}|\p{Zp}/u.test(ch)) {
-      kept.push(" ");
-    } else if (/\p{Cf}/u.test(ch) || isDicpCodepoint(ch.codePointAt(0) as number)) {
+    if (ch === " " || RE_SPACE_LIKE.test(ch) || RE_ZS.test(ch)) {
+      if (!inWs) {
+        kept.push(" ");
+        inWs = true;
+      }
+    } else if (RE_FORMAT.test(ch) || isDicpCodepoint(ch.codePointAt(0) as number)) {
       // Dropped entirely (never a space): by definition invisible/zero-width.
     } else {
       kept.push(ch);
+      inWs = false;
     }
   }
-  let collapsed = collapseWhitespace(kept.join("")).trim();
-  const codepoints = Array.from(collapsed);
-  if (codepoints.length > cap) {
-    collapsed = `${codepoints.slice(0, cap - 1).join("")}…`;
+  let collapsed = kept.join("").trim();
+  // A UTF-16 `.length` is always >= the codepoint count, so this is a safe, cheap sufficient
+  // condition to skip the `Array.from` codepoint-array build below for the common (short,
+  // uncapped) case.
+  if (collapsed.length > cap) {
+    const codepoints = Array.from(collapsed);
+    if (codepoints.length > cap) {
+      collapsed = `${codepoints.slice(0, cap - 1).join("")}…`;
+    }
   }
   if (collapsed.length === 0 && text.length > 0) {
     collapsed = placeholder;

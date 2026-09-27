@@ -1295,46 +1295,35 @@ def has_invisible_codepoint(text: str) -> bool:
     )
 
 
-def _collapse_whitespace(text: str) -> str:
-    """Fold every run of the literal space character or a `Zs`-category codepoint (NBSP, ideographic
-    space, ...) into a single ASCII space -- one explicit, per-engine-identical definition of
-    "collapsible whitespace", category-based rather than each language's own differing built-in
-    ``\\s``/``isspace()`` (which let NBSP/U+3000 diverge across engines before)."""
-    parts: list[str] = []
-    in_ws = False
-    for ch in text:
-        if ch == " " or unicodedata.category(ch) == "Zs":
-            if not in_ws:
-                parts.append(" ")
-                in_ws = True
-        else:
-            parts.append(ch)
-            in_ws = False
-    return "".join(parts)
-
-
 def _neutralize(text: str, cap: int, placeholder: str) -> str:
     """The one shared core every sanitiser target calls first (SPEC §7 injection hardening): replace
-    every `_SPACE_LIKE_CATEGORIES` codepoint with a literal space; drop every `Cf`-or-
+    every `_SPACE_LIKE_CATEGORIES` codepoint or `Zs` (NBSP, ideographic space, ...) with a literal
+    space, folding each run into one (one explicit, per-engine-identical definition of "collapsible
+    whitespace", category-based rather than each language's own differing built-in ``\\s``/
+    ``isspace()``, which let NBSP/U+3000 diverge across engines before); drop every `Cf`-or-
     ``Default_Ignorable_Code_Point`` codepoint entirely (never a space -- removing a zero-width
-    character preserves the string's visual intent); collapse collapsible whitespace to single
-    spaces; trim leading and trailing whitespace; cap by codepoint (never a UTF-16 surrogate half,
-    which Python's own per-codepoint string iteration already guarantees) at `cap`, computed here on
-    the neutralized-but-not-yet-HTML-escaped text, before any HTML-entity expansion a caller applies
-    on top; then render `placeholder` if the result is empty but `text` was not -- escaping, never
-    erasure. `Cn` (unassigned) codepoints are deliberately not filtered: they carry no defined
-    rendering behaviour to exploit, and the one real future-invisible-character risk is already
-    closed permanently by the hard-coded, complete DICP table above."""
+    character preserves the string's visual intent); trim leading and trailing whitespace; cap by
+    codepoint (never a UTF-16 surrogate half, which Python's own per-codepoint string iteration
+    already guarantees) at `cap`, computed here on the neutralized-but-not-yet-HTML-escaped text,
+    before any HTML-entity expansion a caller applies on top; then render `placeholder` if the result
+    is empty but `text` was not -- escaping, never erasure. `Cn` (unassigned) codepoints are
+    deliberately not filtered: they carry no defined rendering behaviour to exploit, and the one real
+    future-invisible-character risk is already closed permanently by the hard-coded, complete DICP
+    table above."""
     kept: list[str] = []
+    in_ws = False
     for ch in text:
         category = unicodedata.category(ch)
-        if category in _SPACE_LIKE_CATEGORIES:
-            kept.append(" ")
+        if ch == " " or category in _SPACE_LIKE_CATEGORIES or category == "Zs":
+            if not in_ws:
+                kept.append(" ")
+                in_ws = True
         elif category == "Cf" or _is_dicp_codepoint(ord(ch)):
             continue
         else:
             kept.append(ch)
-    collapsed = _collapse_whitespace("".join(kept)).strip()
+            in_ws = False
+    collapsed = "".join(kept).strip()
     if len(collapsed) > cap:
         collapsed = collapsed[: cap - 1] + "…"
     if not collapsed and text:
