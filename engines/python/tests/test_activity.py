@@ -188,6 +188,19 @@ def _mixed_events() -> list[dict[str, Any]]:
     ]
 
 
+def test_a_nul_byte_in_one_field_cannot_collide_with_the_next_field() -> None:
+    """Two distinct tools must never merge because a naive join-on-NUL key treats
+    "a\\0b" + "c" the same as "a" + "b\\0c". Python's real tuples never had this bug (no
+    join happens at all), but the same fixture is shared with the TypeScript and Java ports,
+    where a prior version of the dedup key did have exactly this collision."""
+    events = [
+        _event("ToolCall", tool={"name": "a\x00b", "server": "c", "protocol": "p"}),
+        _event("ToolCall", tool={"name": "a", "server": "b\x00c", "protocol": "p"}),
+    ]
+    activity = summarize_activity(events, Profile())
+    assert len(activity["tools"]) == 2
+
+
 def test_activity_is_order_independent() -> None:
     events = _mixed_events()
     profile = _profile(declared_tools=["search"])

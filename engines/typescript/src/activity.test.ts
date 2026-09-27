@@ -149,6 +149,15 @@ test("non-dict data and unrelated event types are ignored", () => {
   assert.deepEqual(activity.models, []);
 });
 
+test("a NUL byte in one field cannot collide with the next field", () => {
+  const events = [
+    event("ToolCall", { tool: { name: "a\u0000b", server: "c", protocol: "p" } }),
+    event("ToolCall", { tool: { name: "a", server: "b\u0000c", protocol: "p" } }),
+  ];
+  const activity = summarizeActivity(events, emptyProfile());
+  assert.equal(activity.tools.length, 2);
+});
+
 test("summarizeActivity is order independent", () => {
   const events = [
     event("ModelCall", { model: { provider: "openai", name: "gpt-x", version_or_digest: "1" } }),
@@ -167,4 +176,9 @@ test("summarizeActivity is order independent", () => {
   const forward = summarizeActivity(events, profile);
   const reversed = summarizeActivity([...events].reverse(), profile);
   assert.deepEqual(reversed, forward);
+  const shuffled = summarizeActivity(
+    [2, 0, 4, 1, 3].map((i) => events[i] as (typeof events)[number]),
+    profile,
+  );
+  assert.deepEqual(shuffled, forward);
 });

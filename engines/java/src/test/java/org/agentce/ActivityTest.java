@@ -180,6 +180,15 @@ class ActivityTest {
     }
 
     @Test
+    void aNulByteInOneFieldCannotCollideWithTheNextField() {
+        List<JsonNode> events = List.of(
+                event("ToolCall", obj("tool", obj("name", "a\u0000b", "server", "c", "protocol", "p"))),
+                event("ToolCall", obj("tool", obj("name", "a", "server", "b\u0000c", "protocol", "p"))));
+        ObjectNode activity = Activity.summarizeActivity(events, emptyProfile());
+        assertEquals(2, activity.get("tools").size());
+    }
+
+    @Test
     void summarizeActivityIsOrderIndependent() {
         List<JsonNode> events = List.of(
                 event("ModelCall", obj("model", obj("provider", "openai", "name", "gpt-x", "version_or_digest", "1"))),
@@ -201,5 +210,9 @@ class ActivityTest {
         Collections.reverse(reversed);
         ObjectNode backward = Activity.summarizeActivity(reversed, profile);
         assertEquals(forward, backward);
+        List<JsonNode> shuffled = List.of(
+                events.get(2), events.get(0), events.get(4), events.get(1), events.get(3));
+        ObjectNode reshuffled = Activity.summarizeActivity(shuffled, profile);
+        assertEquals(forward, reshuffled);
     }
 }
