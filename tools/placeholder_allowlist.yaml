@@ -141,6 +141,12 @@ allow:
     class: legitimate
     justification: "Asserts the starter profile keeps its fill-in source marker when the user picks a non-default framework; the marker is init scaffolding, not unfinished work."
 
+  - path: engines/python/agentce/report.py
+    pattern: placeholder
+    count: 19
+    class: legitimate
+    justification: "_bs_escape's empty_placeholder parameter and the _MD_ESCAPE_EMPTY_PLACEHOLDER/_MD_ESCAPE_EMPTY_FIELD_PLACEHOLDER fallback strings ('(unnamed)'/'(empty)') name the rendered text for an empty field value; not an unfinished stub."
+
   - path: engines/python/agentce/signing.py
     pattern: not-implemented
     count: 2
