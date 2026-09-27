@@ -324,6 +324,53 @@ class ReportTest {
         }
     }
 
+    // An independent, hand-copied transcription of the Unicode 17.0 Default_Ignorable_Code_Point
+    // property's (first, last) ranges -- written separately from Report.java's own DICP_RANGES on
+    // purpose, so a mutation that deletes or narrows a range in the production table (the
+    // post-implementation critic's own mutation testing: removing a range with no covering test left
+    // every other test passing) fails *this* test even though it can't be caught by comparing the
+    // table to itself.
+    private static final int[][] EXPECTED_DICP_RANGES = {
+        {0x00AD, 0x00AD},
+        {0x034F, 0x034F},
+        {0x061C, 0x061C},
+        {0x115F, 0x1160},
+        {0x17B4, 0x17B5},
+        {0x180B, 0x180F},
+        {0x200B, 0x200F},
+        {0x202A, 0x202E},
+        {0x2060, 0x206F},
+        {0x3164, 0x3164},
+        {0xFE00, 0xFE0F},
+        {0xFEFF, 0xFEFF},
+        {0xFFA0, 0xFFA0},
+        {0xFFF0, 0xFFF8},
+        {0x1BCA0, 0x1BCA3},
+        {0x1D173, 0x1D17A},
+        {0xE0000, 0xE0FFF},
+    };
+
+    @Test
+    void neutralizeDropsEveryDicpRangeEndpointIndependentlyChecked() {
+        for (int[] range : EXPECTED_DICP_RANGES) {
+            for (int codepoint : new int[] {range[0], range[1]}) {
+                String out = Report.sanitizeForMarkdown("a" + cp(codepoint) + "b");
+                assertEquals("ab", out, "U+" + Integer.toHexString(codepoint).toUpperCase());
+            }
+        }
+    }
+
+    @Test
+    void hasInvisibleCodepointMatchesTheIndependentDicpRanges() {
+        for (int[] range : EXPECTED_DICP_RANGES) {
+            for (int codepoint : new int[] {range[0], range[1]}) {
+                assertTrue(
+                        Report.hasInvisibleCodepoint(cp(codepoint)),
+                        "U+" + Integer.toHexString(codepoint).toUpperCase());
+            }
+        }
+    }
+
     @Test
     void neutralizeFoldsZsAndLiteralSpaceRunsToOneSpace() {
         assertEquals("a b", Report.sanitizeForMarkdown("a" + NBSP + NBSP + "b"));

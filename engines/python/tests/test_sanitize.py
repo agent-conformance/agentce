@@ -100,6 +100,50 @@ def test_neutralize_removes_default_ignorable_codepoints_cf_does_not_cover() -> 
         )
 
 
+#: An independent, hand-copied transcription of the Unicode 17.0 `Default_Ignorable_Code_Point`
+#: property's (first, last) ranges -- written separately from `report._DICP_RANGES` on purpose, so a
+#: mutation that deletes or narrows a range in the production table (round-2 design critic finding
+#: B5; the post-implementation critic's own mutation testing reproduced the same class of gap for a
+#: range with no covering vector) fails *this* test even though it can't be caught by comparing the
+#: table to itself. Source: unicode.org's `DerivedCoreProperties.txt` DICP block, 2026-09-27.
+_EXPECTED_DICP_RANGES: tuple[tuple[int, int], ...] = (
+    (0x00AD, 0x00AD),
+    (0x034F, 0x034F),
+    (0x061C, 0x061C),
+    (0x115F, 0x1160),
+    (0x17B4, 0x17B5),
+    (0x180B, 0x180F),
+    (0x200B, 0x200F),
+    (0x202A, 0x202E),
+    (0x2060, 0x206F),
+    (0x3164, 0x3164),
+    (0xFE00, 0xFE0F),
+    (0xFEFF, 0xFEFF),
+    (0xFFA0, 0xFFA0),
+    (0xFFF0, 0xFFF8),
+    (0x1BCA0, 0x1BCA3),
+    (0x1D173, 0x1D17A),
+    (0xE0000, 0xE0FFF),
+)
+
+
+def test_neutralize_drops_every_dicp_range_endpoint_independently_checked() -> None:
+    for lo, hi in _EXPECTED_DICP_RANGES:
+        for codepoint in {lo, hi}:
+            out = report._neutralize(f"a{chr(codepoint)}b", 200, "(unnamed)")
+            assert out == "ab", f"U+{codepoint:04X} (range {lo:04X}-{hi:04X}): {out!r}"
+
+
+def test_has_invisible_codepoint_matches_the_independent_dicp_ranges() -> None:
+    # Closes the post-implementation-critic-found gap (mutation testing: deleting or narrowing a
+    # range in `report._DICP_RANGES` left every other test passing, because no fixed payload or
+    # vector exercised the deleted range's own codepoints): every codepoint the independent list
+    # above says is DICP must also be flagged invisible by the production predicate.
+    for lo, hi in _EXPECTED_DICP_RANGES:
+        for codepoint in {lo, hi}:
+            assert report.has_invisible_codepoint(chr(codepoint)), f"U+{codepoint:04X}"
+
+
 def test_neutralize_folds_zs_and_literal_space_runs_to_one_space() -> None:
     assert report._neutralize(f"a{NBSP}{NBSP}b", 200, "(unnamed)") == "a b"
     assert report._neutralize(f"a{IDEOGRAPHIC_SPACE}b", 200, "(unnamed)") == "a b"

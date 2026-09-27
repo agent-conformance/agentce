@@ -331,6 +331,53 @@ test("neutralize removes Default_Ignorable codepoints Cf does not cover", () => 
   }
 });
 
+// An independent, hand-copied transcription of the Unicode 17.0 Default_Ignorable_Code_Point
+// property's (first, last) ranges -- written separately from report.ts's own DICP_RANGES on
+// purpose, so a mutation that deletes or narrows a range in the production table (the
+// post-implementation critic's own mutation testing: removing a range with no covering test left
+// every other test passing) fails *this* test even though it can't be caught by comparing the
+// table to itself.
+const EXPECTED_DICP_RANGES: [number, number][] = [
+  [0x00ad, 0x00ad],
+  [0x034f, 0x034f],
+  [0x061c, 0x061c],
+  [0x115f, 0x1160],
+  [0x17b4, 0x17b5],
+  [0x180b, 0x180f],
+  [0x200b, 0x200f],
+  [0x202a, 0x202e],
+  [0x2060, 0x206f],
+  [0x3164, 0x3164],
+  [0xfe00, 0xfe0f],
+  [0xfeff, 0xfeff],
+  [0xffa0, 0xffa0],
+  [0xfff0, 0xfff8],
+  [0x1bca0, 0x1bca3],
+  [0x1d173, 0x1d17a],
+  [0xe0000, 0xe0fff],
+];
+
+test("neutralize drops every DICP range endpoint (independently checked)", () => {
+  for (const [lo, hi] of EXPECTED_DICP_RANGES) {
+    for (const codepoint of new Set([lo, hi])) {
+      const out = sanitizeForMarkdown(`a${String.fromCodePoint(codepoint)}b`);
+      assert.equal(out, "ab", `U+${codepoint.toString(16).toUpperCase()}`);
+    }
+  }
+});
+
+test("hasInvisibleCodepoint matches the independent DICP ranges", () => {
+  for (const [lo, hi] of EXPECTED_DICP_RANGES) {
+    for (const codepoint of new Set([lo, hi])) {
+      assert.equal(
+        hasInvisibleCodepoint(String.fromCodePoint(codepoint)),
+        true,
+        `U+${codepoint.toString(16).toUpperCase()}`,
+      );
+    }
+  }
+});
+
 test("neutralize folds Zs and literal space runs to one space", () => {
   assert.equal(sanitizeForMarkdown(`a${NBSP}${NBSP}b`), "a b");
   assert.equal(sanitizeForMarkdown(`a${IDEOGRAPHIC_SPACE}b`), "a b");
