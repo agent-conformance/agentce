@@ -224,12 +224,12 @@ def _activity_undeclared_lines(
     if undeclared["tools"]:
         lines.append(
             f"{cat['report.activity_undeclared_tools_label']}: "
-            + ", ".join(undeclared["tools"])
+            + ", ".join(_md_escape(name) for name in undeclared["tools"])
         )
     if undeclared["models"]:
         lines.append(
             f"{cat['report.activity_undeclared_models_label']}: "
-            + ", ".join(undeclared["models"])
+            + ", ".join(_md_escape(name) for name in undeclared["models"])
         )
     return lines
 
@@ -238,12 +238,15 @@ def _activity_rows(
     activity: dict[str, Any], cat: dict[str, str]
 ) -> list[tuple[str, str]]:
     """``(label, value)`` for every counted-facts row -- the one place the row set and order is
-    decided, shared by the Markdown and HTML renderings."""
+    decided, shared by the Markdown and HTML renderings. Agent, model, and tool names are
+    event-derived strings (SPEC §7 injection hardening), escaped with :func:`_md_escape` before
+    joining so a hostile name (embedded newlines) can never start a new Markdown/terminal line --
+    this section renders before the verdict."""
     recorder_labels = {
         k: cat[f"report.activity_recorder_{k}"] for k in RECORDER_CLASSES
     }
     denied_labels = {k: cat[f"report.activity_denied_{k}"] for k in DENIED_KINDS}
-    agents = activity["agents"]
+    agents = [_md_escape(a) for a in activity["agents"]]
     return [
         (
             cat["report.activity_agents_label"],
@@ -251,11 +254,11 @@ def _activity_rows(
         ),
         (
             cat["report.activity_models_label"],
-            ", ".join(m["name"] for m in activity["models"]) or "0",
+            ", ".join(_md_escape(m["name"]) for m in activity["models"]) or "0",
         ),
         (
             cat["report.activity_tools_label"],
-            ", ".join(t["name"] for t in activity["tools"]) or "0",
+            ", ".join(_md_escape(t["name"]) for t in activity["tools"]) or "0",
         ),
         (
             cat["report.activity_actions_label"],

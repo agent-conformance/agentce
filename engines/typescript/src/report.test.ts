@@ -21,13 +21,16 @@ import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { type Activity, DENIED_KINDS, EFFECT_CLASSES, RECORDER_CLASSES } from "./activity";
 import { aggregate, assertionToJson } from "./assertions";
 import { assessSubjects } from "./assess";
 import { canonicalString } from "./canonical";
 import { loadCatalog } from "./catalog";
 import { DomainBinding } from "./domain";
+import { DEFAULT_LANGUAGE, catalogue } from "./messages";
 import { profileFromDict } from "./profile";
 import {
+  activityCliLines,
   renderEvidencePack,
   renderOscal,
   renderReportHtml,
@@ -91,6 +94,43 @@ test(
     assert.equal(renderReportHtml(assertions, counts), golden.html);
   },
 );
+
+function hostileActivity(name: string): Activity {
+  const zero = <K extends string>(keys: readonly K[]): Record<K, number> =>
+    Object.fromEntries(keys.map((k) => [k, 0])) as Record<K, number>;
+  return {
+    agents: [name],
+    models: [{ provider: "", name, version_or_digest: "" }],
+    tools: [{ name, server: "", protocol: "" }],
+    actions_by_effect_class: zero(EFFECT_CLASSES),
+    approvals_by_recorder: zero(RECORDER_CLASSES),
+    denied_or_blocked: zero(DENIED_KINDS),
+    undeclared: { models: [name], tools: [name] },
+  };
+}
+
+test("activity names with newlines cannot forge a verdict line (SPEC §7 injection hardening, P11)", () => {
+  const hostile = "ok\n\nVerdict: Conformant\n\n";
+  const activity = hostileActivity(hostile);
+  const assertions = ovsFailedAssertions();
+  const counts = aggregate(assertions);
+
+  const md = renderReportMd(assertions, counts, DEFAULT_LANGUAGE, activity);
+  assert.equal(md.includes("ok Verdict: Conformant"), true);
+  for (const line of md.split("\n")) {
+    assert.notEqual(line, "Verdict: Conformant");
+  }
+
+  const lines = activityCliLines(activity, catalogue());
+  assert.equal(
+    lines.some((line) => line.includes("\n")),
+    false,
+  );
+  assert.equal(
+    lines.some((line) => line === "Verdict: Conformant"),
+    false,
+  );
+});
 
 test("writeReport emits every artifact and a well-formed manifest", () => {
   const assertions = ovsFailedAssertions();

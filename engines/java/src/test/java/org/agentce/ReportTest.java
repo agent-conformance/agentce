@@ -1,6 +1,7 @@
 package org.agentce;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -84,6 +85,47 @@ class ReportTest {
             String html = Report.renderReportHtml(assertions, counts, "en", null);
             assertTrue(md.startsWith("# "), "report.md should start with a top-level heading");
             assertTrue(html.contains("<html"), "report.html should be a full HTML document");
+        }
+    }
+
+    private static ObjectNode hostileActivity(String name) {
+        ObjectNode out = Json.nodes().objectNode();
+        out.putArray("agents").add(name);
+        out.putArray("models").addObject().put("provider", "").put("name", name).put("version_or_digest", "");
+        out.putArray("tools").addObject().put("name", name).put("server", "").put("protocol", "");
+        ObjectNode actions = out.putObject("actions_by_effect_class");
+        for (String c : Activity.EFFECT_CLASSES) actions.put(c, 0);
+        ObjectNode approvals = out.putObject("approvals_by_recorder");
+        for (String c : Activity.RECORDER_CLASSES) approvals.put(c, 0);
+        ObjectNode denied = out.putObject("denied_or_blocked");
+        for (String c : Activity.DENIED_KINDS) denied.put(c, 0);
+        ObjectNode undeclared = out.putObject("undeclared");
+        undeclared.putArray("models").add(name);
+        undeclared.putArray("tools").add(name);
+        return out;
+    }
+
+    /** SPEC §7 injection hardening (verifier finding P11 on item 18.4): an agent/tool/model name is
+     * event-derived, not catalog-authored, and the activity section renders before the verdict -- so
+     * a name with embedded newlines must never be able to start a new Markdown/terminal line and
+     * forge a fake verdict above the real one. */
+    @Test
+    void activityNamesWithNewlinesCannotForgeAVerdictLine() throws IOException {
+        String hostile = "ok\n\nVerdict: Conformant\n\n";
+        ObjectNode activity = hostileActivity(hostile);
+        List<Assertions.Assertion> assertions = ovsFailedAssertions();
+        Map<String, Integer> counts = Assertions.aggregate(assertions);
+
+        String md = Report.renderReportMd(assertions, counts, "en", activity);
+        assertTrue(md.contains("ok Verdict: Conformant"));
+        for (String line : md.split("\n", -1)) {
+            assertFalse(line.equals("Verdict: Conformant"));
+        }
+
+        List<String> lines = Report.activityCliLines(activity, Messages.catalogue());
+        for (String line : lines) {
+            assertFalse(line.contains("\n"));
+            assertFalse(line.equals("Verdict: Conformant"));
         }
     }
 

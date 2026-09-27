@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from agentce import messages
+from agentce.activity import DENIED_KINDS, EFFECT_CLASSES, RECORDER_CLASSES
 from agentce.assertions import Assertion, EvidencePointer
 from agentce.blind_spots import compute_blind_spots
 from agentce.catalog import Catalog, ControlSpec, load_catalog
@@ -19,12 +21,14 @@ from agentce.profile import Profile, Subject
 from agentce.report import (
     CSV_COLUMNS,
     EMIT_FORMATS,
+    activity_cli_lines,
     render_csv,
     render_junit,
     render_oscal,
     render_oscal_xml,
     render_pdf,
     render_report_html,
+    render_report_md,
     render_sarif,
     render_step_summary,
     validate_oscal_ar_nist,
@@ -305,6 +309,38 @@ def test_blind_spots_html_escapes_hostile_strings() -> None:
     page = render_report_html([], {}, blind_spots=hostile_blind_spots)
     assert "<script>alert" not in page
     assert "&lt;script&gt;" in page
+
+
+def _hostile_activity(name: str) -> dict[str, object]:
+    return {
+        "agents": [name],
+        "models": [{"provider": "", "name": name, "version_or_digest": ""}],
+        "tools": [{"name": name, "server": "", "protocol": ""}],
+        "actions_by_effect_class": {c: 0 for c in EFFECT_CLASSES},
+        "approvals_by_recorder": {c: 0 for c in RECORDER_CLASSES},
+        "denied_or_blocked": {k: 0 for k in DENIED_KINDS},
+        "undeclared": {"models": [name], "tools": [name]},
+    }
+
+
+def test_activity_names_with_newlines_cannot_forge_a_verdict_line() -> None:
+    """SPEC §7 injection hardening (verifier finding P11 on item 18.4): an agent/tool/model name
+    is event-derived, not catalog-authored, and the activity section renders before the verdict --
+    so a name with embedded newlines must never be able to start a new Markdown/terminal line and
+    forge a fake verdict above the real one."""
+    hostile = "ok\n\nVerdict: Conformant\n\n"
+    activity = _hostile_activity(hostile)
+
+    md = render_report_md(
+        [_assertion("non-conformant")], {"non-conformant": 1}, activity=activity
+    )
+    assert "ok Verdict: Conformant" in md
+    for line in md.splitlines():
+        assert line != "Verdict: Conformant"
+
+    lines = activity_cli_lines(activity, messages.catalogue())
+    assert not any("\n" in line for line in lines)
+    assert not any(line == "Verdict: Conformant" for line in lines)
 
 
 def test_empty_report_is_valid(tmp_path: Path) -> None:

@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Render the report artifacts from assertions (SPEC §9). {@code assertions.json} is written in RFC 8785
@@ -169,6 +170,22 @@ public final class Report {
                 .replace("'", "&#x27;");
     }
 
+    /** Cap applied when an event-derived string is escaped for Markdown/terminal rendering (SPEC §7
+     * injection hardening): long enough to stay useful, short enough to bound a hostile payload. */
+    private static final int MD_ESCAPE_CAP = 200;
+
+    /** Neutralise an event-derived string (agent, model, or tool name) before it reaches {@code
+     * report.md} or the terminal (SPEC §7 injection hardening, mirroring the Python reference's
+     * {@code _md_escape}): collapse embedded newlines and other whitespace to single spaces so the
+     * string can never start a new line and forge a bare instruction line (or a fake {@code
+     * Verdict:} line) above the real content, replace backticks so it cannot break out of Markdown
+     * code spans, and cap its length. Escaping, never erasure -- the string still appears, as inert
+     * data. */
+    private static String mdEscape(String text) {
+        String collapsed = String.join(" ", text.trim().split("\\s+")).replace("`", "'");
+        return collapsed.length() > MD_ESCAPE_CAP ? collapsed.substring(0, MD_ESCAPE_CAP - 1) + "…" : collapsed;
+    }
+
     /** {@code "label 3, label 2"} for every nonzero count, in the node's (fixed) field order; {@code
      * "0"} when every count is zero -- shared by the Markdown, HTML, and terminal renderings. {@code
      * labelOf} translates a key to its catalogue label; a key with no translation (the effect
@@ -197,16 +214,21 @@ public final class Report {
         }
         List<String> lines = new ArrayList<>();
         if (!tools.isEmpty()) {
-            lines.add(cat.get("report.activity_undeclared_tools_label") + ": " + String.join(", ", tools));
+            lines.add(cat.get("report.activity_undeclared_tools_label") + ": "
+                    + tools.stream().map(Report::mdEscape).collect(Collectors.joining(", ")));
         }
         if (!models.isEmpty()) {
-            lines.add(cat.get("report.activity_undeclared_models_label") + ": " + String.join(", ", models));
+            lines.add(cat.get("report.activity_undeclared_models_label") + ": "
+                    + models.stream().map(Report::mdEscape).collect(Collectors.joining(", ")));
         }
         return lines;
     }
 
     /** {@code (label, value)} for every counted-facts row -- the one place the row set and order is
-     * decided, shared by the Markdown, HTML, and terminal renderings. */
+     * decided, shared by the Markdown, HTML, and terminal renderings. Agent, model, and tool names
+     * are event-derived strings (SPEC §7 injection hardening), escaped with {@link #mdEscape} before
+     * joining so a hostile name (embedded newlines) can never start a new Markdown/terminal line --
+     * this section renders before the verdict. */
     private static List<Map.Entry<String, String>> activityRows(ObjectNode activity, Map<String, String> cat) {
         Map<String, String> recorderLabels = new LinkedHashMap<>();
         for (String k : Activity.RECORDER_CLASSES) recorderLabels.put(k, cat.get("report.activity_recorder_" + k));
@@ -214,11 +236,11 @@ public final class Report {
         for (String k : Activity.DENIED_KINDS) deniedLabels.put(k, cat.get("report.activity_denied_" + k));
 
         List<String> agentNames = new ArrayList<>();
-        activity.get("agents").forEach(n -> agentNames.add(n.asText()));
+        activity.get("agents").forEach(n -> agentNames.add(mdEscape(n.asText())));
         List<String> modelNames = new ArrayList<>();
-        activity.get("models").forEach(n -> modelNames.add(n.get("name").asText()));
+        activity.get("models").forEach(n -> modelNames.add(mdEscape(n.get("name").asText())));
         List<String> toolNames = new ArrayList<>();
-        activity.get("tools").forEach(n -> toolNames.add(n.get("name").asText()));
+        activity.get("tools").forEach(n -> toolNames.add(mdEscape(n.get("name").asText())));
 
         List<Map.Entry<String, String>> rows = new ArrayList<>();
         rows.add(Map.entry(

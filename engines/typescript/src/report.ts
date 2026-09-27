@@ -79,6 +79,25 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#x27;");
 }
 
+/** Cap applied when an event-derived string is escaped for Markdown/terminal rendering (SPEC §7
+ * injection hardening): long enough to stay useful, short enough to bound a hostile payload. */
+const MD_ESCAPE_CAP = 200;
+
+/** Neutralise an event-derived string (agent, model, or tool name) before it reaches `report.md` or
+ * the terminal (SPEC §7 injection hardening, mirroring the Python reference's `_md_escape`): collapse
+ * embedded newlines and other whitespace to single spaces so the string can never start a new line
+ * and forge a bare instruction line (or a fake `Verdict:` line) above the real content, replace
+ * backticks so it cannot break out of Markdown code spans, and cap its length. Escaping, never
+ * erasure -- the string still appears, as inert data. */
+function mdEscape(text: string, cap: number = MD_ESCAPE_CAP): string {
+  const collapsed = text
+    .split(/\s+/)
+    .filter((w) => w.length > 0)
+    .join(" ")
+    .replace(/`/g, "'");
+  return collapsed.length > cap ? `${collapsed.slice(0, cap - 1)}…` : collapsed;
+}
+
 //: A self-contained stylesheet (no external references), mirroring the Python/Java renderers.
 const HTML_STYLE =
   "body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}" +
@@ -110,18 +129,25 @@ function activityUndeclaredLines(
   }
   const lines: string[] = [];
   if (undeclared.tools.length > 0) {
-    lines.push(`${cat["report.activity_undeclared_tools_label"]}: ${undeclared.tools.join(", ")}`);
+    lines.push(
+      `${cat["report.activity_undeclared_tools_label"]}: ` +
+        `${undeclared.tools.map((name) => mdEscape(name)).join(", ")}`,
+    );
   }
   if (undeclared.models.length > 0) {
     lines.push(
-      `${cat["report.activity_undeclared_models_label"]}: ${undeclared.models.join(", ")}`,
+      `${cat["report.activity_undeclared_models_label"]}: ` +
+        `${undeclared.models.map((name) => mdEscape(name)).join(", ")}`,
     );
   }
   return lines;
 }
 
 /** `(label, value)` for every counted-facts row -- the one place the row set and order is decided,
- * shared by the Markdown, HTML, and terminal renderings. */
+ * shared by the Markdown, HTML, and terminal renderings. Agent, model, and tool names are
+ * event-derived strings (SPEC §7 injection hardening), escaped with `mdEscape` before joining so a
+ * hostile name (embedded newlines) can never start a new Markdown/terminal line -- this section
+ * renders before the verdict. */
 function activityRows(activity: Activity, cat: Record<string, string>): [string, string][] {
   const recorderLabels: Record<string, string> = {};
   for (const k of RECORDER_CLASSES)
@@ -132,16 +158,16 @@ function activityRows(activity: Activity, cat: Record<string, string>): [string,
     [
       cat["report.activity_agents_label"] as string,
       activity.agents.length > 0
-        ? activity.agents.join(", ")
+        ? activity.agents.map((a) => mdEscape(a)).join(", ")
         : (cat["report.activity_none_agents"] as string),
     ],
     [
       cat["report.activity_models_label"] as string,
-      activity.models.map((m) => m.name).join(", ") || "0",
+      activity.models.map((m) => mdEscape(m.name)).join(", ") || "0",
     ],
     [
       cat["report.activity_tools_label"] as string,
-      activity.tools.map((t) => t.name).join(", ") || "0",
+      activity.tools.map((t) => mdEscape(t.name)).join(", ") || "0",
     ],
     [
       cat["report.activity_actions_label"] as string,
