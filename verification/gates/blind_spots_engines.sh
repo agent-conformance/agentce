@@ -37,11 +37,55 @@ args=(assess --bundle "$fixture/evidence" --profile "$fixture/applicability.yaml
 # pre-existing scope gap, not this item's to fix) and have no equivalent flag.
 py_args=("${args[@]}" --allow-unverified-catalog)
 
+# A regenerated golden could itself lose the needed_by case or the ranking (a bad capture, or a
+# Python regression at --write time): check the property once, on the golden itself, rather than
+# once per engine -- a per-engine byte match to this same golden (below) already implies the
+# property holds for every engine, so re-deriving it three times would only repeat this check, not
+# add coverage. NEED-02 makes (ToolCall, any) the only group with checks_unlocked > 0: the two
+# groups differ on the primary sort key, so the correct order (ToolCall first) is not also the
+# order their groups are first created in (ModelCall first, from NEED-01's own two-missing-keys
+# loop, sorted alphabetically) -- a missing, inverted, or discovery-order ranking would put
+# ModelCall first instead. Every entry's owner_key/step_kind/ladder_rung combination must also be
+# internally consistent (RFC 0008 Sec.3: rung 1/2 <-> code_change/agent_team, rung 3 <->
+# request/platform_or_security, rung 4 <-> request/ticketing_or_iam).
+check_golden() {
+  python3 - "$1" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    data = json.load(f)
+spots = data.get("blind_spots", [])
+consistent = {
+    1: ("code_change", "agent_team"), 2: ("code_change", "agent_team"),
+    3: ("request", "platform_or_security"), 4: ("request", "ticketing_or_iam"),
+}
+got = [(s["event"], s["checks_unlocked"], s["needed_by"]) for s in spots]
+ok = (
+    got == [("ToolCall", 1, 1), ("ModelCall", 0, 1)]
+    and data.get("no_population") == []
+    and all(
+        len(s["unlocked_checks"]) == s["checks_unlocked"]
+        and consistent.get(s["ladder_rung"]) == (s["step_kind"], s["owner_key"])
+        for s in spots
+    )
+)
+sys.exit(0 if ok else 1)
+PY
+}
+
 if [ "${1:-}" = "--write" ]; then
   (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_args[@]}" --out "$work/python" >/dev/null)
+  if ! check_golden "$work/python/blind-spots.json"; then
+    echo "blind-spots: the Python reference engine's own output did not honestly surface the fixture's needed_by case or its ranking; refusing to write a bad golden" >&2
+    exit 1
+  fi
   cp "$work/python/blind-spots.json" "$golden"
   echo "blind-spots: wrote $golden from the Python reference engine"
   exit 0
+fi
+
+if ! check_golden "$golden"; then
+  echo "blind-spots: the committed golden $golden did not honestly surface the fixture's needed_by case or its ranking" >&2
+  exit 1
 fi
 
 (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_args[@]}" --out "$work/python" >/dev/null)
@@ -58,45 +102,6 @@ for engine in python typescript java; do
   fi
   if ! cmp -s "$golden" "$work/$engine/blind-spots.json"; then
     echo "blind-spots: $engine blind-spots.json differs from the committed golden $golden" >&2
-    status=1
-  fi
-  # A regenerated golden could itself lose the needed_by case, or the ranking, (a bad capture, or a
-  # Python regression at --write time); check both properties directly too, not only "matches the
-  # golden", and that every entry's owner_key/step_kind/ladder_rung combination is internally
-  # consistent (RFC 0008 Sec.3: rung 1/2 <-> code_change/agent_team, rung 3 <->
-  # request/platform_or_security, rung 4 <-> request/ticketing_or_iam).
-  if ! python3 -c "
-import json, sys
-with open('$work/$engine/blind-spots.json', encoding='utf-8') as f:
-    data = json.load(f)
-spots = data.get('blind_spots', [])
-if len(spots) != 2:
-    sys.exit(1)
-if data.get('no_population') != []:
-    sys.exit(1)
-consistent = {
-    1: ('code_change', 'agent_team'), 2: ('code_change', 'agent_team'),
-    3: ('request', 'platform_or_security'), 4: ('request', 'ticketing_or_iam'),
-}
-for bs in spots:
-    if bs['needed_by'] != 1:
-        sys.exit(1)
-    if (bs['step_kind'], bs['owner_key']) != consistent.get(bs['ladder_rung']):
-        sys.exit(1)
-# NEED-02 makes (ToolCall, any) the only group with checks_unlocked > 0 -- ranking teeth: this is
-# real only because the two groups differ on the primary sort key, so the correct order (ToolCall
-# first) is not also the order their groups are first created in (ModelCall first, from NEED-01's
-# own two-missing-keys loop, sorted alphabetically) -- a missing, inverted, or discovery-order
-# ranking would put ModelCall first instead.
-if [s['event'] for s in spots] != ['ToolCall', 'ModelCall']:
-    sys.exit(1)
-if spots[0]['checks_unlocked'] != 1 or spots[0]['unlocked_checks'] == []:
-    sys.exit(1)
-if spots[1]['checks_unlocked'] != 0 or spots[1]['unlocked_checks'] != []:
-    sys.exit(1)
-sys.exit(0)
-"; then
-    echo "blind-spots: $engine's blind_spots did not honestly surface the fixture's needed_by case or its ranking" >&2
     status=1
   fi
 done

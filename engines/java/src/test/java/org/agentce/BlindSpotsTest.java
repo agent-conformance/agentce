@@ -276,33 +276,26 @@ class BlindSpotsTest {
         // The secondary sort key (needed_by) is real too, not just the primary one: these two
         // groups tie on checks_unlocked=1, and the one discovered first (AEvent) has the lower
         // needed_by -- so a missing or discovery-order tie-break would leave AEvent first, and only
-        // an actual sort by needed_by puts BEvent (needed_by=2) first as RFC 0008's fixed ranking
+        // an actual sort by needed_by puts BEvent (needed_by=1) first as RFC 0008's fixed ranking
         // order requires.
         Catalog.ControlSpec aUnlock = control("C-25", "1", List.of(requirement("AEvent", "any")));
-        Catalog.ControlSpec aNeeded =
-                control("C-26", "1", List.of(requirement("AEvent", "any"), requirement("XEvent", "any")));
         Catalog.ControlSpec bUnlock = control("C-27", "1", List.of(requirement("BEvent", "any")));
-        Catalog.ControlSpec bNeeded1 =
+        Catalog.ControlSpec bNeeded =
                 control("C-28", "1", List.of(requirement("BEvent", "any"), requirement("YEvent", "any")));
-        Catalog.ControlSpec bNeeded2 =
-                control("C-29", "1", List.of(requirement("BEvent", "any"), requirement("ZEvent", "any")));
-        Catalog cat = Catalog.forTest("c", "2026.09", List.of(aUnlock, aNeeded, bUnlock, bNeeded1, bNeeded2));
+        List<Catalog.ControlSpec> controls = List.of(aUnlock, bUnlock, bNeeded);
+        Catalog cat = Catalog.forTest("c", "2026.09", controls);
         Profile profile = oneSubjectProfile();
-        List<Assertions.Assertion> assertions = List.of(
-                assertion(aUnlock, "insufficient_evidence", 1, 0),
-                assertion(aNeeded, "insufficient_evidence", 1, 0),
-                assertion(bUnlock, "insufficient_evidence", 1, 0),
-                assertion(bNeeded1, "insufficient_evidence", 1, 0),
-                assertion(bNeeded2, "insufficient_evidence", 1, 0));
+        List<Assertions.Assertion> assertions =
+                controls.stream().map(c -> assertion(c, "insufficient_evidence", 1, 0)).toList();
         ObjectNode result = BlindSpots.computeBlindSpots(assertions, profile, List.of(cat), List.of());
         JsonNode first = result.get("blind_spots").get(0);
         JsonNode second = result.get("blind_spots").get(1);
         assertEquals("BEvent", first.get("event").asText());
         assertEquals(1, first.get("checks_unlocked").asInt());
-        assertEquals(2, first.get("needed_by").asInt());
+        assertEquals(1, first.get("needed_by").asInt());
         assertEquals("AEvent", second.get("event").asText());
         assertEquals(1, second.get("checks_unlocked").asInt());
-        assertEquals(1, second.get("needed_by").asInt());
+        assertEquals(0, second.get("needed_by").asInt());
     }
 
     @Test

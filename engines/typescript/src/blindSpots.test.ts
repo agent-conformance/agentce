@@ -270,40 +270,25 @@ test("a tied checks_unlocked blind spot with more needed_by ranks first", () => 
   // The secondary sort key (needed_by) is real too, not just the primary one: these two groups tie
   // on checks_unlocked=1, and the one discovered first (AEvent) has the lower needed_by -- so a
   // missing or discovery-order tie-break would leave AEvent first, and only an actual sort by
-  // needed_by puts BEvent (needed_by=2) first as RFC 0008's fixed ranking order requires.
+  // needed_by puts BEvent (needed_by=1) first as RFC 0008's fixed ranking order requires.
   const aUnlock = control("C-25", [{ event: "AEvent", class: "any" }]);
-  const aNeeded = control("C-26", [
-    { event: "AEvent", class: "any" },
-    { event: "XEvent", class: "any" },
-  ]);
   const bUnlock = control("C-27", [{ event: "BEvent", class: "any" }]);
-  const bNeeded1 = control("C-28", [
+  const bNeeded = control("C-28", [
     { event: "BEvent", class: "any" },
     { event: "YEvent", class: "any" },
   ]);
-  const bNeeded2 = control("C-29", [
-    { event: "BEvent", class: "any" },
-    { event: "ZEvent", class: "any" },
-  ]);
-  const cat = catalog("c", [aUnlock, aNeeded, bUnlock, bNeeded1, bNeeded2]);
+  const controls = [aUnlock, bUnlock, bNeeded];
+  const cat = catalog("c", controls);
   const profile = profileOneSubject();
-  const assertions = [aUnlock, aNeeded, bUnlock, bNeeded1, bNeeded2].map((c) =>
-    assertion(c, "insufficient_evidence", [1, 0]),
-  );
+  const assertions = controls.map((c) => assertion(c, "insufficient_evidence", [1, 0]));
   const result = computeBlindSpots(assertions, profile, [cat], []);
-  const topTwo = result.blind_spots.slice(0, 2);
-  assert.deepEqual(
-    topTwo.map((bs) => bs.event),
-    ["BEvent", "AEvent"],
-  );
-  assert.deepEqual(
-    topTwo.map((bs) => bs.checks_unlocked),
-    [1, 1],
-  );
-  assert.deepEqual(
-    topTwo.map((bs) => bs.needed_by),
-    [2, 1],
-  );
+  const topTwo = result.blind_spots
+    .slice(0, 2)
+    .map((bs) => [bs.event, bs.checks_unlocked, bs.needed_by]);
+  assert.deepEqual(topTwo, [
+    ["BEvent", 1, 1],
+    ["AEvent", 1, 0],
+  ]);
 });
 
 test("two catalogs sharing a control id and version never collide", () => {
