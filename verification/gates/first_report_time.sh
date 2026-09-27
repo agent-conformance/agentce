@@ -5,4 +5,4 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen pytest -q -o addopts= -p no:cacheprovider tests/test_records_assess.py)
-(cd "$root" && env -u VIRTUAL_ENV uv run --project tools --frozen python tools/installed_artifacts_check.py records --offline)
+(cd "$root" && env -u VIRTUAL_ENV uv run --project tools --frozen python tools/installed_artifacts_check.py records)

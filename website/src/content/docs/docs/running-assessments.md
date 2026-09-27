@@ -59,7 +59,7 @@ If your agent already writes OTLP/JSON traces (OpenTelemetry GenAI spans, includ
 profile to see a first report. Point `assess` at the folder that holds the exports (`.json` files with one
 trace document each, or `.jsonl` files with one document per line):
 
-```bash
+```bash no-run needs the reader's own folder of trace exports
 uv run --project engines/python agentce assess ./traces --out ./out
 ```
 
