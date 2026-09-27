@@ -39,6 +39,14 @@ def load_registry(path: Path) -> dict[str, Any]:
     return registry
 
 
+def registry_or_exit(path: Path) -> dict[str, Any]:
+    try:
+        return load_registry(path)
+    except (OSError, ValueError) as error:
+        print(f"registry.unreadable: {path}: {error}", file=sys.stderr)
+        raise SystemExit(1) from error
+
+
 def read_or_empty(path: Path) -> str:
     return path.read_text(encoding="utf-8") if path.is_file() else ""
 
@@ -310,7 +318,7 @@ def main(argv: list[str]) -> int:
                 else f"REGISTRY-LINT MISSED {name}: {key}"
             )
         return 0 if caught else 1
-    registry = load_registry(args.registry)
+    registry = registry_or_exit(args.registry)
     problems = lint_registry(registry, root)
     if problems:
         print("REGISTRY-LINT REJECTED", file=sys.stderr)
