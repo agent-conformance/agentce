@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# Build gate helper for VG-BLIND-SPOTS: the three engines compute the same ranked blind-spots
+# artifact (RFC 0008) for the same input and write byte-identical blind-spots.json, matching a
+# committed golden -- so a computation bug shared by all three engines cannot hide behind
+# cross-engine agreement alone.
+#
+# The fixture (verification/gates/fixtures/blind_spots/) is small and purpose-built, not the
+# 132-project corpus or corpus/quickstart: its one control (NEED-01) requires a ModelCall and a
+# ToolCall, and its one subject's one event supplies neither, so both requirements are missing at
+# once -- blind-spots.json's `needed_by` case, which never occurs naturally in the existing corpus
+# (every insufficient_evidence assertion there today has exactly one missing requirement).
+# `no_population` is deliberately not exercised by this fixture: it is reachable only through
+# Python's records-folder auto-derived-profile CLI path, which TypeScript and Java have no
+# equivalent of, so no three-engine golden for it is possible (RFC 0008's post-implementation
+# amendment); its correctness is covered by each engine's own unit tests instead.
+#
+# The golden (blind_spots_golden.json) is always a capture of the Python *reference* engine's
+# output -- comparing the other two engines to Python's own output, never to themselves, is what
+# makes the parity claim non-vacuous (the same rule what_they_did_engines.sh documents for
+# activity.json). Regenerate it with:
+#   verification/gates/blind_spots_engines.sh --write
+set -euo pipefail
+root="$(cd "$(dirname "$0")/../.." && pwd)"
+golden="$root/verification/gates/blind_spots_golden.json"
+fixture="$root/verification/gates/fixtures/blind_spots"
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+args=(assess --bundle "$fixture/evidence" --profile "$fixture/applicability.yaml" \
+  --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog")
+# Only the Python engine verifies a --catalog-dir's signature (SPEC §8.7, item 11.3); the fixture
+# catalog is deliberately unsigned (a test-only catalog, never published), so Python alone needs the
+# explicit override. TypeScript and Java do not verify --catalog-dir signatures at all today (a
+# pre-existing scope gap, not this item's to fix) and have no equivalent flag.
+py_args=("${args[@]}" --allow-unverified-catalog)
+
+if [ "${1:-}" = "--write" ]; then
+  (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_args[@]}" --out "$work/python" >/dev/null)
+  cp "$work/python/blind-spots.json" "$golden"
+  echo "blind-spots: wrote $golden from the Python reference engine"
+  exit 0
+fi
+
+(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_args[@]}" --out "$work/python" >/dev/null)
+(cd "$root/engines/typescript" && pnpm --silent agentce "${args[@]}" --out "$work/typescript" >/dev/null)
+(cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist \
+  && ./build/install/agentce/bin/agentce "${args[@]}" --out "$work/java" >/dev/null)
+
+status=0
+for engine in python typescript java; do
+  if [ ! -f "$work/$engine/blind-spots.json" ]; then
+    echo "blind-spots: $engine did not write blind-spots.json" >&2
+    status=1
+    continue
+  fi
+  if ! cmp -s "$golden" "$work/$engine/blind-spots.json"; then
+    echo "blind-spots: $engine blind-spots.json differs from the committed golden $golden" >&2
+    status=1
+  fi
+  # A regenerated golden could itself lose the needed_by case (a bad capture, or a Python
+  # regression at --write time); check the property directly too, not only "matches the golden",
+  # and that every entry's owner_key/step_kind/ladder_rung combination is internally consistent
+  # (RFC 0008 Sec.3: rung 1/2 <-> code_change/agent_team, rung 3 <-> request/platform_or_security,
+  # rung 4 <-> request/ticketing_or_iam).
+  if ! python3 -c "
+import json, sys
+with open('$work/$engine/blind-spots.json', encoding='utf-8') as f:
+    data = json.load(f)
+spots = data.get('blind_spots', [])
+if len(spots) != 2:
+    sys.exit(1)
+if data.get('no_population') != []:
+    sys.exit(1)
+consistent = {
+    1: ('code_change', 'agent_team'), 2: ('code_change', 'agent_team'),
+    3: ('request', 'platform_or_security'), 4: ('request', 'ticketing_or_iam'),
+}
+for bs in spots:
+    if bs['checks_unlocked'] != 0 or bs['needed_by'] != 1 or bs['unlocked_checks'] != []:
+        sys.exit(1)
+    if (bs['step_kind'], bs['owner_key']) != consistent.get(bs['ladder_rung']):
+        sys.exit(1)
+sys.exit(0)
+"; then
+    echo "blind-spots: $engine's blind_spots did not honestly surface the fixture's needed_by case" >&2
+    status=1
+  fi
+done
+[ "$status" -eq 0 ] && echo "blind-spots: three engines match the golden, needed_by honestly surfaced"
+exit "$status"

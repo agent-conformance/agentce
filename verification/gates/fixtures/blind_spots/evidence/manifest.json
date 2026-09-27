@@ -1,0 +1,10 @@
+{
+  "agentce_bundle_version": 1,
+  "domain": "blind-spots-fixture",
+  "files": [
+    {
+      "path": "events/subject.jsonl",
+      "sha256": "67da1f5bfe0baed6f49ff4ab46ad66f36dca33c63a065b2161353b82defc8518"
+    }
+  ]
+}

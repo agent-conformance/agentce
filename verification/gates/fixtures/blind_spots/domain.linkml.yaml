@@ -1,0 +1,5 @@
+# Domain ontology binding for the VG-BLIND-SPOTS gate fixture (verification/gates/blind_spots_engines.sh).
+decision_types:
+  - id: "dom:NeededByDecision"
+    subclass_of: "agentce:ConsequentialDecision"
+    consequential: true

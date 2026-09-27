@@ -1,0 +1,8 @@
+# A small, dedicated catalog for VG-BLIND-SPOTS (RFC 0008 Sec.9): one control whose two
+# minimum_evidence requirements are both unmet by the fixture's one subject, exercising
+# blind-spots.json's needed_by case (a control missing two distinct requirements at once, which
+# never occurs naturally in the 132-project corpus or corpus/quickstart). Not a base or third-party
+# catalog; loaded only via --catalog-dir --allow-unverified-catalog by this gate's own script.
+id: blind-spots-fixture
+version: "2026.09"
+title: "VG-BLIND-SPOTS gate fixture"

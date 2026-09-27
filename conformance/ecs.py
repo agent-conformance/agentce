@@ -151,7 +151,7 @@ _RUNNERS = {"python": _run_python, "typescript": _run_typescript, "java": _run_j
 
 # The canonical set every conforming engine writes per project. Data artifacts are compared byte for
 # byte; translations are compared after neutralising the engine identity they carry by design.
-_DATA_ARTIFACTS = ("assertions.json", "activity.json")
+_DATA_ARTIFACTS = ("assertions.json", "activity.json", "blind-spots.json")
 _TRANSLATION_ARTIFACTS = ("oscal-ar.json", "results.sarif")
 _ENGINE_IDENTITY = "<engine>"
 

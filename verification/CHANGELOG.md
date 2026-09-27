@@ -3,6 +3,15 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.6.0
+
+- Added `VG-BLIND-SPOTS`: the three engines rank the same blind spots over a small, dedicated fixture (not
+  the 132-project corpus, where the case does not occur naturally) whose one control is missing two distinct
+  requirements at once (the `needed_by` case) -- neither is wrongly claimed as unlocked, and each has a rung,
+  an owner, and a concrete step consistent with the evidence ladder. Each engine's `blind-spots.json` is
+  compared byte-for-byte against a committed golden (`blind_spots_golden.json`), so a computation bug shared
+  by all three engines cannot hide behind cross-engine agreement alone.
+
 ## 0.5.0
 
 - Added `VG-WHAT-THEY-DID`: the three engines write an `activity.json` counting the agents, models, tools,

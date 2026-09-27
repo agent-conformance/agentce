@@ -1,0 +1,22 @@
+id: NEED-01
+version: "2026.09"
+title: Fixture control requiring two distinct evidence types at once
+description: >
+  Gate fixture only (verification/gates/blind_spots_engines.sh): requires a ModelCall and a ToolCall,
+  neither of which the fixture subject's one event provides, so both requirements are missing at once
+  -- blind-spots.json's needed_by case (RFC 0008 Sec.2), which never occurs naturally in the corpus.
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: any
+  minimum_evidence:
+    - {event: ModelCall, class: any}
+    - {event: ToolCall, class: any}
+  shape: shapes/NEED-01.ttl
+expectations:
+  - {id: F1, text: "Fixture-only; not a real requirement."}
+severity: high
+tolerance: {kind: count, max: 0}
+test_cases: []

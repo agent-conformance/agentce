@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.5.0",
+  "suite_version": "0.6.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -203,6 +203,29 @@
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/activity.py, ported field-for-field in engines/typescript/src/activity.ts and engines/java/src/main/java/org/agentce/Activity.java."
+    },
+    {
+      "id": "VG-BLIND-SPOTS",
+      "title": "The three engines rank the same blind spots -- checks unlocked, a concrete step, and a needed_by requirement missing at once -- and write byte-identical blind-spots.json",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": ["bash", "verification/gates/blind_spots_engines.sh"],
+      "requires": ["uv", "pnpm", "java"],
+      "timeout_s": 900,
+      "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
+      "rubric": {
+        "pass": "each engine writes blind-spots.json over the fixture (verification/gates/fixtures/blind_spots/), whose one control is missing two distinct requirements at once (the needed_by case); both requirements appear in blind_spots with checks_unlocked=0, needed_by=1, and an owner_key/step_kind/ladder_rung combination consistent with RFC 0008 Sec.3 (rung 1/2 <-> code_change/agent_team, rung 3 <-> request/platform_or_security, rung 4 <-> request/ticketing_or_iam); no_population is empty; each engine's blind-spots.json is byte-identical to the committed golden (blind_spots_golden.json), not merely to the other two engines",
+        "fail": "an engine omits blind-spots.json, a needed_by requirement is missing or wrongly claimed as unlocked (checks_unlocked>0), an owner_key/step_kind/ladder_rung combination is inconsistent, or any engine's output differs from the committed golden"
+      },
+      "faults": [
+        {
+          "description": "the any/self_report normalization is removed, so a requirement's class is no longer merged before grouping and rendering",
+          "file": "engines/python/agentce/blind_spots.py",
+          "search": "    return \"self_report\" if cls in SELF_REPORT_EQUIVALENT_CLASSES else cls\n",
+          "replace": "    return cls\n"
+        }
+      ],
+      "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/blind_spots.py, ported field-for-field in engines/typescript/src/blindSpots.ts and engines/java/src/main/java/org/agentce/BlindSpots.java."
     }
   ]
 }
