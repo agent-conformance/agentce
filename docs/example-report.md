@@ -23,11 +23,11 @@ This is the report the vendored quickstart project renders end to end with defau
 
 ## Where your records can't show it yet
 
-- ApprovalDecided (self_report): unlocks 8 check(s), needed by 0 more; rung 2 -- a code change for the agent team. Adapters that can supply this: oversight.
-- ModelCall (self_report): unlocks 4 check(s), needed by 0 more; rung 1 -- a code change for the agent team. Adapters that can supply this: otel-genai.
-- Notice (self_report): unlocks 3 check(s), needed by 0 more; rung 2 -- a code change for the agent team. Adapters that can supply this: oversight.
-- PolicyDecision (self_report): unlocks 3 check(s), needed by 0 more; rung 3 -- a request to platform or security. Adapters that can supply this: mcp-gateway, policy-engines.
-- Outcome (self_report): unlocks 1 check(s), needed by 0 more; rung 2 -- a code change for the agent team. Adapters that can supply this: no adapter today.
+- `ApprovalDecided (self_report)`: unlocks 8 check(s), needed by 0 more; rung 2 -- a code change for the agent team. Adapters that can supply this: oversight.
+- `ModelCall (self_report)`: unlocks 4 check(s), needed by 0 more; rung 1 -- a code change for the agent team. Adapters that can supply this: otel-genai.
+- `Notice (self_report)`: unlocks 3 check(s), needed by 0 more; rung 2 -- a code change for the agent team. Adapters that can supply this: oversight.
+- `PolicyDecision (self_report)`: unlocks 3 check(s), needed by 0 more; rung 3 -- a request to platform or security. Adapters that can supply this: mcp-gateway, policy-engines.
+- `Outcome (self_report)`: unlocks 1 check(s), needed by 0 more; rung 2 -- a code change for the agent team. Adapters that can supply this: no adapter today.
 
 ## Verdict
 
