@@ -3,6 +3,12 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.5.0
+
+- Added `VG-WHAT-THEY-DID`: the three engines write a byte-identical `activity.json` counting the agents,
+  models, tools, actions by effect class, approvals by who recorded them, and actions denied or blocked a run's
+  records show, and a tool or model the events show that no subject declares honestly surfaces as undeclared.
+
 ## 0.4.0
 
 - Added `VG-LOCKED-COPY`: the website builds, and the built landing page and the README carry the approved
