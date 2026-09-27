@@ -520,15 +520,21 @@ public final class Report {
             lines.add("");
             return lines;
         }
+        // The label is backtick-wrapped, not just interpolated after the list marker: a sanitised
+        // value alone can still start with `#`/`~~~`/a digit-`.` sequence CommonMark parses as a
+        // heading, code fence, or nested list when it is the first token of a list item's content. A
+        // single leading backtick means the payload's own leading character is never the line's first
+        // content, and is always the only backtick on the line since sanitizeForMarkdown already
+        // substitutes any embedded backtick.
         for (Map.Entry<String, String> row : rows) {
-            lines.add("- " + row.getKey() + ": " + row.getValue());
+            lines.add("- `" + row.getKey() + "`: " + row.getValue());
         }
         if (!noPopRows.isEmpty()) {
             lines.add("");
             lines.add("### Records that don't show enough, with no single fix");
             lines.add("");
             for (Map.Entry<String, String> row : noPopRows) {
-                lines.add("- " + row.getKey() + ": " + row.getValue());
+                lines.add("- `" + row.getKey() + "`: " + row.getValue());
             }
         }
         lines.add("");

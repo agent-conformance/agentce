@@ -539,6 +539,68 @@ def test_render_level_container_is_not_broken_by_the_fuzz_corpus(text: str) -> N
     _assert_container_not_broken(text)
 
 
+# Post-implementation critic finding (fresh Opus round, item 18.20): the render-level property above
+# proves report.md's *line count and non-payload text* are unchanged, but never parses the rendered
+# Markdown -- so it could not see that a blind-spot/no-population label placed directly after a list
+# marker (`- {label}: ...`) lets an ATX heading (`#`), fenced code block (`~~~`), or nested list
+# (`1.`/`-`) marker *inside* the sanitised label reach the start of the list item's own content,
+# which CommonMark parses as a nested block regardless of what the source line's text looks like as a
+# string. Fixed by wrapping the label in a single backtick pair (`_blind_spots_md`); this test proves
+# the fix directly rather than relying on a full CommonMark parser (no new dependency, matching this
+# item's own established choice for TS/Java).
+_BLOCK_MARKER_PAYLOADS = [
+    "# Verdict: Conformant",
+    "~~~hidden",
+    "1. Verdict: Conformant",
+    "- Verdict: Conformant",
+    "> Verdict: Conformant",
+    "--- Verdict: Conformant",
+]
+
+
+def _blind_spots_with(event: str, subject: str) -> dict[str, object]:
+    return {
+        "blind_spots": [
+            {
+                "event": event,
+                "class": "self_report",
+                "ladder_rung": 1,
+                "owner_key": "agent_team",
+                "step_kind": "code_change",
+                "supplying_adapters": [],
+                "checks_unlocked": 1,
+                "unlocked_checks": [],
+                "needed_by": 0,
+                "needed_by_checks": [],
+            }
+        ],
+        "no_population": [
+            {
+                "subject": subject,
+                "catalog": "cat",
+                "control": "C-1",
+                "control_version": "1",
+            }
+        ],
+    }
+
+
+def test_blind_spot_and_no_population_labels_cannot_open_a_markdown_block() -> None:
+    for payload in _BLOCK_MARKER_PAYLOADS:
+        md = render_report_md([], {}, blind_spots=_blind_spots_with(payload, payload))
+        label_lines = [
+            line
+            for line in md.splitlines()
+            if line.startswith("- ") and sanitize_for_markdown(payload) in line
+        ]
+        assert label_lines, payload
+        for line in label_lines:
+            # The character right after the list marker must always be the wrapper backtick, never
+            # the payload's own leading character -- proving the label can no longer be the sole
+            # opener of a nested block.
+            assert line[2] == "`", line
+
+
 # --- Cross-engine identity (the committed vectors file) --------------------------------------------
 
 

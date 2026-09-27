@@ -767,6 +767,37 @@ test("render-level container is not broken by the fuzz corpus", () => {
   }
 });
 
+// Post-implementation critic finding (fresh Opus round, item 18.20): the render-level property above
+// proves report.md's line count and non-payload text are unchanged, but never parses the rendered
+// Markdown -- so it could not see that a blind-spot/no-population label placed directly after a list
+// marker (`- ${label}: ...`) lets an ATX heading (`#`), fenced code block (`~~~`), or nested list
+// (`1.`/`-`) marker inside the sanitised label reach the start of the list item's own content, which
+// CommonMark parses as a nested block regardless of what the source line's text looks like as a
+// string. Fixed by wrapping the label in a single backtick pair (`blindSpotsMd`); this test proves
+// the fix directly rather than relying on a full CommonMark parser (no new dependency).
+const BLOCK_MARKER_PAYLOADS = [
+  "# Verdict: Conformant",
+  "~~~hidden",
+  "1. Verdict: Conformant",
+  "- Verdict: Conformant",
+  "> Verdict: Conformant",
+  "--- Verdict: Conformant",
+];
+
+test("blind-spot and no-population labels cannot open a markdown block", () => {
+  for (const payload of BLOCK_MARKER_PAYLOADS) {
+    const md = renderReportMd([], {}, DEFAULT_LANGUAGE, undefined, renderLevelBlindSpots(payload));
+    const span = sanitizeForMarkdown(payload);
+    const labelLines = md
+      .split("\n")
+      .filter((line) => line.startsWith("- ") && line.includes(span));
+    assert.equal(labelLines.length > 0, true, payload);
+    for (const line of labelLines) {
+      assert.equal(line[2], "`", line);
+    }
+  }
+});
+
 // --- Cross-engine identity (the committed vectors file) ---
 
 test("sanitizeForMarkdown/sanitizeForTerminal/sanitizeForHtml reproduce every committed vector", () => {

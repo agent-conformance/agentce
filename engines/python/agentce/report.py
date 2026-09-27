@@ -396,10 +396,21 @@ def _blind_spots_md(blind_spots: dict[str, Any], cat: dict[str, str]) -> list[st
     if not rows and not no_pop_rows:
         lines += [f"- {cat['report.blind_spots_none']}", ""]
         return lines
-    lines += [f"- {label}: {value}" for label, value in rows]
+    # The label is backtick-wrapped, not just interpolated after the list marker (post-implementation
+    # critic finding, closed here as a same-item follow-up): a sanitised value alone can still start
+    # with `#`/`~~~`/a digit-`.` sequence that CommonMark parses as a heading, code fence, or nested
+    # list when it is the first token of a list item's content -- `_neutralize`'s character
+    # substitutions never touch those (deliberately: see the Design section's own reasoning for why
+    # block-marker characters are not in the substitution set). A single leading backtick (matching
+    # the assertions table's existing, already-safe `` `{control}` `` shape) means the payload's own
+    # leading character is never the line's first content, so it can only ever be parsed as an inline
+    # code span, never as a block start; `sanitize_for_markdown` already substitutes any embedded
+    # backtick, so this added pair is always the only backtick on the line (never three or more, which
+    # would instead risk opening a fenced code block).
+    lines += [f"- `{label}`: {value}" for label, value in rows]
     if no_pop_rows:
         lines += ["", f"### {cat['report.blind_spots_no_population_heading']}", ""]
-        lines += [f"- {label}: {value}" for label, value in no_pop_rows]
+        lines += [f"- `{label}`: {value}" for label, value in no_pop_rows]
     lines.append("")
     return lines
 

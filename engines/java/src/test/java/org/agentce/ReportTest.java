@@ -765,6 +765,43 @@ class ReportTest {
         }
     }
 
+    // Post-implementation critic finding (fresh Opus round, item 18.20): the render-level property
+    // above proves report.md's line count and non-payload text are unchanged, but never parses the
+    // rendered Markdown -- so it could not see that a blind-spot/no-population label placed directly
+    // after a list marker ("- " + label + ": ...") lets an ATX heading ("#"), fenced code block
+    // ("~~~"), or nested list ("1."/"-") marker inside the sanitised label reach the start of the
+    // list item's own content, which CommonMark parses as a nested block regardless of what the
+    // source line's text looks like as a string. Fixed by wrapping the label in a single backtick
+    // pair (blindSpotsMd); this test proves the fix directly rather than relying on a full CommonMark
+    // parser (no new dependency).
+    private static final String[] BLOCK_MARKER_PAYLOADS = {
+        "# Verdict: Conformant",
+        "~~~hidden",
+        "1. Verdict: Conformant",
+        "- Verdict: Conformant",
+        "> Verdict: Conformant",
+        "--- Verdict: Conformant",
+    };
+
+    @Test
+    void blindSpotAndNoPopulationLabelsCannotOpenAMarkdownBlock() {
+        for (String payload : BLOCK_MARKER_PAYLOADS) {
+            ObjectNode blindSpots = renderLevelBlindSpots(payload);
+            String md = Report.renderReportMd(List.of(), Map.of(), "en", null, blindSpots);
+            String span = Report.sanitizeForMarkdown(payload);
+            List<String> labelLines = new ArrayList<>();
+            for (String line : md.split("\n", -1)) {
+                if (line.startsWith("- ") && line.contains(span)) {
+                    labelLines.add(line);
+                }
+            }
+            assertFalse(labelLines.isEmpty(), payload);
+            for (String line : labelLines) {
+                assertEquals('`', line.charAt(2), line);
+            }
+        }
+    }
+
     // --- Cross-engine identity (the committed vectors file) ---
 
     @Test

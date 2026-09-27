@@ -390,10 +390,16 @@ function blindSpotsMd(blindSpots: BlindSpots): string[] {
     lines.push("- every check either has enough evidence, or nothing here would unlock more", "");
     return lines;
   }
-  for (const [label, value] of rows) lines.push(`- ${label}: ${value}`);
+  // The label is backtick-wrapped, not just interpolated after the list marker: a sanitised value
+  // alone can still start with `#`/`~~~`/a digit-`.` sequence CommonMark parses as a heading, code
+  // fence, or nested list when it is the first token of a list item's content. A single leading
+  // backtick (matching the assertions table's existing `- \`{control}\` @ ...` safe shape) means the
+  // payload's own leading character is never the line's first content, and is always the only
+  // backtick on the line since sanitizeForMarkdown already substitutes any embedded backtick.
+  for (const [label, value] of rows) lines.push(`- \`${label}\`: ${value}`);
   if (noPopRows.length > 0) {
     lines.push("", "### Records that don't show enough, with no single fix", "");
-    for (const [label, value] of noPopRows) lines.push(`- ${label}: ${value}`);
+    for (const [label, value] of noPopRows) lines.push(`- \`${label}\`: ${value}`);
   }
   lines.push("");
   return lines;
