@@ -75,8 +75,8 @@ def _is_hidden(attrs: dict[str, str | None]) -> bool:
     style = (attrs.get("style") or "").replace(" ", "").lower()
     return (
         "hidden" in attrs
-        or bool(_UNSEEN_CLASSES & set((attrs.get("class") or "").split()))
-        or attrs.get("aria-hidden") == "true"
+        or bool(_UNSEEN_CLASSES & set((attrs.get("class") or "").lower().split()))
+        or (attrs.get("aria-hidden") or "").lower() == "true"
         or "display:none" in style
         or "visibility:hidden" in style
     )
@@ -134,7 +134,7 @@ class _Hero(HTMLParser):
         self._stack.pop()
 
     def handle_data(self, data: str) -> None:
-        if self._role is not None:
+        if self._role is not None and not any(hidden for _, hidden in self._stack):
             role, text = self.found[-1]
             self.found[-1] = (role, text + data)
 
@@ -259,6 +259,26 @@ def self_test() -> list[str]:
             ),
             True,
         ),
+        "a hidden span inside the headline fails": (
+            check_landing(page(h1="<h1><span hidden>{h}</span></h1>")),
+            True,
+        ),
+        "a screen-reader-only span inside the eyebrow fails": (
+            check_landing(
+                page(eyebrow='<p class="eyebrow"><span class="SR-only">{t}</span></p>')
+            ),
+            True,
+        ),
+        "a template inside the disclaimer fails": (
+            check_landing(
+                page(disclaimer='<p class="disclaimer"><template>{d}</template></p>')
+            ),
+            True,
+        ),
+        "a script inside the lede fails": (
+            check_landing(page(lede='<p class="lede"><script>{s}</script></p>')),
+            True,
+        ),
         "a changed disclaimer fails": (
             check_landing(
                 page(
@@ -327,7 +347,7 @@ def main(argv: list[str] | None = None) -> int:
         for name in wrong:
             print(f"SELF-TEST FAIL: {name}")
         if not wrong:
-            print("locked_copy_check self-test: 18 cases discriminate")
+            print("locked_copy_check self-test: 22 cases discriminate")
         return 1 if wrong else 0
     problems = check_dist(ns.dist) + check_readme(ns.readme.read_text(encoding="utf-8"))
     for problem in problems:
