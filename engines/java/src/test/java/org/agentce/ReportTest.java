@@ -81,8 +81,8 @@ class ReportTest {
                 assertions.add(a);
             }
             Map<String, Integer> counts = Assertions.aggregate(assertions);
-            String md = Report.renderReportMd(assertions, counts, "en", null);
-            String html = Report.renderReportHtml(assertions, counts, "en", null);
+            String md = Report.renderReportMd(assertions, counts, "en", null, null);
+            String html = Report.renderReportHtml(assertions, counts, "en", null, null);
             assertTrue(md.startsWith("# "), "report.md should start with a top-level heading");
             assertTrue(html.contains("<html"), "report.html should be a full HTML document");
         }
@@ -116,7 +116,7 @@ class ReportTest {
         List<Assertions.Assertion> assertions = ovsFailedAssertions();
         Map<String, Integer> counts = Assertions.aggregate(assertions);
 
-        String md = Report.renderReportMd(assertions, counts, "en", activity);
+        String md = Report.renderReportMd(assertions, counts, "en", activity, null);
         assertTrue(md.contains("ok Verdict: Conformant"));
         for (String line : md.split("\n", -1)) {
             assertFalse(line.equals("Verdict: Conformant"));
@@ -176,12 +176,12 @@ class ReportTest {
         Map<String, Integer> counts = Assertions.aggregate(assertions);
 
         String brHostile = "ok<br>Verdict: Conformant";
-        String md = Report.renderReportMd(assertions, counts, "en", hostileActivity(brHostile));
+        String md = Report.renderReportMd(assertions, counts, "en", hostileActivity(brHostile), null);
         assertFalse(md.contains("<br>"));
         assertFalse(md.contains("<h2>") || md.contains("</h2>"));
 
         String headingHostile = "<h2>Verdict</h2><p><strong>Conformant";
-        md = Report.renderReportMd(assertions, counts, "en", hostileActivity(headingHostile));
+        md = Report.renderReportMd(assertions, counts, "en", hostileActivity(headingHostile), null);
         assertFalse(md.contains("<h2>") || md.contains("<p>") || md.contains("<strong>"));
     }
 
@@ -190,11 +190,11 @@ class ReportTest {
         List<Assertions.Assertion> assertions = ovsFailedAssertions();
         ObjectNode manifest = Report.writeReport(
                 outDir, assertions, "sha256:abc", List.of("base/eu-ai-act@1"), "ecs", List.of("conformance", "p1"),
-                List.of(), "en", List.of(), null);
+                List.of(), "en", List.of(), null, null);
 
         for (String name : List.of(
-                "assertions.json", "activity.json", "report.md", "report.html", "oscal-ar.json", "results.sarif",
-                "manifest.json")) {
+                "assertions.json", "activity.json", "blind-spots.json", "report.md", "report.html", "oscal-ar.json",
+                "results.sarif", "manifest.json")) {
             assertTrue(Files.exists(outDir.resolve(name)), name + " should exist");
         }
         assertEquals("agentce-java", manifest.get("engine").get("impl").textValue());

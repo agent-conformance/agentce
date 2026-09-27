@@ -121,9 +121,10 @@ public final class Conformance {
         Applicability.resolve(profile, ingested.accepted, List.of());
         List<Assertions.Assertion> assertions = Assess.assessSubjects(ingested.accepted, profile, cat.catalogs, domain);
         var activity = Activity.summarizeActivity(ingested.accepted, profile);
+        var blindSpots = BlindSpots.computeBlindSpots(assertions, profile, cat.catalogs, ingested.accepted);
         Report.writeReport(
                 outDir, assertions, bundle.digest, cat.labels, ECS_OPERATOR, List.of("conformance", pid), List.of(),
-                "en", cat.catalogs, activity);
+                "en", cat.catalogs, activity, blindSpots);
     }
 
     /** Run every corpus project through the engine and return the implementation report. */

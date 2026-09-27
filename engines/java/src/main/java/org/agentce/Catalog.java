@@ -135,6 +135,12 @@ public final class Catalog {
                 text(metaRecord, "id", ""), text(metaRecord, "version", ""), directory, controls, shapes);
     }
 
+    /** A synthetic catalog carrying only {@code controls}, for tests that need specific
+     * {@code minimum_evidence} shapes without a fixture directory on disk. */
+    static Catalog forTest(String id, String version, List<ControlSpec> controls) {
+        return new Catalog(id, version, null, controls, Map.of());
+    }
+
     /** The PSP shape a control evaluates against (by {@code <id>-Shape} suffix, then any shape with targets). */
     public static Psp.Shape shapeFor(Catalog catalog, ControlSpec control) {
         if (control.shapePath == null) {

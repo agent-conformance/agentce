@@ -344,6 +344,129 @@ public final class Report {
         return lines;
     }
 
+    private static final Map<String, String> BLIND_SPOT_OWNER_LABEL = Map.of(
+            "agent_team", "the agent team",
+            "platform_or_security", "platform or security",
+            "ticketing_or_iam", "whoever runs ticketing or IAM");
+
+    /** No English string is stored in {@code blind-spots.json} itself (RFC 0008 Sec.7): the artifact
+     * carries only {@code owner_key}/{@code step_kind} tokens, and only the rendered report resolves
+     * them to text. Unlike the Python engine, this text is never routed through the message
+     * catalogue (RFC 0008 Sec.7: "the pre-existing, accepted scope boundary that rendered
+     * report.md/report.html output has never been a three-engine byte-identity requirement"). */
+    private static String blindSpotStepText(String stepKind, String ownerLabel) {
+        return "request".equals(stepKind) ? "a request to " + ownerLabel : "a code change for " + ownerLabel;
+    }
+
+    /** {@code (label, value)} for every blind spot, in the module's own ranked order (never re-sorted
+     * here). */
+    private static List<Map.Entry<String, String>> blindSpotRows(ArrayNode blindSpots) {
+        List<Map.Entry<String, String>> rows = new ArrayList<>();
+        for (JsonNode bs : blindSpots) {
+            String ownerLabel = BLIND_SPOT_OWNER_LABEL.get(bs.get("owner_key").asText());
+            String step = blindSpotStepText(bs.get("step_kind").asText(), ownerLabel);
+            List<String> adapterNames = new ArrayList<>();
+            bs.get("supplying_adapters").forEach(n -> adapterNames.add(n.asText()));
+            String adapters = adapterNames.isEmpty() ? "no adapter today" : String.join(", ", adapterNames);
+            String value = "unlocks " + bs.get("checks_unlocked").asInt() + " check(s), needed by "
+                    + bs.get("needed_by").asInt() + " more; rung " + bs.get("ladder_rung").asInt() + " -- " + step
+                    + ". Adapters that can supply this: " + adapters + ".";
+            rows.add(Map.entry(bs.get("event").asText() + " (" + bs.get("class").asText() + ")", value));
+        }
+        return rows;
+    }
+
+    private static List<Map.Entry<String, String>> noPopulationRows(ArrayNode noPopulation) {
+        List<Map.Entry<String, String>> rows = new ArrayList<>();
+        for (JsonNode entry : noPopulation) {
+            String control = entry.get("control").asText();
+            String label = control + " on " + entry.get("subject").asText() + " (" + entry.get("catalog").asText()
+                    + "@" + entry.get("control_version").asText() + ")";
+            String value = "The records show every kind of evidence " + control + " asks for, but not enough of "
+                    + "it in the shape the control expects -- a --domain binding may be needed to identify the "
+                    + "relevant decisions; see the control's documentation for what it needs.";
+            rows.add(Map.entry(label, value));
+        }
+        return rows;
+    }
+
+    private static List<String> blindSpotsMd(ObjectNode blindSpots) {
+        List<Map.Entry<String, String>> rows = blindSpotRows((ArrayNode) blindSpots.get("blind_spots"));
+        List<Map.Entry<String, String>> noPopRows = noPopulationRows((ArrayNode) blindSpots.get("no_population"));
+        List<String> lines = new ArrayList<>();
+        lines.add("## Where your records can't show it yet");
+        lines.add("");
+        if (rows.isEmpty() && noPopRows.isEmpty()) {
+            lines.add("- every check either has enough evidence, or nothing here would unlock more");
+            lines.add("");
+            return lines;
+        }
+        for (Map.Entry<String, String> row : rows) {
+            lines.add("- " + row.getKey() + ": " + row.getValue());
+        }
+        if (!noPopRows.isEmpty()) {
+            lines.add("");
+            lines.add("### Records that don't show enough, with no single fix");
+            lines.add("");
+            for (Map.Entry<String, String> row : noPopRows) {
+                lines.add("- " + row.getKey() + ": " + row.getValue());
+            }
+        }
+        lines.add("");
+        return lines;
+    }
+
+    private static String blindSpotsHtml(ObjectNode blindSpots) {
+        List<Map.Entry<String, String>> rows = blindSpotRows((ArrayNode) blindSpots.get("blind_spots"));
+        List<Map.Entry<String, String>> noPopRows = noPopulationRows((ArrayNode) blindSpots.get("no_population"));
+        String body;
+        if (rows.isEmpty() && noPopRows.isEmpty()) {
+            body = "<p>every check either has enough evidence, or nothing here would unlock more</p>";
+        } else {
+            StringBuilder items = new StringBuilder();
+            for (Map.Entry<String, String> row : rows) {
+                items.append("<li><strong>").append(esc(row.getKey())).append("</strong>: ")
+                        .append(esc(row.getValue())).append("</li>");
+            }
+            StringBuilder b = new StringBuilder("<ul>").append(items).append("</ul>");
+            if (!noPopRows.isEmpty()) {
+                StringBuilder noPopItems = new StringBuilder();
+                for (Map.Entry<String, String> row : noPopRows) {
+                    noPopItems.append("<li><strong>").append(esc(row.getKey())).append("</strong>: ")
+                            .append(esc(row.getValue())).append("</li>");
+                }
+                b.append("<h3>Records that don't show enough, with no single fix</h3><ul>")
+                        .append(noPopItems).append("</ul>");
+            }
+            body = b.toString();
+        }
+        return "<section aria-labelledby=\"blind-spots\"><h2 id=\"blind-spots\">Where your records can't show it "
+                + "yet</h2>" + body + "</section>";
+    }
+
+    /** The lines a command prints for {@code blindSpots}: the same node {@link #blindSpotsMd}/
+     * {@link #blindSpotsHtml} render. */
+    public static List<String> blindSpotsCliLines(ObjectNode blindSpots) {
+        List<Map.Entry<String, String>> rows = blindSpotRows((ArrayNode) blindSpots.get("blind_spots"));
+        List<Map.Entry<String, String>> noPopRows = noPopulationRows((ArrayNode) blindSpots.get("no_population"));
+        List<String> lines = new ArrayList<>();
+        lines.add("Where your records can't show it yet:");
+        if (rows.isEmpty() && noPopRows.isEmpty()) {
+            lines.add("  every check either has enough evidence, or nothing here would unlock more");
+            return lines;
+        }
+        for (Map.Entry<String, String> row : rows) {
+            lines.add("  " + row.getKey() + ": " + row.getValue());
+        }
+        if (!noPopRows.isEmpty()) {
+            lines.add("  Records that don't show enough, with no single fix:");
+            for (Map.Entry<String, String> row : noPopRows) {
+                lines.add("    " + row.getKey() + ": " + row.getValue());
+            }
+        }
+        return lines;
+    }
+
     private static List<Assertions.Assertion> sortedBySubjectControl(List<Assertions.Assertion> assertions) {
         List<Assertions.Assertion> sorted = new ArrayList<>(assertions);
         sorted.sort((a, b) -> {
@@ -353,18 +476,23 @@ public final class Report {
         return sorted;
     }
 
-    /** {@code activity} feeds the "what your agents did" section that leads the report (18.4); {@code
-     * null} for a bare re-render with no activity available. */
+    /** {@code activity} feeds the "what your agents did" section that leads the report (18.4);
+     * {@code blindSpots} feeds the not-enough-evidence section right after it (18.5); either may be
+     * {@code null} for a bare re-render with neither available. */
     public static String renderReportMd(
-            List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language, ObjectNode activity) {
+            List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language, ObjectNode activity,
+            ObjectNode blindSpots) {
         Map<String, String> cat = Messages.catalogue(language);
         List<String> lines = new ArrayList<>();
         lines.add("# " + cat.get("report.title"));
         lines.add("");
         // The records lead the report (SPEC's evidence-first framing, 18.4): what happened, before
-        // how it measures up.
+        // how it measures up. What the records can't show yet (18.5) comes right after.
         if (activity != null) {
             lines.addAll(activityMd(activity, cat));
+        }
+        if (blindSpots != null) {
+            lines.addAll(blindSpotsMd(blindSpots));
         }
         Verdict.Summary verdict = Verdict.summarize(assertions);
         lines.add("## " + cat.get("report.verdict_heading"));
@@ -432,10 +560,12 @@ public final class Report {
                 + "</p></section>";
     }
 
-    /** {@code activity} feeds the "what your agents did" section that leads the report (18.4); {@code
-     * null} for a bare re-render with no activity available. */
+    /** {@code activity} feeds the "what your agents did" section that leads the report (18.4);
+     * {@code blindSpots} feeds the not-enough-evidence section right after it (18.5); either may be
+     * {@code null} for a bare re-render with neither available. */
     public static String renderReportHtml(
-            List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language, ObjectNode activity) {
+            List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language, ObjectNode activity,
+            ObjectNode blindSpots) {
         Map<String, String> cat = Messages.catalogue(language);
         String title = esc(cat.get("report.title"));
         StringBuilder summary = new StringBuilder();
@@ -465,6 +595,7 @@ public final class Report {
                 + "<title>" + title + "</title><style>" + HTML_STYLE + "</style></head><body>"
                 + "<main><h1>" + title + "</h1>"
                 + (activity != null ? activityHtml(activity, cat) : "")
+                + (blindSpots != null ? blindSpotsHtml(blindSpots) : "")
                 + verdictHtml(Verdict.summarize(assertions), cat)
                 + "<section aria-labelledby=\"summary\"><h2 id=\"summary\">"
                 + esc(cat.get("report.summary_heading")) + "</h2><ul>" + summary + "</ul></section>"
@@ -718,18 +849,21 @@ public final class Report {
      *
      * <p>{@code activity} is {@link Activity#summarizeActivity}'s node over the run's accepted events
      * and resolved profile (18.4), feeding {@code activity.json} and the "what your agents did"
-     * report section; computed by the caller, once, since it is also needed for the terminal summary
-     * and the {@code --json} envelope. {@code null} gets the honest answer for a profile that
-     * declares nothing. */
+     * report section; {@code blindSpots} is {@link BlindSpots#computeBlindSpots}'s node over
+     * {@code assertions} and the same {@code profile}/{@code catalogObjects}/events (18.5), feeding
+     * {@code blind-spots.json} and the not-enough-evidence report section. Both are computed by the
+     * caller, once, since each is also needed for the terminal summary and the {@code --json}
+     * envelope; {@code null} gets the honest answer for a caller with neither. */
     public static ObjectNode writeReport(
             Path outDir, List<Assertions.Assertion> assertions, String bundleDigest, List<String> catalogs,
             String operator, List<String> invocation, List<String> supersedes, String reportLanguage,
-            List<Catalog> catalogObjects, ObjectNode activity) {
+            List<Catalog> catalogObjects, ObjectNode activity, ObjectNode blindSpots) {
         Assertions.checkDc5(assertions);
         try {
             Files.createDirectories(outDir);
             Map<String, String> outputs = new LinkedHashMap<>();
             ObjectNode activityNode = activity != null ? activity : Activity.summarizeActivity(List.of(), new Profile());
+            ObjectNode blindSpotsNode = blindSpots != null ? blindSpots : emptyBlindSpots();
 
             ArrayNode assertionsJson = Json.nodes().arrayNode();
             for (Assertions.Assertion a : assertions) {
@@ -737,14 +871,17 @@ public final class Report {
             }
             outputs.put("assertions.json", writeJson(outDir, "assertions.json", assertionsJson));
             outputs.put("activity.json", writeJson(outDir, "activity.json", activityNode));
+            outputs.put("blind-spots.json", writeJson(outDir, "blind-spots.json", blindSpotsNode));
 
             Map<String, Integer> counts = Assertions.aggregate(assertions);
             outputs.put(
                     "report.md",
-                    writeText(outDir, "report.md", renderReportMd(assertions, counts, reportLanguage, activityNode)));
+                    writeText(outDir, "report.md",
+                            renderReportMd(assertions, counts, reportLanguage, activityNode, blindSpotsNode)));
             outputs.put(
                     "report.html",
-                    writeText(outDir, "report.html", renderReportHtml(assertions, counts, reportLanguage, activityNode)));
+                    writeText(outDir, "report.html",
+                            renderReportHtml(assertions, counts, reportLanguage, activityNode, blindSpotsNode)));
             outputs.put("oscal-ar.json", writeJson(outDir, "oscal-ar.json", renderOscal(assertions)));
             outputs.put("results.sarif", writeJson(outDir, "results.sarif", renderSarif(assertions, catalogObjects)));
 
@@ -775,6 +912,17 @@ public final class Report {
         } catch (IOException e) {
             throw new IllegalStateException("cannot write report to " + outDir + ": " + e.getMessage(), e);
         }
+    }
+
+    /** The honest empty answer for a caller with no assertions to explain (never recomputed from an
+     * empty {@link Profile}, unlike {@code activity}'s fallback -- an empty profile has zero
+     * subjects, which would fail {@link BlindSpots#computeBlindSpots}'s positional pairing
+     * immediately against any non-empty {@code assertions} list, RFC 0008 Sec.6). */
+    private static ObjectNode emptyBlindSpots() {
+        ObjectNode empty = Json.nodes().objectNode();
+        empty.putArray("blind_spots");
+        empty.putArray("no_population");
+        return empty;
     }
 
     private static String writeJson(Path outDir, String name, JsonNode obj) throws IOException {

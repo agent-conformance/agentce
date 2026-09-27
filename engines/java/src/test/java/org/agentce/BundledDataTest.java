@@ -59,7 +59,10 @@ class BundledDataTest {
     @Test
     void bundledDataIsByteIdenticalToThePythonEnginesCopy() throws IOException, URISyntaxException {
         Path python = TestPaths.repoRoot().resolve("engines/python/agentce/data");
-        for (List<String> pair : List.of(List.of("/catalogs", "catalogs"), List.of("/corpus", "corpus"))) {
+        for (List<String> pair : List.of(
+                List.of("/catalogs", "catalogs"),
+                List.of("/corpus", "corpus"),
+                List.of("/support_matrices", "support_matrices"))) {
             assertSameTree(onClasspath(pair.get(0)), python.resolve(pair.get(1)), false);
         }
     }

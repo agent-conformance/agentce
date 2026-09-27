@@ -494,10 +494,11 @@ public final class Cli {
         String operatorEnv = System.getenv("AGENTCE_OPERATOR");
         List<String> invocation = List.of(options.invocationCommand(), scrubPath(bundleDir), scrubPath(profilePath));
         ObjectNode activity = Activity.summarizeActivity(ingested.accepted, profileObj);
+        ObjectNode blindSpots = BlindSpots.computeBlindSpots(evaluated, profileObj, resolved.catalogs(), ingested.accepted);
         Report.writeReport(
                 out, evaluated, bundle.digest, resolved.labels(),
                 operatorEnv != null ? operatorEnv : "unknown",
-                invocation, supersedes, Messages.DEFAULT_LANGUAGE, resolved.catalogs(), activity);
+                invocation, supersedes, Messages.DEFAULT_LANGUAGE, resolved.catalogs(), activity, blindSpots);
         if (state != null) {
             state.record(bundle.digest, out.resolve("manifest.json"), newWindowEnd);
         }
@@ -537,6 +538,7 @@ public final class Cli {
             gapNode.put("more", gap.more());
         }
         result.data.set("activity", activity);
+        result.data.set("blind_spots", blindSpots);
         if (options.state() != null) {
             ArrayNode supersedesArr = result.data.putArray("supersedes");
             supersedes.forEach(supersedesArr::add);
@@ -548,6 +550,9 @@ public final class Cli {
             throw nothingEvaluated(profileObj, ingested.accepted, evaluated.size());
         }
         for (String line : Report.activityCliLines(activity, Messages.catalogue(Messages.DEFAULT_LANGUAGE))) {
+            result.note(line);
+        }
+        for (String line : Report.blindSpotsCliLines(blindSpots)) {
             result.note(line);
         }
         result.note("verdict: " + summary.verdict());
@@ -635,8 +640,8 @@ public final class Cli {
         Map<String, Integer> counts = Assertions.aggregate(assertions);
         String rendering;
         switch (format) {
-            case "md" -> rendering = Report.renderReportMd(assertions, counts, Messages.DEFAULT_LANGUAGE, null);
-            case "html" -> rendering = Report.renderReportHtml(assertions, counts, Messages.DEFAULT_LANGUAGE, null);
+            case "md" -> rendering = Report.renderReportMd(assertions, counts, Messages.DEFAULT_LANGUAGE, null, null);
+            case "html" -> rendering = Report.renderReportHtml(assertions, counts, Messages.DEFAULT_LANGUAGE, null, null);
             case "oscal" -> rendering = Json.pretty(Report.renderOscal(assertions)) + "\n";
             case "sarif" -> rendering = Json.pretty(Report.renderSarif(assertions)) + "\n";
             default -> {
