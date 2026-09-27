@@ -3,10 +3,10 @@ package org.agentce;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
@@ -47,20 +47,6 @@ public final class Activity {
         return node != null && node.isTextual() ? node.textValue() : fallback;
     }
 
-    /** Compares tuples the way Python's {@code sorted()} compares tuples: elementwise, by byte order,
-     * earlier elements taking priority. A joined-string key (e.g. on {@code "\u0000"}) cannot serve as
-     * a map key here: two different tuples can join to the same string (a name containing the join
-     * character collides with an adjacent field boundary), which would silently drop one tuple as a
-     * duplicate and could disagree with the other engines' output. */
-    private static int compareTuple(List<String> a, List<String> b) {
-        int n = Math.min(a.size(), b.size());
-        for (int i = 0; i < n; i++) {
-            int c = Json.byteCompare(a.get(i), b.get(i));
-            if (c != 0) return c;
-        }
-        return Integer.compare(a.size(), b.size());
-    }
-
     /** Return the counted facts {@code events} show, compared against what {@code profile} declares.
      *
      * <p>{@code undeclared} names every distinct tool and model name the events show that no
@@ -69,8 +55,12 @@ public final class Activity {
      * which is the correct first-run answer, not a false positive. */
     public static ObjectNode summarizeActivity(List<JsonNode> events, Profile profile) {
         Set<String> agents = new TreeSet<>(Json::byteCompare);
-        TreeMap<List<String>, String[]> models = new TreeMap<>(Activity::compareTuple);
-        TreeMap<List<String>, String[]> tools = new TreeMap<>(Activity::compareTuple);
+        // Ordered, and deduplicated, elementwise by byte order (matching Python's tuple sort) via
+        // Arrays.compare: a joined-string key (e.g. on "\u0000") is not safe here, since two different
+        // tuples can join to the same string when a field's value collides with an adjacent field
+        // boundary, silently dropping one tuple as a duplicate.
+        Set<String[]> models = new TreeSet<>((a, b) -> Arrays.compare(a, b, Json::byteCompare));
+        Set<String[]> tools = new TreeSet<>((a, b) -> Arrays.compare(a, b, Json::byteCompare));
         Set<String> observedTools = new LinkedHashSet<>();
         Set<String> observedModels = new LinkedHashSet<>();
         var actionsByEffectClass = new java.util.LinkedHashMap<String, Integer>();
@@ -96,7 +86,7 @@ public final class Activity {
                         observedModels.add(name);
                         String provider = textOr(model.get("provider"), "");
                         String versionOrDigest = textOr(model.get("version_or_digest"), "");
-                        models.put(List.of(provider, name, versionOrDigest), new String[] {provider, name, versionOrDigest});
+                        models.add(new String[] {provider, name, versionOrDigest});
                     }
                 }
                 case "ToolCall" -> {
@@ -106,7 +96,7 @@ public final class Activity {
                         observedTools.add(name);
                         String server = textOr(tool.get("server"), "");
                         String protocol = textOr(tool.get("protocol"), "");
-                        tools.put(List.of(name, server, protocol), new String[] {name, server, protocol});
+                        tools.add(new String[] {name, server, protocol});
                     }
                     JsonNode effectClass = data.get("effect_class");
                     String key = effectClass != null && effectClass.isTextual()
@@ -154,7 +144,7 @@ public final class Activity {
         agents.forEach(agentsArr::add);
 
         ArrayNode modelsArr = out.putArray("models");
-        for (String[] m : models.values()) {
+        for (String[] m : models) {
             ObjectNode node = modelsArr.addObject();
             node.put("provider", m[0]);
             node.put("name", m[1]);
@@ -162,7 +152,7 @@ public final class Activity {
         }
 
         ArrayNode toolsArr = out.putArray("tools");
-        for (String[] t : tools.values()) {
+        for (String[] t : tools) {
             ObjectNode node = toolsArr.addObject();
             node.put("name", t[0]);
             node.put("server", t[1]);
