@@ -43,6 +43,12 @@ class Subject:
     declared_decision_types: list[str] = field(default_factory=list)
     declared_oversight: dict[str, str] = field(default_factory=dict)
     declared_components: list[str] = field(default_factory=list)
+    #: Tools/models the adopter expects (18.4), the same shape as ``declared_decision_types`` but
+    #: read only by ``agentce.activity``: informational display, not a conformance-relevant drift
+    #: finding like ``declared_decision_types``/``declared_components`` (``agentce.applicability``) --
+    #: an agent trying a new tool is everyday behaviour to surface, not itself a violation.
+    declared_tools: list[str] = field(default_factory=list)
+    declared_models: list[str] = field(default_factory=list)
 
     @property
     def source_ids(self) -> set[str]:
@@ -105,6 +111,8 @@ def _subject(raw: dict[str, Any]) -> Subject:
             for c in raw.get("third_party_components", []) or []
             if isinstance(c, dict) and "name" in c
         ],
+        declared_tools=[str(t) for t in raw.get("declared_tools", []) or []],
+        declared_models=[str(m) for m in raw.get("declared_models", []) or []],
     )
     for entry in raw.get("evidence_sources", []) or []:
         if isinstance(entry, dict) and "source" in entry:

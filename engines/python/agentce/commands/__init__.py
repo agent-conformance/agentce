@@ -35,6 +35,7 @@ from .. import (
     readiness,
     verdict,
 )
+from ..activity import summarize_activity
 from ..applicability import resolve as resolve_applicability
 from ..assess import assess_subjects, evaluated_nothing
 from ..records import (
@@ -65,6 +66,7 @@ from ..profile import Profile
 from ..quarantine import counts_by_reason, write_quarantine
 from ..assertions import Assertion, aggregate
 from ..report import (
+    activity_cli_lines,
     render_evidence_pack,
     render_oscal,
     render_public_statement,
@@ -525,6 +527,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
                 "\n".join(json.dumps(e, sort_keys=True) for e in runtime_drift) + "\n"
             ).encode("utf-8")
         }
+    activity = summarize_activity(ingested.accepted, profile_obj)
     write_report(
         out_dir,
         evaluated,
@@ -539,6 +542,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         events=ingested.accepted,
         reverify_command=reverify_argv,
         extra_outputs=extra_outputs,
+        activity=activity,
     )
     if state is not None:
         state.record(loaded.digest, out_dir / "manifest.json", new_window_end)
@@ -562,6 +566,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "drift_findings": drift_findings,
             "assertions": len(evaluated),
             "summary": summary,
+            "activity": activity,
         }
     )
     if scanned is not None:
@@ -590,6 +595,9 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         result.add_code(int(ExitCode.FINDINGS))
     if evaluated_nothing(evaluated):
         raise _nothing_evaluated(profile_obj, ingested.accepted, len(evaluated))
+    catalogue = messages.catalogue(_opt_str(ns, "report_language") or "en")
+    for line in activity_cli_lines(activity, catalogue):
+        result.note(line)
     for line in _verdict_lines(ns, summary, out):
         result.note(line)
     result.note(

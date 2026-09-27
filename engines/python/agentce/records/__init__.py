@@ -26,8 +26,10 @@ from typing import Any
 import yaml
 
 from .. import bundle, bundled
+from ..activity import summarize_activity
 from ..canonical import canonical_string
 from ..errors import InputError
+from ..profile import Profile
 from . import otel_genai
 
 #: File suffixes read as trace exports: one OTLP/JSON document per ``.json`` file, one per line in
@@ -66,8 +68,13 @@ class ScannedRecords:
     @property
     def profile(self) -> dict[str, Any]:
         """The default applicability profile (SPEC §6.5): the subject, the observation window read
-        from the events, the baseline lens, and one self-reported evidence source per source URI."""
+        from the events, the baseline lens, one self-reported evidence source per source URI, and
+        the tools and models this scan actually saw -- declared up front so a fresh, unedited first
+        run shows nothing as undeclared (18.4); anything new a later run sees is the useful signal."""
         times = [str(e["time"]) for e in self.events]
+        # `summarize_activity` is the one place that extracts tool/model names from events
+        # (agentce.activity); reuse it rather than re-deriving the same names here.
+        seen = summarize_activity(self.events, Profile())
         return {
             "profile_version": 1,
             "observation_window": {"start": min(times), "end": max(times)},
@@ -86,6 +93,8 @@ class ScannedRecords:
                         }
                         for source in sorted(self._sources)
                     ],
+                    "declared_tools": [t["name"] for t in seen["tools"]],
+                    "declared_models": [m["name"] for m in seen["models"]],
                 }
             ],
         }

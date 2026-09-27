@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from . import ENGINE_NAME, SPEC_VERSION, __version__, no_ml
+from .activity import summarize_activity
 from .applicability import resolve as resolve_applicability
 from .assess import assess_subjects
 from .assertions import aggregate
@@ -119,6 +120,8 @@ def _assess_project(
         catalogs=catalogs,
         operator=_ECS_OPERATOR,
         invocation=["conformance", pid],
+        events=ingested.accepted,
+        activity=summarize_activity(ingested.accepted, profile),
     )
     counts = aggregate(assertions)
     return {"id": pid, "assertions": len(assertions), "outcomes": counts}

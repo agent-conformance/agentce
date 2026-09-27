@@ -214,6 +214,14 @@ def test_assess_prints_the_same_summary(
     )
     stdout = capsys.readouterr().out
     assert code == 0
-    assert stdout.startswith("Verdict: ")
+    # The activity view leads (18.4: what your agents did, before how it measures up).
+    assert stdout.startswith("Agents: ")
+    assert "Verdict: " in stdout
     assert "Next step:" in stdout
     assert "assessed " in stdout
+    # The quickstart profile never declares its tool: honest "not yet declared", not a false pass.
+    assert "credit.record_decision" in stdout
+    activity = json.loads(
+        (tmp_path / "out" / "activity.json").read_text(encoding="utf-8")
+    )
+    assert activity["undeclared"]["tools"] == ["credit.record_decision"]

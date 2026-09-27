@@ -62,7 +62,13 @@ def _assertion(outcome: str) -> Assertion:
 
 
 def test_vendored_report_schemas_match_spec() -> None:
-    for name in ("assertions", "manifest", "oscal-assessment-results", "results-sarif"):
+    for name in (
+        "assertions",
+        "manifest",
+        "activity",
+        "oscal-assessment-results",
+        "results-sarif",
+    ):
         vendored = (
             _REPO_ROOT / "engines/python/agentce/data/schemas" / f"{name}.schema.json"
         ).read_text(encoding="utf-8")
@@ -81,6 +87,7 @@ def test_write_report_produces_valid_artifacts(tmp_path: Path) -> None:
     )
     for name in (
         "assertions.json",
+        "activity.json",
         "report.md",
         "report.html",
         "oscal-ar.json",
@@ -90,6 +97,46 @@ def test_write_report_produces_valid_artifacts(tmp_path: Path) -> None:
     ):
         assert (tmp_path / name).is_file()
     assert validate_report(tmp_path) == []
+
+
+def test_report_leads_with_what_your_agents_did(tmp_path: Path) -> None:
+    write_report(
+        tmp_path,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+    )
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
+    html_body = (tmp_path / "report.html").read_text(encoding="utf-8")
+    assert md.index("What your agents did") < md.index("Verdict")
+    assert 'id="activity"' in html_body
+    activity = json.loads((tmp_path / "activity.json").read_text(encoding="utf-8"))
+    assert activity == {
+        "agents": [],
+        "models": [],
+        "tools": [],
+        "actions_by_effect_class": {
+            "external_communication": 0,
+            "irreversible": 0,
+            "physical": 0,
+            "read": 0,
+            "spend": 0,
+            "unspecified": 0,
+            "write": 0,
+        },
+        "approvals_by_recorder": {
+            "enforcement_point": 0,
+            "independent_system": 0,
+            "self_report": 0,
+        },
+        "denied_or_blocked": {
+            "approval_rejected": 0,
+            "authz_denied": 0,
+            "policy_denied": 0,
+            "refused": 0,
+        },
+        "undeclared": {"models": [], "tools": []},
+    }
 
 
 def test_empty_report_is_valid(tmp_path: Path) -> None:

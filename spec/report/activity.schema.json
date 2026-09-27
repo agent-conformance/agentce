@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/report/activity.schema.json",
+  "title": "AgentCE activity summary",
+  "description": "activity.json in the report directory: the counted facts a run's records show -- agents, models, tools, actions by effect class, approvals by who recorded them, actions denied or blocked, and tools/models the records show that the applicability profile never declared. Built only from the accepted events; never affects an outcome or the verdict.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agents",
+    "models",
+    "tools",
+    "actions_by_effect_class",
+    "approvals_by_recorder",
+    "denied_or_blocked",
+    "undeclared"
+  ],
+  "properties": {
+    "agents": {"type": "array", "items": {"type": "string"}},
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["provider", "name", "version_or_digest"],
+        "properties": {
+          "provider": {"type": "string"},
+          "name": {"type": "string"},
+          "version_or_digest": {"type": "string"}
+        }
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "server", "protocol"],
+        "properties": {
+          "name": {"type": "string"},
+          "server": {"type": "string"},
+          "protocol": {"type": "string"}
+        }
+      }
+    },
+    "actions_by_effect_class": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["external_communication", "irreversible", "physical", "read", "spend", "unspecified", "write"],
+      "properties": {
+        "external_communication": {"type": "integer", "minimum": 0},
+        "irreversible": {"type": "integer", "minimum": 0},
+        "physical": {"type": "integer", "minimum": 0},
+        "read": {"type": "integer", "minimum": 0},
+        "spend": {"type": "integer", "minimum": 0},
+        "unspecified": {"type": "integer", "minimum": 0},
+        "write": {"type": "integer", "minimum": 0}
+      }
+    },
+    "approvals_by_recorder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enforcement_point", "independent_system", "self_report"],
+      "properties": {
+        "enforcement_point": {"type": "integer", "minimum": 0},
+        "independent_system": {"type": "integer", "minimum": 0},
+        "self_report": {"type": "integer", "minimum": 0}
+      }
+    },
+    "denied_or_blocked": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approval_rejected", "authz_denied", "policy_denied", "refused"],
+      "properties": {
+        "approval_rejected": {"type": "integer", "minimum": 0},
+        "authz_denied": {"type": "integer", "minimum": 0},
+        "policy_denied": {"type": "integer", "minimum": 0},
+        "refused": {"type": "integer", "minimum": 0}
+      }
+    },
+    "undeclared": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["models", "tools"],
+      "properties": {
+        "models": {"type": "array", "items": {"type": "string"}},
+        "tools": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

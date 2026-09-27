@@ -48,6 +48,8 @@
         "environments": {"type": "array", "items": {"type": "string"}},
         "declared_decision_types": {"type": "array", "items": {"type": "string"}},
         "declared_data_classes": {"type": "array", "items": {"type": "string"}},
+        "declared_tools": {"type": "array", "items": {"type": "string"}, "description": "Tool names the subject is expected to call (18.4); one not seen here that the records show is 'not yet declared', not necessarily wrong."},
+        "declared_models": {"type": "array", "items": {"type": "string"}, "description": "Model names the subject is expected to call (18.4); see declared_tools."},
         "declared_oversight": {
           "type": "object",
           "description": "Decision type to its declared oversight modality.",

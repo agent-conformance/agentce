@@ -36,14 +36,17 @@ from . import (
     templating,
     verdict,
 )
+from .activity import DENIED_KINDS, RECORDER_CLASSES, summarize_activity
 from .assertions import Assertion, aggregate, check_dc5
 from .assess import index_by_subject, requirement_met
 from .catalog import Catalog, ControlSpec, catalog_provenance_digest
+from .profile import Profile
 
 #: Always written, regardless of `--emit`: the run's structural core (write_report's docstring).
 _MANDATORY_ARTIFACT_SCHEMAS = {
     "assertions.json": "assertions",
     "manifest.json": "manifest",
+    "activity.json": "activity",
 }
 #: Written only when `--emit` selects the format that produces them: validated when present,
 #: skipped when a narrower `--emit` legitimately left them unwritten.
@@ -193,6 +196,120 @@ def _verdict_html(summary: dict[str, Any], cat: dict[str, str]) -> str:
     )
 
 
+def _activity_tally_text(
+    counts: dict[str, int], label_of: dict[str, str] | None = None
+) -> str:
+    """``label 3, label 2`` for every nonzero count, in the dict's (fixed) key order; ``0`` when
+    every count is zero -- shared by the Markdown, HTML, and terminal renderings. ``label_of``
+    translates a key to its catalogue label; a key with no translation (the effect classes, which
+    are stable identifiers, not prose) stands for itself."""
+    parts = [f"{(label_of or {}).get(key, key)} {n}" for key, n in counts.items() if n]
+    return ", ".join(parts) if parts else "0"
+
+
+def _activity_undeclared_lines(
+    undeclared: dict[str, list[str]], cat: dict[str, str]
+) -> list[str]:
+    if not (undeclared["tools"] or undeclared["models"]):
+        return [cat["report.activity_none_undeclared"]]
+    lines = []
+    if undeclared["tools"]:
+        lines.append(
+            f"{cat['report.activity_undeclared_tools_label']}: "
+            + ", ".join(undeclared["tools"])
+        )
+    if undeclared["models"]:
+        lines.append(
+            f"{cat['report.activity_undeclared_models_label']}: "
+            + ", ".join(undeclared["models"])
+        )
+    return lines
+
+
+def _activity_rows(
+    activity: dict[str, Any], cat: dict[str, str]
+) -> list[tuple[str, str]]:
+    """``(label, value)`` for every counted-facts row -- the one place the row set and order is
+    decided, shared by the Markdown and HTML renderings."""
+    recorder_labels = {
+        k: cat[f"report.activity_recorder_{k}"] for k in RECORDER_CLASSES
+    }
+    denied_labels = {k: cat[f"report.activity_denied_{k}"] for k in DENIED_KINDS}
+    agents = activity["agents"]
+    return [
+        (
+            cat["report.activity_agents_label"],
+            ", ".join(agents) if agents else cat["report.activity_none_agents"],
+        ),
+        (
+            cat["report.activity_models_label"],
+            ", ".join(m["name"] for m in activity["models"]) or "0",
+        ),
+        (
+            cat["report.activity_tools_label"],
+            ", ".join(t["name"] for t in activity["tools"]) or "0",
+        ),
+        (
+            cat["report.activity_actions_label"],
+            _activity_tally_text(activity["actions_by_effect_class"]),
+        ),
+        (
+            cat["report.activity_approvals_label"],
+            _activity_tally_text(activity["approvals_by_recorder"], recorder_labels),
+        ),
+        (
+            cat["report.activity_denied_label"],
+            _activity_tally_text(activity["denied_or_blocked"], denied_labels),
+        ),
+    ]
+
+
+def _activity_md(activity: dict[str, Any], cat: dict[str, str]) -> list[str]:
+    """The lines that lead the report body (before the verdict, SPEC's evidence-first framing):
+    what the records show your agents did, regardless of how they measure up."""
+    lines = [f"## {cat['report.activity_heading']}", ""]
+    lines += [f"- {label}: {value}" for label, value in _activity_rows(activity, cat)]
+    lines += ["", f"### {cat['report.activity_undeclared_heading']}", ""]
+    lines += [
+        f"- {line}" for line in _activity_undeclared_lines(activity["undeclared"], cat)
+    ]
+    lines.append("")
+    return lines
+
+
+def _activity_html(activity: dict[str, Any], cat: dict[str, str]) -> str:
+    items = "".join(
+        f"<li>{html.escape(label)}: {html.escape(value)}</li>"
+        for label, value in _activity_rows(activity, cat)
+    )
+    undeclared = "".join(
+        f"<p>{html.escape(line)}</p>"
+        for line in _activity_undeclared_lines(activity["undeclared"], cat)
+    )
+    return (
+        '<section aria-labelledby="activity"><h2 id="activity">'
+        f"{html.escape(cat['report.activity_heading'])}</h2><ul>{items}</ul>"
+        f"<h3>{html.escape(cat['report.activity_undeclared_heading'])}</h3>{undeclared}"
+        "</section>"
+    )
+
+
+def activity_cli_lines(
+    activity: dict[str, Any], catalogue: dict[str, str]
+) -> list[str]:
+    """The lines a command prints for ``activity``: agents, tools, models, and anything not yet
+    declared -- the same dictionary :func:`_activity_md`/:func:`_activity_html` render."""
+    lines = [
+        f"{label}: {value}" for label, value in _activity_rows(activity, catalogue)
+    ]
+    lines.append(f"{catalogue['report.activity_undeclared_heading']}:")
+    lines += [
+        f"  {line}"
+        for line in _activity_undeclared_lines(activity["undeclared"], catalogue)
+    ]
+    return lines
+
+
 def _reproduce_command(invocation: list[str] | None) -> str:
     return "agentce " + " ".join(invocation) if invocation else "agentce quickstart"
 
@@ -254,12 +371,17 @@ def render_report_md(
     language: str = messages.DEFAULT_LANGUAGE,
     catalogs: list[Catalog] | None = None,
     invocation: list[str] | None = None,
+    activity: dict[str, Any] | None = None,
 ) -> str:
     cat = messages.catalogue(language)
     by_control = _control_index(catalogs or [])
     labels = [f"{c.id}@{c.version}" for c in (catalogs or [])]
     summary = verdict.summarize(assertions)
     lines = [f"# {cat['report.title']}", ""]
+    # The records lead the report (SPEC's evidence-first framing, 18.4): what happened, before how
+    # it measures up.
+    if activity is not None:
+        lines += _activity_md(activity, cat)
     lines += _verdict_md(summary, cat)
     lines += [f"## {cat['report.summary_heading']}", ""]
     lines += [
@@ -337,6 +459,7 @@ def render_report_html(
     language: str = messages.DEFAULT_LANGUAGE,
     catalogs: list[Catalog] | None = None,
     invocation: list[str] | None = None,
+    activity: dict[str, Any] | None = None,
 ) -> str:
     """Render a self-contained, escaped, WCAG 2.2 AA report page (SPEC §9.3): a strict CSP meta tag,
     no external references, one ``h1``, a ``main`` landmark, a print stylesheet, and every string that
@@ -363,6 +486,7 @@ def render_report_html(
         "content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\">"
         f"<title>{title}</title><style>{_HTML_STYLE}</style></head><body>"
         f"<main><h1>{title}</h1>"
+        f"{_activity_html(activity, cat) if activity is not None else ''}"
         f"{_verdict_html(verdict.summarize(assertions), cat)}"
         f'<section aria-labelledby="summary"><h2 id="summary">'
         f"{html.escape(cat['report.summary_heading'])}</h2><ul>{summary}</ul></section>"
@@ -1430,6 +1554,7 @@ def write_report(
     events: list[dict[str, Any]] | None = None,
     reverify_command: list[str] | None = None,
     extra_outputs: dict[str, bytes] | None = None,
+    activity: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Write every report artifact for ``assertions`` and return the reproducibility manifest.
 
@@ -1452,7 +1577,13 @@ def write_report(
     other artifact uses (its digest lands in the returned manifest's ``outputs`` map), for artifacts
     a caller computes itself outside the formats above -- today only the incremental-state caller's
     ``runtime_drift.jsonl`` (SPEC.md:249 DC-9/HR-10). Never gated by ``emit``: like ``assertions.json``,
-    a caller that passes one always gets it written."""
+    a caller that passes one always gets it written.
+
+    ``activity`` (:func:`agentce.activity.summarize_activity` over ``events`` and the resolved
+    applicability profile) feeds ``activity.json`` and the "what your agents did" report section
+    (18.4); computed by the caller, once, since it is also needed for the terminal summary and the
+    ``--json`` envelope. A caller that leaves it out gets the honest answer for a profile that
+    declares nothing."""
     check_dc5(
         assertions
     )  # DC-5: refuse a supporting verdict without an evidence pointer
@@ -1494,6 +1625,9 @@ def write_report(
         return token in emit
 
     write_json("assertions.json", [a.to_json() for a in assertions])
+    if activity is None:
+        activity = summarize_activity(events or [], Profile())
+    write_json("activity.json", activity)
 
     for name, data in (extra_outputs or {}).items():
         write_bytes(name, data)
@@ -1507,6 +1641,7 @@ def write_report(
                 language=report_language,
                 catalogs=catalogs,
                 invocation=invocation,
+                activity=activity,
             ),
         )
     if wants("html"):
@@ -1518,6 +1653,7 @@ def write_report(
                 language=report_language,
                 catalogs=catalogs,
                 invocation=invocation,
+                activity=activity,
             ),
         )
 
