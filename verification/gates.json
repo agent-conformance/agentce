@@ -167,6 +167,12 @@
           "replace": "<p class=\"eyebrow\" hidden>"
         },
         {
+          "description": "the copy-paste quickstart command beside the hero copy changes",
+          "file": "website/src/pages/index.astro",
+          "search": "<pre class=\"try-it-cmd\"><code>$ agentce quickstart --out ./out</code>",
+          "replace": "<pre class=\"try-it-cmd\"><code>$ agentce quickstart --out ./elsewhere</code>"
+        },
+        {
           "description": "the README drops the tagline",
           "file": "README.md",
           "search": "**Open, repeatable checks of AI agent behavior against AI rules and standards.**\n",

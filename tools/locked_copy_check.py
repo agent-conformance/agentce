@@ -27,8 +27,8 @@ SUBLINE = (
     "roles, and the AI assistant your developers use gets a skill for the fixes."
 )
 
-#: What stays beside the copy, unchanged: the disclaimer and the quickstart command.
-KEPT = ("A conformant result is not a certification.", "agentce quickstart --out ./out")
+DISCLAIMER = "A conformant result is not a certification."
+QUICKSTART = "$ agentce quickstart --out ./out"
 
 #: The wording the approved copy replaced; it must not come back anywhere in the built site or the README.
 RETIRED = (
@@ -38,7 +38,13 @@ RETIRED = (
 )
 
 #: The landing page's hero elements, in reading order, and the approved string each carries.
-HERO = (("eyebrow", TAGLINE), ("h1", HEADLINE), ("lede", SUBLINE))
+HERO = (
+    ("eyebrow", TAGLINE),
+    ("h1", HEADLINE),
+    ("lede", SUBLINE),
+    ("disclaimer", DISCLAIMER),
+    ("try-it-cmd", QUICKSTART),
+)
 
 _VOID = {
     "area",
@@ -55,6 +61,9 @@ _VOID = {
     "track",
     "wbr",
 }
+#: Elements whose content a reader never sees, and the class names that hide an element from sight.
+_UNSEEN_TAGS = {"template", "script", "style", "noscript"}
+_UNSEEN_CLASSES = {"hidden", "sr-only", "visually-hidden"}
 _TEXT_FILES = {".html", ".txt", ".json", ".xml", ".md", ".webmanifest"}
 
 
@@ -66,6 +75,7 @@ def _is_hidden(attrs: dict[str, str | None]) -> bool:
     style = (attrs.get("style") or "").replace(" ", "").lower()
     return (
         "hidden" in attrs
+        or bool(_UNSEEN_CLASSES & set((attrs.get("class") or "").split()))
         or attrs.get("aria-hidden") == "true"
         or "display:none" in style
         or "visibility:hidden" in style
@@ -79,24 +89,27 @@ class _Hero(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.found: list[tuple[str, str]] = []
         self._stack: list[tuple[str, bool]] = []  # (tag, hidden) for every open element
+        self._first_section_depth: int | None = None
         self._sections = 0
-        self._in_first_section = False
         self._role: str | None = None
         self._role_depth = 0
-        self.section_text = ""
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag in _VOID:
             return
         table = dict(attrs)
-        hidden = _is_hidden(table)
+        hidden = _is_hidden(table) or tag in _UNSEEN_TAGS
+        visible = not hidden and not any(h for _, h in self._stack)
+        self._stack.append((tag, hidden))
         if tag == "section":
             self._sections += 1
             if self._sections == 1:
-                self._in_first_section = True
-        visible = not hidden and not any(h for _, h in self._stack)
-        self._stack.append((tag, hidden))
-        if self._role is not None or not self._in_first_section or not visible:
+                self._first_section_depth = len(self._stack)
+        in_first_section = (
+            self._first_section_depth is not None
+            and len(self._stack) >= self._first_section_depth
+        )
+        if self._role is not None or not in_first_section or not visible:
             return
         classes = (table.get("class") or "").split()
         wanted = {role for role, _ in HERO} - {r for r, _ in self.found}
@@ -114,17 +127,13 @@ class _Hero(HTMLParser):
             return
         if self._role is not None and len(self._stack) == self._role_depth:
             self._role = None
+        if tag == "section" and len(self._stack) == self._first_section_depth:
+            self._first_section_depth = (
+                None  # closed: nothing after it is in the first section
+            )
         self._stack.pop()
-        if (
-            tag == "section"
-            and self._sections == 1
-            and not any(t == "section" for t, _ in self._stack)
-        ):
-            self._in_first_section = False
 
     def handle_data(self, data: str) -> None:
-        if self._in_first_section and not any(h for _, h in self._stack):
-            self.section_text += data
         if self._role is not None:
             role, text = self.found[-1]
             self.found[-1] = (role, text + data)
@@ -135,16 +144,11 @@ def check_landing(html: str) -> list[str]:
     parser.feed(html)
     found = [(role, _squash(text)) for role, text in parser.found]
     expected = [(role, text) for role, text in HERO]
-    problems = []
-    if found != expected:
-        problems.append(
-            f"landing page hero: expected {expected!r} (visible, in the first section, in this order), found {found!r}"
-        )
-    shown = _squash(parser.section_text)
-    problems += [
-        f"landing page hero lost {text!r}" for text in KEPT if text not in shown
+    if found == expected:
+        return []
+    return [
+        f"landing page hero: expected {expected!r} (visible, in the first section, in this order), found {found!r}"
     ]
-    return problems
 
 
 def check_retired(name: str, text: str) -> list[str]:
@@ -190,15 +194,23 @@ def check_readme(text: str) -> list[str]:
 
 
 def self_test() -> list[str]:
-    def page(
-        eyebrow: str = '<p class="eyebrow">{t}</p>',
-        h1: str = "<h1>{h}</h1>",
-        lede: str = '<p class="lede">{s}</p>',
-    ) -> str:
-        body = (eyebrow + h1 + lede + f"<p>{KEPT[0]}</p><pre>$ {KEPT[1]}</pre>").format(
-            t=TAGLINE, h=HEADLINE, s=SUBLINE.replace("can't", "can&#39;t")
+    parts = {
+        "eyebrow": '<p class="eyebrow">{t}</p>',
+        "h1": "<h1>{h}</h1>",
+        "lede": '<p class="lede">{s}</p>',
+        "disclaimer": '<p class="disclaimer">{d}</p>',
+        "cmd": '<pre class="try-it-cmd"><code>{q}</code></pre>',
+    }
+
+    def page(**over: str) -> str:
+        body = "".join({**parts, **over}.values()).format(
+            t=TAGLINE,
+            h=HEADLINE,
+            s=SUBLINE.replace("can't", "can&#39;t"),
+            d=DISCLAIMER,
+            q=QUICKSTART,
         )
-        return f"<html><head></head><body><section>{body}<br></section><section><h2>x</h2></section></body></html>"
+        return f"<html><body><section>{body}<br></section><section><h2>x</h2></section></body></html>"
 
     def readme(
         order: tuple[str, ...] = (TAGLINE, HEADLINE, SUBLINE),
@@ -206,19 +218,18 @@ def self_test() -> list[str]:
     ) -> str:
         copy = "\n\n".join(order)
         tail = "**Status:** x\n\n**License:** y\n"
-        return (
+        head = (
             f"# (AgentCE)\n\n{tail}\n{copy}\n"
             if status_first
             else f"# (AgentCE)\n\n{copy}\n\n{tail}"
         )
+        return head
+
+    def hidden(role: str, wrapper: str) -> str:
+        return wrapper.format(parts[role])
 
     cases: dict[str, tuple[list[str], bool]] = {
         "the approved page passes": (check_landing(page()), False),
-        "a lost disclaimer fails": (check_landing(page().replace(KEPT[0], "")), True),
-        "a lost quickstart command fails": (
-            check_landing(page().replace(KEPT[1], "")),
-            True,
-        ),
         "the retired headline fails": (
             check_landing(
                 page(h1="<h1>Assess any AI agent against the same standard.</h1>")
@@ -233,15 +244,47 @@ def self_test() -> list[str]:
             check_landing(page(eyebrow='<p class="eyebrow" hidden>{t}</p>')),
             True,
         ),
+        "a screen-reader-only eyebrow fails": (
+            check_landing(page(eyebrow='<p class="eyebrow sr-only">{t}</p>')),
+            True,
+        ),
+        "an eyebrow in a template fails": (
+            check_landing(page(eyebrow=hidden("eyebrow", "<template>{}</template>"))),
+            True,
+        ),
+        "a disclaimer in a script fails": (
+            check_landing(page(disclaimer=hidden("disclaimer", "<script>{}</script>"))),
+            True,
+        ),
         "a copy in a hidden parent fails": (
             check_landing(
-                page(lede='<div style="display: none"><p class="lede">{s}</p></div>')
+                page(lede=hidden("lede", '<div style="display: none">{}</div>'))
             ),
+            True,
+        ),
+        "a changed disclaimer fails": (
+            check_landing(
+                page(
+                    disclaimer='<p class="disclaimer">A conformant result is a certification.</p>'
+                )
+            ),
+            True,
+        ),
+        "a changed quickstart command fails": (
+            check_landing(page().replace("./out", "./elsewhere")),
             True,
         ),
         "the copy outside the first section fails": (
             check_landing(f"<section><h2>x</h2></section>{page()}"),
             True,
+        ),
+        "a section nested in the hero does not end it": (
+            check_landing(
+                page(eyebrow="<section><b>x</b></section>" + parts["eyebrow"]).replace(
+                    "<br></section>", '<br></section><p class="lede">late</p>', 1
+                )
+            ),
+            False,
         ),
         "the copy in the wrong order fails": (
             check_landing(
@@ -287,7 +330,7 @@ def main(argv: list[str] | None = None) -> int:
         for name in wrong:
             print(f"SELF-TEST FAIL: {name}")
         if not wrong:
-            print("locked_copy_check self-test: 14 cases discriminate")
+            print("locked_copy_check self-test: 18 cases discriminate")
         return 1 if wrong else 0
     problems = check_dist(ns.dist) + check_readme(ns.readme.read_text(encoding="utf-8"))
     for problem in problems:
