@@ -37,8 +37,13 @@ public final class Assess {
         return false;
     }
 
-    private static boolean classOk(String observed, String required) {
-        return required.equals("any") || required.equals("self_report") || observed.equals(required);
+    /** A required class of {@code any} or {@code self_report} is satisfied by any observed source
+     * class (mirrored by {@link BlindSpots}'s {@code normalizeClass}, which groups both onto the same
+     * blind-spot key). Package-private: shared with {@link BlindSpots} rather than duplicated. */
+    static final Set<String> SELF_REPORT_EQUIVALENT_CLASSES = Set.of("any", "self_report");
+
+    static boolean classOk(String observed, String required) {
+        return SELF_REPORT_EQUIVALENT_CLASSES.contains(required) || observed.equals(required);
     }
 
     private static String eventType(JsonNode event) {
@@ -59,18 +64,25 @@ public final class Assess {
         return s != null && s.isTextual() ? s.textValue() : "";
     }
 
+    /** Whether {@code events} carries at least one event satisfying one {@code minimum_evidence}
+     * entry -- factored out of {@code hasMinimumEvidence} so the blind-spots ranking (Hill 2) can
+     * report, per requirement, which of a control's minimum-evidence entries this subject's own
+     * events did and did not satisfy, using the exact same rule the assessment itself used to reach
+     * its outcome. Package-private: shared with {@link BlindSpots} rather than duplicated. */
+    static boolean requirementMet(List<JsonNode> events, JsonNode requirement) {
+        String wantType = requirement.has("event") ? requirement.get("event").asText() : "";
+        String requiredClass = requirement.has("class") ? requirement.get("class").asText() : "any";
+        for (JsonNode e : events) {
+            if (eventType(e).equals(wantType) && classOk(sourceClassOf(e), requiredClass)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean hasMinimumEvidence(List<JsonNode> events, List<JsonNode> minimum) {
         for (JsonNode requirement : minimum) {
-            String wantType = requirement.has("event") ? requirement.get("event").asText() : "";
-            String requiredClass = requirement.has("class") ? requirement.get("class").asText() : "any";
-            boolean found = false;
-            for (JsonNode e : events) {
-                if (eventType(e).equals(wantType) && classOk(sourceClassOf(e), requiredClass)) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
+            if (!requirementMet(events, requirement)) {
                 return false;
             }
         }
@@ -200,8 +212,9 @@ public final class Assess {
         return assertion;
     }
 
-    /** Group {@code accepted} by subject id in one pass over the list. */
-    private static Map<String, List<JsonNode>> indexBySubject(List<JsonNode> accepted) {
+    /** Group {@code accepted} by subject id in one pass over the list. Package-private: shared with
+     * {@link BlindSpots} rather than duplicated. */
+    static Map<String, List<JsonNode>> indexBySubject(List<JsonNode> accepted) {
         Map<String, List<JsonNode>> index = new java.util.HashMap<>();
         for (JsonNode e : accepted) {
             index.computeIfAbsent(subjectOf(e), k -> new ArrayList<>()).add(e);

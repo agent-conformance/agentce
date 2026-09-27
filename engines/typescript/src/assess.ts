@@ -45,8 +45,12 @@ function roleApplies(roles: Set<string>, appliesToRoles: string[]): boolean {
   return false;
 }
 
-function classOk(observed: string, required: string): boolean {
-  return required === "any" || required === "self_report" || observed === required;
+/** A required class of `any` or `self_report` is satisfied by any observed source class (mirrored by
+ * `blindSpots.ts`'s `normalizeClass`, which groups both onto the same blind-spot key). */
+export const SELF_REPORT_EQUIVALENT_CLASSES = new Set(["any", "self_report"]);
+
+export function classOk(observed: string, required: string): boolean {
+  return SELF_REPORT_EQUIVALENT_CLASSES.has(required) || observed === required;
 }
 
 function eventType(event: Event): string {
@@ -54,20 +58,20 @@ function eventType(event: Event): string {
   return isRecord(data) && typeof data["@type"] === "string" ? data["@type"] : "";
 }
 
+/** Whether `events` carries at least one event satisfying one `minimum_evidence` entry -- factored
+ * out of `hasMinimumEvidence` so the blind-spots ranking (Hill 2) can report, per requirement, which
+ * of a control's minimum-evidence entries this subject's own events did and did not satisfy, using
+ * the exact same rule the assessment itself used to reach its outcome. */
+export function requirementMet(events: Event[], requirement: Record<string, string>): boolean {
+  const wantType = requirement.event;
+  const requiredClass = requirement.class ?? "any";
+  return events.some(
+    (e) => eventType(e) === wantType && classOk(String(e.agentcesourceclass ?? ""), requiredClass),
+  );
+}
+
 function hasMinimumEvidence(events: Event[], minimum: Array<Record<string, string>>): boolean {
-  for (const requirement of minimum) {
-    const wantType = requirement.event;
-    const requiredClass = requirement.class ?? "any";
-    if (
-      !events.some(
-        (e) =>
-          eventType(e) === wantType && classOk(String(e.agentcesourceclass ?? ""), requiredClass),
-      )
-    ) {
-      return false;
-    }
-  }
-  return true;
+  return minimum.every((requirement) => requirementMet(events, requirement));
 }
 
 function window(profile: Profile, events: Event[]): [string, string] {
@@ -186,7 +190,7 @@ function assertControl(
 }
 
 /** Group `accepted` by subject id in one pass over the list. */
-function indexBySubject(accepted: Event[]): Map<string, Event[]> {
+export function indexBySubject(accepted: Event[]): Map<string, Event[]> {
   const index = new Map<string, Event[]>();
   for (const event of accepted) {
     const key = String(event.subject ?? "");

@@ -8,11 +8,12 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
@@ -27,56 +28,6 @@ import java.util.TreeSet;
  */
 public final class BlindSpots {
     private BlindSpots() {}
-
-    /** {@code classOk} treats a required class of {@code any} and {@code self_report} identically
-     * (mirrors {@link Assess}'s private helper of the same name; duplicated here rather than shared,
-     * matching this codebase's existing per-module style). */
-    private static final Set<String> SELF_REPORT_EQUIVALENT_CLASSES = Set.of("any", "self_report");
-
-    private static boolean classOk(String observed, String required) {
-        return SELF_REPORT_EQUIVALENT_CLASSES.contains(required) || observed.equals(required);
-    }
-
-    private static String eventType(JsonNode event) {
-        JsonNode data = event.get("data");
-        if (data != null && data.isObject() && data.get("@type") != null && data.get("@type").isTextual()) {
-            return data.get("@type").textValue();
-        }
-        return "";
-    }
-
-    private static String sourceClassOf(JsonNode event) {
-        JsonNode s = event.get("agentcesourceclass");
-        return s != null && s.isTextual() ? s.textValue() : "";
-    }
-
-    private static String subjectOf(JsonNode event) {
-        JsonNode s = event.get("subject");
-        return s != null && s.isTextual() ? s.textValue() : "";
-    }
-
-    /** Whether {@code events} carries at least one event satisfying one {@code minimum_evidence}
-     * entry -- mirrors {@link Assess}'s private per-list {@code hasMinimumEvidence}, but for a single
-     * requirement (needed here, per requirement, the same rule the assessment itself used to reach
-     * its outcome). */
-    private static boolean requirementMet(List<JsonNode> events, JsonNode requirement) {
-        String wantType = requirement.has("event") ? requirement.get("event").asText() : "";
-        String requiredClass = requirement.has("class") ? requirement.get("class").asText() : "any";
-        for (JsonNode e : events) {
-            if (eventType(e).equals(wantType) && classOk(sourceClassOf(e), requiredClass)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static Map<String, List<JsonNode>> indexBySubject(List<JsonNode> accepted) {
-        Map<String, List<JsonNode>> index = new LinkedHashMap<>();
-        for (JsonNode event : accepted) {
-            index.computeIfAbsent(subjectOf(event), k -> new ArrayList<>()).add(event);
-        }
-        return index;
-    }
 
     /** The seven OpenTelemetry-GenAI-shaped trace events (RFC 0008 Sec.3): a self-report requirement
      * for one of these is rung 1 ("what happened"); every other self-report requirement is rung 2. */
@@ -94,7 +45,7 @@ public final class BlindSpots {
             4, new OwnerStep("ticketing_or_iam", "request"));
 
     private static String normalizeClass(String cls) {
-        return SELF_REPORT_EQUIVALENT_CLASSES.contains(cls) ? "self_report" : cls;
+        return Assess.SELF_REPORT_EQUIVALENT_CLASSES.contains(cls) ? "self_report" : cls;
     }
 
     private static volatile Map<String, Map<String, String>> cachedEventProducers;
@@ -150,12 +101,12 @@ public final class BlindSpots {
     }
 
     /** Only the adapters whose default class actually satisfies this key (RFC 0008 Sec.3), reusing
-     * {@link #classOk} -- never every adapter that merely declares the event. */
+     * {@link Assess#classOk} -- never every adapter that merely declares the event. */
     private static List<String> supplyingAdapters(String event, String normalizedClass) {
         Map<String, String> producers = eventProducers().getOrDefault(event, Map.of());
         TreeSet<String> out = new TreeSet<>(Json::byteCompare);
         for (Map.Entry<String, String> e : producers.entrySet()) {
-            if (classOk(e.getValue(), normalizedClass)) {
+            if (Assess.classOk(e.getValue(), normalizedClass)) {
                 out.add(e.getKey());
             }
         }
@@ -211,6 +162,16 @@ public final class BlindSpots {
         }
     }
 
+    /** {@code (subjectId, event, cls)}: a value-equality key for {@code metCache}, so the cache is a
+     * plain {@link HashMap} lookup rather than per-lookup string-byte comparisons against a sorted
+     * tree -- final output order comes only from the explicit sorts below, never from this map's
+     * iteration order. */
+    private record MetKey(String subjectId, String event, String cls) {}
+
+    /** {@code (event, cls)}: a value-equality key for {@code groups} and {@code normalizedByKey}, for
+     * the same reason as {@link MetKey}. */
+    private record GroupKey(String event, String cls) {}
+
     /** Return {@code {"blind_spots": [...], "no_population": [...]}} for {@code assertions}.
      *
      * <p>{@code assertions} must be {@link Assess#assessSubjects}'s own output, in its own order --
@@ -228,24 +189,24 @@ public final class BlindSpots {
                             + "must be assessSubjects' own output.");
         }
 
-        Map<String, List<JsonNode>> eventsBySubject = indexBySubject(events);
-        // Keyed elementwise by a String[] TreeMap comparator, never a delimiter-joined string: two
-        // distinct triples whose fields happen to abut at a boundary must never collide into the same
-        // cache/group entry (the exact class of bug 18.4's activity port fixed for its own tuple keys).
-        Map<String[], Boolean> metCache = new TreeMap<>((a, b) -> Arrays.compare(a, b, Json::byteCompare));
+        Map<String, List<JsonNode>> eventsBySubject = Assess.indexBySubject(events);
+        // Keyed by a (subjectId, event, cls) value-equality record, never a delimiter-joined string:
+        // two distinct triples whose fields happen to abut at a boundary must never collide into the
+        // same cache entry (the exact class of bug 18.4's activity port fixed for its own tuple keys).
+        Map<MetKey, Boolean> metCache = new HashMap<>();
         java.util.function.BiFunction<String, JsonNode, Boolean> met = (subjectId, requirement) -> {
             String event = requirement.has("event") ? requirement.get("event").asText() : "";
             String cls = requirement.has("class") ? requirement.get("class").asText() : "any";
-            String[] key = {subjectId, event, cls};
+            MetKey key = new MetKey(subjectId, event, cls);
             Boolean cached = metCache.get(key);
             if (cached == null) {
-                cached = requirementMet(eventsBySubject.getOrDefault(subjectId, List.of()), requirement);
+                cached = Assess.requirementMet(eventsBySubject.getOrDefault(subjectId, List.of()), requirement);
                 metCache.put(key, cached);
             }
             return cached;
         };
 
-        Map<String[], Group> groups = new TreeMap<>((a, b) -> Arrays.compare(a, b, Json::byteCompare));
+        Map<GroupKey, Group> groups = new HashMap<>();
         List<CheckRef> noPopulation = new ArrayList<>();
 
         for (int i = 0; i < triples.size(); i++) {
@@ -268,11 +229,11 @@ public final class BlindSpots {
                     missing.add(r);
                 }
             }
-            Map<String[], String[]> normalizedByKey = new TreeMap<>((x, y) -> Arrays.compare(x, y, Json::byteCompare));
+            Set<GroupKey> normalizedByKey = new HashSet<>();
             for (JsonNode r : missing) {
                 String event = r.has("event") ? r.get("event").asText() : "";
                 String cls = normalizeClass(r.has("class") ? r.get("class").asText() : "any");
-                normalizedByKey.put(new String[] {event, cls}, new String[] {event, cls});
+                normalizedByKey.add(new GroupKey(event, cls));
             }
             CheckRef checkRef = new CheckRef(t.subjectId(), t.catalogId(), t.control().id, t.control().version);
             if (normalizedByKey.isEmpty()) {
@@ -286,8 +247,8 @@ public final class BlindSpots {
             // missing set is informative but never provably sufficient on its own, so it always lands
             // in needed_by.
             boolean unlocked = a.population[0] > 0 && normalizedByKey.size() == 1;
-            for (String[] key : normalizedByKey.keySet()) {
-                Group group = groups.computeIfAbsent(key, k -> new Group(k[0], k[1]));
+            for (GroupKey key : normalizedByKey) {
+                Group group = groups.computeIfAbsent(key, k -> new Group(k.event(), k.cls()));
                 (unlocked ? group.unlocked : group.needed).add(checkRef);
             }
         }

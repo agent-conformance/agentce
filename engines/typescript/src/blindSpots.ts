@@ -11,51 +11,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Assertion } from "./assertions";
+import { SELF_REPORT_EQUIVALENT_CLASSES, classOk, indexBySubject, requirementMet } from "./assess";
 import type { Catalog, ControlSpec } from "./catalog";
 import type { Profile } from "./profile";
 import { byteCompare } from "./util";
 
 type Event = Record<string, unknown>;
-
-/** `classOk` treats a required class of `any` and `self_report` identically (mirrors `assess.ts`'s
- * private helper of the same name; duplicated here rather than exported, matching this codebase's
- * existing per-module style). */
-const SELF_REPORT_EQUIVALENT_CLASSES = new Set(["any", "self_report"]);
-
-function classOk(observed: string, required: string): boolean {
-  return SELF_REPORT_EQUIVALENT_CLASSES.has(required) || observed === required;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function eventType(event: Event): string {
-  const data = event.data;
-  return isRecord(data) && typeof data["@type"] === "string" ? data["@type"] : "";
-}
-
-/** Whether `events` carries at least one event satisfying one `minimum_evidence` entry -- mirrors
- * `assess.ts`'s private per-list `hasMinimumEvidence`, but for a single requirement (needed here, per
- * requirement, the same rule the assessment itself used to reach its outcome). */
-function requirementMet(events: Event[], requirement: Record<string, string>): boolean {
-  const wantType = requirement.event;
-  const requiredClass = requirement.class ?? "any";
-  return events.some(
-    (e) => eventType(e) === wantType && classOk(String(e.agentcesourceclass ?? ""), requiredClass),
-  );
-}
-
-function indexBySubject(accepted: Event[]): Map<string, Event[]> {
-  const index = new Map<string, Event[]>();
-  for (const event of accepted) {
-    const key = String(event.subject ?? "");
-    const events = index.get(key);
-    if (events) events.push(event);
-    else index.set(key, [event]);
-  }
-  return index;
-}
 
 /** The seven OpenTelemetry-GenAI-shaped trace events (RFC 0008 Sec.3): a self-report requirement for
  * one of these is rung 1 ("what happened"); every other self-report requirement is rung 2. */
