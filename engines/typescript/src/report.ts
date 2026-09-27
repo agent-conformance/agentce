@@ -464,7 +464,9 @@ export function renderReportMd(
   }
   lines.push(`## ${cat["report.summary_heading"]}`, "");
   for (const [outcome, count] of Object.entries(counts)) {
-    lines.push(`- ${outcome}: ${count}`);
+    // List-item first content: backtick-wrapped (SPEC §7 injection hardening;
+    // `contracts/P18-18.21.md`), matching the Python/Java engines' summary tally.
+    lines.push(`- \`${sanitizeForMarkdown(outcome)}\`: ${count}`);
   }
   lines.push("", `## ${cat["report.assertions_heading"]}`, "");
   if (assertions.length === 0) {
@@ -474,8 +476,9 @@ export function renderReportMd(
     const control = sanitizeForMarkdown(a.control);
     const subject = sanitizeForMarkdown(a.subject);
     lines.push(
-      `- \`${control}\` @ \`${subject}\` -> **${a.outcome}** ` +
-        `(rung ${a.rung}, ${a.mode}; ${a.population[1]}/${a.population[0]} failed)`,
+      `- \`${control}\` @ \`${subject}\` -> **${sanitizeForMarkdown(a.outcome)}** ` +
+        `(rung ${a.rung}, ${sanitizeForMarkdown(a.mode)}; ` +
+        `${a.population[1]}/${a.population[0]} failed)`,
     );
   }
   return `${lines.join("\n")}\n`;
@@ -494,14 +497,14 @@ export function renderReportHtml(
   const cat = catalogue(language);
   const title = escapeHtml(cat["report.title"] as string);
   const summary = Object.entries(counts)
-    .map(([o, c]) => `<li>${escapeHtml(o)}: ${c}</li>`)
+    .map(([o, c]) => `<li>${sanitizeForHtml(o)}: ${c}</li>`)
     .join("");
   const rows = [...assertions]
     .sort(bySubjectControl)
     .map(
       (a) =>
         `<tr><td>${sanitizeForHtml(a.control)}</td><td>${sanitizeForHtml(a.subject)}</td>` +
-        `<td>${escapeHtml(a.outcome)}</td></tr>`,
+        `<td>${sanitizeForHtml(a.outcome)}</td></tr>`,
     )
     .join("");
   const bodyRows =
