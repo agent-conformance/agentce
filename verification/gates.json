@@ -142,9 +142,9 @@
       "cmd": ["bash", "verification/gates/locked_copy.sh"],
       "requires": ["python3", "pnpm"],
       "timeout_s": 900,
-      "invariant": "Examples are the source of truth for documentation snippets; rendered outputs come from the corpus",
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "the website builds, and the built landing page shows the approved tagline as its eyebrow, the approved headline as its heading and the approved subline as its lead paragraph, word for word; the README states the tagline, headline and subline in that order under its title and keeps its status and licence lines; none of the retired wording appears on either",
+        "pass": "the website builds, and the built landing page shows the approved tagline as its eyebrow, the approved headline as its heading and the approved subline as its lead paragraph, word for word; the README states the tagline, headline and subline in that order directly under its title and keeps its status and licence lines; the disclaimer and the quickstart command stay in the hero; none of the retired wording appears anywhere in the built site or in the README",
         "fail": "the site does not build, a hero element carries other words, the retired wording is still on the page or in the README, or the README loses its status or licence line"
       },
       "faults": [
@@ -159,6 +159,12 @@
           "file": "website/src/pages/index.astro",
           "search": "gets a skill for the fixes.",
           "replace": "gets a plugin for the fixes."
+        },
+        {
+          "description": "the landing eyebrow is hidden from the reader",
+          "file": "website/src/pages/index.astro",
+          "search": "<p class=\"eyebrow\">",
+          "replace": "<p class=\"eyebrow\" hidden>"
         },
         {
           "description": "the README drops the tagline",
