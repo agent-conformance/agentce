@@ -187,7 +187,7 @@
       "tier": "quick",
       "cwd": ".",
       "cmd": ["bash", "verification/gates/what_they_did_engines.sh"],
-      "requires": ["uv", "pnpm", "jq"],
+      "requires": ["uv", "pnpm", "jq", "java"],
       "timeout_s": 900,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
