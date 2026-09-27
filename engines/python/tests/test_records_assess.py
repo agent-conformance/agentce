@@ -536,7 +536,7 @@ def test_a_file_that_cannot_be_read_is_listed_not_fatal(
     assert "could not be read" in unread["locked.json"]
 
 
-def test_an_output_folder_that_is_the_records_folder_or_above_it_still_finds_the_records(
+def test_an_output_folder_above_the_records_folder_still_finds_the_records(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     project = tmp_path / "project"
@@ -545,10 +545,6 @@ def test_an_output_folder_that_is_the_records_folder_or_above_it_still_finds_the
     code, env = _run(["assess", "traces", "--out", "."], capsys)
     assert code == 0 and len(env["records"]["files"]) == 3
 
-    same = tmp_path / "same"
-    _records(same)
-    code, env = _run(["assess", str(same), "--out", str(same)], capsys)
-    assert code == 0 and len(env["records"]["files"]) == 3
     assert traces.is_dir()
 
 
@@ -656,3 +652,54 @@ def test_renamed_and_reordered_files_give_the_same_result(
     _, first = _run(["assess", str(one), "--out", str(tmp_path / "o1")], capsys)
     _, second = _run(["assess", str(two), "--out", str(tmp_path / "o2")], capsys)
     assert first["bundle_digest"] == second["bundle_digest"]
+
+
+def test_a_default_output_folder_holding_records_is_refused_and_no_record_is_overwritten(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = _records(tmp_path / "records")
+    user_out = folder / "out"
+    user_out.mkdir()
+    kept = user_out / "manifest.json"
+    kept.write_text(
+        (next(folder.glob("*.json"))).read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    before = kept.read_bytes()
+    monkeypatch.chdir(folder)
+
+    code, _ = _run(["assess", "."], capsys)
+
+    assert code == 3
+    assert kept.read_bytes() == before
+    assert not (user_out / "records-bundle").exists()
+
+
+def test_an_output_folder_that_is_the_records_folder_is_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = _records(tmp_path / "records")
+    before = {p.name: p.read_bytes() for p in folder.iterdir() if p.is_file()}
+
+    code, _ = _run(["assess", str(folder), "--out", str(folder)], capsys)
+
+    assert code == 3
+    assert {p.name: p.read_bytes() for p in folder.iterdir() if p.is_file()} == before
+
+
+def test_compressed_files_and_symlinked_folders_are_listed_as_not_read(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = _records(tmp_path / "records")
+    (folder / "old.json.gz").write_bytes(b"\x1f\x8b")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (folder / "linked").symlink_to(elsewhere, target_is_directory=True)
+
+    code, envelope = _run(
+        ["assess", str(folder), "--out", str(tmp_path / "out")], capsys
+    )
+
+    reasons = {u["path"]: u["reason"] for u in envelope["records"]["unrecognised"]}
+    assert code == 0
+    assert "decompress" in reasons["old.json.gz"]
+    assert "symlinked folder" in reasons["linked"]

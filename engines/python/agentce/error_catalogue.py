@@ -57,6 +57,7 @@ _KINDS: dict[str, str] = {
     "input.init_exists": "error",
     "input.profile_missing": "error",
     "input.records_no_genai_spans": "error",
+    "input.records_out_collides": "error",
     "input.records_none_recognised": "error",
     "input.records_not_a_directory": "error",
     "input.records_source_ambiguous": "error",

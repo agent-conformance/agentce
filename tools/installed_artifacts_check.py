@@ -432,11 +432,11 @@ def _records_problems(
     ran: list[tuple[str, Path, Path]] = []
     for name, fixtures in cases.items():
         folder = _records_folder(empty / f"records-{name}", fixtures)
-        out = empty / f"first-report-{name}"
+        workdir = empty / f"first-report-{name}"
+        workdir.mkdir()
+        out = workdir / "out"  # the default output folder: no --out is given
         proc = runner.run(
-            [agentce, "assess", str(folder), "--out", str(out), "--json"],
-            empty,
-            offline=True,
+            [agentce, "assess", str(folder), "--json"], workdir, offline=True
         )
         finished = time.monotonic()
         if proc.returncode != 0:

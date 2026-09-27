@@ -147,20 +147,46 @@ def _adapt(payload: bytes, subject: str) -> otel_genai.AdaptResult:
     return result
 
 
-def _candidates(folder: Path, skip: list[Path]) -> list[tuple[str, Path | None]]:
+#: File suffixes that are archives or compressed exports: named as not read, never opened.
+COMPRESSED_SUFFIXES = frozenset({".gz", ".tgz", ".zip", ".zst", ".bz2", ".xz"})
+
+
+def _candidates(
+    folder: Path, skip: list[Path], unread: list[dict[str, str]]
+) -> list[tuple[str, Path | None]]:
     """The record files under ``folder`` in a fixed order (hidden files and directories and the ``skip``
-    trees are not walked); ``None`` marks a symlink that leaves the folder."""
+    trees are not walked); ``None`` marks a symlink that leaves the folder. Compressed files and symlinked
+    directories, which are never read, are named in ``unread`` with why."""
     found: list[tuple[str, Path | None]] = []
     for dirpath, dirnames, filenames in os.walk(folder):
         here = Path(dirpath)
-        dirnames[:] = sorted(
-            d
-            for d in dirnames
-            if not d.startswith(".") and (here / d).resolve() not in skip
-        )
+        kept = []
+        for d in sorted(dirnames):
+            if d.startswith(".") or (here / d).resolve() in skip:
+                continue
+            if (here / d).is_symlink():
+                unread.append(
+                    {
+                        "path": (here / d).relative_to(folder).as_posix(),
+                        "reason": "a symlinked folder is not followed",
+                    }
+                )
+                continue
+            kept.append(d)
+        dirnames[:] = kept
         for name in sorted(filenames):
             path = here / name
-            if name.startswith(".") or path.suffix.lower() not in RECORD_SUFFIXES:
+            if name.startswith("."):
+                continue
+            if path.suffix.lower() in COMPRESSED_SUFFIXES:
+                unread.append(
+                    {
+                        "path": path.relative_to(folder).as_posix(),
+                        "reason": "compressed files are not read; decompress them first",
+                    }
+                )
+                continue
+            if path.suffix.lower() not in RECORD_SUFFIXES:
                 continue
             rel = path.relative_to(folder).as_posix()
             if not bundle.safe_is_file(path):
@@ -215,7 +241,16 @@ def scan(folder: Path, *, subject: str, exclude: Path | None = None) -> ScannedR
     if exclude is not None:
         out = exclude.resolve()
         skip.append(out / BUNDLE_DIR)
-        if out != folder and out.is_relative_to(folder):
+        if out.is_relative_to(folder):
+            if out == folder or (
+                out.exists() and not (out / BUNDLE_DIR).is_dir() and any(out.iterdir())
+            ):
+                raise InputError(
+                    "input.records_out_collides",
+                    f"the output folder {out.name!r} lies inside the records folder and holds files "
+                    "that are not a previous run's output; writing there would overwrite records.",
+                    "choose an output folder outside the records folder with --out, or an empty one.",
+                )
             skip.append(out)
     by_id: dict[str, dict[str, Any]] = {}
     read: list[dict[str, Any]] = []
@@ -224,7 +259,10 @@ def scan(folder: Path, *, subject: str, exclude: Path | None = None) -> ScannedR
     counts = {"spans": 0, "spans_skipped": 0, "duplicates": 0, "lines_unrecognised": 0}
     conventions: set[str] = set()
 
-    for rel, path in _candidates(folder, skip):
+    unread: list[dict[str, str]] = []
+    candidates = _candidates(folder, skip, unread)
+    unrecognised.extend(unread)
+    for rel, path in candidates:
         if path is None:
             unrecognised.append(
                 {"path": rel, "reason": "a symlink that leaves the folder is not read"}

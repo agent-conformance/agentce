@@ -45,6 +45,8 @@
   "errors.input.records_none_recognised.fix": "point assess at a folder of OTLP/JSON trace exports (.json, .jsonl or .ndjson).",
   "errors.input.records_no_genai_spans.cause": "the folder holds OpenTelemetry traces, but none of their spans is a GenAI operation the engine maps.",
   "errors.input.records_no_genai_spans.fix": "instrument the agent with OpenTelemetry GenAI or OpenInference, then export its traces.",
+  "errors.input.records_out_collides.cause": "the output folder lies inside the records folder and holds files that are not a previous run's output.",
+  "errors.input.records_out_collides.fix": "choose an output folder outside the records folder with --out, or an empty one.",
   "errors.input.records_not_a_directory.cause": "the records folder does not exist or is not a directory.",
   "errors.input.records_not_a_directory.fix": "pass a folder of OpenTelemetry GenAI or OpenInference trace exports.",
   "errors.input.records_source_ambiguous.cause": "both a records folder and --bundle were given.",
