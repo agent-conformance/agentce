@@ -37,6 +37,13 @@ from .. import (
 )
 from ..applicability import resolve as resolve_applicability
 from ..assess import assess_subjects, evaluated_nothing
+from ..records import (
+    BUNDLE_DIR,
+    DERIVED_PROFILE_FILE,
+    RECORDS_LIMITATION,
+    ScannedRecords,
+)
+from ..records import scan as scan_records
 from ..bundle import load_bundle
 from ..catalog import Catalog, lint_catalog, load_catalog
 from ..collect import EnvSecretManager, SourceSpec, load_config, run_collect
@@ -356,14 +363,49 @@ def _parse_emit(raw: str | None) -> frozenset[str] | None:
 
 def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="assess")
-    bundle = _require_dir(
-        _opt_str(ns, "bundle"), key="bundle", what="the evidence bundle"
-    )
-    profile = _require_file(
-        _opt_str(ns, "profile"), key="profile", what="the applicability profile"
-    )
-    catalog = _opt_str(ns, "catalog")
     out = _opt_str(ns, "out") or DEFAULT_OUT_DIR
+    folder_arg = _opt_str(ns, "folder")
+    scanned: ScannedRecords | None = None
+    derived_profile = False
+    if folder_arg is None:
+        bundle = _require_dir(
+            _opt_str(ns, "bundle"), key="bundle", what="the evidence bundle"
+        )
+        profile = _require_file(
+            _opt_str(ns, "profile"), key="profile", what="the applicability profile"
+        )
+        profile_obj = Profile.load(profile)
+    else:
+        # A records folder is read in memory first; nothing is written until the run is known to be
+        # well-formed (below), so a refused run leaves nothing behind that looks like a result.
+        if _opt_str(ns, "bundle") is not None:
+            raise InputError(
+                "input.records_source_ambiguous",
+                "both a records folder and --bundle were given.",
+                "pass either a folder of trace exports or --bundle <dir>, not both.",
+            )
+        folder = _require_dir(
+            folder_arg,
+            key="records",
+            what="the records folder",
+            fix="pass a folder of OpenTelemetry GenAI or OpenInference trace exports.",
+        )
+        profile_arg = _opt_str(ns, "profile")
+        declared: Profile | None = None
+        if profile_arg is not None:
+            profile = _require_file(
+                profile_arg, key="profile", what="the applicability profile"
+            )
+            declared = Profile.load(profile)
+        else:
+            profile = Path(out) / DERIVED_PROFILE_FILE
+        scanned = scan_records(
+            folder, subject=_records_subject(declared), exclude=Path(out)
+        )
+        derived_profile = declared is None
+        profile_obj = declared or Profile.from_dict(scanned.profile)
+        bundle = Path(out) / BUNDLE_DIR
+    catalog = _opt_str(ns, "catalog")
     # --emit is validated before any output is written (below, before ingest/quarantine): an unknown
     # token must never leave a partial or misleading result behind.
     emit = _parse_emit(_opt_str(ns, "emit"))
@@ -373,7 +415,6 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     fail_on_predicate = parse_fail_on(fail_on_raw) if fail_on_raw is not None else None
     # Resolve the catalogs before any output is written: a run that cannot name what it evaluates
     # against — or cannot verify it — must leave nothing behind that looks like a result.
-    profile_obj = Profile.load(profile)
     catalogs, catalog_labels, limitations = _resolve_catalogs(
         catalog,
         profile_obj,
@@ -381,10 +422,13 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         _effective_trust_root(ns),
         allow_unverified=_flag(ns, "allow_unverified_catalog"),
     )
+    out_dir = Path(out)
+    if scanned is not None:
+        scanned.write(out_dir, write_profile=derived_profile)
+        limitations.append(RECORDS_LIMITATION)
     # Stage 1: ingest and validate. A missing/mismatching manifest aborts with exit 3.
     loaded = load_bundle(bundle)
     ingested = ingest(loaded)
-    out_dir = Path(out)
     write_quarantine(ingested.quarantined, out_dir / "quarantine.jsonl")
     # Stage 2: integrity verification, one IntegrityResult per stream.
     integrity_results = verify_bundle(ingested.accepted, loaded.manifest, loaded.root)
@@ -415,7 +459,13 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     drift_findings = sum(len(s["drift"]) for s in statements)
     # Stage 6: catalog evaluation and report artifacts. Each resolved catalog is evaluated
     # against every subject to produce assertions; the report artifacts are rendered from them.
-    evaluated = assess_subjects(ingested.accepted, profile_obj, catalogs, domain)
+    evaluated = assess_subjects(
+        ingested.accepted,
+        profile_obj,
+        catalogs,
+        domain,
+        applicability_declared=scanned is None,
+    )
     # Stage 6a: incremental state (SPEC §5.4 B7, HR-10). With --state the engine detects a changed
     # bundle (late-arriving evidence lands here), supersedes the prior report, and counts late events.
     state_arg = _opt_str(ns, "state")
@@ -436,23 +486,29 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         # a drifted pair's runtime_drift.jsonl line and its manifest digest land in the same run.
         runtime_drift = state.drift(evaluated)
     command_name = _opt_str(ns, "command_name") or "assess"
-    invocation = (
-        ["quickstart"]
-        if command_name == "quickstart"
-        else ["assess", _scrub_path(bundle), _scrub_path(profile)]
-    )
+    if scanned is not None:
+        invocation = ["assess", _scrub_path(str(folder_arg))]
+    elif command_name == "quickstart":
+        invocation = ["quickstart"]
+    else:
+        invocation = ["assess", _scrub_path(bundle), _scrub_path(profile)]
     # The actual re-verify invocation a remediation finding names (SPEC §7): unlike `invocation`
     # above (kept positional for backward compatibility with the manifest), this carries every flag
     # needed to reproduce this run's catalog resolution exactly -- `--catalog` (the resolved
     # id@version labels, always reproducible regardless of how they were originally supplied),
     # every `--catalog-dir`, and `--domain` when one was given.
-    reverify_argv = [
-        "assess",
-        "--bundle",
-        _scrub_path(bundle),
-        "--profile",
-        _scrub_path(profile),
-    ]
+    if scanned is None:
+        reverify_argv = [
+            "assess",
+            "--bundle",
+            _scrub_path(bundle),
+            "--profile",
+            _scrub_path(profile),
+        ]
+    else:
+        reverify_argv = ["assess", _scrub_path(str(folder_arg))]
+        if _opt_str(ns, "profile") is not None:
+            reverify_argv += ["--profile", _scrub_path(profile)]
     if catalog_labels:
         reverify_argv += ["--catalog", ",".join(catalog_labels)]
     for catalog_dir in list(getattr(ns, "catalog_dir", None) or []):
@@ -505,6 +561,11 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "summary": summary,
         }
     )
+    if scanned is not None:
+        result.data["records"] = scanned.summary
+        shown = f"{out}/{DERIVED_PROFILE_FILE}" if derived_profile else None
+        for line in _records_lines(scanned.summary, shown):
+            result.note(line)
     if state is not None:
         result.data["supersedes"] = supersedes
         result.data["late_events"] = late_events
@@ -532,6 +593,54 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         f"assessed {len(evaluated)} (control, subject) pairs; {non_conformant} non-conformant"
     )
     return result
+
+
+def _records_subject(declared: Profile | None) -> str:
+    """The subject a records folder is assessed as: the one subject an adopter's own profile declares,
+    else the engine's default. A folder is one subject; a profile declaring several cannot say which of
+    them the records are about."""
+    if declared is None or not declared.subjects:
+        return DEFAULT_SUBJECT
+    if len(declared.subjects) > 1:
+        raise InputError(
+            "input.records_subject_ambiguous",
+            f"the profile declares {len(declared.subjects)} subjects, and a records folder is "
+            "assessed as one.",
+            "declare one subject in the profile, or assess each agent's records folder separately.",
+        )
+    return declared.subjects[0].id
+
+
+def _printable(text: str) -> str:
+    """``text`` with control characters escaped, so a file name cannot drive the terminal."""
+    return (
+        text.encode("unicode_escape").decode("ascii")
+        if not text.isprintable()
+        else text
+    )
+
+
+def _records_lines(summary: dict[str, Any], profile: str | None) -> list[str]:
+    """What a records-folder run read, what it could not, and where the default profile is (``None``
+    when the adopter passed their own)."""
+    lines = [
+        f"read {summary['events']} events from {len(summary['files'])} record file(s) "
+        f"({summary['spans']} spans; {summary['spans_skipped']} not a GenAI operation the adapter maps)",
+    ]
+    lines += [
+        f"not read: {_printable(item['path'])}: {_printable(item['reason'])}"
+        for item in summary["unrecognised"]
+    ]
+    lines += [
+        f"not read: {_printable(item['path'])} line {item['line']}: {_printable(item['reason'])}"
+        for item in summary["unrecognised_lines"]
+    ]
+    if profile is not None:
+        lines.append(
+            f"default profile: {_printable(profile)} (declare your agents there and pass it back with "
+            "--profile to refine the run)"
+        )
+    return lines
 
 
 def _verdict_lines(

@@ -126,6 +126,8 @@ def _assert_control(
     events: list[dict[str, Any]],
     events_by_iri: dict[str, dict[str, Any]],
     window: tuple[str, str],
+    *,
+    applicability_declared: bool = True,
 ) -> Assertion:
     base: dict[str, Any] = {
         "control": control.id,
@@ -149,7 +151,16 @@ def _assert_control(
         store, shape, catalog.shapes, control.id
     )
     if not applicable:
-        return Assertion(outcome="not_applicable", population=(0, 0), **base)
+        # Where nobody declared what the agent decides (a profile derived from the records), an empty
+        # population says the records show none, not that the control does not apply: report that the
+        # evidence is not enough rather than claim the control is out of scope.
+        return Assertion(
+            outcome="not_applicable"
+            if applicability_declared
+            else "insufficient_evidence",
+            population=(0, 0),
+            **base,
+        )
     if not _has_minimum_evidence(events, control.minimum_evidence):
         return Assertion(
             outcome="insufficient_evidence", population=(len(applicable), 0), **base
@@ -195,8 +206,14 @@ def assess_subjects(
     profile: Profile,
     catalogs: list[Catalog],
     domain: DomainBinding,
+    *,
+    applicability_declared: bool = True,
 ) -> list[Assertion]:
-    """Evaluate every catalog control against every subject and return the assertions."""
+    """Evaluate every catalog control against every subject and return the assertions.
+
+    ``applicability_declared`` is False only for a profile the engine derived from a records folder:
+    the adopter has declared no decision types, so a control with no population in the records is
+    reported as ``insufficient_evidence``, never ``not_applicable``."""
     assertions: list[Assertion] = []
     events_by_subject = index_by_subject(accepted)
     for subject in profile.subjects:
@@ -219,6 +236,7 @@ def assess_subjects(
                         subject_events,
                         events_by_iri,
                         window,
+                        applicability_declared=applicability_declared,
                     )
                 )
     return assertions

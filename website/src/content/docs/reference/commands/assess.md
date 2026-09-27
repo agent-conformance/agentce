@@ -14,6 +14,16 @@ usage: agentce assess [-h] [--json] [--debug] [--quiet] [--bundle BUNDLE]
                       [--probes PROBES] [--out OUT] [--state STATE]
                       [--report-language REPORT_LANGUAGE] [--emit EMIT]
                       [--fail-on FAIL_ON]
+                      [folder]
+
+Run a full assessment: `agentce assess <folder>` over a folder of trace
+exports, or `agentce assess --bundle <dir> --profile <file>` over an evidence
+bundle.
+
+positional arguments:
+  folder                a folder of OpenTelemetry GenAI or OpenInference trace
+                        exports (.json, .jsonl, .ndjson): assess reads it and
+                        writes a default profile, so no other flag is needed
 
 options:
   -h, --help            show this help message and exit

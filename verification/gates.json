@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.2.0",
+  "suite_version": "0.3.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -98,6 +98,41 @@
         }
       ],
       "fix_hint": "Run the gate's command from engines/python and read the failing test; the catalog is spec/catalogs/base/baseline and its vendored copies are re-made and re-signed with conformance/dev_trust.py."
+    },
+    {
+      "id": "VG-FIRST-REPORT-TIME",
+      "title": "An installed package turns a folder of OpenTelemetry records into a report with no flags, offline, in under five minutes",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": ["bash", "verification/gates/first_report_time.sh"],
+      "requires": ["uv"],
+      "timeout_s": 900,
+      "invariant": "Tests run with no network",
+      "rubric": {
+        "pass": "`agentce assess <folder>` reads OpenTelemetry GenAI and OpenInference exports (one document per .json file or per .jsonl line) with no other argument, lists every file it cannot read with a reason, refuses a folder with no recognised record before writing anything, and evaluates the baseline lens; the adapter it carries is byte-identical to the adapter source; the built wheel, installed into a clean environment and run from an empty directory with the network cut, produces the report within 300 seconds of the start of the install (install steps use the local package cache; the run steps are offline)",
+        "fail": "assess needs a flag or a hand-written profile for a records folder, a file is dropped without a reason, a refused run leaves output behind, the carried adapter differs from its source, the installed wheel cannot read the records, or the install plus first report takes longer than 300 seconds"
+      },
+      "faults": [
+        {
+          "description": "a required flag is reintroduced: a records folder needs a hand-written --profile again",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "            profile = Path(out) / DERIVED_PROFILE_FILE\n",
+          "replace": "            profile = _require_file(None, key=\"profile\", what=\"the applicability profile\")\n"
+        },
+        {
+          "description": "the adapter the installed package carries drifts from the adapter source",
+          "file": "engines/python/agentce/records/otel_genai.py",
+          "search": "    if operation in {\"retrieve\", \"retrieval\"}:",
+          "replace": "    if operation in {\"retrieve\"}:"
+        },
+        {
+          "description": "a trace export the adapter reads is treated as not a record",
+          "file": "engines/python/agentce/records/__init__.py",
+          "search": "    if not result.events:\n",
+          "replace": "    if result.events:\n"
+        }
+      ],
+      "fix_hint": "Run the gate's command: the engine tests are engines/python/tests/test_records_assess.py, the installed-package check is tools/installed_artifacts_check.py records; the carried adapter is re-synced with `cp adapters/otel-genai/src/agentce_adapters/otel_genai.py engines/python/agentce/records/otel_genai.py`."
     }
   ]
 }

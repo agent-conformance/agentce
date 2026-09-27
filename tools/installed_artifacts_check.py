@@ -23,8 +23,13 @@ Network cut-off: inside a network namespace (``unshare -rn``) where the kernel a
 proxies plus the offline switches of each tool. ``--require-netns`` makes the namespace mandatory (CI).
 Install steps may fetch third-party dependencies; every run step is offline.
 
+* ``records``: build and install the wheel, then time ``agentce assess <folder>`` over a folder of
+  OpenTelemetry GenAI exports and one of OpenInference exports, with no other argument: the report must
+  evaluate the baseline and the install plus the first report must fit the five-minute budget (Hill 1).
+  It is its own kind (the build gate VG-FIRST-REPORT-TIME runs it); ``all`` does not include it.
+
 Usage:
-    installed_artifacts_check.py {python,npm,jar,all} [--offline] [--require-netns] [--json]
+    installed_artifacts_check.py {python,records,npm,jar,all} [--offline] [--require-netns] [--json]
     installed_artifacts_check.py --self-test
 """
 
@@ -39,6 +44,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 from collections.abc import Iterator
 from pathlib import Path
@@ -192,11 +198,15 @@ def _outside_checkout(path: Path) -> bool:
     return ROOT not in path.resolve().parents and path.resolve() != ROOT
 
 
-def compare_outputs(reference: Path, installed: Path) -> list[str]:
+def compare_outputs(
+    reference: Path, installed: Path, *, may_be_empty: tuple[str, ...] = ()
+) -> list[str]:
+    """Compare the canonical outputs of an installed run with a checkout run. ``may_be_empty`` names
+    outputs that are legitimately empty for the run (for example an empty quarantine)."""
     problems: list[str] = []
     for name in CANONICAL_OUTPUTS:
         ref, got = reference / name, installed / name
-        if not got.is_file() or got.stat().st_size == 0:
+        if not got.is_file() or (got.stat().st_size == 0 and name not in may_be_empty):
             problems.append(f"installed run wrote no {name}")
         elif not ref.is_file() or not filecmp.cmp(ref, got, shallow=False):
             problems.append(f"{name} differs from the checkout run")
@@ -230,22 +240,11 @@ def check_python_artifact(
     offline_install: bool,
     label: str,
 ) -> list[str]:
-    venv = tmp / f"venv-{label}"
-    empty = tmp / f"empty-{label}"
-    empty.mkdir()
+    installed = _install(runner, artifact, tmp, label, offline_install=offline_install)
+    if isinstance(installed, str):
+        return [installed]
+    venv, empty = installed
     out = tmp / f"out-{label}"
-    proc = runner.run(["uv", "venv", str(venv)], tmp, offline=False)
-    if proc.returncode != 0:
-        return [_fail(f"{label}: create venv", proc)]
-    flags = ["--offline"] if offline_install else []
-    proc = runner.run(
-        ["uv", "pip", "install", *flags, str(artifact)],
-        tmp,
-        offline=False,
-        env={"VIRTUAL_ENV": str(venv)},
-    )
-    if proc.returncode != 0:
-        return [_fail(f"{label}: install {artifact.name}", proc)]
     proc = runner.run(
         [str(venv / "bin" / "agentce"), "quickstart", "--out", str(out)],
         empty,
@@ -255,6 +254,29 @@ def check_python_artifact(
         return [_fail(f"{label}: agentce quickstart from an empty directory", proc)]
     problems = [f"{label}: {p}" for p in compare_outputs(reference, out)]
     return problems + _lens_problems(runner, venv, empty, label)
+
+
+def _install(
+    runner: Runner, artifact: Path, tmp: Path, label: str, *, offline_install: bool
+) -> tuple[Path, Path] | str:
+    """Install ``artifact`` into a clean venv; return the venv and an empty working directory, or the
+    failure text."""
+    venv = tmp / f"venv-{label}"
+    empty = tmp / f"empty-{label}"
+    empty.mkdir()
+    proc = runner.run(["uv", "venv", str(venv)], tmp, offline=False)
+    if proc.returncode != 0:
+        return _fail(f"{label}: create venv", proc)
+    flags = ["--offline"] if offline_install else []
+    proc = runner.run(
+        ["uv", "pip", "install", *flags, str(artifact)],
+        tmp,
+        offline=False,
+        env={"VIRTUAL_ENV": str(venv)},
+    )
+    if proc.returncode != 0:
+        return _fail(f"{label}: install {artifact.name}", proc)
+    return venv, empty
 
 
 def _lens_problems(runner: Runner, venv: Path, empty: Path, label: str) -> list[str]:
@@ -355,6 +377,155 @@ def _lens_problems(runner: Runner, venv: Path, empty: Path, label: str) -> list[
             f"{label}: an empty --catalog was not refused with input.catalog_missing"
         )
     return problems
+
+
+#: The first report from an installed package, from the start of the install to the report on disk
+#: (Hill 1; VG-FIRST-REPORT-TIME).
+FIRST_REPORT_BUDGET_S = 300
+_OTEL_FIXTURES = ROOT / "adapters" / "otel-genai" / "fixtures"
+
+
+def _records_folder(directory: Path, fixtures: list[tuple[str, str]]) -> Path:
+    """A records folder of the adapter's own fixtures: ``(fixture, file name)`` pairs."""
+    directory.mkdir(parents=True)
+    for fixture, name in fixtures:
+        shutil.copy(_OTEL_FIXTURES / fixture / "input.json", directory / name)
+    return directory
+
+
+def _budget_problem(label: str, elapsed_s: float, budget_s: float) -> str | None:
+    if elapsed_s < budget_s:
+        return None
+    return f"{label}: install and first report took {elapsed_s:.0f}s, over the {budget_s:.0f}s budget"
+
+
+def _expected_events(fixtures: list[tuple[str, str]]) -> int:
+    """How many events the adapter's own expected output holds for these fixtures."""
+    return sum(
+        len(
+            (_OTEL_FIXTURES / fixture / "expected.jsonl")
+            .read_text("utf-8")
+            .splitlines()
+        )
+        for fixture, _ in fixtures
+    )
+
+
+def _records_problems(
+    runner: Runner, venv: Path, empty: Path, label: str, started: float
+) -> list[str]:
+    """``agentce assess <folder>`` from the installed package, with no other argument, the network cut:
+    a folder of OpenTelemetry GenAI exports and a folder of OpenInference exports each exit 0, read
+    exactly the events the adapter's expected output lists, evaluate the baseline, write output
+    byte-identical to a run from the checkout, and finish inside the first-report budget counted from
+    ``started`` (the start of the install)."""
+    agentce = str(venv / "bin" / "agentce")
+    cases = {
+        "otel-genai": [
+            ("otel-genai-agent-session", "session.json"),
+            ("otel-genai-chat", "chat.json"),
+        ],
+        "openinference": [("openinference-rag", "rag.json")],
+    }
+    problems: list[str] = []
+    finished = time.monotonic()
+    ran: list[tuple[str, Path, Path]] = []
+    for name, fixtures in cases.items():
+        folder = _records_folder(empty / f"records-{name}", fixtures)
+        out = empty / f"first-report-{name}"
+        proc = runner.run(
+            [agentce, "assess", str(folder), "--out", str(out), "--json"],
+            empty,
+            offline=True,
+        )
+        finished = time.monotonic()
+        if proc.returncode != 0:
+            problems.append(_fail(f"{label}: assess <folder> ({name} records)", proc))
+            continue
+        try:
+            envelope = json.loads(proc.stdout)
+            manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+            labels = [
+                f"{c['id']}@{c['version']}" for c in manifest["inputs"]["catalogs"]
+            ]
+        except (OSError, ValueError, KeyError) as exc:
+            problems.append(f"{label}: the {name} run left no readable result: {exc}")
+            continue
+        want = _expected_events(fixtures)
+        if envelope.get("accepted") != want or envelope.get("quarantined") != 0:
+            problems.append(
+                f"{label}: the {name} run accepted {envelope.get('accepted')} events "
+                f"({envelope.get('quarantined')} quarantined), expected {want}"
+            )
+        if labels != ["baseline@2026.09"]:
+            problems.append(
+                f"{label}: the {name} run evaluated {labels}, not the baseline"
+            )
+        if not (out / "applicability.yaml").is_file():
+            problems.append(f"{label}: the {name} run wrote no default profile")
+        ran.append((name, folder, out))
+    # The reference runs come after the timed installed runs, so they never count against the budget.
+    for name, folder, out in ran:
+        reference = empty / f"reference-{name}"
+        ref_proc = runner.run(
+            [
+                "uv",
+                "run",
+                "--frozen",
+                "--project",
+                str(PY_ENGINE),
+                "agentce",
+                "assess",
+                str(folder),
+                "--out",
+                str(reference),
+            ],
+            empty,
+            offline=False,
+        )
+        if ref_proc.returncode != 0:
+            problems.append(
+                _fail(f"{label}: reference {name} run from the checkout", ref_proc)
+            )
+            continue
+        problems += [
+            f"{label}: {name}: {p}"
+            for p in compare_outputs(reference, out, may_be_empty=("quarantine.jsonl",))
+        ]
+    budget = _budget_problem(label, finished - started, FIRST_REPORT_BUDGET_S)
+    return problems + ([budget] if budget else [])
+
+
+def check_records(runner: Runner, *, offline_install: bool) -> list[str]:
+    """Build the wheel, install it, and time the first report from a records folder."""
+    with _scratch("agentce-first-report-") as raw:
+        tmp = Path(raw)
+        assert _outside_checkout(tmp)
+        flags = ["--offline"] if offline_install else []
+        proc = runner.run(
+            [
+                "uv",
+                "build",
+                *flags,
+                "--wheel",
+                "--out-dir",
+                str(tmp / "dist"),
+                str(PY_ENGINE),
+            ],
+            tmp,
+            offline=False,
+        )
+        wheels = sorted((tmp / "dist").glob("*.whl"))
+        if proc.returncode != 0 or len(wheels) != 1:
+            return [_fail("build the wheel", proc)]
+        started = time.monotonic()
+        installed = _install(
+            runner, wheels[0], tmp, "wheel", offline_install=offline_install
+        )
+        if isinstance(installed, str):
+            return [installed]
+        venv, empty = installed
+        return _records_problems(runner, venv, empty, "wheel", started)
 
 
 def check_python(runner: Runner, *, offline_install: bool) -> list[str]:
@@ -530,12 +701,16 @@ def _npm_run_problems(runner: Runner, empty: Path, version: str) -> list[str]:
         if not (package / rel).exists():
             problems.append(f"the installed package lacks {rel}")
     qs_out = empty / "quickstart-out"
-    proc = runner.run([*exe, "quickstart", "--out", str(qs_out), "--json"], empty, offline=True)
+    proc = runner.run(
+        [*exe, "quickstart", "--out", str(qs_out), "--json"], empty, offline=True
+    )
     try:
         qs_envelope = json.loads(proc.stdout)
     except ValueError:
         qs_envelope = {}
-    problems += [f"quickstart: {p}" for p in assess_smoke_check.check(qs_out, qs_envelope)]
+    problems += [
+        f"quickstart: {p}" for p in assess_smoke_check.check(qs_out, qs_envelope)
+    ]
     return problems
 
 
@@ -606,11 +781,18 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
             qs_envelope = json.loads(proc.stdout)
         except ValueError:
             qs_envelope = {}
-        problems += [f"quickstart: {p}" for p in assess_smoke_check.check(qs_out, qs_envelope)]
+        problems += [
+            f"quickstart: {p}" for p in assess_smoke_check.check(qs_out, qs_envelope)
+        ]
         return problems
 
 
-CHECKS = {"python": check_python, "npm": check_npm, "jar": check_jar}
+CHECKS = {
+    "python": check_python,
+    "records": check_records,
+    "npm": check_npm,
+    "jar": check_jar,
+}
 
 
 def run_all(
@@ -656,7 +838,7 @@ def _inert_jar(directory: Path) -> Path | None:
     src = directory / "Inert.java"
     src.write_text(
         "public class Inert {\n"
-        '    public static void main(String[] args) {\n'
+        "    public static void main(String[] args) {\n"
         '        if (args.length > 0 && args[0].equals("--version")) {\n'
         '            System.out.println("agentce 0.0.0");\n'
         "        }\n"
@@ -671,15 +853,29 @@ def _inert_jar(directory: Path) -> Path | None:
         ["javac", "-d", str(classes), str(src)], capture_output=True, text=True
     )
     if proc.returncode != 0:
-        raise SystemExit(f"self-test: could not compile the inert jar fixture: {proc.stderr}")
+        raise SystemExit(
+            f"self-test: could not compile the inert jar fixture: {proc.stderr}"
+        )
     jar = directory / "inert.jar"
     proc = subprocess.run(
-        ["jar", "--create", "--file", str(jar), "--main-class", "Inert", "-C", str(classes), "."],
+        [
+            "jar",
+            "--create",
+            "--file",
+            str(jar),
+            "--main-class",
+            "Inert",
+            "-C",
+            str(classes),
+            ".",
+        ],
         capture_output=True,
         text=True,
     )
     if proc.returncode != 0:
-        raise SystemExit(f"self-test: could not package the inert jar fixture: {proc.stderr}")
+        raise SystemExit(
+            f"self-test: could not package the inert jar fixture: {proc.stderr}"
+        )
     return jar
 
 
@@ -716,6 +912,11 @@ def self_test() -> int:
         if not any("checkout path" in p for p in compare_outputs(good, leak)):
             failures.append("a report embedding the checkout path was accepted")
 
+        if _budget_problem("t", 10, 300) is not None:
+            failures.append("a fast first report was reported as over budget")
+        if _budget_problem("t", 400, 300) is None:
+            failures.append("a first report over the budget was accepted")
+
         # An inert wheel installs and exits 0 but evaluates nothing: it must be rejected.
         inert = _inert_wheel(tmp, package_version())
         reference = tmp / "reference"
@@ -726,6 +927,15 @@ def self_test() -> int:
         if not problems:
             failures.append(
                 "an inert wheel that evaluates nothing passed the installed-artifact check"
+            )
+        installed = _install(runner, inert, tmp, "inert-records", offline_install=False)
+        if isinstance(installed, str):
+            failures.append(f"could not install the inert wheel: {installed}")
+        elif not _records_problems(
+            runner, installed[0], installed[1], "inert", time.monotonic()
+        ):
+            failures.append(
+                "an inert wheel that reads no records passed the records check"
             )
         if _outside_checkout(ROOT):
             failures.append("the checkout was reported to be outside itself")
@@ -799,7 +1009,7 @@ def main(argv: list[str] | None = None) -> int:
         return self_test()
     if args.kind is None:
         parser.error("choose python, npm, jar, or all")
-    kinds = list(CHECKS) if args.kind == "all" else [args.kind]
+    kinds = [k for k in CHECKS if k != "records"] if args.kind == "all" else [args.kind]
     results = run_all(kinds, offline=args.offline, require_netns=args.require_netns)
     failed = {k: v for k, v in results.items() if v}
     if args.json:

@@ -3,6 +3,13 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.3.0
+
+- Added `VG-FIRST-REPORT-TIME`: an installed package turns a folder of OpenTelemetry GenAI or OpenInference
+  records into a report with `agentce assess <folder>` and no other argument, offline, within five minutes of the
+  start of the install; files it cannot read are listed with a reason and a folder with no recognised record is
+  refused before anything is written.
+
 ## 0.2.0
 
 - Added `VG-BASELINE-LENS`: the baseline catalog cites at least two standards per control by clause reference

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 import shlex
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -274,11 +275,20 @@ def test_the_documented_assess_example_evaluates_as_written(
     checkout has), run the command exactly as documented, and require real assertions."""
     (tmp_path / "corpus").mkdir()
     (tmp_path / "corpus" / "quickstart").symlink_to(_QUICKSTART)
+    # The trace exports a page's records-folder example points at.
+    traces = tmp_path / "traces"
+    traces.mkdir()
+    fixtures = _REPO_ROOT / "adapters" / "otel-genai" / "fixtures"
+    shutil.copy(
+        fixtures / "otel-genai-agent-session" / "input.json", traces / "run.json"
+    )
     monkeypatch.chdir(tmp_path)
     assert cli.main([*words, "--json"]) == 0, capsys.readouterr()
     capsys.readouterr()
     out = tmp_path / words[words.index("--out") + 1]
     assert _assertion_count(out) > 0
+    if "--domain" not in words:
+        return  # a records-folder example carries no domain binding to strip
 
     # Without its domain binding the same run still exits 0 yet judges almost nothing (most controls
     # come out not_applicable), so the example must reach more verdicts than the stripped command.

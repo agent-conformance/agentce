@@ -53,6 +53,27 @@ The run writes the assertions, the human report, and the OSCAL and SARIF renderi
 coverage, integrity, and quarantine detail. Validate the artifacts against their schemas with
 `agentce report --validate ./out`.
 
+## Assess a folder of traces
+
+If your agent already writes OTLP/JSON traces (OpenTelemetry GenAI spans, including OpenInference spans), you do not need a bundle or a
+profile to see a first report. Point `assess` at the folder that holds the exports (`.json` files with one
+trace document each, or `.jsonl` files with one document per line):
+
+```bash
+uv run --project engines/python agentce assess ./traces --out ./out
+```
+
+The engine reads every trace export it recognises (vendor-native export formats are not read yet), writes an evidence bundle and a default profile under
+`./out` (`./out/applicability.yaml`), and assesses against the baseline lens. It lists each file it could
+not read with the reason, and it stops with exit code `3` and the message key `input.records_none_recognised`
+when the folder holds nothing it can read.
+
+Traces record model calls and tool calls, not decisions, and nothing yet says which tool calls are
+consequential. So a records run never calls a check "not applicable" on the strength of records that could not
+show it: every check the records give no population for reports *insufficient evidence*, and the manifest
+records that the run was assessed from trace records only. A profile you pass with `--profile` is used as you
+wrote it and is never overwritten; `./out/applicability.yaml` is the starting point to copy and edit.
+
 ## Inspect and verify
 
 - `agentce config show --json` prints every option, its resolved value, and where that value came from.

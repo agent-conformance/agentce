@@ -27,6 +27,19 @@ A run over this project ends with 25 conformant, 19 insufficient evidence, 5 not
 
 <!-- quickstart-run:end -->
 
+## Assess your own traces
+
+If your agent already writes OpenTelemetry GenAI or OpenInference traces to a folder, one argument is enough:
+
+```bash
+uv run --project engines/python agentce assess ./traces --out ./out
+```
+
+The engine reads the exports it recognises, writes a default profile to `./out/applicability.yaml`, and assesses
+against the baseline lens. Files it cannot read are listed with the reason. See
+[Running assessments](../website/src/content/docs/docs/running-assessments.md) for what the default profile
+leaves undeclared.
+
 Validate the report artifacts against their schemas with:
 
 ```bash

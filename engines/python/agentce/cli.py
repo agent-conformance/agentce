@@ -82,7 +82,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--release", help="verify a release artifact's signatures")
     p.set_defaults(func=commands.cmd_verify)
 
-    p = sub.add_parser("assess", parents=[common], help="run a full assessment")
+    p = sub.add_parser(
+        "assess",
+        parents=[common],
+        help="run a full assessment",
+        description="Run a full assessment: `agentce assess <folder>` over a folder of trace "
+        "exports, or `agentce assess --bundle <dir> --profile <file>` over an evidence bundle.",
+    )
+    p.add_argument(
+        "folder",
+        nargs="?",
+        help="a folder of OpenTelemetry GenAI or OpenInference trace exports (.json, .jsonl, "
+        ".ndjson): assess reads it and writes a default profile, so no other flag is needed",
+    )
     p.add_argument("--bundle", help="the evidence bundle directory")
     p.add_argument(
         "--catalog",
