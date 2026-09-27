@@ -564,6 +564,39 @@ def test_an_output_folder_that_would_overwrite_the_records_is_refused_and_nothin
     assert {p: p.read_bytes() for p in bundle.rglob("*") if p.is_file()} == before
 
 
+def test_a_different_spelling_of_the_same_folder_is_still_a_collision(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    records = _records(tmp_path / "traces")
+    if not (tmp_path / "TRACES").exists():
+        pytest.skip("this file system tells folder names apart by case")
+    before = {p: p.read_bytes() for p in records.rglob("*") if p.is_file()}
+    code, env = _run(
+        ["assess", str(records), "--out", str(tmp_path / "TRACES")], capsys
+    )
+    assert code == 3 and env["error"]["key"] == "input.records_out_collides"
+
+    out = tmp_path / "out"
+    stale = _records(out / "records-bundle")
+    (stale / "manifest.json").write_text("{}", encoding="utf-8")
+    before |= {p: p.read_bytes() for p in stale.rglob("*") if p.is_file()}
+    code, env = _run(["assess", str(out / "Records-Bundle"), "--out", str(out)], capsys)
+    assert code == 3 and env["error"]["key"] == "input.records_out_collides"
+    assert {p: p.read_bytes() for p in before} == before
+
+
+def test_a_records_run_that_judges_nothing_renders_no_report(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("agentce.commands.evaluated_nothing", lambda _a: True)
+    out = tmp_path / "out"
+    code, env = _run(
+        ["assess", str(_records(tmp_path / "records")), "--out", str(out)], capsys
+    )
+    assert code == 3 and env["error"]["key"] == "input.nothing_evaluated"
+    assert not (out / "report.md").exists() and not (out / "report.html").exists()
+
+
 def test_a_profile_that_declares_no_subject_is_refused_before_anything_is_written(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

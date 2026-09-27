@@ -466,6 +466,9 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         domain,
         applicability_declared=scanned is None,
     )
+    # A records run that judged nothing renders no report: its headline would read "Conformant".
+    if scanned is not None and evaluated_nothing(evaluated):
+        raise _nothing_evaluated(profile_obj, ingested.accepted, len(evaluated))
     # Stage 6a: incremental state (SPEC §5.4 B7, HR-10). With --state the engine detects a changed
     # bundle (late-arriving evidence lands here), supersedes the prior report, and counts late events.
     state_arg = _opt_str(ns, "state")

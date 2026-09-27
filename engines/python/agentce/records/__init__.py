@@ -151,6 +151,20 @@ def _adapt(payload: bytes, subject: str) -> otel_genai.AdaptResult:
 COMPRESSED_SUFFIXES = frozenset({".gz", ".tgz", ".zip", ".zst", ".bz2", ".xz"})
 
 
+def _same(a: Path, b: Path) -> bool:
+    """True when ``a`` and ``b`` are the same folder on disk, however each is spelled (case, Unicode
+    form, symlinks); a path that does not exist is the same as nothing."""
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return False
+
+
+def _within(path: Path, root: Path) -> bool:
+    """True when ``path`` is ``root`` or lies under it, compared by identity on disk, not by spelling."""
+    return any(_same(p, root) for p in (path, *path.parents))
+
+
 def _candidates(
     folder: Path, skip: list[Path], unread: list[dict[str, str]]
 ) -> list[tuple[str, Path | None]]:
@@ -162,7 +176,7 @@ def _candidates(
         here = Path(dirpath)
         kept = []
         for d in sorted(dirnames):
-            if d.startswith(".") or (here / d).resolve() in skip:
+            if d.startswith(".") or any(_same(here / d, tree) for tree in skip):
                 continue
             if (here / d).is_symlink():
                 unread.append(
@@ -243,7 +257,7 @@ def scan(folder: Path, *, subject: str, exclude: Path | None = None) -> ScannedR
         stale = out / BUNDLE_DIR
         skip.append(stale)
         if (
-            folder.is_relative_to(stale)
+            _within(folder, stale)
             or stale.is_symlink()
             or (stale.is_dir() and not (stale / "manifest.json").is_file())
         ):
@@ -253,8 +267,8 @@ def scan(folder: Path, *, subject: str, exclude: Path | None = None) -> ScannedR
                 "holds the records or is not a previous run's bundle; writing there would overwrite records.",
                 "choose an output folder outside the records folder with --out, or an empty one.",
             )
-        if out.is_relative_to(folder):
-            if out == folder or (
+        if _within(out, folder):
+            if _same(out, folder) or (
                 out.exists() and not stale.is_dir() and any(out.iterdir())
             ):
                 raise InputError(
