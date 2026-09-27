@@ -1,0 +1,24 @@
+id: NEED-02
+version: "2026.09"
+title: Fixture control requiring one evidence type the sibling control also needs
+description: >
+  Gate fixture only (verification/gates/blind_spots_engines.sh): requires only a ToolCall, which the
+  fixture subject's one event does not provide -- an exactly-one-missing-requirement case (RFC 0008
+  Sec.2's minimum-evidence branch), so (ToolCall, any) gains a `checks_unlocked` count that
+  (ModelCall, any) does not. Gives the gate's two blind spots different `checks_unlocked` counts (1
+  vs 0) so the ranking sort has something real to get right -- NEED-01 alone ties both groups on
+  every field, so a missing or inverted sort would still happen to match discovery order.
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: any
+  minimum_evidence:
+    - {event: ToolCall, class: any}
+  shape: shapes/NEED-02.ttl
+expectations:
+  - {id: F1, text: "Fixture-only; not a real requirement."}
+severity: high
+tolerance: {kind: count, max: 0}
+test_cases: []

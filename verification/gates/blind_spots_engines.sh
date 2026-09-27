@@ -5,10 +5,14 @@
 # cross-engine agreement alone.
 #
 # The fixture (verification/gates/fixtures/blind_spots/) is small and purpose-built, not the
-# 132-project corpus or corpus/quickstart: its one control (NEED-01) requires a ModelCall and a
-# ToolCall, and its one subject's one event supplies neither, so both requirements are missing at
-# once -- blind-spots.json's `needed_by` case, which never occurs naturally in the existing corpus
-# (every insufficient_evidence assertion there today has exactly one missing requirement).
+# 132-project corpus or corpus/quickstart: its two controls share one subject whose one event
+# supplies neither ModelCall nor ToolCall. NEED-01 requires both at once -- blind-spots.json's
+# `needed_by` case, which never occurs naturally in the existing corpus (every insufficient_evidence
+# assertion there today has exactly one missing requirement). NEED-02 requires only ToolCall, so
+# (ToolCall, any) alone gains a checks_unlocked count -- the two resulting blind spots differ on
+# checks_unlocked (1 vs 0), so their correct rank order (ToolCall first) differs from the order their
+# groups are first created in (ModelCall first, since NEED-01 alone -- both requirements missing at
+# once -- would tie every field and let a missing or inverted sort pass by coincidence).
 # `no_population` is deliberately not exercised by this fixture: it is reachable only through
 # Python's records-folder auto-derived-profile CLI path, which TypeScript and Java have no
 # equivalent of, so no three-engine golden for it is possible (RFC 0008's post-implementation
@@ -56,11 +60,11 @@ for engine in python typescript java; do
     echo "blind-spots: $engine blind-spots.json differs from the committed golden $golden" >&2
     status=1
   fi
-  # A regenerated golden could itself lose the needed_by case (a bad capture, or a Python
-  # regression at --write time); check the property directly too, not only "matches the golden",
-  # and that every entry's owner_key/step_kind/ladder_rung combination is internally consistent
-  # (RFC 0008 Sec.3: rung 1/2 <-> code_change/agent_team, rung 3 <-> request/platform_or_security,
-  # rung 4 <-> request/ticketing_or_iam).
+  # A regenerated golden could itself lose the needed_by case, or the ranking, (a bad capture, or a
+  # Python regression at --write time); check both properties directly too, not only "matches the
+  # golden", and that every entry's owner_key/step_kind/ladder_rung combination is internally
+  # consistent (RFC 0008 Sec.3: rung 1/2 <-> code_change/agent_team, rung 3 <->
+  # request/platform_or_security, rung 4 <-> request/ticketing_or_iam).
   if ! python3 -c "
 import json, sys
 with open('$work/$engine/blind-spots.json', encoding='utf-8') as f:
@@ -75,15 +79,26 @@ consistent = {
     3: ('request', 'platform_or_security'), 4: ('request', 'ticketing_or_iam'),
 }
 for bs in spots:
-    if bs['checks_unlocked'] != 0 or bs['needed_by'] != 1 or bs['unlocked_checks'] != []:
+    if bs['needed_by'] != 1:
         sys.exit(1)
     if (bs['step_kind'], bs['owner_key']) != consistent.get(bs['ladder_rung']):
         sys.exit(1)
+# NEED-02 makes (ToolCall, any) the only group with checks_unlocked > 0 -- ranking teeth: this is
+# real only because the two groups differ on the primary sort key, so the correct order (ToolCall
+# first) is not also the order their groups are first created in (ModelCall first, from NEED-01's
+# own two-missing-keys loop, sorted alphabetically) -- a missing, inverted, or discovery-order
+# ranking would put ModelCall first instead.
+if [s['event'] for s in spots] != ['ToolCall', 'ModelCall']:
+    sys.exit(1)
+if spots[0]['checks_unlocked'] != 1 or spots[0]['unlocked_checks'] == []:
+    sys.exit(1)
+if spots[1]['checks_unlocked'] != 0 or spots[1]['unlocked_checks'] != []:
+    sys.exit(1)
 sys.exit(0)
 "; then
-    echo "blind-spots: $engine's blind_spots did not honestly surface the fixture's needed_by case" >&2
+    echo "blind-spots: $engine's blind_spots did not honestly surface the fixture's needed_by case or its ranking" >&2
     status=1
   fi
 done
-[ "$status" -eq 0 ] && echo "blind-spots: three engines match the golden, needed_by honestly surfaced"
+[ "$status" -eq 0 ] && echo "blind-spots: three engines match the golden, needed_by and ranking honestly surfaced"
 exit "$status"

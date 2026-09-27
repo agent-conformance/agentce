@@ -1,0 +1,7 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+
+# Same shape as NEED-01: no sh:property, targets the same node, so population[0] > 0 here too and
+# the outcome is governed entirely by minimum_evidence (the case under test).
+agentce:NEED-02-Shape a sh:NodeShape ;
+  sh:targetClass agentce:ConsequentialDecision .

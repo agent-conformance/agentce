@@ -3,6 +3,14 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.6.1
+
+- Changed `VG-BLIND-SPOTS`: its fixture gained a second control (`NEED-02`) so its two blind spots differ on
+  `checks_unlocked` (1 vs 0) rather than tying on every field -- the prior single-control fixture could not
+  tell a correct ranking from a missing, inverted, or discovery-order one, since the tied groups' discovery
+  order already matched their (accidentally) correct rank order. Two more seeded faults were added: an
+  inverted ranking key, and a dropped concrete step for a rung.
+
 ## 0.6.0
 
 - Added `VG-BLIND-SPOTS`: the three engines rank the same blind spots over a small, dedicated fixture (not

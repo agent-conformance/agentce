@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.6.0",
+  "suite_version": "0.6.1",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -214,8 +214,8 @@
       "timeout_s": 900,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
-        "pass": "each engine writes blind-spots.json over the fixture (verification/gates/fixtures/blind_spots/), whose one control is missing two distinct requirements at once (the needed_by case); both requirements appear in blind_spots with checks_unlocked=0, needed_by=1, and an owner_key/step_kind/ladder_rung combination consistent with RFC 0008 Sec.3 (rung 1/2 <-> code_change/agent_team, rung 3 <-> request/platform_or_security, rung 4 <-> request/ticketing_or_iam); no_population is empty; each engine's blind-spots.json is byte-identical to the committed golden (blind_spots_golden.json), not merely to the other two engines",
-        "fail": "an engine omits blind-spots.json, a needed_by requirement is missing or wrongly claimed as unlocked (checks_unlocked>0), an owner_key/step_kind/ladder_rung combination is inconsistent, or any engine's output differs from the committed golden"
+        "pass": "each engine writes blind-spots.json over the fixture (verification/gates/fixtures/blind_spots/); NEED-01 is missing two distinct requirements at once (the needed_by case) and NEED-02 is missing only one of them, so the two blind spots differ on checks_unlocked (ToolCall=1, ModelCall=0) and rank in that order -- ToolCall first; both requirements' owner_key/step_kind/ladder_rung combination is consistent with RFC 0008 Sec.3 (rung 1/2 <-> code_change/agent_team, rung 3 <-> request/platform_or_security, rung 4 <-> request/ticketing_or_iam); no_population is empty; each engine's blind-spots.json is byte-identical to the committed golden (blind_spots_golden.json), not merely to the other two engines",
+        "fail": "an engine omits blind-spots.json, a needed_by requirement is missing, checks_unlocked is wrong for either entry, the two entries are not ranked ToolCall-then-ModelCall, an owner_key/step_kind/ladder_rung combination is inconsistent, or any engine's output differs from the committed golden"
       },
       "faults": [
         {
@@ -223,6 +223,18 @@
           "file": "engines/python/agentce/blind_spots.py",
           "search": "    return \"self_report\" if cls in SELF_REPORT_EQUIVALENT_CLASSES else cls\n",
           "replace": "    return cls\n"
+        },
+        {
+          "description": "the ranking is inverted (fewest checks unlocked first) instead of ranking by how many checks each blind spot would unlock",
+          "file": "engines/python/agentce/blind_spots.py",
+          "search": "            -b[\"checks_unlocked\"],\n",
+          "replace": "            b[\"checks_unlocked\"],\n"
+        },
+        {
+          "description": "a rung's concrete step is dropped, so a blind spot reports no step to take",
+          "file": "engines/python/agentce/blind_spots.py",
+          "search": "    1: (\"agent_team\", \"code_change\"),\n",
+          "replace": "    1: (\"agent_team\", \"\"),\n"
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/blind_spots.py, ported field-for-field in engines/typescript/src/blindSpots.ts and engines/java/src/main/java/org/agentce/BlindSpots.java."

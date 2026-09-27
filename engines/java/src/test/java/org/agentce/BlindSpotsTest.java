@@ -248,6 +248,30 @@ class BlindSpotsTest {
     }
 
     @Test
+    void aBlindSpotUnlockingMoreChecksRanksFirstEvenWhenDiscoveredLater() {
+        // The primary sort key is real, not an accident of discovery order: unlike the tie-broken
+        // test above, these two groups differ on checks_unlocked, and the higher-unlocking group
+        // (BEvent) is discovered *after* the lower one (AEvent) -- so a missing or discovery-order
+        // ranking would put AEvent first, and only an actual sort by checks_unlocked puts BEvent
+        // first as it must.
+        Catalog.ControlSpec low = control("C-22", "1", List.of(requirement("AEvent", "any")));
+        Catalog.ControlSpec high1 = control("C-23", "1", List.of(requirement("BEvent", "any")));
+        Catalog.ControlSpec high2 = control("C-24", "1", List.of(requirement("BEvent", "any")));
+        Catalog cat = Catalog.forTest("c", "2026.09", List.of(low, high1, high2));
+        Profile profile = oneSubjectProfile();
+        Assertions.Assertion aLow = assertion(low, "insufficient_evidence", 1, 0);
+        Assertions.Assertion aHigh1 = assertion(high1, "insufficient_evidence", 1, 0);
+        Assertions.Assertion aHigh2 = assertion(high2, "insufficient_evidence", 1, 0);
+        ObjectNode result =
+                BlindSpots.computeBlindSpots(List.of(aLow, aHigh1, aHigh2), profile, List.of(cat), List.of());
+        assertEquals(2, result.get("blind_spots").size());
+        assertEquals("BEvent", result.get("blind_spots").get(0).get("event").asText());
+        assertEquals(2, result.get("blind_spots").get(0).get("checks_unlocked").asInt());
+        assertEquals("AEvent", result.get("blind_spots").get(1).get("event").asText());
+        assertEquals(1, result.get("blind_spots").get(1).get("checks_unlocked").asInt());
+    }
+
+    @Test
     void twoCatalogsSharingAControlIdAndVersionNeverCollide() {
         Catalog.ControlSpec c = control("SHARED-01", "1", List.of(requirement("ModelCall", "self_report")));
         Catalog catA = Catalog.forTest("cat-a", "2026.09", List.of(c));

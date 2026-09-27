@@ -310,6 +310,29 @@ def test_blind_spots_sort_by_rank_then_rung_then_event_then_class() -> None:
     assert events == ["AEvent", "BEvent", "ZEvent"]
 
 
+def test_a_blind_spot_unlocking_more_checks_ranks_first_even_when_discovered_later() -> (
+    None
+):
+    """The primary sort key is real, not an accident of discovery order: unlike the tie-broken test
+    above, these two groups differ on checks_unlocked, and the higher-unlocking group (BEvent) is
+    discovered *after* the lower one (AEvent) -- so a missing or discovery-order ranking would put
+    AEvent first, and only an actual sort by checks_unlocked puts BEvent first as it must."""
+    low = _control("C-22", [{"event": "AEvent", "class": "any"}])
+    high_1 = _control("C-23", [{"event": "BEvent", "class": "any"}])
+    high_2 = _control("C-24", [{"event": "BEvent", "class": "any"}])
+    catalog = _catalog([low, high_1, high_2])
+    assertions = [
+        _assertion(low, outcome="insufficient_evidence", population=(1, 0)),
+        _assertion(high_1, outcome="insufficient_evidence", population=(1, 0)),
+        _assertion(high_2, outcome="insufficient_evidence", population=(1, 0)),
+    ]
+    result = compute_blind_spots(assertions, _profile(), [catalog], [])
+    events = [b["event"] for b in result["blind_spots"]]
+    unlocked = [b["checks_unlocked"] for b in result["blind_spots"]]
+    assert events == ["BEvent", "AEvent"]
+    assert unlocked == [2, 1]
+
+
 def test_is_order_independent_over_assess_subjects_own_order() -> None:
     """A deterministic pure function of its arguments (given assertions in its one true order, RFC
     0008 Sec.6) -- calling it twice with the same input gives the same output."""

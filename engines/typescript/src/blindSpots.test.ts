@@ -242,6 +242,30 @@ test("two blind spots with equal counts sort by (ladder_rung, event, class), not
   );
 });
 
+test("a blind spot unlocking more checks ranks first, even when discovered later", () => {
+  // The primary sort key is real, not an accident of discovery order: unlike the tie-broken test
+  // above, these two groups differ on checks_unlocked, and the higher-unlocking group (BEvent) is
+  // discovered *after* the lower one (AEvent) -- so a missing or discovery-order ranking would put
+  // AEvent first, and only an actual sort by checks_unlocked puts BEvent first as it must.
+  const low = control("C-22", [{ event: "AEvent", class: "any" }]);
+  const high1 = control("C-23", [{ event: "BEvent", class: "any" }]);
+  const high2 = control("C-24", [{ event: "BEvent", class: "any" }]);
+  const cat = catalog("c", [low, high1, high2]);
+  const profile = profileOneSubject();
+  const aLow = assertion(low, "insufficient_evidence", [1, 0]);
+  const aHigh1 = assertion(high1, "insufficient_evidence", [1, 0]);
+  const aHigh2 = assertion(high2, "insufficient_evidence", [1, 0]);
+  const result = computeBlindSpots([aLow, aHigh1, aHigh2], profile, [cat], []);
+  assert.deepEqual(
+    result.blind_spots.map((bs) => bs.event),
+    ["BEvent", "AEvent"],
+  );
+  assert.deepEqual(
+    result.blind_spots.map((bs) => bs.checks_unlocked),
+    [2, 1],
+  );
+});
+
 test("two catalogs sharing a control id and version never collide", () => {
   const c = control("SHARED-01", [{ event: "ModelCall", class: "self_report" }]);
   const catA = catalog("cat-a", [c]);
