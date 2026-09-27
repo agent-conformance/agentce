@@ -70,12 +70,14 @@ from ..report import (
     ASSESS_DEFAULT_EMIT,
     activity_cli_lines,
     blind_spots_cli_lines,
+    has_invisible_codepoint,
     render_evidence_pack,
     render_oscal,
     render_public_statement,
     render_report_html,
     render_report_md,
     render_sarif,
+    sanitize_for_terminal,
     validate_report,
     write_report,
 )
@@ -641,10 +643,14 @@ def _records_subject(declared: Profile | None) -> str:
 
 
 def _printable(text: str) -> str:
-    """``text`` with control characters escaped, so a file name cannot drive the terminal."""
+    """``text`` with control characters escaped, so a file name cannot drive the terminal. The
+    trigger also fires on the shared ``Default_Ignorable_Code_Point`` predicate
+    (:func:`agentce.report.has_invisible_codepoint`), not only ``str.isprintable()`` -- that built-in
+    treats variation selectors, CGJ, the Mongolian free variation selectors, and the Hangul filler
+    characters as printable, so without this they would pass through raw."""
     return (
         text.encode("unicode_escape").decode("ascii")
-        if not text.isprintable()
+        if not text.isprintable() or has_invisible_codepoint(text)
         else text
     )
 
@@ -1321,6 +1327,14 @@ def _diff_assertion_sets(
     return changes
 
 
+def _diff_field(value: str | None) -> str:
+    """``value`` sanitised for the terminal, or the fixed literal ``(none)`` when the key was absent
+    on one side of the diff (an added or removed assertion) -- never passed into the sanitiser, whose
+    empty-placeholder logic means something different (a string that neutralises to nothing), and
+    never rendered as a bare, silently-blank field."""
+    return sanitize_for_terminal(value) if value is not None else "(none)"
+
+
 def cmd_diff(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="diff")
     fix = "pass two assertion files: `agentce diff <report-a> <report-b>`."
@@ -1346,7 +1360,12 @@ def cmd_diff(ns: argparse.Namespace) -> CommandResult:
         result.add_code(int(ExitCode.FINDINGS))
         result.note(f"{len(changes)} assertion(s) differ:")
         for c in changes:
-            result.note(f"  {c['control']} @ {c['subject']}: {c['from']} -> {c['to']}")
+            control = sanitize_for_terminal(c["control"])
+            subject = sanitize_for_terminal(c["subject"])
+            result.note(
+                f"  {control} @ {subject}: "
+                f"{_diff_field(c['from'])} -> {_diff_field(c['to'])}"
+            )
     else:
         result.note("no differences")
     return result

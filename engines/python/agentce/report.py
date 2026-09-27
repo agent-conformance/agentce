@@ -17,6 +17,7 @@ import io
 import json
 import os
 import platform
+import unicodedata
 import uuid
 import xml.etree.ElementTree as ET
 from importlib import resources
@@ -224,12 +225,12 @@ def _activity_undeclared_lines(
     if undeclared["tools"]:
         lines.append(
             f"{cat['report.activity_undeclared_tools_label']}: "
-            + ", ".join(_md_escape(name) for name in undeclared["tools"])
+            + ", ".join(sanitize_for_markdown(name) for name in undeclared["tools"])
         )
     if undeclared["models"]:
         lines.append(
             f"{cat['report.activity_undeclared_models_label']}: "
-            + ", ".join(_md_escape(name) for name in undeclared["models"])
+            + ", ".join(sanitize_for_markdown(name) for name in undeclared["models"])
         )
     return lines
 
@@ -239,14 +240,14 @@ def _activity_rows(
 ) -> list[tuple[str, str]]:
     """``(label, value)`` for every counted-facts row -- the one place the row set and order is
     decided, shared by the Markdown and HTML renderings. Agent, model, and tool names are
-    event-derived strings (SPEC §7 injection hardening), escaped with :func:`_md_escape` before
-    joining so a hostile name (embedded newlines) can never start a new Markdown/terminal line --
-    this section renders before the verdict."""
+    event-derived strings (SPEC §7 injection hardening), escaped with :func:`sanitize_for_markdown`
+    before joining so a hostile name (embedded newlines) can never start a new Markdown/terminal line
+    -- this section renders before the verdict."""
     recorder_labels = {
         k: cat[f"report.activity_recorder_{k}"] for k in RECORDER_CLASSES
     }
     denied_labels = {k: cat[f"report.activity_denied_{k}"] for k in DENIED_KINDS}
-    agents = [_md_escape(a) for a in activity["agents"]]
+    agents = [sanitize_for_markdown(a) for a in activity["agents"]]
     return [
         (
             cat["report.activity_agents_label"],
@@ -254,11 +255,13 @@ def _activity_rows(
         ),
         (
             cat["report.activity_models_label"],
-            ", ".join(_md_escape(m["name"]) for m in activity["models"]) or "0",
+            ", ".join(sanitize_for_markdown(m["name"]) for m in activity["models"])
+            or "0",
         ),
         (
             cat["report.activity_tools_label"],
-            ", ".join(_md_escape(t["name"]) for t in activity["tools"]) or "0",
+            ", ".join(sanitize_for_markdown(t["name"]) for t in activity["tools"])
+            or "0",
         ),
         (
             cat["report.activity_actions_label"],
@@ -331,29 +334,24 @@ def _blind_spot_step_text(step_kind: str, owner_label: str, cat: dict[str, str])
     )
 
 
-def _bs_escape(value: str) -> str:
-    """Neutralise a blind-spot field before it reaches ``report.md``/the terminal (SPEC §7 injection
-    hardening): ``event``/``class`` come from the catalog, but a ``no_population`` entry's ``subject``
-    can be records-derived (the records-folder auto-derived-profile path, RFC 0008 Sec.9) -- the same
-    "renders right after activity, before the verdict" position P11 (item 18.4 rework) forged a fake
-    verdict line through. ``_blind_spots_html`` escapes independently via ``_li_items``/``html.escape``
-    on the same already-``_bs_escape``d text, matching how ``_activity_rows`` escapes once for all
-    three renderings."""
-    return _md_escape(value, empty_placeholder=_MD_ESCAPE_EMPTY_FIELD_PLACEHOLDER)
-
-
 def _blind_spot_rows(
     blind_spots: list[dict[str, Any]], cat: dict[str, str]
 ) -> list[tuple[str, str]]:
     """``(label, value)`` for every blind spot, in the module's own ranked order (never re-sorted
     here): the label names the missing event/class, the value the rung, the step, the owner, and the
-    counts -- the report's rendering of the evidence ladder (RFC 0008 Sec.7)."""
+    counts -- the report's rendering of the evidence ladder (RFC 0008 Sec.7). ``event``/``class`` come
+    from the catalog, but a ``no_population`` entry's ``subject`` can be records-derived (the
+    records-folder auto-derived-profile path, RFC 0008 Sec.9) -- the same "renders right after
+    activity, before the verdict" position P11 (item 18.4 rework) forged a fake verdict line through,
+    so every field here is sanitised via :func:`_sanitize_field`. ``_blind_spots_html`` escapes
+    independently via ``_li_items``/``html.escape`` on the same already-sanitised text, matching how
+    ``_activity_rows`` escapes once for all three renderings."""
     rows: list[tuple[str, str]] = []
     for bs in blind_spots:
         owner_label = _blind_spot_owner_label(bs["owner_key"], cat)
         step = _blind_spot_step_text(bs["step_kind"], owner_label, cat)
         adapters = (
-            ", ".join(_bs_escape(a) for a in bs["supplying_adapters"])
+            ", ".join(_sanitize_field(a) for a in bs["supplying_adapters"])
             or cat["report.blind_spots_no_adapters"]
         )
         value = i18n_format.format_message(
@@ -364,7 +362,7 @@ def _blind_spot_rows(
             step=step,
             adapters=adapters,
         )
-        label = f"{_bs_escape(bs['event'])} ({_bs_escape(bs['class'])})"
+        label = f"{_sanitize_field(bs['event'])} ({_sanitize_field(bs['class'])})"
         rows.append((label, value))
     return rows
 
@@ -376,11 +374,11 @@ def _no_population_rows(
     sentence (RFC 0008 Sec.4) -- no rung, owner, or step, since none is knowable for this case."""
     return [
         (
-            f"{_bs_escape(entry['control'])} on {_bs_escape(entry['subject'])} "
-            f"({_bs_escape(entry['catalog'])}@{_bs_escape(entry['control_version'])})",
+            f"{_sanitize_field(entry['control'])} on {_sanitize_field(entry['subject'])} "
+            f"({_sanitize_field(entry['catalog'])}@{_sanitize_field(entry['control_version'])})",
             i18n_format.format_message(
                 cat["report.blind_spots_no_population_text"],
-                control=_bs_escape(entry["control"]),
+                control=_sanitize_field(entry["control"]),
             ),
         )
         for entry in no_population
@@ -483,19 +481,25 @@ def _finding_md(
 ) -> list[str]:
     """One finding: its control title, outcome, crosswalk citation, and -- when present -- the
     evidence pointers, the offending nodes from its violations, and the control's remediation
-    technique (SPEC §9.3), so a reviewer sees not just the verdict but why and what to do about it."""
+    technique (SPEC §9.3), so a reviewer sees not just the verdict but why and what to do about it.
+    The title (including :func:`_finding_title`'s raw-control fallback), control id, subject id,
+    evidence refs, and violation focus nodes all originate in evidence or a third-party catalog, so
+    every one is sanitised before it reaches this Markdown line (SPEC §7 injection hardening)."""
+    title = sanitize_for_markdown(_finding_title(a, spec))
+    control = sanitize_for_markdown(a.control)
+    subject = sanitize_for_markdown(a.subject)
     lines = [
-        f"- **{_finding_title(a, spec)}** (`{a.control}` @ `{a.subject}`) -> "
+        f"- **{title}** (`{control}` @ `{subject}`) -> "
         f"**{_outcome_label(cat, a.outcome)}** "
         f"(rung {a.rung}, {a.mode}; {a.population[1]}/{a.population[0]} failed)"
     ]
     lines += [f"  - {_crosswalk_text(e, cat)}" for e in a.crosswalk]
     if a.evidence:
-        refs = ", ".join(f"`{e.ref}`" for e in a.evidence)
+        refs = ", ".join(f"`{_sanitize_field(e.ref)}`" for e in a.evidence)
         lines.append(f"  - {cat['report.evidence_label']}: {refs}")
     offending = [str(v.get("focus", "")) for v in a.violations if v.get("focus")]
     if offending:
-        nodes = ", ".join(f"`{node}`" for node in offending)
+        nodes = ", ".join(f"`{_sanitize_field(node)}`" for node in offending)
         lines.append(f"  - {cat['report.violations_label']}: {nodes}")
     hints = _remediation_hints(spec)
     if hints:
@@ -569,24 +573,31 @@ def _provenance_html(catalogs: list[str], invocation: list[str] | None) -> str:
 
 def _row_html(a: Assertion, spec: ControlSpec | None, cat: dict[str, str]) -> str:
     """One finding row: its title, severity, outcome, clause citation, and -- when present -- the
-    evidence pointers, offending nodes, and remediation technique in a Details cell (SPEC §9.3),
-    every field escaped since a control title, an evidence ref, and a violation's focus node can
-    all originate in evidence or a third-party catalog."""
+    evidence pointers, offending nodes, and remediation technique in a Details cell (SPEC §9.3), every
+    field sanitised (via :func:`sanitize_for_html`, dropping bidi/zero-width characters as well as
+    HTML-escaping) since a control title, an evidence ref, and a violation's focus node can all
+    originate in evidence or a third-party catalog."""
     details: list[str] = []
     if a.evidence:
-        refs = ", ".join(html.escape(e.ref) for e in a.evidence)
+        refs = ", ".join(
+            sanitize_for_html(e.ref, placeholder=_SANITIZE_EMPTY_FIELD_PLACEHOLDER)
+            for e in a.evidence
+        )
         details.append(f"{html.escape(cat['report.evidence_label'])}: {refs}")
     offending = [str(v.get("focus", "")) for v in a.violations if v.get("focus")]
     if offending:
-        nodes = ", ".join(html.escape(node) for node in offending)
+        nodes = ", ".join(
+            sanitize_for_html(node, placeholder=_SANITIZE_EMPTY_FIELD_PLACEHOLDER)
+            for node in offending
+        )
         details.append(f"{html.escape(cat['report.violations_label'])}: {nodes}")
     hints = _remediation_hints(spec)
     if hints:
         label = html.escape(cat["report.remediation_label"])
         details.append(f"{label}: {html.escape(', '.join(hints))}")
     return (
-        f"<tr><td>{html.escape(_finding_title(a, spec))}</td>"
-        f"<td>{html.escape(a.control)}</td><td>{html.escape(a.subject)}</td>"
+        f"<tr><td>{sanitize_for_html(_finding_title(a, spec))}</td>"
+        f"<td>{sanitize_for_html(a.control)}</td><td>{sanitize_for_html(a.subject)}</td>"
         f"<td>{html.escape(spec.severity if spec else '')}</td>"
         f"<td>{html.escape(_outcome_label(cat, a.outcome))}</td>"
         f"<td>{'; '.join(html.escape(_crosswalk_text(e, cat)) for e in a.crosswalk)}</td>"
@@ -1225,62 +1236,175 @@ _REMEDIATION_FINDING_OUTCOMES = frozenset(
 #: finding, so it can never drift control to control): don't over-claim, cite the clause with its
 #: verification status, make the minimal change, and re-verify before considering it fixed.
 _REMEDIATION_GUARDRAILS_REF = "remediation.guardrails.v1"
-#: Cap applied when an evidence- or profile-derived string is escaped for Markdown/terminal
-#: rendering (SPEC §7 injection hardening): long enough to stay useful, short enough to bound a
-#: hostile payload.
-_MD_ESCAPE_CAP = 200
+#: Cap applied when a record-derived string is sanitised for Markdown/terminal/HTML rendering (SPEC
+#: §7 injection hardening): long enough to stay useful, short enough to bound a hostile payload.
+_SANITIZE_CAP = 200
 #: Shown in place of a name that neutralises to nothing (e.g. an event/agent name made entirely of
 #: control characters): escaping, never erasure -- real activity is never silently dropped to "0".
-_MD_ESCAPE_EMPTY_PLACEHOLDER = "(unnamed)"
+_SANITIZE_EMPTY_NAME_PLACEHOLDER = "(unnamed)"
 #: Shown in place of a subject id, evidence ref, or violation path that neutralises to nothing --
-#: `_MD_ESCAPE_EMPTY_PLACEHOLDER`'s "(unnamed)" reads oddly for a field that was never a name.
-_MD_ESCAPE_EMPTY_FIELD_PLACEHOLDER = "(empty)"
+#: `_SANITIZE_EMPTY_NAME_PLACEHOLDER`'s "(unnamed)" reads oddly for a field that was never a name.
+_SANITIZE_EMPTY_FIELD_PLACEHOLDER = "(empty)"
+
+#: Unicode General Categories `_neutralize` replaces with a single literal space: control (`Cc`),
+#: private-use (`Co`, an unpredictable glyph in most fonts), lone surrogate (`Cs`, must not crash the
+#: sanitiser if one occurs), and the line/paragraph separators (`Zl`/`Zp`, which fall outside `C*`).
+#: Each represents "the source intended a line break or a visible-but-unpredictable glyph here" -- a
+#: space is an honest, safe stand-in.
+_SPACE_LIKE_CATEGORIES = frozenset({"Cc", "Co", "Cs", "Zl", "Zp"})
+
+#: The complete, current Unicode `Default_Ignorable_Code_Point` property, as (first, last) inclusive
+#: codepoint ranges -- hard-coded once and identical across all three engines, independent of any
+#: engine's own Unicode database version (`Cf` category alone misses variation selectors, CGJ, the
+#: Mongolian free variation selectors, the Hangul fillers, and every reserved-for-future-use DICP
+#: range). Union this with category `Cf` and drop the result entirely (never replace with a space --
+#: these are, by definition, meant to be invisible/zero-width).
+_DICP_RANGES: tuple[tuple[int, int], ...] = (
+    (0x00AD, 0x00AD),
+    (0x034F, 0x034F),
+    (0x061C, 0x061C),
+    (0x115F, 0x1160),
+    (0x17B4, 0x17B5),
+    (0x180B, 0x180F),
+    (0x200B, 0x200F),
+    (0x202A, 0x202E),
+    (0x2060, 0x206F),
+    (0x3164, 0x3164),
+    (0xFE00, 0xFE0F),
+    (0xFEFF, 0xFEFF),
+    (0xFFA0, 0xFFA0),
+    (0xFFF0, 0xFFF8),
+    (0x1BCA0, 0x1BCA3),
+    (0x1D173, 0x1D17A),
+    (0xE0000, 0xE0FFF),
+)
 
 
-def _is_control_like(codepoint: int) -> bool:
-    """C0/C1 controls (``\\n``, ``\\r``, tab, the ESC that starts a terminal escape sequence, NEL
-    U+0085, ...) plus the Unicode line/paragraph separators U+2028/U+2029 -- every codepoint that can
-    move the terminal cursor, start a new line, or hide text, not only whitespace (verifier finding
-    P11 round 2: ``str.split()`` alone leaves ESC and NEL untouched since neither is whitespace)."""
-    return (
-        codepoint <= 0x1F
-        or codepoint == 0x7F
-        or 0x80 <= codepoint <= 0x9F
-        or codepoint in (0x2028, 0x2029)
+def _is_dicp_codepoint(codepoint: int) -> bool:
+    return any(lo <= codepoint <= hi for lo, hi in _DICP_RANGES)
+
+
+def has_invisible_codepoint(text: str) -> bool:
+    """Whether any codepoint in ``text`` is in the drop-set :func:`_neutralize` uses (category `Cf`
+    or the hard-coded ``Default_Ignorable_Code_Point`` table above) -- shared with
+    ``commands._printable``'s widened trigger (SPEC §7 injection hardening), so a variation selector,
+    CGJ, or Mongolian free variation selector is caught there too, not only by `str.isprintable()`
+    (which treats those categories as printable)."""
+    return any(
+        unicodedata.category(ch) == "Cf" or _is_dicp_codepoint(ord(ch)) for ch in text
     )
 
 
-def _md_escape(
-    text: str,
-    cap: int = _MD_ESCAPE_CAP,
-    empty_placeholder: str = _MD_ESCAPE_EMPTY_PLACEHOLDER,
-) -> str:
-    """Neutralise an evidence- or profile-derived string before it reaches `remediation.md`, a
-    report's Markdown/terminal rendering, or any other non-canonical, human-read surface (SPEC §7
-    injection hardening): replace every control character and line/paragraph separator with a space
-    (never just whitespace -- a raw ESC can still write a hostile terminal escape sequence) so the
-    string can never start a new line, forge a heading or a bare instruction line, or manipulate the
-    terminal cursor; collapse the result to single spaces; replace backticks and angle brackets with
-    visually similar but inert characters so the string can neither break out of a template's own
-    backtick delimiters nor pass through as raw HTML when the Markdown is rendered by a browser or
-    forge a `<h2>`/`<br>` of its own (round 3: a hostile name renders inert here even though it is
-    not, and never has been, escaped as `&lt;`/`&gt;` -- that would defeat plain-text/terminal
-    readability, which angle-bracket substitution keeps); and cap its length (by codepoint, never a
-    UTF-16 half of a surrogate pair). A string that neutralises to nothing renders as
-    `empty_placeholder` (a caller names one that fits its own field -- a tool name reads oddly as an
-    empty path or ref, and vice versa), never a silent gap -- escaping, never erasure."""
-    neutralized = "".join(" " if _is_control_like(ord(ch)) else ch for ch in text)
-    collapsed = (
-        " ".join(neutralized.split())
-        .replace("`", "'")
-        .replace("<", "‹")
-        .replace(">", "›")
-    )
-    if not collapsed and text:
-        collapsed = empty_placeholder
+def _collapse_whitespace(text: str) -> str:
+    """Fold every run of the literal space character or a `Zs`-category codepoint (NBSP, ideographic
+    space, ...) into a single ASCII space -- one explicit, per-engine-identical definition of
+    "collapsible whitespace", category-based rather than each language's own differing built-in
+    ``\\s``/``isspace()`` (which let NBSP/U+3000 diverge across engines before)."""
+    parts: list[str] = []
+    in_ws = False
+    for ch in text:
+        if ch == " " or unicodedata.category(ch) == "Zs":
+            if not in_ws:
+                parts.append(" ")
+                in_ws = True
+        else:
+            parts.append(ch)
+            in_ws = False
+    return "".join(parts)
+
+
+def _neutralize(text: str, cap: int, placeholder: str) -> str:
+    """The one shared core every sanitiser target calls first (SPEC §7 injection hardening): replace
+    every `_SPACE_LIKE_CATEGORIES` codepoint with a literal space; drop every `Cf`-or-
+    ``Default_Ignorable_Code_Point`` codepoint entirely (never a space -- removing a zero-width
+    character preserves the string's visual intent); collapse collapsible whitespace to single
+    spaces; trim leading and trailing whitespace; cap by codepoint (never a UTF-16 surrogate half,
+    which Python's own per-codepoint string iteration already guarantees) at `cap`, computed here on
+    the neutralized-but-not-yet-HTML-escaped text, before any HTML-entity expansion a caller applies
+    on top; then render `placeholder` if the result is empty but `text` was not -- escaping, never
+    erasure. `Cn` (unassigned) codepoints are deliberately not filtered: they carry no defined
+    rendering behaviour to exploit, and the one real future-invisible-character risk is already
+    closed permanently by the hard-coded, complete DICP table above."""
+    kept: list[str] = []
+    for ch in text:
+        category = unicodedata.category(ch)
+        if category in _SPACE_LIKE_CATEGORIES:
+            kept.append(" ")
+        elif category == "Cf" or _is_dicp_codepoint(ord(ch)):
+            continue
+        else:
+            kept.append(ch)
+    collapsed = _collapse_whitespace("".join(kept)).strip()
     if len(collapsed) > cap:
         collapsed = collapsed[: cap - 1] + "…"
+    if not collapsed and text:
+        collapsed = placeholder
     return collapsed
+
+
+#: The six substitutions `sanitize_for_markdown`/`sanitize_for_terminal` apply on top of
+#: `_neutralize`'s output: backtick to an inert lookalike (breaks a code-span escape); `<`/`>` to
+#: fullwidth lookalikes (already-established P11 fix, breaks raw HTML); `[`/`]` to fullwidth
+#: lookalikes (breaks Markdown link/image syntax, closing CommonMark's `[text](url)`/`![text](url)`
+#: regardless of what surrounds them); `&` to a fullwidth lookalike (closes the HTML/XML
+#: character-reference decoding path -- `&#x202E;`/`&zwj;`/etc. would otherwise survive `_neutralize`
+#: as plain text and be decoded back into a live bidi/zero-width character by a downstream CommonMark
+#: renderer). Deliberately not a broader "fullwidth every punctuation character" rule -- see
+#: `contracts/P18-18.20.md`'s Design section for why emphasis/strikethrough/pipe-tables stay
+#: unescaped (cosmetic, not a container break).
+_MARKDOWN_SUBSTITUTIONS: tuple[tuple[str, str], ...] = (
+    ("`", "'"),
+    ("<", "‹"),
+    (">", "›"),
+    ("[", "［"),
+    ("]", "］"),
+    ("&", "＆"),
+)
+
+
+def sanitize_for_markdown(
+    text: str,
+    placeholder: str = _SANITIZE_EMPTY_NAME_PLACEHOLDER,
+    cap: int = _SANITIZE_CAP,
+) -> str:
+    """Neutralise a record-derived string before it reaches `remediation.md`, a report's Markdown
+    rendering, or the terminal (SPEC §7 injection hardening; see `contracts/P18-18.20.md`): call
+    `_neutralize` first, then substitute the six Markdown-special characters `_MARKDOWN_SUBSTITUTIONS`
+    names for visually similar but inert lookalikes, so the string can neither forge a heading/HTML
+    element nor form link, image, autolink, or code-span syntax of its own."""
+    neutralized = _neutralize(text, cap, placeholder)
+    for old, new in _MARKDOWN_SUBSTITUTIONS:
+        neutralized = neutralized.replace(old, new)
+    return neutralized
+
+
+#: `sanitize_for_terminal` is a documented alias for `sanitize_for_markdown`, not a second
+#: implementation: every existing call site already computes one sanitised value and reuses it for
+#: both `report.md` and the CLI lines, and terminal text never parses Markdown, so the substitutions
+#: are harmless there. See `contracts/P18-18.20.md`'s Design section for the two checked, documented
+#: residuals of this choice (neither a reason to change the design).
+sanitize_for_terminal = sanitize_for_markdown
+
+
+def sanitize_for_html(
+    text: str,
+    placeholder: str = _SANITIZE_EMPTY_NAME_PLACEHOLDER,
+    cap: int = _SANITIZE_CAP,
+) -> str:
+    """Neutralise a record-derived string for HTML rendering (SPEC §7 injection hardening): call
+    `_neutralize` first (closing the bidi/zero-width vector no independent `html.escape` alone
+    closes), then the language's own HTML-escape on the result -- nothing else. Backtick/bracket
+    characters are not HTML-special and pass through unchanged, which is correct: a literal backtick
+    or bracket in HTML text content is inert."""
+    return html.escape(_neutralize(text, cap, placeholder))
+
+
+def _sanitize_field(text: str) -> str:
+    """`sanitize_for_markdown` with the field placeholder (`_SANITIZE_EMPTY_FIELD_PLACEHOLDER`,
+    "(empty)") rather than the name placeholder -- the one small convenience every call site that
+    renders a subject id, evidence ref, or violation path uses, consolidating what were roughly ten
+    separate `empty_placeholder=` call sites under one name."""
+    return sanitize_for_markdown(text, placeholder=_SANITIZE_EMPTY_FIELD_PLACEHOLDER)
 
 
 def _remediation_severity(spec: ControlSpec | None) -> str:
@@ -1485,35 +1609,20 @@ def render_remediation_package(
 
 def _remediation_md_context(package: dict[str, Any]) -> dict[str, Any]:
     """A render-only view of `package`: every evidence- or profile-derived string the template
-    interpolates (the subject id, each finding's evidence refs and violation paths) is escaped
-    (:func:`_md_escape`); the canonical `package` itself is never mutated -- only this copy feeds the
-    template (SPEC §7 injection hardening)."""
+    interpolates (the subject id, each finding's evidence refs and violation paths) is sanitised
+    (:func:`_sanitize_field`); the canonical `package` itself is never mutated -- only this copy feeds
+    the template (SPEC §7 injection hardening)."""
     ctx = dict(package)
-    ctx["subject"] = _md_escape(
-        str(package.get("subject", "")),
-        empty_placeholder=_MD_ESCAPE_EMPTY_FIELD_PLACEHOLDER,
-    )
+    ctx["subject"] = _sanitize_field(str(package.get("subject", "")))
     findings = []
     for finding in package.get("findings", []):
         f = dict(finding)
         f["evidence"] = [
-            {
-                **e,
-                "ref": _md_escape(
-                    str(e.get("ref", "")),
-                    empty_placeholder=_MD_ESCAPE_EMPTY_FIELD_PLACEHOLDER,
-                ),
-            }
+            {**e, "ref": _sanitize_field(str(e.get("ref", "")))}
             for e in finding.get("evidence", [])
         ]
         f["violations"] = [
-            {
-                **v,
-                "path": _md_escape(
-                    str(v.get("path", "")),
-                    empty_placeholder=_MD_ESCAPE_EMPTY_FIELD_PLACEHOLDER,
-                ),
-            }
+            {**v, "path": _sanitize_field(str(v.get("path", "")))}
             for v in finding.get("violations", [])
         ]
         findings.append(f)
@@ -1536,12 +1645,12 @@ def render_remediation_md(package: dict[str, Any]) -> str:
 def _tool_names_for_subject(subject_events: list[dict[str, Any]]) -> list[str]:
     """Every distinct tool name this subject's own events name (SPEC §7 injection hardening: tool
     names are one of the named evidence-derived-string categories, alongside subject ids and paths),
-    escaped and length-capped with the same :func:`_md_escape` the subject id and evidence refs
-    already use, so a hostile or oversized tool name can neither hide instruction sentences nor blow
-    up a rendered note. Scans every event this subject carries, not only those a specific finding
-    cites as evidence -- a control can be `insufficient_evidence` (no evidence pointer at all) while
-    the subject's raw events still show real tool activity worth surfacing as context. Deduplicated,
-    in first-seen order."""
+    sanitised and length-capped with the same :func:`sanitize_for_markdown` the subject id and
+    evidence refs already use, so a hostile or oversized tool name can neither hide instruction
+    sentences nor blow up a rendered note. Scans every event this subject carries, not only those a
+    specific finding cites as evidence -- a control can be `insufficient_evidence` (no evidence
+    pointer at all) while the subject's raw events still show real tool activity worth surfacing as
+    context. Deduplicated, in first-seen order."""
     names: list[str] = []
     seen: set[str] = set()
     for event in subject_events:
@@ -1552,10 +1661,10 @@ def _tool_names_for_subject(subject_events: list[dict[str, Any]]) -> list[str]:
         name = tool.get("name") if isinstance(tool, dict) else None
         if not name:
             continue
-        escaped = _md_escape(str(name))
-        if escaped not in seen:
-            seen.add(escaped)
-            names.append(escaped)
+        sanitized = sanitize_for_markdown(str(name))
+        if sanitized not in seen:
+            seen.add(sanitized)
+            names.append(sanitized)
     return names
 
 
@@ -1563,27 +1672,15 @@ def _skill_finding_context(
     finding: dict[str, Any], tool_calls: list[str]
 ) -> dict[str, Any]:
     """A render-only view of one remediation-package finding for its ``findings/<control>--<n>.md``
-    note: the same escaping :func:`_remediation_md_context` applies per finding, plus the subject's
-    already-escaped tool names (SPEC §7). The canonical package itself is never mutated."""
+    note: the same sanitising :func:`_remediation_md_context` applies per finding, plus the subject's
+    already-sanitised tool names (SPEC §7). The canonical package itself is never mutated."""
     ctx = dict(finding)
     ctx["evidence"] = [
-        {
-            **e,
-            "ref": _md_escape(
-                str(e.get("ref", "")),
-                empty_placeholder=_MD_ESCAPE_EMPTY_FIELD_PLACEHOLDER,
-            ),
-        }
+        {**e, "ref": _sanitize_field(str(e.get("ref", "")))}
         for e in finding.get("evidence", [])
     ]
     ctx["violations"] = [
-        {
-            **v,
-            "path": _md_escape(
-                str(v.get("path", "")),
-                empty_placeholder=_MD_ESCAPE_EMPTY_FIELD_PLACEHOLDER,
-            ),
-        }
+        {**v, "path": _sanitize_field(str(v.get("path", "")))}
         for v in finding.get("violations", [])
     ]
     ctx["tool_calls"] = list(tool_calls)
