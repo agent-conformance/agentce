@@ -52,18 +52,6 @@ def test_invalid_json_and_non_object_lines_are_skipped() -> None:
     }
 
 
-def test_a_matching_digest_with_a_trusted_key_verifies() -> None:
-    record = _record(
-        kind="attestation",
-        format="sigstore",
-        subject_digests=["sha256:a", "sha256:b"],
-        observed_digests=["sha256:b", "sha256:a"],  # order-independent
-        signature={"key_id": "k1"},
-    )
-    event = adapt(record, subject="s", trusted_keys=["k1"]).events[0]
-    assert event["data"]["verification"]["status"] == "verified"
-
-
 def test_a_bundle_loaded_with_no_components_still_emits() -> None:
     record = _record(
         kind="bundle_loaded", format="bundle-load", bundle_digest="sha256:x"

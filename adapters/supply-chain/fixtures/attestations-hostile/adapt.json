@@ -1,0 +1,10 @@
+{
+  "subject": "spiffe://corp/agents/credit-underwriter",
+  "source_class": "enforcement_point",
+  "trusted_keys": {
+    "key-a": "vHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=",
+    "key-b": "VRVPQgZepaG+oFRjgmviaE65LfksEAAnqrquV8pVQgc=",
+    "key-p256": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAECIu5/yKrKRp0yG/Gd7qJe6re43DM\nYSm4LRcLo/wmQVxELamnFgZ5VtkeqgK5OtQJSQ6HzV51jqajMaHet1uoRg==\n-----END PUBLIC KEY-----\n",
+    "key-nomaterial": null
+  }
+}

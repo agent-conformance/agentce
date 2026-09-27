@@ -24,7 +24,6 @@ events:
       - signer
       - statement_type
       - subject_digests
-      - verification.log_ref
       - verification.method
       - verification.status
-    missing: [acted_for]
+    missing: [acted_for, verification.log_ref]

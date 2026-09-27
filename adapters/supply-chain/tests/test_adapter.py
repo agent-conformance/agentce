@@ -31,7 +31,12 @@ def _by_id(name: str, event_id: str) -> dict[str, Any]:
 
 
 def test_fixtures_present() -> None:
-    assert {f.name for f in FIXTURES} == {"attestations", "bundle-load"}
+    assert {f.name for f in FIXTURES} == {
+        "attestations",
+        "attestations-hostile",
+        "attestations-interop",
+        "bundle-load",
+    }
 
 
 @pytest.mark.parametrize("fixture", FIXTURES, ids=lambda f: f.name)
@@ -80,9 +85,9 @@ def test_a_valid_attestation_verifies() -> None:
     assert att["data"]["@type"] == "Attestation"
     assert att["data"]["verification"] == {
         "status": "verified",
-        "method": "sigstore-bundle",
-        "log_ref": "rekor://index/12345",
+        "method": "dsse-ed25519",
     }
+    assert att["data"]["signer"] == "key-fulcio-1"
 
 
 def test_a_tampered_subject_digest_fails_verification() -> None:
@@ -126,8 +131,8 @@ def test_conventions_name_the_formats() -> None:
     )
 
 
-def test_verification_defaults_to_failed_without_trusted_keys() -> None:
-    # A signed attestation whose key is not in an (empty) trusted set fails.
+def test_a_key_id_alone_is_never_verified() -> None:
+    # Without a signature envelope a record's key id proves nothing, trusted or not.
     record = {
         "timestamp": "2026-05-08T09:00:00.000Z",
         "id": "x",
@@ -136,8 +141,9 @@ def test_verification_defaults_to_failed_without_trusted_keys() -> None:
         "subject_digests": ["sha256:a"],
         "signature": {"key_id": "key-1"},
     }
-    result = adapt(json.dumps(record), subject="s")
-    assert result.events[0]["data"]["verification"]["status"] == "failed"
+    for trusted in (None, ["key-1"]):
+        result = adapt(json.dumps(record), subject="s", trusted_keys=trusted)
+        assert result.events[0]["data"]["verification"] == {"status": "unverified"}
 
 
 def test_an_invalid_component_kind_is_dropped() -> None:
@@ -171,3 +177,13 @@ def test_empty_log_yields_no_events() -> None:
     result = adapt(b"", subject="s")
     assert result.events == []
     assert result.report.records_seen == 0
+
+
+def test_dsse_encoding_matches_the_engines() -> None:
+    # The adapter cannot import the engine at runtime, so pin its copy of the encoding to the engine's.
+    from agentce.signing import _pae as engine_pae
+
+    from agentce_adapters.supply_chain import _pae as adapter_pae
+
+    args = ("application/vnd.in-toto+json", b'{"k": "v"}')
+    assert adapter_pae(*args) == engine_pae(*args)

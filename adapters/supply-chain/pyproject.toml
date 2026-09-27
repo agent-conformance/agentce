@@ -11,6 +11,7 @@ requires-python = ">=3.12"
 license = "Apache-2.0"
 authors = [{ name = "Agent Conformance Engine maintainers" }]
 dependencies = [
+  "cryptography>=50,<51",
   "pyyaml>=6,<7",
 ]
 

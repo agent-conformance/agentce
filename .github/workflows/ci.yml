@@ -285,6 +285,47 @@ jobs:
       - name: ingest, collect, and the collector component all work
         run: uv run --project engines/python --frozen python tools/collect_ingest_check.py
 
+  adapter-supply-chain:
+    # The supply-chain adapter marks an attestation `verified` only after a DSSE signature verifies
+    # against a trusted public key; its tests, hostile and interoperability fixtures, seeded faults,
+    # and the cross-adapter conformance run on every pull request, offline after the sync.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Sync every adapter
+        run: |
+          for adapter in adapters/*/; do
+            if [ -f "$adapter/uv.lock" ]; then (cd "$adapter" && uv sync --frozen); fi
+          done
+      - name: supply-chain adapter tests (coverage threshold kept)
+        working-directory: adapters/supply-chain
+        run: uv run --frozen pytest -q
+      - name: Support matrix matches what the adapter emits
+        working-directory: adapters/supply-chain
+        run: uv run --frozen python -m agentce_adapters.check_support_matrix .
+      - name: Signed fixtures regenerate byte-identically
+        working-directory: adapters/supply-chain
+        run: uv run --frozen python fixtures/generate.py --check
+      - name: Seeded faults turn the signature tests red
+        working-directory: adapters/supply-chain
+        run: uv run --frozen python tests/seeded_fault_demo.py
+      - name: Adapter conformance is byte-identical for every adapter
+        working-directory: adapters
+        run: uv run --project supply-chain --frozen python conformance.py --json | jq -e '.identical == .total and .total > 0 and .round_trip'
+      - name: An ingested hostile export is never verified and never shows a forged signer
+        working-directory: adapters
+        run: >-
+          uv run --project supply-chain --frozen python _ingest.py supply-chain
+          supply-chain/fixtures/attestations-hostile/input.jsonl
+          --subject spiffe://corp/agents/x --source-class enforcement_point
+          | jq -e '[.events[] | select(.data["@type"] == "Attestation") | .data] as $a
+          | ($a | length > 0) and ($a | all(.verification.status != "verified" and .signer == null))'
+
   integration-breadth:
     # Item 16.3: AutoGen, LlamaIndex, Semantic Kernel, Bedrock Agents, and Vertex Agents each really
     # run their named SDK offline and keyless; Langfuse, Phoenix/Arize, Datadog LLM Observability, and

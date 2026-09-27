@@ -2,6 +2,6 @@
   "subject": "spiffe://corp/agents/credit-underwriter",
   "source_class": "enforcement_point",
   "trusted_keys": {
-    "key-fulcio-1": "vHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU="
+    "key-interop": "1AS8RFZa7buJkVDlsLOzK5RBvwy3iEwzEw2o28J90s8="
   }
 }

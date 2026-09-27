@@ -10,23 +10,36 @@ and ``format``):
 * ``attestation``   (a Sigstore/in-toto statement)               -> ``Attestation``.
 
 The adapter **verifies at adapt time** and records the outcome in ``Attestation.verification`` (SPEC
-12.2). Verification is deterministic and offline: it checks the digest binding (the attested
-``subject_digests`` against the digests actually observed at load) and the signer's trust (the key id
-against a vendored trusted-key set). A valid, in-trust, digest-matching attestation is ``verified``; a
-digest mismatch or an untrusted signer is ``failed``; an attestation with no signature is
-``unverified``. Cryptographic verification of the signature bytes against a Fulcio/Rekor trust root is
-a release-time concern (SPEC §8.7, Phase 5), exactly as the engine's integrity verifier defers it.
+12.2). Verification is deterministic and offline. An attestation record carries a DSSE envelope
+(``dsse``) over an in-toto Statement. It is ``verified`` only when a signature in the envelope
+cryptographically verifies, over the DSSE pre-authentication encoding, against a public key the caller
+trusts (Ed25519, or ECDSA on P-256 with SHA-256) *and* the Statement's subject digests equal the digests
+observed at load. A signature that does not verify, a signer outside the trusted set, or a digest
+mismatch is ``failed``; no signature, a trusted key id without key material, or no observed digests to
+bind the Statement to is ``unverified``. The statement type and subject digests are read from the signed
+payload, never from unsigned record fields, and the reported signer is the verifying key's id.
 
 The adapter contract of SPEC 12.1 holds: deterministic ids, preserved timestamps, a declared trust
-class, a recorded convention, no invented events. Standard library only; no network, no learned component.
+class, a recorded convention, no invented events. Standard library plus ``cryptography``; no network, no
+learned component.
 """
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, NamedTuple
+
+from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519
+from cryptography.hazmat.primitives.serialization import (
+    load_der_public_key,
+    load_pem_public_key,
+)
 
 #: The JSON-LD context every canonical payload carries (SPEC 6.2.2).
 BASE_CONTEXT = "https://agent-conformance.org/contexts/evidence/v1"
@@ -38,6 +51,9 @@ VALID_SOURCE_CLASSES = frozenset(
 
 #: Record ``kind`` -> canonical event type.
 _KINDS = {"bundle_loaded": "BundleLoaded", "attestation": "Attestation"}
+
+#: The DSSE payload type of an in-toto Statement; an envelope of any other type is not an attestation.
+_INTOTO_PAYLOAD_TYPE = "application/vnd.in-toto+json"
 
 _COMPONENT_KINDS = frozenset(
     {"skill", "mcp_server", "model", "prompt", "config", "policy"}
@@ -159,37 +175,207 @@ def _base_payload(record: _Record) -> dict[str, Any]:
     return payload
 
 
-# --- Verification (deterministic, offline; SPEC 12.2, §8.7 defers signature-byte crypto). ----------
+# --- Verification (deterministic, offline; SPEC 12.2). ------------------------------------------------
+
+_PublicKey = ed25519.Ed25519PublicKey | ec.EllipticCurvePublicKey
+_KeyTable = dict[str, _PublicKey | None]
 
 
-def _verify(
-    record: _Record, trusted_keys: frozenset[str]
-) -> tuple[str, dict[str, Any]]:
-    """Return (status, verification block) for an attestation record."""
-    subject = _as_str_list(record.raw.get("subject_digests"))
-    signature = _obj(record.raw.get("signature"))
-    key_id = _as_str(signature.get("key_id"))
-    observed = _as_str_list(record.raw.get("observed_digests"))
+def _load_public_key(key_id: str, material: str) -> _PublicKey:
+    """Load one trusted public key: PEM or base64 DER SPKI, or a raw base64 32-byte Ed25519 key."""
+    try:
+        text = material.strip()
+        if text.startswith("-----BEGIN"):
+            key = load_pem_public_key(text.encode("ascii"))
+        else:
+            raw = base64.b64decode(text, validate=True)
+            key = (
+                ed25519.Ed25519PublicKey.from_public_bytes(raw)
+                if len(raw) == 32
+                else load_der_public_key(raw)
+            )
+    except (ValueError, TypeError, binascii.Error, UnsupportedAlgorithm) as exc:
+        raise AdapterError("bad_trusted_key", key_id) from exc
+    if isinstance(key, ed25519.Ed25519PublicKey) or (
+        isinstance(key, ec.EllipticCurvePublicKey)
+        and isinstance(key.curve, ec.SECP256R1)
+    ):
+        return key
+    raise AdapterError("bad_trusted_key", key_id)
 
-    if key_id is None:
-        status = "unverified"
-    elif key_id not in trusted_keys:
-        status = "failed"
-    elif observed and set(observed) != set(subject):
-        status = (
-            "failed"  # the attested subject does not match what was loaded (tampering)
+
+def _trusted_key_table(
+    trusted_keys: Mapping[str, str | None] | Iterable[str] | None,
+) -> _KeyTable:
+    """Key id -> public key; an id given without material maps to ``None`` (it cannot verify)."""
+    if trusted_keys is None:
+        return {}
+    if isinstance(trusted_keys, Mapping):
+        return {
+            key_id: None if material is None else _load_public_key(key_id, material)
+            for key_id, material in trusted_keys.items()
+        }
+    return dict.fromkeys(trusted_keys)
+
+
+def _b64decode(value: object) -> bytes | None:
+    """Strict base64 (standard or URL-safe alphabet, padding optional); ``None`` when malformed."""
+    if not isinstance(value, str):
+        return None
+    if ("+" in value or "/" in value) and ("-" in value or "_" in value):
+        return None
+    text = value.replace("-", "+").replace("_", "/")
+    text += "=" * (-len(text) % 4)
+    try:
+        return base64.b64decode(text, validate=True)
+    except (ValueError, binascii.Error):
+        return None
+
+
+def _pae(payload_type: str, payload: bytes) -> bytes:
+    """DSSE pre-authentication encoding: the exact bytes a signature covers."""
+    kind = payload_type.encode("utf-8")
+    return b"DSSEv1 %d %s %d %s" % (len(kind), kind, len(payload), payload)
+
+
+def _signature_verifies(key: _PublicKey, signature: bytes, message: bytes) -> bool:
+    """Verify ``signature`` over ``message``; the algorithm comes only from the trusted key's type."""
+    try:
+        if isinstance(key, ed25519.Ed25519PublicKey):
+            key.verify(signature, message)
+        else:
+            key.verify(signature, message, ec.ECDSA(hashes.SHA256()))
+    except InvalidSignature:
+        return False
+    return True
+
+
+def _statement_of(envelope: dict[str, Any]) -> tuple[bytes, dict[str, Any]] | None:
+    """The signed in-toto Statement and its payload bytes; ``None`` when the envelope is malformed."""
+    if envelope.get("payloadType") != _INTOTO_PAYLOAD_TYPE:
+        return None
+    payload = _b64decode(envelope.get("payload"))
+    if payload is None:
+        return None
+    try:
+        statement = json.loads(payload)
+    except ValueError:
+        return None
+    if (
+        not isinstance(statement, dict)
+        or _as_str(statement.get("_type")) is None
+        or not isinstance(statement.get("subject"), list)
+    ):
+        return None
+    return payload, statement
+
+
+def _subject_digests(statement: dict[str, Any]) -> list[str]:
+    digests: list[str] = []
+    for subject in statement["subject"]:
+        digest = _obj(_obj(subject).get("digest"))
+        digests.extend(
+            f"{alg}:{value.lower()}"
+            for alg, value in sorted(digest.items())
+            if isinstance(value, str) and value
         )
+    return digests
+
+
+class _SigOutcome(NamedTuple):
+    """One DSSE signature entry, classified: ``verified``, ``bad``, ``untrusted`` or ``nomaterial``."""
+
+    status: str
+    key_id: str | None = None
+    method: str | None = None
+
+
+def _signature_outcome(entry: object, pae: bytes, keys: _KeyTable) -> _SigOutcome:
+    fields = _obj(entry)
+    key_id = _as_str(fields.get("keyid"))
+    if key_id is None:
+        return _SigOutcome("nomaterial")
+    if key_id not in keys:
+        return _SigOutcome("untrusted", key_id)
+    key = keys[key_id]
+    if key is None:
+        return _SigOutcome("nomaterial", key_id)
+    signature = _b64decode(fields.get("sig"))
+    ok = signature is not None and _signature_verifies(key, signature, pae)
+    method = (
+        "dsse-ed25519"
+        if isinstance(key, ed25519.Ed25519PublicKey)
+        else "dsse-ecdsa-p256"
+    )
+    return _SigOutcome("verified" if ok else "bad", key_id, method)
+
+
+@dataclass(frozen=True)
+class _Claims:
+    """What an attestation states: the in-toto statement type and its subject digests."""
+
+    statement_type: str | None = None
+    subject_digests: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class _Verdict:
+    """Outcome of verifying one attestation record. Claims come from the signed payload when there
+    is an envelope; a record with no envelope reports its own unsigned fields, always ``unverified``."""
+
+    status: str
+    method: str | None = None
+    signer: str | None = None
+    claims: _Claims = _Claims()
+
+
+def _verify(record: _Record, keys: _KeyTable) -> _Verdict:
+    """Verify an attestation record's DSSE envelope; unsigned record fields never establish trust."""
+    envelope = record.raw.get("dsse")
+    if not isinstance(envelope, dict):
+        return _Verdict(
+            "unverified",
+            claims=_Claims(
+                _as_str(record.raw.get("statement_type")),
+                tuple(_as_str_list(record.raw.get("subject_digests"))),
+            ),
+        )
+    entries = envelope.get("signatures")
+    entries = entries if isinstance(entries, list) else []
+    decoded = _statement_of(envelope)
+    if decoded is None:
+        return _Verdict("failed" if entries else "unverified")
+    payload, statement = decoded
+    claims = _Claims(
+        _as_str(statement.get("_type")), tuple(_subject_digests(statement))
+    )
+
+    # Any verifying signature wins (stop at the first); otherwise a bad or untrusted one makes it failed.
+    pae = _pae(_INTOTO_PAYLOAD_TYPE, payload)
+    verified = bad = None
+    untrusted = False
+    for entry in entries:
+        outcome = _signature_outcome(entry, pae, keys)
+        if outcome.status == "verified":
+            verified = outcome
+            break
+        if outcome.status == "bad":
+            bad = bad or outcome
+        untrusted = untrusted or outcome.status == "untrusted"
+    if verified is None:
+        if bad or untrusted:
+            return _Verdict("failed", bad.method if bad else None, claims=claims)
+        return _Verdict("unverified", claims=claims)
+
+    observed = {d.lower() for d in _as_str_list(record.raw.get("observed_digests"))}
+    if not observed:
+        status = "unverified"  # nothing was observed to bind the Statement to
+    elif observed != set(claims.subject_digests):
+        status = "failed"  # the signed subject is not what was loaded (tampering)
     else:
         status = "verified"
-
-    verification: dict[str, Any] = {"status": status}
-    method = _as_str(record.raw.get("method"))
-    if method is not None:
-        verification["method"] = method
-    log_ref = _as_str(record.raw.get("log_ref"))
-    if log_ref is not None:
-        verification["log_ref"] = log_ref
-    return status, verification
+    signer = verified.key_id if status == "verified" else None
+    return _Verdict(status, verified.method, signer, claims)
 
 
 # --- Per-kind payload builders (SPEC 12.2). -------------------------------------------------------
@@ -208,7 +394,7 @@ def _component(raw: object) -> dict[str, Any] | None:
     return component or None
 
 
-def _bundle_loaded(record: _Record, _trusted: frozenset[str]) -> dict[str, Any] | None:
+def _bundle_loaded(record: _Record, _keys: _KeyTable) -> dict[str, Any] | None:
     payload = _base_payload(record)
     bundle_digest = _as_str(record.raw.get("bundle_digest"))
     if bundle_digest is not None:
@@ -228,20 +414,18 @@ def _bundle_loaded(record: _Record, _trusted: frozenset[str]) -> dict[str, Any] 
     return payload
 
 
-def _attestation(
-    record: _Record, trusted_keys: frozenset[str]
-) -> dict[str, Any] | None:
+def _attestation(record: _Record, keys: _KeyTable) -> dict[str, Any] | None:
     payload = _base_payload(record)
-    statement_type = _as_str(record.raw.get("statement_type"))
-    if statement_type is not None:
-        payload["statement_type"] = statement_type
-    subject_digests = _as_str_list(record.raw.get("subject_digests"))
-    if subject_digests:
-        payload["subject_digests"] = subject_digests
-    signer = _as_str(record.raw.get("signer"))
-    if signer is not None:
-        payload["signer"] = signer
-    _status, verification = _verify(record, trusted_keys)
+    verdict = _verify(record, keys)
+    if verdict.claims.statement_type is not None:
+        payload["statement_type"] = verdict.claims.statement_type
+    if verdict.claims.subject_digests:
+        payload["subject_digests"] = list(verdict.claims.subject_digests)
+    if verdict.signer is not None:
+        payload["signer"] = verdict.signer
+    verification: dict[str, Any] = {"status": verdict.status}
+    if verdict.method is not None:
+        verification["method"] = verdict.method
     payload["verification"] = verification
     return payload
 
@@ -300,18 +484,20 @@ def adapt(
     subject: str,
     source_class: str = "enforcement_point",
     source: str | None = None,
-    trusted_keys: Iterable[str] | None = None,
+    trusted_keys: Mapping[str, str | None] | Iterable[str] | None = None,
 ) -> AdaptResult:
     """Adapt one supply-chain log (JSON Lines) into canonical events (SPEC 12).
 
     ``subject`` is the assessed subject system and ``source_class`` the adapter's declared trust class
-    (SPEC 6.4). ``trusted_keys`` is the vendored set of signer key ids the adapter trusts; an
-    attestation signed by a key outside it verifies as ``failed``. ``source`` overrides the source URI
+    (SPEC 6.4). ``trusted_keys`` maps each trusted signer key id to its public key (PEM or base64 DER
+    SPKI; a raw base64 32-byte Ed25519 key is also accepted); a key id given without key material (a
+    ``None`` value, or a plain iterable of ids) can never verify. A key of any type other than Ed25519 or
+    ECDSA P-256 raises :class:`AdapterError` (``bad_trusted_key``). ``source`` overrides the source URI
     otherwise derived from the system or registry id.
     """
     if source_class not in VALID_SOURCE_CLASSES:
         raise AdapterError("bad_source_class", source_class)
-    trusted = frozenset(trusted_keys or ())
+    keys = _trusted_key_table(trusted_keys)
     text = payload.decode("utf-8") if isinstance(payload, bytes) else payload
 
     events: list[dict[str, Any]] = []
@@ -338,7 +524,7 @@ def adapt(
         if record.kind not in _KINDS:
             skipped.append(SkippedRecord(line_number, "unknown_kind"))
             continue
-        body = _BUILDERS[record.kind](record, trusted)
+        body = _BUILDERS[record.kind](record, keys)
         if body is None:
             skipped.append(SkippedRecord(line_number, "incomplete_record"))
             continue
