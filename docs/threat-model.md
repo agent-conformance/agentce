@@ -158,10 +158,10 @@ reading assistant treat it as part of the trusted prompt rather than as inert da
 - **Sanitising, not trust separation by format.** Both renderers build their template context by
   routing every evidence- or profile-derived field -- the subject id, each evidence ref, each
   validation path, each tool-call name -- through the same `sanitize_for_markdown` function
-  (`engines/python/agentce/report.py:1365`, via the `_sanitize_field` convenience at line 1402;
-  `_remediation_md_context` at line 1610 for the remediation package, `_skill_finding_context` at line
-  1671 for the skill folder) before it reaches the template (SPEC §7 injection hardening).
-  `sanitize_for_markdown` calls the shared `_neutralize` core (line 1316) first -- which collapses
+  (`engines/python/agentce/report.py:1354`, via the `_sanitize_field` convenience at line 1391;
+  `_remediation_md_context` at line 1599 for the remediation package, `_skill_finding_context` at line
+  1660 for the skill folder) before it reaches the template (SPEC §7 injection hardening).
+  `sanitize_for_markdown` calls the shared `_neutralize` core (line 1298) first -- which collapses
   embedded newlines, other control characters, and Unicode whitespace to single spaces (so a derived
   string can never start a new line and become a live heading or a bare instruction line of its own)
   and drops bidi-override, zero-width, and other `Default_Ignorable_Code_Point` characters entirely --
@@ -171,17 +171,18 @@ reading assistant treat it as part of the trusted prompt rather than as inert da
   the rendered document come only from the template or the signed catalog; everything evidence-derived
   is sanitised and length-capped this way, never trusted verbatim. This is sanitising, not erasure --
   the string still appears, as inert data.
-- **Same mitigation, two output formats.** `render_remediation_md` (line 1633) and
-  `render_skill_finding_md`/`render_skill_md` (lines 1690/1699) are two templates over the same
+- **Same mitigation, two output formats.** `render_remediation_md` (line 1622) and
+  `render_skill_finding_md`/`render_skill_md` (lines 1679/1688) are two templates over the same
   canonical `remediation-package.json`, and both derive their context through `sanitize_for_markdown`,
   so one row covers both F17's and F31's rendered output.
-- **Proved by hostile fixtures.** `engines/python/tests/test_remediation.py::test_md_escapes_a_hostile_subject_id`
+- **Proved by hostile fixtures.** `engines/python/tests/test_remediation.py::test_sanitize_for_markdown_escapes_a_hostile_subject_id`
   renders a package whose subject id contains a Markdown heading and a backtick fence and asserts the
   rendered document neutralises both; `engines/python/tests/test_skill_emit.py::test_finding_note_escapes_a_hostile_tool_name`
   does the equivalent for a hostile tool-call name in a generated skill finding note;
   `engines/python/tests/test_sanitize.py` covers the shared sanitiser directly, including a
   render-level property test that decodes the rendered Markdown/HTML and asserts no bidi-override or
-  zero-width character survives (item 18.20).
+  zero-width character survives, driven over every named adversarial vector in the committed
+  `spec/report/test-vectors/sanitize-vectors.json` (item 18.20).
 
 ## Assumptions and residual risk
 
