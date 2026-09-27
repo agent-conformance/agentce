@@ -1,0 +1,369 @@
+#!/usr/bin/env python3
+"""The verification suite runner: one command, fixed build gates, machine-readable results.
+
+    ./verification/run --quick                  run every quick-tier gate (offline)
+    ./verification/run --full                   run every gate (quick and full tiers)
+    ./verification/run --gate <ID> [--json]     run one gate
+    ./verification/run --demo-fault <ID>        break the gate's target on purpose, show RED, restore, show GREEN
+    ./verification/run --lint-registry          check the gate registry itself
+    ./verification/run --lint-registry --demo-reject
+                                                show the lint rejecting deliberately bad registries
+    ./verification/run --list                   print the gate ids, one per line
+
+Exit codes: 0 every gate passed (or was skipped and reported as such), 1 a gate failed or the registry was
+rejected, 2 the command line named something that does not exist. Standard library only; no network.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import shutil
+import subprocess
+import sys
+from collections import Counter
+from pathlib import Path
+from typing import Any
+
+HERE = Path(__file__).resolve().parent
+DEFAULT_ROOT = HERE.parent
+TIERS = ("quick", "full")
+GATE_ID = re.compile(r"^VG-[A-Z0-9]+(-[A-Z0-9]+)*(@[0-9A-Za-z.]+)?$")
+TAIL_LINES = 20
+CLAIMS_REGISTER = Path("tools/claims/register.yaml")
+
+
+def load_registry(path: Path) -> dict[str, Any]:
+    registry: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    return registry
+
+
+def read_or_empty(path: Path) -> str:
+    return path.read_text(encoding="utf-8") if path.is_file() else ""
+
+
+def lint_registry(registry: dict[str, Any], root: Path) -> list[str]:
+    """Return one ``<key>: <detail>`` line per problem; an empty list means the registry is accepted."""
+    problems: list[str] = []
+    gates = registry.get("gates")
+    if registry.get("version") != 1 or not isinstance(gates, list) or not gates:
+        return ["registry.malformed: expected version 1 and a non-empty gates list"]
+    # claim ids are matched as loose substrings: stdlib only, no YAML parser
+    claims = read_or_empty(root / CLAIMS_REGISTER)
+    agents = read_or_empty(root / "AGENTS.md")
+    changelog = read_or_empty(root / "verification" / "CHANGELOG.md")
+    seen: set[str] = set()
+    for gate in gates:
+        gid = str(gate.get("id", ""))
+        if not GATE_ID.match(gid):
+            problems.append(f"registry.bad_gate_id: {gid!r}")
+        if gid in seen:
+            problems.append(f"registry.duplicate_gate_id: {gid}")
+        seen.add(gid)
+        if not str(gate.get("title", "")).strip():
+            problems.append(f"registry.gate_without_title: {gid}")
+        rubric = gate.get("rubric")
+        if not (isinstance(rubric, dict) and rubric.get("pass") and rubric.get("fail")):
+            problems.append(f"registry.gate_without_rubric: {gid}")
+        if gate.get("tier") not in TIERS:
+            problems.append(f"registry.bad_tier: {gid}")
+        cmd = gate.get("cmd")
+        if not (
+            isinstance(cmd, list) and cmd and all(isinstance(part, str) for part in cmd)
+        ):
+            problems.append(f"registry.gate_without_command: {gid}")
+        timeout = gate.get("timeout_s")
+        if not (isinstance(timeout, int) and 0 < timeout <= 3600):
+            problems.append(f"registry.bad_timeout: {gid}")
+        cwd = gate.get("cwd", ".")
+        if not (root / cwd).is_dir():
+            problems.append(f"registry.missing_cwd: {gid} {cwd}")
+        claim, invariant = gate.get("claim"), gate.get("invariant")
+        if bool(claim) == bool(invariant):
+            problems.append(
+                f"registry.gate_without_claim: {gid} needs exactly one of claim or invariant"
+            )
+        elif claim and f"  - id: {claim}\n" not in claims:
+            problems.append(f"registry.unknown_claim: {gid} {claim}")
+        elif invariant and invariant not in agents:
+            problems.append(f"registry.unknown_invariant: {gid}")
+        faults = gate.get("faults")
+        if not (isinstance(faults, list) and faults):
+            problems.append(f"registry.gate_without_fault: {gid}")
+            faults = []
+        for fault in faults:
+            problems.extend(lint_fault(gid, fault, root))
+        if gid not in changelog:
+            problems.append(f"registry.gate_not_in_changelog: {gid}")
+    return problems
+
+
+def lint_fault(gid: str, fault: dict[str, Any], root: Path) -> list[str]:
+    target = root / str(fault.get("file", ""))
+    search, replace = fault.get("search"), fault.get("replace")
+    if not (
+        fault.get("description")
+        and isinstance(search, str)
+        and isinstance(replace, str)
+        and search != replace
+    ):
+        return [f"registry.bad_fault: {gid}"]
+    if not target.is_file():
+        return [f"registry.fault_target_missing: {gid} {fault.get('file')}"]
+    if target.read_text(encoding="utf-8").count(search) != 1:
+        return [
+            f"registry.fault_not_applicable: {gid} {fault.get('file')} (the search text must occur exactly once)"
+        ]
+    return []
+
+
+def run_gate(gate: dict[str, Any], root: Path) -> dict[str, Any]:
+    gid = gate["id"]
+    result: dict[str, Any] = {
+        "id": gid,
+        "title": gate["title"],
+        "tier": gate["tier"],
+        "rerun": f"./verification/run --gate {gid}",
+    }
+    missing = [tool for tool in gate.get("requires", []) if shutil.which(tool) is None]
+    if missing:
+        return {
+            **result,
+            "status": "skipped",
+            "reason": f"missing toolchain: {', '.join(missing)}",
+        }
+    hint = gate.get(
+        "fix_hint",
+        "Read the output above, fix the code the gate names, then re-run it.",
+    )
+    failed = {**result, "status": "fail", "fix_hint": hint}
+    try:
+        proc = subprocess.run(
+            gate["cmd"],
+            cwd=root / gate.get("cwd", "."),
+            capture_output=True,
+            text=True,
+            timeout=gate["timeout_s"],
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return {**failed, "reason": f"timed out after {gate['timeout_s']} s"}
+    except OSError as error:
+        return {**failed, "reason": f"could not start: {error.strerror}"}
+    if proc.returncode == 0:
+        return {**result, "status": "pass"}
+    tail = "\n".join((proc.stdout + proc.stderr).strip().splitlines()[-TAIL_LINES:])
+    return {**failed, "reason": f"exit code {proc.returncode}", "output_tail": tail}
+
+
+def demo_fault(gate: dict[str, Any], root: Path) -> dict[str, Any]:
+    """Apply each seeded fault in place, expect RED, restore the exact bytes, expect GREEN."""
+    faults = gate["faults"]
+    red_on_fault = True
+    restored = True
+    for fault in faults:
+        target = root / fault["file"]
+        original = target.read_bytes()
+        try:
+            target.write_bytes(
+                original.decode("utf-8")
+                .replace(fault["search"], fault["replace"], 1)
+                .encode("utf-8")
+            )
+            if run_gate(gate, root)["status"] != "fail":
+                red_on_fault = False
+        finally:
+            target.write_bytes(original)
+            restored = restored and target.read_bytes() == original
+    return {
+        "id": gate["id"],
+        "faults": [fault["description"] for fault in faults],
+        "red_on_fault": red_on_fault,
+        "green_after_restore": restored and run_gate(gate, root)["status"] == "pass",
+    }
+
+
+def summarise(
+    results: list[dict[str, Any]], tier: str, registry: dict[str, Any]
+) -> dict[str, Any]:
+    failed = any(entry["status"] == "fail" for entry in results)
+    return {
+        "suite_version": registry["suite_version"],
+        "tier": tier,
+        "status": "fail" if failed else "pass",
+        "gates": results,
+    }
+
+
+def emit(payload: dict[str, Any], as_json: bool, lines: list[str]) -> None:
+    if as_json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print("\n".join(lines))
+
+
+def describe(entry: dict[str, Any]) -> list[str]:
+    head = f"{entry['status'].upper():7} {entry['id']}  {entry['title']}"
+    lines = [head]
+    if entry["status"] != "pass":
+        lines.append(f"        {entry.get('reason', '')}")
+    if entry["status"] == "fail":
+        lines.extend(
+            f"        | {row}" for row in entry.get("output_tail", "").splitlines()
+        )
+        lines.append(f"        fix: {entry['fix_hint']}")
+        lines.append(f"        re-run: {entry['rerun']}")
+    return lines
+
+
+def bad_registries() -> dict[str, tuple[dict[str, Any], str]]:
+    """Deliberately bad registries, each with the message key the lint must raise for it."""
+    base: dict[str, Any] = {
+        "id": "VG-DEMO-BAD",
+        "title": "A demonstration gate",
+        "tier": "quick",
+        "cmd": ["true"],
+        "timeout_s": 10,
+        "rubric": {"pass": "exits 0", "fail": "exits non-zero"},
+        "invariant": "Tests run with no network",
+        "faults": [
+            {
+                "description": "x",
+                "file": "AGENTS.md",
+                "search": "Tests run",
+                "replace": "Tests skip",
+            }
+        ],
+    }
+
+    def variant(**changes: Any) -> dict[str, Any]:
+        gate = {**base, **changes}
+        return {
+            "version": 1,
+            "gates": [{k: v for k, v in gate.items() if v is not None}],
+        }
+
+    return {
+        "a gate without a seeded fault": (
+            variant(faults=None),
+            "registry.gate_without_fault",
+        ),
+        "a gate without a claim or invariant": (
+            variant(invariant=None),
+            "registry.gate_without_claim",
+        ),
+        "a gate with a malformed id": (variant(id="verify-me"), "registry.bad_gate_id"),
+        "a gate whose fault does not apply": (
+            variant(
+                faults=[{**base["faults"][0], "search": "text that is not in the file"}]
+            ),
+            "registry.fault_not_applicable",
+        ),
+    }
+
+
+def parse(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="verification/run", description=__doc__.split("\n\n")[0]
+    )
+    parser.add_argument(
+        "--quick", action="store_true", help="run the quick tier (offline)"
+    )
+    parser.add_argument("--full", action="store_true", help="run every tier")
+    parser.add_argument("--gate", metavar="ID", help="run one gate")
+    parser.add_argument(
+        "--demo-fault",
+        metavar="ID",
+        help="show a gate turn RED on a seeded fault, then GREEN",
+    )
+    parser.add_argument(
+        "--lint-registry", action="store_true", help="check the gate registry"
+    )
+    parser.add_argument(
+        "--demo-reject",
+        action="store_true",
+        help="with --lint-registry: reject bad registries",
+    )
+    parser.add_argument("--list", action="store_true", help="print the gate ids")
+    parser.add_argument("--json", action="store_true", help="machine-readable output")
+    parser.add_argument(
+        "--registry", type=Path, default=HERE / "gates.json", help=argparse.SUPPRESS
+    )
+    parser.add_argument(
+        "--root", type=Path, default=DEFAULT_ROOT, help=argparse.SUPPRESS
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str]) -> int:
+    args = parse(argv)
+    root = args.root.resolve()
+    if args.lint_registry and args.demo_reject:
+        caught = True
+        for name, (bad, key) in bad_registries().items():
+            hit = any(line.startswith(key) for line in lint_registry(bad, root))
+            caught = caught and hit
+            print(
+                f"REGISTRY-LINT REJECTED {name}: {key}"
+                if hit
+                else f"REGISTRY-LINT MISSED {name}: {key}"
+            )
+        return 0 if caught else 1
+    registry = load_registry(args.registry)
+    problems = lint_registry(registry, root)
+    if problems:
+        print("REGISTRY-LINT REJECTED", file=sys.stderr)
+        print("\n".join(problems), file=sys.stderr)
+        return 1
+    if args.lint_registry:
+        print(f"REGISTRY-LINT OK {len(registry['gates'])} gates")
+        return 0
+    gates = {gate["id"]: gate for gate in registry["gates"]}
+    if args.list:
+        print("\n".join(gates))
+        return 0
+    chosen = args.gate or args.demo_fault
+    if chosen:
+        if chosen not in gates:
+            print(f"suite.unknown_gate: {chosen}", file=sys.stderr)
+            return 2
+        if args.demo_fault:
+            outcome = demo_fault(gates[chosen], root)
+            emit(
+                outcome,
+                args.json,
+                [
+                    f"{chosen}: RED on the seeded fault: {outcome['red_on_fault']}; GREEN after restore: {outcome['green_after_restore']}"
+                ],
+            )
+            return (
+                0 if outcome["red_on_fault"] and outcome["green_after_restore"] else 1
+            )
+        entry = run_gate(gates[chosen], root)
+        emit(entry, args.json, describe(entry))
+        return 1 if entry["status"] == "fail" else 0
+    if not (args.quick or args.full):
+        print(
+            "suite.no_command: pass --quick, --full, --gate, --demo-fault, --lint-registry or --list",
+            file=sys.stderr,
+        )
+        return 2
+    tier = "full" if args.full else "quick"
+    results = [
+        run_gate(gate, root)
+        for gate in gates.values()
+        if args.full or gate["tier"] == "quick"
+    ]
+    payload = summarise(results, tier, registry)
+    lines = [row for entry in results for row in describe(entry)]
+    counts = Counter(entry["status"] for entry in results)
+    lines.append(
+        f"{tier} tier: {counts['pass']} passed, {counts['fail']} failed, {counts['skipped']} skipped"
+    )
+    emit(payload, args.json, lines)
+    return 1 if payload["status"] == "fail" else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

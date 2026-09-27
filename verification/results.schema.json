@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Verification suite results",
+  "description": "What `./verification/run --quick|--full --json` prints. A single gate (`--gate <ID> --json`) prints one entry of `gates`.",
+  "type": "object",
+  "required": ["suite_version", "tier", "status", "gates"],
+  "additionalProperties": false,
+  "properties": {
+    "suite_version": {"type": "string"},
+    "tier": {"enum": ["quick", "full"]},
+    "status": {"enum": ["pass", "fail"]},
+    "gates": {"type": "array", "items": {"$ref": "#/$defs/gate"}}
+  },
+  "$defs": {
+    "gate": {
+      "type": "object",
+      "required": ["id", "title", "tier", "status", "rerun"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string"},
+        "title": {"type": "string"},
+        "tier": {"enum": ["quick", "full"]},
+        "status": {"enum": ["pass", "fail", "skipped"]},
+        "reason": {"type": "string"},
+        "rerun": {"type": "string"},
+        "output_tail": {"type": "string"},
+        "fix_hint": {"type": "string"}
+      }
+    }
+  }
+}

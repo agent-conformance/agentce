@@ -35,6 +35,9 @@ These mirror the CI workflows; keep them in sync.
 - Quickstart: `agentce quickstart --out ./out`
 - Examples: `uv run python examples/run_all.py --check`
 - Catalog lint (a base or third-party catalog): `agentce catalog lint <dir> --require-provenance`
+- Verification suite (fixed build gates, one runner): `./verification/run --quick` (offline) and
+  `./verification/run --full`; one gate: `./verification/run --gate <ID>`; its seeded-fault demo:
+  `./verification/run --demo-fault <ID>`; the registry check: `./verification/run --lint-registry`
 - Runtime conformance: `cd conformance && uv run --frozen python runtime_conformance_check.py --self-test`
 - Integration breadth (framework/SDK examples, trace-store connectors, GRC recipes): `uv run --project tools --frozen python -m integration_breadth_check`
 - Domain depth (red-team probes, mutation floor, perf-at-scale, air-gap bundle, registries): `uv run --project tools --frozen python -m offline_bundle --verify --no-network`
@@ -50,6 +53,7 @@ These mirror the CI workflows; keep them in sync.
 - `examples/` — one small runnable agent per style plus a server and a mesh example.
 - `docs/` — documentation, including architecture decision records.
 - `governance/` — charters, versioning and support policy, security and vulnerability policy.
+- `verification/` — the verification suite: the runner, the gate registry, the results schema, and the changelog.
 - `tools/` — repository-level checks (dependency denylist, license headers).
 - `website/` — the public site (agent-conformance.org): the landing page, documentation, and the canonical JSON-LD context, vocabulary, and JSON Schemas served at their IRIs.
 
@@ -79,6 +83,9 @@ These mirror the CI workflows; keep them in sync.
 - Tests run with no network; a dedicated job proves an assessment runs with networking disabled.
 - No learned components in any engine or script dependency tree; a dependency-denylist job enforces it.
 - Every GitHub Action is pinned by commit SHA, never by a tag.
+- Every new feature, adapter or catalog adds or extends a build gate in `verification/`, with a seeded-fault
+  demo and a claim or invariant link; a change without a gate is incomplete.
+- An attestation is reported as verified only after its signature verifies against a trusted key.
 
 ## Where things live
 

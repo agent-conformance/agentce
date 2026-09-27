@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "suite_version": "0.1.0",
+  "gates": [
+    {
+      "id": "VG-SUITE-SELFTEST",
+      "title": "The runner reports pass, fail, skipped and timeout honestly, and the registry lint rejects bad gates",
+      "tier": "quick",
+      "cmd": ["python3", "verification/selftest.py"],
+      "timeout_s": 300,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every self-test case ends as expected: a passing command is pass, a failing or timed-out command is fail, a missing tool is skipped (never pass), a seeded fault turns a sensitive gate RED and an insensitive one is reported, the fault is restored byte for byte, and each bad registry is rejected with its stable key",
+        "fail": "any case ends differently, for example a failing command reported as pass"
+      },
+      "faults": [
+        {
+          "description": "the runner reports every gate as pass, whatever its command returned",
+          "file": "verification/run",
+          "search": "    if proc.returncode == 0:\n        return {**result, \"status\": \"pass\"}",
+          "replace": "    if True:\n        return {**result, \"status\": \"pass\"}"
+        },
+        {
+          "description": "the registry lint stops requiring a seeded fault",
+          "file": "verification/run",
+          "search": "        if not (isinstance(faults, list) and faults):\n            problems.append(f\"registry.gate_without_fault: {gid}\")",
+          "replace": "        if False:\n            problems.append(f\"registry.gate_without_fault: {gid}\")"
+        }
+      ],
+      "fix_hint": "Run `python3 verification/selftest.py` and read which case failed; the runner is `verification/run`."
+    },
+    {
+      "id": "VG-ATTESTATION-SIGNATURES",
+      "title": "An attestation is verified only after its DSSE signature verifies against a trusted key",
+      "tier": "quick",
+      "cwd": "adapters/supply-chain",
+      "cmd": ["uv", "run", "--frozen", "pytest", "-q", "-o", "addopts=", "-p", "no:cacheprovider", "tests/test_signatures.py", "tests/test_adapter.py"],
+      "requires": ["uv"],
+      "timeout_s": 600,
+      "invariant": "An attestation is reported as verified only after its signature verifies against a trusted key",
+      "rubric": {
+        "pass": "a valid Ed25519 or ECDSA P-256 signature from a trusted key is verified; a forged signature, an untrusted signer or a subject-digest mismatch is failed; a trusted key id without key material, or no signature, is unverified",
+        "fail": "any attestation is reported verified without a verifying signature, or the adapter tests fail"
+      },
+      "faults": [
+        {
+          "description": "the signature check always succeeds, so a forged signature under a trusted key id would be accepted",
+          "file": "adapters/supply-chain/src/agentce_adapters/supply_chain.py",
+          "search": "        if isinstance(key, ed25519.Ed25519PublicKey):\n            key.verify(signature, message)\n",
+          "replace": "        return True\n        if isinstance(key, ed25519.Ed25519PublicKey):\n            key.verify(signature, message)\n"
+        },
+        {
+          "description": "the observed-digest comparison is dropped, so a statement about other content would be accepted",
+          "file": "adapters/supply-chain/src/agentce_adapters/supply_chain.py",
+          "search": "    elif observed != set(claims.subject_digests):",
+          "replace": "    elif False:"
+        }
+      ],
+      "fix_hint": "Run the gate's command from adapters/supply-chain and read the failing test; the verifier is adapters/supply-chain/src/agentce_adapters/supply_chain.py."
+    }
+  ]
+}
