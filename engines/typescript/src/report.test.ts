@@ -104,6 +104,7 @@ test("writeReport emits every artifact and a well-formed manifest", () => {
 
   for (const name of [
     "assertions.json",
+    "activity.json",
     "report.md",
     "report.html",
     "oscal-ar.json",

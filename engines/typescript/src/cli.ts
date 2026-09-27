@@ -9,6 +9,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { homedir } from "node:os";
 import { basename, join, relative, resolve as resolvePath, sep } from "node:path";
 import { load } from "js-yaml";
+import { summarizeActivity } from "./activity";
 import { resolve as resolveApplicability } from "./applicability";
 import { type Assertion, aggregate, assertionFromJson, assertionToJson } from "./assertions";
 import { assessSubjects, evaluatedNothing } from "./assess";
@@ -23,11 +24,12 @@ import { ExitCode } from "./exitCodes";
 import { buildGraph } from "./graph";
 import { ingest } from "./ingest";
 import { integrityResultToJson, verifyBundle } from "./integrity";
-import { DEFAULT_LANGUAGE } from "./messages";
+import { DEFAULT_LANGUAGE, catalogue } from "./messages";
 import { computeVectorFile } from "./numerics";
 import { type Profile, loadProfile } from "./profile";
 import { writeQuarantine } from "./quarantine";
 import {
+  activityCliLines,
   renderEvidencePack,
   renderOscal,
   renderReportHtml,
@@ -404,6 +406,7 @@ function runAssess(options: AssessOptions): CommandResult {
     [supersedes] = state.plan(bundle.digest, ingested.accepted, newWindowEnd);
   }
 
+  const activity = summarizeActivity(ingested.accepted, profileObj);
   writeReport(out, evaluated, {
     bundleDigest: bundle.digest,
     catalogs: catalogLabels,
@@ -411,6 +414,7 @@ function runAssess(options: AssessOptions): CommandResult {
     operator: process.env.AGENTCE_OPERATOR ?? "unknown",
     invocation: [options.invocationCommand, scrubPath(bundleDir), scrubPath(profilePath)],
     supersedes,
+    activity,
   });
   if (state !== null) {
     state.record(bundle.digest, join(out, "manifest.json"), newWindowEnd);
@@ -435,6 +439,7 @@ function runAssess(options: AssessOptions): CommandResult {
     counts: summary.counts,
     top_gaps: summary.topGaps,
   };
+  result.data.activity = activity;
   if (options.state !== undefined) {
     result.data.supersedes = supersedes;
   }
@@ -443,6 +448,9 @@ function runAssess(options: AssessOptions): CommandResult {
   }
   if (evaluatedNothing(evaluated)) {
     throw nothingEvaluated(profileObj, ingested.accepted, evaluated.length);
+  }
+  for (const line of activityCliLines(activity, catalogue(DEFAULT_LANGUAGE))) {
+    result.note(line);
   }
   result.note(`verdict: ${summary.verdict}`);
   result.note(

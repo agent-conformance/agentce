@@ -35,6 +35,8 @@ export interface Subject {
   declaredDecisionTypes: string[];
   declaredOversight: Record<string, string>;
   declaredComponents: string[];
+  declaredTools: string[];
+  declaredModels: string[];
 }
 
 export interface Profile {
@@ -83,6 +85,8 @@ function parseSubject(raw: Record<string, unknown>): Subject {
     declaredComponents: asArray(raw.third_party_components)
       .filter((c): c is Record<string, unknown> => isRecord(c) && "name" in c)
       .map((c) => String(c.name)),
+    declaredTools: asArray(raw.declared_tools).map(String),
+    declaredModels: asArray(raw.declared_models).map(String),
   };
   for (const entry of asArray(raw.evidence_sources)) {
     if (isRecord(entry) && "source" in entry) {
