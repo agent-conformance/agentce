@@ -958,11 +958,25 @@ def check_own_rules(runner: Runner, *, offline_install: bool) -> list[str]:
         # TEETH: a catalog tampered AFTER signing is refused at assess time. Verification happens
         # before any output is written (cmd_assess resolves and verifies catalogs before touching
         # `--out`), so re-running the SAME command against the still-present `report` directory from
-        # the successful run above is safe: a refusal never touches it.
+        # the successful run above is safe: a refusal never touches it. The append itself runs
+        # through `runner.run` (the venv's own python, not this process's) so it holds the same
+        # privilege as whatever created the file: under CI's network namespace, `catalog init` runs
+        # as root via `sudo unshare`, and this process cannot write that file directly.
         control_file = directory / "controls" / f"{family}-01.yaml"
-        control_file.write_text(
-            control_file.read_text("utf-8") + "# tampered\n", encoding="utf-8"
+        proc = runner.run(
+            [
+                str(venv / "bin" / "python"),
+                "-c",
+                "import pathlib, sys\n"
+                "p = pathlib.Path(sys.argv[1])\n"
+                "p.write_text(p.read_text('utf-8') + '# tampered\\n', encoding='utf-8')\n",
+                str(control_file),
+            ],
+            empty,
+            offline=True,
         )
+        if proc.returncode != 0:
+            return problems + [_fail("operator: append the tamper byte", proc)]
         proc = runner.run(assess_cmd, empty, offline=True)
         if proc.returncode != 3 or "input.catalog_unverified" not in proc.stdout:
             problems.append(
