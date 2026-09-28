@@ -99,7 +99,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--report",
         help="re-run a shareable report bundle (assess --package-for-sharing) offline and check "
-        "it reproduces byte for byte, refusing any tampering (SPEC 18.8, Hill 3)",
+        "it reproduces byte for byte, refusing any tampering",
     )
     p.add_argument(
         "--signer-trust-root",
@@ -162,8 +162,8 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="copy the evidence bundle, profile, domain binding and every --catalog-dir into "
         "--out/bundle/ so the directory is self-contained: `agentce sign` then `agentce verify "
-        "--report` re-runs it offline on another machine (SPEC 18.8, Hill 3). Requires --bundle "
-        "(not a records folder).",
+        "--report` re-runs it offline on another machine. Requires --bundle (not a records "
+        "folder).",
     )
     p.add_argument("--out", help="the output directory (default: ./out)")
     p.add_argument("--state", help="the incremental state directory")
@@ -364,8 +364,8 @@ def build_parser() -> argparse.ArgumentParser:
         dest="write_trust_root",
         action="store_true",
         help="write trust-root.json (the signer's public key) into the report directory, so a "
-        "recipient can `agentce verify --report` this bundle without any other key exchange (SPEC "
-        "18.8, Hill 3). Requires --profile kms (the only profile with an exportable key).",
+        "recipient can `agentce verify --report` this bundle without any other key exchange. "
+        "Requires --profile kms (the only profile with an exportable key).",
     )
     p.set_defaults(func=commands.cmd_sign)
 

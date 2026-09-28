@@ -51,8 +51,8 @@ options:
                         every --catalog-dir into --out/bundle/ so the
                         directory is self-contained: `agentce sign` then
                         `agentce verify --report` re-runs it offline on
-                        another machine (SPEC 18.8, Hill 3). Requires --bundle
-                        (not a records folder).
+                        another machine. Requires --bundle (not a records
+                        folder).
   --out OUT             the output directory (default: ./out)
   --state STATE         the incremental state directory
   --report-language REPORT_LANGUAGE

@@ -23,8 +23,8 @@ options:
   --write-trust-root    write trust-root.json (the signer's public key) into
                         the report directory, so a recipient can `agentce
                         verify --report` this bundle without any other key
-                        exchange (SPEC 18.8, Hill 3). Requires --profile kms
-                        (the only profile with an exportable key).
+                        exchange. Requires --profile kms (the only profile
+                        with an exportable key).
 
 global options:
   --json                emit machine-readable JSON on stdout

@@ -32,7 +32,7 @@ options:
   --release RELEASE     verify a release artifact's signatures
   --report REPORT       re-run a shareable report bundle (assess --package-
                         for-sharing) offline and check it reproduces byte for
-                        byte, refusing any tampering (SPEC 18.8, Hill 3)
+                        byte, refusing any tampering
   --signer-trust-root SIGNER_TRUST_ROOT
                         verify --report's signature against this trust root
                         file, instead of an embedded trust-root.json inside
