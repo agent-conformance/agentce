@@ -82,5 +82,30 @@ The path above is exactly what a bring-your-own catalog follows: write `catalog.
 control under `controls/`, add a shape under `shapes/` for anything evaluated structurally, add
 `passed`/`failed`/`inapplicable` fixtures under `test/<control-id>/`, then run `agentce catalog lint`
 against the directory. Point an assessment at it with `--catalog-dir <path>`, and either sign it against
-your own trust root or pass `--allow-unverified-catalog` while you are iterating. No engine change, in
-any of the three engines, is needed at any step.
+your own key and trust root (below) or pass `--allow-unverified-catalog` while you are iterating. No
+engine change, in any of the three engines, is needed at any step.
+
+Beyond `catalog lint`'s own schema, evidence, and test-case checks, `tools/catalog_authoring_check.py`
+(run in CI on every catalog change) rejects a Portable Shape Profile shape that uses a SPARQL- or
+script-based constraint (`sh:sparql`, `sh:js`) — logic `catalog lint` itself does not catch, but which
+would let one catalog carry evaluation logic the other two engines cannot run identically.
+
+## Guided path: init and sign
+
+A scaffold gets you to a lint-clean, signed catalog in four commands, from an empty directory:
+
+```bash
+uv run --project engines/python agentce catalog init my-catalog
+uv run --project engines/python agentce catalog lint my-catalog --support-matrix support-matrix.json
+uv run --project engines/python agentce catalog sign my-catalog --new-key my-key.pem --write-trust-root my-trust-root.json
+uv run --project engines/python agentce assess --bundle <your evidence bundle> --profile <your applicability profile> --domain <your domain binding> --catalog-dir my-catalog --trust-root my-trust-root.json --out ./out
+```
+
+`catalog init` scaffolds a `mode: automated` control that already lints clean. `catalog lint
+--support-matrix` writes a preview of what each control needs and who can supply it today — rung, owner,
+and the adapters that already produce the event, if any — before you sign anything. `catalog sign
+--new-key` generates a fresh Ed25519 key and writes a trust root naming it, so the last `assess` verifies
+against your own root rather than the vendored one. The `--bundle`/`--profile`/`--domain` in that last
+command are your own evidence bundle, applicability profile, and domain binding — if you don't have one
+yet, [Getting Started](/docs/getting-started/) walks through `agentce quickstart`, which builds one you
+can point this sequence at instead.
