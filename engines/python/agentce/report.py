@@ -98,11 +98,13 @@ def _hash_safe(text: str) -> str:
     `contracts/P18-18.21.md`'s Design section). Used only for a hash input, never for a rendered
     field, so it must not be lossy or lossless-truncating like `sanitize_for_markdown` (whose
     200-character cap and lookalike substitutions would collide two distinct long or punctuated
-    control/subject ids onto the same UUID) -- it must instead match the byte-identical substitution
-    every engine's own UTF-8 encoder already applies to an unpaired surrogate (Node's `Buffer.from`
-    and Java's `String.getBytes(UTF_8)` both replace one with the 3-byte U+FFFD sequence; only
-    Python's own ``str.encode`` raises instead), so all three engines hash the same control/subject
-    to the same UUID (SPEC C5 byte-identity)."""
+    control/subject ids onto the same UUID) -- for every other character it must match TypeScript's
+    own UUID/fingerprint hashing exactly, which sanitises nothing at all (Node's `Buffer.from` writes
+    the 3-byte U+FFFD sequence for an unpaired surrogate, the same substitution this function makes),
+    so Python and TypeScript hash the same non-surrogate control/subject to the same UUID (SPEC C5
+    byte-identity). Java's `String.getBytes(UTF_8)` substitutes `?` for an unpaired surrogate instead
+    of U+FFFD, a pre-existing, narrower divergence from both other engines for that one input class,
+    unrelated to and not fixed by this function (`contracts/P18-18.21.md`'s Dispositions)."""
     return "".join("�" if 0xD800 <= ord(ch) <= 0xDFFF else ch for ch in text)
 
 
