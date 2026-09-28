@@ -490,6 +490,12 @@ def _assert_container_not_broken(payload: str) -> None:
     benign_span = sanitize_for_markdown(_BENIGN)
     payload_span = sanitize_for_markdown(payload)
     for base_line, adv_line in zip(baseline_lines, adversarial_lines):
+        # A line the payload never touches (e.g. the fixed "Lenses available" footer) is already
+        # byte-identical; skip the strip-and-compare there so a short payload span that happens to be
+        # a substring of unrelated fixed text (`"base"` inside `"baseline@2026.09"`) can't produce a
+        # false mismatch.
+        if base_line == adv_line:
+            continue
         assert base_line.replace(benign_span, "") == adv_line.replace(payload_span, "")
 
     assert _tag_skeleton(baseline_html) == _tag_skeleton(adversarial_html)
