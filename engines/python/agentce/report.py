@@ -91,21 +91,37 @@ def _package_digest() -> str:
     )
 
 
+def _hash_safe(text: str) -> str:
+    """``text`` with every lone (unpaired) UTF-16 surrogate replaced by U+FFFD, and nothing else
+    changed: the narrowest possible fix for ``str.encode`` raising ``UnicodeEncodeError`` on a lone
+    surrogate before ``uuid.uuid5`` ever reaches it (SPEC §7 injection hardening;
+    `contracts/P18-18.21.md`'s Design section). Used only for a hash input, never for a rendered
+    field, so it must not be lossy or lossless-truncating like `sanitize_for_markdown` (whose
+    200-character cap and lookalike substitutions would collide two distinct long or punctuated
+    control/subject ids onto the same UUID) -- it must instead match the byte-identical substitution
+    every engine's own UTF-8 encoder already applies to an unpaired surrogate (Node's `Buffer.from`
+    and Java's `String.getBytes(UTF_8)` both replace one with the 3-byte U+FFFD sequence; only
+    Python's own ``str.encode`` raises instead), so all three engines hash the same control/subject
+    to the same UUID (SPEC C5 byte-identity)."""
+    return "".join("�" if 0xD800 <= ord(ch) <= 0xDFFF else ch for ch in text)
+
+
 def _uuid_raw(*parts: str) -> str:
-    """As `_uuid`, but ``parts`` are already sanitised: for a caller that needs the same sanitised
-    control/subject in more than one UUID, sanitising once and passing it here avoids repeating the
-    (non-trivial) sanitisation work per UUID."""
+    """As `_uuid`, but ``parts`` are already hash-safe (`_hash_safe`): for a caller that needs the
+    same hash-safe control/subject in more than one UUID, converting once and passing it here avoids
+    repeating that work per UUID."""
     return str(uuid.uuid5(uuid.NAMESPACE_URL, "agentce:" + ":".join(parts)))
 
 
 def _uuid(*parts: str) -> str:
     """A UUID over ``parts``, which can carry a catalog- or evidence-derived control/subject id: hash
-    the sanitised (never the raw canonical-JSON) form, since ``str.encode`` raises on a lone surrogate
-    before any Markdown/HTML sanitiser is ever reached (SPEC §7 injection hardening;
-    `contracts/P18-18.21.md`'s Design section). The OSCAL/SARIF document's own ``control``/``subject``
-    fields are written separately from their raw, unsanitised value (C5 byte-identity) -- only this
-    hash input is protected."""
-    return _uuid_raw(*(sanitize_for_markdown(p) for p in parts))
+    the hash-safe (`_hash_safe`, never the raw canonical-JSON, and never the Markdown/HTML-sanitised)
+    form, since ``str.encode`` raises on a lone surrogate before any Markdown/HTML sanitiser is ever
+    reached (SPEC §7 injection hardening; `contracts/P18-18.21.md`'s Design section). The OSCAL/SARIF
+    document's own ``control``/``subject`` fields are written separately from their raw, unsanitised
+    value (C5 byte-identity) -- only this hash input is protected, and only from the one thing that
+    would otherwise crash it."""
+    return _uuid_raw(*(_hash_safe(p) for p in parts))
 
 
 def _safe(name: str) -> str:
@@ -717,11 +733,11 @@ def render_oscal(assertions: list[Assertion]) -> dict[str, Any]:
     observations: list[dict[str, Any]] = []
     findings: list[dict[str, Any]] = []
     for a in ordered:
-        # `control`/`subject` back both this assertion's observation and its finding, so sanitise each
-        # once and reuse it rather than sanitising twice per assertion (`_uuid` would otherwise be
+        # `control`/`subject` back both this assertion's observation and its finding, so convert each
+        # once and reuse it rather than converting twice per assertion (`_uuid` would otherwise be
         # called with the same raw parts twice).
-        safe_control = sanitize_for_markdown(a.control)
-        safe_subject = sanitize_for_markdown(a.subject)
+        safe_control = _hash_safe(a.control)
+        safe_subject = _hash_safe(a.subject)
         # An observation backs every finding, evidence-bearing or not, so every finding resolves to
         # one (SPEC §9); only an evidence-bearing assertion's observation carries `relevant-evidence`.
         obs_uuid = _uuid_raw("observation", safe_control, safe_subject)
@@ -1077,16 +1093,17 @@ def _sarif_fingerprint(a: Assertion) -> str:
     """A fingerprint derived only from the assertion's own content -- control, subject, outcome, and
     the evaluation window/population that produced it -- so two independent offline runs over the same
     evidence produce byte-identical fingerprints (no clock, host, or run counter). The hash input is
-    sanitised (never the raw SARIF document's own field values, which stay byte-identical to the
-    assertion) since ``str.encode`` raises on a lone surrogate (SPEC §7 injection hardening;
-    `contracts/P18-18.21.md`)."""
+    hash-safe (`_hash_safe`, never the raw SARIF document's own field values, which stay byte-identical
+    to the assertion, and never the Markdown-sanitised form, which TypeScript's and Java's own
+    fingerprint hashing never apply either) since ``str.encode`` raises on a lone surrogate (SPEC §7
+    injection hardening; `contracts/P18-18.21.md`)."""
     payload = "|".join(
         [
-            sanitize_for_markdown(a.control),
-            sanitize_for_markdown(a.subject),
-            sanitize_for_markdown(a.outcome),
-            sanitize_for_markdown(a.window[0]),
-            sanitize_for_markdown(a.window[1]),
+            _hash_safe(a.control),
+            _hash_safe(a.subject),
+            _hash_safe(a.outcome),
+            _hash_safe(a.window[0]),
+            _hash_safe(a.window[1]),
             str(a.population[0]),
             str(a.population[1]),
         ]

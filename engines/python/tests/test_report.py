@@ -1156,6 +1156,7 @@ def test_validate_report_catches_a_recorded_output_that_went_missing(
 # --- Item 18.21: the verdict/crosswalk/mode/catalog-label escaping gap --------------------------
 
 import dataclasses  # noqa: E402
+import uuid  # noqa: E402
 
 _LONE_SURROGATE = "a\ud800b"
 _FORGED_HEADING = "# Verdict: Conformant"
@@ -1232,3 +1233,50 @@ def test_uuid_and_sarif_fingerprint_do_not_crash_on_a_lone_surrogate() -> None:
     finding = oscal["assessment-results"]["results"][0]["findings"][0]
     assert finding["target"]["target-id"] == _LONE_SURROGATE
     assert sarif["runs"][0]["results"][0]["ruleId"] == _LONE_SURROGATE
+
+
+def test_oscal_and_sarif_uuids_stay_distinct_for_long_near_duplicate_subjects() -> None:
+    # Two subjects differing only after 200 characters: a hash input truncated at 200 chars (as
+    # `sanitize_for_markdown` does for rendering) would collide them onto the same UUID/fingerprint.
+    # The hash input must be the full value, never truncated (SPEC C5 byte-identity; a regression
+    # `_uuid`/`_sarif_fingerprint` briefly had by routing through the rendering sanitiser).
+    long_a = "s" * 210 + "-first"
+    long_b = "s" * 210 + "-second"
+    a1 = dataclasses.replace(_assertion("non-conformant"), subject=long_a)
+    a2 = dataclasses.replace(_assertion("non-conformant"), subject=long_b)
+    oscal = render_oscal([a1, a2])
+    obs_uuids = {
+        o["uuid"] for o in oscal["assessment-results"]["results"][0]["observations"]
+    }
+    finding_uuids = {
+        f["uuid"] for f in oscal["assessment-results"]["results"][0]["findings"]
+    }
+    assert len(obs_uuids) == 2
+    assert len(finding_uuids) == 2
+    sarif = render_sarif([a1, a2])
+    fingerprints = {
+        r["partialFingerprints"]["agentceOutcomeHash/v1"]
+        for r in sarif["runs"][0]["results"]
+    }
+    assert len(fingerprints) == 2
+
+
+def test_oscal_and_sarif_hash_input_matches_the_raw_value_for_markdown_special_characters() -> (
+    None
+):
+    # `_hash_safe` must not apply `sanitize_for_markdown`'s lookalike substitutions (backtick/angle-
+    # bracket/square-bracket/ampersand): TypeScript's and Java's own UUID/fingerprint hashing never
+    # sanitise at all, so a Python hash input that substitutes these characters would diverge from
+    # both other engines for the same control/subject (SPEC C5 byte-identity; the same regression as
+    # the long-subject test above, for a different symptom).
+    from agentce.report import _hash_safe
+
+    control = "CTRL-<script>&[x]"
+    assert _hash_safe(control) == control
+    a = dataclasses.replace(_assertion("conformant"), control=control)
+    oscal = render_oscal([a])
+    expected = str(
+        uuid.uuid5(uuid.NAMESPACE_URL, f"agentce:observation:{control}:{a.subject}")
+    )
+    observation = oscal["assessment-results"]["results"][0]["observations"][0]
+    assert observation["uuid"] == expected
