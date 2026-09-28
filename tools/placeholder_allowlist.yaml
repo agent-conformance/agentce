@@ -203,9 +203,9 @@ allow:
 
   - path: engines/typescript/src/report.test.ts
     pattern: todo
-    count: 1
+    count: 2
     class: legitimate
-    justification: "report.md/report.html are derived, locale-varying renderings, not part of the byte-identical canonical set (assertions.json, oscal-ar.json, results.sarif, packs/*/pack.json); the catalog-joined, risk-ranked human-report enrichment is scoped to the Python reference engine only. This test documents that known, deliberate boundary rather than tracking pending work."
+    justification: "report.md/report.html are derived, locale-varying renderings, not part of the byte-identical canonical set (assertions.json, oscal-ar.json, results.sarif, packs/*/pack.json); the catalog-joined, risk-ranked human-report enrichment is scoped to the Python reference engine only. This test documents that known, deliberate boundary rather than tracking pending work. The second hit is a doc comment on verdictAndTallySpanMd/Html cross-referencing this same test, added by the 18.22 verifier round-1 fix (byte-equal Verdict/tally parity)."
 
   - path: engines/typescript/src/report.test.ts
     pattern: placeholder
