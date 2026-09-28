@@ -3,6 +3,18 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.7.0
+
+- Added `VG-DIFF`: `agentce diff --format md` renders a classified "## What changed" section
+  (closed/opened/other) over the full six-outcome vocabulary, matching a committed golden over a
+  dedicated fixture pair that exercises every classification bucket at once.
+- Added `VG-GOLDEN-LOOP`: a scripted `assess -> apply the skill's code-level step -> re-assess -> diff`
+  loop closes a real blind spot end to end, tied to 18.5's own `blind-spots.json` and the remediation
+  package's `expected_transition`, not just to `assess`'s own before/after outcomes.
+- Added `VG-SELF-APPROVAL-LABEL`: an approval an agent records about itself stays labelled `self_report`
+  end to end through the real CLI; a class-mismatched event claiming `independent_system` is quarantined
+  and gains nothing, over two independent honest/spoofed fixture bundles.
+
 ## 0.6.1
 
 - Changed `VG-BLIND-SPOTS`: its fixture gained a second control (`NEED-02`) so its two blind spots differ on

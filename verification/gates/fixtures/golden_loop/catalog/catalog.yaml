@@ -1,0 +1,8 @@
+# A small, dedicated catalog for VG-GOLDEN-LOOP (item 18.6): one control whose minimum_evidence is
+# unmet by the fixture's `before/` bundle and met by `after/` (before plus one added ToolCall event) --
+# the scripted stand-in for "apply the skill's code-level step" (contracts/P18-18.6.md Dispositions).
+# Not a base or third-party catalog; loaded only via --catalog-dir --allow-unverified-catalog by this
+# gate's own script.
+id: golden-loop-fixture
+version: "2026.09"
+title: "VG-GOLDEN-LOOP gate fixture"

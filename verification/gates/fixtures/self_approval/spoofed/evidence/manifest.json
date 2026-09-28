@@ -1,0 +1,17 @@
+{
+  "agentce_bundle_version": 1,
+  "domain": "self-approval-fixture",
+  "files": [
+    {
+      "path": "events/subject.jsonl",
+      "sha256": "4d9937e9b85fd54d15aa3f978168b6edcd08eb840787b1c93814225570623563"
+    }
+  ],
+  "sources": [
+    {
+      "id": "urn:agentce:source:test:self-approval",
+      "class": "self_report",
+      "class_justification": "test fixture, a self-reporting agent runtime"
+    }
+  ]
+}

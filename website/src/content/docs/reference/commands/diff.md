@@ -6,19 +6,24 @@ description: deterministic diff of two assertion sets
 Deterministic diff of two assertion sets.
 
 ```text
-usage: agentce diff [-h] [--json] [--debug] [--quiet] [report_a] [report_b]
+usage: agentce diff [-h] [--json] [--debug] [--quiet]
+                    [--format {text,json,md}]
+                    [report_a] [report_b]
 
 positional arguments:
-  report_a    the first assertions.json
-  report_b    the second assertions.json
+  report_a              the first assertions.json
+  report_b              the second assertions.json
 
 options:
-  -h, --help  show this help message and exit
+  -h, --help            show this help message and exit
+  --format {text,json,md}
+                        how to render the diff (default: text)
 
 global options:
-  --json      emit machine-readable JSON on stdout
-  --debug     verbose logs on stderr and a stack trace on unexpected errors
-  --quiet     log warnings and errors only
+  --json                emit machine-readable JSON on stdout
+  --debug               verbose logs on stderr and a stack trace on unexpected
+                        errors
+  --quiet               log warnings and errors only
 ```
 
 Exit codes follow the [common CLI scheme](/reference/commands/#exit-codes).

@@ -1,0 +1,10 @@
+{
+  "agentce_bundle_version": 1,
+  "domain": "golden-loop-fixture",
+  "files": [
+    {
+      "path": "events/subject.jsonl",
+      "sha256": "ec4bbc7f1ba22e3b48f3cafaf6d166e6f9c05781a044d0dc636afff366357574"
+    }
+  ]
+}

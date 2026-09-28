@@ -1,0 +1,16 @@
+# Applicability profile for the VG-SELF-APPROVAL-LABEL gate fixture (verification/gates/self_approval_label.sh).
+# One subject, the fixture-only SELF-01 catalog loaded via --catalog-dir. Shared by both the honest/
+# and spoofed/ bundles.
+profile_version: 1
+observation_window:
+  start: "2026-01-01T00:00:00Z"
+  end: "2026-02-01T00:00:00Z"
+content_capture:
+  mode: hashes_only
+catalogs: []
+subjects:
+  - id: "spiffe://corp/agents/self-approval-fixture"
+    name: "Self-approval gate fixture subject"
+    role: "both"
+    declared_decision_types:
+      - "dom:SelfApprovalDecision"

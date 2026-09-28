@@ -1,12 +1,15 @@
 {
   "version": 1,
-  "suite_version": "0.6.1",
+  "suite_version": "0.7.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
       "title": "The runner reports pass, fail, skipped and timeout honestly, and the registry lint rejects bad gates",
       "tier": "quick",
-      "cmd": ["python3", "verification/selftest.py"],
+      "cmd": [
+        "python3",
+        "verification/selftest.py"
+      ],
       "timeout_s": 300,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
@@ -34,8 +37,22 @@
       "title": "An attestation is verified only after its DSSE signature verifies against a trusted key",
       "tier": "quick",
       "cwd": "adapters/supply-chain",
-      "cmd": ["uv", "run", "--frozen", "pytest", "-q", "-o", "addopts=", "-p", "no:cacheprovider", "tests/test_signatures.py", "tests/test_adapter.py"],
-      "requires": ["uv"],
+      "cmd": [
+        "uv",
+        "run",
+        "--frozen",
+        "pytest",
+        "-q",
+        "-o",
+        "addopts=",
+        "-p",
+        "no:cacheprovider",
+        "tests/test_signatures.py",
+        "tests/test_adapter.py"
+      ],
+      "requires": [
+        "uv"
+      ],
       "timeout_s": 600,
       "invariant": "An attestation is reported as verified only after its signature verifies against a trusted key",
       "rubric": {
@@ -63,8 +80,22 @@
       "title": "The baseline catalog cites at least two standards per control, is the default lens, and every report lists the lenses",
       "tier": "quick",
       "cwd": "engines/python",
-      "cmd": ["uv", "run", "--frozen", "pytest", "-q", "-o", "addopts=", "-p", "no:cacheprovider", "tests/test_baseline_lens.py", "tests/test_assess_catalog_resolution.py"],
-      "requires": ["uv"],
+      "cmd": [
+        "uv",
+        "run",
+        "--frozen",
+        "pytest",
+        "-q",
+        "-o",
+        "addopts=",
+        "-p",
+        "no:cacheprovider",
+        "tests/test_baseline_lens.py",
+        "tests/test_assess_catalog_resolution.py"
+      ],
+      "requires": [
+        "uv"
+      ],
       "timeout_s": 600,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
@@ -104,8 +135,13 @@
       "title": "An installed package turns a folder of OpenTelemetry records into a report with no flags, offline, in under five minutes",
       "tier": "quick",
       "cwd": ".",
-      "cmd": ["bash", "verification/gates/first_report_time.sh"],
-      "requires": ["uv"],
+      "cmd": [
+        "bash",
+        "verification/gates/first_report_time.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
       "timeout_s": 900,
       "invariant": "Tests run with no network",
       "rubric": {
@@ -139,8 +175,14 @@
       "title": "The built landing page and the README carry the approved product copy, and the wording it replaced is gone",
       "tier": "quick",
       "cwd": ".",
-      "cmd": ["bash", "verification/gates/locked_copy.sh"],
-      "requires": ["python3", "pnpm"],
+      "cmd": [
+        "bash",
+        "verification/gates/locked_copy.sh"
+      ],
+      "requires": [
+        "python3",
+        "pnpm"
+      ],
       "timeout_s": 900,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
@@ -186,8 +228,15 @@
       "title": "The three engines compute the same 'what your agents did' activity summary, and an undeclared tool honestly surfaces",
       "tier": "quick",
       "cwd": ".",
-      "cmd": ["bash", "verification/gates/what_they_did_engines.sh"],
-      "requires": ["uv", "pnpm", "java"],
+      "cmd": [
+        "bash",
+        "verification/gates/what_they_did_engines.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "java"
+      ],
       "timeout_s": 900,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
@@ -209,8 +258,15 @@
       "title": "The three engines rank the same blind spots -- checks unlocked, a concrete step, and a needed_by requirement missing at once -- and write byte-identical blind-spots.json",
       "tier": "quick",
       "cwd": ".",
-      "cmd": ["bash", "verification/gates/blind_spots_engines.sh"],
-      "requires": ["uv", "pnpm", "java"],
+      "cmd": [
+        "bash",
+        "verification/gates/blind_spots_engines.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "java"
+      ],
       "timeout_s": 900,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
@@ -238,6 +294,90 @@
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/blind_spots.py, ported field-for-field in engines/typescript/src/blindSpots.ts and engines/java/src/main/java/org/agentce/BlindSpots.java."
+    },
+    {
+      "id": "VG-DIFF",
+      "title": "agentce diff --format md renders a classified 'what changed' section (closed/opened/other) over the full six-outcome vocabulary, matching a committed golden",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/diff_engine.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 120,
+      "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
+      "rubric": {
+        "pass": "a dedicated fixture pair (verification/gates/fixtures/diff/{before,after}/assertions.json), each a schema-valid assertions.json, exercises one closed transition (non-conformant -> conformant), one opened transition (conformant -> insufficient_evidence), one gap-to-gap other (partial -> not_assessed), one not_applicable-touching other (conformant -> not_applicable), and one added assertion (other); `agentce diff before/assertions.json after/assertions.json --format md` exits 1 (FINDINGS) and its stdout is byte-identical to the committed golden (diff_golden.md)",
+        "fail": "either fixture file fails jsonschema validation against spec/report/assertions.schema.json, the command's exit code is not 1, or its stdout differs from the committed golden"
+      },
+      "faults": [
+        {
+          "description": "the closed condition is inverted, so a non-conformant -> conformant transition is no longer classified as closed",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "if before in GAP_OUTCOMES and after == \"conformant\":\n",
+          "replace": "if before in GAP_OUTCOMES and after != \"conformant\":\n"
+        }
+      ],
+      "fix_hint": "Run the gate's command and read the diff against diff_golden.md; the reference implementation is engines/python/agentce/commands/__init__.py's _classify_change and _what_changed."
+    },
+    {
+      "id": "VG-GOLDEN-LOOP",
+      "title": "A scripted assess -> apply the skill's code-level step -> re-assess -> diff loop closes a real blind spot end to end, and the diff shows it closed",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/golden_loop.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 180,
+      "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
+      "rubric": {
+        "pass": "over a dedicated LOOP-01 fixture catalog, `assess` on the before/ bundle gives LOOP-01 == insufficient_evidence, and 18.5's own blind-spots.json independently confirms LOOP-01 is a real blind spot (checks_unlocked >= 1, step_kind == code_change, and the recorded event matches the one event type after/ adds over before/); the before/ bundle's remediation-package.json for LOOP-01 states expected_transition {from: insufficient_evidence, to: conformant}; `assess` on the after/ bundle (before/ plus that one added event) gives LOOP-01 == conformant; `agentce diff` between the two assertions files (both --format json and --format md) shows LOOP-01 closed, matching the remediation package's own expected_transition exactly",
+        "fail": "the before/ outcome is not insufficient_evidence, blind-spots.json does not independently confirm the gap or its step_kind/event, the remediation package's expected_transition does not match, the after/ outcome is not conformant, or the diff does not show LOOP-01 closed"
+      },
+      "faults": [
+        {
+          "description": "the closed condition is inverted, so the golden loop's real closed transition is misclassified as other, caught end to end through assess+diff",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "if before in GAP_OUTCOMES and after == \"conformant\":\n",
+          "replace": "if before in GAP_OUTCOMES and after != \"conformant\":\n"
+        }
+      ],
+      "fix_hint": "Run the gate's command and read the FAIL lines; the fixture is verification/gates/fixtures/golden_loop/, the reference implementation is engines/python/agentce/blind_spots.py and agentce/commands/__init__.py's diff classification."
+    },
+    {
+      "id": "VG-SELF-APPROVAL-LABEL",
+      "title": "An approval an agent records about itself stays labelled self_report end to end; a class-mismatched event claiming independent_system is quarantined and gains nothing",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/self_approval_label.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 180,
+      "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
+      "rubric": {
+        "pass": "over two independent SELF-01 fixture bundles (honest, spoofed), a real assess run over honest/ gives SELF-01 == conformant, activity.json's approvals_by_recorder.self_report == 1 with every other key 0, and report.md/report.html show the current i18n 'the agent's own account' line read live at gate-run time; a real assess run over spoofed/ (a class-mismatched ApprovalDecided claiming independent_system) gives exactly one class_mismatch quarantine entry, approvals_by_recorder.independent_system == 0, and SELF-01 == insufficient_evidence",
+        "fail": "either scenario's outcome, quarantine entry, or activity/report line does not hold as specified"
+      },
+      "faults": [
+        {
+          "description": "the class-mismatch check is disabled, so the spoofed scenario's mismatch is never caught: quarantine.jsonl has no class_mismatch entry, approvals_by_recorder.independent_system == 1, and SELF-01 comes out conformant instead of insufficient_evidence",
+          "file": "engines/python/agentce/ingest.py",
+          "search": "if event_class != declared_class:\n",
+          "replace": "if False:  # event_class != declared_class\n"
+        }
+      ],
+      "fix_hint": "Run the gate's command and read the FAIL lines; the fixtures are verification/gates/fixtures/self_approval/{honest,spoofed}/, the reference implementation is engines/python/agentce/ingest.py's class_mismatch check."
     }
   ]
 }

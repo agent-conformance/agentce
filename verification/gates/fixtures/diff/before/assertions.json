@@ -1,0 +1,50 @@
+[
+  {
+    "control": "DIF-01",
+    "control_version": "2026.09",
+    "subject": "spiffe://corp/agents/diff-fixture",
+    "outcome": "non-conformant",
+    "rung": 2,
+    "mode": "automated",
+    "window": {"start": "2026-01-01T00:00:00Z", "end": "2026-02-01T00:00:00Z"},
+    "population": {"applicable": 1, "failed": 1},
+    "severity": "high",
+    "family": "DIF"
+  },
+  {
+    "control": "DIF-02",
+    "control_version": "2026.09",
+    "subject": "spiffe://corp/agents/diff-fixture",
+    "outcome": "conformant",
+    "rung": 2,
+    "mode": "automated",
+    "window": {"start": "2026-01-01T00:00:00Z", "end": "2026-02-01T00:00:00Z"},
+    "population": {"applicable": 1, "failed": 0},
+    "severity": "medium",
+    "family": "DIF"
+  },
+  {
+    "control": "DIF-03",
+    "control_version": "2026.09",
+    "subject": "spiffe://corp/agents/diff-fixture",
+    "outcome": "partial",
+    "rung": 2,
+    "mode": "automated",
+    "window": {"start": "2026-01-01T00:00:00Z", "end": "2026-02-01T00:00:00Z"},
+    "population": {"applicable": 2, "failed": 1},
+    "severity": "medium",
+    "family": "DIF"
+  },
+  {
+    "control": "DIF-04",
+    "control_version": "2026.09",
+    "subject": "spiffe://corp/agents/diff-fixture",
+    "outcome": "conformant",
+    "rung": 2,
+    "mode": "automated",
+    "window": {"start": "2026-01-01T00:00:00Z", "end": "2026-02-01T00:00:00Z"},
+    "population": {"applicable": 1, "failed": 0},
+    "severity": "low",
+    "family": "DIF"
+  }
+]

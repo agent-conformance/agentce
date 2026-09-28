@@ -1,0 +1,5 @@
+# Domain ontology binding for the VG-SELF-APPROVAL-LABEL gate fixture (verification/gates/self_approval_label.sh).
+decision_types:
+  - id: "dom:SelfApprovalDecision"
+    subclass_of: "agentce:ConsequentialDecision"
+    consequential: true

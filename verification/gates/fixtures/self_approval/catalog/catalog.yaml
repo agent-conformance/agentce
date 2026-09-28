@@ -1,0 +1,6 @@
+# A small, dedicated catalog for VG-SELF-APPROVAL-LABEL (item 18.6): one control whose
+# minimum_evidence is an ApprovalDecided event of any class. Not a base or third-party catalog;
+# loaded only via --catalog-dir --allow-unverified-catalog by this gate's own script.
+id: self-approval-fixture
+version: "2026.09"
+title: "VG-SELF-APPROVAL-LABEL gate fixture"

@@ -1,0 +1,22 @@
+id: LOOP-01
+version: "2026.09"
+title: Fixture control closed by one added ToolCall event
+description: >
+  Gate fixture only (verification/gates/golden_loop.sh): requires a ToolCall event. The `before/`
+  evidence bundle has none, so LOOP-01 is insufficient_evidence; the `after/` bundle adds exactly one,
+  the scripted stand-in for a code-level fix, so LOOP-01 becomes conformant -- the closed transition
+  VG-GOLDEN-LOOP proves end to end through assess, blind_spots, and diff together.
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: any
+  minimum_evidence:
+    - {event: ToolCall, class: any}
+  shape: shapes/LOOP-01.ttl
+expectations:
+  - {id: F1, text: "Fixture-only; not a real requirement."}
+severity: high
+tolerance: {kind: count, max: 0}
+test_cases: []

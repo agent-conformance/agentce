@@ -1,0 +1,24 @@
+id: SELF-01
+version: "2026.09"
+title: Fixture control requiring one recorded approval
+description: >
+  Gate fixture only (verification/gates/self_approval_label.sh): requires an ApprovalDecided event of
+  any class. The property under test is the *accepted evidence's recorded class* (SPEC §6.4), not
+  whether the control is met at all -- the honest/ bundle's approval is accepted as self_report and
+  SELF-01 is conformant; the spoofed/ bundle's approval claims independent_system while its own
+  manifest still declares the source self_report, so ingest.py's class_mismatch check quarantines it
+  and SELF-01 stays insufficient_evidence.
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: any
+  minimum_evidence:
+    - {event: ApprovalDecided, class: any}
+  shape: shapes/SELF-01.ttl
+expectations:
+  - {id: F1, text: "Fixture-only; not a real requirement."}
+severity: high
+tolerance: {kind: count, max: 0}
+test_cases: []

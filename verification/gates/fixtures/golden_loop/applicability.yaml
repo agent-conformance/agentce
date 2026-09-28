@@ -1,0 +1,15 @@
+# Applicability profile for the VG-GOLDEN-LOOP gate fixture (verification/gates/golden_loop.sh).
+# One subject, the fixture-only LOOP-01 catalog loaded via --catalog-dir.
+profile_version: 1
+observation_window:
+  start: "2026-01-01T00:00:00Z"
+  end: "2026-02-01T00:00:00Z"
+content_capture:
+  mode: hashes_only
+catalogs: []
+subjects:
+  - id: "spiffe://corp/agents/golden-loop-fixture"
+    name: "Golden-loop gate fixture subject"
+    role: "both"
+    declared_decision_types:
+      - "dom:LoopDecision"

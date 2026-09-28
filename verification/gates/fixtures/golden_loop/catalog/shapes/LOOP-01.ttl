@@ -1,0 +1,7 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+
+# No sh:property: every targeted node is trivially applicable and never failing, so the outcome this
+# fixture control reaches is governed entirely by minimum_evidence (the case under test).
+agentce:LOOP-01-Shape a sh:NodeShape ;
+  sh:targetClass agentce:ConsequentialDecision .
