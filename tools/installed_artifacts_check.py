@@ -841,6 +841,35 @@ def check_own_rules(runner: Runner, *, offline_install: bool) -> list[str]:
         except (ValueError, KeyError) as exc:
             return [f"operator: catalog init printed no readable family: {exc}"]
 
+        # An overlay-only family (CND, from overlays/eu-ai-act-annex-iii) is invisible to a
+        # `spec/`-based implementation that only walks the three base catalogs; only the installed
+        # wheel's own `bundled.vendored_catalogs()` proves the collision check sees it too (contracts/
+        # P18-18.9.md C1, round 2's negative case).
+        overlay_collision_dir = empty / "overlay-collision-cat"
+        proc = runner.run(
+            [
+                agentce,
+                "catalog",
+                "init",
+                str(overlay_collision_dir),
+                "--id",
+                "CND",
+                "--json",
+            ],
+            empty,
+            offline=True,
+        )
+        if proc.returncode != 3 or "catalog.init_family_collision" not in proc.stdout:
+            return [
+                _fail(
+                    "operator: catalog init --id CND (an overlay family) was not "
+                    "refused as catalog.init_family_collision",
+                    proc,
+                )
+            ]
+        if overlay_collision_dir.exists():
+            return ["operator: catalog init --id CND wrote output despite refusing"]
+
         support_matrix = empty / "support-matrix.json"
         proc = runner.run(
             [

@@ -181,12 +181,20 @@ def test_catalog_init_rejects_an_invalid_family(
         assert not directory.exists()
 
 
+@pytest.mark.parametrize(
+    "family",
+    ["REC", "CND"],
+    ids=["base-catalog-family", "overlay-catalog-family"],
+)
 def test_catalog_init_rejects_a_vendored_family_collision(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    family: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """REC comes from a base catalog, CND from an overlay -- both must collide, since
+    `_vendored_control_families` reads every vendored catalog `bundled.vendored_catalogs()` resolves,
+    not just the base three."""
     directory = tmp_path / "cat"
     code, env = _run(
-        ["catalog", "init", str(directory), "--id", "REC", "--json"], capsys
+        ["catalog", "init", str(directory), "--id", family, "--json"], capsys
     )
     assert code == 3, env
     assert env["error"]["key"] == "catalog.init_family_collision"
