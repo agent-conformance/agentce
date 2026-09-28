@@ -85,6 +85,7 @@ from ..state import StateDir, window_end
 from ..result import CommandResult
 from ..store import GraphStore
 from .. import signing
+from ..verdict import GAP_OUTCOMES
 from ..canonical import canonical_string, canonicalize
 
 _log = get_logger()
@@ -1335,6 +1336,67 @@ def _diff_field(value: str | None) -> str:
     return sanitize_for_terminal(value) if value is not None else "(none)"
 
 
+#: ``agentce diff --format``'s three renderings (SPEC §9.3): today's flat human-note list, the
+#: machine-readable ``what_changed`` object standalone, and a Markdown "## What changed" section.
+DIFF_FORMATS = ("text", "json", "md")
+
+
+def _classify_change(before: str | None, after: str | None) -> str:
+    """One of ``"closed"``, ``"opened"``, ``"other"`` for a single ``(before, after)`` outcome pair
+    (SPEC §9.3; item 18.6): ``"closed"`` iff ``before`` was a gap (:data:`agentce.verdict.GAP_OUTCOMES`,
+    which already includes ``not_assessed``) and ``after`` is ``"conformant"``; ``"opened"`` iff the
+    reverse. The two conditions cannot both hold -- ``"conformant"`` is not itself a member of
+    ``GAP_OUTCOMES`` -- so every pair lands in exactly one bucket. An added or removed assertion (either
+    side ``None``) and any pair touching ``"not_applicable"`` (a scope change, not a regression or a fix)
+    always land in ``"other"``; an out-of-vocabulary outcome string does too, by the same plain string
+    comparison, with no special-casing."""
+    if before in GAP_OUTCOMES and after == "conformant":
+        return "closed"
+    if before == "conformant" and after in GAP_OUTCOMES:
+        return "opened"
+    return "other"
+
+
+def _what_changed(changes: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Group ``changes`` (``_diff_assertion_sets``'s own output, already sorted by ``(control,
+    subject)``) by :func:`_classify_change`, preserving that order within each of the three groups so
+    the grouping is a stable, cross-engine output contract (item 18.24 reproduces this byte-for-byte)."""
+    what_changed: dict[str, list[dict[str, Any]]] = {
+        "closed": [],
+        "opened": [],
+        "other": [],
+    }
+    for change in changes:
+        what_changed[_classify_change(change["from"], change["to"])].append(change)
+    return what_changed
+
+
+def _diff_md_lines(what_changed: dict[str, list[dict[str, Any]]]) -> list[str]:
+    """The ``--format md`` "## What changed" section as a list of lines (one per ``result.note()``
+    call): one ``### <Label> (<n>)`` subsection per **non-empty** group only, in ``closed``, ``opened``,
+    ``other`` order, each a bullet list built from the same fields the text format already renders."""
+    groups = (("closed", "Closed"), ("opened", "Opened"), ("other", "Other changes"))
+    if not any(what_changed[key] for key, _ in groups):
+        return ["## What changed", "", "no differences."]
+    lines = ["## What changed", ""]
+    for key, label in groups:
+        group = what_changed[key]
+        if not group:
+            continue
+        lines.append(f"### {label} ({len(group)})")
+        for change in group:
+            control = sanitize_for_terminal(change["control"])
+            subject = sanitize_for_terminal(change["subject"])
+            lines.append(
+                f"- {control} @ {subject}: "
+                f"{_diff_field(change['from'])} -> {_diff_field(change['to'])}"
+            )
+        lines.append("")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return lines
+
+
 def cmd_diff(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="diff")
     fix = "pass two assertion files: `agentce diff <report-a> <report-b>`."
@@ -1350,14 +1412,29 @@ def cmd_diff(ns: argparse.Namespace) -> CommandResult:
         what="the second assertion set",
         fix=fix,
     )
+    fmt = _opt_str(ns, "format") or "text"
+    if fmt not in DIFF_FORMATS:
+        raise InputError(
+            "input.diff_format",
+            f"--format must be one of {', '.join(DIFF_FORMATS)}, not {fmt!r}.",
+            "pass --format text|json|md.",
+        )
     result.data.update({"report_a": str(left), "report_b": str(right)})
     a = json.loads(left.read_text("utf-8"))
     b = json.loads(right.read_text("utf-8"))
     changes = _diff_assertion_sets(a, b)
+    what_changed = _what_changed(changes)
     result.data["changed"] = len(changes)
     result.data["diff"] = changes
+    result.data["what_changed"] = what_changed
     if changes:
         result.add_code(int(ExitCode.FINDINGS))
+    if fmt == "md":
+        for line in _diff_md_lines(what_changed):
+            result.note(line)
+    elif fmt == "json":
+        result.note(json.dumps(result.data, indent=2, sort_keys=True))
+    elif changes:
         result.note(f"{len(changes)} assertion(s) differ:")
         for c in changes:
             control = sanitize_for_terminal(c["control"])

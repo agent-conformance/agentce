@@ -103,6 +103,136 @@ def test_diff_renders_added_or_removed_assertion_as_none_not_a_placeholder(
     assert "(none) -> conformant" in out
 
 
+#: All 42 off-diagonal `(before, after)` pairs over `{None} + assertions.OUTCOMES` (item 18.6, C1(a)):
+#: written by hand from `verdict.GAP_OUTCOMES = ("non-conformant", "partial", "insufficient_evidence",
+#: "not_assessed")`, never re-derived by calling `_classify_change`'s own two conditions again, so this
+#: table pins the intended behaviour rather than tautologically restating the implementation.
+_DIFF_CLASSIFY_PAIRS: tuple[tuple[str | None, str | None, str], ...] = (
+    # before=None: never opened/closed regardless of after (an added assertion).
+    (None, "conformant", "other"),
+    (None, "non-conformant", "other"),
+    (None, "partial", "other"),
+    (None, "not_applicable", "other"),
+    (None, "not_assessed", "other"),
+    (None, "insufficient_evidence", "other"),
+    # before="conformant": opened iff after is a gap outcome.
+    ("conformant", None, "other"),
+    ("conformant", "non-conformant", "opened"),
+    ("conformant", "partial", "opened"),
+    ("conformant", "not_applicable", "other"),
+    ("conformant", "not_assessed", "opened"),
+    ("conformant", "insufficient_evidence", "opened"),
+    # before="non-conformant" (a gap): closed iff after=="conformant".
+    ("non-conformant", None, "other"),
+    ("non-conformant", "conformant", "closed"),
+    ("non-conformant", "partial", "other"),
+    ("non-conformant", "not_applicable", "other"),
+    ("non-conformant", "not_assessed", "other"),
+    ("non-conformant", "insufficient_evidence", "other"),
+    # before="partial" (a gap): closed iff after=="conformant".
+    ("partial", None, "other"),
+    ("partial", "conformant", "closed"),
+    ("partial", "non-conformant", "other"),
+    ("partial", "not_applicable", "other"),
+    ("partial", "not_assessed", "other"),
+    ("partial", "insufficient_evidence", "other"),
+    # before="not_applicable": never a gap and never conformant, so always other.
+    ("not_applicable", None, "other"),
+    ("not_applicable", "conformant", "other"),
+    ("not_applicable", "non-conformant", "other"),
+    ("not_applicable", "partial", "other"),
+    ("not_applicable", "not_assessed", "other"),
+    ("not_applicable", "insufficient_evidence", "other"),
+    # before="not_assessed" (a gap): closed iff after=="conformant".
+    ("not_assessed", None, "other"),
+    ("not_assessed", "conformant", "closed"),
+    ("not_assessed", "non-conformant", "other"),
+    ("not_assessed", "partial", "other"),
+    ("not_assessed", "not_applicable", "other"),
+    ("not_assessed", "insufficient_evidence", "other"),
+    # before="insufficient_evidence" (a gap): closed iff after=="conformant".
+    ("insufficient_evidence", None, "other"),
+    ("insufficient_evidence", "conformant", "closed"),
+    ("insufficient_evidence", "non-conformant", "other"),
+    ("insufficient_evidence", "partial", "other"),
+    ("insufficient_evidence", "not_applicable", "other"),
+    ("insufficient_evidence", "not_assessed", "other"),
+)
+
+
+def test_diff_classify_change_pairs_cover_all_42() -> None:
+    assert len(_DIFF_CLASSIFY_PAIRS) == 42
+    assert len({(b, a) for b, a, _ in _DIFF_CLASSIFY_PAIRS}) == 42
+    universe = (
+        None,
+        "conformant",
+        "non-conformant",
+        "partial",
+        "not_applicable",
+        "not_assessed",
+        "insufficient_evidence",
+    )
+    assert len(universe) == 7
+    for before in universe:
+        for after in universe:
+            if before != after:
+                assert (before, after) in {(b, a) for b, a, _ in _DIFF_CLASSIFY_PAIRS}
+
+
+@pytest.mark.parametrize("before,after,expected", _DIFF_CLASSIFY_PAIRS)
+def test_diff_classify_change_pairs(
+    before: str | None, after: str | None, expected: str
+) -> None:
+    from agentce.commands import _classify_change
+
+    assert _classify_change(before, after) == expected
+
+
+@pytest.mark.parametrize(
+    "before,after",
+    [
+        ("Conformant", "non-conformant"),
+        ("non-conformant", "Conformant"),
+        ("CONFORMANT", "conformant"),
+    ],
+)
+def test_diff_classify_change_unknown_outcome(before: str, after: str) -> None:
+    """An out-of-vocabulary outcome string (wrong case, or otherwise not in the six-outcome
+    vocabulary) lands in `other` by the same plain two-condition rule -- neither `in GAP_OUTCOMES` nor
+    `== "conformant"` matches it -- with no special-casing needed in the implementation."""
+    from agentce.commands import _classify_change
+
+    assert _classify_change(before, after) == "other"
+
+
+def test_diff_what_changed_always_has_all_three_keys_sorted_within_group() -> None:
+    """`_what_changed`'s three keys are always present, even when empty (the cross-engine output
+    contract for item 18.24), and entries within a group keep `_diff_assertion_sets`'s own
+    `(control, subject)` order."""
+    from agentce.commands import _what_changed
+
+    empty = _what_changed([])
+    assert set(empty) == {"closed", "opened", "other"}
+    assert empty == {"closed": [], "opened": [], "other": []}
+
+    changes = [
+        {
+            "control": "C-02",
+            "subject": "s1",
+            "from": "non-conformant",
+            "to": "conformant",
+        },
+        {
+            "control": "C-01",
+            "subject": "s1",
+            "from": "non-conformant",
+            "to": "conformant",
+        },
+    ]
+    grouped = _what_changed(changes)
+    assert [c["control"] for c in grouped["closed"]] == ["C-02", "C-01"]
+
+
 def test_printable_widens_trigger_to_default_ignorable_codepoints() -> None:
     from agentce.commands import _printable
 

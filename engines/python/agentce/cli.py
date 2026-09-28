@@ -282,6 +282,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("report_a", nargs="?", help="the first assertions.json")
     p.add_argument("report_b", nargs="?", help="the second assertions.json")
+    p.add_argument(
+        "--format",
+        choices=commands.DIFF_FORMATS,
+        help="how to render the diff (default: text)",
+    )
     p.set_defaults(func=commands.cmd_diff)
 
     p = sub.add_parser(

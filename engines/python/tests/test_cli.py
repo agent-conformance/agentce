@@ -632,6 +632,129 @@ def test_diff_missing(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> Non
     assert env["error"]["key"] == "input.report_b_not_a_file"
 
 
+def _diff_pair(
+    tmp_path: Path, left_rows: list[dict[str, str]], right_rows: list[dict[str, str]]
+) -> tuple[Path, Path]:
+    left = tmp_path / "a.json"
+    right = tmp_path / "b.json"
+    left.write_text(json.dumps(left_rows), encoding="utf-8")
+    right.write_text(json.dumps(right_rows), encoding="utf-8")
+    return left, right
+
+
+def test_diff_format_invalid_exits_3(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An unrecognised `--format` value is an input error (argparse's own `choices=`), not a silent
+    fallback to `text` and not a crash (round 2 finding 5c)."""
+    left, right = _diff_pair(tmp_path, [], [])
+    code = cli.main(["diff", str(left), str(right), "--format", "xml"])
+    assert code == 3
+
+
+def test_diff_format_text_unchanged(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`--format text` (and no `--format` at all) is today's exact human-note rendering, byte for
+    byte, unaffected by the new `what_changed` grouping (round 2 finding: pin the literal lines)."""
+    left, right = _diff_pair(
+        tmp_path,
+        [{"control": "C-01", "subject": "s1", "outcome": "non-conformant"}],
+        [{"control": "C-01", "subject": "s1", "outcome": "conformant"}],
+    )
+    code = cli.main(["diff", str(left), str(right)])
+    out = capsys.readouterr().out
+    assert code == 1
+    assert out == "1 assertion(s) differ:\n  C-01 @ s1: non-conformant -> conformant\n"
+    for fmt in (None, "text"):
+        left2, right2 = _diff_pair(tmp_path, [], [])
+        argv = ["diff", str(left2), str(right2)]
+        if fmt:
+            argv += ["--format", fmt]
+        code2 = cli.main(argv)
+        assert code2 == 0
+        assert capsys.readouterr().out == "no differences\n"
+
+
+def test_diff_format_md_empty_group_omitted(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`--format md` prints a subsection only for a non-empty group; a run with only a closed change
+    has no `### Opened` or `### Other changes` heading at all."""
+    left, right = _diff_pair(
+        tmp_path,
+        [{"control": "C-01", "subject": "s1", "outcome": "non-conformant"}],
+        [{"control": "C-01", "subject": "s1", "outcome": "conformant"}],
+    )
+    code = cli.main(["diff", str(left), str(right), "--format", "md"])
+    out = capsys.readouterr().out
+    assert code == 1
+    assert out == (
+        "## What changed\n\n### Closed (1)\n- C-01 @ s1: non-conformant -> conformant\n"
+    )
+    assert "Opened" not in out
+    assert "Other changes" not in out
+
+
+def test_diff_format_md_no_differences(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    left, right = _diff_pair(tmp_path, [], [])
+    code = cli.main(["diff", str(left), str(right), "--format", "md"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert out == "## What changed\n\nno differences.\n"
+
+
+def test_diff_md_hostile_id(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A hostile control id survives `--format md` rendering exactly as every other
+    Markdown-rendering surface in this repo does: backtick (code-span escape), `<`/`>` (raw HTML),
+    and `[`/`]` (link/image syntax) are neutralised to inert lookalikes -- the same fields
+    `test_diff_sanitises_all_four_hostile_fields` already exercises for `--format text`."""
+    hostile = "ok<br>[x](evil)`y`"
+    left, right = _diff_pair(
+        tmp_path,
+        [{"control": hostile, "subject": "s1", "outcome": "non-conformant"}],
+        [{"control": hostile, "subject": "s1", "outcome": "conformant"}],
+    )
+    code = cli.main(["diff", str(left), str(right), "--format", "md"])
+    out = capsys.readouterr().out
+    assert code == 1
+
+    from agentce.report import sanitize_for_terminal
+
+    expected_control = sanitize_for_terminal(hostile)
+    assert out == (
+        "## What changed\n"
+        "\n"
+        "### Closed (1)\n"
+        f"- {expected_control} @ s1: non-conformant -> conformant\n"
+    )
+    assert "<br>" not in out
+    assert "[x](evil)" not in out
+    assert "`y`" not in out
+
+
+@pytest.mark.parametrize("fmt", ["md", "json"])
+def test_diff_json_envelope_wins_over_format(
+    fmt: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`--json` always wins over `--format`: `_emit_result` (`cli.py:391-399`) prints only the JSON
+    envelope and ignores every `result.note()` call, so `--format md --json` and `--format json --json`
+    each print exactly one JSON document (round 2 finding 5)."""
+    left, right = _diff_pair(
+        tmp_path,
+        [{"control": "C-01", "subject": "s1", "outcome": "non-conformant"}],
+        [{"control": "C-01", "subject": "s1", "outcome": "conformant"}],
+    )
+    code = cli.main(["diff", str(left), str(right), "--format", fmt, "--json"])
+    out = capsys.readouterr().out
+    assert code == 1
+    parsed = json.loads(out)  # exactly one JSON document on stdout, or this raises
+    assert parsed["command"] == "diff"
+    assert parsed["what_changed"]["closed"][0]["control"] == "C-01"
+
+
 def test_sign_ok(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     code, env = run(
         ["sign", str(tmp_path), "--as", "claimant", "--dry-run", "--json"], capsys
