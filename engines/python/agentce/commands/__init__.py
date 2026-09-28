@@ -1734,6 +1734,26 @@ def cmd_collect(ns: argparse.Namespace) -> CommandResult:
     return result
 
 
+def _reject_inside_catalog(
+    value: str,
+    catalog_dir: Path,
+    *,
+    key: str,
+    flag: str,
+    noun: str,
+    shown_dir: Path,
+) -> None:
+    """Raise ``InputError(key)`` if `value` resolves inside `catalog_dir` -- an operator-supplied path
+    for something that must live outside the catalog it's paired with (a support matrix, a signing
+    key, a trust root)."""
+    if Path(value).resolve().is_relative_to(catalog_dir):
+        raise InputError(
+            key,
+            f"{flag} {value!r} resolves inside the catalog directory {shown_dir}.",
+            f"write the {noun} outside the catalog directory.",
+        )
+
+
 def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="catalog")
     action = _opt_str(ns, "catalog_action")
@@ -1771,14 +1791,14 @@ def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
                 f"{len(catalog_dirs)}.",
                 "pass the single catalog's own directory, not a directory holding several.",
             )
-        if catalog_dirs and Path(support_matrix).resolve().is_relative_to(
-            catalog_dirs[0].resolve()
-        ):
-            raise InputError(
-                "catalog.support_matrix_inside_catalog",
-                f"--support-matrix {support_matrix!r} resolves inside the catalog directory "
-                f"{catalog_dirs[0]}.",
-                "write the support matrix outside the catalog directory.",
+        if catalog_dirs:
+            _reject_inside_catalog(
+                support_matrix,
+                catalog_dirs[0].resolve(),
+                key="catalog.support_matrix_inside_catalog",
+                flag="--support-matrix",
+                noun="support matrix",
+                shown_dir=catalog_dirs[0],
             )
     problems: list[str] = []
     if not catalog_dirs:
@@ -1838,10 +1858,8 @@ def _vendored_control_families() -> frozenset[str]:
     each call from `bundled.vendored_catalogs()` so it never drifts from what actually ships."""
     families: set[str] = set()
     for directory in bundled.vendored_catalogs().values():
-        for control_file in sorted(directory.glob("controls/*.yaml")):
-            data = yaml.safe_load(control_file.read_text(encoding="utf-8")) or {}
-            control_id = str(data.get("id", ""))
-            family = control_id.split("-", 1)[0]
+        for control in load_catalog(directory).controls:
+            family = control.id.split("-", 1)[0]
             if family:
                 families.add(family)
     return frozenset(families)
@@ -2406,11 +2424,6 @@ def _sign_signer(ns: argparse.Namespace, profile: str) -> signing.Signer:
         key_file = _require_file(key_path, key="key", what="the signing key")
         loaded = _load_ed25519_private_key(
             key_file,
-            missing=(
-                "sign.kms_key_missing",
-                "the kms profile signs with an operator-held key.",
-                "pass --key <ed25519-private-key.pem>.",
-            ),
             bad_algorithm=(
                 "sign.key_algorithm",
                 "the signing key is not an Ed25519 private key.",
@@ -2439,7 +2452,6 @@ def _sign_signer(ns: argparse.Namespace, profile: str) -> signing.Signer:
 def _load_ed25519_private_key(
     key_path: Path,
     *,
-    missing: tuple[str, str, str],
     bad_algorithm: tuple[str, str, str],
     unreadable: tuple[str, str, str],
 ) -> Any:
@@ -2448,12 +2460,10 @@ def _load_ed25519_private_key(
     Shared by ``agentce sign``'s ``kms`` profile and ``agentce catalog sign``. An unparseable file or
     a password-protected key with no password supplied (previously an uncaught crash to
     ``internal.unexpected``) raises ``unreadable``; a key that parses but is not Ed25519 raises
-    ``bad_algorithm`` (unchanged behaviour, only relocated). ``missing`` is accepted only so every
-    caller passes the same three-key shape; a missing ``key_path`` is refused by the caller before
-    this helper is ever called (``_require_file`` for ``sign``, the argparse mutually-exclusive group
-    for ``catalog sign``), so this helper never raises it itself.
+    ``bad_algorithm`` (unchanged behaviour, only relocated). A missing ``key_path`` is refused by the
+    caller before this helper is ever called (``_require_file`` for ``sign``, the argparse
+    mutually-exclusive group for ``catalog sign``), so this helper has no ``missing`` case.
     """
-    del missing
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
@@ -2501,24 +2511,24 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
     key_arg = _opt_str(ns, "key")
     new_key_arg = _opt_str(ns, "new_key")
     key_arg_raw = new_key_arg if new_key_arg is not None else key_arg
-    if key_arg_raw is not None and Path(key_arg_raw).resolve().is_relative_to(
-        catalog_dir
-    ):
-        flag = "--new-key" if new_key_arg is not None else "--key"
-        raise InputError(
-            "catalog.sign_key_inside_catalog",
-            f"{flag} {key_arg_raw!r} resolves inside the catalog directory {directory}.",
-            "write the key outside the catalog directory.",
+    if key_arg_raw is not None:
+        _reject_inside_catalog(
+            key_arg_raw,
+            catalog_dir,
+            key="catalog.sign_key_inside_catalog",
+            flag="--new-key" if new_key_arg is not None else "--key",
+            noun="key",
+            shown_dir=directory,
         )
     write_trust_root = _opt_str(ns, "write_trust_root")
-    if write_trust_root is not None and Path(write_trust_root).resolve().is_relative_to(
-        catalog_dir
-    ):
-        raise InputError(
-            "catalog.sign_trust_root_inside_catalog",
-            f"--write-trust-root {write_trust_root!r} resolves inside the catalog directory "
-            f"{directory}.",
-            "write the trust root outside the catalog directory.",
+    if write_trust_root is not None:
+        _reject_inside_catalog(
+            write_trust_root,
+            catalog_dir,
+            key="catalog.sign_trust_root_inside_catalog",
+            flag="--write-trust-root",
+            noun="trust root",
+            shown_dir=directory,
         )
 
     new_key_written: str | None = None
@@ -2550,11 +2560,6 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
         key_file = _require_file(key_arg, key="key", what="the signing key")
         key = _load_ed25519_private_key(
             key_file,
-            missing=(
-                "catalog.sign_key_missing",
-                "`catalog sign` signs with an operator-held key.",
-                "pass --key <ed25519-private-key.pem> or --new-key <path>.",
-            ),
             bad_algorithm=(
                 "catalog.sign_key_algorithm",
                 "the signing key is not an Ed25519 private key.",
