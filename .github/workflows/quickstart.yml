@@ -177,6 +177,12 @@ jobs:
         run: |
           corepack enable
           pnpm install --frozen-lockfile
+      - name: Cross-engine catalog digest must agree (self-test, then the real catalog)
+        run: |
+          uv run --project tools --frozen python tools/catalog_digest_check.py --self-test
+          (cd engines/typescript && pnpm build)
+          (cd engines/java && ./gradlew :assemble -q)
+          uv run --project tools --frozen python tools/catalog_digest_check.py spec/catalogs/base/baseline
       - name: The check itself must be able to fail
         run: python3 tools/installed_artifacts_check.py --self-test
       - name: Build each artifact, install it outside the checkout, run it with no network

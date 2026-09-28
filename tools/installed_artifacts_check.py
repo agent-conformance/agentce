@@ -40,6 +40,7 @@ import contextlib
 import filecmp
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -50,12 +51,16 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import assess_smoke_check
+import catalog_digest_check
 
 ROOT = Path(__file__).resolve().parent.parent
 PY_ENGINE = ROOT / "engines" / "python"
 TS_ENGINE = ROOT / "engines" / "typescript"
 JAVA_ENGINE = ROOT / "engines" / "java"
 VECTORS = ROOT / "spec" / "rules" / "numerics-vectors" / "cases"
+#: The real, signed catalog a quickstart run evaluates (not `baseline`) -- the source for C4's
+#: cross-engine catalog-digest and tamper checks (item 18.22).
+EU_AI_ACT_DIR = ROOT / "spec" / "catalogs" / "base" / "eu-ai-act"
 DEAD_PROXY = "http://127.0.0.1:9"
 # Canonical quickstart outputs. graph.sqlite (a binary store) and manifest.json (carries the run's
 # start time) legitimately differ between two runs and are not compared.
@@ -593,6 +598,234 @@ def check_python_files(
         return problems
 
 
+# --- version --json, real catalog digests, and the Verdict section, the way a user meets them in an
+# installed TypeScript or Java artifact (item 18.22) -- pure functions so the self-test can prove each
+# one discriminates a broken fixture without a full install/build cycle. --------------------------
+
+
+def _python_reference_quickstart(runner: Runner, tmp: Path) -> Path | str:
+    """A real Python-engine quickstart run from the checkout: the cross-engine reference every other
+    engine's rendered Verdict section must match byte-for-byte (C1(h)/C4)."""
+    reference = tmp / "py-reference"
+    proc = runner.run(
+        [
+            "uv",
+            "run",
+            "--frozen",
+            "--project",
+            str(PY_ENGINE),
+            "agentce",
+            "quickstart",
+            "--out",
+            str(reference),
+        ],
+        tmp,
+        offline=False,
+    )
+    if proc.returncode != 0:
+        return _fail("python reference quickstart", proc)
+    return reference
+
+
+def _python_spec_version(runner: Runner, tmp: Path) -> str | None:
+    """The Python engine's own `spec_version`, for the `version --json` cross-engine assertion."""
+    proc = runner.run(
+        ["uv", "run", "--frozen", "--project", str(PY_ENGINE), "agentce", "version", "--json"],
+        tmp,
+        offline=False,
+    )
+    try:
+        version: str | None = json.loads(proc.stdout).get("spec_version")
+    except ValueError:
+        return None
+    return version
+
+
+def _version_plain_problems(
+    stdout: str, returncode: int, engine_id: str, version: str
+) -> list[str]:
+    """The two-line plain-text form of `version` (no `--json`): `<engine> <version> (spec <spec>)`
+    then `no_ml: <result>`, matching Python's own `cmd_version` output field for field."""
+    problems: list[str] = []
+    if returncode != 0:
+        problems.append(f"version: exit {returncode}, expected 0 for a passing no_ml")
+    lines = stdout.strip("\n").splitlines()
+    expected_first = f"{engine_id} {version} (spec "
+    if len(lines) != 2 or not lines[0].startswith(expected_first):
+        problems.append(
+            f"version: printed {stdout!r}, expected two lines starting {expected_first!r}"
+        )
+    elif not lines[1].startswith("no_ml: "):
+        problems.append(f"version: second line {lines[1]!r} does not start with 'no_ml: '")
+    return problems
+
+
+def _version_json_problems(
+    stdout: str, returncode: int, engine_id: str, spec_version: str
+) -> list[str]:
+    """`version --json`'s structured envelope: the same shape `validate`/`assess` already produce,
+    with a real installed-artifact `no_ml` self-report (never a literal `pass`)."""
+    try:
+        envelope = json.loads(stdout)
+    except ValueError:
+        return [f"version --json: output is not JSON: {stdout.strip()[:200]!r}"]
+    problems: list[str] = []
+    if envelope.get("engine") != engine_id:
+        problems.append(f"version --json: engine={envelope.get('engine')!r}, expected {engine_id!r}")
+    if envelope.get("spec_version") != spec_version:
+        problems.append(
+            f"version --json: spec_version={envelope.get('spec_version')!r}, "
+            f"expected {spec_version!r} (the Python engine's own)"
+        )
+    if envelope.get("no_ml") != "pass":
+        problems.append(
+            f"version --json: no_ml={envelope.get('no_ml')!r}, expected 'pass' for the real "
+            "installed artifact's own (non-denylisted) bundled dependencies"
+        )
+    detail = envelope.get("no_ml_detail")
+    if not isinstance(detail, dict) or "denylisted_present" not in detail:
+        problems.append("version --json: no_ml_detail is missing or lacks denylisted_present")
+    if returncode != 0:
+        problems.append(f"version --json: exit {returncode}, expected 0 for a passing no_ml")
+    return problems
+
+
+def _version_problems(
+    exe: list[str], runner: Runner, cwd: Path, engine_id: str, spec_version: str
+) -> list[str]:
+    version = package_version()
+    proc = runner.run([*exe, "version"], cwd, offline=True)
+    problems = _version_plain_problems(proc.stdout, proc.returncode, engine_id, version)
+    proc = runner.run([*exe, "version", "--json"], cwd, offline=True)
+    problems += _version_json_problems(proc.stdout, proc.returncode, engine_id, spec_version)
+    return problems
+
+
+_ZERO_DIGEST = "sha256:" + "0" * 64
+
+
+def _manifest_digest(out_dir: Path, catalog_id: str) -> str | None:
+    manifest_path = out_dir / "manifest.json"
+    if not manifest_path.is_file():
+        return None
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    return next(
+        (
+            c.get("digest")
+            for c in manifest.get("inputs", {}).get("catalogs", [])
+            if c.get("id") == catalog_id
+        ),
+        None,
+    )
+
+
+def _digest_problem(
+    label: str, out_dir: Path, catalog_id: str, expected_digest: str
+) -> str | None:
+    """`manifest.json`'s digest for `catalog_id` must be the real, live-recomputed content digest --
+    never the zero digest, and never a value that merely happens to differ from zero but isn't the
+    one an independent recomputation of the same bundled directory produces."""
+    got = _manifest_digest(out_dir, catalog_id)
+    if got is None:
+        return f"{label}: manifest.json has no digest for catalog {catalog_id!r}"
+    if got == _ZERO_DIGEST:
+        return f"{label}: manifest digest for {catalog_id!r} is the zero digest"
+    if got != expected_digest:
+        return f"{label}: manifest digest {got!r} != independently recomputed {expected_digest!r}"
+    return None
+
+
+_VERDICT_HTML_RE = re.compile(r'<section aria-labelledby="verdict">.*?</section>', re.DOTALL)
+
+
+def _verdict_span_md(text: str) -> str | None:
+    lines = text.splitlines()
+    start = next((i for i, line in enumerate(lines) if line.startswith("## Verdict")), None)
+    end = next((i for i, line in enumerate(lines) if line.startswith("## Outcome summary")), None)
+    if start is None or end is None or end < start:
+        return None
+    return "\n".join(lines[start : end + 1])
+
+
+def _verdict_span_html(text: str) -> str | None:
+    match = _VERDICT_HTML_RE.search(text)
+    return match.group(0) if match else None
+
+
+def _verdict_problems(label: str, fmt: str, text: str, reference_span: str) -> list[str]:
+    """The rendered Verdict section (`## Verdict` through `## Outcome summary` in md; the
+    `<section aria-labelledby="verdict">` element in html) must be byte-equal to the Python engine's
+    rendering of the identical bundle -- not merely present (C1(h)/C4)."""
+    span = _verdict_span_md(text) if fmt == "md" else _verdict_span_html(text)
+    if span is None:
+        return [f"{label}: {fmt} report has no Verdict section"]
+    if span != reference_span:
+        return [f"{label}: {fmt} Verdict section differs from the Python reference rendering"]
+    return []
+
+
+def _tamper_catalog(tmp: Path) -> Path:
+    """A copy of the real, bundled eu-ai-act catalog with one control file's content changed, so its
+    content digest legitimately differs from the original -- while its `catalog.yaml` (excluded from
+    the digest, and never copied forward with a corrected value) still carries the now-stale
+    `provenance.digest` of the untampered catalog."""
+    tampered = tmp / "tampered-eu-ai-act"
+    shutil.copytree(EU_AI_ACT_DIR, tampered)
+    controls = sorted((tampered / "controls").glob("*.yaml"))
+    if not controls:
+        raise SystemExit("no control files to tamper with in the eu-ai-act catalog")
+    with controls[0].open("a", encoding="utf-8") as fh:
+        fh.write("# tampered by installed_artifacts_check\n")
+    return tampered
+
+
+def _tamper_problems(
+    label: str,
+    exe: list[str],
+    runner: Runner,
+    tmp: Path,
+    quickstart: Path,
+    untampered_digest: str | None,
+) -> list[str]:
+    """`--catalog-dir` pointed at a modified catalog produces a manifest digest that is a live
+    recomputation of the tampered content -- never the untampered run's digest, and never the
+    tampered catalog's own (now-stale) `catalog.yaml` value, which this never touches."""
+    tampered = _tamper_catalog(tmp)
+    out = tmp / f"{label}-tampered-out"
+    proc = runner.run(
+        [
+            *exe,
+            "assess",
+            "--bundle",
+            str(quickstart / "evidence"),
+            "--profile",
+            str(quickstart / "applicability.yaml"),
+            "--domain",
+            str(quickstart / "domain.linkml.yaml"),
+            "--catalog-dir",
+            str(tampered),
+            "--out",
+            str(out),
+        ],
+        tmp,
+        offline=True,
+    )
+    if proc.returncode not in (0, 1):
+        return [_fail(f"{label}: assess against a tampered --catalog-dir", proc)]
+    expected = catalog_digest_check.digest_tree(tampered)
+    problems = []
+    problem = _digest_problem(f"{label} tampered", out, "eu-ai-act", expected)
+    if problem:
+        problems.append(problem)
+    got = _manifest_digest(out, "eu-ai-act")
+    if got is not None and got == untampered_digest:
+        problems.append(
+            f"{label}: the tampered run's digest equals the untampered run's -- "
+            "not a live recomputation"
+        )
+    return problems
+
+
 def _numerics_problems(engine_cmd: list[str], cwd: Path, runner: Runner) -> list[str]:
     problems: list[str] = []
     files = sorted(VECTORS.glob("*.json"))
@@ -650,6 +883,12 @@ def check_npm_tarball(
     with _scratch("agentce-installed-") as raw:
         tmp = Path(raw)
         assert _outside_checkout(tmp)
+        reference = _python_reference_quickstart(runner, tmp)
+        if isinstance(reference, str):
+            return [reference]
+        spec_version = _python_spec_version(runner, tmp)
+        if spec_version is None:
+            return ["could not determine the python engine's own spec_version"]
         empty = tmp / "empty"
         empty.mkdir()
         (empty / "package.json").write_text(
@@ -671,10 +910,14 @@ def check_npm_tarball(
         )
         if proc.returncode != 0:
             return [_fail("install the tarball into an empty project", proc)]
-        return _npm_run_problems(runner, empty, version)
+        return _npm_run_problems(
+            runner, empty, version, reference=reference, spec_version=spec_version
+        )
 
 
-def _npm_run_problems(runner: Runner, empty: Path, version: str) -> list[str]:
+def _npm_run_problems(
+    runner: Runner, empty: Path, version: str, *, reference: Path, spec_version: str
+) -> list[str]:
     exe = [str(empty / "node_modules" / ".bin" / "agentce")]
     problems: list[str] = []
     proc = runner.run([*exe, "--version"], empty, offline=True)
@@ -692,6 +935,7 @@ def _npm_run_problems(runner: Runner, empty: Path, version: str) -> list[str]:
             _fail("conformance run --json did not return a stable error envelope", proc)
         )
     problems += _numerics_problems(exe, empty, runner)
+    problems += [f"npm: {p}" for p in _version_problems(exe, runner, empty, "agentce-ts", spec_version)]
     package = empty / "node_modules" / "@agent-conformance" / "cli"
     for rel in (
         "schema/agentce-evidence.schema.json",
@@ -711,6 +955,32 @@ def _npm_run_problems(runner: Runner, empty: Path, version: str) -> list[str]:
     problems += [
         f"quickstart: {p}" for p in assess_smoke_check.check(qs_out, qs_envelope)
     ]
+    bundled_eu_ai_act = package / "data" / "catalogs" / "base" / "eu-ai-act"
+    untampered_digest = _manifest_digest(qs_out, "eu-ai-act")
+    if bundled_eu_ai_act.is_dir():
+        expected_digest = catalog_digest_check.digest_tree(bundled_eu_ai_act)
+        problem = _digest_problem("npm quickstart", qs_out, "eu-ai-act", expected_digest)
+        if problem:
+            problems.append(problem)
+    for fmt, name in (("md", "report.md"), ("html", "report.html")):
+        rendered = qs_out / name
+        ref_rendered = reference / name
+        if rendered.is_file() and ref_rendered.is_file():
+            ref_text = ref_rendered.read_text(encoding="utf-8")
+            ref_span = (
+                _verdict_span_md(ref_text) if fmt == "md" else _verdict_span_html(ref_text)
+            )
+            problems += [
+                f"npm quickstart: {p}"
+                for p in _verdict_problems(
+                    "npm", fmt, rendered.read_text(encoding="utf-8"), ref_span or ""
+                )
+            ]
+    bundled_quickstart = package / "data" / "corpus" / "quickstart"
+    if bundled_quickstart.is_dir():
+        problems += _tamper_problems(
+            "npm", exe, runner, empty, bundled_quickstart, untampered_digest
+        )
     return problems
 
 
@@ -730,27 +1000,43 @@ def check_jar(runner: Runner, *, offline_install: bool) -> list[str]:
     return check_jar_file(runner, jars[0])
 
 
+def _extract_zip_subtree(archive: Path, prefix: str, dest: Path) -> Path:
+    """Every entry of `archive` whose name starts with `prefix`, written under `dest` with the
+    prefix stripped -- used to read a jar's bundled catalog/corpus data as real files on disk so
+    `agentce assess --catalog-dir`/`--bundle`/`--domain` (which take filesystem paths) can use them."""
+    with zipfile.ZipFile(archive) as zf:
+        names = [n for n in zf.namelist() if n.startswith(prefix) and not n.endswith("/")]
+        for name in names:
+            target = dest / name[len(prefix) :]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(zf.read(name))
+    return dest
+
+
 def check_jar_file(runner: Runner, built: Path) -> list[str]:
     """Run a built or downloaded jar from an empty directory."""
     version = package_version()
     with _scratch("agentce-installed-") as raw:
         tmp = Path(raw)
         assert _outside_checkout(tmp)
+        reference = _python_reference_quickstart(runner, tmp)
+        if isinstance(reference, str):
+            return [reference]
+        spec_version = _python_spec_version(runner, tmp)
+        if spec_version is None:
+            return ["could not determine the python engine's own spec_version"]
         jar = tmp / built.name
         shutil.copy2(built, jar)
         empty = tmp / "empty"
         empty.mkdir()
+        exe = ["java", "-jar", str(jar)]
         problems: list[str] = []
-        proc = runner.run(["java", "-jar", str(jar), "--version"], empty, offline=True)
+        proc = runner.run([*exe, "--version"], empty, offline=True)
         if proc.returncode != 0 or proc.stdout.strip() != f"agentce {version}":
             problems.append(
                 f"--version printed {proc.stdout.strip()!r}, expected 'agentce {version}'"
             )
-        proc = runner.run(
-            ["java", "-jar", str(jar), "conformance", "run", "--json"],
-            empty,
-            offline=True,
-        )
+        proc = runner.run([*exe, "conformance", "run", "--json"], empty, offline=True)
         try:
             envelope = json.loads(proc.stdout)
         except ValueError:
@@ -762,6 +1048,9 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
                     proc,
                 )
             )
+        problems += [
+            f"jar: {p}" for p in _version_problems(exe, runner, empty, "agentce-java", spec_version)
+        ]
         with zipfile.ZipFile(jar) as zf:
             names = set(zf.namelist())
         for entry in (
@@ -773,9 +1062,7 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
                 problems.append(f"the jar lacks {entry}")
         qs_out = tmp / "quickstart-out"
         proc = runner.run(
-            ["java", "-jar", str(jar), "quickstart", "--out", str(qs_out), "--json"],
-            empty,
-            offline=True,
+            [*exe, "quickstart", "--out", str(qs_out), "--json"], empty, offline=True
         )
         try:
             qs_envelope = json.loads(proc.stdout)
@@ -784,6 +1071,38 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
         problems += [
             f"quickstart: {p}" for p in assess_smoke_check.check(qs_out, qs_envelope)
         ]
+        bundled_eu_ai_act_prefix = "catalogs/base/eu-ai-act/"
+        untampered_digest = _manifest_digest(qs_out, "eu-ai-act")
+        if any(n.startswith(bundled_eu_ai_act_prefix) for n in names):
+            bundled_eu_ai_act = _extract_zip_subtree(
+                jar, bundled_eu_ai_act_prefix, tmp / "jar-eu-ai-act"
+            )
+            expected_digest = catalog_digest_check.digest_tree(bundled_eu_ai_act)
+            problem = _digest_problem("jar quickstart", qs_out, "eu-ai-act", expected_digest)
+            if problem:
+                problems.append(problem)
+        for fmt, name in (("md", "report.md"), ("html", "report.html")):
+            rendered = qs_out / name
+            ref_rendered = reference / name
+            if rendered.is_file() and ref_rendered.is_file():
+                ref_text = ref_rendered.read_text(encoding="utf-8")
+                ref_span = (
+                    _verdict_span_md(ref_text) if fmt == "md" else _verdict_span_html(ref_text)
+                )
+                problems += [
+                    f"jar quickstart: {p}"
+                    for p in _verdict_problems(
+                        "jar", fmt, rendered.read_text(encoding="utf-8"), ref_span or ""
+                    )
+                ]
+        bundled_quickstart_prefix = "corpus/quickstart/"
+        if any(n.startswith(bundled_quickstart_prefix) for n in names):
+            bundled_quickstart = _extract_zip_subtree(
+                jar, bundled_quickstart_prefix, tmp / "jar-quickstart"
+            )
+            problems += _tamper_problems(
+                "jar", exe, runner, empty, bundled_quickstart, untampered_digest
+            )
         return problems
 
 
@@ -886,6 +1205,11 @@ def self_test() -> int:
     failures: list[str] = []
     with _scratch("agentce-installed-selftest-") as raw:
         tmp = Path(raw)
+        py_reference = _python_reference_quickstart(runner, tmp)
+        if isinstance(py_reference, str):
+            failures.append(f"could not build the python reference quickstart: {py_reference}")
+            py_reference = tmp / "py-reference"  # missing; guarded reads below just skip
+        py_spec_version = _python_spec_version(runner, tmp) or "0.0"
         good = tmp / "good"
         (good / "packs" / "p").mkdir(parents=True)
         for name in CANONICAL_OUTPUTS:
@@ -950,13 +1274,20 @@ def self_test() -> int:
         inert_bin = consumer / "node_modules" / ".bin" / "agentce"
         inert_bin.write_text("#!/bin/sh\necho agentce 0.0.0\n", encoding="utf-8")
         inert_bin.chmod(0o755)
-        found = _npm_run_problems(runner, consumer, package_version())
+        found = _npm_run_problems(
+            runner,
+            consumer,
+            package_version(),
+            reference=py_reference,
+            spec_version=py_spec_version,
+        )
         for expected in (
             "--version printed",
             "stable error envelope",
             "numerics",
             "lacks data/catalogs/base",
             "quickstart: ",
+            "version: ",
         ):
             if not any(expected in p for p in found):
                 failures.append(
@@ -977,15 +1308,98 @@ def self_test() -> int:
                 "stable error envelope",
                 "the jar lacks",
                 "quickstart: ",
+                "version: ",
             ):
                 if not any(expected in p for p in found):
                     failures.append(
                         f"an inert jar install was accepted: missing '{expected}'"
                     )
+
+        # --- item 18.22: version --json, the real catalog digest, and the Verdict section must each
+        # discriminate a broken installed artifact -- proven directly against the four new seeded-fault
+        # fixtures the contract names, each paired with a positive case so a correct fixture is never
+        # rejected either. ------------------------------------------------------------------------
+
+        # 1. `version --json` must reject a plain-text response where JSON was expected.
+        if not _version_json_problems(
+            "agentce-ts 0.1.0 (spec 0.6)\nno_ml: pass\n", 0, "agentce-ts", "0.6"
+        ):
+            failures.append("a plain-text version --json response was accepted")
+        good_envelope = json.dumps(
+            {
+                "engine": "agentce-ts",
+                "spec_version": "0.6",
+                "no_ml": "pass",
+                "no_ml_detail": {"result": "pass", "denylisted_present": []},
+            }
+        )
+        if _version_json_problems(good_envelope, 0, "agentce-ts", "0.6"):
+            failures.append("a correct version --json envelope was rejected")
+
+        # 2. a manifest digest of all zeros must be rejected as the zero digest specifically, not
+        #    merely because it differs from the expected value.
+        zero_manifest_dir = tmp / "zero-manifest"
+        zero_manifest_dir.mkdir()
+        (zero_manifest_dir / "manifest.json").write_text(
+            json.dumps({"inputs": {"catalogs": [{"id": "eu-ai-act", "digest": _ZERO_DIGEST}]}}),
+            encoding="utf-8",
+        )
+        zero_problem = _digest_problem(
+            "test", zero_manifest_dir, "eu-ai-act", "sha256:" + "1" * 64
+        )
+        if zero_problem is None or "zero digest" not in zero_problem:
+            failures.append(
+                "a zero-digest manifest was not rejected as the zero digest specifically"
+            )
+
+        # 3. a manifest digest equal to a stale (never recomputed) value -- as a tampered catalog's own
+        #    catalog.yaml would still carry -- must be rejected, and the correct, live-recomputed
+        #    digest must be accepted.
+        real_eu_ai_act_digest = catalog_digest_check.digest_tree(EU_AI_ACT_DIR)
+        stale_manifest_dir = tmp / "stale-manifest"
+        stale_manifest_dir.mkdir()
+        (stale_manifest_dir / "manifest.json").write_text(
+            json.dumps(
+                {"inputs": {"catalogs": [{"id": "eu-ai-act", "digest": "sha256:" + "f" * 64}]}}
+            ),
+            encoding="utf-8",
+        )
+        if _digest_problem("test", stale_manifest_dir, "eu-ai-act", real_eu_ai_act_digest) is None:
+            failures.append("a stale, unrecomputed manifest digest was accepted")
+        good_manifest_dir = tmp / "good-manifest"
+        good_manifest_dir.mkdir()
+        (good_manifest_dir / "manifest.json").write_text(
+            json.dumps(
+                {"inputs": {"catalogs": [{"id": "eu-ai-act", "digest": real_eu_ai_act_digest}]}}
+            ),
+            encoding="utf-8",
+        )
+        if (
+            _digest_problem("test", good_manifest_dir, "eu-ai-act", real_eu_ai_act_digest)
+            is not None
+        ):
+            failures.append("a correct, live-recomputed manifest digest was rejected")
+
+        # 4. a report missing its Verdict section entirely must be rejected, in both formats; a
+        #    byte-identical section (with unrelated trailing content) must be accepted.
+        if not _verdict_problems(
+            "test", "md", "# report\n\n## Outcome summary\n", "## Verdict\n\nx\n\n## Outcome summary"
+        ):
+            failures.append("a markdown report with no Verdict section was accepted")
+        if not _verdict_problems(
+            "test",
+            "html",
+            '<section aria-labelledby="summary">...</section>',
+            '<section aria-labelledby="verdict">x</section>',
+        ):
+            failures.append("an html report with no Verdict section was accepted")
+        matching_span = "## Verdict\n\nx\n\n## Outcome summary"
+        if _verdict_problems("test", "md", matching_span + "\nmore\n", matching_span):
+            failures.append("a byte-identical markdown Verdict section was rejected")
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if not failures:
-        print("installed_artifacts_check self-test: 7 cases discriminate")
+        print("installed_artifacts_check self-test: 11 cases discriminate")
     return 1 if failures else 0
 
 
