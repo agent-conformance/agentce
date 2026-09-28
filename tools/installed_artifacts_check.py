@@ -574,6 +574,43 @@ def _generate_kms_key(runner: Runner, venv: Path, tmp: Path, name: str) -> Path:
     return key_path
 
 
+def _assert_tamper_refused(
+    runner: Runner,
+    recipient_agentce: str,
+    recipient_empty: Path,
+    sender_out: Path,
+    trust_root_copy: Path,
+    *,
+    dest_name: str,
+    corrupt: Callable[[Path], Path],
+    expected_key: str,
+) -> str | None:
+    """Copy `sender_out` to `recipient_empty/dest_name`, corrupt the file `corrupt` names, and assert
+    the recipient's `verify --report` refuses it with `expected_key` (a TEETH case)."""
+    dest = recipient_empty / dest_name
+    shutil.copytree(sender_out, dest)
+    target = corrupt(dest)
+    target.write_bytes(target.read_bytes() + b"TAMPER")
+    proc = runner.run(
+        [
+            recipient_agentce,
+            "verify",
+            "--report",
+            str(dest),
+            "--signer-trust-root",
+            str(trust_root_copy),
+            "--json",
+        ],
+        recipient_empty,
+        offline=True,
+    )
+    if proc.returncode != 3 or expected_key not in proc.stdout:
+        return _fail(
+            f"TEETH: a tampered {dest_name} was not refused as {expected_key}", proc
+        )
+    return None
+
+
 def check_rerun(runner: Runner, *, offline_install: bool) -> list[str]:
     """VG-RERUN-TIME (Hill 3, contracts/P18-18.8.md C4): a sender packages and signs a shareable
     report bundle from `corpus/quickstart`; a SEPARATE recipient installs the engine fresh and
@@ -697,57 +734,33 @@ def check_rerun(runner: Runner, *, offline_install: bool) -> list[str]:
         # 3. TEETH, both against the RECIPIENT install, both with the trust root kept EXTERNAL (D6's
         # embedded-trust exception is out of scope for a tamper case) so the check under test is the
         # real one.
-        tampered_report = recipient_empty / "tampered-report-out"
-        shutil.copytree(sender_out, tampered_report)
-        report_md = tampered_report / "report.md"
-        report_md.write_bytes(report_md.read_bytes() + b"TAMPER")
-        proc = runner.run(
-            [
-                recipient_agentce,
-                "verify",
-                "--report",
-                str(tampered_report),
-                "--signer-trust-root",
-                str(trust_root_copy),
-                "--json",
-            ],
+        report_problem = _assert_tamper_refused(
+            runner,
+            recipient_agentce,
             recipient_empty,
-            offline=True,
+            sender_out,
+            trust_root_copy,
+            dest_name="tampered-report-out",
+            corrupt=lambda dest: dest / "report.md",
+            expected_key="report_output_tampered",
         )
-        if proc.returncode != 3 or "report_output_tampered" not in proc.stdout:
-            problems.append(
-                _fail(
-                    "TEETH: a tampered report.md was not refused as report_output_tampered",
-                    proc,
-                )
-            )
+        if report_problem:
+            problems.append(report_problem)
 
-        tampered_evidence = recipient_empty / "tampered-evidence-out"
-        shutil.copytree(sender_out, tampered_evidence)
-        event_file = next(
-            (tampered_evidence / "bundle" / "evidence" / "events").glob("*.jsonl")
-        )
-        event_file.write_bytes(event_file.read_bytes() + b"TAMPER")
-        proc = runner.run(
-            [
-                recipient_agentce,
-                "verify",
-                "--report",
-                str(tampered_evidence),
-                "--signer-trust-root",
-                str(trust_root_copy),
-                "--json",
-            ],
+        evidence_problem = _assert_tamper_refused(
+            runner,
+            recipient_agentce,
             recipient_empty,
-            offline=True,
+            sender_out,
+            trust_root_copy,
+            dest_name="tampered-evidence-out",
+            corrupt=lambda dest: next(
+                (dest / "bundle" / "evidence" / "events").glob("*.jsonl")
+            ),
+            expected_key="report_evidence_tampered",
         )
-        if proc.returncode != 3 or "report_evidence_tampered" not in proc.stdout:
-            problems.append(
-                _fail(
-                    "TEETH: a tampered evidence file was not refused as report_evidence_tampered",
-                    proc,
-                )
-            )
+        if evidence_problem:
+            problems.append(evidence_problem)
         return problems
 
 
