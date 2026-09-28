@@ -303,7 +303,7 @@ test("catalogProvenanceDigest changes when the catalog content changes, and igno
   }
 });
 
-test("buildManifest carries the catalog's real content digest, never the all-zero placeholder", () => {
+test("buildManifest carries the catalog's real content digest, never the all-zero constant", () => {
   const catalogObjects = [
     { id: "fixture", version: "1", directory: DIGEST_FIXTURE, controls: [], shapes: new Map() },
   ];
