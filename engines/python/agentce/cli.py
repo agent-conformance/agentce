@@ -137,8 +137,8 @@ def build_parser() -> argparse.ArgumentParser:
         + ", ".join(sorted(commands.ASSESS_DEFAULT_EMIT))
         + "); one or more of: "
         + ", ".join(commands.EMIT_FORMATS)
-        + ". Under the CI environment variable, junit is added to the default automatically "
-        "(see --for); an explicit --emit is never extended.",
+        + ". Setting CI adds junit to the default automatically (see --for); an explicit "
+        "--emit is never extended.",
     )
     p.add_argument(
         "--for",

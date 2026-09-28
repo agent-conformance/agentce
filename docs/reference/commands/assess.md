@@ -51,10 +51,9 @@ options:
   --emit EMIT           comma-separated report formats to render (default:
                         html, md, oscal, pack, sarif, skill); one or more of:
                         md, html, oscal, sarif, public, pack, junit, csv,
-                        oscal_xml, pdf, remediation, skill. Under the CI
-                        environment variable, junit is added to the default
-                        automatically (see --for); an explicit --emit is never
-                        extended.
+                        oscal_xml, pdf, remediation, skill. Setting CI adds
+                        junit to the default automatically (see --for); an
+                        explicit --emit is never extended.
   --for PRESET          report preset for an audience, in place of --emit:
                         engineering (html, md, remediation, skill); compliance
                         (csv, oscal, oscal_xml, pack, public); security (html,
