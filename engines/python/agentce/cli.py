@@ -304,6 +304,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="require a provenance block (source, version, digest) on the catalog (SPEC 14.5 CP-3)",
     )
+    lint.add_argument(
+        "--support-matrix",
+        dest="support_matrix",
+        help="write a per-control view of which adapters can supply each requirement's evidence",
+    )
     matrix = csub.add_parser(
         "coverage-matrix",
         parents=[common],
@@ -314,6 +319,43 @@ def build_parser() -> argparse.ArgumentParser:
         "--check",
         action="store_true",
         help="fail if the committed matrix differs from the regenerated one",
+    )
+    init = csub.add_parser(
+        "init", parents=[common], help="scaffold a new, lint-clean custom catalog"
+    )
+    init.add_argument("dir", help="where to write the new catalog")
+    init.add_argument(
+        "--id",
+        dest="family",
+        help="the control-family prefix, 2-4 uppercase letters (default: derived from <dir>)",
+    )
+    init.add_argument(
+        "--title", help="the catalog title (default: '<family> custom catalog')"
+    )
+    init.add_argument(
+        "--force", action="store_true", help="overwrite any of the five scaffolded files"
+    )
+    sign = csub.add_parser(
+        "sign", parents=[common], help="sign a catalog directory with an operator-held key"
+    )
+    sign.add_argument("dir", help="the catalog directory to sign")
+    sign_keys = sign.add_mutually_exclusive_group(required=True)
+    sign_keys.add_argument("--key", help="an existing Ed25519 private key (PEM)")
+    sign_keys.add_argument(
+        "--new-key",
+        dest="new_key",
+        help="generate a fresh Ed25519 private key (PEM) at this path and sign with it",
+    )
+    sign.add_argument(
+        "--write-trust-root",
+        dest="write_trust_root",
+        help="write a trust root for this key to this path (for `assess --trust-root`)",
+    )
+    sign.add_argument(
+        "--identity", help="a human-readable label for the signer, recorded in the trust root"
+    )
+    sign.add_argument(
+        "--force", action="store_true", help="overwrite an existing catalog.sig.json"
     )
     p.set_defaults(func=commands.cmd_catalog)
 

@@ -21,8 +21,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from contextlib import redirect_stdout
 from collections.abc import Iterable
+from contextlib import redirect_stdout
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -38,29 +38,25 @@ from .. import (
     messages,
     no_ml,
     readiness,
+    signing,
     verdict,
 )
 from ..activity import summarize_activity
 from ..applicability import resolve as resolve_applicability
+from ..assertions import Assertion, aggregate
 from ..assess import assess_subjects, evaluated_nothing
-from ..blind_spots import compute_blind_spots
-from ..records import (
-    BUNDLE_DIR,
-    DERIVED_PROFILE_FILE,
-    RECORDS_LIMITATION,
-    ScannedRecords,
-)
-from ..records import scan as scan_records
+from ..blind_spots import catalog_support_view, compute_blind_spots
 from ..bundle import copy_bundle, load_bundle
+from ..canonical import canonical_string, canonicalize
 from ..catalog import Catalog, lint_catalog, load_catalog
 from ..collect import EnvSecretManager, SourceSpec, load_config, run_collect
 from ..config import resolve as resolve_config
 from ..conformance import run_ecs
 from ..coverage import compute_coverage
 from ..coverage_matrix import MATRIX_FILE, check_matrix, write_matrix
-from ..error_catalogue import MESSAGE_KEYS, render_errors_md
 from ..domain import DomainBinding
 from ..environment import inspect_environment
+from ..error_catalogue import MESSAGE_KEYS, render_errors_md
 from ..errors import AgentceError, InputError
 from ..exit_codes import ExitCode
 from ..fail_on import parse_fail_on
@@ -70,7 +66,13 @@ from ..integrity import IntegrityStatus, verify_bundle
 from ..logsetup import get_logger
 from ..profile import Profile
 from ..quarantine import counts_by_reason, write_quarantine
-from ..assertions import Assertion, aggregate
+from ..records import (
+    BUNDLE_DIR,
+    DERIVED_PROFILE_FILE,
+    RECORDS_LIMITATION,
+    ScannedRecords,
+)
+from ..records import scan as scan_records
 from ..report import (
     ASSESS_DEFAULT_EMIT,
     _package_digest,
@@ -88,12 +90,10 @@ from ..report import (
     validate_report,
     write_report,
 )
-from ..state import StateDir, window_end
 from ..result import CommandResult
+from ..state import StateDir, window_end
 from ..store import GraphStore
-from .. import signing
 from ..verdict import GAP_OUTCOMES
-from ..canonical import canonical_string, canonicalize
 
 _log = get_logger()
 
@@ -1739,11 +1739,16 @@ def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
     action = _opt_str(ns, "catalog_action")
     if action == "coverage-matrix":
         return _cmd_coverage_matrix(ns)
+    if action == "init":
+        return _cmd_catalog_init(ns)
+    if action == "sign":
+        return _cmd_catalog_sign(ns)
     if action != "lint":
         raise InputError(
             "input.catalog_action",
-            "the catalog actions are `lint` and `coverage-matrix`.",
-            "run `agentce catalog lint <dir>` or `agentce catalog coverage-matrix <dir>`.",
+            "the catalog actions are `lint`, `coverage-matrix`, `init`, and `sign`.",
+            "run `agentce catalog lint <dir>`, `agentce catalog coverage-matrix <dir>`, "
+            "`agentce catalog init <dir>`, or `agentce catalog sign <dir>`.",
         )
     directory = _require_dir(
         _opt_str(ns, "dir"),
@@ -1757,6 +1762,24 @@ def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
         catalog_dirs = [directory]
     else:
         catalog_dirs = sorted({p.parent for p in directory.rglob("catalog.yaml")})
+    support_matrix = _opt_str(ns, "support_matrix")
+    if support_matrix is not None:
+        if len(catalog_dirs) > 1:
+            raise InputError(
+                "catalog.support_matrix_multi",
+                f"--support-matrix needs exactly one catalog, but {directory} holds "
+                f"{len(catalog_dirs)}.",
+                "pass the single catalog's own directory, not a directory holding several.",
+            )
+        if catalog_dirs and Path(support_matrix).resolve().is_relative_to(
+            catalog_dirs[0].resolve()
+        ):
+            raise InputError(
+                "catalog.support_matrix_inside_catalog",
+                f"--support-matrix {support_matrix!r} resolves inside the catalog directory "
+                f"{catalog_dirs[0]}.",
+                "write the support matrix outside the catalog directory.",
+            )
     problems: list[str] = []
     if not catalog_dirs:
         problems.append(f"{directory}: no catalog.yaml (and none beneath it)")
@@ -1781,6 +1804,21 @@ def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
             "problems": problems,
         }
     )
+    if support_matrix is not None and catalog_dirs:
+        catalog = load_catalog(catalog_dirs[0])
+        view = catalog_support_view(catalog)
+        sm_path = Path(support_matrix)
+        sm_path.parent.mkdir(parents=True, exist_ok=True)
+        sm_path.write_text(
+            json.dumps(
+                {"catalog": catalog.id, "version": catalog.version, "controls": view},
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        result.data["support_matrix"] = str(sm_path)
     if problems:
         result.add_code(int(ExitCode.FINDINGS))
         result.note(f"CATALOG FAILED: {directory}: {len(problems)} problem(s)")
@@ -1788,6 +1826,190 @@ def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
             result.note(f"  {problem}")
     else:
         result.note(f"CATALOG OK: {directory}")
+    return result
+
+
+#: The control-family prefix `catalog init` accepts (`control.schema.json`'s own id-prefix pattern).
+_FAMILY_RE = re.compile(r"^[A-Z]{2,4}$")
+
+
+def _vendored_control_families() -> frozenset[str]:
+    """Every control-family prefix a vendored base or overlay catalog already uses, computed fresh
+    each call from `bundled.vendored_catalogs()` so it never drifts from what actually ships."""
+    families: set[str] = set()
+    for directory in bundled.vendored_catalogs().values():
+        for control_file in sorted(directory.glob("controls/*.yaml")):
+            data = yaml.safe_load(control_file.read_text(encoding="utf-8")) or {}
+            control_id = str(data.get("id", ""))
+            family = control_id.split("-", 1)[0]
+            if family:
+                families.add(family)
+    return frozenset(families)
+
+
+def _default_family(dir_path: Path) -> str:
+    """The `--id` `catalog init` uses when none is given: `dir_path`'s own resolved directory name,
+    uppercased and filtered to letters, truncated to 4 -- falling back to `GEN` when that yields
+    fewer than 2 letters (a `.`, a trailing slash, or a non-ASCII name)."""
+    letters = "".join(ch for ch in dir_path.resolve().name.upper() if ch.isalpha())[:4]
+    return letters if len(letters) >= 2 else "GEN"
+
+
+def _cmd_catalog_init(ns: argparse.Namespace) -> CommandResult:
+    """Scaffold a from-scratch, lint-clean, `mode: automated` custom catalog (SPEC §7.3)."""
+    result = CommandResult(command="catalog")
+    directory = Path(_opt_str(ns, "dir") or ".")
+    family = _opt_str(ns, "family")
+    if family is None:
+        family = _default_family(directory)
+    elif not _FAMILY_RE.match(family):
+        raise InputError(
+            "catalog.init_family_invalid",
+            f"--id {family!r} must be 2-4 uppercase letters.",
+            "pass --id as 2-4 uppercase letters, e.g. --id ACM.",
+        )
+    if family in _vendored_control_families():
+        raise InputError(
+            "catalog.init_family_collision",
+            f"the control family {family!r} is already used by a vendored catalog.",
+            "pass a different --id.",
+        )
+    title = _opt_str(ns, "title") or f"{family} custom catalog"
+    slug = re.sub(r"[^a-z0-9]+", "-", directory.resolve().name.lower()).strip("-") or (
+        "custom-catalog"
+    )
+    version = date.today().strftime("%Y.%m")
+
+    catalog_yaml = directory / "catalog.yaml"
+    control_yaml = directory / "controls" / f"{family}-01.yaml"
+    shape_ttl = directory / "shapes" / f"{family}-01.ttl"
+    domain_yaml = directory / "test" / "domain.yaml"
+    fixtures_dir = directory / "test" / f"{family}-01"
+    passed_jsonl = fixtures_dir / "passed.jsonl"
+    failed_jsonl = fixtures_dir / "failed.jsonl"
+    inapplicable_jsonl = fixtures_dir / "inapplicable.jsonl"
+    files = [
+        catalog_yaml,
+        control_yaml,
+        shape_ttl,
+        domain_yaml,
+        passed_jsonl,
+        failed_jsonl,
+        inapplicable_jsonl,
+    ]
+    existing = [str(p) for p in files if p.exists()]
+    if existing and not _flag(ns, "force"):
+        raise InputError(
+            "catalog.init_exists",
+            f"catalog init would overwrite {', '.join(existing)}.",
+            "pass --force to overwrite, or a different <dir>.",
+        )
+
+    catalog_doc = {
+        "id": slug,
+        "version": version,
+        "title": title,
+        "kind": "overlay",
+        "families": [family],
+        "controls": [f"controls/{family}-01.yaml"],
+    }
+    control_doc = {
+        "id": f"{family}-01",
+        "version": version,
+        "title": f"{family}-01 custom control",
+        "crosswalk": [
+            {
+                "framework": "nist-ai-rmf",
+                "clause": "GOVERN-1.1",
+                "relation": "supports",
+                "verified_against_text": False,
+            }
+        ],
+        "applicability": {"applies_to_roles": ["both"]},
+        "evaluation": {
+            "mode": "automated",
+            "rung": 2,
+            "min_source_class": "self_report",
+            "minimum_evidence": [{"event": "Decision", "class": "self_report"}],
+            "shape": f"shapes/{family}-01.ttl",
+        },
+        "expectations": [
+            {"id": "S1", "text": "Consequential decisions record who is associated with them."}
+        ],
+        "severity": "high",
+        "evidence_strength": "strong",
+        "tolerance": {"kind": "count", "max": 0},
+        "test_cases": [
+            {"id": "pass", "expected": "passed", "fixture": f"test/{family}-01/passed.jsonl"},
+            {"id": "fail", "expected": "failed", "fixture": f"test/{family}-01/failed.jsonl"},
+            {
+                "id": "na",
+                "expected": "inapplicable",
+                "fixture": f"test/{family}-01/inapplicable.jsonl",
+            },
+        ],
+    }
+    shape_text = (
+        "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
+        "@prefix prov: <http://www.w3.org/ns/prov#> .\n"
+        "@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\n"
+        f"agentce:{family}-01-Shape a sh:NodeShape ;\n"
+        "  sh:targetClass agentce:ConsequentialDecision ;\n"
+        '  sh:property [ sh:path prov:wasAssociatedWith ; sh:minCount 1 ; sh:name "S1" ] .\n'
+    )
+    domain_text = (
+        "# Domain binding used only by this catalog's own lint fixtures (SPEC 6.5).\n"
+        "decision_types:\n"
+        '  - {id: "dom:Credit", subclass_of: "agentce:ConsequentialDecision", consequential: true}\n'
+        '  - {id: "dom:Minor", subclass_of: "agentce:Decision", consequential: false}\n'
+    )
+    _decision_line = (
+        '{{"id":"d1","source":"urn:src:self_report","subject":"spiffe://corp/agents/a",'
+        '"type":"org.agent-conformance.evidence.Decision.v1","agentcesourceclass":"self_report",'
+        '"data":{{"@type":"Decision","decision_type":"{decision_type}"{agent}}},'
+        '"time":"2026-01-01T00:00:00Z"}}\n'
+    )
+    passed_text = _decision_line.format(
+        decision_type="dom:Credit", agent=',"agent":{"id":"spiffe://corp/agents/a"}'
+    )
+    failed_text = _decision_line.format(decision_type="dom:Credit", agent="")
+    inapplicable_text = _decision_line.format(
+        decision_type="dom:Minor", agent=',"agent":{"id":"spiffe://corp/agents/a"}'
+    )
+
+    for path in (catalog_yaml, control_yaml, shape_ttl, domain_yaml):
+        path.parent.mkdir(parents=True, exist_ok=True)
+    fixtures_dir.mkdir(parents=True, exist_ok=True)
+    catalog_yaml.write_text(
+        yaml.safe_dump(catalog_doc, sort_keys=False, default_flow_style=False),
+        encoding="utf-8",
+    )
+    control_yaml.write_text(
+        yaml.safe_dump(control_doc, sort_keys=False, default_flow_style=False),
+        encoding="utf-8",
+    )
+    shape_ttl.write_text(shape_text, encoding="utf-8")
+    domain_yaml.write_text(domain_text, encoding="utf-8")
+    passed_jsonl.write_text(passed_text, encoding="utf-8")
+    failed_jsonl.write_text(failed_text, encoding="utf-8")
+    inapplicable_jsonl.write_text(inapplicable_text, encoding="utf-8")
+
+    result.data.update(
+        {
+            "dir": str(directory),
+            "id": slug,
+            "family": family,
+            "title": title,
+            "version": version,
+            "files": [str(p) for p in files],
+        }
+    )
+    result.note(
+        f"wrote a scaffolded catalog to {directory} (family {family}); next: "
+        f"`agentce catalog lint {directory} --support-matrix <path>`, "
+        f"`agentce catalog sign {directory} --new-key <path> --write-trust-root <path>`, and "
+        f"`agentce assess --catalog-dir {directory} --trust-root <path> --bundle ... --profile ...`."
+    )
     return result
 
 
@@ -2170,18 +2392,29 @@ def _sign_signer(ns: argparse.Namespace, profile: str) -> signing.Signer:
                 "the kms profile signs with an operator-held key.",
                 "pass --key <ed25519-private-key.pem>.",
             )
-        from cryptography.hazmat.primitives.serialization import load_pem_private_key
-
         key_file = _require_file(key_path, key="key", what="the signing key")
-        loaded = load_pem_private_key(key_file.read_bytes(), password=None)
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
-        if not isinstance(loaded, Ed25519PrivateKey):
-            raise InputError(
+        loaded = _load_ed25519_private_key(
+            key_file,
+            missing=(
+                "sign.kms_key_missing",
+                "the kms profile signs with an operator-held key.",
+                "pass --key <ed25519-private-key.pem>.",
+            ),
+            bad_algorithm=(
                 "sign.key_algorithm",
                 "the signing key is not an Ed25519 private key.",
                 "supply an Ed25519 key (the algorithm the engine signs with, SPEC §8.7).",
-            )
+            ),
+            unreadable=(
+                "sign.key_unreadable",
+                "the signing key file could not be parsed as an unencrypted PEM private key.",
+                (
+                    "supply an unencrypted Ed25519 private key PEM (`openssl genpkey "
+                    "-algorithm ed25519 -out key.pem`, or `agentce catalog sign --new-key "
+                    "<path>`)."
+                ),
+            ),
+        )
         return signing.KmsSigner(private_key=loaded)
     raise InputError(
         "sign.keyless_offline",
@@ -2190,6 +2423,183 @@ def _sign_signer(ns: argparse.Namespace, profile: str) -> signing.Signer:
         "use --profile kms --key <file> offline, or run keyless signing where the Fulcio and "
         "Rekor endpoints are reachable.",
     )
+
+
+def _load_ed25519_private_key(
+    key_path: Path,
+    *,
+    missing: tuple[str, str, str],
+    bad_algorithm: tuple[str, str, str],
+    unreadable: tuple[str, str, str],
+) -> Any:
+    """Load and validate an Ed25519 private key PEM at ``key_path`` (SPEC §8.7, §9.1).
+
+    Shared by ``agentce sign``'s ``kms`` profile and ``agentce catalog sign``. An unparseable file or
+    a password-protected key with no password supplied (previously an uncaught crash to
+    ``internal.unexpected``) raises ``unreadable``; a key that parses but is not Ed25519 raises
+    ``bad_algorithm`` (unchanged behaviour, only relocated). ``missing`` is accepted only so every
+    caller passes the same three-key shape; a missing ``key_path`` is refused by the caller before
+    this helper is ever called (``_require_file`` for ``sign``, the argparse mutually-exclusive group
+    for ``catalog sign``), so this helper never raises it itself.
+    """
+    del missing
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+    try:
+        loaded = load_pem_private_key(key_path.read_bytes(), password=None)
+    except (ValueError, TypeError) as exc:
+        key, cause, fix = unreadable
+        raise InputError(key, cause, fix) from exc
+    if not isinstance(loaded, Ed25519PrivateKey):
+        key, cause, fix = bad_algorithm
+        raise InputError(key, cause, fix)
+    return loaded
+
+
+def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
+    """Sign a catalog directory with an operator-held Ed25519 key (SPEC §8.7, §9.1)."""
+    result = CommandResult(command="catalog")
+    directory = _require_dir(
+        _opt_str(ns, "dir"),
+        key="dir",
+        what="the catalog directory",
+        fix="pass the catalog directory: `agentce catalog sign <dir>`.",
+    )
+    catalog_dir = directory.resolve()
+    if not (directory / "catalog.yaml").is_file():
+        raise InputError(
+            "catalog.sign_not_a_catalog",
+            f"{directory} has no catalog.yaml.",
+            "pass a catalog directory, or scaffold one first: `agentce catalog init <dir>`.",
+        )
+    lint_problems = lint_catalog(directory)
+    if lint_problems:
+        raise InputError(
+            "catalog.sign_lint_failed",
+            f"{directory} fails `catalog lint`: {'; '.join(lint_problems)}.",
+            "fix the lint problems (`agentce catalog lint <dir>`) before signing.",
+        )
+    sig_path = directory / signing.CATALOG_SIGNATURE_NAME
+    if sig_path.exists() and not _flag(ns, "force"):
+        raise InputError(
+            "catalog.sign_exists",
+            f"{sig_path} already exists.",
+            "pass --force to re-sign, or remove the existing signature first.",
+        )
+    key_arg = _opt_str(ns, "key")
+    new_key_arg = _opt_str(ns, "new_key")
+    key_arg_raw = new_key_arg if new_key_arg is not None else key_arg
+    if key_arg_raw is not None and Path(key_arg_raw).resolve().is_relative_to(catalog_dir):
+        flag = "--new-key" if new_key_arg is not None else "--key"
+        raise InputError(
+            "catalog.sign_key_inside_catalog",
+            f"{flag} {key_arg_raw!r} resolves inside the catalog directory {directory}.",
+            "write the key outside the catalog directory.",
+        )
+    write_trust_root = _opt_str(ns, "write_trust_root")
+    if write_trust_root is not None and Path(write_trust_root).resolve().is_relative_to(
+        catalog_dir
+    ):
+        raise InputError(
+            "catalog.sign_trust_root_inside_catalog",
+            f"--write-trust-root {write_trust_root!r} resolves inside the catalog directory "
+            f"{directory}.",
+            "write the trust root outside the catalog directory.",
+        )
+
+    new_key_written: str | None = None
+    if new_key_arg is not None:
+        new_key_path = Path(new_key_arg)
+        if new_key_path.exists():
+            raise InputError(
+                "catalog.sign_new_key_exists",
+                f"--new-key {new_key_arg!r} already exists.",
+                "pass a path that does not exist yet, or reuse it with --key instead.",
+            )
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        from cryptography.hazmat.primitives.serialization import (
+            Encoding,
+            NoEncryption,
+            PrivateFormat,
+        )
+
+        key = Ed25519PrivateKey.generate()
+        pem = key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
+        new_key_path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(str(new_key_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            os.write(fd, pem)
+        finally:
+            os.close(fd)
+        new_key_written = str(new_key_path)
+    else:
+        key_file = _require_file(key_arg, key="key", what="the signing key")
+        key = _load_ed25519_private_key(
+            key_file,
+            missing=(
+                "catalog.sign_key_missing",
+                "`catalog sign` signs with an operator-held key.",
+                "pass --key <ed25519-private-key.pem> or --new-key <path>.",
+            ),
+            bad_algorithm=(
+                "catalog.sign_key_algorithm",
+                "the signing key is not an Ed25519 private key.",
+                "supply an Ed25519 key, or generate one with --new-key.",
+            ),
+            unreadable=(
+                "catalog.sign_key_unreadable",
+                "the signing key file could not be parsed as an unencrypted PEM private key.",
+                "supply an unencrypted Ed25519 private key PEM, or generate one with --new-key.",
+            ),
+        )
+    signer = signing.KmsSigner(private_key=key)
+
+    catalog_id = catalog_dir.name
+    digest = signing.digest_tree(directory, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME}))
+    statement = signing.intoto_statement(
+        subject_name=catalog_id,
+        digest=digest,
+        predicate_type="https://agent-conformance.org/attestation/catalog/v1",
+        predicate={"kind": "catalog", "id": catalog_id},
+    )
+    envelope = signing.sign_statement(statement, signer)
+    sig_path.write_text(
+        json.dumps(envelope, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    result.data.update(
+        {
+            "dir": str(directory),
+            "signature": str(sig_path),
+            "keyid": signer.keyid,
+            "catalog_id": catalog_id,
+        }
+    )
+    if new_key_written is not None:
+        result.data["new_key"] = new_key_written
+
+    if write_trust_root is not None:
+        trust_root_path = Path(write_trust_root)
+        trust_root_path.parent.mkdir(parents=True, exist_ok=True)
+        trust_root_path.write_text(
+            json.dumps(
+                signing.TrustRoot.document(
+                    signer.keyid,
+                    signer.public_key_b64,
+                    _opt_str(ns, "identity") or "unset",
+                ),
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        result.data["trust_root"] = str(trust_root_path)
+    result.note(
+        f"signed {directory}; next: `agentce assess --catalog-dir {directory} --trust-root "
+        f"{write_trust_root or '<trust-root.json>'} --bundle ... --profile ...`."
+    )
+    return result
 
 
 def _readiness_severities(ns: argparse.Namespace) -> dict[str, str]:

@@ -109,6 +109,48 @@ def _check_sort_key(ref: CheckRef) -> tuple[str, str, str, str]:
     return (ref["subject"], ref["catalog"], ref["control"], ref["control_version"])
 
 
+def catalog_support_view(catalog: Catalog) -> list[dict[str, Any]]:
+    """A per-control, pre-run view of which adapters can supply each requirement's evidence (Hill 6).
+
+    Unlike :func:`compute_blind_spots` (which groups a completed run's `insufficient_evidence`
+    outcomes across subjects), this has no subject yet to group by: one entry per control, in
+    `catalog.id` order, each carrying its own `mode`/`rung` (a `mode: manual` control never reaches a
+    real verdict regardless of what its `minimum_evidence` lists, so callers must not read this as
+    "evidence alone produces a verdict" without checking those two fields). Calls the same three
+    private helpers `compute_blind_spots` calls, unchanged -- one ladder-rung implementation, one
+    `event_producers.json` reader."""
+    entries: list[dict[str, Any]] = []
+    for control in sorted(catalog.controls, key=lambda c: c.id):
+        requirements: list[dict[str, Any]] = []
+        for entry in control.minimum_evidence:
+            event = str(entry.get("event", ""))
+            cls = _normalize_class(str(entry.get("class", "any")))
+            rung = _ladder_rung(event, cls)
+            owner_key, step_kind = _OWNER_AND_STEP_BY_RUNG[rung]
+            requirements.append(
+                {
+                    "event": event,
+                    "class": cls,
+                    "ladder_rung": rung,
+                    "owner_key": owner_key,
+                    "step_kind": step_kind,
+                    "supplying_adapters": _supplying_adapters(event, cls),
+                }
+            )
+        requirements.sort(key=lambda r: (r["event"], r["class"]))
+        entries.append(
+            {
+                "control": control.id,
+                "control_version": control.version,
+                "title": control.title,
+                "mode": control.mode,
+                "rung": control.rung,
+                "requirements": requirements,
+            }
+        )
+    return entries
+
+
 def _replay_triples(
     profile: Profile, catalogs: list[Catalog]
 ) -> list[tuple[str, str, ControlSpec]]:
