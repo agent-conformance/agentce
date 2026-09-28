@@ -98,14 +98,18 @@ A scaffold gets you to a lint-clean, signed catalog in four commands, from an em
 uv run --project engines/python agentce catalog init my-catalog
 uv run --project engines/python agentce catalog lint my-catalog --support-matrix support-matrix.json
 uv run --project engines/python agentce catalog sign my-catalog --new-key my-key.pem --write-trust-root my-trust-root.json
-uv run --project engines/python agentce assess --bundle <your evidence bundle> --profile <your applicability profile> --domain <your domain binding> --catalog-dir my-catalog --trust-root my-trust-root.json --out ./out
 ```
 
 `catalog init` scaffolds a `mode: automated` control that already lints clean. `catalog lint
 --support-matrix` writes a preview of what each control needs and who can supply it today — rung, owner,
 and the adapters that already produce the event, if any — before you sign anything. `catalog sign
---new-key` generates a fresh Ed25519 key and writes a trust root naming it, so the last `assess` verifies
-against your own root rather than the vendored one. The `--bundle`/`--profile`/`--domain` in that last
-command are your own evidence bundle, applicability profile, and domain binding — if you don't have one
-yet, [Getting Started](/docs/getting-started/) walks through `agentce quickstart`, which builds one you
-can point this sequence at instead.
+--new-key` generates a fresh Ed25519 key and writes a trust root naming it, so the assessment below
+verifies against your own root rather than the vendored one:
+
+```bash no-run needs the reader's own evidence bundle, applicability profile, and domain binding
+uv run --project engines/python agentce assess --bundle <your evidence bundle> --profile <your applicability profile> --domain <your domain binding> --catalog-dir my-catalog --trust-root my-trust-root.json --out ./out
+```
+
+The `--bundle`/`--profile`/`--domain` there are your own evidence bundle, applicability profile, and
+domain binding — if you don't have one yet, [Getting Started](/docs/getting-started/) walks through
+`agentce quickstart`, which builds one you can point this sequence at instead.
