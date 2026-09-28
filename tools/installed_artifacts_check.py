@@ -47,7 +47,7 @@ import sys
 import tempfile
 import time
 import zipfile
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import assess_smoke_check
@@ -746,9 +746,11 @@ def _digest_problem(
     return None
 
 
-_VERDICT_HTML_RE = re.compile(
-    r'<section aria-labelledby="verdict">.*?</section>', re.DOTALL
-)
+def _section_span_html(text: str, aria_label: str) -> str | None:
+    match = re.search(
+        rf'<section aria-labelledby="{aria_label}">.*?</section>', text, re.DOTALL
+    )
+    return match.group(0) if match else None
 
 
 def _verdict_span_md(text: str) -> str | None:
@@ -766,29 +768,7 @@ def _verdict_span_md(text: str) -> str | None:
 
 
 def _verdict_span_html(text: str) -> str | None:
-    match = _VERDICT_HTML_RE.search(text)
-    return match.group(0) if match else None
-
-
-def _verdict_problems(
-    label: str, fmt: str, text: str, reference_span: str
-) -> list[str]:
-    """The rendered Verdict section (`## Verdict` through `## Outcome summary` in md; the
-    `<section aria-labelledby="verdict">` element in html) must be byte-equal to the Python engine's
-    rendering of the identical bundle -- not merely present (C1(h)/C4)."""
-    span = _verdict_span_md(text) if fmt == "md" else _verdict_span_html(text)
-    if span is None:
-        return [f"{label}: {fmt} report has no Verdict section"]
-    if span != reference_span:
-        return [
-            f"{label}: {fmt} Verdict section differs from the Python reference rendering"
-        ]
-    return []
-
-
-_TALLY_HTML_RE = re.compile(
-    r'<section aria-labelledby="summary">.*?</section>', re.DOTALL
-)
+    return _section_span_html(text, "verdict")
 
 
 def _tally_span_md(text: str) -> str | None:
@@ -809,8 +789,45 @@ def _tally_span_md(text: str) -> str | None:
 
 
 def _tally_span_html(text: str) -> str | None:
-    match = _TALLY_HTML_RE.search(text)
-    return match.group(0) if match else None
+    return _section_span_html(text, "summary")
+
+
+def _section_problems(
+    label: str,
+    fmt: str,
+    text: str,
+    reference_span: str,
+    span_md: Callable[[str], str | None],
+    span_html: Callable[[str], str | None],
+    missing_name: str,
+    differs_name: str,
+) -> list[str]:
+    span = span_md(text) if fmt == "md" else span_html(text)
+    if span is None:
+        return [f"{label}: {fmt} report has no {missing_name} section"]
+    if span != reference_span:
+        return [
+            f"{label}: {fmt} {differs_name} differs from the Python reference rendering"
+        ]
+    return []
+
+
+def _verdict_problems(
+    label: str, fmt: str, text: str, reference_span: str
+) -> list[str]:
+    """The rendered Verdict section (`## Verdict` through `## Outcome summary` in md; the
+    `<section aria-labelledby="verdict">` element in html) must be byte-equal to the Python engine's
+    rendering of the identical bundle -- not merely present (C1(h)/C4)."""
+    return _section_problems(
+        label,
+        fmt,
+        text,
+        reference_span,
+        _verdict_span_md,
+        _verdict_span_html,
+        "Verdict",
+        "Verdict section",
+    )
 
 
 def _tally_problems(label: str, fmt: str, text: str, reference_span: str) -> list[str]:
@@ -819,14 +836,16 @@ def _tally_problems(label: str, fmt: str, text: str, reference_span: str) -> lis
     engine's rendering of the identical bundle, compared pairwise across engines via the shared
     Python reference (C4's "summary tally ... compared pairwise" clause) -- the Verdict-span check
     above stops at the `## Outcome summary` heading itself and never reaches the counts."""
-    span = _tally_span_md(text) if fmt == "md" else _tally_span_html(text)
-    if span is None:
-        return [f"{label}: {fmt} report has no Outcome summary section"]
-    if span != reference_span:
-        return [
-            f"{label}: {fmt} outcome tally differs from the Python reference rendering"
-        ]
-    return []
+    return _section_problems(
+        label,
+        fmt,
+        text,
+        reference_span,
+        _tally_span_md,
+        _tally_span_html,
+        "Outcome summary",
+        "outcome tally",
+    )
 
 
 def _quickstart_parity_problems(
