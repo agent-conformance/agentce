@@ -333,10 +333,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--title", help="the catalog title (default: '<family> custom catalog')"
     )
     init.add_argument(
-        "--force", action="store_true", help="overwrite any of the five scaffolded files"
+        "--force",
+        action="store_true",
+        help="overwrite any of the five scaffolded files",
     )
     sign = csub.add_parser(
-        "sign", parents=[common], help="sign a catalog directory with an operator-held key"
+        "sign",
+        parents=[common],
+        help="sign a catalog directory with an operator-held key",
     )
     sign.add_argument("dir", help="the catalog directory to sign")
     sign_keys = sign.add_mutually_exclusive_group(required=True)
@@ -352,7 +356,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="write a trust root for this key to this path (for `assess --trust-root`)",
     )
     sign.add_argument(
-        "--identity", help="a human-readable label for the signer, recorded in the trust root"
+        "--identity",
+        help="a human-readable label for the signer, recorded in the trust root",
     )
     sign.add_argument(
         "--force", action="store_true", help="overwrite an existing catalog.sig.json"

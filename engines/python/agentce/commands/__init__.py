@@ -1934,14 +1934,25 @@ def _cmd_catalog_init(ns: argparse.Namespace) -> CommandResult:
             "shape": f"shapes/{family}-01.ttl",
         },
         "expectations": [
-            {"id": "S1", "text": "Consequential decisions record who is associated with them."}
+            {
+                "id": "S1",
+                "text": "Consequential decisions record who is associated with them.",
+            }
         ],
         "severity": "high",
         "evidence_strength": "strong",
         "tolerance": {"kind": "count", "max": 0},
         "test_cases": [
-            {"id": "pass", "expected": "passed", "fixture": f"test/{family}-01/passed.jsonl"},
-            {"id": "fail", "expected": "failed", "fixture": f"test/{family}-01/failed.jsonl"},
+            {
+                "id": "pass",
+                "expected": "passed",
+                "fixture": f"test/{family}-01/passed.jsonl",
+            },
+            {
+                "id": "fail",
+                "expected": "failed",
+                "fixture": f"test/{family}-01/failed.jsonl",
+            },
             {
                 "id": "na",
                 "expected": "inapplicable",
@@ -2490,7 +2501,9 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
     key_arg = _opt_str(ns, "key")
     new_key_arg = _opt_str(ns, "new_key")
     key_arg_raw = new_key_arg if new_key_arg is not None else key_arg
-    if key_arg_raw is not None and Path(key_arg_raw).resolve().is_relative_to(catalog_dir):
+    if key_arg_raw is not None and Path(key_arg_raw).resolve().is_relative_to(
+        catalog_dir
+    ):
         flag = "--new-key" if new_key_arg is not None else "--key"
         raise InputError(
             "catalog.sign_key_inside_catalog",
@@ -2556,7 +2569,9 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
     signer = signing.KmsSigner(private_key=key)
 
     catalog_id = catalog_dir.name
-    digest = signing.digest_tree(directory, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME}))
+    digest = signing.digest_tree(
+        directory, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME})
+    )
     statement = signing.intoto_statement(
         subject_name=catalog_id,
         digest=digest,
