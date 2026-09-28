@@ -1,0 +1,3 @@
+id: fixture
+version: "1"
+# nested controls/catalog.yaml is NOT excluded (exclude matches the full relpath only)

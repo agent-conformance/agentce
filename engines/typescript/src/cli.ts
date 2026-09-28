@@ -26,12 +26,14 @@ import { buildGraph } from "./graph";
 import { ingest } from "./ingest";
 import { integrityResultToJson, verifyBundle } from "./integrity";
 import { DEFAULT_LANGUAGE, catalogue } from "./messages";
+import { evaluateInstalledNoMl, loadVendoredDenylist } from "./noMl";
 import { computeVectorFile } from "./numerics";
 import { type Profile, loadProfile } from "./profile";
 import { writeQuarantine } from "./quarantine";
 import {
   activityCliLines,
   blindSpotsCliLines,
+  digestTree,
   renderEvidencePack,
   renderOscal,
   renderReportHtml,
@@ -44,7 +46,7 @@ import { StateDir, windowEnd } from "./state";
 import { GraphStore } from "./store";
 import { byteCompare, sortKeysDeep, writeJsonl } from "./util";
 import { summarize } from "./verdict";
-import { engineVersion } from "./version";
+import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
 const DEFAULT_OUT_DIR = "out";
 /** The catalog an assessment evaluates when nothing names one: the cross-standard baseline. */
@@ -588,6 +590,29 @@ function notImplemented(command: string): CommandResult {
   return result;
 }
 
+/** `agentce version` (SPEC §8.5): the same structured envelope every other command returns, with a
+ * real installed-artifact `no_ml` self-report (mirrors Python's `cmd_version`). Distinct from the
+ * bare `--version`/`-V` flag, which stays a plain one-line shortcut (handled before this is ever
+ * reached, `main` below). */
+function cmdVersion(): CommandResult {
+  const result = new CommandResult("version");
+  const resolveFrom = join(__dirname, "..");
+  const scan = evaluateInstalledNoMl(loadVendoredDenylist(), resolveFrom);
+  result.data.engine = ENGINE_NAME;
+  result.data.engine_version = engineVersion();
+  result.data.spec_version = SPEC_VERSION;
+  result.data.supported_catalogs = [];
+  result.data.no_ml = scan.result;
+  result.data.no_ml_detail = scan;
+  result.note(`${ENGINE_NAME} ${engineVersion()} (spec ${SPEC_VERSION})`);
+  result.note(`no_ml: ${scan.result}`);
+  if (scan.result !== "pass") {
+    // A learned component is present: an input/environment error for a model-free engine.
+    result.addCode(ExitCode.INPUT_ERROR);
+  }
+  return result;
+}
+
 function errorResult(command: string, error: AgentceError): CommandResult {
   const result = new CommandResult(command);
   result.addCode(error.exitCode);
@@ -601,7 +626,7 @@ function errorResult(command: string, error: AgentceError): CommandResult {
 
 export function main(argv: string[]): number {
   const command = argv[0];
-  if (command === "--version" || command === "-V" || command === "version") {
+  if (command === "--version" || command === "-V") {
     console.log(`agentce ${engineVersion()}`);
     return 0;
   }
@@ -619,6 +644,19 @@ export function main(argv: string[]): number {
     return 0;
   }
 
+  // digest-tree is a plain computation seam (the same pattern as `numerics` above), driven from
+  // outside the repo's TypeScript sources by `tools/catalog_digest_check.py` against the built
+  // `dist/`: it prints one catalog directory's real content digest, nothing else.
+  if (command === "digest-tree") {
+    const dir = argv[1];
+    if (dir === undefined) {
+      console.error("digest-tree: a directory path is required");
+      return ExitCode.INPUT_ERROR;
+    }
+    console.log(digestTree(dir, new Set(["catalog.sig.json", "catalog.yaml"])));
+    return 0;
+  }
+
   const json = argv.includes("--json");
   let result: CommandResult;
   try {
@@ -632,6 +670,8 @@ export function main(argv: string[]): number {
       result = cmdReport(argv);
     } else if (command === "quickstart") {
       result = cmdQuickstart(argv);
+    } else if (command === "version") {
+      result = cmdVersion();
     } else {
       result = notImplemented(command ?? "");
     }

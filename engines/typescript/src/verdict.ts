@@ -9,6 +9,7 @@
 
 import type { Assertion } from "./assertions";
 import { aggregate } from "./assertions";
+import { sanitizeForMarkdown } from "./report";
 import { byteCompare } from "./util";
 
 export const NON_CONFORMANT = "non-conformant";
@@ -58,4 +59,48 @@ export function summarize(assertions: Assertion[]): Summary {
     }
   }
   return { verdict, counts, topGaps };
+}
+
+/** English CLDR plural category: `"one"` for exactly 1, `"other"` otherwise -- the one plural rule
+ * the message catalogue's `report.gaps_more` needs (mirrors the Python reference's
+ * `i18n_format._english_plural_category`). */
+function pluralCategory(n: number): string {
+  return n === 1 ? "one" : "other";
+}
+
+/** Render an ICU MessageFormat plural template (`"{n, plural, one {...} other {...}}"`) against
+ * `n`, replacing `#` with the formatted count -- a minimal port of the one construct the message
+ * catalogue actually uses this way (`report.gaps_more`), not a general ICU engine (mirrors the
+ * Python reference's `i18n_format.format_message`). */
+function formatPlural(template: string, n: number): string {
+  const match = /^\{n,\s*plural,\s*(.*)\}$/s.exec(template);
+  if (!match) {
+    return template;
+  }
+  const body = match[1] as string;
+  const categories = new Map<string, string>();
+  const categoryRe = /([A-Za-z0-9_=]+)\s*\{([^{}]*)\}/g;
+  let m: RegExpExecArray | null;
+  // biome-ignore lint/suspicious/noAssignInExpressions: the standard exec-loop idiom
+  while ((m = categoryRe.exec(body)) !== null) {
+    categories.set(m[1] as string, m[2] as string);
+  }
+  const exact = `=${n}`;
+  const category = categories.has(exact) ? exact : pluralCategory(n);
+  const chosen = categories.get(category) ?? categories.get("other") ?? "";
+  return chosen.replace("#", String(n));
+}
+
+/** One gap as text: `insufficient evidence: DAT-01, DAT-02 (+14 more gaps)` (mirrors the Python
+ * reference's `verdict.gap_text` and Java's `Verdict.gapText`). Each control id is sanitised with
+ * `sanitizeForMarkdown` -- mid-line, after the fixed label prefix, so no backtick-wrap is needed
+ * here (unlike the summary tally). */
+export function gapText(gap: Gap, cat: Record<string, string>): string {
+  const label = cat[`outcome.${gap.outcome}`] ?? gap.outcome;
+  const controls = gap.controls.map((c) => sanitizeForMarkdown(c)).join(", ");
+  let text = `${label}: ${controls}`;
+  if (gap.more > 0) {
+    text += ` (${formatPlural(cat["report.gaps_more"] as string, gap.more)})`;
+  }
+  return text;
 }

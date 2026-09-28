@@ -17,7 +17,7 @@
  */
 
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -33,6 +33,9 @@ import { profileFromDict } from "./profile";
 import {
   activityCliLines,
   blindSpotsCliLines,
+  buildManifest,
+  catalogProvenanceDigest,
+  digestTree,
   hasInvisibleCodepoint,
   renderEvidencePack,
   renderOscal,
@@ -44,6 +47,7 @@ import {
   sanitizeForTerminal,
   writeReport,
 } from "./report";
+import { gapText } from "./verdict";
 
 const REPO = join(__dirname, "..", "..", "..");
 const BASE = join(REPO, "spec", "catalogs", "base", "eu-ai-act");
@@ -259,6 +263,147 @@ test("writeReport emits every artifact and a well-formed manifest", () => {
   // the manifest on disk is Python-style json.dumps(sort_keys, indent=2): sorted top-level keys
   const onDisk = readFileSync(join(outDir, "manifest.json"), "utf-8");
   assert.equal(onDisk.startsWith('{\n  "agentce_manifest_version": 1,'), true);
+});
+
+// --- digestTree / catalog provenance digest (item 18.22: a real catalog content digest, never
+// sha256:000...0) ---
+
+const DIGEST_FIXTURE = join(REPO, "spec", "model", "test-vectors", "digest-tree");
+const DIGEST_EXPECTED = readFileSync(
+  join(REPO, "spec", "model", "test-vectors", "digest-tree.expected"),
+  "utf-8",
+).trim();
+const PROVENANCE_EXCLUDE = new Set(["catalog.sig.json", "catalog.yaml"]);
+
+test("digestTree matches the Python reference over the shared fixture tree (ordering trap, exclusions)", () => {
+  assert.equal(digestTree(DIGEST_FIXTURE, PROVENANCE_EXCLUDE), DIGEST_EXPECTED);
+});
+
+test("digestTree excludes only the exact top-level name, never a nested one of the same basename", () => {
+  // `controls/catalog.yaml` is NOT excluded even though `catalog.yaml` is; a naive basename-only
+  // match would silently drop it from the digest and mask a tampered nested control file.
+  const withNested = digestTree(DIGEST_FIXTURE, PROVENANCE_EXCLUDE);
+  const withoutExclude = digestTree(DIGEST_FIXTURE, new Set());
+  assert.notEqual(withNested, withoutExclude);
+});
+
+test("catalogProvenanceDigest changes when the catalog content changes, and ignores a stale stored digest", () => {
+  const tmp = mkdtempSync(join(tmpdir(), "agentce-digest-"));
+  try {
+    cpSync(DIGEST_FIXTURE, tmp, { recursive: true });
+    const before = catalogProvenanceDigest(tmp);
+    assert.equal(before, DIGEST_EXPECTED);
+    // Tamper a non-excluded file's content; catalog.yaml's own (unrelated) content is untouched, so
+    // a naive "read catalog.yaml's stored provenance.digest" implementation would not notice.
+    writeFileSync(join(tmp, "readme.txt"), "tampered content\n");
+    const after = catalogProvenanceDigest(tmp);
+    assert.notEqual(after, before);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("buildManifest carries the catalog's real content digest, never the all-zero placeholder", () => {
+  const catalogObjects = [
+    { id: "fixture", version: "1", directory: DIGEST_FIXTURE, controls: [], shapes: new Map() },
+  ];
+  const manifest = buildManifest({
+    bundleDigest: "sha256:abc",
+    catalogs: ["fixture@1"],
+    catalogObjects,
+    outputs: {},
+    operator: "test",
+    invocation: [],
+    supersedes: [],
+  });
+  const catalogRefs = (manifest.inputs as { catalogs: { id: string; digest: string }[] }).catalogs;
+  assert.equal(catalogRefs.length, 1);
+  assert.equal(catalogRefs[0]?.digest, DIGEST_EXPECTED);
+  assert.notEqual(catalogRefs[0]?.digest, `sha256:${"0".repeat(64)}`);
+});
+
+test("buildManifest keeps the all-zero digest for a label with no matching catalog object (a bare re-render)", () => {
+  const manifest = buildManifest({
+    bundleDigest: "sha256:abc",
+    catalogs: ["unknown@1"],
+    outputs: {},
+    operator: "test",
+    invocation: [],
+    supersedes: [],
+  });
+  const catalogRefs = (manifest.inputs as { catalogs: { digest: string }[] }).catalogs;
+  assert.equal(catalogRefs[0]?.digest, `sha256:${"0".repeat(64)}`);
+});
+
+// --- The Verdict section (item 18.22: TypeScript gains parity with Python/Java) and the
+// outcome-label fix (the summary tally and assertions rows showed the raw enum) ---
+
+test("report.md and report.html lead with a Verdict section and the human outcome label", () => {
+  const assertions = ovsFailedAssertions();
+  const counts = aggregate(assertions);
+  const md = renderReportMd(assertions, counts);
+  const html = renderReportHtml(assertions, counts);
+
+  assert.match(md, /^# AgentCE conformance report\n\n## Verdict\n\n/);
+  assert.match(md, /\*\*Non-conformant — at least one applicable control failed\.\*\*/);
+  assert.match(md, /Top gaps:/);
+  assert.match(md, /Next step: Fix the non-conformant controls/);
+  // The outcome-label fix: the human label, not the raw enum, in both the summary tally and the
+  // per-assertion rows.
+  assert.equal(md.includes("insufficient_evidence"), false);
+  assert.match(md, /- `insufficient evidence`: \d+/);
+  assert.match(md, /-> \*\*insufficient evidence\*\*/);
+
+  assert.equal(html.includes("insufficient_evidence"), false);
+  assert.match(html, /<section aria-labelledby="verdict"><h2 id="verdict">Verdict<\/h2>/);
+  assert.match(html, /<li>insufficient evidence: \d+<\/li>/);
+});
+
+test("gapText sanitises a hostile control id, byte-equal to a value hand-computed from the Python reference", () => {
+  const cat = catalogue(DEFAULT_LANGUAGE);
+  const gap = {
+    outcome: "non-conformant",
+    controls: ["X`\n# Verdict: Conformant", '</li><h2 id="verdict">'],
+    more: 0,
+  };
+  // Hand-computed by running the identical payload through the Python reference's
+  // `verdict.gap_text` (contracts/P18-18.22.md C1(i)) -- a literal, not a live cross-check, so the
+  // test discriminates a broken sanitiser fix regardless of any Python environment.
+  assert.equal(
+    gapText(gap, cat),
+    'non-conformant: X\' # Verdict: Conformant, ‹/li›‹h2 id="verdict"›',
+  );
+});
+
+test("gapText renders report.gaps_more's ICU plural correctly at the singular/plural boundary", () => {
+  const cat = catalogue(DEFAULT_LANGUAGE);
+  const singular = { outcome: "partial", controls: ["A"], more: 1 };
+  const plural = { outcome: "partial", controls: ["A"], more: 14 };
+  assert.match(gapText(singular, cat), /\(\+1 more gap\)$/);
+  assert.match(gapText(plural, cat), /\(\+14 more gaps\)$/);
+});
+
+test("a control id with zero gaps in an outcome renders 'none', never a crash or an empty section", () => {
+  const conformantOnly: Assertion[] = [
+    makeAssertion({
+      control: "REC-01",
+      controlVersion: "1",
+      subject: SUBJECT,
+      outcome: "conformant",
+      rung: 2,
+      mode: "automated",
+      window: ["2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"],
+      population: [1, 0],
+      severity: "high",
+      family: "REC",
+    }),
+  ];
+  const md = renderReportMd(conformantOnly, aggregate(conformantOnly));
+  assert.match(md, /Top gaps: none/);
+  assert.match(
+    md,
+    /\*\*Conformant — every applicable control met its expectations with evidence\.\*\*/,
+  );
 });
 
 // --- The unified sanitiser (SPEC §7 injection hardening; contracts/P18-18.20.md): named adversarial

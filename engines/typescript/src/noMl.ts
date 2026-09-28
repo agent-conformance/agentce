@@ -9,7 +9,8 @@
  * package names are matched on both the scope and the sub-name. `claim: full` requires `result: pass`.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 import { byteCompare } from "./util";
 
@@ -81,4 +82,72 @@ export function evaluateNoMl(repoRoot: string, lockPath: string): NoMlResult {
     packages: names.size,
     violations,
   };
+}
+
+export interface InstalledNoMlResult {
+  result: "pass" | "fail";
+  denylisted_present: string[];
+}
+
+/**
+ * Whether `name` (already normalised) resolves from `resolveFrom` via Node's own module
+ * resolution -- the "is this actually present in the dependency tree the CLI runs with" question
+ * `installed_distribution_names()` answers in Python, phrased as presence-of-each-denylisted-name
+ * so it works under npm's hoisting (a `node_modules` walk from the package's own directory would
+ * miss hoisted deps; module resolution does not).
+ *
+ * Presence is checked via `require.resolve.paths` (which lists candidate directories without
+ * importing anything) plus `existsSync` on each candidate's `<name>/package.json`, never a bare
+ * `require.resolve(name)` -- the plain resolver throws `ERR_PACKAGE_PATH_NOT_EXPORTED` for a
+ * package present but ESM-only or lacking a CJS `"."` export, and treating that as "absent" would
+ * produce a false `no_ml: pass` (a hard-invariant violation). A scoped name (`@scope/name`) is also
+ * detected when only its scope directory is present, mirroring `candidates()`'s scope-and-sub-name
+ * split above.
+ */
+function isInstalled(name: string, resolveFrom: string): boolean {
+  const req = createRequire(join(resolveFrom, "noop.js"));
+  let dirs: string[];
+  try {
+    dirs = req.resolve.paths(name) ?? [];
+  } catch {
+    dirs = [];
+  }
+  for (const dir of dirs) {
+    if (existsSync(join(dir, name, "package.json"))) {
+      return true;
+    }
+    if (name.startsWith("@") && name.includes("/")) {
+      const scope = name.split("/")[0] as string;
+      if (existsSync(join(dir, scope))) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** The installed engine's own no_ml self-report (`agentce version --json`): every name in
+ * `denylist` that actually resolves from `resolveFrom` -- the package's own installed location --
+ * via Node's module resolution, not a lockfile the installed artifact cannot see. */
+export function evaluateInstalledNoMl(
+  denylist: ReadonlySet<string>,
+  resolveFrom: string,
+): InstalledNoMlResult {
+  const present = [...denylist].filter((name) => isInstalled(name, resolveFrom)).sort(byteCompare);
+  return { result: present.length === 0 ? "pass" : "fail", denylisted_present: present };
+}
+
+/** The vendored denylist copy an installed package carries (`data/no-ml-denylist.txt`,
+ * byte-identical to `spec/rules/no-ml-denylist.txt`, `noMl.test.ts` holds them in sync), for the
+ * installed self-report above -- unlike `loadDenylist`, this needs no repo checkout. */
+export function loadVendoredDenylist(): Set<string> {
+  const text = readFileSync(join(__dirname, "..", "data", "no-ml-denylist.txt"), "utf-8");
+  const out = new Set<string>();
+  for (const raw of text.split("\n")) {
+    const line = (raw.split("#")[0] as string).trim();
+    if (line) {
+      out.add(normalize(line));
+    }
+  }
+  return out;
 }

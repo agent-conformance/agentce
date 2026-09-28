@@ -10,7 +10,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { arch, platform } from "node:os";
 import { dirname, join } from "node:path";
 import type { Activity } from "./activity";
@@ -22,10 +22,67 @@ import type { Catalog, ControlSpec } from "./catalog";
 import { DEFAULT_LANGUAGE, catalogue } from "./messages";
 import { profileFromDict } from "./profile";
 import { byteCompare, sortKeysDeep } from "./util";
+import { gapText, summarize as summarizeVerdict } from "./verdict";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
 const ZERO_DIGEST = `sha256:${"0".repeat(64)}`;
 const NAMESPACE_URL = "6ba7b811-9dad-11d1-80b4-00c04fd430c8";
+
+/** Files left out of a catalog's provenance digest: the detached signature and `catalog.yaml`
+ * itself (which carries the provenance block), so the digest covers the catalog's rules and is
+ * non-circular (mirrors the Python reference's `catalog._PROVENANCE_EXCLUDE`). */
+const PROVENANCE_EXCLUDE = new Set(["catalog.sig.json", "catalog.yaml"]);
+
+/** Every file's POSIX relpath under `dir`, unsorted. */
+function walkFiles(dir: string, base: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(dir).sort(byteCompare)) {
+    const full = join(dir, name);
+    const rel = base === "" ? name : `${base}/${name}`;
+    const st = statSync(full);
+    if (st.isDirectory()) {
+      out.push(...walkFiles(full, rel));
+    } else if (st.isFile()) {
+      out.push(rel);
+    }
+  }
+  return out;
+}
+
+/** Content-address a directory: `sha256:` over the sorted `<relpath>\0<filehash>` lines. Ports
+ * the Python reference's `signing.digest_tree` exactly: sorted by the full POSIX relpath string
+ * (code-point/byte order, so `a-b` sorts before `a/x`), `exclude` matched against the *full*
+ * relpath (a nested `controls/catalog.yaml` is never excluded, only a top-level one), and any path
+ * segment that is a dotfile or named `__pycache__` is skipped regardless of `exclude`. Recomputed
+ * from the directory's real bytes every call -- never read from a catalog's stored
+ * `provenance.digest` field. */
+export function digestTree(dir: string, exclude: ReadonlySet<string> = new Set()): string {
+  const rels = walkFiles(dir, "").sort(byteCompare);
+  const lines: Buffer[] = [];
+  for (const rel of rels) {
+    if (exclude.has(rel)) {
+      continue;
+    }
+    if (rel.split("/").some((part) => part.startsWith(".") || part === "__pycache__")) {
+      continue;
+    }
+    const fileHash = createHash("sha256")
+      .update(readFileSync(join(dir, rel)))
+      .digest("hex");
+    lines.push(Buffer.from(`${rel}\0${fileHash}`, "utf-8"));
+  }
+  const joined = Buffer.concat(
+    lines.flatMap((line, i) => (i === 0 ? [line] : [Buffer.from("\n"), line])),
+  );
+  return `sha256:${createHash("sha256").update(joined).digest("hex")}`;
+}
+
+/** The catalog's real content digest (SPEC §14.5 CP-3): the same recomputation a reader can
+ * independently verify against the catalog directory (mirrors the Python reference's
+ * `catalog.catalog_provenance_digest`). */
+export function catalogProvenanceDigest(directory: string): string {
+  return digestTree(directory, PROVENANCE_EXCLUDE);
+}
 
 const SARIF_LEVEL: Record<string, string> = {
   "non-conformant": "error",
@@ -445,6 +502,52 @@ export function blindSpotsCliLines(blindSpots: BlindSpots): string[] {
   return lines;
 }
 
+/** `cat["outcome.<key>"]` falling back to the raw key (mirrors the Python/Java engines'
+ * `_outcome_label`/`outcomeLabel`), so the report shows the human label (`insufficient evidence`)
+ * instead of the raw enum (`insufficient_evidence`). */
+function outcomeLabel(cat: Record<string, string>, outcome: string): string {
+  return cat[`outcome.${outcome}`] ?? outcome;
+}
+
+type VerdictSummary = ReturnType<typeof summarizeVerdict>;
+
+/** The lines that lead the report: the verdict, the top gaps, and the next step (SPEC §9.2).
+ * Mirrors the Python reference's `_verdict_md` and Java's `renderReportMd` verdict block exactly,
+ * content for content. */
+function verdictMd(summary: VerdictSummary, cat: Record<string, string>): string[] {
+  const state = summary.verdict;
+  const lines = [`## ${cat["report.verdict_heading"]}`, "", `**${cat[`verdict.${state}`]}**`, ""];
+  if (summary.topGaps.length > 0) {
+    lines.push(`${cat["report.top_gaps_heading"]}:`, "");
+    for (const gap of summary.topGaps) {
+      lines.push(`- ${gapText(gap, cat)}`);
+    }
+  } else {
+    lines.push(`${cat["report.top_gaps_heading"]}: ${cat["report.no_gaps"]}`);
+  }
+  lines.push("", `${cat["report.next_step_heading"]}: ${cat[`next.${state}`]}`, "");
+  return lines;
+}
+
+function verdictHtml(summary: VerdictSummary, cat: Record<string, string>): string {
+  const state = summary.verdict;
+  const heading = escapeHtml(cat["report.top_gaps_heading"] as string);
+  let gaps: string;
+  if (summary.topGaps.length > 0) {
+    const items = summary.topGaps
+      .map((gap) => `<li>${escapeHtml(gapText(gap, cat))}</li>`)
+      .join("");
+    gaps = `<p>${heading}:</p><ul>${items}</ul>`;
+  } else {
+    gaps = `<p>${heading}: ${escapeHtml(cat["report.no_gaps"] as string)}</p>`;
+  }
+  return (
+    `<section aria-labelledby="verdict"><h2 id="verdict">${escapeHtml(cat["report.verdict_heading"] as string)}</h2>` +
+    `<p><strong>${escapeHtml(cat[`verdict.${state}`] as string)}</strong></p>${gaps}` +
+    `<p>${escapeHtml(cat["report.next_step_heading"] as string)}: ${escapeHtml(cat[`next.${state}`] as string)}</p></section>`
+  );
+}
+
 export function renderReportMd(
   assertions: Assertion[],
   counts: Record<string, number>,
@@ -462,11 +565,12 @@ export function renderReportMd(
   if (blindSpots !== undefined) {
     lines.push(...blindSpotsMd(blindSpots));
   }
+  lines.push(...verdictMd(summarizeVerdict(assertions), cat));
   lines.push(`## ${cat["report.summary_heading"]}`, "");
   for (const [outcome, count] of Object.entries(counts)) {
     // List-item first content: backtick-wrapped (SPEC §7 injection hardening;
     // `contracts/P18-18.21.md`), matching the Python/Java engines' summary tally.
-    lines.push(`- \`${sanitizeForMarkdown(outcome)}\`: ${count}`);
+    lines.push(`- \`${sanitizeForMarkdown(outcomeLabel(cat, outcome))}\`: ${count}`);
   }
   lines.push("", `## ${cat["report.assertions_heading"]}`, "");
   if (assertions.length === 0) {
@@ -476,7 +580,7 @@ export function renderReportMd(
     const control = sanitizeForMarkdown(a.control);
     const subject = sanitizeForMarkdown(a.subject);
     lines.push(
-      `- \`${control}\` @ \`${subject}\` -> **${sanitizeForMarkdown(a.outcome)}** ` +
+      `- \`${control}\` @ \`${subject}\` -> **${sanitizeForMarkdown(outcomeLabel(cat, a.outcome))}** ` +
         `(rung ${a.rung}, ${sanitizeForMarkdown(a.mode)}; ` +
         `${a.population[1]}/${a.population[0]} failed)`,
     );
@@ -497,14 +601,14 @@ export function renderReportHtml(
   const cat = catalogue(language);
   const title = escapeHtml(cat["report.title"] as string);
   const summary = Object.entries(counts)
-    .map(([o, c]) => `<li>${sanitizeForHtml(o)}: ${c}</li>`)
+    .map(([o, c]) => `<li>${sanitizeForHtml(outcomeLabel(cat, o))}: ${c}</li>`)
     .join("");
   const rows = [...assertions]
     .sort(bySubjectControl)
     .map(
       (a) =>
         `<tr><td>${sanitizeForHtml(a.control)}</td><td>${sanitizeForHtml(a.subject)}</td>` +
-        `<td>${sanitizeForHtml(a.outcome)}</td></tr>`,
+        `<td>${sanitizeForHtml(outcomeLabel(cat, a.outcome))}</td></tr>`,
     )
     .join("");
   const bodyRows =
@@ -512,7 +616,8 @@ export function renderReportHtml(
   const csp = "default-src 'none'; style-src 'unsafe-inline'; img-src 'none'";
   const activitySection = activity !== undefined ? activityHtml(activity, cat) : "";
   const blindSpotsSection = blindSpots !== undefined ? blindSpotsHtml(blindSpots) : "";
-  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${csp}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1>${activitySection}${blindSpotsSection}<section aria-labelledby="summary"><h2 id="summary">${escapeHtml(cat["report.summary_heading"] as string)}</h2><ul>${summary}</ul></section><section aria-labelledby="assertions"><h2 id="assertions">${escapeHtml(cat["report.assertions_heading"] as string)}</h2><table><tr><th>Control</th><th>Subject</th><th>Outcome</th></tr>${bodyRows}</table></section></main></body></html>\n`;
+  const verdictSection = verdictHtml(summarizeVerdict(assertions), cat);
+  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${csp}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1>${activitySection}${blindSpotsSection}${verdictSection}<section aria-labelledby="summary"><h2 id="summary">${escapeHtml(cat["report.summary_heading"] as string)}</h2><ul>${summary}</ul></section><section aria-labelledby="assertions"><h2 id="assertions">${escapeHtml(cat["report.assertions_heading"] as string)}</h2><table><tr><th>Control</th><th>Subject</th><th>Outcome</th></tr>${bodyRows}</table></section></main></body></html>\n`;
 }
 
 /** A deterministic OSCAL date-time for this run: the earliest evidence-window start across the
@@ -703,6 +808,11 @@ function now(): string {
 export interface ManifestOptions {
   bundleDigest: string;
   catalogs: string[];
+  /** The resolved catalog objects, matched to `catalogs` by `id@version`, so each ref's digest is
+   * the catalog directory's real, recomputed-every-call content digest (SPEC §14.5 CP-3) --
+   * never read from a catalog's stored `provenance.digest`. A label with no matching object here
+   * (a bare re-render that has only labels, no directories) keeps the honest all-zero digest. */
+  catalogObjects?: Catalog[];
   outputs: Record<string, string>;
   operator: string;
   invocation: string[];
@@ -713,11 +823,14 @@ export interface ManifestOptions {
 export function buildManifest(options: ManifestOptions): Record<string, unknown> {
   const pkgDigest = packageDigest();
   const host = createHash("sha256").update(`${platform()}|${arch()}|${pkgDigest}`).digest("hex");
+  const byLabel = new Map((options.catalogObjects ?? []).map((c) => [`${c.id}@${c.version}`, c]));
   const catalogRefs = options.catalogs.map((entry) => {
     const at = entry.indexOf("@");
     const cid = at >= 0 ? entry.slice(0, at) : entry;
     const version = at >= 0 ? entry.slice(at + 1) : "";
-    return { id: cid, version: version || "0", digest: ZERO_DIGEST };
+    const catalog = byLabel.get(entry);
+    const digest = catalog !== undefined ? catalogProvenanceDigest(catalog.directory) : ZERO_DIGEST;
+    return { id: cid, version: version || "0", digest };
   });
   const manifest: Record<string, unknown> = {
     agentce_manifest_version: 1,
@@ -819,6 +932,7 @@ export function writeReport(
   const manifest = buildManifest({
     bundleDigest: options.bundleDigest,
     catalogs: options.catalogs,
+    catalogObjects: options.catalogObjects,
     outputs,
     operator: options.operator ?? "unknown",
     invocation: options.invocation ?? [],

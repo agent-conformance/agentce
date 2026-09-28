@@ -35,6 +35,27 @@ const EN: Record<string, string> = {
   "report.activity_denied_authz_denied": "blocked by an authorization check",
   "report.activity_denied_policy_denied": "blocked by policy",
   "report.activity_denied_refused": "the agent refused",
+  "report.verdict_heading": "Verdict",
+  "report.top_gaps_heading": "Top gaps",
+  "report.no_gaps": "none",
+  "report.next_step_heading": "Next step",
+  "report.gaps_more": "{n, plural, one {+# more gap} other {+# more gaps}}",
+  "verdict.conformant": "Conformant — every applicable control met its expectations with evidence.",
+  "verdict.incomplete":
+    "Incomplete — no control failed, but not every applicable control is demonstrated.",
+  "verdict.non-conformant": "Non-conformant — at least one applicable control failed.",
+  "next.conformant":
+    "No gaps. Run the assessment again when the agent, its evidence, or the catalog changes.",
+  "next.incomplete":
+    "Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.",
+  "next.non-conformant":
+    "Fix the non-conformant controls listed under Top gaps, then run the assessment again.",
+  "outcome.conformant": "conformant",
+  "outcome.insufficient_evidence": "insufficient evidence",
+  "outcome.non-conformant": "non-conformant",
+  "outcome.not_applicable": "not applicable",
+  "outcome.not_assessed": "not assessed",
+  "outcome.partial": "partial",
 };
 
 /** A partial translation, to exercise the mechanism; missing keys fall back to `en`. */

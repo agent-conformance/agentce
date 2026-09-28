@@ -209,3 +209,65 @@ test("report --validate is refused honestly rather than silently skipped", () =>
     "input.report_validate_unsupported",
   );
 });
+
+test("version --json returns the same structured envelope every other command produces", () => {
+  const { exitCode, envelope } = runJson(["version"]);
+  assert.equal(envelope.command, "version");
+  assert.equal(envelope.engine, "agentce-ts");
+  assert.equal(typeof envelope.engine_version, "string");
+  assert.equal(envelope.spec_version, "0.6");
+  assert.deepEqual(envelope.supported_catalogs, []);
+  assert.equal(envelope.no_ml, "pass");
+  assert.deepEqual(envelope.no_ml_detail, { result: "pass", denylisted_present: [] });
+  assert.ok(Array.isArray(envelope.exit_codes));
+  assert.equal(exitCode, 0);
+});
+
+test("plain `version` prints exactly two human-readable lines, distinct from --version/-V", () => {
+  const lines: string[] = [];
+  const original = console.log;
+  console.log = (line: string) => lines.push(line);
+  let exitCode: number;
+  try {
+    exitCode = main(["version"]);
+  } finally {
+    console.log = original;
+  }
+  assert.equal(exitCode, 0);
+  assert.equal(lines.length, 2);
+  assert.match(lines[0] as string, /^agentce-ts \S+ \(spec 0\.6\)$/);
+  assert.equal(lines[1], "no_ml: pass");
+
+  const flagLines: string[] = [];
+  console.log = (line: string) => flagLines.push(line);
+  try {
+    main(["--version"]);
+    main(["-V"]);
+  } finally {
+    console.log = original;
+  }
+  assert.equal(flagLines.length, 2);
+  assert.match(flagLines[0] as string, /^agentce \S+$/);
+  assert.equal(flagLines[0], flagLines[1]);
+});
+
+test("digest-tree prints one catalog directory's real content digest", () => {
+  const lines: string[] = [];
+  const original = console.log;
+  console.log = (line: string) => lines.push(line);
+  let exitCode: number;
+  try {
+    exitCode = main([
+      "digest-tree",
+      join(__dirname, "..", "..", "..", "spec", "model", "test-vectors", "digest-tree"),
+    ]);
+  } finally {
+    console.log = original;
+  }
+  assert.equal(exitCode, 0);
+  const expected = readFileSync(
+    join(__dirname, "..", "..", "..", "spec", "model", "test-vectors", "digest-tree.expected"),
+    "utf-8",
+  ).trim();
+  assert.equal(lines[0], expected);
+});
