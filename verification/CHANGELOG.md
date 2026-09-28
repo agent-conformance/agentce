@@ -3,6 +3,15 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.10.0
+
+- Added `VG-OWN-RULES`: an operator installs fresh and, from an empty directory, authors a from-scratch
+  catalog (`catalog init`), previews its own support matrix (`catalog lint --support-matrix`), signs it
+  with a freshly generated key (`catalog sign --new-key --write-trust-root`), and assesses their own
+  evidence bundle against it to a real conformant verdict, within the same five-minute budget as
+  `VG-FIRST-REPORT-TIME` (Hill 6); the support matrix's exact rung, owner and adapters are pinned, and a
+  catalog tampered after signing is refused at assess time (`input.catalog_unverified`).
+
 ## 0.9.0
 
 - Added `VG-RERUN-TIME`: a sender packages and signs a shareable `corpus/quickstart` report bundle

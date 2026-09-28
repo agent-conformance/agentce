@@ -32,9 +32,16 @@ Install steps may fetch third-party dependencies; every run step is offline.
   recipient's own install, reproducing every canonical output byte for byte inside the ten-minute
   budget (Hill 3); a tampered report and a tampered evidence file are each refused with their own exact
   key. It is its own kind (the build gate VG-RERUN-TIME runs it); ``all`` does not include it.
+* ``own_rules``: an operator installs fresh, authors a from-scratch catalog (``catalog init``),
+  previews its own support matrix (``catalog lint --support-matrix``), signs it with a freshly
+  generated key (``catalog sign --new-key --write-trust-root``), and assesses their own evidence
+  bundle against it, from an empty directory to a real conformant verdict inside the five-minute
+  budget (Hill 6); a catalog tampered after signing is refused at assess time. It is its own kind
+  (the build gate VG-OWN-RULES runs it); ``all`` does not include it.
 
 Usage:
-    installed_artifacts_check.py {python,records,rerun,npm,jar,all} [--offline] [--require-netns] [--json]
+    installed_artifacts_check.py {python,records,rerun,own_rules,npm,jar,all} [--offline]
+        [--require-netns] [--json]
     installed_artifacts_check.py --self-test
 """
 
@@ -764,6 +771,210 @@ def check_rerun(runner: Runner, *, offline_install: bool) -> list[str]:
         return problems
 
 
+#: The catalog-authoring walkthrough's own budget (Hill 6, VG-OWN-RULES): the same "install to first
+#: report" shape as VG-FIRST-REPORT-TIME, now against a self-authored catalog.
+OWN_RULES_BUDGET_S = FIRST_REPORT_BUDGET_S
+#: The scaffold's one requirement (Decision/self_report) has no adapter producer at all: a true,
+#: meaningful "only your own code can emit this" answer (contracts/P18-18.9.md C4/C5).
+_OWN_RULES_REQUIREMENT = {
+    "event": "Decision",
+    "class": "self_report",
+    "ladder_rung": 2,
+    "owner_key": "agent_team",
+    "step_kind": "code_change",
+    "supplying_adapters": [],
+}
+
+
+def _own_rules_assess_cmd(
+    agentce: str, directory: Path, trust_root: Path, out: Path
+) -> list[str]:
+    return [
+        agentce,
+        "assess",
+        "--bundle",
+        str(QUICKSTART_DIR / "evidence"),
+        "--profile",
+        str(QUICKSTART_DIR / "applicability.yaml"),
+        "--domain",
+        str(QUICKSTART_DIR / "domain.linkml.yaml"),
+        "--catalog-dir",
+        str(directory),
+        "--trust-root",
+        str(trust_root),
+        "--out",
+        str(out),
+        "--emit",
+        "md",
+        "--json",
+    ]
+
+
+def check_own_rules(runner: Runner, *, offline_install: bool) -> list[str]:
+    """VG-OWN-RULES (Hill 6, contracts/P18-18.9.md C5): an operator installs fresh, authors a
+    from-scratch catalog (`catalog init`), previews its own support matrix (`catalog lint
+    --support-matrix`), signs it with a freshly generated key (`catalog sign --new-key
+    --write-trust-root`), and assesses their own evidence bundle against it, from an empty directory
+    to a real conformant verdict within the timed budget (D10: the clock starts at the operator's own
+    install, matching VG-FIRST-REPORT-TIME); a catalog tampered after signing is refused at assess
+    time."""
+    with _scratch("agentce-own-rules-") as raw:
+        tmp = Path(raw)
+        assert _outside_checkout(tmp)
+        flags = ["--offline"] if offline_install else []
+        proc = runner.run(
+            [
+                "uv",
+                "build",
+                *flags,
+                "--wheel",
+                "--out-dir",
+                str(tmp / "dist"),
+                str(PY_ENGINE),
+            ],
+            tmp,
+            offline=False,
+        )
+        wheels = sorted((tmp / "dist").glob("*.whl"))
+        if proc.returncode != 0 or len(wheels) != 1:
+            return [_fail("build the wheel", proc)]
+
+        started = time.monotonic()
+        installed = _install(
+            runner, wheels[0], tmp, "operator", offline_install=offline_install
+        )
+        if isinstance(installed, str):
+            return [installed]
+        venv, empty = installed
+        agentce = str(venv / "bin" / "agentce")
+        directory = empty / "own-rules-cat"
+
+        proc = runner.run(
+            [agentce, "catalog", "init", str(directory), "--json"], empty, offline=True
+        )
+        if proc.returncode != 0:
+            return [_fail("operator: catalog init", proc)]
+        try:
+            family = str(json.loads(proc.stdout)["family"])
+        except (ValueError, KeyError) as exc:
+            return [f"operator: catalog init printed no readable family: {exc}"]
+
+        support_matrix = empty / "support-matrix.json"
+        proc = runner.run(
+            [
+                agentce,
+                "catalog",
+                "lint",
+                str(directory),
+                "--support-matrix",
+                str(support_matrix),
+                "--json",
+            ],
+            empty,
+            offline=True,
+        )
+        if proc.returncode != 0:
+            return [_fail("operator: catalog lint --support-matrix", proc)]
+        problems: list[str] = []
+        try:
+            matrix = json.loads(support_matrix.read_text("utf-8"))["controls"]
+            entry = next(e for e in matrix if e["control"] == f"{family}-01")
+        except (OSError, ValueError, KeyError, StopIteration) as exc:
+            return [
+                f"operator: no readable support matrix entry for {family}-01: {exc}"
+            ]
+        if entry["mode"] != "automated" or entry["rung"] != 2:
+            problems.append(
+                f"operator: {family}-01's support matrix entry is "
+                f"mode={entry['mode']!r} rung={entry['rung']!r}, not automated/2"
+            )
+        if entry["requirements"] != [_OWN_RULES_REQUIREMENT]:
+            problems.append(
+                f"operator: {family}-01's support matrix requirement is "
+                f"{entry['requirements']!r}, not the pinned literal"
+            )
+
+        key_path = empty / "own-rules-key.pem"
+        trust_root = empty / "own-rules-trust.json"
+        proc = runner.run(
+            [
+                agentce,
+                "catalog",
+                "sign",
+                str(directory),
+                "--new-key",
+                str(key_path),
+                "--write-trust-root",
+                str(trust_root),
+                "--json",
+            ],
+            empty,
+            offline=True,
+        )
+        if proc.returncode != 0:
+            return problems + [_fail("operator: catalog sign --new-key", proc)]
+
+        out = empty / "report"
+        assess_cmd = _own_rules_assess_cmd(agentce, directory, trust_root, out)
+        proc = runner.run(assess_cmd, empty, offline=True)
+        finished = time.monotonic()
+        if proc.returncode != 0:
+            return problems + [_fail("operator: assess --catalog-dir", proc)]
+        try:
+            assertions = json.loads((out / "assertions.json").read_text("utf-8"))
+            manifest = json.loads((out / "manifest.json").read_text("utf-8"))
+        except (OSError, ValueError) as exc:
+            return problems + [f"operator: assess left no readable output: {exc}"]
+        matches = [
+            a
+            for a in assertions
+            if a["control"] == f"{family}-01"
+            and a["subject"] == "spiffe://corp/agents/credit-langgraph"
+        ]
+        if len(matches) != 1 or matches[0]["outcome"] != "conformant":
+            problems.append(
+                f"operator: assess did not reach a conformant {family}-01 "
+                f"verdict for the quickstart subject: {matches!r}"
+            )
+        if "limitations" in manifest:
+            problems.append(
+                "operator: assess reported limitations on a fully verified run"
+            )
+        catalog_ids = [c["id"] for c in manifest["inputs"]["catalogs"]]
+        if "own-rules-cat" not in catalog_ids:
+            problems.append(
+                f"operator: assess's manifest names catalogs {catalog_ids!r}, "
+                "not own-rules-cat"
+            )
+        budget = _budget_problem(
+            "operator",
+            finished - started,
+            OWN_RULES_BUDGET_S,
+            what="install, author, sign, and assess",
+        )
+        if budget:
+            problems.append(budget)
+
+        # TEETH: a catalog tampered AFTER signing is refused at assess time. Verification happens
+        # before any output is written (cmd_assess resolves and verifies catalogs before touching
+        # `--out`), so re-running the SAME command against the still-present `report` directory from
+        # the successful run above is safe: a refusal never touches it.
+        control_file = directory / "controls" / f"{family}-01.yaml"
+        control_file.write_text(
+            control_file.read_text("utf-8") + "# tampered\n", encoding="utf-8"
+        )
+        proc = runner.run(assess_cmd, empty, offline=True)
+        if proc.returncode != 3 or "input.catalog_unverified" not in proc.stdout:
+            problems.append(
+                _fail(
+                    "TEETH: a catalog tampered after signing was not refused as "
+                    "input.catalog_unverified",
+                    proc,
+                )
+            )
+        return problems
+
+
 def check_python(runner: Runner, *, offline_install: bool) -> list[str]:
     with _scratch("agentce-installed-") as raw:
         tmp = Path(raw)
@@ -1459,11 +1670,13 @@ CHECKS = {
     "python": check_python,
     "records": check_records,
     "rerun": check_rerun,
+    "own_rules": check_own_rules,
     "npm": check_npm,
     "jar": check_jar,
 }
-# `all` covers the package kinds; `records` and `rerun` are their own build gates' own checks.
-ALL_KINDS = tuple(k for k in CHECKS if k not in ("records", "rerun"))
+# `all` covers the package kinds; `records`, `rerun` and `own_rules` are their own build gates' own
+# checks.
+ALL_KINDS = tuple(k for k in CHECKS if k not in ("records", "rerun", "own_rules"))
 
 
 def run_all(

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.9.0",
+  "suite_version": "0.10.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -434,6 +434,40 @@
         }
       ],
       "fix_hint": "run agentce verify --report <dir> locally and read the exact key it reports"
+    },
+    {
+      "id": "VG-OWN-RULES",
+      "title": "An operator authors, lints (with a support-matrix preview), signs with a freshly generated key, and assesses their own custom catalog, from an empty directory to a real conformant verdict, within the timed budget, and a catalog tampered after signing is refused",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/own_rules.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 900,
+      "invariant": "Tests run with no network",
+      "rubric": {
+        "pass": "the four-command guided sequence (catalog init, catalog lint --support-matrix, catalog sign --new-key --write-trust-root, assess --catalog-dir --trust-root) completes within the timed budget with a verified (non-bypassed) catalog reaching a real conformant verdict, the support matrix's exact rung/owner/adapters are correct, and a catalog tampered after signing is refused at assess time",
+        "fail": "any of: a step fails or is bypassed via --allow-unverified-catalog, the timed budget is exceeded, the support matrix is missing or has the wrong rung/owner/adapters, or a tampered catalog is still accepted"
+      },
+      "faults": [
+        {
+          "description": "the signature's digest comparison is turned into an unconditional pass, so a catalog tampered AFTER signing would still verify",
+          "file": "engines/python/agentce/signing.py",
+          "search": "    if signed_digest != recomputed:\n",
+          "replace": "    if False:  # signed_digest != recomputed\n"
+        },
+        {
+          "description": "the no-producer ladder rung is raised from 2 to 3, so the support matrix's own exact-value assertion silently reports the wrong owner and step for a generic, adapter-free event",
+          "file": "engines/python/agentce/blind_spots.py",
+          "search": "        # No adapter declares this event at all: a generic, adapter-free event (Decision/Outcome/\n        # Incident) any agent can emit directly -- not a vacuous rung 3 (round 2's fix).\n        return 2\n",
+          "replace": "        # No adapter declares this event at all: a generic, adapter-free event (Decision/Outcome/\n        # Incident) any agent can emit directly -- not a vacuous rung 3 (round 2's fix).\n        return 3\n"
+        }
+      ],
+      "fix_hint": "run the four agentce catalog commands from website/src/content/docs/docs/catalog-authoring.md locally and read the exact key any step reports"
     }
   ]
 }
