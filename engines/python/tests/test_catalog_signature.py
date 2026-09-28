@@ -411,3 +411,95 @@ def test_the_committed_base_catalogs_verify_under_the_vendored_root() -> None:
         assert catalogs, f"no committed catalogs under {root}"
         for meta in catalogs:
             signing.verify_catalog_directory(meta.parent, trust)
+
+
+# --- 18.9 C3: the guided path (`catalog init` -> `lint --support-matrix` -> `sign --new-key
+# --write-trust-root`) round-trips through `assess --catalog-dir` to a real outcome
+# (contracts/P18-18.9.md). No new `assess` code -- this is the round-trip proof. ---
+
+
+def _guided_signed_catalog(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> tuple[Path, Path, str]:
+    """``catalog init`` -> ``catalog lint --support-matrix`` -> ``catalog sign --new-key
+    --write-trust-root``, through the real C1/C2 CLI -- not a hand-built envelope."""
+    directory = tmp_path / "own-rules-cat"
+    capsys.readouterr()
+    code = cli.main(["catalog", "init", str(directory), "--json"])
+    env = json.loads(capsys.readouterr().out)
+    assert code == 0, env
+    family = str(env["family"])
+
+    capsys.readouterr()
+    code = cli.main(
+        [
+            "catalog",
+            "lint",
+            str(directory),
+            "--support-matrix",
+            str(tmp_path / "sm.json"),
+            "--json",
+        ]
+    )
+    lint_out = capsys.readouterr().out
+    assert code == 0, json.loads(lint_out)
+
+    key_path = tmp_path / "key.pem"
+    trust_path = tmp_path / "trust.json"
+    capsys.readouterr()
+    code = cli.main(
+        [
+            "catalog",
+            "sign",
+            str(directory),
+            "--new-key",
+            str(key_path),
+            "--write-trust-root",
+            str(trust_path),
+            "--json",
+        ]
+    )
+    sign_out = capsys.readouterr().out
+    assert code == 0, json.loads(sign_out)
+    return directory, trust_path, family
+
+
+def test_a_guided_catalog_round_trips_through_assess_to_a_real_outcome(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    directory, trust_path, family = _guided_signed_catalog(tmp_path, capsys)
+    out = tmp_path / "out"
+    code, envelope = _assess(
+        capsys, out, "--catalog-dir", str(directory), "--trust-root", str(trust_path)
+    )
+    assert code in (0, 1), envelope
+
+    assertions = json.loads((out / "assertions.json").read_text("utf-8"))
+    matches = [
+        a
+        for a in assertions
+        if a["control"] == f"{family}-01"
+        and a["subject"] == "spiffe://corp/agents/credit-langgraph"
+    ]
+    assert len(matches) == 1, assertions
+    assert matches[0]["outcome"] == "conformant"
+
+    manifest = json.loads((out / "manifest.json").read_text("utf-8"))
+    assert "limitations" not in manifest
+    catalog_refs = manifest["inputs"]["catalogs"]
+    assert any(ref["id"] == "own-rules-cat" for ref in catalog_refs), catalog_refs
+
+
+def test_a_guided_catalog_without_a_trust_root_is_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The operator's own key is, correctly, not the vendored dev-trust root: omitting
+    ``--trust-root`` (with ``AGENTCE_TRUST_ROOT`` explicitly unset, so this is not flaky under a
+    developer's or CI's ambient env) falls back to the vendored root and refuses."""
+    monkeypatch.delenv("AGENTCE_TRUST_ROOT", raising=False)
+    directory, _trust_path, _family = _guided_signed_catalog(tmp_path, capsys)
+    out = tmp_path / "out"
+    code, envelope = _assess(capsys, out, "--catalog-dir", str(directory))
+    assert code == 3
+    assert envelope["error"]["key"] == "input.catalog_unverified"
+    assert not out.exists()
