@@ -2,13 +2,16 @@ package org.agentce;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /**
@@ -139,6 +142,87 @@ public final class Catalog {
      * {@code minimum_evidence} shapes without a fixture directory on disk. */
     static Catalog forTest(String id, String version, List<ControlSpec> controls) {
         return new Catalog(id, version, null, controls, Map.of());
+    }
+
+    /** Files left out of a catalog's provenance digest: the detached signature and {@code catalog.yaml}
+     * itself (which carries the provenance block), so the digest covers the catalog's rules and is
+     * non-circular (mirrors the Python reference's {@code catalog._PROVENANCE_EXCLUDE} and the
+     * TypeScript port's {@code PROVENANCE_EXCLUDE}). */
+    private static final Set<String> PROVENANCE_EXCLUDE = Set.of("catalog.sig.json", "catalog.yaml");
+
+    private static void collectFiles(Path dir, String base, List<String> out) {
+        if (!Files.isDirectory(dir)) {
+            return;
+        }
+        List<String> names = new ArrayList<>();
+        try (Stream<Path> stream = Files.list(dir)) {
+            stream.map(p -> p.getFileName().toString()).forEach(names::add);
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot list " + dir + ": " + e.getMessage(), e);
+        }
+        names.sort(Json::byteCompare);
+        for (String name : names) {
+            Path full = dir.resolve(name);
+            String rel = base.isEmpty() ? name : base + "/" + name;
+            if (Files.isDirectory(full)) {
+                collectFiles(full, rel, out);
+            } else if (Files.isRegularFile(full)) {
+                out.add(rel);
+            }
+        }
+    }
+
+    /** Content-address a directory: {@code sha256:} over the sorted {@code <relpath>\0<filehash>}
+     * lines. Ports the Python reference's {@code signing.digest_tree} exactly: sorted by the full
+     * POSIX relpath string (byte order, so {@code a-b} sorts before {@code a/x}), {@code exclude}
+     * matched against the full relpath (a nested {@code controls/catalog.yaml} is never excluded, only
+     * a top-level one), and any path segment that is a dotfile or named {@code __pycache__} is skipped
+     * regardless of {@code exclude}. Recomputed from the directory's real bytes every call -- never
+     * read from a catalog's stored {@code provenance.digest} field. */
+    public static String digestTree(Path dir, Set<String> exclude) {
+        List<String> rels = new ArrayList<>();
+        collectFiles(dir, "", rels);
+        rels.sort(Json::byteCompare);
+        List<byte[]> lines = new ArrayList<>();
+        for (String rel : rels) {
+            if (exclude.contains(rel)) {
+                continue;
+            }
+            boolean skip = false;
+            for (String part : rel.split("/")) {
+                if (part.startsWith(".") || part.equals("__pycache__")) {
+                    skip = true;
+                    break;
+                }
+            }
+            if (skip) {
+                continue;
+            }
+            byte[] content;
+            try {
+                content = Files.readAllBytes(dir.resolve(rel));
+            } catch (IOException e) {
+                throw new IllegalStateException("cannot read " + dir.resolve(rel) + ": " + e.getMessage(), e);
+            }
+            String fileHash = Canonical.sha256Hex(content);
+            lines.add((rel + "\0" + fileHash).getBytes(StandardCharsets.UTF_8));
+        }
+        ByteArrayOutputStream joined = new ByteArrayOutputStream();
+        for (int i = 0; i < lines.size(); i++) {
+            if (i > 0) {
+                joined.write('\n');
+            }
+            joined.writeBytes(lines.get(i));
+        }
+        return "sha256:" + Canonical.sha256Hex(joined.toByteArray());
+    }
+
+    /** The catalog's real content digest (SPEC §14.5 CP-3): the same recomputation a reader can
+     * independently verify against the catalog directory (mirrors the Python reference's
+     * {@code catalog.catalog_provenance_digest} and the TypeScript port's
+     * {@code catalogProvenanceDigest}). */
+    public static String provenanceDigest(Path directory) {
+        return digestTree(directory, PROVENANCE_EXCLUDE);
     }
 
     /** The PSP shape a control evaluates against (by {@code <id>-Shape} suffix, then any shape with targets). */

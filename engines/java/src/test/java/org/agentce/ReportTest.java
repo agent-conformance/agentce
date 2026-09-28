@@ -252,6 +252,46 @@ class ReportTest {
         assertTrue(onDisk.startsWith("{\n  \"agentce_manifest_version\": 1,"), "manifest is Python-style pretty JSON");
     }
 
+    // --- buildManifest's real catalog digest (item 18.22: never sha256:000...0) -- the same shared
+    // fixture tree CatalogTest's digestTree tests and TypeScript's report.test.ts read. ---
+
+    private static final Path DIGEST_FIXTURE =
+            TestPaths.repoRoot().resolve("spec/model/test-vectors/digest-tree");
+
+    private static String digestExpected() throws IOException {
+        return Files.readString(TestPaths.repoRoot().resolve("spec/model/test-vectors/digest-tree.expected")).strip();
+    }
+
+    @Test
+    void buildManifestCarriesTheCatalogsRealContentDigestNeverTheAllZeroConstant() throws IOException {
+        Catalog fixture = Catalog.load(DIGEST_FIXTURE);
+        ObjectNode manifest = Report.buildManifest(
+                "sha256:abc", List.of("fixture@1"), Map.of(), "test", List.of(), List.of(), "en", List.of(fixture));
+        JsonNode ref = manifest.get("inputs").get("catalogs").get(0);
+        assertEquals(digestExpected(), ref.get("digest").textValue());
+        assertNotEquals("sha256:" + "0".repeat(64), ref.get("digest").textValue());
+    }
+
+    @Test
+    void buildManifestKeepsTheAllZeroDigestForALabelWithNoMatchingCatalogObject() {
+        ObjectNode manifest = Report.buildManifest(
+                "sha256:abc", List.of("unknown@1"), Map.of(), "test", List.of(), List.of(), "en", List.of());
+        JsonNode ref = manifest.get("inputs").get("catalogs").get(0);
+        assertEquals("sha256:" + "0".repeat(64), ref.get("digest").textValue());
+    }
+
+    // --- Verdict.gapText's report.gaps_more plural fix (item 18.22): Java previously hardcoded
+    // "+{n} more" instead of the message catalogue's real ICU-plural string. ---
+
+    @Test
+    void gapTextRendersReportGapsMoresIcuPluralCorrectlyAtTheSingularPluralBoundary() {
+        Map<String, String> cat = Messages.catalogue("en");
+        Verdict.Gap singular = new Verdict.Gap("partial", List.of("A"), 1);
+        Verdict.Gap plural = new Verdict.Gap("partial", List.of("A"), 14);
+        assertTrue(Verdict.gapText(singular, cat).endsWith("(+1 more gap)"));
+        assertTrue(Verdict.gapText(plural, cat).endsWith("(+14 more gaps)"));
+    }
+
     // --- The unified sanitiser (SPEC §7 injection hardening; contracts/P18-18.20.md): named
     // adversarial payloads built from explicit code points, never a raw literal, so no control,
     // bidi-override, or zero-width character ever appears in this source file itself (matching

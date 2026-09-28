@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -24,6 +26,37 @@ class NoMlAndSchemaTest {
         assertEquals("pass", result.result, "engine dependencies must carry no learned component");
         assertTrue(result.violations.isEmpty());
         assertTrue(result.packages > 0);
+    }
+
+    // --- The installed-artifact no_ml self-report (item 18.22): `agentce version --json` in a
+    // packaged jar has no repo checkout to read `gradle.lockfile` from, so it intersects the vendored
+    // denylist against the runtime classpath's real, resolved dependency coordinates instead (baked
+    // into the jar at build time by the `noMlRuntimeDeps` Gradle task). ---
+
+    @Test
+    void evaluateInstalledFailsWhenASyntheticDenylistNamesARealBundledRuntimeDependency() {
+        // jackson-databind is a real, always-bundled runtime dependency (build.gradle.kts).
+        NoMl.InstalledResult result = NoMl.evaluateInstalled(Set.of("jackson-databind"), NoMl.loadRuntimeDeps());
+        assertEquals("fail", result.result);
+        assertEquals(List.of("jackson-databind"), result.denylistedPresent);
+    }
+
+    @Test
+    void evaluateInstalledPassesForTheRealVendoredDenylistAgainstTheRealRuntimeDependencies() {
+        NoMl.InstalledResult result = NoMl.evaluateInstalled(NoMl.loadVendoredDenylist(), NoMl.loadRuntimeDeps());
+        assertEquals("pass", result.result, "the engine's runtime dependencies must carry no learned component");
+        assertTrue(result.denylistedPresent.isEmpty());
+    }
+
+    @Test
+    void vendoredDenylistIsByteIdenticalToSpec() throws IOException {
+        byte[] spec = Files.readAllBytes(TestPaths.repoRoot().resolve("spec/rules/no-ml-denylist.txt"));
+        byte[] vendored;
+        try (InputStream in = NoMlAndSchemaTest.class.getResourceAsStream("/no-ml-denylist.txt")) {
+            assertTrue(in != null, "the vendored denylist must be on the classpath");
+            vendored = in.readAllBytes();
+        }
+        assertArrayEquals(spec, vendored, "the vendored no_ml denylist must match spec/ byte for byte");
     }
 
     @Test

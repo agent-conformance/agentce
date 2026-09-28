@@ -1,9 +1,12 @@
 package org.agentce;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -55,8 +58,40 @@ public final class Verdict {
         return new Summary(verdict, counts, gaps);
     }
 
-    /** One gap as text: {@code insufficient evidence: DAT-01, DAT-02 (+14 more)}. Each control id is
-     * sanitised (SPEC §7 injection hardening; {@code contracts/P18-18.21.md}): mid-line, after the
+    private static final Pattern PLURAL_RE = Pattern.compile("^\\{n,\\s*plural,\\s*(.*)\\}$", Pattern.DOTALL);
+    private static final Pattern CATEGORY_RE = Pattern.compile("([A-Za-z0-9_=]+)\\s*\\{([^{}]*)\\}");
+
+    /** English CLDR plural category: {@code "one"} for exactly 1, {@code "other"} otherwise -- the one
+     * plural rule the message catalogue's {@code report.gaps_more} needs (mirrors the Python
+     * reference's {@code i18n_format._english_plural_category} and the TypeScript port's
+     * {@code pluralCategory}). */
+    private static String pluralCategory(int n) {
+        return n == 1 ? "one" : "other";
+    }
+
+    /** Render an ICU MessageFormat plural template ({@code "{n, plural, one {...} other {...}}"})
+     * against {@code n}, replacing {@code #} with the formatted count -- a minimal port of the one
+     * construct the message catalogue actually uses this way ({@code report.gaps_more}), not a general
+     * ICU engine (mirrors the Python reference's {@code i18n_format.format_message} and the TypeScript
+     * port's {@code formatPlural}). */
+    private static String formatPlural(String template, int n) {
+        Matcher plural = PLURAL_RE.matcher(template);
+        if (!plural.matches()) {
+            return template;
+        }
+        Map<String, String> categories = new LinkedHashMap<>();
+        Matcher category = CATEGORY_RE.matcher(plural.group(1));
+        while (category.find()) {
+            categories.put(category.group(1), category.group(2));
+        }
+        String exact = "=" + n;
+        String key = categories.containsKey(exact) ? exact : pluralCategory(n);
+        String chosen = categories.getOrDefault(key, categories.getOrDefault("other", ""));
+        return chosen.replace("#", String.valueOf(n));
+    }
+
+    /** One gap as text: {@code insufficient evidence: DAT-01, DAT-02 (+14 more gaps)}. Each control id
+     * is sanitised (SPEC §7 injection hardening; {@code contracts/P18-18.21.md}): mid-line, after the
      * fixed label prefix, so no backtick-wrap is needed here (unlike the summary tally). */
     public static String gapText(Gap gap, Map<String, String> cat) {
         String label = cat.getOrDefault("outcome." + gap.outcome(), gap.outcome());
@@ -64,7 +99,7 @@ public final class Verdict {
                 .collect(Collectors.joining(", "));
         String text = label + ": " + controls;
         if (gap.more() > 0) {
-            text += " (" + cat.get("report.gaps_more").replace("{n}", String.valueOf(gap.more())) + ")";
+            text += " (" + formatPlural(cat.get("report.gaps_more"), gap.more()) + ")";
         }
         return text;
     }

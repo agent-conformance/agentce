@@ -27,7 +27,7 @@ public final class Messages {
         m.put("report.outcomes_label", "Outcomes");
         m.put("report.top_gaps_heading", "Top gaps");
         m.put("report.no_gaps", "none");
-        m.put("report.gaps_more", "+{n} more");
+        m.put("report.gaps_more", "{n, plural, one {+# more gap} other {+# more gaps}}");
         m.put("report.next_step_heading", "Next step");
         m.put("report.see_report", "See report.md in {dir} for every control.");
         m.put("report.crosswalk_unverified", "(clause reference unverified)");

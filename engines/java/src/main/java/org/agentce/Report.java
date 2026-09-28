@@ -930,9 +930,20 @@ public final class Report {
         return ZonedDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"));
     }
 
+    /** {@code catalogObjects} are the resolved catalog objects, matched to {@code catalogs} by
+     * {@code id@version}, so each ref's digest is the catalog directory's real, recomputed-every-call
+     * content digest (SPEC §14.5 CP-3) -- never read from a catalog's stored {@code provenance.digest}.
+     * A label with no matching object here (a bare re-render that has only labels, no directories)
+     * keeps the honest all-zero digest. Mirrors the TypeScript port's {@code buildManifest}. */
     public static ObjectNode buildManifest(
             String bundleDigest, List<String> catalogs, Map<String, String> outputs, String operator,
-            List<String> invocation, List<String> supersedes, String reportLanguage) {
+            List<String> invocation, List<String> supersedes, String reportLanguage, List<Catalog> catalogObjects) {
+        Map<String, Catalog> byLabel = new LinkedHashMap<>();
+        if (catalogObjects != null) {
+            for (Catalog c : catalogObjects) {
+                byLabel.put(c.id + "@" + c.version, c);
+            }
+        }
         String packageDigest = packageDigest();
         String host = Canonical.sha256Hex(
                 (System.getProperty("os.name") + "|" + System.getProperty("os.arch") + "|" + packageDigest)
@@ -951,10 +962,14 @@ public final class Report {
             int at = entry.indexOf('@');
             String cid = at >= 0 ? entry.substring(0, at) : entry;
             String version = at >= 0 ? entry.substring(at + 1) : "";
+            Catalog catalog = byLabel.get(entry);
+            String digest = catalog != null && catalog.directory != null
+                    ? Catalog.provenanceDigest(catalog.directory)
+                    : ZERO_DIGEST;
             ObjectNode ref = catalogRefs.addObject();
             ref.put("id", cid);
             ref.put("version", version.isEmpty() ? "0" : version);
-            ref.put("digest", ZERO_DIGEST);
+            ref.put("digest", digest);
         }
         ObjectNode outputsNode = manifest.putObject("outputs");
         List<String> outputKeys = new ArrayList<>(outputs.keySet());
@@ -1039,7 +1054,7 @@ public final class Report {
             }
 
             ObjectNode manifest = buildManifest(
-                    bundleDigest, catalogs, outputs, operator, invocation, supersedes, reportLanguage);
+                    bundleDigest, catalogs, outputs, operator, invocation, supersedes, reportLanguage, catalogObjects);
             Files.write(outDir.resolve("manifest.json"), Json.pretty(manifest).getBytes(StandardCharsets.UTF_8));
             return manifest;
         } catch (IOException e) {

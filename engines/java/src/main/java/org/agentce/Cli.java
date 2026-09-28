@@ -39,7 +39,7 @@ public final class Cli {
 
     static int run(String[] args) {
         String command = args.length > 0 ? args[0] : null;
-        if ("--version".equals(command) || "-V".equals(command) || "version".equals(command)) {
+        if ("--version".equals(command) || "-V".equals(command)) {
             System.out.println("agentce " + Version.ENGINE_VERSION);
             return 0;
         }
@@ -52,6 +52,18 @@ public final class Cli {
                 return ExitCode.INPUT_ERROR.code;
             }
             System.out.println(Json.pretty(Numerics.computeVectorFile(java.nio.file.Path.of(args[1]))));
+            return 0;
+        }
+
+        // digest-tree is a plain computation seam (the same pattern as `numerics` above), driven from
+        // outside the repo's Java sources by `tools/catalog_digest_check.py` against the built jar: it
+        // prints one catalog directory's real content digest, nothing else.
+        if ("digest-tree".equals(command)) {
+            if (args.length < 2) {
+                System.err.println("digest-tree: a directory path is required");
+                return ExitCode.INPUT_ERROR.code;
+            }
+            System.out.println(Catalog.digestTree(Paths.get(args[1]), Set.of("catalog.sig.json", "catalog.yaml")));
             return 0;
         }
 
@@ -68,6 +80,8 @@ public final class Cli {
                 result = cmdReport(args);
             } else if ("quickstart".equals(command)) {
                 result = cmdQuickstart(args);
+            } else if ("version".equals(command)) {
+                result = cmdVersion();
             } else {
                 result = notImplemented(command == null ? "" : command);
             }
@@ -671,6 +685,32 @@ public final class Cli {
             result.data.put("out", out);
         }
         result.note(rendering);
+        return result;
+    }
+
+    /** {@code agentce version} (SPEC §8.5): the same structured envelope every other command returns,
+     * with a real installed-artifact {@code no_ml} self-report (mirrors Python's {@code cmd_version}
+     * and the TypeScript port's {@code cmdVersion}). Distinct from the bare {@code --version}/
+     * {@code -V} flag, which stays a plain one-line shortcut (handled before this is ever reached,
+     * {@link #run}). */
+    private static CommandResult cmdVersion() {
+        CommandResult result = new CommandResult("version");
+        NoMl.InstalledResult scan = NoMl.evaluateInstalled(NoMl.loadVendoredDenylist(), NoMl.loadRuntimeDeps());
+        result.data.put("engine", Version.ENGINE_NAME);
+        result.data.put("engine_version", Version.ENGINE_VERSION);
+        result.data.put("spec_version", Version.SPEC_VERSION);
+        result.data.putArray("supported_catalogs");
+        result.data.put("no_ml", scan.result);
+        ObjectNode detail = result.data.putObject("no_ml_detail");
+        detail.put("result", scan.result);
+        ArrayNode present = detail.putArray("denylisted_present");
+        scan.denylistedPresent.forEach(present::add);
+        result.note(Version.ENGINE_NAME + " " + Version.ENGINE_VERSION + " (spec " + Version.SPEC_VERSION + ")");
+        result.note("no_ml: " + scan.result);
+        if (!"pass".equals(scan.result)) {
+            // A learned component is present: an input/environment error for a model-free engine.
+            result.addCode(ExitCode.INPUT_ERROR.code);
+        }
         return result;
     }
 

@@ -31,6 +31,36 @@ dependencyLocking {
     lockAllConfigurations()
 }
 
+// Bakes the real runtime-classpath dependency coordinates into a generated resource (item 18.22), so
+// an installed jar's `version --json` no_ml self-report reads the actual bundled dependency tree it
+// runs with -- not a lockfile an installed artifact has no access to (the TypeScript port's
+// `evaluateInstalledNoMl` answers the same question via Node's own module resolution instead).
+val noMlRuntimeDepsDir = layout.buildDirectory.dir("generated/resources/main")
+
+val noMlRuntimeDeps by tasks.registering {
+    group = "build"
+    description =
+        "Writes the resolved runtime classpath's dependency coordinates for the installed-artifact no_ml self-report."
+    inputs.files(configurations.runtimeClasspath.get())
+    outputs.dir(noMlRuntimeDepsDir)
+    doLast {
+        val coordinates = configurations.runtimeClasspath.get().resolvedConfiguration.resolvedArtifacts
+            .map { it.moduleVersion.id }
+            .map { "${it.group}:${it.name}" }
+            .distinct()
+            .sorted()
+        val file = noMlRuntimeDepsDir.get().file("no-ml-runtime-deps.txt").asFile
+        file.parentFile.mkdirs()
+        file.writeText(if (coordinates.isEmpty()) "" else coordinates.joinToString("\n") + "\n")
+    }
+}
+
+sourceSets.main.get().resources.srcDir(noMlRuntimeDepsDir)
+
+tasks.processResources {
+    dependsOn(noMlRuntimeDeps)
+}
+
 application {
     mainClass = "org.agentce.Cli"
     applicationName = "agentce"

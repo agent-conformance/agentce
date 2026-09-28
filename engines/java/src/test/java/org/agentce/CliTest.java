@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -262,6 +263,56 @@ class CliTest {
                 "--state", state.toString());
         assertEquals(3, third.get("exit_code").asInt());
         assertEquals("input.state_version_incompatible", third.get("error").get("message_key").asText());
+    }
+
+    // --- `version` (item 18.22): the same structured `--json` envelope every other command returns,
+    // with a real installed-artifact no_ml self-report; distinct from the bare `--version`/`-V` flag,
+    // which stays a plain one-line shortcut. ---
+
+    private static String captureStdout(String... args) {
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        PrintStream original = System.out;
+        System.setOut(new PrintStream(buf, true, StandardCharsets.UTF_8));
+        try {
+            Cli.run(args);
+        } finally {
+            System.setOut(original);
+        }
+        return buf.toString(StandardCharsets.UTF_8);
+    }
+
+    @Test
+    void versionJsonEnvelopeMatchesTheOtherCommandsShape() {
+        JsonNode env = runJson("version");
+        assertEquals(0, env.get("exit_code").asInt());
+        assertEquals("agentce-java", env.get("engine").asText());
+        assertEquals(Version.ENGINE_VERSION, env.get("engine_version").asText());
+        assertEquals(Version.SPEC_VERSION, env.get("spec_version").asText());
+        assertTrue(env.get("supported_catalogs").isArray());
+        assertEquals("pass", env.get("no_ml").asText());
+        assertEquals("pass", env.get("no_ml_detail").get("result").asText());
+        assertTrue(env.get("no_ml_detail").get("denylisted_present").isEmpty());
+    }
+
+    @Test
+    void versionPlainTextPrintsTwoLinesDistinctFromTheBareVersionFlag() {
+        String out = captureStdout("version");
+        assertEquals(
+                "agentce-java " + Version.ENGINE_VERSION + " (spec " + Version.SPEC_VERSION + ")\nno_ml: pass\n",
+                out);
+    }
+
+    @Test
+    void bareVersionFlagStaysAOneLinePlainTextShortcutUntouchedByTheVersionSubcommand() {
+        assertEquals("agentce " + Version.ENGINE_VERSION + "\n", captureStdout("--version"));
+        assertEquals("agentce " + Version.ENGINE_VERSION + "\n", captureStdout("-V"));
+    }
+
+    @Test
+    void digestTreeVerbPrintsTheDirectorysRealContentDigest() {
+        Path fixture = REPO.resolve("spec/model/test-vectors/digest-tree");
+        String expected = Catalog.digestTree(fixture, Set.of("catalog.sig.json", "catalog.yaml"));
+        assertEquals(expected + "\n", captureStdout("digest-tree", fixture.toString()));
     }
 
     @Test
