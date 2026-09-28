@@ -91,6 +91,13 @@ def _package_digest() -> str:
     )
 
 
+def _uuid_raw(*parts: str) -> str:
+    """As `_uuid`, but ``parts`` are already sanitised: for a caller that needs the same sanitised
+    control/subject in more than one UUID, sanitising once and passing it here avoids repeating the
+    (non-trivial) sanitisation work per UUID."""
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, "agentce:" + ":".join(parts)))
+
+
 def _uuid(*parts: str) -> str:
     """A UUID over ``parts``, which can carry a catalog- or evidence-derived control/subject id: hash
     the sanitised (never the raw canonical-JSON) form, since ``str.encode`` raises on a lone surrogate
@@ -98,8 +105,7 @@ def _uuid(*parts: str) -> str:
     `contracts/P18-18.21.md`'s Design section). The OSCAL/SARIF document's own ``control``/``subject``
     fields are written separately from their raw, unsanitised value (C5 byte-identity) -- only this
     hash input is protected."""
-    safe_parts = (sanitize_for_markdown(p) for p in parts)
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, "agentce:" + ":".join(safe_parts)))
+    return _uuid_raw(*(sanitize_for_markdown(p) for p in parts))
 
 
 def _safe(name: str) -> str:
@@ -708,13 +714,17 @@ def render_oscal(assertions: list[Assertion]) -> dict[str, Any]:
     ordered = sorted(assertions, key=lambda x: (x.subject, x.control))
     when = _oscal_timestamp(assertions)
 
-    observation_uuid: dict[tuple[str, str], str] = {}
     observations: list[dict[str, Any]] = []
+    findings: list[dict[str, Any]] = []
     for a in ordered:
+        # `control`/`subject` back both this assertion's observation and its finding, so sanitise each
+        # once and reuse it rather than sanitising twice per assertion (`_uuid` would otherwise be
+        # called with the same raw parts twice).
+        safe_control = sanitize_for_markdown(a.control)
+        safe_subject = sanitize_for_markdown(a.subject)
         # An observation backs every finding, evidence-bearing or not, so every finding resolves to
         # one (SPEC §9); only an evidence-bearing assertion's observation carries `relevant-evidence`.
-        obs_uuid = _uuid("observation", a.control, a.subject)
-        observation_uuid[(a.control, a.subject)] = obs_uuid
+        obs_uuid = _uuid_raw("observation", safe_control, safe_subject)
         observation: dict[str, Any] = {
             "uuid": obs_uuid,
             "description": f"Assessment activity for {a.control} on {a.subject}.",
@@ -731,10 +741,8 @@ def render_oscal(assertions: list[Assertion]) -> dict[str, Any]:
             ]
         observations.append(observation)
 
-    findings: list[dict[str, Any]] = []
-    for a in ordered:
         finding: dict[str, Any] = {
-            "uuid": _uuid("finding", a.control, a.subject),
+            "uuid": _uuid_raw("finding", safe_control, safe_subject),
             "title": f"{a.control} for {a.subject}",
             "description": f"{a.control} assessed for {a.subject}: {a.outcome}.",
             "target": {
@@ -746,9 +754,7 @@ def render_oscal(assertions: list[Assertion]) -> dict[str, Any]:
                 },
             },
             "links": [{"href": f"urn:agentce:control:{a.control}", "rel": "control"}],
-            "related-observations": [
-                {"observation-uuid": observation_uuid[(a.control, a.subject)]}
-            ],
+            "related-observations": [{"observation-uuid": obs_uuid}],
         }
         findings.append(finding)
 
@@ -1636,18 +1642,18 @@ def render_remediation_package(
     }
 
 
+def _sanitize_keys(d: dict[str, Any], keys: tuple[str, ...]) -> dict[str, Any]:
+    """A rebuilt (never mutated-in-place) shallow copy of `d` with every field in `keys` sanitised
+    (SPEC §7 injection hardening; `contracts/P18-18.21.md`) and every other field carried through
+    unchanged."""
+    return {**d, **{k: _sanitize_field(str(d.get(k, ""))) for k in keys}}
+
+
 def _sanitize_evidence_gap(gap: dict[str, Any]) -> dict[str, Any]:
     """A rebuilt (never mutated-in-place) `evidence_gap`: every `event`/`class` name sanitised, in
     each of `required`/`observed`/`missing` (SPEC §7 injection hardening; `contracts/P18-18.21.md`)."""
     return {
-        key: [
-            {
-                **r,
-                "event": _sanitize_field(str(r.get("event", ""))),
-                "class": _sanitize_field(str(r.get("class", ""))),
-            }
-            for r in gap.get(key, [])
-        ]
+        key: [_sanitize_keys(r, ("event", "class")) for r in gap.get(key, [])]
         for key in ("required", "observed", "missing")
     }
 
@@ -1656,58 +1662,32 @@ def _sanitize_finding(finding: dict[str, Any]) -> dict[str, Any]:
     """A render-only, rebuilt view of one remediation-package finding: every catalog- or
     evidence-derived string the two templates (`remediation.md.tmpl`, `skill-finding.md.tmpl`)
     interpolate is sanitised (SPEC §7 injection hardening; `contracts/P18-18.21.md`'s widened
-    surface). Every nested structure is rebuilt (`{**x, k: v}`), never mutated in place, so the
+    surface). Every nested structure is rebuilt (`_sanitize_keys`), never mutated in place, so the
     canonical `package` a caller still holds is untouched (a shallow-copy risk 18.20 already
     documented for the top-level dict; this closes it for nested dicts too)."""
-    f = dict(finding)
-    f["control"] = _sanitize_field(str(finding.get("control", "")))
-    f["title"] = _sanitize_field(str(finding.get("title", "")))
-    f["mode"] = _sanitize_field(str(finding.get("mode", "")))
-    window = finding.get("window") or {}
-    f["window"] = {
-        "start": _sanitize_field(str(window.get("start", ""))),
-        "end": _sanitize_field(str(window.get("end", ""))),
-    }
+    f = _sanitize_keys(finding, ("control", "title", "mode"))
+    f["window"] = _sanitize_keys(finding.get("window") or {}, ("start", "end"))
     f["clauses"] = [
-        {
-            **c,
-            "framework": _sanitize_field(str(c.get("framework", ""))),
-            "clause": _sanitize_field(str(c.get("clause", ""))),
-            "relation": _sanitize_field(str(c.get("relation", ""))),
-        }
+        _sanitize_keys(c, ("framework", "clause", "relation"))
         for c in finding.get("clauses", [])
     ]
     f["expectations"] = [
-        {**e, "text": _sanitize_field(str(e.get("text", "")))}
-        for e in finding.get("expectations", [])
+        _sanitize_keys(e, ("text",)) for e in finding.get("expectations", [])
     ]
     f["evidence_gap"] = _sanitize_evidence_gap(finding.get("evidence_gap") or {})
-    f["evidence"] = [
-        {**e, "ref": _sanitize_field(str(e.get("ref", "")))}
-        for e in finding.get("evidence", [])
-    ]
+    f["evidence"] = [_sanitize_keys(e, ("ref",)) for e in finding.get("evidence", [])]
     f["violations"] = [
-        {
-            **v,
-            "path": _sanitize_field(str(v.get("path", ""))),
-            "constraint": _sanitize_field(str(v.get("constraint", ""))),
-            "message_key": _sanitize_field(str(v.get("message_key", ""))),
-        }
+        _sanitize_keys(v, ("path", "constraint", "message_key"))
         for v in finding.get("violations", [])
     ]
     remediation = finding.get("remediation") or {}
     f["remediation"] = {
         **remediation,
         "techniques": [
-            {**t, "ref": _sanitize_field(str(t.get("ref", "")))}
-            for t in remediation.get("techniques", [])
+            _sanitize_keys(t, ("ref",)) for t in remediation.get("techniques", [])
         ],
     }
-    acceptance = finding.get("acceptance") or {}
-    f["acceptance"] = {
-        **acceptance,
-        "criteria": _sanitize_field(str(acceptance.get("criteria", ""))),
-    }
+    f["acceptance"] = _sanitize_keys(finding.get("acceptance") or {}, ("criteria",))
     return f
 
 

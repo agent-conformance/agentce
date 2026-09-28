@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 /**
  * The run verdict: one categorical state, the six-outcome tally, and the top gaps (SPEC §9.2, §9.3). The
@@ -60,7 +61,7 @@ public final class Verdict {
     public static String gapText(Gap gap, Map<String, String> cat) {
         String label = cat.getOrDefault("outcome." + gap.outcome(), gap.outcome());
         String controls = gap.controls().stream().map(Report::sanitizeForMarkdown)
-                .collect(java.util.stream.Collectors.joining(", "));
+                .collect(Collectors.joining(", "));
         String text = label + ": " + controls;
         if (gap.more() > 0) {
             text += " (" + cat.get("report.gaps_more").replace("{n}", String.valueOf(gap.more())) + ")";
