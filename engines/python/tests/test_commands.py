@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -722,3 +724,240 @@ def test_write_trust_root_dry_run_writes_nothing(tmp_path: Path) -> None:
     assert code == 0
     assert sorted(out.rglob("*")) == before
     assert not (out / "trust-root.json").exists()
+
+
+# --- 18.8 C3: `agentce verify --report` (contracts/P18-18.8.md). ---
+
+
+def _packaged_and_signed(
+    tmp_path: Path, *assess_extra: str
+) -> tuple[Path, Ed25519PrivateKey]:
+    """A `--package-for-sharing` quickstart report, signed as claimant with `--write-trust-root`."""
+    out = tmp_path / "o"
+    assert cli.main(_assess_argv(out, "--package-for-sharing", *assess_extra)) == 0
+    key_path = tmp_path / "claimant.pem"
+    key = _write_kms_key(key_path)
+    assert (
+        cli.main(
+            [
+                "sign",
+                str(out),
+                "--as",
+                "claimant",
+                "--profile",
+                "kms",
+                "--key",
+                str(key_path),
+                "--write-trust-root",
+            ]
+        )
+        == 0
+    )
+    return out, key
+
+
+def test_verify_report_happy_path_reproduces(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out, _key = _packaged_and_signed(tmp_path)
+    summary_path = tmp_path / "step-summary.md"
+    summary_path.write_text("before\n", encoding="utf-8")
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary_path))
+    code = cli.main(["verify", "--report", str(out), "--json"])
+    assert code == 0
+    # The re-run must not append a second, fake step summary (N2).
+    assert summary_path.read_text(encoding="utf-8") == "before\n"
+
+
+def test_verify_report_no_claim(tmp_path: Path) -> None:
+    out = tmp_path / "o"
+    assert cli.main(_assess_argv(out, "--package-for-sharing")) == 0
+    (out / "claim.json").unlink()
+    assert cli.main(["verify", "--report", str(out)]) == 3
+
+
+def test_verify_report_output_tampered(tmp_path: Path) -> None:
+    out, _key = _packaged_and_signed(tmp_path)
+    (out / "report.md").write_bytes((out / "report.md").read_bytes() + b"TAMPER")
+    code = cli.main(["verify", "--report", str(out), "--json"])
+    assert code == 3
+
+
+def test_verify_report_evidence_tampered(tmp_path: Path) -> None:
+    out, _key = _packaged_and_signed(tmp_path)
+    event_file = next((out / "bundle" / "evidence" / "events").glob("*.jsonl"))
+    event_file.write_bytes(event_file.read_bytes() + b"TAMPER")
+    code = cli.main(["verify", "--report", str(out), "--json"])
+    assert code == 3
+
+
+def test_verify_report_unpackaged_reports_null(tmp_path: Path) -> None:
+    out = tmp_path / "o"
+    assert cli.main(_assess_argv(out)) == 0
+    key_path = tmp_path / "claimant.pem"
+    _write_kms_key(key_path)
+    assert (
+        cli.main(
+            [
+                "sign",
+                str(out),
+                "--as",
+                "claimant",
+                "--profile",
+                "kms",
+                "--key",
+                str(key_path),
+                "--write-trust-root",
+            ]
+        )
+        == 0
+    )
+    code = cli.main(["verify", "--report", str(out), "--json"])
+    assert code == 0
+
+
+def test_verify_report_byo_catalog_dir_round_trip(tmp_path: Path) -> None:
+    # quickstart's own evidence/profile/domain (known to reach READY, D8) plus the audience-presets
+    # fixture's unsigned catalog directory (D7/round-2 defect 5) -- only the catalog is reused from
+    # that fixture, not its evidence, which has its own known integrity gap unrelated to this test.
+    argv = [
+        "assess",
+        "--bundle",
+        str(_QUICKSTART / "evidence"),
+        "--profile",
+        str(_QUICKSTART / "applicability.yaml"),
+        "--domain",
+        str(_QUICKSTART / "domain.linkml.yaml"),
+        "--catalog-dir",
+        str(_AUD_FIXTURE / "catalog"),
+        "--allow-unverified-catalog",
+        "--out",
+        str(tmp_path / "o"),
+        "--package-for-sharing",
+    ]
+    assert cli.main(argv) == 0
+    out = tmp_path / "o"
+    key_path = tmp_path / "claimant.pem"
+    _write_kms_key(key_path)
+    assert (
+        cli.main(
+            [
+                "sign",
+                str(out),
+                "--as",
+                "claimant",
+                "--profile",
+                "kms",
+                "--key",
+                str(key_path),
+                "--write-trust-root",
+            ]
+        )
+        == 0
+    )
+    # The recipient's own ambient trust config must not matter: unset it, still succeeds because
+    # step 8 builds its own scratch trust root from the report's own signer key.
+    old_env = os.environ.pop("AGENTCE_TRUST_ROOT", None)
+    try:
+        code = cli.main(["verify", "--report", str(out), "--json"])
+    finally:
+        if old_env is not None:
+            os.environ["AGENTCE_TRUST_ROOT"] = old_env
+    assert code == 0
+
+
+def test_verify_report_expect_keyid_match_and_mismatch(tmp_path: Path) -> None:
+    from agentce import signing
+
+    out, key = _packaged_and_signed(tmp_path)
+    real_keyid = signing.keyid_for(key.public_key())
+    assert cli.main(["verify", "--report", str(out), "--expect-keyid", real_keyid]) == 0
+    assert (
+        cli.main(["verify", "--report", str(out), "--expect-keyid", "sha256:bogus"])
+        == 3
+    )
+
+
+def test_verify_report_forged_keyid_trust_root_is_refused(tmp_path: Path) -> None:
+    from agentce import signing
+
+    out, key = _packaged_and_signed(tmp_path)
+    real_keyid = signing.keyid_for(key.public_key())
+    attacker_key = Ed25519PrivateKey.generate()
+    forged = {
+        "keys": {
+            real_keyid: {
+                "public_key": signing.public_ed25519_b64(attacker_key.public_key()),
+                "identity": "attacker",
+            }
+        }
+    }
+    (out / "trust-root.json").write_text(json.dumps(forged), encoding="utf-8")
+    code = cli.main(
+        ["verify", "--report", str(out), "--expect-keyid", real_keyid, "--json"]
+    )
+    assert code == 3
+
+
+def test_verify_report_external_vs_embedded_trust_source(tmp_path: Path) -> None:
+    out, _key = _packaged_and_signed(tmp_path)
+    trust_root_copy = tmp_path / "external-trust-root.json"
+    trust_root_copy.write_bytes((out / "trust-root.json").read_bytes())
+    assert cli.main(["verify", "--report", str(out)]) == 0  # embedded
+    assert (
+        cli.main(
+            [
+                "verify",
+                "--report",
+                str(out),
+                "--signer-trust-root",
+                str(trust_root_copy),
+            ]
+        )
+        == 0
+    )  # external
+
+
+def test_verify_report_re_sign_append_is_manifest_tampered(tmp_path: Path) -> None:
+    """`agentce sign` APPENDS a new signature; re-signing after a tamper leaves the original,
+    still-verifying signature in place, so manifest.json's own digest mismatch (step 4) is what
+    catches the tamper, never `signature_invalid` (round-2 defect 8)."""
+    out, _key = _packaged_and_signed(tmp_path)
+    trust_root_copy = tmp_path / "external-trust-root.json"
+    trust_root_copy.write_bytes((out / "trust-root.json").read_bytes())
+    (out / "report.md").write_bytes((out / "report.md").read_bytes() + b"TAMPER")
+    manifest = json.loads((out / "manifest.json").read_text())
+    manifest["outputs"]["report.md"] = (
+        "sha256:" + hashlib.sha256((out / "report.md").read_bytes()).hexdigest()
+    )
+    (out / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
+    )
+    key2_path = tmp_path / "attacker.pem"
+    _write_kms_key(key2_path)
+    assert (
+        cli.main(
+            [
+                "sign",
+                str(out),
+                "--as",
+                "claimant",
+                "--profile",
+                "kms",
+                "--key",
+                str(key2_path),
+            ]
+        )
+        == 0
+    )
+    code = cli.main(
+        [
+            "verify",
+            "--report",
+            str(out),
+            "--signer-trust-root",
+            str(trust_root_copy),
+            "--json",
+        ]
+    )
+    assert code == 3

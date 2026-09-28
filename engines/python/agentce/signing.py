@@ -309,6 +309,14 @@ class TrustRoot:
             description=str(data.get("description", "")),
         )
 
+    @staticmethod
+    def document(keyid: str, public_key_b64: str, identity: str) -> dict[str, Any]:
+        """The JSON shape :meth:`from_dict` loads, for a single key (``sign --write-trust-root``'s
+        embedded ``trust-root.json``, and ``verify --report``'s scratch trust root for its own
+        offline re-run): the one place that shape is built, so both callers stay in sync with
+        :meth:`from_dict`'s own load-time invariant."""
+        return {"keys": {keyid: {"public_key": public_key_b64, "identity": identity}}}
+
     def resolve(self, signature: dict[str, Any]) -> tuple[Ed25519PublicKey, str]:
         """Resolve a DSSE signature entry to the ``(public_key, identity)`` that must verify it."""
         cert = signature.get("cert")

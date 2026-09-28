@@ -13,11 +13,15 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import re
 import shutil
 import subprocess
+import sys
+import tempfile
+from contextlib import redirect_stdout
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
@@ -69,6 +73,7 @@ from ..quarantine import counts_by_reason, write_quarantine
 from ..assertions import Assertion, aggregate
 from ..report import (
     ASSESS_DEFAULT_EMIT,
+    _package_digest,
     activity_cli_lines,
     blind_spots_cli_lines,
     has_invisible_codepoint,
@@ -223,20 +228,30 @@ def cmd_verify(ns: argparse.Namespace) -> CommandResult:
     bundle = _opt_str(ns, "bundle")
     catalog = _opt_str(ns, "catalog")
     release = _opt_str(ns, "release")
+    report = _opt_str(ns, "report")
     chosen = [
         name
         for name, value in (
             ("bundle", bundle),
             ("catalog", catalog),
             ("release", release),
+            ("report", report),
         )
         if value
     ]
     if len(chosen) != 1:
         raise InputError(
             "input.verify_target",
-            "verify needs exactly one of --bundle, --catalog, or --release.",
+            "verify needs exactly one of --bundle, --catalog, --release, or --report.",
             "pass exactly one target, e.g. `agentce verify --bundle <dir>`.",
+        )
+    signer_trust_root = _opt_str(ns, "signer_trust_root")
+    expect_keyid = _opt_str(ns, "expect_keyid")
+    if report is None and (signer_trust_root is not None or expect_keyid is not None):
+        raise InputError(
+            "input.verify_target",
+            "--signer-trust-root/--expect-keyid apply only to --report.",
+            "pass --report <dir> together with --signer-trust-root/--expect-keyid, or drop them.",
         )
     if bundle is not None:
         bundle_dir = _require_dir(bundle, key="bundle", what="the evidence bundle")
@@ -262,6 +277,9 @@ def cmd_verify(ns: argparse.Namespace) -> CommandResult:
     if catalog is not None:
         catalog_dir = _require_dir(catalog, key="catalog", what="the catalog directory")
         return _verify_catalog(result, catalog_dir)
+    if report is not None:
+        report_dir = _require_dir(report, key="report", what="the report directory")
+        return _verify_report(result, report_dir, signer_trust_root, expect_keyid)
     release_path = Path(release)  # type: ignore[arg-type]
     if not release_path.exists():
         raise InputError(
@@ -303,6 +321,380 @@ def _verify_catalog(result: CommandResult, catalog_dir: Path) -> CommandResult:
         }
     )
     result.note(f"verified catalog {catalog_dir.name}: signer {verified.identity}")
+    return result
+
+
+#: The subjects `agentce sign` always covers (`_sign_subjects`): a `verify --report` re-run treats
+#: an omitted one as itself a failure, never a silently-skipped check (SPEC 18.8, Hill 3).
+REQUIRED_REPORT_SUBJECTS = ("manifest.json", "claim.json")
+#: The deterministic per-run artifacts a `verify --report` re-run byte-compares against the shipped
+#: ones -- never a rendered format (the re-run passes `--emit ""`, so none exist to compare).
+_RERUN_COMPARE_FILES = (
+    "assertions.json",
+    "activity.json",
+    "blind-spots.json",
+    "coverage.json",
+    "integrity.jsonl",
+    "applicability.jsonl",
+)
+
+
+def _load_report_trust_root(path: Path) -> signing.TrustRoot:
+    """Load a `verify --report` trust root (external `--signer-trust-root` or an embedded
+    `trust-root.json`), reusing `input.trust_root_invalid` -- the same key `--trust-root`/
+    `AGENTCE_TRUST_ROOT` already use for an unreadable or malformed file, including one
+    `TrustRoot.from_dict`'s own keyid invariant refuses as forged (signing.py)."""
+    if not path.is_file():
+        raise InputError(
+            "input.trust_root_invalid",
+            f"the trust root {str(path)!r} does not exist.",
+            "pass --signer-trust-root <file>, or ask the sender to re-sign with "
+            "`sign --write-trust-root`.",
+        )
+    try:
+        return signing.load_trust_root(path)
+    except signing.VerificationError as exc:
+        raise InputError(
+            "input.trust_root_invalid",
+            f"the trust root {str(path)!r} could not be loaded: {exc}",
+            "pass a trust root file shaped like the one `sign --write-trust-root` writes.",
+        ) from exc
+
+
+def _verify_report(
+    result: CommandResult,
+    report_dir: Path,
+    trust_root_path: str | None,
+    expect_keyid: str | None,
+) -> CommandResult:
+    """Re-run a shareable report bundle (`assess --package-for-sharing`) offline, byte-compare the
+    canonical outputs against the shipped ones, and refuse any tampering (SPEC 18.8, Hill 3;
+    contracts/P18-18.8.md C3). Nine stages, each with its own message key, in order: (1) the claim
+    exists and is signed, (2) the trust root resolves, (3) a claimant signature verifies, (4) the
+    signed subjects (manifest.json, claim.json) match what's on disk, (5) the engine build matches,
+    (6) every manifest-tracked output's digest matches, (7) the packaged evidence/profile/domain/
+    catalogs match, (8) an offline re-run reproduces every canonical output byte for byte, (9)
+    success."""
+    claim_path = report_dir / "claim.json"
+    if not claim_path.is_file():
+        raise InputError(
+            "verify.report_no_claim",
+            f"{report_dir} has no claim.json.",
+            "pass the directory `agentce assess` wrote and `agentce sign` signed.",
+        )
+    try:
+        claim = json.loads(claim_path.read_text("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise InputError(
+            "verify.report_claim_malformed",
+            f"claim.json is not valid JSON: {exc}.",
+            "regenerate the report; claim.json must be well-formed JSON.",
+        ) from exc
+    signatures = claim.get("signatures") or []
+    if not signatures:
+        raise InputError(
+            "verify.report_unsigned",
+            "claim.json carries no signatures.",
+            "sign the report first: `agentce sign <report-dir> --as claimant`.",
+        )
+
+    if trust_root_path is not None:
+        trust_source = "external"
+        trust = _load_report_trust_root(Path(trust_root_path))
+    else:
+        embedded_path = report_dir / "trust-root.json"
+        if not embedded_path.is_file():
+            raise InputError(
+                "verify.report_no_trust_root",
+                f"{report_dir} has no embedded trust-root.json, and --signer-trust-root was not given.",
+                "pass --signer-trust-root <file>, or ask the sender to re-sign with "
+                "`sign --write-trust-root`.",
+            )
+        trust_source = "embedded"
+        trust = _load_report_trust_root(embedded_path)
+
+    candidates = [s for s in signatures if s.get("role") == "claimant"]
+    if expect_keyid is not None:
+        candidates = [
+            s
+            for s in candidates
+            if any(sig.get("keyid") == expect_keyid for sig in s.get("signatures", []))
+        ]
+        if not candidates:
+            raise InputError(
+                "verify.report_keyid_mismatch",
+                f"no claimant signature has keyid {expect_keyid!r}.",
+                "confirm the keyid with the sender, or drop --expect-keyid.",
+            )
+    verified = None
+    verified_statement: dict[str, Any] = {}
+    last_error: Exception | None = None
+    for candidate in candidates:
+        try:
+            v = signing.verify_envelope(candidate, trust)
+            statement = json.loads(v.payload)
+        except (
+            signing.VerificationError,
+            json.JSONDecodeError,
+            UnicodeDecodeError,
+        ) as exc:
+            last_error = exc
+            continue
+        if statement.get("predicate", {}).get("role") != "claimant":
+            last_error = signing.VerificationError(
+                "the verified predicate's own role is not 'claimant'"
+            )
+            continue
+        verified = v
+        verified_statement = statement
+        break
+    if verified is None:
+        raise InputError(
+            "verify.report_signature_invalid",
+            f"no claimant signature verified against the trust root: {last_error}.",
+            "confirm the trust root holds the signer's real key, or re-sign the report.",
+        )
+    assert (
+        verified.keyid is not None
+    )  # every DSSE signature `sign_statement` writes carries one
+    if trust_source == "embedded":
+        print(
+            f"warning: this key came from inside the bundle; confirm keyid {verified.keyid} "
+            "with the sender for full assurance.",
+            file=sys.stderr,
+        )
+
+    subject_map = {s["name"]: s for s in verified_statement.get("subject", [])}
+    for name in REQUIRED_REPORT_SUBJECTS:
+        if name not in subject_map:
+            raise InputError(
+                "verify.report_subject_missing",
+                f"the signed statement has no subject named {name!r}.",
+                "re-sign the report: `agentce sign <report-dir> --as claimant`.",
+            )
+    manifest_path = report_dir / "manifest.json"
+    if not manifest_path.is_file():
+        raise InputError(
+            "verify.report_output_tampered",
+            f"{report_dir} has no manifest.json.",
+            "regenerate the report with `agentce assess`.",
+        )
+    manifest_bytes = manifest_path.read_bytes()
+    if (
+        hashlib.sha256(manifest_bytes).hexdigest()
+        != subject_map["manifest.json"]["digest"]["sha256"]
+    ):
+        raise InputError(
+            "verify.report_manifest_tampered",
+            "manifest.json does not match the digest the signature covers.",
+            "the manifest was altered after signing; regenerate and re-sign the report.",
+        )
+    manifest = json.loads(manifest_bytes.decode("utf-8"))
+    claim_body = {k: v for k, v in claim.items() if k != "signatures"}
+    if (
+        hashlib.sha256(canonicalize(claim_body)).hexdigest()
+        != subject_map["claim.json"]["digest"]["sha256"]
+    ):
+        raise InputError(
+            "verify.report_claim_tampered",
+            "claim.json does not match the digest the signature covers.",
+            "the claim was altered after signing; regenerate and re-sign the report.",
+        )
+
+    engine = manifest.get("engine", {})
+    installed = {
+        "version": __version__,
+        "spec_version": SPEC_VERSION,
+        "package_digest": _package_digest(),
+    }
+    if any(engine.get(k) != v for k, v in installed.items()):
+        raise InputError(
+            "verify.report_engine_mismatch",
+            f"this report was produced by engine {engine.get('version')!r} "
+            f"(spec {engine.get('spec_version')!r}); this machine has a different build.",
+            f"install engine {engine.get('version')!r} (spec {engine.get('spec_version')!r}) "
+            "to re-run this report.",
+        )
+
+    tampered: list[str] = []
+    for name, expected in manifest.get("outputs", {}).items():
+        candidate_path = report_dir / name
+        if not candidate_path.is_file():
+            tampered.append(name)
+            continue
+        actual = signing.sha256_prefixed(candidate_path.read_bytes())
+        if actual != expected:
+            tampered.append(name)
+    if tampered:
+        raise InputError(
+            "verify.report_output_tampered",
+            f"these manifest-tracked outputs are missing or altered: {', '.join(sorted(tampered))}.",
+            "the report was altered after signing; regenerate and re-sign it.",
+        )
+
+    packaging = json.loads((report_dir / "packaging.json").read_text("utf-8"))
+    if not packaging.get("packaged"):
+        result.data.update(
+            {
+                "reproduced": None,
+                "reason": "this report was not packaged for re-running",
+            }
+        )
+        result.note(f"{report_dir}: not packaged for re-running (nothing to reproduce)")
+        return result
+
+    inputs = manifest.get("inputs", {})
+    bundle_evidence = report_dir / "bundle" / "evidence"
+    try:
+        loaded_bundle = load_bundle(bundle_evidence)
+    except InputError as exc:
+        raise InputError(
+            "verify.report_evidence_tampered",
+            f"bundle/evidence does not load cleanly: {exc.cause}",
+            "the packaged evidence was altered after signing; regenerate and re-sign the report.",
+        ) from exc
+    if loaded_bundle.digest != inputs.get("bundle_digest"):
+        raise InputError(
+            "verify.report_evidence_tampered",
+            "bundle/evidence's digest does not match manifest.json's bundle_digest.",
+            "the packaged evidence was altered after signing; regenerate and re-sign the report.",
+        )
+    profile_path = report_dir / "bundle" / "applicability.yaml"
+    if not profile_path.is_file() or signing.sha256_prefixed(
+        profile_path.read_bytes()
+    ) != inputs.get("applicability_profile_digest"):
+        raise InputError(
+            "verify.report_evidence_tampered",
+            "bundle/applicability.yaml is missing or does not match its recorded digest.",
+            "the packaged profile was altered after signing; regenerate and re-sign the report.",
+        )
+    domain_digest = inputs.get("domain_binding_digest")
+    domain_path = report_dir / "bundle" / "domain.linkml.yaml"
+    if domain_digest is not None:
+        if (
+            not domain_path.is_file()
+            or signing.sha256_prefixed(domain_path.read_bytes()) != domain_digest
+        ):
+            raise InputError(
+                "verify.report_evidence_tampered",
+                "bundle/domain.linkml.yaml is missing or does not match its recorded digest.",
+                "the packaged domain binding was altered after signing; regenerate and re-sign "
+                "the report.",
+            )
+    catalog_dir_order = packaging.get("catalog_dir_order", [])
+    catalog_dir_digests = packaging.get("catalog_dir_digests", {})
+    for position, label in enumerate(catalog_dir_order):
+        catalog_path = report_dir / "bundle" / "catalog" / str(position)
+        if not catalog_path.is_dir() or signing.digest_tree(
+            catalog_path
+        ) != catalog_dir_digests.get(label):
+            raise InputError(
+                "verify.report_evidence_tampered",
+                f"bundle/catalog/{position} ({label}) is missing or does not match its "
+                "recorded digest.",
+                "the packaged catalog was altered after signing; regenerate and re-sign the "
+                "report.",
+            )
+
+    # Step 8: the offline re-run. A scratch trust root built from THIS report's own verified
+    # signer key (never the recipient's ambient --trust-root/AGENTCE_TRUST_ROOT) is what any
+    # --catalog-dir re-run trusts, so the check depends solely on what the sender's signature
+    # covers, identical on every recipient machine regardless of local trust configuration.
+    allow_unverified = any(
+        "--allow-unverified-catalog" in lim for lim in manifest.get("limitations", [])
+    )
+    catalog_positions = {label: i for i, label in enumerate(catalog_dir_order)}
+    vendored_labels: list[str] = []
+    catalog_dir_args: list[str] = []
+    for ref in inputs.get("catalogs", []):
+        label = f"{ref['id']}@{ref['version']}"
+        dir_position = catalog_positions.get(label)
+        if dir_position is not None:
+            catalog_dir_args += [
+                "--catalog-dir",
+                str(report_dir / "bundle" / "catalog" / str(dir_position)),
+            ]
+        else:
+            vendored_labels.append(label)
+
+    with tempfile.TemporaryDirectory(prefix="agentce-verify-report-") as scratch_raw:
+        scratch = Path(scratch_raw)
+        argv = [
+            "assess",
+            "--bundle",
+            str(bundle_evidence),
+            "--profile",
+            str(profile_path),
+        ]
+        if domain_digest is not None:
+            argv += ["--domain", str(domain_path)]
+        if vendored_labels:
+            argv += ["--catalog", ",".join(vendored_labels)]
+        argv += catalog_dir_args
+        if catalog_dir_args:
+            scratch_trust_path = scratch / "trust-root.json"
+            scratch_trust_path.write_text(
+                json.dumps(
+                    signing.TrustRoot.document(
+                        verified.keyid,
+                        signing.public_ed25519_b64(trust.keys[verified.keyid]),
+                        verified.identity,
+                    )
+                ),
+                encoding="utf-8",
+            )
+            argv += ["--trust-root", str(scratch_trust_path)]
+        if allow_unverified:
+            argv.append("--allow-unverified-catalog")
+        argv += ["--emit", "", "--out", str(scratch / "out"), "--quiet"]
+
+        from .. import cli as _cli  # deferred: cli imports this module at top level
+
+        saved_step_summary = os.environ.pop("GITHUB_STEP_SUMMARY", None)
+        try:
+            # The re-run's own report text has no reader here -- only its files matter, compared
+            # below -- so its stdout (`--quiet` silences only logging, not the result rendering
+            # `main` always does) is captured and discarded rather than mixed into this command's
+            # own output.
+            with redirect_stdout(io.StringIO()):
+                _cli.main(
+                    argv
+                )  # an ordinary assess outcome (0/1/2) is not itself a failure here
+        finally:
+            if saved_step_summary is not None:
+                os.environ["GITHUB_STEP_SUMMARY"] = saved_step_summary
+
+        mismatched_files: list[str] = []
+        for name in _RERUN_COMPARE_FILES:
+            shipped = report_dir / name
+            produced = scratch / "out" / name
+            if not produced.is_file() or not shipped.is_file():
+                mismatched_files.append(name)
+                continue
+            if produced.read_bytes() != shipped.read_bytes():
+                mismatched_files.append(name)
+        if mismatched_files:
+            raise InputError(
+                "verify.report_reproduction_mismatch",
+                f"the re-run does not reproduce {mismatched_files[0]!r} byte for byte "
+                f"({len(mismatched_files)} file(s) differ).",
+                "run `agentce diff` between the shipped and re-run outputs for the full picture.",
+            )
+
+    result.data.update(
+        {
+            "reproduced": True,
+            "signer": verified.identity,
+            "keyid": verified.keyid,
+            "trust_source": trust_source,
+            "files_checked": len(manifest.get("outputs", {}))
+            + len(REQUIRED_REPORT_SUBJECTS),
+        }
+    )
+    note = f"{report_dir}: reproduced, signer {verified.identity}"
+    if trust_source == "embedded":
+        note += " (embedded trust-root.json -- confirm the keyid with the sender out of band)"
+    result.note(note)
     return result
 
 
@@ -1724,14 +2116,11 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
         trust_root_path = report_dir / "trust-root.json"
         trust_root_path.write_text(
             json.dumps(
-                {
-                    "keys": {
-                        signer.keyid: {
-                            "public_key": signer.public_key_b64,
-                            "identity": claim.get("claimant", {}).get("org", "unset"),
-                        }
-                    }
-                },
+                signing.TrustRoot.document(
+                    signer.keyid,
+                    signer.public_key_b64,
+                    claim.get("claimant", {}).get("org", "unset"),
+                ),
                 indent=2,
                 sort_keys=True,
             )
