@@ -9,6 +9,20 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 
 | Key | Cause | Fix |
 |---|---|---|
+| `catalog.init_exists` | catalog init would overwrite a scaffolded file that already exists. | pass --force to overwrite, or a different <dir>. |
+| `catalog.init_family_collision` | the control family named by --id is already used by a vendored base or overlay catalog. | pass a different --id. |
+| `catalog.init_family_invalid` | the --id given to catalog init is not 2-4 uppercase letters. | pass --id as 2-4 uppercase letters, e.g. --id ACM. |
+| `catalog.sign_exists` | the catalog directory already carries a catalog.sig.json. | pass --force to re-sign, or remove the existing signature first. |
+| `catalog.sign_key_algorithm` | the signing key given to catalog sign is not an Ed25519 private key. | supply an Ed25519 key, or generate one with --new-key. |
+| `catalog.sign_key_inside_catalog` | the --key or --new-key path resolves inside the catalog directory being signed. | write the signing key outside the catalog directory. |
+| `catalog.sign_key_missing` | catalog sign signs with an operator-held key, and neither --key nor --new-key was given. | pass --key <ed25519-private-key.pem> or --new-key <path>. |
+| `catalog.sign_key_unreadable` | the signing key file given to catalog sign could not be parsed as an unencrypted PEM private key. | supply an unencrypted Ed25519 private key PEM, or generate one with --new-key. |
+| `catalog.sign_lint_failed` | the catalog fails agentce catalog lint. | fix the lint problems (agentce catalog lint <dir>) before signing. |
+| `catalog.sign_new_key_exists` | the path given to --new-key already exists. | pass a path that does not exist yet, or reuse it with --key instead. |
+| `catalog.sign_not_a_catalog` | the directory given to catalog sign has no catalog.yaml. | pass a catalog directory, or scaffold one first with agentce catalog init <dir>. |
+| `catalog.sign_trust_root_inside_catalog` | the --write-trust-root path resolves inside the catalog directory being signed. | write the trust root outside the catalog directory. |
+| `catalog.support_matrix_inside_catalog` | the --support-matrix path resolves inside the catalog directory being linted. | write the support matrix outside the catalog directory. |
+| `catalog.support_matrix_multi` | --support-matrix was given while linting a directory that holds more than one catalog. | pass the single catalog's own directory, not a directory holding several. |
 | `environment.cryptography_unavailable` | the cryptography package the engine signs and verifies with is missing or does not import. | install the engine's dependencies with `uv sync`; where no prebuilt wheel exists, install Rust and OpenSSL 3 first. |
 | `environment.python_unsupported` | the running Python is older than the interpreter the engine supports. | run the engine under Python 3.12 or newer (`uv python install 3.12`). |
 | `input.bundle_manifest_file_too_large` | a manifest-listed file is over the per-file size limit. | split large evidence into more, smaller files, or reference bulk content by an opaque locator instead of inlining it (SPEC R12). |
@@ -38,6 +52,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.records_subject_ambiguous` | the profile declares several subjects, and a records folder is assessed as one. | declare one subject in the profile, or assess each agent's records folder separately. |
 | `input.trust_root_invalid` | the trust root supplied by --trust-root or AGENTCE_TRUST_ROOT could not be loaded. | pass --trust-root <file> pointing at a trust root in the form of the engine's vendored data/trust/dev-root.json. |
 | `internal.unexpected` | an unexpected internal error occurred. | re-run with --debug to see the stack trace, then file an issue. |
+| `sign.key_unreadable` | the signing key file could not be parsed as an unencrypted PEM private key. | supply an unencrypted Ed25519 private key PEM (openssl genpkey -algorithm ed25519 -out key.pem, or agentce catalog sign --new-key <path>). |
 | `sign.trust_root_requires_kms` | --write-trust-root needs an exportable public key, and the sigstore-public and sigstore-private profiles have none. | pass --profile kms --key <ed25519-private-key.pem> together with --write-trust-root. |
 | `verify.report_claim_malformed` | claim.json exists but is not valid JSON. | regenerate the report; claim.json must be well-formed JSON. |
 | `verify.report_claim_tampered` | claim.json does not match the digest the signature covers. | the claim was altered after signing; regenerate and re-sign the report. |

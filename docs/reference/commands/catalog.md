@@ -9,6 +9,8 @@ positional arguments:
   <action>
     lint             validate controls, shapes, and test cases
     coverage-matrix  regenerate the automation coverage matrix (SPEC 7.5)
+    init             scaffold a new, lint-clean custom catalog
+    sign             sign a catalog directory with an operator-held key
 
 options:
   -h, --help         show this help message and exit

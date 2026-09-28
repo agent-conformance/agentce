@@ -10,7 +10,11 @@ from typing import Any
 import pytest
 
 from agentce.assertions import Assertion
-from agentce.blind_spots import compute_blind_spots
+from agentce.blind_spots import (
+    _supplying_adapters,
+    catalog_support_view,
+    compute_blind_spots,
+)
 from agentce.catalog import Catalog, ControlSpec
 from agentce.profile import Profile, Subject
 
@@ -23,14 +27,16 @@ def _control(
     minimum_evidence: list[dict[str, str]],
     *,
     version: str = "2026.09",
+    mode: str = "automated",
+    rung: int = 2,
 ) -> ControlSpec:
     return ControlSpec(
         id=control_id,
         version=version,
         title=control_id,
         applies_to_roles=["both"],
-        mode="automated",
-        rung=2,
+        mode=mode,
+        rung=rung,
         severity="high",
         min_source_class="any",
         minimum_evidence=minimum_evidence,
@@ -393,3 +399,94 @@ def test_is_locale_and_clock_independent() -> None:
         else:
             os.environ["TZ"] = old_tz
         locale.setlocale(locale.LC_ALL, old_locale)
+
+
+# --- 18.9 C4: `catalog_support_view` (contracts/P18-18.9.md). ---
+
+
+def test_catalog_support_view_pins_the_scaffold_requirement() -> None:
+    """The scaffold's one requirement (Decision/self_report) has no adapter producer at all -- a
+    true, meaningful "only your own code can emit this" answer, not a stub-passable empty list. A
+    stub returning ``requirements: []``, or one that zeroes ``supplying_adapters``, would pass a
+    presence check but not this exact-literal one."""
+    control = _control("GEN-01", [{"event": "Decision", "class": "self_report"}])
+    view = catalog_support_view(_catalog([control]))
+    assert view == [
+        {
+            "control": "GEN-01",
+            "control_version": "2026.09",
+            "title": "GEN-01",
+            "mode": "automated",
+            "rung": 2,
+            "requirements": [
+                {
+                    "event": "Decision",
+                    "class": "self_report",
+                    "ladder_rung": 2,
+                    "owner_key": "agent_team",
+                    "step_kind": "code_change",
+                    "supplying_adapters": [],
+                }
+            ],
+        }
+    ]
+
+
+def test_catalog_support_view_pins_supplying_adapters_for_a_real_event() -> None:
+    """A control needing ``ToolCall``/``any`` (matching
+    ``verification/gates/fixtures/audience_presets/catalog/controls/AUD-01.yaml``'s own shape): the
+    pinned adapter list, cross-checked against ``_supplying_adapters`` called directly so the test
+    stays correct if ``event_producers.json`` is ever regenerated."""
+    control = _control("AUD-01", [{"event": "ToolCall", "class": "any"}])
+    view = catalog_support_view(_catalog([control]))
+    requirement = view[0]["requirements"][0]
+    assert requirement["supplying_adapters"] == ["mcp-gateway", "otel-genai"]
+    assert requirement["supplying_adapters"] == _supplying_adapters(
+        "ToolCall", "self_report"
+    )
+
+
+def test_catalog_support_view_reports_manual_mode_regardless_of_minimum_evidence() -> (
+    None
+):
+    """A ``mode: manual`` control (``assess.py``'s own gate always resolves it to
+    ``not_assessed``, never a real verdict, regardless of what its ``minimum_evidence`` lists) must
+    not look identical to an automated/rung-2 control with the same requirement -- the view carries
+    the control's own ``mode``/``rung`` so a reader isn't misled into thinking evidence collection
+    alone would produce a verdict for it."""
+    control = _control(
+        "MAN-01", [{"event": "Decision", "class": "self_report"}], mode="manual", rung=1
+    )
+    view = catalog_support_view(_catalog([control]))
+    assert view[0]["mode"] == "manual"
+    assert view[0]["rung"] == 1
+
+
+def test_catalog_support_view_orders_controls_and_requirements() -> None:
+    b_control = _control(
+        "B-01",
+        [
+            {"event": "ToolCall", "class": "any"},
+            {"event": "Decision", "class": "self_report"},
+        ],
+    )
+    a_control = _control("A-01", [{"event": "Decision", "class": "self_report"}])
+    view = catalog_support_view(_catalog([b_control, a_control]))
+    assert [entry["control"] for entry in view] == ["A-01", "B-01"]
+    b_entry = next(entry for entry in view if entry["control"] == "B-01")
+    assert [r["event"] for r in b_entry["requirements"]] == ["Decision", "ToolCall"]
+
+
+def test_catalog_support_view_never_drops_an_empty_requirements_control() -> None:
+    control = _control("E-01", [])
+    view = catalog_support_view(_catalog([control]))
+    assert view == [
+        {
+            "control": "E-01",
+            "control_version": "2026.09",
+            "title": "E-01",
+            "mode": "automated",
+            "rung": 2,
+            "requirements": [],
+        }
+    ]

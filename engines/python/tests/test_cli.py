@@ -527,6 +527,76 @@ def test_catalog_lint_no_catalog_yaml(
     assert env["clean"] is False
 
 
+# --- 18.9 C4: `catalog lint --support-matrix` wiring (contracts/P18-18.9.md). ---
+
+
+def test_catalog_lint_support_matrix_matches_catalog_support_view(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from agentce.blind_spots import catalog_support_view
+    from agentce.catalog import load_catalog
+
+    base = (
+        Path(__file__).resolve().parents[3] / "spec" / "catalogs" / "base" / "eu-ai-act"
+    )
+    out = tmp_path / "sm.json"
+    code, env = run(
+        ["catalog", "lint", str(base), "--support-matrix", str(out), "--json"], capsys
+    )
+    assert code == 0, env
+    assert env["support_matrix"] == str(out)
+    written = json.loads(out.read_text(encoding="utf-8"))
+    catalog = load_catalog(base)
+    assert written == {
+        "catalog": catalog.id,
+        "version": catalog.version,
+        "controls": catalog_support_view(catalog),
+    }
+
+
+def test_catalog_lint_support_matrix_refuses_multiple_catalogs(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    base = (
+        Path(__file__).resolve().parents[3] / "spec" / "catalogs" / "base" / "eu-ai-act"
+    )
+    parent = tmp_path / "many"
+    for name in ("one", "two"):
+        (parent / name).mkdir(parents=True)
+        for entry in base.iterdir():
+            if entry.is_dir():
+                (parent / name / entry.name).symlink_to(entry, target_is_directory=True)
+            else:
+                (parent / name / entry.name).write_bytes(entry.read_bytes())
+    out = tmp_path / "sm.json"
+    code, env = run(
+        ["catalog", "lint", str(parent), "--support-matrix", str(out), "--json"], capsys
+    )
+    assert code == 3, env
+    assert env["error"]["key"] == "catalog.support_matrix_multi"
+    assert not out.exists()
+
+
+def test_catalog_lint_support_matrix_refuses_a_path_inside_the_catalog(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    base = (
+        Path(__file__).resolve().parents[3] / "spec" / "catalogs" / "base" / "eu-ai-act"
+    )
+    catalog_dir = tmp_path / "cat"
+    import shutil as _shutil
+
+    _shutil.copytree(base, catalog_dir)
+    out = catalog_dir / "sm.json"
+    code, env = run(
+        ["catalog", "lint", str(catalog_dir), "--support-matrix", str(out), "--json"],
+        capsys,
+    )
+    assert code == 3, env
+    assert env["error"]["key"] == "catalog.support_matrix_inside_catalog"
+    assert not out.exists()
+
+
 def test_conformance_run(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     corpus = tmp_path / "c"
     proj = corpus / "projects" / "credit/x/known-pass"
