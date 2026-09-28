@@ -21,8 +21,10 @@ function normalize(name: string): string {
     .replace(/[-_.]+/g, "-");
 }
 
-function loadDenylist(repoRoot: string): Set<string> {
-  const text = readFileSync(join(repoRoot, "spec", "rules", "no-ml-denylist.txt"), "utf-8");
+/** Parse a `no-ml-denylist.txt` file's text into its normalised entries, shared by the repo-checkout
+ * loader ({@link loadDenylist}) and the vendored-copy loader ({@link loadVendoredDenylist}) below,
+ * which differ only in where the text comes from. */
+function parseDenylist(text: string): Set<string> {
   const out = new Set<string>();
   for (const raw of text.split("\n")) {
     const line = (raw.split("#")[0] as string).trim();
@@ -31,6 +33,12 @@ function loadDenylist(repoRoot: string): Set<string> {
     }
   }
   return out;
+}
+
+function loadDenylist(repoRoot: string): Set<string> {
+  return parseDenylist(
+    readFileSync(join(repoRoot, "spec", "rules", "no-ml-denylist.txt"), "utf-8"),
+  );
 }
 
 /** The normalised name(s) a lockfile package key contributes (scope and sub-name for scoped names). */
@@ -90,8 +98,9 @@ export interface InstalledNoMlResult {
 }
 
 /**
- * Whether `name` (already normalised) resolves from `resolveFrom` via Node's own module
- * resolution -- the "is this actually present in the dependency tree the CLI runs with" question
+ * Whether `name` (already normalised) resolves via `req`'s own module resolution (a `require`
+ * created once from `resolveFrom` by the caller, shared across every denylist entry) -- the "is
+ * this actually present in the dependency tree the CLI runs with" question
  * `installed_distribution_names()` answers in Python, phrased as presence-of-each-denylisted-name
  * so it works under npm's hoisting (a `node_modules` walk from the package's own directory would
  * miss hoisted deps; module resolution does not).
@@ -104,8 +113,7 @@ export interface InstalledNoMlResult {
  * detected when only its scope directory is present, mirroring `candidates()`'s scope-and-sub-name
  * split above.
  */
-function isInstalled(name: string, resolveFrom: string): boolean {
-  const req = createRequire(join(resolveFrom, "noop.js"));
+function isInstalled(name: string, req: NodeJS.Require): boolean {
   let dirs: string[];
   try {
     dirs = req.resolve.paths(name) ?? [];
@@ -133,7 +141,8 @@ export function evaluateInstalledNoMl(
   denylist: ReadonlySet<string>,
   resolveFrom: string,
 ): InstalledNoMlResult {
-  const present = [...denylist].filter((name) => isInstalled(name, resolveFrom)).sort(byteCompare);
+  const req = createRequire(join(resolveFrom, "noop.js"));
+  const present = [...denylist].filter((name) => isInstalled(name, req)).sort(byteCompare);
   return { result: present.length === 0 ? "pass" : "fail", denylisted_present: present };
 }
 
@@ -141,13 +150,5 @@ export function evaluateInstalledNoMl(
  * byte-identical to `spec/rules/no-ml-denylist.txt`, `noMl.test.ts` holds them in sync), for the
  * installed self-report above -- unlike `loadDenylist`, this needs no repo checkout. */
 export function loadVendoredDenylist(): Set<string> {
-  const text = readFileSync(join(__dirname, "..", "data", "no-ml-denylist.txt"), "utf-8");
-  const out = new Set<string>();
-  for (const raw of text.split("\n")) {
-    const line = (raw.split("#")[0] as string).trim();
-    if (line) {
-      out.add(normalize(line));
-    }
-  }
-  return out;
+  return parseDenylist(readFileSync(join(__dirname, "..", "data", "no-ml-denylist.txt"), "utf-8"));
 }

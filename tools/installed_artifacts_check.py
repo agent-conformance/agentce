@@ -627,17 +627,18 @@ def _python_reference_quickstart(runner: Runner, tmp: Path) -> Path | str:
     return reference
 
 
-def _python_spec_version(runner: Runner, tmp: Path) -> str | None:
-    """The Python engine's own `spec_version`, for the `version --json` cross-engine assertion."""
-    proc = runner.run(
-        ["uv", "run", "--frozen", "--project", str(PY_ENGINE), "agentce", "version", "--json"],
-        tmp,
-        offline=False,
-    )
+def _python_spec_version(reference: Path) -> str | None:
+    """The Python engine's own `spec_version`, for the `version --json` cross-engine assertion --
+    read off the reference quickstart's own `manifest.json` (`engine.spec_version`, written by
+    `build_manifest`) rather than launching a second `uv run` process just to ask the engine again."""
+    manifest_path = reference / "manifest.json"
+    if not manifest_path.is_file():
+        return None
     try:
-        version: str | None = json.loads(proc.stdout).get("spec_version")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except ValueError:
         return None
+    version: str | None = manifest.get("engine", {}).get("spec_version")
     return version
 
 
@@ -656,7 +657,9 @@ def _version_plain_problems(
             f"version: printed {stdout!r}, expected two lines starting {expected_first!r}"
         )
     elif not lines[1].startswith("no_ml: "):
-        problems.append(f"version: second line {lines[1]!r} does not start with 'no_ml: '")
+        problems.append(
+            f"version: second line {lines[1]!r} does not start with 'no_ml: '"
+        )
     return problems
 
 
@@ -671,7 +674,9 @@ def _version_json_problems(
         return [f"version --json: output is not JSON: {stdout.strip()[:200]!r}"]
     problems: list[str] = []
     if envelope.get("engine") != engine_id:
-        problems.append(f"version --json: engine={envelope.get('engine')!r}, expected {engine_id!r}")
+        problems.append(
+            f"version --json: engine={envelope.get('engine')!r}, expected {engine_id!r}"
+        )
     if envelope.get("spec_version") != spec_version:
         problems.append(
             f"version --json: spec_version={envelope.get('spec_version')!r}, "
@@ -684,9 +689,13 @@ def _version_json_problems(
         )
     detail = envelope.get("no_ml_detail")
     if not isinstance(detail, dict) or "denylisted_present" not in detail:
-        problems.append("version --json: no_ml_detail is missing or lacks denylisted_present")
+        problems.append(
+            "version --json: no_ml_detail is missing or lacks denylisted_present"
+        )
     if returncode != 0:
-        problems.append(f"version --json: exit {returncode}, expected 0 for a passing no_ml")
+        problems.append(
+            f"version --json: exit {returncode}, expected 0 for a passing no_ml"
+        )
     return problems
 
 
@@ -697,7 +706,9 @@ def _version_problems(
     proc = runner.run([*exe, "version"], cwd, offline=True)
     problems = _version_plain_problems(proc.stdout, proc.returncode, engine_id, version)
     proc = runner.run([*exe, "version", "--json"], cwd, offline=True)
-    problems += _version_json_problems(proc.stdout, proc.returncode, engine_id, spec_version)
+    problems += _version_json_problems(
+        proc.stdout, proc.returncode, engine_id, spec_version
+    )
     return problems
 
 
@@ -735,13 +746,20 @@ def _digest_problem(
     return None
 
 
-_VERDICT_HTML_RE = re.compile(r'<section aria-labelledby="verdict">.*?</section>', re.DOTALL)
+_VERDICT_HTML_RE = re.compile(
+    r'<section aria-labelledby="verdict">.*?</section>', re.DOTALL
+)
 
 
 def _verdict_span_md(text: str) -> str | None:
     lines = text.splitlines()
-    start = next((i for i, line in enumerate(lines) if line.startswith("## Verdict")), None)
-    end = next((i for i, line in enumerate(lines) if line.startswith("## Outcome summary")), None)
+    start = next(
+        (i for i, line in enumerate(lines) if line.startswith("## Verdict")), None
+    )
+    end = next(
+        (i for i, line in enumerate(lines) if line.startswith("## Outcome summary")),
+        None,
+    )
     if start is None or end is None or end < start:
         return None
     return "\n".join(lines[start : end + 1])
@@ -752,7 +770,9 @@ def _verdict_span_html(text: str) -> str | None:
     return match.group(0) if match else None
 
 
-def _verdict_problems(label: str, fmt: str, text: str, reference_span: str) -> list[str]:
+def _verdict_problems(
+    label: str, fmt: str, text: str, reference_span: str
+) -> list[str]:
     """The rendered Verdict section (`## Verdict` through `## Outcome summary` in md; the
     `<section aria-labelledby="verdict">` element in html) must be byte-equal to the Python engine's
     rendering of the identical bundle -- not merely present (C1(h)/C4)."""
@@ -760,8 +780,56 @@ def _verdict_problems(label: str, fmt: str, text: str, reference_span: str) -> l
     if span is None:
         return [f"{label}: {fmt} report has no Verdict section"]
     if span != reference_span:
-        return [f"{label}: {fmt} Verdict section differs from the Python reference rendering"]
+        return [
+            f"{label}: {fmt} Verdict section differs from the Python reference rendering"
+        ]
     return []
+
+
+def _quickstart_parity_problems(
+    label: str,
+    exe: list[str],
+    runner: Runner,
+    empty: Path,
+    qs_out: Path,
+    reference: Path,
+    bundled_eu_ai_act: Path | None,
+    bundled_quickstart: Path | None,
+) -> list[str]:
+    """The digest, Verdict-section, and tamper-parity assertions shared by the npm and jar installed-
+    artifact checks (C4) -- identical once each caller has located its own bundled `eu-ai-act` catalog
+    and `quickstart` corpus directory (a filesystem path for npm, an extracted zip subtree for the
+    jar; `None` when the package lacks it, which each caller checks separately)."""
+    problems: list[str] = []
+    untampered_digest = _manifest_digest(qs_out, "eu-ai-act")
+    if bundled_eu_ai_act is not None:
+        expected_digest = catalog_digest_check.digest_tree(bundled_eu_ai_act)
+        problem = _digest_problem(
+            f"{label} quickstart", qs_out, "eu-ai-act", expected_digest
+        )
+        if problem:
+            problems.append(problem)
+    for fmt, name in (("md", "report.md"), ("html", "report.html")):
+        rendered = qs_out / name
+        ref_rendered = reference / name
+        if rendered.is_file() and ref_rendered.is_file():
+            ref_text = ref_rendered.read_text(encoding="utf-8")
+            ref_span = (
+                _verdict_span_md(ref_text)
+                if fmt == "md"
+                else _verdict_span_html(ref_text)
+            )
+            problems += [
+                f"{label} quickstart: {p}"
+                for p in _verdict_problems(
+                    label, fmt, rendered.read_text(encoding="utf-8"), ref_span or ""
+                )
+            ]
+    if bundled_quickstart is not None:
+        problems += _tamper_problems(
+            label, exe, runner, empty, bundled_quickstart, untampered_digest
+        )
+    return problems
 
 
 def _tamper_catalog(tmp: Path) -> Path:
@@ -886,7 +954,7 @@ def check_npm_tarball(
         reference = _python_reference_quickstart(runner, tmp)
         if isinstance(reference, str):
             return [reference]
-        spec_version = _python_spec_version(runner, tmp)
+        spec_version = _python_spec_version(reference)
         if spec_version is None:
             return ["could not determine the python engine's own spec_version"]
         empty = tmp / "empty"
@@ -935,7 +1003,10 @@ def _npm_run_problems(
             _fail("conformance run --json did not return a stable error envelope", proc)
         )
     problems += _numerics_problems(exe, empty, runner)
-    problems += [f"npm: {p}" for p in _version_problems(exe, runner, empty, "agentce-ts", spec_version)]
+    problems += [
+        f"npm: {p}"
+        for p in _version_problems(exe, runner, empty, "agentce-ts", spec_version)
+    ]
     package = empty / "node_modules" / "@agent-conformance" / "cli"
     for rel in (
         "schema/agentce-evidence.schema.json",
@@ -956,31 +1027,17 @@ def _npm_run_problems(
         f"quickstart: {p}" for p in assess_smoke_check.check(qs_out, qs_envelope)
     ]
     bundled_eu_ai_act = package / "data" / "catalogs" / "base" / "eu-ai-act"
-    untampered_digest = _manifest_digest(qs_out, "eu-ai-act")
-    if bundled_eu_ai_act.is_dir():
-        expected_digest = catalog_digest_check.digest_tree(bundled_eu_ai_act)
-        problem = _digest_problem("npm quickstart", qs_out, "eu-ai-act", expected_digest)
-        if problem:
-            problems.append(problem)
-    for fmt, name in (("md", "report.md"), ("html", "report.html")):
-        rendered = qs_out / name
-        ref_rendered = reference / name
-        if rendered.is_file() and ref_rendered.is_file():
-            ref_text = ref_rendered.read_text(encoding="utf-8")
-            ref_span = (
-                _verdict_span_md(ref_text) if fmt == "md" else _verdict_span_html(ref_text)
-            )
-            problems += [
-                f"npm quickstart: {p}"
-                for p in _verdict_problems(
-                    "npm", fmt, rendered.read_text(encoding="utf-8"), ref_span or ""
-                )
-            ]
     bundled_quickstart = package / "data" / "corpus" / "quickstart"
-    if bundled_quickstart.is_dir():
-        problems += _tamper_problems(
-            "npm", exe, runner, empty, bundled_quickstart, untampered_digest
-        )
+    problems += _quickstart_parity_problems(
+        "npm",
+        exe,
+        runner,
+        empty,
+        qs_out,
+        reference,
+        bundled_eu_ai_act if bundled_eu_ai_act.is_dir() else None,
+        bundled_quickstart if bundled_quickstart.is_dir() else None,
+    )
     return problems
 
 
@@ -1005,7 +1062,9 @@ def _extract_zip_subtree(archive: Path, prefix: str, dest: Path) -> Path:
     prefix stripped -- used to read a jar's bundled catalog/corpus data as real files on disk so
     `agentce assess --catalog-dir`/`--bundle`/`--domain` (which take filesystem paths) can use them."""
     with zipfile.ZipFile(archive) as zf:
-        names = [n for n in zf.namelist() if n.startswith(prefix) and not n.endswith("/")]
+        names = [
+            n for n in zf.namelist() if n.startswith(prefix) and not n.endswith("/")
+        ]
         for name in names:
             target = dest / name[len(prefix) :]
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -1022,7 +1081,7 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
         reference = _python_reference_quickstart(runner, tmp)
         if isinstance(reference, str):
             return [reference]
-        spec_version = _python_spec_version(runner, tmp)
+        spec_version = _python_spec_version(reference)
         if spec_version is None:
             return ["could not determine the python engine's own spec_version"]
         jar = tmp / built.name
@@ -1049,7 +1108,8 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
                 )
             )
         problems += [
-            f"jar: {p}" for p in _version_problems(exe, runner, empty, "agentce-java", spec_version)
+            f"jar: {p}"
+            for p in _version_problems(exe, runner, empty, "agentce-java", spec_version)
         ]
         with zipfile.ZipFile(jar) as zf:
             names = set(zf.namelist())
@@ -1072,37 +1132,27 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
             f"quickstart: {p}" for p in assess_smoke_check.check(qs_out, qs_envelope)
         ]
         bundled_eu_ai_act_prefix = "catalogs/base/eu-ai-act/"
-        untampered_digest = _manifest_digest(qs_out, "eu-ai-act")
-        if any(n.startswith(bundled_eu_ai_act_prefix) for n in names):
-            bundled_eu_ai_act = _extract_zip_subtree(
-                jar, bundled_eu_ai_act_prefix, tmp / "jar-eu-ai-act"
-            )
-            expected_digest = catalog_digest_check.digest_tree(bundled_eu_ai_act)
-            problem = _digest_problem("jar quickstart", qs_out, "eu-ai-act", expected_digest)
-            if problem:
-                problems.append(problem)
-        for fmt, name in (("md", "report.md"), ("html", "report.html")):
-            rendered = qs_out / name
-            ref_rendered = reference / name
-            if rendered.is_file() and ref_rendered.is_file():
-                ref_text = ref_rendered.read_text(encoding="utf-8")
-                ref_span = (
-                    _verdict_span_md(ref_text) if fmt == "md" else _verdict_span_html(ref_text)
-                )
-                problems += [
-                    f"jar quickstart: {p}"
-                    for p in _verdict_problems(
-                        "jar", fmt, rendered.read_text(encoding="utf-8"), ref_span or ""
-                    )
-                ]
+        bundled_eu_ai_act = (
+            _extract_zip_subtree(jar, bundled_eu_ai_act_prefix, tmp / "jar-eu-ai-act")
+            if any(n.startswith(bundled_eu_ai_act_prefix) for n in names)
+            else None
+        )
         bundled_quickstart_prefix = "corpus/quickstart/"
-        if any(n.startswith(bundled_quickstart_prefix) for n in names):
-            bundled_quickstart = _extract_zip_subtree(
-                jar, bundled_quickstart_prefix, tmp / "jar-quickstart"
-            )
-            problems += _tamper_problems(
-                "jar", exe, runner, empty, bundled_quickstart, untampered_digest
-            )
+        bundled_quickstart = (
+            _extract_zip_subtree(jar, bundled_quickstart_prefix, tmp / "jar-quickstart")
+            if any(n.startswith(bundled_quickstart_prefix) for n in names)
+            else None
+        )
+        problems += _quickstart_parity_problems(
+            "jar",
+            exe,
+            runner,
+            empty,
+            qs_out,
+            reference,
+            bundled_eu_ai_act,
+            bundled_quickstart,
+        )
         return problems
 
 
@@ -1207,9 +1257,13 @@ def self_test() -> int:
         tmp = Path(raw)
         py_reference = _python_reference_quickstart(runner, tmp)
         if isinstance(py_reference, str):
-            failures.append(f"could not build the python reference quickstart: {py_reference}")
-            py_reference = tmp / "py-reference"  # missing; guarded reads below just skip
-        py_spec_version = _python_spec_version(runner, tmp) or "0.0"
+            failures.append(
+                f"could not build the python reference quickstart: {py_reference}"
+            )
+            py_reference = (
+                tmp / "py-reference"
+            )  # missing; guarded reads below just skip
+        py_spec_version = _python_spec_version(py_reference) or "0.0"
         good = tmp / "good"
         (good / "packs" / "p").mkdir(parents=True)
         for name in CANONICAL_OUTPUTS:
@@ -1341,7 +1395,9 @@ def self_test() -> int:
         zero_manifest_dir = tmp / "zero-manifest"
         zero_manifest_dir.mkdir()
         (zero_manifest_dir / "manifest.json").write_text(
-            json.dumps({"inputs": {"catalogs": [{"id": "eu-ai-act", "digest": _ZERO_DIGEST}]}}),
+            json.dumps(
+                {"inputs": {"catalogs": [{"id": "eu-ai-act", "digest": _ZERO_DIGEST}]}}
+            ),
             encoding="utf-8",
         )
         zero_problem = _digest_problem(
@@ -1360,22 +1416,41 @@ def self_test() -> int:
         stale_manifest_dir.mkdir()
         (stale_manifest_dir / "manifest.json").write_text(
             json.dumps(
-                {"inputs": {"catalogs": [{"id": "eu-ai-act", "digest": "sha256:" + "f" * 64}]}}
+                {
+                    "inputs": {
+                        "catalogs": [
+                            {"id": "eu-ai-act", "digest": "sha256:" + "f" * 64}
+                        ]
+                    }
+                }
             ),
             encoding="utf-8",
         )
-        if _digest_problem("test", stale_manifest_dir, "eu-ai-act", real_eu_ai_act_digest) is None:
+        if (
+            _digest_problem(
+                "test", stale_manifest_dir, "eu-ai-act", real_eu_ai_act_digest
+            )
+            is None
+        ):
             failures.append("a stale, unrecomputed manifest digest was accepted")
         good_manifest_dir = tmp / "good-manifest"
         good_manifest_dir.mkdir()
         (good_manifest_dir / "manifest.json").write_text(
             json.dumps(
-                {"inputs": {"catalogs": [{"id": "eu-ai-act", "digest": real_eu_ai_act_digest}]}}
+                {
+                    "inputs": {
+                        "catalogs": [
+                            {"id": "eu-ai-act", "digest": real_eu_ai_act_digest}
+                        ]
+                    }
+                }
             ),
             encoding="utf-8",
         )
         if (
-            _digest_problem("test", good_manifest_dir, "eu-ai-act", real_eu_ai_act_digest)
+            _digest_problem(
+                "test", good_manifest_dir, "eu-ai-act", real_eu_ai_act_digest
+            )
             is not None
         ):
             failures.append("a correct, live-recomputed manifest digest was rejected")
@@ -1383,7 +1458,10 @@ def self_test() -> int:
         # 4. a report missing its Verdict section entirely must be rejected, in both formats; a
         #    byte-identical section (with unrelated trailing content) must be accepted.
         if not _verdict_problems(
-            "test", "md", "# report\n\n## Outcome summary\n", "## Verdict\n\nx\n\n## Outcome summary"
+            "test",
+            "md",
+            "# report\n\n## Outcome summary\n",
+            "## Verdict\n\nx\n\n## Outcome summary",
         ):
             failures.append("a markdown report with no Verdict section was accepted")
         if not _verdict_problems(

@@ -33,7 +33,7 @@ import { writeQuarantine } from "./quarantine";
 import {
   activityCliLines,
   blindSpotsCliLines,
-  digestTree,
+  catalogProvenanceDigest,
   renderEvidencePack,
   renderOscal,
   renderReportHtml,
@@ -653,7 +653,7 @@ export function main(argv: string[]): number {
       console.error("digest-tree: a directory path is required");
       return ExitCode.INPUT_ERROR;
     }
-    console.log(digestTree(dir, new Set(["catalog.sig.json", "catalog.yaml"])));
+    console.log(catalogProvenanceDigest(dir));
     return 0;
   }
 

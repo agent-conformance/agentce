@@ -63,7 +63,7 @@ public final class Cli {
                 System.err.println("digest-tree: a directory path is required");
                 return ExitCode.INPUT_ERROR.code;
             }
-            System.out.println(Catalog.digestTree(Paths.get(args[1]), Set.of("catalog.sig.json", "catalog.yaml")));
+            System.out.println(Catalog.provenanceDigest(Paths.get(args[1])));
             return 0;
         }
 

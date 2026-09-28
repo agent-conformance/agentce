@@ -38,20 +38,27 @@ public final class NoMl {
         return name.trim().toLowerCase(Locale.ROOT).replaceAll("[-_.]+", "-");
     }
 
-    private static Set<String> loadDenylist(Path repoRoot) {
+    /** Parse a {@code no-ml-denylist.txt} file's lines into its normalised entries, shared by the
+     * repo-checkout loader ({@link #loadDenylist}) and the vendored-copy loader
+     * ({@link #loadVendoredDenylist}) below, which differ only in where the lines come from. */
+    private static Set<String> parseDenylistLines(Iterable<String> lines) {
         Set<String> out = new LinkedHashSet<>();
+        for (String raw : lines) {
+            String line = raw.split("#", 2)[0].trim();
+            if (!line.isEmpty()) {
+                out.add(normalize(line));
+            }
+        }
+        return out;
+    }
+
+    private static Set<String> loadDenylist(Path repoRoot) {
         Path denyFile = repoRoot.resolve("spec/rules/no-ml-denylist.txt");
         try {
-            for (String raw : Files.readAllLines(denyFile, StandardCharsets.UTF_8)) {
-                String line = raw.split("#", 2)[0].trim();
-                if (!line.isEmpty()) {
-                    out.add(normalize(line));
-                }
-            }
+            return parseDenylistLines(Files.readAllLines(denyFile, StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new IllegalStateException("cannot read no-ml denylist: " + e.getMessage(), e);
         }
-        return out;
     }
 
     /** Every {@code group:artifact} coordinate line's normalised group and artifact names -- shared by
@@ -85,17 +92,26 @@ public final class NoMl {
         }
     }
 
+    /** Every member of {@code names} that also appears in {@code other}, sorted -- the "which of
+     * these are denylisted" intersection shared by {@link #evaluate} (repo-checkout names against
+     * the denylist) and {@link #evaluateInstalled} (the denylist against the installed jar's real
+     * runtime deps), which differ only in which set plays which role. */
+    private static List<String> sortedIntersection(Set<String> names, Set<String> other) {
+        List<String> present = new ArrayList<>();
+        for (String name : names) {
+            if (other.contains(name)) {
+                present.add(name);
+            }
+        }
+        present.sort(Json::byteCompare);
+        return present;
+    }
+
     /** Scan the engine's lockfile against the denylist; {@code result: pass} iff no denylisted name is present. */
     public static Result evaluate(Path repoRoot, Path lockPath) {
         Set<String> deny = loadDenylist(repoRoot);
         Set<String> names = packageNames(lockPath);
-        List<String> violations = new ArrayList<>();
-        for (String name : names) {
-            if (deny.contains(name)) {
-                violations.add(name);
-            }
-        }
-        violations.sort(Json::byteCompare);
+        List<String> violations = sortedIntersection(names, deny);
         return new Result(violations.isEmpty() ? "pass" : "fail", names.size(), violations);
     }
 
@@ -125,14 +141,7 @@ public final class NoMl {
      * holds them in sync), for the installed self-report below -- unlike {@link #loadDenylist}, this
      * needs no repo checkout. */
     public static Set<String> loadVendoredDenylist() {
-        Set<String> out = new LinkedHashSet<>();
-        for (String raw : readClasspathResource("/no-ml-denylist.txt").split("\n")) {
-            String line = raw.split("#", 2)[0].trim();
-            if (!line.isEmpty()) {
-                out.add(normalize(line));
-            }
-        }
-        return out;
+        return parseDenylistLines(List.of(readClasspathResource("/no-ml-denylist.txt").split("\n")));
     }
 
     /** The real, bundled runtime dependency set an installed jar carries: normalised group and
@@ -150,13 +159,7 @@ public final class NoMl {
      * uses for the repo-checkout scan above (parametrised so a unit test can supply a synthetic
      * denylist; mirrors the TypeScript port's {@code evaluateInstalledNoMl}). */
     public static InstalledResult evaluateInstalled(Set<String> denylist, Set<String> deps) {
-        List<String> present = new ArrayList<>();
-        for (String d : denylist) {
-            if (deps.contains(d)) {
-                present.add(d);
-            }
-        }
-        present.sort(Json::byteCompare);
+        List<String> present = sortedIntersection(denylist, deps);
         return new InstalledResult(present.isEmpty() ? "pass" : "fail", present);
     }
 }

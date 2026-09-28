@@ -52,14 +52,18 @@ def digest_tree(root: Path, exclude: frozenset[str] = PROVENANCE_EXCLUDE) -> str
     which does not install the engine) so the self-test proves this reference implementation, and the
     real invocation below proves the engines against it and each other.
     """
+
+    def rel_posix(path: Path) -> str:
+        return path.relative_to(root).as_posix()
+
     lines: list[bytes] = []
-    for path in sorted(root.rglob("*"), key=lambda p: p.relative_to(root).as_posix()):
+    for path in sorted(root.rglob("*"), key=rel_posix):
         if not path.is_file():
             continue
-        rel = path.relative_to(root).as_posix()
+        rel_path = path.relative_to(root)
+        rel = rel_path.as_posix()
         if rel in exclude or any(
-            part.startswith(".") or part == "__pycache__"
-            for part in path.relative_to(root).parts
+            part.startswith(".") or part == "__pycache__" for part in rel_path.parts
         ):
             continue
         file_hash = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -67,9 +71,18 @@ def digest_tree(root: Path, exclude: frozenset[str] = PROVENANCE_EXCLUDE) -> str
     return "sha256:" + hashlib.sha256(b"\n".join(lines)).hexdigest()
 
 
+def _run_or_die(cmd: list[str], label: str, *, cwd: Path | None = None) -> str:
+    """Run `cmd`, returning its stripped stdout, or raising with `label` and stderr on failure --
+    shared by the three engines' digest invocations below, which differ only in the command."""
+    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
+    if proc.returncode != 0:
+        raise SystemExit(f"{label} failed: {proc.stderr.strip()}")
+    return proc.stdout.strip()
+
+
 def python_engine_digest(directory: Path) -> str:
     """The real Python engine's own digest, run in its own project environment."""
-    proc = subprocess.run(
+    return _run_or_die(
         [
             "uv",
             "run",
@@ -84,13 +97,9 @@ def python_engine_digest(directory: Path) -> str:
             "print(catalog_provenance_digest(Path(sys.argv[1])))\n",
             str(directory),
         ],
-        capture_output=True,
-        text=True,
+        "python engine digest",
         cwd=ROOT,
     )
-    if proc.returncode != 0:
-        raise SystemExit(f"python engine digest failed: {proc.stderr.strip()}")
-    return proc.stdout.strip()
 
 
 def typescript_digest(directory: Path) -> str:
@@ -101,14 +110,9 @@ def typescript_digest(directory: Path) -> str:
             f"typescript dist is not built: {entry} is missing "
             "(run `pnpm build` in engines/typescript first)"
         )
-    proc = subprocess.run(
-        ["node", str(entry), "digest-tree", str(directory)],
-        capture_output=True,
-        text=True,
+    return _run_or_die(
+        ["node", str(entry), "digest-tree", str(directory)], "typescript digest-tree"
     )
-    if proc.returncode != 0:
-        raise SystemExit(f"typescript digest-tree failed: {proc.stderr.strip()}")
-    return proc.stdout.strip()
 
 
 def java_digest(directory: Path) -> str:
@@ -122,14 +126,10 @@ def java_digest(directory: Path) -> str:
             "java runnable jar is not built "
             "(run `./gradlew :assemble --offline -q` in engines/java first)"
         )
-    proc = subprocess.run(
+    return _run_or_die(
         ["java", "-jar", str(jars[-1]), "digest-tree", str(directory)],
-        capture_output=True,
-        text=True,
+        "java digest-tree",
     )
-    if proc.returncode != 0:
-        raise SystemExit(f"java digest-tree failed: {proc.stderr.strip()}")
-    return proc.stdout.strip()
 
 
 def self_test() -> int:
