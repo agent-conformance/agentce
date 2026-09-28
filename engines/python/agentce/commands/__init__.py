@@ -1371,29 +1371,29 @@ def _what_changed(changes: list[dict[str, Any]]) -> dict[str, list[dict[str, Any
     return what_changed
 
 
+def _diff_change_line(change: dict[str, Any]) -> str:
+    """``control @ subject: from -> to``, sanitised -- the one line both the text and md formats
+    render for a single change, so the two renderings cannot drift apart from each other."""
+    control = sanitize_for_terminal(change["control"])
+    subject = sanitize_for_terminal(change["subject"])
+    return f"{control} @ {subject}: {_diff_field(change['from'])} -> {_diff_field(change['to'])}"
+
+
 def _diff_md_lines(what_changed: dict[str, list[dict[str, Any]]]) -> list[str]:
     """The ``--format md`` "## What changed" section as a list of lines (one per ``result.note()``
     call): one ``### <Label> (<n>)`` subsection per **non-empty** group only, in ``closed``, ``opened``,
     ``other`` order, each a bullet list built from the same fields the text format already renders."""
     groups = (("closed", "Closed"), ("opened", "Opened"), ("other", "Other changes"))
-    if not any(what_changed[key] for key, _ in groups):
+    non_empty = [
+        (label, what_changed[key]) for key, label in groups if what_changed[key]
+    ]
+    if not non_empty:
         return ["## What changed", "", "no differences."]
-    lines = ["## What changed", ""]
-    for key, label in groups:
-        group = what_changed[key]
-        if not group:
-            continue
-        lines.append(f"### {label} ({len(group)})")
-        for change in group:
-            control = sanitize_for_terminal(change["control"])
-            subject = sanitize_for_terminal(change["subject"])
-            lines.append(
-                f"- {control} @ {subject}: "
-                f"{_diff_field(change['from'])} -> {_diff_field(change['to'])}"
-            )
+    lines = ["## What changed"]
+    for label, group in non_empty:
         lines.append("")
-    if lines and lines[-1] == "":
-        lines.pop()
+        lines.append(f"### {label} ({len(group)})")
+        lines.extend(f"- {_diff_change_line(change)}" for change in group)
     return lines
 
 
@@ -1429,6 +1429,10 @@ def cmd_diff(ns: argparse.Namespace) -> CommandResult:
     result.data["what_changed"] = what_changed
     if changes:
         result.add_code(int(ExitCode.FINDINGS))
+    if _flag(ns, "json"):
+        # `_emit_result` (cli.py) prints only the envelope under --json and never reads
+        # `result.human_lines`, so rendering any format's notes here would be pure wasted work.
+        return result
     if fmt == "md":
         for line in _diff_md_lines(what_changed):
             result.note(line)
@@ -1437,12 +1441,7 @@ def cmd_diff(ns: argparse.Namespace) -> CommandResult:
     elif changes:
         result.note(f"{len(changes)} assertion(s) differ:")
         for c in changes:
-            control = sanitize_for_terminal(c["control"])
-            subject = sanitize_for_terminal(c["subject"])
-            result.note(
-                f"  {control} @ {subject}: "
-                f"{_diff_field(c['from'])} -> {_diff_field(c['to'])}"
-            )
+            result.note(f"  {_diff_change_line(c)}")
     else:
         result.note("no differences")
     return result
