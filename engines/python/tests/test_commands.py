@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -756,41 +758,93 @@ def _packaged_and_signed(
     return out, key
 
 
+def _verify_report_json(
+    capsys: pytest.CaptureFixture[str], report_dir: str, *extra: str
+) -> tuple[int, dict[str, Any]]:
+    """Run `agentce verify --report <dir> --json`, discarding stdout any earlier setup call
+    (assess, sign) emitted first, and parse the resulting JSON envelope."""
+    capsys.readouterr()  # discard setup output
+    code = cli.main(["verify", "--report", report_dir, *extra, "--json"])
+    return code, json.loads(capsys.readouterr().out)
+
+
 def test_verify_report_happy_path_reproduces(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     out, _key = _packaged_and_signed(tmp_path)
     summary_path = tmp_path / "step-summary.md"
     summary_path.write_text("before\n", encoding="utf-8")
     monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary_path))
-    code = cli.main(["verify", "--report", str(out), "--json"])
+    code, envelope = _verify_report_json(capsys, str(out))
     assert code == 0
+    assert envelope["reproduced"] is True
     # The re-run must not append a second, fake step summary (N2).
     assert summary_path.read_text(encoding="utf-8") == "before\n"
 
 
-def test_verify_report_no_claim(tmp_path: Path) -> None:
+def _corrupt_claim_no_claim(out: Path) -> None:
+    (out / "claim.json").unlink()
+
+
+def _corrupt_claim_malformed(out: Path) -> None:
+    (out / "claim.json").write_text("not json", encoding="utf-8")
+
+
+def _corrupt_claim_unsigned(out: Path) -> None:
+    claim = json.loads((out / "claim.json").read_text(encoding="utf-8"))
+    claim["signatures"] = []
+    (out / "claim.json").write_text(
+        json.dumps(claim, indent=2, sort_keys=True), encoding="utf-8"
+    )
+
+
+@pytest.mark.parametrize(
+    ("corrupt", "expected_key"),
+    [
+        (_corrupt_claim_no_claim, "verify.report_no_claim"),
+        (_corrupt_claim_malformed, "verify.report_claim_malformed"),
+        (_corrupt_claim_unsigned, "verify.report_unsigned"),
+    ],
+)
+def test_verify_report_claim_stage_tamper_cases(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    corrupt: Callable[[Path], None],
+    expected_key: str,
+) -> None:
     out = tmp_path / "o"
     assert cli.main(_assess_argv(out, "--package-for-sharing")) == 0
-    (out / "claim.json").unlink()
-    assert cli.main(["verify", "--report", str(out)]) == 3
+    corrupt(out)
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert envelope["error"]["key"] == expected_key
 
 
 @pytest.mark.parametrize("tampered_file", ["report.md", "packaging.json"])
-def test_verify_report_output_tampered(tmp_path: Path, tampered_file: str) -> None:
+def test_verify_report_output_tampered(
+    tmp_path: Path, tampered_file: str, capsys: pytest.CaptureFixture[str]
+) -> None:
     out, _key = _packaged_and_signed(tmp_path)
     target = out / tampered_file
     target.write_bytes(target.read_bytes() + b"TAMPER")
-    code = cli.main(["verify", "--report", str(out), "--json"])
+    code, envelope = _verify_report_json(capsys, str(out))
     assert code == 3
+    assert envelope["error"]["key"] == "verify.report_output_tampered"
 
 
-def test_verify_report_evidence_tampered(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "relative_path", ["bundle/evidence/events", "bundle/applicability.yaml"]
+)
+def test_verify_report_evidence_tampered(
+    tmp_path: Path, relative_path: str, capsys: pytest.CaptureFixture[str]
+) -> None:
     out, _key = _packaged_and_signed(tmp_path)
-    event_file = next((out / "bundle" / "evidence" / "events").glob("*.jsonl"))
-    event_file.write_bytes(event_file.read_bytes() + b"TAMPER")
-    code = cli.main(["verify", "--report", str(out), "--json"])
+    target = out / relative_path
+    tampered_file = next(target.glob("*.jsonl")) if target.is_dir() else target
+    tampered_file.write_bytes(tampered_file.read_bytes() + b"TAMPER")
+    code, envelope = _verify_report_json(capsys, str(out))
     assert code == 3
+    assert envelope["error"]["key"] == "verify.report_evidence_tampered"
 
 
 def test_verify_report_unpackaged_reports_null(tmp_path: Path) -> None:
@@ -868,19 +922,24 @@ def test_verify_report_byo_catalog_dir_round_trip(tmp_path: Path) -> None:
     assert code == 0
 
 
-def test_verify_report_expect_keyid_match_and_mismatch(tmp_path: Path) -> None:
+def test_verify_report_expect_keyid_match_and_mismatch(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     from agentce import signing
 
     out, key = _packaged_and_signed(tmp_path)
     real_keyid = signing.keyid_for(key.public_key())
     assert cli.main(["verify", "--report", str(out), "--expect-keyid", real_keyid]) == 0
-    assert (
-        cli.main(["verify", "--report", str(out), "--expect-keyid", "sha256:bogus"])
-        == 3
+    code, envelope = _verify_report_json(
+        capsys, str(out), "--expect-keyid", "sha256:bogus"
     )
+    assert code == 3
+    assert envelope["error"]["key"] == "verify.report_keyid_mismatch"
 
 
-def test_verify_report_forged_keyid_trust_root_is_refused(tmp_path: Path) -> None:
+def test_verify_report_forged_keyid_trust_root_is_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     from agentce import signing
 
     out, key = _packaged_and_signed(tmp_path)
@@ -895,32 +954,33 @@ def test_verify_report_forged_keyid_trust_root_is_refused(tmp_path: Path) -> Non
         }
     }
     (out / "trust-root.json").write_text(json.dumps(forged), encoding="utf-8")
-    code = cli.main(
-        ["verify", "--report", str(out), "--expect-keyid", real_keyid, "--json"]
-    )
+    code, envelope = _verify_report_json(capsys, str(out), "--expect-keyid", real_keyid)
     assert code == 3
+    # `TrustRoot.from_dict`'s own content-addressed invariant must refuse this before
+    # verification even starts -- assert THIS exact key, not `verify.report_signature_invalid`
+    # (round-2 critic defect 2, the live-forged-signature bypass).
+    assert envelope["error"]["key"] == "input.trust_root_invalid"
 
 
-def test_verify_report_external_vs_embedded_trust_source(tmp_path: Path) -> None:
+def test_verify_report_external_vs_embedded_trust_source(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     out, _key = _packaged_and_signed(tmp_path)
     trust_root_copy = tmp_path / "external-trust-root.json"
     trust_root_copy.write_bytes((out / "trust-root.json").read_bytes())
-    assert cli.main(["verify", "--report", str(out)]) == 0  # embedded
-    assert (
-        cli.main(
-            [
-                "verify",
-                "--report",
-                str(out),
-                "--signer-trust-root",
-                str(trust_root_copy),
-            ]
-        )
-        == 0
-    )  # external
+    code, embedded = _verify_report_json(capsys, str(out))
+    assert code == 0
+    assert embedded["trust_source"] == "embedded"
+    code, external = _verify_report_json(
+        capsys, str(out), "--signer-trust-root", str(trust_root_copy)
+    )
+    assert code == 0
+    assert external["trust_source"] == "external"
 
 
-def test_verify_report_re_sign_append_is_manifest_tampered(tmp_path: Path) -> None:
+def test_verify_report_re_sign_append_is_manifest_tampered(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """`agentce sign` APPENDS a new signature; re-signing after a tamper leaves the original,
     still-verifying signature in place, so manifest.json's own digest mismatch (step 4) is what
     catches the tamper, never `signature_invalid` (round-2 defect 8)."""
@@ -952,31 +1012,30 @@ def test_verify_report_re_sign_append_is_manifest_tampered(tmp_path: Path) -> No
         )
         == 0
     )
-    code = cli.main(
-        [
-            "verify",
-            "--report",
-            str(out),
-            "--signer-trust-root",
-            str(trust_root_copy),
-            "--json",
-        ]
+    code, envelope = _verify_report_json(
+        capsys, str(out), "--signer-trust-root", str(trust_root_copy)
     )
     assert code == 3
+    assert envelope["error"]["key"] == "verify.report_manifest_tampered"
 
 
-def test_verify_report_claim_tampered(tmp_path: Path) -> None:
+def test_verify_report_claim_tampered(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     out, _key = _packaged_and_signed(tmp_path)
     claim = json.loads((out / "claim.json").read_text(encoding="utf-8"))
     claim["claimant"] = {"org": "tampered-after-signing"}
     (out / "claim.json").write_text(
         json.dumps(claim, indent=2, sort_keys=True), encoding="utf-8"
     )
-    code = cli.main(["verify", "--report", str(out), "--json"])
+    code, envelope = _verify_report_json(capsys, str(out))
     assert code == 3
+    assert envelope["error"]["key"] == "verify.report_claim_tampered"
 
 
-def test_verify_report_subject_missing(tmp_path: Path) -> None:
+def test_verify_report_subject_missing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """A signature whose subject list omits `manifest.json` entirely -- built by signing over a
     hand-trimmed subject list, not by editing a file post-signature (round-2 defect 7)."""
     from agentce import signing
@@ -1022,12 +1081,13 @@ def test_verify_report_subject_missing(tmp_path: Path) -> None:
         + "\n",
         encoding="utf-8",
     )
-    code = cli.main(["verify", "--report", str(out), "--json"])
+    code, envelope = _verify_report_json(capsys, str(out))
     assert code == 3
+    assert envelope["error"]["key"] == "verify.report_subject_missing"
 
 
 def test_verify_report_engine_mismatch(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Simulates the RECIPIENT running a different engine build than the one that produced the
     manifest -- patched on the recipient side right before the re-run, never by editing
@@ -1036,12 +1096,13 @@ def test_verify_report_engine_mismatch(
 
     out, _key = _packaged_and_signed(tmp_path)
     monkeypatch.setattr(commands, "__version__", "9.9.9-recipient")
-    code = cli.main(["verify", "--report", str(out), "--json"])
+    code, envelope = _verify_report_json(capsys, str(out))
     assert code == 3
+    assert envelope["error"]["key"] == "verify.report_engine_mismatch"
 
 
 def test_verify_report_full_re_sign_strips_original_is_signature_invalid(
-    tmp_path: Path,
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A genuine full re-sign (the original signature entry is REMOVED, not appended alongside a
     new one) leaves nothing in `signatures[]` that verifies against the original external trust
@@ -1083,14 +1144,8 @@ def test_verify_report_full_re_sign_strips_original_is_signature_invalid(
         )
         == 0
     )
-    code = cli.main(
-        [
-            "verify",
-            "--report",
-            str(out),
-            "--signer-trust-root",
-            str(trust_root_copy),
-            "--json",
-        ]
+    code, envelope = _verify_report_json(
+        capsys, str(out), "--signer-trust-root", str(trust_root_copy)
     )
     assert code == 3
+    assert envelope["error"]["key"] == "verify.report_signature_invalid"

@@ -75,7 +75,23 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=commands.cmd_validate)
 
     p = sub.add_parser(
-        "verify", parents=[common], help="integrity or signature verification"
+        "verify",
+        parents=[common],
+        help="integrity or signature verification",
+        description="Integrity or signature verification. `--report <dir>` re-runs a shareable "
+        "report bundle (`assess --package-for-sharing`) offline through nine stages, in order, "
+        "each with its own message key: (1) the claim exists and is signed "
+        "(verify.report_no_claim, verify.report_claim_malformed, verify.report_unsigned); "
+        "(2) the trust root resolves (verify.report_no_trust_root, input.trust_root_invalid, "
+        "verify.report_keyid_mismatch); (3) a claimant signature verifies "
+        "(verify.report_signature_invalid); (4) the signed subjects match what's on disk "
+        "(verify.report_subject_missing, verify.report_manifest_tampered, "
+        "verify.report_claim_tampered); (5) the engine build matches "
+        "(verify.report_engine_mismatch); (6) every manifest-tracked output's digest matches "
+        "(verify.report_output_tampered); (7) the packaged evidence, profile, domain binding, "
+        "and catalogs match (verify.report_evidence_tampered); (8) an offline re-run reproduces "
+        "every canonical output byte for byte (verify.report_reproduction_mismatch); "
+        "(9) success (`reproduced: true`).",
     )
     p.add_argument("--bundle", help="verify an evidence bundle's integrity")
     p.add_argument("--catalog", help="verify a catalog's signatures")
