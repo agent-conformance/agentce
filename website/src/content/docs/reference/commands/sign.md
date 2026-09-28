@@ -9,7 +9,7 @@ Sign a report as claimant or assessor.
 usage: agentce sign [-h] [--json] [--debug] [--quiet]
                     [--as {claimant,assessor}]
                     [--profile {sigstore-public,sigstore-private,kms}]
-                    [--key KEY] [--dry-run]
+                    [--key KEY] [--dry-run] [--write-trust-root]
                     [report_dir]
 
 positional arguments:
@@ -23,6 +23,11 @@ options:
                         the signing profile
   --key KEY             operator Ed25519 private key (PEM) for the kms profile
   --dry-run             plan only; sign nothing
+  --write-trust-root    write trust-root.json (the signer's public key) into
+                        the report directory, so a recipient can `agentce
+                        verify --report` this bundle without any other key
+                        exchange (SPEC 18.8, Hill 3). Requires --profile kms
+                        (the only profile with an exportable key).
 
 global options:
   --json                emit machine-readable JSON on stdout
