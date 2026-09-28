@@ -406,9 +406,9 @@ def test_is_locale_and_clock_independent() -> None:
 
 def test_catalog_support_view_pins_the_scaffold_requirement() -> None:
     """The scaffold's one requirement (Decision/self_report) has no adapter producer at all -- a
-    true, meaningful "only your own code can emit this" answer, not a stub-passable empty list. A
-    stub returning ``requirements: []``, or one that zeroes ``supplying_adapters``, would pass a
-    presence check but not this exact-literal one."""
+    true, meaningful "only your own code can emit this" answer, not a trivially-empty one that a
+    do-nothing implementation, or one that zeroes ``supplying_adapters``, would also produce. This
+    exact-literal assertion catches both; a mere presence check would not."""
     control = _control("GEN-01", [{"event": "Decision", "class": "self_report"}])
     view = catalog_support_view(_catalog([control]))
     assert view == [
