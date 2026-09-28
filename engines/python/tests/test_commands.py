@@ -833,7 +833,12 @@ def test_verify_report_output_tampered(
 
 
 @pytest.mark.parametrize(
-    "relative_path", ["bundle/evidence/events", "bundle/applicability.yaml"]
+    "relative_path",
+    [
+        "bundle/evidence/events",
+        "bundle/applicability.yaml",
+        "bundle/domain.linkml.yaml",
+    ],
 )
 def test_verify_report_evidence_tampered(
     tmp_path: Path, relative_path: str, capsys: pytest.CaptureFixture[str]
@@ -845,6 +850,39 @@ def test_verify_report_evidence_tampered(
     code, envelope = _verify_report_json(capsys, str(out))
     assert code == 3
     assert envelope["error"]["key"] == "verify.report_evidence_tampered"
+
+
+def test_verify_report_catalog_dir_digest_tampered(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A packaged BYO `--catalog-dir` copy tampered after signing -- step 7's
+    `catalog_dir_digests` check, distinct from the evidence/profile/domain cases above, must catch
+    it on its own (a mutation that drops the catalog-dir loop leaves this case unhandled)."""
+    out, _key = _packaged_and_signed(
+        tmp_path,
+        "--catalog-dir",
+        str(_AUD_FIXTURE / "catalog"),
+        "--allow-unverified-catalog",
+    )
+    catalog_copy = out / "bundle" / "catalog" / "0"
+    catalog_file = next(catalog_copy.glob("controls/*.yaml"))
+    catalog_file.write_bytes(catalog_file.read_bytes() + b"\n# TAMPER\n")
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert envelope["error"]["key"] == "verify.report_evidence_tampered"
+
+
+def test_verify_report_no_trust_root(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """No embedded `trust-root.json` and no `--signer-trust-root` -- stage 2's own dedicated exit,
+    distinct from every stage-1 claim case above and from `input.trust_root_invalid` (an unreadable
+    or forged file, tested elsewhere)."""
+    out, _key = _packaged_and_signed(tmp_path)
+    (out / "trust-root.json").unlink()
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert envelope["error"]["key"] == "verify.report_no_trust_root"
 
 
 def test_verify_report_unpackaged_reports_null(tmp_path: Path) -> None:
@@ -1086,6 +1124,65 @@ def test_verify_report_subject_missing(
     assert envelope["error"]["key"] == "verify.report_subject_missing"
 
 
+def test_verify_report_claimant_predicate_role_required(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A signature that cryptographically verifies and whose outer, UNSIGNED `role` field says
+    "claimant", but whose verified predicate carries a different role -- step 3 must re-check the
+    role inside the verified predicate itself, not trust the outer field alone (N5). Built by
+    signing a hand-crafted statement, the same technique as the subject_missing test above."""
+    from agentce import signing
+    from agentce.canonical import canonicalize
+
+    out = tmp_path / "o"
+    assert cli.main(_assess_argv(out, "--package-for-sharing")) == 0
+    key_path = tmp_path / "claimant.pem"
+    key = _write_kms_key(key_path)
+    signer = signing.KmsSigner(private_key=key)
+
+    claim = json.loads((out / "claim.json").read_text(encoding="utf-8"))
+    body = {k: v for k, v in claim.items() if k != "signatures"}
+    manifest_bytes = (out / "manifest.json").read_bytes()
+    subjects = [
+        {
+            "name": "manifest.json",
+            "digest": {"sha256": hashlib.sha256(manifest_bytes).hexdigest()},
+        },
+        {
+            "name": "claim.json",
+            "digest": {"sha256": hashlib.sha256(canonicalize(body)).hexdigest()},
+        },
+    ]
+    statement = {
+        "_type": signing.INTOTO_STATEMENT_TYPE,
+        "subject": subjects,
+        "predicateType": "https://agent-conformance.org/attestation/claim/v1",
+        "predicate": {
+            "role": "reviewer",
+            "profile": "kms",
+            "statement": "predicate role mismatch for the claimant-role test.",
+        },
+    }
+    envelope = signing.sign_statement(statement, signer)
+    record = {"role": "claimant", "profile": "kms", **envelope}
+    claim.setdefault("signatures", []).append(record)
+    (out / "claim.json").write_text(
+        json.dumps(claim, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    (out / "trust-root.json").write_text(
+        json.dumps(
+            signing.TrustRoot.document(signer.keyid, signer.public_key_b64, "unset"),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert envelope["error"]["key"] == "verify.report_signature_invalid"
+
+
 def test_verify_report_engine_mismatch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -1149,3 +1246,27 @@ def test_verify_report_full_re_sign_strips_original_is_signature_invalid(
     )
     assert code == 3
     assert envelope["error"]["key"] == "verify.report_signature_invalid"
+
+
+def test_verify_report_reproduction_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Step 8's byte-compare must catch a genuine reproduction failure, not just tampering
+    already caught by steps 6-7 -- built by mutating a control's severity on the RECIPIENT side
+    only, after packaging and signing, so every prior stage (subjects, manifest, evidence, all
+    digest-verified unchanged) still passes and only the re-run's own output differs."""
+    from agentce import commands
+
+    out, _key = _packaged_and_signed(tmp_path)
+    real_load_catalog = commands.load_catalog
+
+    def mutated_load_catalog(directory: Path) -> Any:
+        catalog = real_load_catalog(directory)
+        for control in catalog.controls:
+            control.severity = "critical" if control.severity != "critical" else "low"
+        return catalog
+
+    monkeypatch.setattr(commands, "load_catalog", mutated_load_catalog)
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert envelope["error"]["key"] == "verify.report_reproduction_mismatch"
