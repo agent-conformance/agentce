@@ -124,6 +124,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--manual", help="the manual-records directory")
     p.add_argument("--probes", help="the probe-results directory")
+    p.add_argument(
+        "--package-for-sharing",
+        dest="package_for_sharing",
+        action="store_true",
+        help="copy the evidence bundle, profile, domain binding and every --catalog-dir into "
+        "--out/bundle/ so the directory is self-contained: `agentce sign` then `agentce verify "
+        "--report` re-runs it offline on another machine (SPEC 18.8, Hill 3). Requires --bundle "
+        "(not a records folder).",
+    )
     p.add_argument("--out", help="the output directory (default: ./out)")
     p.add_argument("--state", help="the incremental state directory")
     p.add_argument(

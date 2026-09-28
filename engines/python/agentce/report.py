@@ -1880,12 +1880,22 @@ def build_manifest(
     report_language: str = messages.DEFAULT_LANGUAGE,
     limitations: list[str] | None = None,
     started_at: str | None = None,
+    applicability_profile_digest: str | None = None,
+    domain_binding_digest: str | None = None,
 ) -> dict[str, Any]:
     package_digest = _package_digest()
     host = hashlib.sha256(
         f"{platform.system()}|{platform.machine()}|{package_digest}".encode()
     ).hexdigest()
     catalog_refs = _catalog_refs(catalogs)
+    inputs: dict[str, Any] = {"bundle_digest": bundle_digest, "catalogs": catalog_refs}
+    if applicability_profile_digest is not None:
+        # SPEC §8.4's manifest schema already declares this property; every ``assess`` run now
+        # populates it (18.8) so a report always names exactly which profile produced it, packaged
+        # for re-running or not.
+        inputs["applicability_profile_digest"] = applicability_profile_digest
+    if domain_binding_digest is not None:
+        inputs["domain_binding_digest"] = domain_binding_digest
     manifest: dict[str, Any] = {
         "agentce_manifest_version": 1,
         "engine": {
@@ -1894,7 +1904,7 @@ def build_manifest(
             "spec_version": SPEC_VERSION,
             "package_digest": package_digest,
         },
-        "inputs": {"bundle_digest": bundle_digest, "catalogs": catalog_refs},
+        "inputs": inputs,
         "outputs": outputs,
         "run": {
             "started_at": started_at or _now(),
@@ -2005,6 +2015,8 @@ def write_report(
     extra_outputs: dict[str, bytes] | None = None,
     activity: dict[str, Any] | None = None,
     blind_spots: dict[str, Any] | None = None,
+    applicability_profile_digest: str | None = None,
+    domain_binding_digest: str | None = None,
 ) -> dict[str, Any]:
     """Write every report artifact for ``assertions`` and return the reproducibility manifest.
 
@@ -2041,7 +2053,12 @@ def write_report(
     and the ``--json`` envelope. Unlike ``activity``, a caller that leaves it out gets the honest empty
     answer rather than a silent recomputation: an empty ``Profile()`` has zero subjects, which would
     fail ``compute_blind_spots``'s positional pairing against any non-empty ``assertions`` (RFC 0008
-    Sec.6), so every real call site must compute and pass its own."""
+    Sec.6), so every real call site must compute and pass its own.
+
+    ``applicability_profile_digest``/``domain_binding_digest`` (sha256 of the resolved profile/domain
+    file bytes, computed by the caller) land in ``manifest.json``'s existing, previously-unpopulated
+    schema properties of the same names (18.8) -- present on every run regardless of whether it was
+    packaged for sharing."""
     check_dc5(
         assertions
     )  # DC-5: refuse a supporting verdict without an evidence pointer
@@ -2255,6 +2272,8 @@ def write_report(
         report_language=report_language,
         limitations=limitations,
         started_at=started_at,
+        applicability_profile_digest=applicability_profile_digest,
+        domain_binding_digest=domain_binding_digest,
     )
     (out_dir / "manifest.json").write_text(
         json.dumps(manifest, sort_keys=True, indent=2), encoding="utf-8"

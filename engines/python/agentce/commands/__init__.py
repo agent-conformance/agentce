@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -46,7 +47,7 @@ from ..records import (
     ScannedRecords,
 )
 from ..records import scan as scan_records
-from ..bundle import load_bundle
+from ..bundle import copy_bundle, load_bundle
 from ..catalog import Catalog, lint_catalog, load_catalog
 from ..collect import EnvSecretManager, SourceSpec, load_config, run_collect
 from ..config import resolve as resolve_config
@@ -472,6 +473,16 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         profile_obj = declared or Profile.from_dict(scanned.profile)
         bundle = Path(out) / BUNDLE_DIR
     catalog = _opt_str(ns, "catalog")
+    # --package-for-sharing (18.8, Hill 3): a records-folder run's evaluation mode
+    # (`applicability_declared=False`, below) makes a `--bundle`-shaped re-run not reproduce it, so
+    # packaging is refused outright for that form, before anything is written.
+    package_for_sharing = _flag(ns, "package_for_sharing")
+    if package_for_sharing and folder_arg is not None:
+        raise InputError(
+            "input.package_requires_bundle",
+            "--package-for-sharing works only with --bundle/--profile, not a records folder.",
+            "pass --bundle and --profile instead of a records folder, or drop --package-for-sharing.",
+        )
     # --emit/--for/CI-detection are all resolved and validated before any output is written (below,
     # before ingest/quarantine): an unknown token, a bad flag combination, or an unknown preset must
     # never leave a partial or misleading result behind.
@@ -482,14 +493,20 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     fail_on_predicate = parse_fail_on(fail_on_raw) if fail_on_raw is not None else None
     # Resolve the catalogs before any output is written: a run that cannot name what it evaluates
     # against — or cannot verify it — must leave nothing behind that looks like a result.
+    raw_catalog_dirs = list(getattr(ns, "catalog_dir", None) or [])
     catalogs, catalog_labels, limitations = _resolve_catalogs(
         catalog,
         profile_obj,
-        list(getattr(ns, "catalog_dir", None) or []),
+        raw_catalog_dirs,
         _effective_trust_root(ns),
         allow_unverified=_flag(ns, "allow_unverified_catalog"),
     )
     out_dir = Path(out)
+    domain_path_early = _opt_str(ns, "domain")
+    if package_for_sharing:
+        _check_package_path_overlap(
+            out_dir, bundle, profile, domain_path_early, raw_catalog_dirs
+        )
     if scanned is not None:
         scanned.write(out_dir, write_profile=derived_profile)
         limitations.append(RECORDS_LIMITATION)
@@ -497,6 +514,27 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     loaded = load_bundle(bundle)
     ingested = ingest(loaded)
     write_quarantine(ingested.quarantined, out_dir / "quarantine.jsonl")
+    # Packaging for sharing (18.8, Hill 3), right after Stage 1 so the copy reflects exactly what was
+    # ingested: --out becomes self-contained, ready for `agentce verify --report` to re-run offline.
+    # `catalog_dir_order`/`catalog_dir_digests` are recorded in `packaging.json` below (never as new
+    # `manifest.json` `inputs` properties, which the schema does not declare) so no schema change is
+    # needed; keyed/indexed to avoid a directory-name collision between two `--catalog-dir`s.
+    catalog_dir_order: list[str] = []
+    catalog_dir_digests: dict[str, str] = {}
+    if package_for_sharing:
+        bundle_out = out_dir / "bundle"
+        shutil.rmtree(bundle_out, ignore_errors=True)
+        copy_bundle(loaded.root, bundle_out / "evidence")
+        shutil.copy2(profile, bundle_out / "applicability.yaml")
+        if domain_path_early is not None:
+            shutil.copy2(domain_path_early, bundle_out / "domain.linkml.yaml")
+        for i, raw_dir in enumerate(raw_catalog_dirs):
+            src_dir = _require_dir(raw_dir, key="catalog-dir", what="the catalog directory")
+            cat = load_catalog(src_dir)
+            label = f"{cat.id}@{cat.version}"
+            catalog_dir_order.append(label)
+            catalog_dir_digests[label] = signing.digest_tree(src_dir)
+            shutil.copytree(src_dir, bundle_out / "catalog" / str(i))
     # Stage 2: integrity verification, one IntegrityResult per stream.
     integrity_results = verify_bundle(ingested.accepted, loaded.manifest, loaded.root)
     _write_jsonl((r.to_json() for r in integrity_results), out_dir / "integrity.jsonl")
@@ -585,13 +623,31 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         reverify_argv += ["--catalog-dir", _scrub_path(catalog_dir)]
     if domain_path is not None:
         reverify_argv += ["--domain", _scrub_path(domain_path)]
-    extra_outputs: dict[str, bytes] | None = None
+    extra_outputs: dict[str, bytes] = {}
     if runtime_drift:
-        extra_outputs = {
-            "runtime_drift.jsonl": (
-                "\n".join(json.dumps(e, sort_keys=True) for e in runtime_drift) + "\n"
-            ).encode("utf-8")
+        extra_outputs["runtime_drift.jsonl"] = (
+            "\n".join(json.dumps(e, sort_keys=True) for e in runtime_drift) + "\n"
+        ).encode("utf-8")
+    # Every deterministic output `verify --report` must be able to digest-check (18.8) gets a
+    # manifest-tracked entry: these four are written above by Stages 1/2/4/5 directly (not through
+    # `write_report`'s own `write_json`/`write_text` helpers), so their bytes are read back once, in
+    # this same process, immediately after this run wrote them itself -- not a race, just avoiding a
+    # signature change to each stage's own writer.
+    for artifact in ("quarantine.jsonl", "integrity.jsonl", "coverage.json", "applicability.jsonl"):
+        extra_outputs[artifact] = (out_dir / artifact).read_bytes()
+    applicability_profile_digest = signing.sha256_prefixed(profile.read_bytes())
+    domain_binding_digest = (
+        signing.sha256_prefixed(Path(domain_path).read_bytes())
+        if domain_path is not None
+        else None
+    )
+    extra_outputs["packaging.json"] = canonicalize(
+        {
+            "packaged": package_for_sharing,
+            "catalog_dir_order": catalog_dir_order,
+            "catalog_dir_digests": catalog_dir_digests,
         }
+    )
     activity = summarize_activity(ingested.accepted, profile_obj)
     blind_spots = compute_blind_spots(
         evaluated, profile_obj, catalogs, ingested.accepted
@@ -612,6 +668,8 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         extra_outputs=extra_outputs,
         activity=activity,
         blind_spots=blind_spots,
+        applicability_profile_digest=applicability_profile_digest,
+        domain_binding_digest=domain_binding_digest,
     )
     if state is not None:
         state.record(loaded.digest, out_dir / "manifest.json", new_window_end)
@@ -816,6 +874,39 @@ def _verify_catalog_dirs(
                 "limitation.",
             ) from exc
     return limitations
+
+
+def _check_package_path_overlap(
+    out_dir: Path,
+    bundle: Path,
+    profile: Path,
+    domain_path: str | None,
+    catalog_dirs: list[str],
+) -> None:
+    """Refuse (``input.package_path_overlap``) before anything is written when ``--out`` is, contains,
+    or sits inside any input path ``--package-for-sharing`` will copy from (SPEC 18.8 D4): packaging
+    would otherwise read from or write into the same tree it is producing (assessing back into the
+    bundle it was just given, or a catalog directory that happens to sit inside ``--out`` already)."""
+    resolved_out = out_dir.resolve()
+    candidates: list[tuple[str, Path]] = [("--bundle", bundle), ("--profile", profile)]
+    if domain_path is not None:
+        candidates.append(("--domain", Path(domain_path)))
+    for raw_dir in catalog_dirs:
+        candidates.append(("--catalog-dir", Path(raw_dir)))
+    for label, path in candidates:
+        try:
+            resolved = path.resolve()
+        except OSError:
+            continue
+        if resolved == resolved_out or resolved_out.is_relative_to(resolved) or resolved.is_relative_to(
+            resolved_out
+        ):
+            raise InputError(
+                "input.package_path_overlap",
+                f"--out {out_dir} overlaps {label} {path}: packaging would read from or write "
+                "into the same tree it is producing.",
+                "point --out somewhere outside every input path, then re-run.",
+            )
 
 
 def _resolve_catalogs(

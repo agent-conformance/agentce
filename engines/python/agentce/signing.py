@@ -243,6 +243,11 @@ class KmsSigner(Signer):
     def keyid(self) -> str:
         return keyid_for(self.private_key.public_key())
 
+    @property
+    def public_key_b64(self) -> str:
+        """The base64 raw public key a claimant publishes for ``--write-trust-root`` (SPEC §9.1)."""
+        return public_ed25519_b64(self.private_key.public_key())
+
 
 @dataclass
 class KeylessSigner(Signer):
@@ -276,10 +281,22 @@ class TrustRoot:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TrustRoot":
+        """Load a trust root from its JSON shape (``--trust-root``, ``--signer-trust-root``, an
+        embedded ``trust-root.json``, or the vendored root). Every ``keys`` entry's declared id must
+        equal :func:`keyid_for` of the key it maps to -- a trust root is content-addressed by
+        construction (every trust root this engine itself writes already satisfies this), so an entry
+        whose id and key disagree is not a differently-labelled key but a forged or corrupted one: a
+        file could otherwise map the real signer's own keyid to an attacker's public key, which
+        `verify_envelope`/`--expect-keyid` would then accept as if it were the real signer (SPEC §9.1)."""
         keys: dict[str, Ed25519PublicKey] = {}
         identities: dict[str, str] = {}
         for keyid, entry in (data.get("keys") or {}).items():
-            keys[keyid] = load_public_ed25519(entry["public_key"])
+            public_key = load_public_ed25519(entry["public_key"])
+            if keyid_for(public_key) != keyid:
+                raise VerificationError(
+                    f"trust root entry {keyid!r} does not match its own key"
+                )
+            keys[keyid] = public_key
             identities[keyid] = entry.get("identity", keyid)
         authorities = {
             issuer: load_public_ed25519(entry["public_key"])

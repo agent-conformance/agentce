@@ -142,3 +142,34 @@ def test_vendored_trust_loads() -> None:
     trust = signing.vendored_trust()
     assert trust.keys
     assert "development" in trust.description.lower()
+
+
+# --- 18.8 round-2 critic defect 2: TrustRoot.from_dict's content-addressed keyid invariant ---
+
+
+def test_trust_root_from_dict_rejects_a_mismatched_keyid() -> None:
+    """A trust-root entry's declared id must equal `keyid_for` the key it maps to. Without this check
+    an attacker's own embedded `trust-root.json` could label an attacker key with the victim's real
+    keyid string, and `verify_envelope`/`--expect-keyid` would accept it as the real signer
+    (round-2 critic, verdicts/P18-18.8-critic-r2.md defect 2, live-demonstrated)."""
+    real_key = Ed25519PrivateKey.from_private_bytes(bytes(32))
+    attacker_key = Ed25519PrivateKey.from_private_bytes(bytes([1] * 32))
+    real_keyid = signing.keyid_for(real_key.public_key())
+    forged = {
+        "keys": {
+            real_keyid: {
+                "public_key": signing.public_ed25519_b64(attacker_key.public_key()),
+                "identity": "Original Corp",
+            }
+        }
+    }
+    with pytest.raises(signing.VerificationError):
+        signing.TrustRoot.from_dict(forged)
+
+
+def test_trust_root_from_dict_accepts_a_correctly_addressed_key() -> None:
+    key = Ed25519PrivateKey.from_private_bytes(bytes(32))
+    keyid = signing.keyid_for(key.public_key())
+    data = {"keys": {keyid: {"public_key": signing.public_ed25519_b64(key.public_key()), "identity": "op"}}}
+    trust = signing.TrustRoot.from_dict(data)
+    assert keyid in trust.keys

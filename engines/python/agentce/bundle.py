@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -96,6 +97,28 @@ def _safe_member(root: Path, rel: str) -> Path:
             "the manifest must list only paths that stay inside the bundle after symlinks resolve.",
         )
     return member
+
+
+def copy_bundle(src_root: Path, dst_root: Path) -> None:
+    """Copy exactly the files a bundle's own ``manifest.json`` lists (plus the manifest itself) into
+    ``dst_root``, each resolved through :func:`confine_to_root` first (SPEC §8.1's own bundle-safety
+    rule, reused here rather than a plain ``shutil.copytree``): a symlink that escapes ``src_root``, or
+    a file present on disk but not in the manifest, never reaches the copy. Does not itself verify the
+    bundle; call :func:`load_bundle` on ``dst_root`` afterwards to confirm the copy is faithful."""
+    manifest_path = src_root / "manifest.json"
+    manifest: dict[str, Any] = json.loads(manifest_path.read_text(encoding="utf-8"))
+    dst_root.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(manifest_path, dst_root / "manifest.json")
+    for entry in manifest.get("files", []):
+        if not isinstance(entry, dict) or "path" not in entry:
+            continue
+        rel = str(entry["path"])
+        src = confine_to_root(src_root, rel)
+        if src is None or not safe_is_file(src):
+            continue  # load_bundle on dst_root reports this the same way it reports any other gap
+        dst = dst_root / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
 
 
 def load_bundle(bundle_dir: Path) -> Bundle:

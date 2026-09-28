@@ -23,6 +23,8 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.for_preset` | --for names a preset assess does not know. | choose one of: ci, compliance, engineering, security, share. |
 | `input.init_exists` | init would overwrite a profile or domain binding that already exists. | pass --force to overwrite, or --out <dir> to write somewhere else. |
 | `input.nothing_evaluated` | no control reached conformant, non-conformant, or insufficient_evidence, so the run judged nothing. | emit under the subject and source the profile declares, and record the evidence the catalog's controls apply to. |
+| `input.package_path_overlap` | --out overlaps --bundle, --profile, --domain, or a --catalog-dir: packaging would read from or write into the tree it is producing. | point --out somewhere outside every input path, then re-run. |
+| `input.package_requires_bundle` | --package-for-sharing works only with --bundle/--profile; a records-folder run cannot be reproduced from a --bundle re-run. | pass --bundle and --profile instead of a records folder, or drop --package-for-sharing. |
 | `input.profile_invalid` | the applicability profile is not safe YAML: a disallowed construct, or a structure nested too deeply to parse safely. | remove custom YAML tags and flatten deep nesting; regenerate the profile from `agentce init`. |
 | `input.profile_missing` | the applicability profile was not supplied. | pass --profile agentce/applicability.yaml (start from agentce init). |
 | `input.records_no_genai_spans` | the folder holds OpenTelemetry traces, but none of their spans is a GenAI operation the engine maps. | instrument the agent with OpenTelemetry GenAI or OpenInference, then export its traces. |

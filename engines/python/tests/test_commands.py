@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from agentce import cli
-from agentce.report import ASSESS_DEFAULT_EMIT
+from agentce.report import ASSESS_DEFAULT_EMIT, validate_report
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _QUICKSTART = _REPO_ROOT / "corpus" / "quickstart"
@@ -82,6 +82,7 @@ _ALWAYS_FILES = frozenset(
         "graph.sqlite",
         "coverage.json",
         "applicability.jsonl",
+        "packaging.json",
     }
 )
 
@@ -429,3 +430,158 @@ def test_printable_widens_trigger_to_default_ignorable_codepoints() -> None:
     out = _printable(hostile)
     assert variation_selector not in out
     assert "\\ufe0f" in out
+
+
+# --- 18.8 C1: `--package-for-sharing` (contracts/P18-18.8.md). ---
+
+_AUD_FIXTURE = (
+    Path(__file__).resolve().parents[3] / "verification" / "gates" / "fixtures" / "audience_presets"
+)
+
+
+def test_package_for_sharing_refuses_records_folder(tmp_path: Path) -> None:
+    records = tmp_path / "records"
+    records.mkdir()
+    (records / "trace.json").write_text("{}", encoding="utf-8")
+    out = tmp_path / "o"
+    code = cli.main(["assess", str(records), "--out", str(out), "--package-for-sharing"])
+    assert code == 3
+    assert not out.exists() or not any(out.iterdir())
+
+
+def _copied_quickstart_inputs(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
+    """A private, tmp_path-local copy of the quickstart fixture: overlap tests write ``--out``
+    inside/around these paths, and must never touch the real repo fixture."""
+    import shutil as _shutil
+
+    root = tmp_path / "inputs"
+    _shutil.copytree(_QUICKSTART / "evidence", root / "evidence")
+    _shutil.copy2(_QUICKSTART / "applicability.yaml", root / "applicability.yaml")
+    _shutil.copy2(_QUICKSTART / "domain.linkml.yaml", root / "domain.linkml.yaml")
+    _shutil.copytree(_AUD_FIXTURE / "catalog", root / "catalog")
+    return root / "evidence", root / "applicability.yaml", root / "domain.linkml.yaml", root / "catalog"
+
+
+@pytest.mark.parametrize("which", ["bundle", "profile", "domain", "catalog_dir"])
+@pytest.mark.parametrize("direction", ["out_inside_input", "input_inside_out"])
+def test_package_for_sharing_refuses_path_overlap(
+    tmp_path: Path, which: str, direction: str
+) -> None:
+    bundle, profile, domain, catalog_dir = _copied_quickstart_inputs(tmp_path)
+    inputs = {"bundle": bundle, "profile": profile, "domain": domain, "catalog_dir": catalog_dir}
+    if direction == "out_inside_input":
+        out = inputs[which] / "nested-out"
+    else:
+        out = tmp_path / "o"
+        out.mkdir()
+        inputs[which] = out / ("target-dir" if which in ("bundle", "catalog_dir") else "target-file")
+        if which in ("bundle", "catalog_dir"):
+            import shutil as _shutil
+
+            _shutil.copytree(bundle if which == "bundle" else catalog_dir, inputs[which])
+        else:
+            inputs[which].write_bytes((profile if which == "profile" else domain).read_bytes())
+    argv = [
+        "assess",
+        "--bundle",
+        str(inputs["bundle"]),
+        "--profile",
+        str(inputs["profile"]),
+        "--domain",
+        str(inputs["domain"]),
+        "--catalog-dir",
+        str(inputs["catalog_dir"]),
+        "--allow-unverified-catalog",
+        "--out",
+        str(out),
+        "--package-for-sharing",
+    ]
+    code = cli.main(argv)
+    assert code == 3
+    if direction == "out_inside_input":
+        assert not out.exists()
+
+
+def test_package_for_sharing_writes_self_contained_bundle(tmp_path: Path) -> None:
+    out = tmp_path / "o"
+    assert cli.main(_assess_argv(out, "--package-for-sharing")) == 0
+    src_files = sorted(p.relative_to(_QUICKSTART / "evidence") for p in (_QUICKSTART / "evidence").rglob("*") if p.is_file())
+    dst_files = sorted(p.relative_to(out / "bundle" / "evidence") for p in (out / "bundle" / "evidence").rglob("*") if p.is_file())
+    assert src_files == dst_files
+    for rel in src_files:
+        assert (out / "bundle" / "evidence" / rel).read_bytes() == (
+            _QUICKSTART / "evidence" / rel
+        ).read_bytes()
+    assert (out / "bundle" / "applicability.yaml").read_bytes() == (
+        _QUICKSTART / "applicability.yaml"
+    ).read_bytes()
+    assert (out / "bundle" / "domain.linkml.yaml").read_bytes() == (
+        _QUICKSTART / "domain.linkml.yaml"
+    ).read_bytes()
+    packaging = json.loads((out / "packaging.json").read_text())
+    assert packaging["packaged"] is True
+    assert packaging["catalog_dir_order"] == []
+    manifest = json.loads((out / "manifest.json").read_text())
+    assert manifest["inputs"]["applicability_profile_digest"].startswith("sha256:")
+    assert manifest["inputs"]["domain_binding_digest"].startswith("sha256:")
+    for name in ("integrity.jsonl", "applicability.jsonl", "quarantine.jsonl", "coverage.json", "packaging.json"):
+        digest = manifest["outputs"][name]
+        actual = "sha256:" + __import__("hashlib").sha256((out / name).read_bytes()).hexdigest()
+        assert digest == actual, name
+    assert validate_report(out) == []
+
+    # A second run without --domain overwrites cleanly (no stale domain.linkml.yaml left behind).
+    argv_no_domain = [
+        "assess",
+        "--bundle",
+        str(_QUICKSTART / "evidence"),
+        "--profile",
+        str(_QUICKSTART / "applicability.yaml"),
+        "--out",
+        str(out),
+        "--package-for-sharing",
+    ]
+    assert cli.main(argv_no_domain) == 0
+    assert not (out / "bundle" / "domain.linkml.yaml").exists()
+
+
+def test_package_for_sharing_off_by_default_writes_no_bundle(tmp_path: Path) -> None:
+    out = tmp_path / "o"
+    assert cli.main(_assess_argv(out)) == 0
+    assert not (out / "bundle").exists()
+    packaging = json.loads((out / "packaging.json").read_text())
+    assert packaging["packaged"] is False
+    manifest = json.loads((out / "manifest.json").read_text())
+    assert manifest["inputs"]["applicability_profile_digest"].startswith("sha256:")
+    assert validate_report(out) == []
+
+
+def test_package_for_sharing_catalog_dir_is_digested_and_copied(tmp_path: Path) -> None:
+    out = tmp_path / "o"
+    argv = [
+        "assess",
+        "--bundle",
+        str(_AUD_FIXTURE / "evidence"),
+        "--profile",
+        str(_AUD_FIXTURE / "applicability.yaml"),
+        "--domain",
+        str(_AUD_FIXTURE / "domain.linkml.yaml"),
+        "--catalog-dir",
+        str(_AUD_FIXTURE / "catalog"),
+        "--allow-unverified-catalog",
+        "--out",
+        str(out),
+        "--package-for-sharing",
+    ]
+    assert cli.main(argv) == 0
+    packaging = json.loads((out / "packaging.json").read_text())
+    assert len(packaging["catalog_dir_order"]) == 1
+    label = packaging["catalog_dir_order"][0]
+    assert label in packaging["catalog_dir_digests"]
+    from agentce import signing
+
+    assert packaging["catalog_dir_digests"][label] == signing.digest_tree(
+        _AUD_FIXTURE / "catalog"
+    )
+    assert (out / "bundle" / "catalog" / "0" / "catalog.yaml").is_file()
+    assert validate_report(out) == []

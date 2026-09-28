@@ -80,3 +80,35 @@ def test_declared_sources_loaded(
 ) -> None:
     bundle = load_bundle(make_bundle([example_event], sources=["urn:agentce:source:a"]))
     assert bundle.sources == frozenset({"urn:agentce:source:a"})
+
+
+# --- 18.8 C1: copy_bundle (contracts/P18-18.8.md's --package-for-sharing) ---
+
+
+def test_copy_bundle_reproduces_a_loadable_bundle(
+    make_bundle: Callable[..., Path], example_event: dict[str, Any], tmp_path: Path
+) -> None:
+    from agentce.bundle import copy_bundle
+
+    src = make_bundle([example_event])
+    dst = tmp_path / "copy"
+    copy_bundle(src, dst)
+    copied = load_bundle(dst)
+    assert copied.digest == load_bundle(src).digest
+
+
+def test_copy_bundle_skips_unlisted_files(
+    make_bundle: Callable[..., Path], example_event: dict[str, Any], tmp_path: Path
+) -> None:
+    """A file present on disk but not in the manifest (e.g. a stray ``.env``) must never reach the
+    copy: `copy_bundle` walks the manifest's own file list, never the directory tree."""
+    from agentce.bundle import copy_bundle
+
+    src = make_bundle([example_event])
+    (src / ".env").write_text("SECRET=1\n", encoding="utf-8")
+    (src / "unlisted.txt").write_text("not in the manifest\n", encoding="utf-8")
+    dst = tmp_path / "copy"
+    copy_bundle(src, dst)
+    assert not (dst / ".env").exists()
+    assert not (dst / "unlisted.txt").exists()
+    load_bundle(dst)  # still loads cleanly: only manifest-listed files were copied
