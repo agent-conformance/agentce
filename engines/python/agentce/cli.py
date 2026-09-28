@@ -80,6 +80,22 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--bundle", help="verify an evidence bundle's integrity")
     p.add_argument("--catalog", help="verify a catalog's signatures")
     p.add_argument("--release", help="verify a release artifact's signatures")
+    p.add_argument(
+        "--report",
+        help="re-run a shareable report bundle (assess --package-for-sharing) offline and check "
+        "it reproduces byte for byte, refusing any tampering (SPEC 18.8, Hill 3)",
+    )
+    p.add_argument(
+        "--signer-trust-root",
+        dest="signer_trust_root",
+        help="verify --report's signature against this trust root file, instead of an embedded "
+        "trust-root.json inside the report directory",
+    )
+    p.add_argument(
+        "--expect-keyid",
+        dest="expect_keyid",
+        help="verify --report: refuse unless the claim signature's keyid matches this value",
+    )
     p.set_defaults(func=commands.cmd_verify)
 
     p = sub.add_parser(
@@ -326,6 +342,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--dry-run", dest="dry_run", action="store_true", help="plan only; sign nothing"
+    )
+    p.add_argument(
+        "--write-trust-root",
+        dest="write_trust_root",
+        action="store_true",
+        help="write trust-root.json (the signer's public key) into the report directory, so a "
+        "recipient can `agentce verify --report` this bundle without any other key exchange (SPEC "
+        "18.8, Hill 3). Requires --profile kms (the only profile with an exportable key).",
     )
     p.set_defaults(func=commands.cmd_sign)
 

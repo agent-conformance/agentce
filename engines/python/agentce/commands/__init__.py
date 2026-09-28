@@ -1639,6 +1639,13 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
             f"unknown signing profile {profile!r}.",
             f"choose one of: {', '.join(SIGN_PROFILES)}.",
         )
+    write_trust_root = _flag(ns, "write_trust_root")
+    if write_trust_root and profile != "kms":
+        raise InputError(
+            "sign.trust_root_requires_kms",
+            f"--write-trust-root needs an exportable public key; the {profile!r} profile has none.",
+            "pass --profile kms --key <ed25519-private-key.pem> --write-trust-root.",
+        )
     dry_run = _flag(ns, "dry_run")
     result.data.update(
         {
@@ -1708,6 +1715,30 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
             "signatures": len(claim["signatures"]),
         }
     )
+    if write_trust_root:
+        # A recipient of a shareable report bundle (18.8, Hill 3) verifies it with `agentce verify
+        # --report`, which needs this signer's public key; publishing it inside the report directory
+        # itself means no separate key exchange is required for the common case (D6's embedded-trust
+        # exception applies, and is called out to the recipient there).
+        assert isinstance(signer, signing.KmsSigner)
+        trust_root_path = report_dir / "trust-root.json"
+        trust_root_path.write_text(
+            json.dumps(
+                {
+                    "keys": {
+                        signer.keyid: {
+                            "public_key": signer.public_key_b64,
+                            "identity": claim.get("claimant", {}).get("org", "unset"),
+                        }
+                    }
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        result.data["trust_root"] = str(trust_root_path)
     result.note(f"signed {claim_path.name} as {role} ({profile})")
     return result
 

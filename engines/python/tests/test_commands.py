@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from agentce import cli
 from agentce.report import ASSESS_DEFAULT_EMIT, validate_report
@@ -624,3 +625,100 @@ def test_package_for_sharing_catalog_dir_is_digested_and_copied(tmp_path: Path) 
     )
     assert (out / "bundle" / "catalog" / "0" / "catalog.yaml").is_file()
     assert validate_report(out) == []
+
+
+# --- 18.8 C2: `sign --write-trust-root` (contracts/P18-18.8.md). ---
+
+
+def _write_kms_key(path: Path) -> Ed25519PrivateKey:
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        NoEncryption,
+        PrivateFormat,
+    )
+
+    key = Ed25519PrivateKey.generate()
+    path.write_bytes(
+        key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
+    )
+    return key
+
+
+def test_write_trust_root_key_verifies_the_signed_claim(tmp_path: Path) -> None:
+    from agentce import signing
+
+    out = tmp_path / "o"
+    assert cli.main(_assess_argv(out)) == 0
+    key_path = tmp_path / "claimant.pem"
+    key = _write_kms_key(key_path)
+    code = cli.main(
+        [
+            "sign",
+            str(out),
+            "--as",
+            "claimant",
+            "--profile",
+            "kms",
+            "--key",
+            str(key_path),
+            "--write-trust-root",
+        ]
+    )
+    assert code == 0
+    trust_root_path = out / "trust-root.json"
+    assert trust_root_path.is_file()
+    trust = signing.load_trust_root(trust_root_path)
+    keyid = signing.keyid_for(key.public_key())
+    assert keyid in trust.keys
+    assert signing.public_ed25519_b64(trust.keys[keyid]) == signing.public_ed25519_b64(
+        key.public_key()
+    )
+    claim = json.loads((out / "claim.json").read_text())
+    record = next(r for r in claim["signatures"] if r["role"] == "claimant")
+    verified = signing.verify_envelope(record, trust)
+    assert verified.identity is not None
+
+
+def test_write_trust_root_refuses_non_kms_profile(tmp_path: Path) -> None:
+    out = tmp_path / "o"
+    assert cli.main(_assess_argv(out)) == 0
+    claim_before = (out / "claim.json").read_bytes()
+    code = cli.main(
+        [
+            "sign",
+            str(out),
+            "--as",
+            "claimant",
+            "--profile",
+            "sigstore-public",
+            "--write-trust-root",
+        ]
+    )
+    assert code == 3
+    assert (out / "claim.json").read_bytes() == claim_before
+    assert not (out / "trust-root.json").exists()
+
+
+def test_write_trust_root_dry_run_writes_nothing(tmp_path: Path) -> None:
+    out = tmp_path / "o"
+    assert cli.main(_assess_argv(out)) == 0
+    key_path = tmp_path / "claimant.pem"
+    _write_kms_key(key_path)
+    before = sorted(out.rglob("*"))
+    code = cli.main(
+        [
+            "sign",
+            str(out),
+            "--as",
+            "claimant",
+            "--profile",
+            "kms",
+            "--key",
+            str(key_path),
+            "--dry-run",
+            "--write-trust-root",
+        ]
+    )
+    assert code == 0
+    assert sorted(out.rglob("*")) == before
+    assert not (out / "trust-root.json").exists()
