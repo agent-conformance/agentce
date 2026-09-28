@@ -3,6 +3,15 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.9.0
+
+- Added `VG-RERUN-TIME`: a sender packages and signs a shareable `corpus/quickstart` report bundle
+  (`assess --package-for-sharing`, `sign --write-trust-root`); a separate recipient installs the wheel
+  fresh and `verify --report`s it offline, timed from before the recipient's own install, reproducing
+  every canonical output byte for byte inside a ten-minute budget (Hill 3); a tampered report and a
+  tampered evidence file, both checked against an external trust root, are each refused with their own
+  exact key (`verify.report_output_tampered`, `verify.report_evidence_tampered`).
+
 ## 0.8.0
 
 - Added `VG-AUDIENCE-PRESETS`: `agentce assess --for {engineering,compliance,security,ci,share}` resolves

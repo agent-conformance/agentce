@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.8.0",
+  "suite_version": "0.9.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -406,6 +406,34 @@
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the fixture is verification/gates/fixtures/audience_presets/, the reference implementation is engines/python/agentce/commands/__init__.py's PRESET_EMIT/_ci_detected and the --for resolution block in cmd_assess."
+    },
+    {
+      "id": "VG-RERUN-TIME",
+      "title": "A shareable report bundle re-runs offline on a clean machine and a tampered bundle is refused",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/rerun_time.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 900,
+      "invariant": "An attestation is reported as verified only after its signature verifies against a trusted key.",
+      "rubric": {
+        "pass": "the recipient's fresh install plus verify --report reproduces every canonical output byte for byte, completes within the timed budget, and both seeded tamper cases below are refused with their own exact keys",
+        "fail": "any of: the re-run differs from the shipped outputs, the timed budget is exceeded, or a tampered bundle exits 0"
+      },
+      "faults": [
+        {
+          "description": "step 6's per-file output-digest loop is turned into a no-op, so a tampered report.md would be reported REPRODUCED",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "        if actual != expected:\n            tampered.append(name)",
+          "replace": "        if False:  # actual != expected\n            tampered.append(name)"
+        }
+      ],
+      "fix_hint": "run agentce verify --report <dir> locally and read the exact key it reports"
     }
   ]
 }

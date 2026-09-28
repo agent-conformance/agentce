@@ -27,9 +27,14 @@ Install steps may fetch third-party dependencies; every run step is offline.
   OpenTelemetry GenAI exports and one of OpenInference exports, with no other argument: the report must
   evaluate the baseline and the install plus the first report must fit the five-minute budget (Hill 1).
   It is its own kind (the build gate VG-FIRST-REPORT-TIME runs it); ``all`` does not include it.
+* ``rerun``: a sender packages and signs a shareable ``corpus/quickstart`` report bundle; a SEPARATE
+  recipient installs the wheel fresh and ``verify --report``s it offline, timed from before the
+  recipient's own install, reproducing every canonical output byte for byte inside the ten-minute
+  budget (Hill 3); a tampered report and a tampered evidence file are each refused with their own exact
+  key. It is its own kind (the build gate VG-RERUN-TIME runs it); ``all`` does not include it.
 
 Usage:
-    installed_artifacts_check.py {python,records,npm,jar,all} [--offline] [--require-netns] [--json]
+    installed_artifacts_check.py {python,records,rerun,npm,jar,all} [--offline] [--require-netns] [--json]
     installed_artifacts_check.py --self-test
 """
 
@@ -61,6 +66,10 @@ VECTORS = ROOT / "spec" / "rules" / "numerics-vectors" / "cases"
 #: The real, signed catalog a quickstart run evaluates (not `baseline`) -- the source for C4's
 #: cross-engine catalog-digest and tamper checks (item 18.22).
 EU_AI_ACT_DIR = ROOT / "spec" / "catalogs" / "base" / "eu-ai-act"
+#: `--package-for-sharing`/`sign --write-trust-root`/`verify --report`'s own example and VG-RERUN-TIME's
+#: gate input (18.8 D8): the vendored, already-signed corpus/quickstart project, reused as-is.
+QUICKSTART_DIR = ROOT / "corpus" / "quickstart"
+RERUN_BUDGET_S = 600
 DEAD_PROXY = "http://127.0.0.1:9"
 # Canonical quickstart outputs. graph.sqlite (a binary store) and manifest.json (carries the run's
 # start time) legitimately differ between two runs and are not compared.
@@ -398,10 +407,16 @@ def _records_folder(directory: Path, fixtures: list[tuple[str, str]]) -> Path:
     return directory
 
 
-def _budget_problem(label: str, elapsed_s: float, budget_s: float) -> str | None:
+def _budget_problem(
+    label: str,
+    elapsed_s: float,
+    budget_s: float,
+    *,
+    what: str = "install and first report",
+) -> str | None:
     if elapsed_s < budget_s:
         return None
-    return f"{label}: install and first report took {elapsed_s:.0f}s, over the {budget_s:.0f}s budget"
+    return f"{label}: {what} took {elapsed_s:.0f}s, over the {budget_s:.0f}s budget"
 
 
 def _expected_events(fixtures: list[tuple[str, str]]) -> int:
@@ -531,6 +546,209 @@ def check_records(runner: Runner, *, offline_install: bool) -> list[str]:
             return [installed]
         venv, empty = installed
         return _records_problems(runner, venv, empty, "wheel", started)
+
+
+def _generate_kms_key(runner: Runner, venv: Path, tmp: Path, name: str) -> Path:
+    """A throwaway Ed25519 test key (never committed), written with the venv's own ``cryptography``
+    (a transitive dependency of the installed package -- this project takes no direct dependency on
+    it)."""
+    key_path = tmp / f"{name}.pem"
+    proc = runner.run(
+        [
+            str(venv / "bin" / "python"),
+            "-c",
+            "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey\n"
+            "from cryptography.hazmat.primitives.serialization import (\n"
+            "    Encoding, NoEncryption, PrivateFormat)\n"
+            "import sys\n"
+            "key = Ed25519PrivateKey.generate()\n"
+            "open(sys.argv[1], 'wb').write(\n"
+            "    key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()))\n",
+            str(key_path),
+        ],
+        tmp,
+        offline=True,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(_fail(f"{name}: generate test key", proc))
+    return key_path
+
+
+def check_rerun(runner: Runner, *, offline_install: bool) -> list[str]:
+    """VG-RERUN-TIME (Hill 3, contracts/P18-18.8.md C4): a sender packages and signs a shareable
+    report bundle from `corpus/quickstart`; a SEPARATE recipient installs the engine fresh and
+    `verify --report`s it offline, reproducing every canonical output byte for byte inside the timed
+    budget (D10: the clock starts before the recipient's own install, never the sender's); a tampered
+    copy of the report and a tampered copy of its evidence are each refused with their own exact
+    key."""
+    with _scratch("agentce-rerun-") as raw:
+        tmp = Path(raw)
+        assert _outside_checkout(tmp)
+        flags = ["--offline"] if offline_install else []
+        proc = runner.run(
+            [
+                "uv",
+                "build",
+                *flags,
+                "--wheel",
+                "--out-dir",
+                str(tmp / "dist"),
+                str(PY_ENGINE),
+            ],
+            tmp,
+            offline=False,
+        )
+        wheels = sorted((tmp / "dist").glob("*.whl"))
+        if proc.returncode != 0 or len(wheels) != 1:
+            return [_fail("build the wheel", proc)]
+
+        # 1. Sender venv (untimed): package and sign corpus/quickstart for sharing.
+        sender_installed = _install(
+            runner, wheels[0], tmp, "sender", offline_install=offline_install
+        )
+        if isinstance(sender_installed, str):
+            return [sender_installed]
+        sender_venv, sender_empty = sender_installed
+        sender_agentce = str(sender_venv / "bin" / "agentce")
+        sender_out = sender_empty / "sender-out"
+        proc = runner.run(
+            [
+                sender_agentce,
+                "assess",
+                "--bundle",
+                str(QUICKSTART_DIR / "evidence"),
+                "--profile",
+                str(QUICKSTART_DIR / "applicability.yaml"),
+                "--domain",
+                str(QUICKSTART_DIR / "domain.linkml.yaml"),
+                "--package-for-sharing",
+                "--out",
+                str(sender_out),
+            ],
+            sender_empty,
+            offline=True,
+        )
+        if proc.returncode != 0:
+            return [_fail("sender: assess --package-for-sharing", proc)]
+        try:
+            key_path = _generate_kms_key(runner, sender_venv, tmp, "sender-key")
+        except RuntimeError as exc:
+            return [str(exc)]
+        proc = runner.run(
+            [
+                sender_agentce,
+                "sign",
+                str(sender_out),
+                "--as",
+                "claimant",
+                "--profile",
+                "kms",
+                "--key",
+                str(key_path),
+                "--write-trust-root",
+            ],
+            sender_empty,
+            offline=True,
+        )
+        if proc.returncode != 0:
+            return [_fail("sender: sign --write-trust-root", proc)]
+        trust_root_copy = tmp / "sender-trust-root.json"
+        trust_root_copy.write_bytes((sender_out / "trust-root.json").read_bytes())
+
+        # 2. A SEPARATE recipient venv; the timed window opens before ITS install (D10), never
+        # counting the sender's own build/install/sign above.
+        started = time.monotonic()
+        recipient_installed = _install(
+            runner, wheels[0], tmp, "recipient", offline_install=offline_install
+        )
+        if isinstance(recipient_installed, str):
+            return [recipient_installed]
+        recipient_venv, recipient_empty = recipient_installed
+        recipient_agentce = str(recipient_venv / "bin" / "agentce")
+
+        proc = runner.run(
+            [recipient_agentce, "verify", "--report", str(sender_out), "--json"],
+            recipient_empty,
+            offline=True,
+        )
+        elapsed = time.monotonic() - started
+        problems: list[str] = []
+        if proc.returncode != 0:
+            problems.append(_fail("recipient: verify --report", proc))
+        else:
+            try:
+                envelope = json.loads(proc.stdout)
+            except ValueError as exc:
+                problems.append(
+                    f"recipient: verify --report printed no readable JSON: {exc}"
+                )
+                envelope = {}
+            if envelope.get("reproduced") is not True:
+                problems.append(
+                    "recipient: verify --report reported "
+                    f"reproduced={envelope.get('reproduced')!r}, not true"
+                )
+        budget = _budget_problem(
+            "recipient", elapsed, RERUN_BUDGET_S, what="install and re-run"
+        )
+        if budget:
+            problems.append(budget)
+
+        # 3. TEETH, both against the RECIPIENT install, both with the trust root kept EXTERNAL (D6's
+        # embedded-trust exception is out of scope for a tamper case) so the check under test is the
+        # real one.
+        tampered_report = recipient_empty / "tampered-report-out"
+        shutil.copytree(sender_out, tampered_report)
+        report_md = tampered_report / "report.md"
+        report_md.write_bytes(report_md.read_bytes() + b"TAMPER")
+        proc = runner.run(
+            [
+                recipient_agentce,
+                "verify",
+                "--report",
+                str(tampered_report),
+                "--signer-trust-root",
+                str(trust_root_copy),
+                "--json",
+            ],
+            recipient_empty,
+            offline=True,
+        )
+        if proc.returncode != 3 or "report_output_tampered" not in proc.stdout:
+            problems.append(
+                _fail(
+                    "TEETH: a tampered report.md was not refused as report_output_tampered",
+                    proc,
+                )
+            )
+
+        tampered_evidence = recipient_empty / "tampered-evidence-out"
+        shutil.copytree(sender_out, tampered_evidence)
+        event_file = next(
+            (tampered_evidence / "bundle" / "evidence" / "events").glob("*.jsonl")
+        )
+        event_file.write_bytes(event_file.read_bytes() + b"TAMPER")
+        proc = runner.run(
+            [
+                recipient_agentce,
+                "verify",
+                "--report",
+                str(tampered_evidence),
+                "--signer-trust-root",
+                str(trust_root_copy),
+                "--json",
+            ],
+            recipient_empty,
+            offline=True,
+        )
+        if proc.returncode != 3 or "report_evidence_tampered" not in proc.stdout:
+            problems.append(
+                _fail(
+                    "TEETH: a tampered evidence file was not refused as report_evidence_tampered",
+                    proc,
+                )
+            )
+        return problems
 
 
 def check_python(runner: Runner, *, offline_install: bool) -> list[str]:
@@ -1227,11 +1445,12 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
 CHECKS = {
     "python": check_python,
     "records": check_records,
+    "rerun": check_rerun,
     "npm": check_npm,
     "jar": check_jar,
 }
-# `all` covers the package kinds; `records` is the first-report gate's own check.
-ALL_KINDS = tuple(k for k in CHECKS if k != "records")
+# `all` covers the package kinds; `records` and `rerun` are their own build gates' own checks.
+ALL_KINDS = tuple(k for k in CHECKS if k not in ("records", "rerun"))
 
 
 def run_all(
@@ -1364,6 +1583,10 @@ def self_test() -> int:
             failures.append("a fast first report was reported as over budget")
         if _budget_problem("t", 400, 300) is None:
             failures.append("a first report over the budget was accepted")
+        if _budget_problem("t", 400, 300, what="install and re-run") != (
+            "t: install and re-run took 400s, over the 300s budget"
+        ):
+            failures.append("a custom budget label (VG-RERUN-TIME's own) was not used")
 
         # An inert wheel installs and exits 0 but evaluates nothing: it must be rejected.
         inert = _inert_wheel(tmp, package_version())
@@ -1599,7 +1822,7 @@ def self_test() -> int:
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if not failures:
-        print("installed_artifacts_check self-test: 15 cases discriminate")
+        print("installed_artifacts_check self-test: 16 cases discriminate")
     return 1 if failures else 0
 
 
