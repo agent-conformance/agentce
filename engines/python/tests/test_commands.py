@@ -776,9 +776,11 @@ def test_verify_report_no_claim(tmp_path: Path) -> None:
     assert cli.main(["verify", "--report", str(out)]) == 3
 
 
-def test_verify_report_output_tampered(tmp_path: Path) -> None:
+@pytest.mark.parametrize("tampered_file", ["report.md", "packaging.json"])
+def test_verify_report_output_tampered(tmp_path: Path, tampered_file: str) -> None:
     out, _key = _packaged_and_signed(tmp_path)
-    (out / "report.md").write_bytes((out / "report.md").read_bytes() + b"TAMPER")
+    target = out / tampered_file
+    target.write_bytes(target.read_bytes() + b"TAMPER")
     code = cli.main(["verify", "--report", str(out), "--json"])
     assert code == 3
 
@@ -933,6 +935,137 @@ def test_verify_report_re_sign_append_is_manifest_tampered(tmp_path: Path) -> No
     (out / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
     )
+    key2_path = tmp_path / "attacker.pem"
+    _write_kms_key(key2_path)
+    assert (
+        cli.main(
+            [
+                "sign",
+                str(out),
+                "--as",
+                "claimant",
+                "--profile",
+                "kms",
+                "--key",
+                str(key2_path),
+            ]
+        )
+        == 0
+    )
+    code = cli.main(
+        [
+            "verify",
+            "--report",
+            str(out),
+            "--signer-trust-root",
+            str(trust_root_copy),
+            "--json",
+        ]
+    )
+    assert code == 3
+
+
+def test_verify_report_claim_tampered(tmp_path: Path) -> None:
+    out, _key = _packaged_and_signed(tmp_path)
+    claim = json.loads((out / "claim.json").read_text(encoding="utf-8"))
+    claim["claimant"] = {"org": "tampered-after-signing"}
+    (out / "claim.json").write_text(
+        json.dumps(claim, indent=2, sort_keys=True), encoding="utf-8"
+    )
+    code = cli.main(["verify", "--report", str(out), "--json"])
+    assert code == 3
+
+
+def test_verify_report_subject_missing(tmp_path: Path) -> None:
+    """A signature whose subject list omits `manifest.json` entirely -- built by signing over a
+    hand-trimmed subject list, not by editing a file post-signature (round-2 defect 7)."""
+    from agentce import signing
+    from agentce.canonical import canonicalize
+
+    out = tmp_path / "o"
+    assert cli.main(_assess_argv(out, "--package-for-sharing")) == 0
+    key_path = tmp_path / "claimant.pem"
+    key = _write_kms_key(key_path)
+    signer = signing.KmsSigner(private_key=key)
+
+    claim = json.loads((out / "claim.json").read_text(encoding="utf-8"))
+    body = {k: v for k, v in claim.items() if k != "signatures"}
+    subjects = [
+        {
+            "name": "claim.json",
+            "digest": {"sha256": hashlib.sha256(canonicalize(body)).hexdigest()},
+        }
+        # manifest.json deliberately omitted.
+    ]
+    statement = {
+        "_type": signing.INTOTO_STATEMENT_TYPE,
+        "subject": subjects,
+        "predicateType": "https://agent-conformance.org/attestation/claim/v1",
+        "predicate": {
+            "role": "claimant",
+            "profile": "kms",
+            "statement": "hand-trimmed subject list for the subject_missing test.",
+        },
+    }
+    envelope = signing.sign_statement(statement, signer)
+    record = {"role": "claimant", "profile": "kms", **envelope}
+    claim.setdefault("signatures", []).append(record)
+    (out / "claim.json").write_text(
+        json.dumps(claim, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    (out / "trust-root.json").write_text(
+        json.dumps(
+            signing.TrustRoot.document(signer.keyid, signer.public_key_b64, "unset"),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    code = cli.main(["verify", "--report", str(out), "--json"])
+    assert code == 3
+
+
+def test_verify_report_engine_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Simulates the RECIPIENT running a different engine build than the one that produced the
+    manifest -- patched on the recipient side right before the re-run, never by editing
+    manifest.json directly (that would trip the manifest-digest check first, N11)."""
+    from agentce import commands
+
+    out, _key = _packaged_and_signed(tmp_path)
+    monkeypatch.setattr(commands, "__version__", "9.9.9-recipient")
+    code = cli.main(["verify", "--report", str(out), "--json"])
+    assert code == 3
+
+
+def test_verify_report_full_re_sign_strips_original_is_signature_invalid(
+    tmp_path: Path,
+) -> None:
+    """A genuine full re-sign (the original signature entry is REMOVED, not appended alongside a
+    new one) leaves nothing in `signatures[]` that verifies against the original external trust
+    root, so this is `verify.report_signature_invalid`, distinct from the append-only re-sign
+    case above, which manifest.json's own digest check catches instead."""
+    out, _key = _packaged_and_signed(tmp_path)
+    trust_root_copy = tmp_path / "external-trust-root.json"
+    trust_root_copy.write_bytes((out / "trust-root.json").read_bytes())
+
+    (out / "report.md").write_bytes((out / "report.md").read_bytes() + b"TAMPER")
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    manifest["outputs"]["report.md"] = (
+        "sha256:" + hashlib.sha256((out / "report.md").read_bytes()).hexdigest()
+    )
+    (out / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
+    )
+
+    claim = json.loads((out / "claim.json").read_text(encoding="utf-8"))
+    claim["signatures"] = []
+    (out / "claim.json").write_text(
+        json.dumps(claim, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
     key2_path = tmp_path / "attacker.pem"
     _write_kms_key(key2_path)
     assert (
