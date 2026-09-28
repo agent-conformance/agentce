@@ -1270,3 +1270,505 @@ def test_verify_report_reproduction_mismatch(
     code, envelope = _verify_report_json(capsys, str(out))
     assert code == 3
     assert envelope["error"]["key"] == "verify.report_reproduction_mismatch"
+
+
+# --- 18.9 C2: `agentce catalog sign`, and the shared `_load_ed25519_private_key` helper it and
+# `agentce sign --profile kms` both now call (contracts/P18-18.9.md). ---
+
+
+def _ready_report(tmp_path: Path) -> Path:
+    out = tmp_path / "o"
+    assert cli.main(_assess_argv(out)) == 0
+    return out
+
+
+def _garbage_key(path: Path) -> Path:
+    path.write_text("not a key\n", encoding="utf-8")
+    return path
+
+
+def _ec_key(path: Path) -> Path:
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        NoEncryption,
+        PrivateFormat,
+    )
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    path.write_bytes(
+        key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
+    )
+    return path
+
+
+def _password_protected_key(path: Path) -> Path:
+    from cryptography.hazmat.primitives.serialization import (
+        BestAvailableEncryption,
+        Encoding,
+        PrivateFormat,
+    )
+
+    key = Ed25519PrivateKey.generate()
+    path.write_bytes(
+        key.private_bytes(
+            Encoding.PEM, PrivateFormat.PKCS8, BestAvailableEncryption(b"secret")
+        )
+    )
+    return path
+
+
+def _openssh_key(path: Path) -> Path:
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        NoEncryption,
+        PrivateFormat,
+    )
+
+    key = Ed25519PrivateKey.generate()
+    path.write_bytes(
+        key.private_bytes(Encoding.PEM, PrivateFormat.OpenSSH, NoEncryption())
+    )
+    return path
+
+
+def _catalog_init(
+    directory: Path, capsys: pytest.CaptureFixture[str], *extra: str
+) -> str:
+    capsys.readouterr()
+    code = cli.main(["catalog", "init", str(directory), "--json", *extra])
+    env = json.loads(capsys.readouterr().out)
+    assert code == 0, env
+    return str(env["family"])
+
+
+def _catalog_sign_run(
+    argv: list[str], capsys: pytest.CaptureFixture[str]
+) -> tuple[int, dict[str, Any]]:
+    capsys.readouterr()
+    code = cli.main([*argv, "--json"])
+    return code, json.loads(capsys.readouterr().out)
+
+
+# Characterisation: pinned GREEN both before and after the `_load_ed25519_private_key` extraction
+# (blast-radius proof, commits cited in `evidence/P18-18.9/simplify.md`). Round 2 (F1) found no
+# existing test pinned any of these three -- they are the first real guard on the refactor.
+
+
+def test_sign_kms_without_key_exits_kms_key_missing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out = _ready_report(tmp_path)
+    capsys.readouterr()
+    code = cli.main(
+        ["sign", str(out), "--as", "claimant", "--profile", "kms", "--json"]
+    )
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "sign.kms_key_missing"
+
+
+def test_sign_kms_missing_key_path_exits_input_key_not_a_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out = _ready_report(tmp_path)
+    capsys.readouterr()
+    code = cli.main(
+        [
+            "sign",
+            str(out),
+            "--as",
+            "claimant",
+            "--profile",
+            "kms",
+            "--key",
+            str(tmp_path / "missing.pem"),
+            "--json",
+        ]
+    )
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "input.key_not_a_file"
+
+
+def test_sign_kms_non_ed25519_key_exits_sign_key_algorithm(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out = _ready_report(tmp_path)
+    key_path = _ec_key(tmp_path / "ec.pem")
+    capsys.readouterr()
+    code = cli.main(
+        [
+            "sign",
+            str(out),
+            "--as",
+            "claimant",
+            "--profile",
+            "kms",
+            "--key",
+            str(key_path),
+            "--json",
+        ]
+    )
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "sign.key_algorithm"
+
+
+# New behaviour (18.9 C2): before the extraction, each of these crashed to `internal.unexpected`.
+
+
+def test_sign_kms_password_protected_key_exits_sign_key_unreadable(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out = _ready_report(tmp_path)
+    key_path = _password_protected_key(tmp_path / "protected.pem")
+    capsys.readouterr()
+    code = cli.main(
+        [
+            "sign",
+            str(out),
+            "--as",
+            "claimant",
+            "--profile",
+            "kms",
+            "--key",
+            str(key_path),
+            "--json",
+        ]
+    )
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "sign.key_unreadable"
+
+
+def test_sign_kms_openssh_format_key_exits_sign_key_unreadable(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out = _ready_report(tmp_path)
+    key_path = _openssh_key(tmp_path / "openssh.pem")
+    capsys.readouterr()
+    code = cli.main(
+        [
+            "sign",
+            str(out),
+            "--as",
+            "claimant",
+            "--profile",
+            "kms",
+            "--key",
+            str(key_path),
+            "--json",
+        ]
+    )
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "sign.key_unreadable"
+
+
+def test_catalog_sign_new_key_round_trips_through_the_real_verifier(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from agentce import signing
+
+    directory = tmp_path / "cat"
+    _catalog_init(directory, capsys)
+    key_path = tmp_path / "new.pem"
+    trust_path = tmp_path / "trust.json"
+    code, env = _catalog_sign_run(
+        [
+            "catalog",
+            "sign",
+            str(directory),
+            "--new-key",
+            str(key_path),
+            "--write-trust-root",
+            str(trust_path),
+        ],
+        capsys,
+    )
+    assert code == 0, env
+    assert env["catalog_id"] == directory.resolve().name
+    assert oct(key_path.stat().st_mode)[-3:] == "600"
+    sig_path = directory / signing.CATALOG_SIGNATURE_NAME
+    assert sig_path.is_file()
+    trust = signing.load_trust_root(trust_path)
+    verified = signing.verify_catalog_directory(directory, trust)
+    assert verified.identity == "unset"
+
+
+def test_catalog_sign_pre_existing_key_happy_path(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from agentce import signing
+
+    directory = tmp_path / "cat"
+    _catalog_init(directory, capsys)
+    key_path = tmp_path / "existing.pem"
+    key = _write_kms_key(key_path)
+    before = key_path.read_bytes()
+    code, env = _catalog_sign_run(
+        ["catalog", "sign", str(directory), "--key", str(key_path)], capsys
+    )
+    assert code == 0, env
+    assert key_path.read_bytes() == before
+    assert env["keyid"] == signing.keyid_for(key.public_key())
+
+
+def test_catalog_sign_key_and_new_key_together_is_an_argparse_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Asserted via `cli.main`'s own argparse exit path (exit 3, `_Parser.error`), not a `cmd_catalog`
+    unit call -- `--key`/`--new-key` are `add_mutually_exclusive_group(required=True)`."""
+    from agentce import signing
+
+    directory = tmp_path / "cat"
+    _catalog_init(directory, capsys)
+    key_path = _write_kms_key(tmp_path / "existing.pem")
+    new_key_path = tmp_path / "new.pem"
+    capsys.readouterr()
+    code = cli.main(
+        [
+            "catalog",
+            "sign",
+            str(directory),
+            "--key",
+            str(key_path),
+            "--new-key",
+            str(new_key_path),
+        ]
+    )
+    assert code == 3
+    assert not new_key_path.exists()
+    assert not (directory / signing.CATALOG_SIGNATURE_NAME).exists()
+
+
+def test_catalog_sign_garbage_key_exits_key_unreadable_at_both_call_sites(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The blast-radius proof that the shared `_load_ed25519_private_key` helper fixes the same
+    garbage-key file at both call sites: `agentce catalog sign` (new) and `agentce sign --profile
+    kms` (behaviour CHANGE -- previously `internal.unexpected`)."""
+    from agentce import signing
+
+    directory = tmp_path / "cat"
+    _catalog_init(directory, capsys)
+    key_path = _garbage_key(tmp_path / "garbage.pem")
+
+    code, env = _catalog_sign_run(
+        ["catalog", "sign", str(directory), "--key", str(key_path)], capsys
+    )
+    assert code == 3, env
+    assert env["error"]["key"] == "catalog.sign_key_unreadable"
+    assert not (directory / signing.CATALOG_SIGNATURE_NAME).exists()
+
+    out = _ready_report(tmp_path)
+    capsys.readouterr()
+    code = cli.main(
+        [
+            "sign",
+            str(out),
+            "--as",
+            "claimant",
+            "--profile",
+            "kms",
+            "--key",
+            str(key_path),
+            "--json",
+        ]
+    )
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "sign.key_unreadable"
+
+
+def test_catalog_sign_non_ed25519_key_exits_catalog_sign_key_algorithm(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    directory = tmp_path / "cat"
+    _catalog_init(directory, capsys)
+    key_path = _ec_key(tmp_path / "ec.pem")
+    code, env = _catalog_sign_run(
+        ["catalog", "sign", str(directory), "--key", str(key_path)], capsys
+    )
+    assert code == 3, env
+    assert env["error"]["key"] == "catalog.sign_key_algorithm"
+
+
+def test_catalog_sign_new_key_existing_path_exits_new_key_exists(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    directory = tmp_path / "cat"
+    _catalog_init(directory, capsys)
+    key_path = tmp_path / "taken.pem"
+    key_path.write_text("already here\n", encoding="utf-8")
+    before = key_path.read_bytes()
+    code, env = _catalog_sign_run(
+        ["catalog", "sign", str(directory), "--new-key", str(key_path)], capsys
+    )
+    assert code == 3, env
+    assert env["error"]["key"] == "catalog.sign_new_key_exists"
+    assert key_path.read_bytes() == before
+
+
+def test_catalog_sign_not_a_catalog(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    directory = tmp_path / "not-a-cat"
+    directory.mkdir()
+    code, env = _catalog_sign_run(
+        ["catalog", "sign", str(directory), "--new-key", str(tmp_path / "k.pem")],
+        capsys,
+    )
+    assert code == 3, env
+    assert env["error"]["key"] == "catalog.sign_not_a_catalog"
+    assert not (tmp_path / "k.pem").exists()
+
+
+def test_catalog_sign_lint_failed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    directory = tmp_path / "cat"
+    family = _catalog_init(directory, capsys)
+    control = directory / "controls" / f"{family}-01.yaml"
+    control.write_text(
+        control.read_text(encoding="utf-8").replace(
+            "severity: high", "severity: catastrophic"
+        ),
+        encoding="utf-8",
+    )
+    code, env = _catalog_sign_run(
+        ["catalog", "sign", str(directory), "--new-key", str(tmp_path / "k.pem")],
+        capsys,
+    )
+    assert code == 3, env
+    assert env["error"]["key"] == "catalog.sign_lint_failed"
+    assert not (tmp_path / "k.pem").exists()
+
+
+def test_catalog_sign_key_inside_catalog_dir(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from agentce import signing
+
+    directory = tmp_path / "cat"
+    _catalog_init(directory, capsys)
+    inside_key = directory / "signing-key.pem"
+    code, env = _catalog_sign_run(
+        ["catalog", "sign", str(directory), "--new-key", str(inside_key)], capsys
+    )
+    assert code == 3, env
+    assert env["error"]["key"] == "catalog.sign_key_inside_catalog"
+    assert not inside_key.exists()
+    assert not (directory / signing.CATALOG_SIGNATURE_NAME).exists()
+
+
+def test_catalog_sign_exists_guard_and_force(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from agentce import signing
+
+    directory = tmp_path / "cat"
+    _catalog_init(directory, capsys)
+    key = _write_kms_key(tmp_path / "key.pem")
+    code, env = _catalog_sign_run(
+        ["catalog", "sign", str(directory), "--key", str(tmp_path / "key.pem")], capsys
+    )
+    assert code == 0, env
+    sig_path = directory / signing.CATALOG_SIGNATURE_NAME
+    before = sig_path.read_bytes()
+
+    code, env = _catalog_sign_run(
+        ["catalog", "sign", str(directory), "--key", str(tmp_path / "key.pem")], capsys
+    )
+    assert code == 3, env
+    assert env["error"]["key"] == "catalog.sign_exists"
+    assert sig_path.read_bytes() == before
+
+    code, env = _catalog_sign_run(
+        [
+            "catalog",
+            "sign",
+            str(directory),
+            "--key",
+            str(tmp_path / "key.pem"),
+            "--force",
+        ],
+        capsys,
+    )
+    assert code == 0, env
+    trust = signing.TrustRoot(
+        keys={signing.keyid_for(key.public_key()): key.public_key()}
+    )
+    verified = signing.verify_catalog_directory(directory, trust)
+    assert verified.identity is not None
+
+
+def test_catalog_sign_write_trust_root_inside_catalog_dir(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from agentce import signing
+
+    directory = tmp_path / "cat"
+    _catalog_init(directory, capsys)
+    inside_trust_root = directory / "trust-root.json"
+    code, env = _catalog_sign_run(
+        [
+            "catalog",
+            "sign",
+            str(directory),
+            "--new-key",
+            str(tmp_path / "k.pem"),
+            "--write-trust-root",
+            str(inside_trust_root),
+        ],
+        capsys,
+    )
+    assert code == 3, env
+    assert env["error"]["key"] == "catalog.sign_trust_root_inside_catalog"
+    assert not (directory / signing.CATALOG_SIGNATURE_NAME).exists()
+    assert not inside_trust_root.exists()
+    assert not (tmp_path / "k.pem").exists()
+
+
+def test_catalog_sign_dot_gives_a_non_empty_resolved_catalog_id(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    directory = tmp_path / "own-rules-cat"
+    _catalog_init(directory, capsys)
+    monkeypatch.chdir(directory)
+    code, env = _catalog_sign_run(
+        ["catalog", "sign", ".", "--new-key", str(tmp_path / "k.pem")], capsys
+    )
+    assert code == 0, env
+    assert env["catalog_id"] == directory.resolve().name
+    assert env["catalog_id"] != ""
+
+
+def test_catalog_sign_tamper_after_signing_fails_verification(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from agentce import signing
+
+    directory = tmp_path / "cat"
+    family = _catalog_init(directory, capsys)
+    key_path = tmp_path / "k.pem"
+    trust_path = tmp_path / "trust.json"
+    code, env = _catalog_sign_run(
+        [
+            "catalog",
+            "sign",
+            str(directory),
+            "--new-key",
+            str(key_path),
+            "--write-trust-root",
+            str(trust_path),
+        ],
+        capsys,
+    )
+    assert code == 0, env
+    control = directory / "controls" / f"{family}-01.yaml"
+    control.write_text(control.read_text(encoding="utf-8") + "\n# tampered\n")
+    trust = signing.load_trust_root(trust_path)
+    with pytest.raises(signing.VerificationError):
+        signing.verify_catalog_directory(directory, trust)
