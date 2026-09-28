@@ -219,6 +219,30 @@ def _outside_checkout(path: Path) -> bool:
     return ROOT not in path.resolve().parents and path.resolve() != ROOT
 
 
+def _build_wheel(runner: Runner, tmp: Path, *, offline_install: bool) -> Path | str:
+    """Build the Python engine's wheel into ``tmp / "dist"``, returning its path or a `_fail(...)`
+    message. Shared by every gate that installs from a fresh wheel; `check_python` builds a wheel
+    *and* sdist and has its own block."""
+    flags = ["--offline"] if offline_install else []
+    proc = runner.run(
+        [
+            "uv",
+            "build",
+            *flags,
+            "--wheel",
+            "--out-dir",
+            str(tmp / "dist"),
+            str(PY_ENGINE),
+        ],
+        tmp,
+        offline=False,
+    )
+    wheels = sorted((tmp / "dist").glob("*.whl"))
+    if proc.returncode != 0 or len(wheels) != 1:
+        return _fail("build the wheel", proc)
+    return wheels[0]
+
+
 def compare_outputs(
     reference: Path, installed: Path, *, may_be_empty: tuple[str, ...] = ()
 ) -> list[str]:
@@ -528,26 +552,12 @@ def check_records(runner: Runner, *, offline_install: bool) -> list[str]:
     with _scratch("agentce-first-report-") as raw:
         tmp = Path(raw)
         assert _outside_checkout(tmp)
-        flags = ["--offline"] if offline_install else []
-        proc = runner.run(
-            [
-                "uv",
-                "build",
-                *flags,
-                "--wheel",
-                "--out-dir",
-                str(tmp / "dist"),
-                str(PY_ENGINE),
-            ],
-            tmp,
-            offline=False,
-        )
-        wheels = sorted((tmp / "dist").glob("*.whl"))
-        if proc.returncode != 0 or len(wheels) != 1:
-            return [_fail("build the wheel", proc)]
+        wheel = _build_wheel(runner, tmp, offline_install=offline_install)
+        if isinstance(wheel, str):
+            return [wheel]
         started = time.monotonic()
         installed = _install(
-            runner, wheels[0], tmp, "wheel", offline_install=offline_install
+            runner, wheel, tmp, "wheel", offline_install=offline_install
         )
         if isinstance(installed, str):
             return [installed]
@@ -628,27 +638,13 @@ def check_rerun(runner: Runner, *, offline_install: bool) -> list[str]:
     with _scratch("agentce-rerun-") as raw:
         tmp = Path(raw)
         assert _outside_checkout(tmp)
-        flags = ["--offline"] if offline_install else []
-        proc = runner.run(
-            [
-                "uv",
-                "build",
-                *flags,
-                "--wheel",
-                "--out-dir",
-                str(tmp / "dist"),
-                str(PY_ENGINE),
-            ],
-            tmp,
-            offline=False,
-        )
-        wheels = sorted((tmp / "dist").glob("*.whl"))
-        if proc.returncode != 0 or len(wheels) != 1:
-            return [_fail("build the wheel", proc)]
+        wheel = _build_wheel(runner, tmp, offline_install=offline_install)
+        if isinstance(wheel, str):
+            return [wheel]
 
         # 1. Sender venv (untimed): package and sign corpus/quickstart for sharing.
         sender_installed = _install(
-            runner, wheels[0], tmp, "sender", offline_install=offline_install
+            runner, wheel, tmp, "sender", offline_install=offline_install
         )
         if isinstance(sender_installed, str):
             return [sender_installed]
@@ -703,7 +699,7 @@ def check_rerun(runner: Runner, *, offline_install: bool) -> list[str]:
         # counting the sender's own build/install/sign above.
         started = time.monotonic()
         recipient_installed = _install(
-            runner, wheels[0], tmp, "recipient", offline_install=offline_install
+            runner, wheel, tmp, "recipient", offline_install=offline_install
         )
         if isinstance(recipient_installed, str):
             return [recipient_installed]
@@ -821,27 +817,13 @@ def check_own_rules(runner: Runner, *, offline_install: bool) -> list[str]:
     with _scratch("agentce-own-rules-") as raw:
         tmp = Path(raw)
         assert _outside_checkout(tmp)
-        flags = ["--offline"] if offline_install else []
-        proc = runner.run(
-            [
-                "uv",
-                "build",
-                *flags,
-                "--wheel",
-                "--out-dir",
-                str(tmp / "dist"),
-                str(PY_ENGINE),
-            ],
-            tmp,
-            offline=False,
-        )
-        wheels = sorted((tmp / "dist").glob("*.whl"))
-        if proc.returncode != 0 or len(wheels) != 1:
-            return [_fail("build the wheel", proc)]
+        wheel = _build_wheel(runner, tmp, offline_install=offline_install)
+        if isinstance(wheel, str):
+            return [wheel]
 
         started = time.monotonic()
         installed = _install(
-            runner, wheels[0], tmp, "operator", offline_install=offline_install
+            runner, wheel, tmp, "operator", offline_install=offline_install
         )
         if isinstance(installed, str):
             return [installed]
