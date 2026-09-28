@@ -89,7 +89,7 @@ export function summaryLines(run) {
   const start = run.report.indexOf('## Outcome summary');
   if (start < 0) throw new Error('report.md has no "## Outcome summary" section');
   let end = start + 1;
-  const bullet = /^- (.+): (\d+)$/;
+  const bullet = /^- `?(.+?)`?: (\d+)$/;
   while (end < run.report.length && (run.report[end] === '' || bullet.test(run.report[end]))) end += 1;
   while (run.report[end - 1] === '') end -= 1;
   const shown = {};
