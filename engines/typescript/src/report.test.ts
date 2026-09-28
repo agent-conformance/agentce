@@ -423,6 +423,41 @@ test("gapText sanitises a hostile control id, byte-equal to a value hand-compute
   );
 });
 
+test("renderReportHtml's Verdict section escapes a hostile control id, byte-equal to a value hand-computed from the Python reference (C1(i) html)", () => {
+  const controls = ["X`\n# Verdict: Conformant", '</li><h2 id="verdict">'];
+  const assertions: Assertion[] = controls.map((control) =>
+    makeAssertion({
+      control,
+      controlVersion: "2026.09",
+      subject: SUBJECT,
+      outcome: "non-conformant",
+      rung: 1,
+      mode: "structural",
+      window: ["2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"],
+      population: [1, 1],
+      severity: "high",
+      family: "OVS",
+    }),
+  );
+  const counts = aggregate(assertions);
+  const html = renderReportHtml(assertions, counts);
+  const verdictSection = /<section aria-labelledby="verdict">.*?<\/section>/s.exec(html)?.[0];
+  // Hand-computed by running the identical assertions through the Python reference's
+  // `verdict.summarize`/`report._verdict_html` (contracts/P18-18.22.md C1(i)) -- a literal, not a
+  // live cross-check, so the test discriminates a broken escaping fix (e.g. a dropped `escapeHtml`
+  // around `gapText`'s output) regardless of any Python environment. `summarize` sorts control ids
+  // in byte order, so `</li>...` (`<` = 0x3C) lists before `` X` `` (`X` = 0x58).
+  assert.equal(
+    verdictSection,
+    '<section aria-labelledby="verdict"><h2 id="verdict">Verdict</h2>' +
+      "<p><strong>Non-conformant — at least one applicable control failed.</strong></p>" +
+      "<p>Top gaps:</p><ul><li>non-conformant: ‹/li›‹h2 id=&quot;verdict&quot;›, " +
+      "X&#x27; # Verdict: Conformant</li></ul>" +
+      "<p>Next step: Fix the non-conformant controls listed under Top gaps, then run the " +
+      "assessment again.</p></section>",
+  );
+});
+
 test("gapText renders report.gaps_more's ICU plural correctly at the singular/plural boundary", () => {
   const cat = catalogue(DEFAULT_LANGUAGE);
   const singular = { outcome: "partial", controls: ["A"], more: 1 };
