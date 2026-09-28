@@ -435,7 +435,11 @@ def test_printable_widens_trigger_to_default_ignorable_codepoints() -> None:
 # --- 18.8 C1: `--package-for-sharing` (contracts/P18-18.8.md). ---
 
 _AUD_FIXTURE = (
-    Path(__file__).resolve().parents[3] / "verification" / "gates" / "fixtures" / "audience_presets"
+    Path(__file__).resolve().parents[3]
+    / "verification"
+    / "gates"
+    / "fixtures"
+    / "audience_presets"
 )
 
 
@@ -444,7 +448,9 @@ def test_package_for_sharing_refuses_records_folder(tmp_path: Path) -> None:
     records.mkdir()
     (records / "trace.json").write_text("{}", encoding="utf-8")
     out = tmp_path / "o"
-    code = cli.main(["assess", str(records), "--out", str(out), "--package-for-sharing"])
+    code = cli.main(
+        ["assess", str(records), "--out", str(out), "--package-for-sharing"]
+    )
     assert code == 3
     assert not out.exists() or not any(out.iterdir())
 
@@ -459,7 +465,12 @@ def _copied_quickstart_inputs(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     _shutil.copy2(_QUICKSTART / "applicability.yaml", root / "applicability.yaml")
     _shutil.copy2(_QUICKSTART / "domain.linkml.yaml", root / "domain.linkml.yaml")
     _shutil.copytree(_AUD_FIXTURE / "catalog", root / "catalog")
-    return root / "evidence", root / "applicability.yaml", root / "domain.linkml.yaml", root / "catalog"
+    return (
+        root / "evidence",
+        root / "applicability.yaml",
+        root / "domain.linkml.yaml",
+        root / "catalog",
+    )
 
 
 @pytest.mark.parametrize("which", ["bundle", "profile", "domain", "catalog_dir"])
@@ -468,19 +479,30 @@ def test_package_for_sharing_refuses_path_overlap(
     tmp_path: Path, which: str, direction: str
 ) -> None:
     bundle, profile, domain, catalog_dir = _copied_quickstart_inputs(tmp_path)
-    inputs = {"bundle": bundle, "profile": profile, "domain": domain, "catalog_dir": catalog_dir}
+    inputs = {
+        "bundle": bundle,
+        "profile": profile,
+        "domain": domain,
+        "catalog_dir": catalog_dir,
+    }
     if direction == "out_inside_input":
         out = inputs[which] / "nested-out"
     else:
         out = tmp_path / "o"
         out.mkdir()
-        inputs[which] = out / ("target-dir" if which in ("bundle", "catalog_dir") else "target-file")
+        inputs[which] = out / (
+            "target-dir" if which in ("bundle", "catalog_dir") else "target-file"
+        )
         if which in ("bundle", "catalog_dir"):
             import shutil as _shutil
 
-            _shutil.copytree(bundle if which == "bundle" else catalog_dir, inputs[which])
+            _shutil.copytree(
+                bundle if which == "bundle" else catalog_dir, inputs[which]
+            )
         else:
-            inputs[which].write_bytes((profile if which == "profile" else domain).read_bytes())
+            inputs[which].write_bytes(
+                (profile if which == "profile" else domain).read_bytes()
+            )
     argv = [
         "assess",
         "--bundle",
@@ -505,8 +527,16 @@ def test_package_for_sharing_refuses_path_overlap(
 def test_package_for_sharing_writes_self_contained_bundle(tmp_path: Path) -> None:
     out = tmp_path / "o"
     assert cli.main(_assess_argv(out, "--package-for-sharing")) == 0
-    src_files = sorted(p.relative_to(_QUICKSTART / "evidence") for p in (_QUICKSTART / "evidence").rglob("*") if p.is_file())
-    dst_files = sorted(p.relative_to(out / "bundle" / "evidence") for p in (out / "bundle" / "evidence").rglob("*") if p.is_file())
+    src_files = sorted(
+        p.relative_to(_QUICKSTART / "evidence")
+        for p in (_QUICKSTART / "evidence").rglob("*")
+        if p.is_file()
+    )
+    dst_files = sorted(
+        p.relative_to(out / "bundle" / "evidence")
+        for p in (out / "bundle" / "evidence").rglob("*")
+        if p.is_file()
+    )
     assert src_files == dst_files
     for rel in src_files:
         assert (out / "bundle" / "evidence" / rel).read_bytes() == (
@@ -524,9 +554,18 @@ def test_package_for_sharing_writes_self_contained_bundle(tmp_path: Path) -> Non
     manifest = json.loads((out / "manifest.json").read_text())
     assert manifest["inputs"]["applicability_profile_digest"].startswith("sha256:")
     assert manifest["inputs"]["domain_binding_digest"].startswith("sha256:")
-    for name in ("integrity.jsonl", "applicability.jsonl", "quarantine.jsonl", "coverage.json", "packaging.json"):
+    for name in (
+        "integrity.jsonl",
+        "applicability.jsonl",
+        "quarantine.jsonl",
+        "coverage.json",
+        "packaging.json",
+    ):
         digest = manifest["outputs"][name]
-        actual = "sha256:" + __import__("hashlib").sha256((out / name).read_bytes()).hexdigest()
+        actual = (
+            "sha256:"
+            + __import__("hashlib").sha256((out / name).read_bytes()).hexdigest()
+        )
         assert digest == actual, name
     assert validate_report(out) == []
 

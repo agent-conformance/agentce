@@ -529,7 +529,9 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         if domain_path_early is not None:
             shutil.copy2(domain_path_early, bundle_out / "domain.linkml.yaml")
         for i, raw_dir in enumerate(raw_catalog_dirs):
-            src_dir = _require_dir(raw_dir, key="catalog-dir", what="the catalog directory")
+            src_dir = _require_dir(
+                raw_dir, key="catalog-dir", what="the catalog directory"
+            )
             cat = load_catalog(src_dir)
             label = f"{cat.id}@{cat.version}"
             catalog_dir_order.append(label)
@@ -633,7 +635,12 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     # `write_report`'s own `write_json`/`write_text` helpers), so their bytes are read back once, in
     # this same process, immediately after this run wrote them itself -- not a race, just avoiding a
     # signature change to each stage's own writer.
-    for artifact in ("quarantine.jsonl", "integrity.jsonl", "coverage.json", "applicability.jsonl"):
+    for artifact in (
+        "quarantine.jsonl",
+        "integrity.jsonl",
+        "coverage.json",
+        "applicability.jsonl",
+    ):
         extra_outputs[artifact] = (out_dir / artifact).read_bytes()
     applicability_profile_digest = signing.sha256_prefixed(profile.read_bytes())
     domain_binding_digest = (
@@ -898,8 +905,10 @@ def _check_package_path_overlap(
             resolved = path.resolve()
         except OSError:
             continue
-        if resolved == resolved_out or resolved_out.is_relative_to(resolved) or resolved.is_relative_to(
-            resolved_out
+        if (
+            resolved == resolved_out
+            or resolved_out.is_relative_to(resolved)
+            or resolved.is_relative_to(resolved_out)
         ):
             raise InputError(
                 "input.package_path_overlap",

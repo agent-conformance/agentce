@@ -170,6 +170,13 @@ def test_trust_root_from_dict_rejects_a_mismatched_keyid() -> None:
 def test_trust_root_from_dict_accepts_a_correctly_addressed_key() -> None:
     key = Ed25519PrivateKey.from_private_bytes(bytes(32))
     keyid = signing.keyid_for(key.public_key())
-    data = {"keys": {keyid: {"public_key": signing.public_ed25519_b64(key.public_key()), "identity": "op"}}}
+    data = {
+        "keys": {
+            keyid: {
+                "public_key": signing.public_ed25519_b64(key.public_key()),
+                "identity": "op",
+            }
+        }
+    }
     trust = signing.TrustRoot.from_dict(data)
     assert keyid in trust.keys

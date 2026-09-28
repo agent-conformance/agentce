@@ -8,9 +8,9 @@ usage: agentce assess [-h] [--json] [--debug] [--quiet] [--bundle BUNDLE]
                       [--deviations DEVIATIONS] [--domain DOMAIN]
                       [--catalog-dir CATALOG_DIR] [--trust-root TRUST_ROOT]
                       [--allow-unverified-catalog] [--manual MANUAL]
-                      [--probes PROBES] [--out OUT] [--state STATE]
-                      [--report-language REPORT_LANGUAGE] [--emit EMIT]
-                      [--for PRESET] [--fail-on FAIL_ON]
+                      [--probes PROBES] [--package-for-sharing] [--out OUT]
+                      [--state STATE] [--report-language REPORT_LANGUAGE]
+                      [--emit EMIT] [--for PRESET] [--fail-on FAIL_ON]
                       [folder]
 
 Run a full assessment: `agentce assess <folder>` over a folder of trace
@@ -43,6 +43,13 @@ options:
                         limitation in the manifest and the claim (SPEC 8.7)
   --manual MANUAL       the manual-records directory
   --probes PROBES       the probe-results directory
+  --package-for-sharing
+                        copy the evidence bundle, profile, domain binding and
+                        every --catalog-dir into --out/bundle/ so the
+                        directory is self-contained: `agentce sign` then
+                        `agentce verify --report` re-runs it offline on
+                        another machine (SPEC 18.8, Hill 3). Requires --bundle
+                        (not a records folder).
   --out OUT             the output directory (default: ./out)
   --state STATE         the incremental state directory
   --report-language REPORT_LANGUAGE

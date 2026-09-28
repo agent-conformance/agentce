@@ -87,6 +87,7 @@ ALWAYS = {
     "graph.sqlite",
     "coverage.json",
     "applicability.jsonl",
+    "packaging.json",
 }
 MD_HTML = {"report.md", "report.html"}
 SKILL = {
