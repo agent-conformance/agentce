@@ -105,6 +105,54 @@ test(
   },
 );
 
+/** The `## Verdict` heading through the end of `## Outcome summary`, before `## Assertions` --
+ * the part of the human report the contract (P18-18.22 C1(h)/C4) requires byte-equal to Python's
+ * rendering. The assertions listing beyond it is the documented, permanent scope boundary (see
+ * the "report human renderers" `todo` test above): Python groups it by family/severity and
+ * TypeScript does not. */
+function verdictAndTallySpanMd(md: string): string {
+  return md.slice(0, md.indexOf("\n## Assertions"));
+}
+function verdictAndTallySpanHtml(html: string): string {
+  // From <h1> (skipping <head>/<style>, which carries an unrelated, pre-existing CSS
+  // divergence -- Python's stylesheet has print/reduced-motion rules TS's copy lacks;
+  // out of this item's scope, noted in the decision log) through the summary section.
+  return html.slice(html.indexOf("<h1>"), html.indexOf('<section aria-labelledby="assertions"'));
+}
+
+test("report.md and report.html's Verdict section and outcome tally are byte-equal to the Python reference, across every verdict state (C1(h))", () => {
+  const golden = JSON.parse(readFileSync(join(TESTDATA, "report-golden.json"), "utf-8"));
+  const cases = golden.verdict_cases as {
+    assertions: [string, string, string][];
+    md: string;
+    html: string;
+  }[];
+  assert.equal(cases.length, 3);
+  for (const c of cases) {
+    const assertions: Assertion[] = c.assertions.map(([control, subject, outcome]) =>
+      makeAssertion({
+        control,
+        controlVersion: "2026.09",
+        subject,
+        outcome,
+        rung: 2,
+        mode: "automated",
+        window: ["2026-01-01T00:00:00Z", "2026-04-01T00:00:00Z"],
+        population: [1, outcome === "non-conformant" ? 1 : 0],
+        severity: "high",
+        family: control.includes("-") ? (control.split("-", 1)[0] as string) : control,
+      }),
+    );
+    const counts = aggregate(assertions);
+    const md = renderReportMd(assertions, counts);
+    const html = renderReportHtml(assertions, counts);
+    // Byte-equal to the Python reference's rendering of the identical input, not merely
+    // present or fragment-matched (contract P18-18.22 C1(h)).
+    assert.equal(verdictAndTallySpanMd(md), verdictAndTallySpanMd(c.md));
+    assert.equal(verdictAndTallySpanHtml(html), verdictAndTallySpanHtml(c.html));
+  }
+});
+
 function hostileActivity(name: string): Activity {
   const zero = <K extends string>(keys: readonly K[]): Record<K, number> =>
     Object.fromEntries(keys.map((k) => [k, 0])) as Record<K, number>;

@@ -786,6 +786,49 @@ def _verdict_problems(
     return []
 
 
+_TALLY_HTML_RE = re.compile(
+    r'<section aria-labelledby="summary">.*?</section>', re.DOTALL
+)
+
+
+def _tally_span_md(text: str) -> str | None:
+    """`## Outcome summary` through (not including) the next `## ` heading -- the six-outcome
+    tally list itself, not only the section's presence."""
+    lines = text.splitlines()
+    start = next(
+        (i for i, line in enumerate(lines) if line.startswith("## Outcome summary")),
+        None,
+    )
+    if start is None:
+        return None
+    end = next(
+        (i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")),
+        len(lines),
+    )
+    return "\n".join(lines[start:end])
+
+
+def _tally_span_html(text: str) -> str | None:
+    match = _TALLY_HTML_RE.search(text)
+    return match.group(0) if match else None
+
+
+def _tally_problems(label: str, fmt: str, text: str, reference_span: str) -> list[str]:
+    """The rendered outcome-tally counts (`## Outcome summary`'s bullet list in md; the
+    `<section aria-labelledby="summary">` element in html) must be byte-equal to the Python
+    engine's rendering of the identical bundle, compared pairwise across engines via the shared
+    Python reference (C4's "summary tally ... compared pairwise" clause) -- the Verdict-span check
+    above stops at the `## Outcome summary` heading itself and never reaches the counts."""
+    span = _tally_span_md(text) if fmt == "md" else _tally_span_html(text)
+    if span is None:
+        return [f"{label}: {fmt} report has no Outcome summary section"]
+    if span != reference_span:
+        return [
+            f"{label}: {fmt} outcome tally differs from the Python reference rendering"
+        ]
+    return []
+
+
 def _quickstart_parity_problems(
     label: str,
     exe: list[str],
@@ -813,17 +856,23 @@ def _quickstart_parity_problems(
         rendered = qs_out / name
         ref_rendered = reference / name
         if rendered.is_file() and ref_rendered.is_file():
+            text = rendered.read_text(encoding="utf-8")
             ref_text = ref_rendered.read_text(encoding="utf-8")
-            ref_span = (
+            ref_verdict_span = (
                 _verdict_span_md(ref_text)
                 if fmt == "md"
                 else _verdict_span_html(ref_text)
             )
+            ref_tally_span = (
+                _tally_span_md(ref_text) if fmt == "md" else _tally_span_html(ref_text)
+            )
             problems += [
                 f"{label} quickstart: {p}"
-                for p in _verdict_problems(
-                    label, fmt, rendered.read_text(encoding="utf-8"), ref_span or ""
-                )
+                for p in _verdict_problems(label, fmt, text, ref_verdict_span or "")
+            ]
+            problems += [
+                f"{label} quickstart: {p}"
+                for p in _tally_problems(label, fmt, text, ref_tally_span or "")
             ]
     if bundled_quickstart is not None:
         problems += _tamper_problems(
@@ -1474,10 +1523,64 @@ def self_test() -> int:
         matching_span = "## Verdict\n\nx\n\n## Outcome summary"
         if _verdict_problems("test", "md", matching_span + "\nmore\n", matching_span):
             failures.append("a byte-identical markdown Verdict section was rejected")
+
+        # 5. the outcome-tally counts (C4's "compared pairwise" clause) must be caught when they
+        #    differ from the reference, even though the Verdict-span check above stops at the
+        #    heading and never reaches them; a byte-identical tally with unrelated surrounding
+        #    content (a differently-formatted assertions section) must still be accepted. The
+        #    reference span is derived through the same extractor as the candidates so the "up to
+        #    the next heading" boundary's trailing blank line can't cause a spurious mismatch.
+        md_reference_text = (
+            "## Outcome summary\n\n- `conformant`: 3\n- `non-conformant`: 0"
+            "\n\n## Assertions\n\nsomething\n"
+        )
+        md_tally_reference = _tally_span_md(md_reference_text) or ""
+        if not _tally_problems(
+            "test",
+            "md",
+            md_reference_text.replace("conformant`: 3", "conformant`: 1"),
+            md_tally_reference,
+        ):
+            failures.append(
+                "a markdown report with a differing outcome tally was accepted"
+            )
+        if _tally_problems(
+            "test",
+            "md",
+            md_reference_text.replace("something", "an unrelated assertions section"),
+            md_tally_reference,
+        ):
+            failures.append(
+                "a byte-identical markdown outcome tally was rejected over unrelated trailing content"
+            )
+        html_reference_text = (
+            '<section aria-labelledby="summary"><h2 id="summary">Outcome summary</h2>'
+            "<ul><li>conformant: 3</li></ul></section>"
+            '<section aria-labelledby="assertions">something</section>'
+        )
+        html_tally_reference = _tally_span_html(html_reference_text) or ""
+        if not _tally_problems(
+            "test",
+            "html",
+            html_reference_text.replace("conformant: 3", "conformant: 1"),
+            html_tally_reference,
+        ):
+            failures.append(
+                "an html report with a differing outcome tally was accepted"
+            )
+        if _tally_problems(
+            "test",
+            "html",
+            html_reference_text.replace("something", "an unrelated assertions section"),
+            html_tally_reference,
+        ):
+            failures.append(
+                "a byte-identical html outcome tally was rejected over unrelated trailing content"
+            )
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if not failures:
-        print("installed_artifacts_check self-test: 11 cases discriminate")
+        print("installed_artifacts_check self-test: 15 cases discriminate")
     return 1 if failures else 0
 
 

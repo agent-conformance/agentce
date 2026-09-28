@@ -26,12 +26,14 @@ import org.junit.jupiter.api.io.TempDir;
  * failed scenario; the SARIF engine name is the only engine-specific field.
  *
  * <p>The canonical machine outputs -- OSCAL, SARIF, the evidence pack, and assertions.json -- are
- * byte-identical to the reference and are asserted below. The human-readable renderers (report.md,
- * report.html) still diverge from the reference: the reference groups findings by control severity
- * with a verdict banner, per-finding evidence/violations/remediation, and a provenance block (SPEC
- * §9.3), none of which this engine's renderer emits yet. Bringing this engine to that parity is
- * engine-parity work owned by a later item (the TypeScript engine tracks the same gap explicitly in
- * {@code report.test.ts}), so md/html are not compared here.
+ * byte-identical to the reference and are asserted below. The Verdict section and outcome tally
+ * (item 18.22) are also byte-identical to the reference, per {@link #verdictCasesMatchReference}.
+ * The per-assertion listing beyond it still diverges from the reference: the reference groups
+ * findings by control severity with per-finding evidence/violations/remediation and a provenance
+ * block (SPEC §9.3), none of which this engine's renderer emits. Bringing this engine to that
+ * parity is engine-parity work owned by a later item (the TypeScript engine tracks the same gap
+ * explicitly in {@code report.test.ts}), so only the Verdict-through-outcome-tally span is
+ * compared, not the whole document.
  */
 class ReportTest {
 
@@ -63,12 +65,25 @@ class ReportTest {
         assertEquals(Canonical.canonicalString(golden.get("assertions")), Canonical.canonicalString(myAssertions));
     }
 
-    /** Every verdict state, the gap cap, and a control assessed for two subjects render without error.
-     * The golden's {@code md}/{@code html} fields exercise the reference's verdict-banner rendering
-     * (SPEC §9.3), which this engine does not implement yet (see the class doc); this keeps the
-     * renderer under coverage for each scenario rather than asserting byte-identity it cannot meet. */
+    /** From the {@code ## Verdict} heading through the end of {@code ## Outcome summary}, before
+     * {@code ## Assertions} -- the part of the human report contract P18-18.22 C1(h)/C2(f) requires
+     * byte-equal to the Python reference. The per-assertion listing beyond it is the documented,
+     * permanent scope boundary (see the class doc): Python groups it by severity/family and this
+     * engine does not. */
+    private static String verdictAndTallySpanMd(String md) {
+        return md.substring(0, md.indexOf("\n## Assertions"));
+    }
+
+    private static String verdictAndTallySpanHtml(String html) {
+        return html.substring(html.indexOf("<h1>"), html.indexOf("<section aria-labelledby=\"assertions\""));
+    }
+
+    /** Every verdict state, the gap cap, and a control assessed for two subjects: this engine's
+     * Verdict section and outcome tally are byte-equal to the Python reference's rendering of the
+     * identical input (contract P18-18.22 C1(h)/C2(f)), not merely present or rendered without
+     * error. */
     @Test
-    void verdictCasesRenderWithoutError() throws IOException {
+    void verdictCasesMatchReference() throws IOException {
         JsonNode golden = Json.parseFile(TestPaths.testData().resolve("report-golden.json"));
         assertEquals(3, golden.get("verdict_cases").size());
         for (JsonNode verdictCase : golden.get("verdict_cases")) {
@@ -88,8 +103,10 @@ class ReportTest {
             Map<String, Integer> counts = Assertions.aggregate(assertions);
             String md = Report.renderReportMd(assertions, counts, "en", null, null);
             String html = Report.renderReportHtml(assertions, counts, "en", null, null);
-            assertTrue(md.startsWith("# "), "report.md should start with a top-level heading");
-            assertTrue(html.contains("<html"), "report.html should be a full HTML document");
+            String expectedMd = verdictCase.get("md").textValue();
+            String expectedHtml = verdictCase.get("html").textValue();
+            assertEquals(verdictAndTallySpanMd(expectedMd), verdictAndTallySpanMd(md));
+            assertEquals(verdictAndTallySpanHtml(expectedHtml), verdictAndTallySpanHtml(html));
         }
     }
 
