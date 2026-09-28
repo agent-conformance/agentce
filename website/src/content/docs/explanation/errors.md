@@ -38,6 +38,20 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.records_subject_ambiguous` | the profile declares several subjects, and a records folder is assessed as one. | declare one subject in the profile, or assess each agent's records folder separately. |
 | `input.trust_root_invalid` | the trust root supplied by --trust-root or AGENTCE_TRUST_ROOT could not be loaded. | pass --trust-root <file> pointing at a trust root in the form of the engine's vendored data/trust/dev-root.json. |
 | `internal.unexpected` | an unexpected internal error occurred. | re-run with --debug to see the stack trace, then file an issue. |
+| `sign.trust_root_requires_kms` | --write-trust-root needs an exportable public key, and the sigstore-public and sigstore-private profiles have none. | pass --profile kms --key <ed25519-private-key.pem> together with --write-trust-root. |
+| `verify.report_claim_malformed` | claim.json exists but is not valid JSON. | regenerate the report; claim.json must be well-formed JSON. |
+| `verify.report_claim_tampered` | claim.json does not match the digest the signature covers. | the claim was altered after signing; regenerate and re-sign the report. |
+| `verify.report_engine_mismatch` | the report was produced by a different engine build (version, spec version, or package digest) than the one re-running it. | install the same engine build the report names, then re-run verify. |
+| `verify.report_evidence_tampered` | the packaged bundle, applicability profile, domain binding, or a catalog no longer matches the digest the manifest recorded. | the packaged evidence was altered after signing; regenerate and re-sign the report. |
+| `verify.report_keyid_mismatch` | no claimant signature carries the keyid --expect-keyid named. | confirm the keyid with the sender, or drop --expect-keyid. |
+| `verify.report_manifest_tampered` | manifest.json does not match the digest the signature covers. | the manifest was altered after signing; regenerate and re-sign the report. |
+| `verify.report_no_claim` | the report directory has no claim.json: it was never signed, or the wrong directory was given. | pass the directory agentce assess wrote and agentce sign signed. |
+| `verify.report_no_trust_root` | the report has no embedded trust-root.json, and --signer-trust-root was not given. | pass --signer-trust-root <file>, or ask the sender to re-sign with sign --write-trust-root. |
+| `verify.report_output_tampered` | a manifest-tracked output file is missing, or its bytes no longer match the manifest. | the report was altered after signing; regenerate and re-sign it. |
+| `verify.report_reproduction_mismatch` | an offline re-run from the packaged evidence does not reproduce a canonical output byte for byte. | run agentce diff between the shipped and re-run outputs for the full picture. |
+| `verify.report_signature_invalid` | no claimant signature verifies against the trust root. | confirm the trust root holds the signer's real key, or re-sign the report. |
+| `verify.report_subject_missing` | the signed statement is missing a required subject (manifest.json or claim.json). | re-sign the report: agentce sign <report-dir> --as claimant. |
+| `verify.report_unsigned` | claim.json carries no signatures. | sign the report first: agentce sign <report-dir> --as claimant. |
 
 ## Warnings
 
