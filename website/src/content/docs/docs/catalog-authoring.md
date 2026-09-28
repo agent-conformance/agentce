@@ -111,6 +111,6 @@ uv run --project engines/python agentce assess --bundle <your evidence bundle> -
 ```
 
 The `--bundle`/`--profile`/`--domain` there are your own evidence bundle, applicability profile, and
-domain binding — if you don't have one yet, [Getting Started](/docs/getting-started/) walks through
+domain binding. If you don't have one yet, [Getting Started](/docs/getting-started/) walks through
 `agentce quickstart --out ./out`, which assesses the small sample project bundled with the package end
 to end, so you can see a full report before pointing this sequence at your own evidence.
