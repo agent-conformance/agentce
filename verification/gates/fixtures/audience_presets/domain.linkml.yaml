@@ -1,0 +1,5 @@
+# Domain ontology binding for the VG-AUDIENCE-PRESETS gate fixture (verification/gates/audience_presets.sh).
+decision_types:
+  - id: "dom:AudienceDecision"
+    subclass_of: "agentce:ConsequentialDecision"
+    consequential: true

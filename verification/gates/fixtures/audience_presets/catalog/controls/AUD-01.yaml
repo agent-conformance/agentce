@@ -1,0 +1,22 @@
+id: AUD-01
+version: "2026.09"
+title: Fixture control the evidence bundle never satisfies
+description: >
+  Gate fixture only (verification/gates/audience_presets.sh): requires a ToolCall event. The fixture's
+  evidence bundle has none (one Decision event only), so AUD-01 is insufficient_evidence on every
+  `--for` preset run -- guaranteeing a non-passing outcome so the `engineering` preset's
+  skill/<subject>/findings/ directory is never empty (contracts/P18-18.7.md N-e).
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: any
+  minimum_evidence:
+    - {event: ToolCall, class: any}
+  shape: shapes/AUD-01.ttl
+expectations:
+  - {id: F1, text: "Fixture-only; not a real requirement."}
+severity: high
+tolerance: {kind: count, max: 0}
+test_cases: []

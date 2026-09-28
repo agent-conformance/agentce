@@ -19,6 +19,8 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.coverage_denominator_manifest_invalid` | a coverage denominator's manifest file is nested too deeply to parse safely. | flatten the denominator manifest's structure; it exceeds the engine's safe nesting depth. |
 | `input.domain_binding_invalid` | the domain binding is not safe YAML: a disallowed construct, or a structure nested too deeply to parse safely. | remove custom YAML tags and flatten deep nesting in the domain binding file. |
 | `input.event_structure_too_deep` | an evidence event line is nested too deeply to parse safely. | flatten the event's structure; reference deeply nested content by an opaque locator instead (SPEC R12). |
+| `input.for_emit_ambiguous` | both --for and --emit were given. | pass --for <preset> or --emit <formats>, not both. |
+| `input.for_preset` | --for names a preset assess does not know. | choose one of: ci, compliance, engineering, security, share. |
 | `input.init_exists` | init would overwrite a profile or domain binding that already exists. | pass --force to overwrite, or --out <dir> to write somewhere else. |
 | `input.nothing_evaluated` | no control reached conformant, non-conformant, or insufficient_evidence, so the run judged nothing. | emit under the subject and source the profile declares, and record the evidence the catalog's controls apply to. |
 | `input.profile_invalid` | the applicability profile is not safe YAML: a disallowed construct, or a structure nested too deeply to parse safely. | remove custom YAML tags and flatten deep nesting; regenerate the profile from `agentce init`. |

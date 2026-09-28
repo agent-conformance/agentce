@@ -71,9 +71,17 @@ def gap_text(gap: dict[str, Any], catalogue: dict[str, str]) -> str:
 
 
 def cli_lines(
-    summary: dict[str, Any], catalogue: dict[str, str], *, report_dir: str
+    summary: dict[str, Any],
+    catalogue: dict[str, str],
+    *,
+    report_dir: str,
+    report_written: bool = True,
 ) -> list[str]:
-    """The lines a command prints for ``summary``: the verdict, the tally, the top gaps, the next step."""
+    """The lines a command prints for ``summary``: the verdict, the tally, the top gaps, the next step.
+
+    ``report_written`` is ``False`` when the run's resolved emit set has no ``md`` renderer (an
+    audience preset or an explicit ``--emit`` that omits it); the next-step line then names the verdict
+    without pointing at a ``report.md`` that was never written (contracts/P18-18.7.md N5/N-f)."""
     from .report import sanitize_for_markdown
 
     verdict = summary["verdict"]
@@ -92,8 +100,12 @@ def cli_lines(
         lines.append(
             f"{catalogue['report.top_gaps_heading']}: {catalogue['report.no_gaps']}"
         )
-    lines.append(
-        f"{catalogue['report.next_step_heading']}: {catalogue[f'next.{verdict}']} "
-        + i18n_format.format_message(catalogue["report.see_report"], dir=report_dir)
+    next_step = (
+        f"{catalogue['report.next_step_heading']}: {catalogue[f'next.{verdict}']}"
     )
+    if report_written:
+        next_step += " " + i18n_format.format_message(
+            catalogue["report.see_report"], dir=report_dir
+        )
+    lines.append(next_step)
     return lines

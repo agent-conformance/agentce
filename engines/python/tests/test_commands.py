@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from agentce import cli
+from agentce.report import ASSESS_DEFAULT_EMIT
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _QUICKSTART = _REPO_ROOT / "corpus" / "quickstart"
@@ -56,6 +57,192 @@ def test_json_envelope_emit_default_includes_skill(
     assert code == 0
     assert "skill" in envelope["emit"]
     assert "blind_spots" in envelope
+
+
+# `--for` audience presets (contracts/P18-18.7.md). Every table below is hand-written, never derived
+# from `commands.PRESET_EMIT`, so a typo in the shipped mapping cannot also hide in its own test.
+_PRESET_PAIRS: dict[str, frozenset[str]] = {
+    "engineering": frozenset({"md", "html", "skill", "remediation"}),
+    "compliance": frozenset({"oscal", "oscal_xml", "public", "pack", "csv"}),
+    "security": frozenset({"sarif", "md", "html"}),
+    "ci": frozenset({"sarif", "junit"}),
+    "share": frozenset({"md", "html", "pdf", "public", "pack"}),
+}
+
+#: Every file a run writes regardless of `--emit`/`--for` (contracts/P18-18.7.md C1).
+_ALWAYS_FILES = frozenset(
+    {
+        "assertions.json",
+        "activity.json",
+        "blind-spots.json",
+        "manifest.json",
+        "claim.json",
+        "quarantine.jsonl",
+        "integrity.jsonl",
+        "graph.sqlite",
+        "coverage.json",
+        "applicability.jsonl",
+    }
+)
+
+#: Per-token files, relative to `--out`, one glob pattern per file (a `*` stands for the one subject
+#: id the quickstart fixture assesses).
+_TOKEN_FILES: dict[str, tuple[str, ...]] = {
+    "md": ("report.md",),
+    "html": ("report.html",),
+    "oscal": ("oscal-ar.json",),
+    "oscal_xml": ("oscal-ar.xml", "oscal-ar.json"),
+    "sarif": ("results.sarif",),
+    "public": ("public-statement.md",),
+    "pack": ("packs/*/pack.json",),
+    "junit": ("report.junit.xml",),
+    "csv": ("report.csv",),
+    "pdf": ("report.pdf",),
+    "remediation": (
+        "remediation/*/remediation-package.json",
+        "remediation/*/remediation.md",
+    ),
+    "skill": (
+        "skill/*/SKILL.md",
+        "skill/*/REVERIFY.md",
+        "skill/*/remediation-package.json",
+        "skill/*/findings/*.md",
+    ),
+}
+
+
+def test_for_preset_matches_documented_set_pairs() -> None:
+    from agentce import commands
+
+    assert commands.PRESET_EMIT == _PRESET_PAIRS
+
+
+def test_for_unknown_preset_exits_3(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out = tmp_path / "o"
+    code = cli.main(_assess_argv(out, "--for", "bogus", "--json"))
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "input.for_preset"
+    assert not out.exists()
+
+
+def test_for_and_emit_conflict_exits_3(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out = tmp_path / "o"
+    code = cli.main(_assess_argv(out, "--for", "engineering", "--emit", "md", "--json"))
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "input.for_emit_ambiguous"
+    assert not out.exists()
+
+
+@pytest.mark.parametrize(
+    ("argv_extra", "expected_key"),
+    [
+        (("--for", "CI"), "input.for_preset"),
+        (("--for", "Engineering"), "input.for_preset"),
+        (("--for", "ci,security"), "input.for_preset"),
+        (("--for", ""), "input.for_preset"),
+        (("--emit", "", "--for", "engineering"), "input.for_emit_ambiguous"),
+    ],
+)
+def test_for_case_and_list_negative_cases(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    argv_extra: tuple[str, ...],
+    expected_key: str,
+) -> None:
+    """No case-folding, no list parsing: `--for` matches exactly one of `PRESET_EMIT`'s keys, and an
+    explicitly empty `--emit` still counts as "given" against `--for`."""
+    out = tmp_path / "o"
+    code = cli.main(_assess_argv(out, *argv_extra, "--json"))
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == expected_key
+    assert not out.exists()
+
+
+def test_for_absent_no_ci_env_unchanged(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`CI` is unset by the autouse `_no_ci_env` fixture (conftest.py)."""
+    out = tmp_path / "o"
+    code = cli.main(_assess_argv(out, "--json"))
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert set(envelope["emit"]) == set(ASSESS_DEFAULT_EMIT)
+    assert envelope["preset"] is None
+    assert envelope["preset_source"] is None
+
+
+@pytest.mark.parametrize("value", ["false", "0", "", "FALSE"])
+def test_for_ci_falsy_values_treated_as_unset(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    value: str,
+) -> None:
+    monkeypatch.setenv("CI", value)
+    out = tmp_path / "o"
+    code = cli.main(_assess_argv(out, "--json"))
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert set(envelope["emit"]) == set(ASSESS_DEFAULT_EMIT)
+    assert envelope["preset_source"] is None
+
+
+def test_ci_detected_extends_default_and_keeps_existing_consumers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`CI=true` (GitHub Actions' and GitLab CI's real default) must ADD `report.junit.xml` to the
+    legacy default, never replace it -- every existing no-`--emit` caller (`.github/actions/assess`,
+    `.gitlab/components/agentce-assess`, `cmd_quickstart`, the quick-tier gates) keeps every file it
+    gets today (contracts/P18-18.7.md D1)."""
+    monkeypatch.setenv("CI", "true")
+    out = tmp_path / "o"
+    assert cli.main(_assess_argv(out)) == 0
+    for name in ("report.md", "results.sarif", "report.junit.xml"):
+        assert (out / name).is_file(), name
+    assert list((out / "skill").glob("*/SKILL.md")), "skill/ must still be written"
+
+
+def test_for_explicit_overrides_ci_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An explicit `--for` is authoritative: `CI=true` never adds `junit` on top of it."""
+    monkeypatch.setenv("CI", "true")
+    out = tmp_path / "o"
+    code = cli.main(_assess_argv(out, "--for", "engineering", "--json"))
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert set(envelope["emit"]) == _PRESET_PAIRS["engineering"]
+    assert envelope["preset"] == "engineering"
+    assert envelope["preset_source"] == "flag"
+
+
+@pytest.mark.parametrize("preset", sorted(_PRESET_PAIRS))
+def test_for_each_preset_writes_exactly_its_set(tmp_path: Path, preset: str) -> None:
+    """Every preset writes exactly the always-present files plus its own per-token files -- never
+    extra, never missing (contracts/P18-18.7.md C1). `CI` is unset by the autouse `_no_ci_env`
+    fixture (conftest.py)."""
+    out = tmp_path / "o"
+    assert cli.main(_assess_argv(out, "--for", preset)) == 0
+    expected: set[str] = set(_ALWAYS_FILES)
+    for token in _PRESET_PAIRS[preset]:
+        for pattern in _TOKEN_FILES[token]:
+            matches = sorted(out.glob(pattern))
+            assert matches, f"{preset}: no file matches {pattern!r}"
+            for match in matches:
+                expected.add(str(match.relative_to(out)))
+    actual = {str(p.relative_to(out)) for p in out.rglob("*") if p.is_file()}
+    assert actual == expected, (
+        preset,
+        sorted(actual - expected),
+        sorted(expected - actual),
+    )
 
 
 def test_diff_sanitises_all_four_hostile_fields(

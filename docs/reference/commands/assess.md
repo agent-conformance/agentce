@@ -10,7 +10,7 @@ usage: agentce assess [-h] [--json] [--debug] [--quiet] [--bundle BUNDLE]
                       [--allow-unverified-catalog] [--manual MANUAL]
                       [--probes PROBES] [--out OUT] [--state STATE]
                       [--report-language REPORT_LANGUAGE] [--emit EMIT]
-                      [--fail-on FAIL_ON]
+                      [--for PRESET] [--fail-on FAIL_ON]
                       [folder]
 
 Run a full assessment: `agentce assess <folder>` over a folder of trace
@@ -51,7 +51,16 @@ options:
   --emit EMIT           comma-separated report formats to render (default:
                         html, md, oscal, pack, sarif, skill); one or more of:
                         md, html, oscal, sarif, public, pack, junit, csv,
-                        oscal_xml, pdf, remediation, skill
+                        oscal_xml, pdf, remediation, skill. Under the CI
+                        environment variable, junit is added to the default
+                        automatically (see --for); an explicit --emit is never
+                        extended.
+  --for PRESET          report preset for an audience, in place of --emit:
+                        engineering (html, md, remediation, skill); compliance
+                        (csv, oscal, oscal_xml, pack, public); security (html,
+                        md, sarif); ci (junit, sarif); share (html, md, pack,
+                        pdf, public). CI detected automatically (adds junit to
+                        the default) when neither --for nor --emit is given.
   --fail-on FAIL_ON     gate the exit code on a tiny deterministic expression
                         over assertion fields (control, subject, outcome,
                         severity, family, rung, mode), e.g. 'outcome=="non-

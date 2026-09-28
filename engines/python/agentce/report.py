@@ -340,6 +340,30 @@ def _activity_html(activity: dict[str, Any], cat: dict[str, str]) -> str:
     )
 
 
+def preset_cli_lines(
+    preset: str | None,
+    preset_source: str,
+    formats: frozenset[str],
+    catalogue: dict[str, str],
+) -> list[str]:
+    """The one line a run prints when ``--for`` or CI auto-detection resolved the ``--emit`` set
+    (contracts/P18-18.7.md). ``preset_source`` is ``"flag"`` (an explicit ``--for <preset>``) or
+    ``"ci-env"`` (the ``CI`` environment variable was detected, extending the legacy default); the
+    CI-detected note never names a preset, since none ran (N-b: only ``--for`` selected one)."""
+    formats_text = ", ".join(sorted(formats))
+    if preset_source == "flag":
+        return [
+            i18n_format.format_message(
+                catalogue["report.for_preset_used"], preset=preset, formats=formats_text
+            )
+        ]
+    return [
+        i18n_format.format_message(
+            catalogue["report.for_ci_detected"], formats=formats_text
+        )
+    ]
+
+
 def activity_cli_lines(
     activity: dict[str, Any], catalogue: dict[str, str]
 ) -> list[str]:

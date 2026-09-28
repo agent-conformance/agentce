@@ -47,6 +47,8 @@ _KINDS: dict[str, str] = {
     "input.domain_binding_invalid": "error",
     "input.coverage_denominator_manifest_invalid": "error",
     "input.event_structure_too_deep": "error",
+    "input.for_emit_ambiguous": "error",
+    "input.for_preset": "error",
     "input.catalog_missing": "error",
     "input.catalog_unresolved": "error",
     "input.catalog_mismatch": "error",

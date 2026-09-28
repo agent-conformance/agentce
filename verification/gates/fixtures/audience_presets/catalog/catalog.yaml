@@ -1,0 +1,8 @@
+# A small, dedicated catalog for VG-AUDIENCE-PRESETS (item 18.7): one control the fixture's evidence
+# bundle never satisfies, so every `--for` preset's run reaches AUD-01 == insufficient_evidence --
+# guaranteeing a non-passing outcome (claim.json present, skill/<subject>/findings/ non-empty for the
+# `engineering` preset, contracts/P18-18.7.md N-e). Not a base or third-party catalog; loaded only via
+# --catalog-dir --allow-unverified-catalog by this gate's own script.
+id: audience-presets-fixture
+version: "2026.09"
+title: "VG-AUDIENCE-PRESETS gate fixture"

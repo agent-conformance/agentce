@@ -3,6 +3,13 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.8.0
+
+- Added `VG-AUDIENCE-PRESETS`: `agentce assess --for {engineering,compliance,security,ci,share}` resolves
+  to the documented `--emit` set for each audience preset over a dedicated AUD-01 fixture catalog, and the
+  `CI` environment variable extends -- never replaces -- the legacy default when neither `--for` nor
+  `--emit` is given (a control pair proves the addition, not a silent swap to the minimal `ci` preset).
+
 ## 0.7.0
 
 - Added `VG-DIFF`: `agentce diff --format md` renders a classified "## What changed" section

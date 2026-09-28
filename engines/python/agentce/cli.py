@@ -136,7 +136,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="comma-separated report formats to render (default: "
         + ", ".join(sorted(commands.ASSESS_DEFAULT_EMIT))
         + "); one or more of: "
-        + ", ".join(commands.EMIT_FORMATS),
+        + ", ".join(commands.EMIT_FORMATS)
+        + ". Under the CI environment variable, junit is added to the default automatically "
+        "(see --for); an explicit --emit is never extended.",
+    )
+    p.add_argument(
+        "--for",
+        dest="for_preset",
+        metavar="PRESET",
+        help="report preset for an audience, in place of --emit: "
+        + "; ".join(
+            f"{k} ({', '.join(sorted(v))})" for k, v in commands.PRESET_EMIT.items()
+        )
+        + ". CI detected automatically (adds junit to the default) when neither --for nor "
+        "--emit is given.",
     )
     p.add_argument(
         "--fail-on",

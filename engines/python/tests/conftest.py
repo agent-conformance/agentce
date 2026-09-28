@@ -56,6 +56,15 @@ def write_bundle(
     return root
 
 
+@pytest.fixture(autouse=True)
+def _no_ci_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`assess --for`'s CI auto-detection (contracts/P18-18.7.md) reads the real `CI` environment
+    variable; GitHub Actions sets `CI=true` for every job, which would otherwise make every
+    no-`--emit` test in this suite pick up an extra `report.junit.xml` under real CI. The handful of
+    tests that exercise CI detection on purpose set `CI` themselves, after this fixture has run."""
+    monkeypatch.delenv("CI", raising=False)
+
+
 @pytest.fixture
 def example_event() -> dict[str, Any]:
     return load_example("event-1.json")

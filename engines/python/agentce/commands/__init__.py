@@ -71,6 +71,7 @@ from ..report import (
     activity_cli_lines,
     blind_spots_cli_lines,
     has_invisible_codepoint,
+    preset_cli_lines,
     render_evidence_pack,
     render_oscal,
     render_public_statement,
@@ -103,6 +104,29 @@ EMIT_FORMATS = REPORT_FORMATS + (
     "remediation",
     "skill",
 )
+#: The audience presets `assess --for` resolves to an `--emit` set (SPEC §13.4; contracts/P18-18.7.md).
+#: Each preset is a fixed, hand-picked subset of :data:`EMIT_FORMATS` for one reader; it is sugar for
+#: `--emit`, never a new rendering pipeline.
+PRESET_EMIT: dict[str, frozenset[str]] = {
+    "engineering": frozenset({"md", "html", "skill", "remediation"}),
+    "compliance": frozenset({"oscal", "oscal_xml", "public", "pack", "csv"}),
+    "security": frozenset({"sarif", "md", "html"}),
+    "ci": frozenset({"sarif", "junit"}),
+    "share": frozenset({"md", "html", "pdf", "public", "pack"}),
+}
+#: `CI` values treated as "not in CI" (the `ci-info` convention): unset, empty, or one of these,
+#: case-insensitively. Jenkins (`JENKINS_URL`/`BUILD_ID`) and Azure Pipelines (`TF_BUILD`) are not
+#: detected by this check and get no automatic `junit` -- a known, disclosed gap (contracts/P18-18.7.md
+#: D6), not a silent regression: those environments simply keep today's legacy default.
+_CI_FALSY = frozenset({"", "0", "false", "no", "off"})
+
+
+def _ci_detected() -> bool:
+    """Whether the `CI` environment variable names a CI run (GitHub Actions, GitLab CI, CircleCI,
+    Travis, Buildkite, and Bitbucket Pipelines all set `CI=true` by default)."""
+    return os.environ.get("CI", "").strip().lower() not in _CI_FALSY
+
+
 #: Where a command writes, or reads a project from, when the caller names no directory: the working
 #: directory for a project (``init``, ``doctor``) and ``./out`` for a run's output (``assess``,
 #: ``quickstart``), so the first command a newcomer types needs no flag.
@@ -369,6 +393,40 @@ def _parse_emit(raw: str | None) -> frozenset[str] | None:
     return frozenset(tokens)
 
 
+def _resolve_emit(
+    ns: argparse.Namespace,
+) -> tuple[frozenset[str], str | None, str | None]:
+    """Resolve `--emit`/`--for`/CI auto-detection into one final format set, validated before any
+    output is written (same invariant as :func:`_parse_emit`): a bad flag combination or an unknown
+    preset must never leave a partial or misleading result behind (contracts/P18-18.7.md). Returns
+    ``(formats, preset, preset_source)`` -- ``preset`` is the ``--for`` value or ``None``;
+    ``preset_source`` is ``"flag"``, ``"ci-env"``, or ``None`` when neither resolved anything, in
+    which case ``formats`` is the caller's explicit ``--emit`` set or ``assess``'s own default
+    (unlike ``write_report``'s frozen ``emit=None`` bundle, SPEC's evidence-first framing, RFC 0008
+    Sec.8: the skill is emitted by every default run of the command a user actually runs; an explicit
+    ``--emit`` still names exactly what it names)."""
+    emit_raw = _opt_str(ns, "emit")
+    emit = _parse_emit(emit_raw)
+    for_preset = _opt_str(ns, "for_preset")
+    if for_preset is not None and emit_raw is not None:
+        raise InputError(
+            "input.for_emit_ambiguous",
+            "both --for and --emit were given.",
+            "pass --for <preset> or --emit <formats>, not both.",
+        )
+    if for_preset is not None and for_preset not in PRESET_EMIT:
+        raise InputError(
+            "input.for_preset",
+            f"unknown --for preset {for_preset!r}.",
+            f"choose one of: {', '.join(PRESET_EMIT)}.",
+        )
+    if for_preset is not None:
+        return PRESET_EMIT[for_preset], for_preset, "flag"
+    if emit is None and _ci_detected():
+        return ASSESS_DEFAULT_EMIT | {"junit"}, None, "ci-env"
+    return (emit if emit is not None else ASSESS_DEFAULT_EMIT), None, None
+
+
 def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="assess")
     out = _opt_str(ns, "out") or DEFAULT_OUT_DIR
@@ -414,9 +472,10 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         profile_obj = declared or Profile.from_dict(scanned.profile)
         bundle = Path(out) / BUNDLE_DIR
     catalog = _opt_str(ns, "catalog")
-    # --emit is validated before any output is written (below, before ingest/quarantine): an unknown
-    # token must never leave a partial or misleading result behind.
-    emit = _parse_emit(_opt_str(ns, "emit"))
+    # --emit/--for/CI-detection are all resolved and validated before any output is written (below,
+    # before ingest/quarantine): an unknown token, a bad flag combination, or an unknown preset must
+    # never leave a partial or misleading result behind.
+    resolved_emit, for_preset, preset_source = _resolve_emit(ns)
     # --fail-on is parsed (never eval'd) before any output is written too: a hostile or malformed
     # expression is refused at exit 3 before any assertion is evaluated against it (SPEC §7).
     fail_on_raw = _opt_str(ns, "fail_on")
@@ -537,10 +596,6 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     blind_spots = compute_blind_spots(
         evaluated, profile_obj, catalogs, ingested.accepted
     )
-    # `assess`'s own default (unlike `write_report`'s frozen `emit=None` bundle, SPEC's evidence-first
-    # framing, RFC 0008 Sec.8): the skill is emitted by every default run of the command a user
-    # actually runs; an explicit `--emit` still names exactly what it names.
-    resolved_emit = emit if emit is not None else ASSESS_DEFAULT_EMIT
     write_report(
         out_dir,
         evaluated,
@@ -570,6 +625,8 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "catalogs": catalog_labels,
             "out": out,
             "emit": sorted(resolved_emit),
+            "preset": for_preset,
+            "preset_source": preset_source,
             "accepted": len(ingested.accepted),
             "quarantined": len(ingested.quarantined),
             "streams": len(integrity_results),
@@ -609,11 +666,16 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     if evaluated_nothing(evaluated):
         raise _nothing_evaluated(profile_obj, ingested.accepted, len(evaluated))
     catalogue = messages.catalogue(_opt_str(ns, "report_language") or "en")
+    if preset_source is not None:
+        for line in preset_cli_lines(
+            for_preset, preset_source, resolved_emit, catalogue
+        ):
+            result.note(line)
     for line in activity_cli_lines(activity, catalogue):
         result.note(line)
     for line in blind_spots_cli_lines(blind_spots, catalogue):
         result.note(line)
-    for line in _verdict_lines(ns, summary, out):
+    for line in _verdict_lines(ns, summary, out, report_written="md" in resolved_emit):
         result.note(line)
     result.note(
         f"assessed {len(evaluated)} (control, subject) pairs; {non_conformant} non-conformant"
@@ -680,11 +742,19 @@ def _records_lines(summary: dict[str, Any], profile: str | None) -> list[str]:
 
 
 def _verdict_lines(
-    ns: argparse.Namespace, summary: dict[str, Any], out: str
+    ns: argparse.Namespace,
+    summary: dict[str, Any],
+    out: str,
+    *,
+    report_written: bool = True,
 ) -> list[str]:
-    """The verdict, tally, top gaps, and next step a run prints, in the report language."""
+    """The verdict, tally, top gaps, and next step a run prints, in the report language.
+    ``report_written`` is ``False`` when the resolved ``--emit``/``--for`` set has no ``md`` renderer,
+    so the next step never points at a ``report.md`` that was never written (SPEC §13.4)."""
     catalogue = messages.catalogue(_opt_str(ns, "report_language") or "en")
-    return verdict.cli_lines(summary, catalogue, report_dir=out)
+    return verdict.cli_lines(
+        summary, catalogue, report_dir=out, report_written=report_written
+    )
 
 
 def _effective_trust_root(ns: argparse.Namespace) -> signing.TrustRoot:
@@ -1839,7 +1909,12 @@ def cmd_quickstart(ns: argparse.Namespace) -> CommandResult:
     result.data["quickstart"] = "ok"
     for code in assess.codes:
         result.add_code(code)
-    for line in _verdict_lines(assess_ns, assess.data["summary"], out):
+    for line in _verdict_lines(
+        assess_ns,
+        assess.data["summary"],
+        out,
+        report_written="md" in assess.data["emit"],
+    ):
         result.note(line)
     result.note(
         f"quickstart complete: {assess.data.get('assertions', 0)} assertions; report in {out}"

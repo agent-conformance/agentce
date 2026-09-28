@@ -1,0 +1,10 @@
+{
+  "agentce_bundle_version": 1,
+  "domain": "audience-presets-fixture",
+  "files": [
+    {
+      "path": "events/subject.jsonl",
+      "sha256": "be3e4623cf9837e274d0742659d403ef32fd7e0066f87e331f4ade17cbfc9a31"
+    }
+  ]
+}
