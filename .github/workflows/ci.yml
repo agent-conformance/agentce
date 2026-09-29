@@ -567,6 +567,7 @@ jobs:
           out="$(uv run --frozen python3 scripts/lint_profile.py --self-test --json)"
           echo "$out"
           echo "$out" | grep -q '"self_test": "ok"'
+          uv run --frozen pytest -q -p no:cacheprovider
       - name: agentce-prepare-to-share runs standalone, no sibling engines/ checkout
         run: |
           set -euo pipefail

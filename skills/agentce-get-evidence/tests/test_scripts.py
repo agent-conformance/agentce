@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 import bundle_preflight
 import explain_insufficient
 import linkml_validate
@@ -167,8 +169,6 @@ def test_explain_groups_by_cause_and_suggests_an_adapter(tmp_path: Path) -> None
     cause = report["root_causes"][0]
     assert cause["missing_member"] == "refs.authorization"
     assert cause["controls"] == ["OVS-01", "OVS-02"]
-    # The mcp-gateway adapter can supply refs.authorization (SPEC 12.3).
-    assert "mcp-gateway" in cause["suggested_adapters"]
     assert (
         explain_insufficient.main(
             [
@@ -181,6 +181,21 @@ def test_explain_groups_by_cause_and_suggests_an_adapter(tmp_path: Path) -> None
         )
         == explain_insufficient.FINDINGS
     )
+
+
+@pytest.mark.skipif(
+    not ADAPTERS.is_dir(),
+    reason="adapters/ support matrices only exist in the monorepo checkout, not a standalone skill install",
+)
+def test_explain_suggests_an_adapter_from_the_support_matrices() -> None:
+    # The mcp-gateway adapter can supply refs.authorization (SPEC 12.3).
+    supplies = explain_insufficient._adapters_supplying(ADAPTERS)
+    assert "mcp-gateway" in supplies["refs.authorization"]
+
+
+def test_without_support_matrices_nothing_is_suggested(tmp_path: Path) -> None:
+    # A standalone install has no adapters/ beside it: no suggestions, no error.
+    assert explain_insufficient._adapters_supplying(tmp_path / "absent") == {}
 
 
 def test_skill_is_for_the_coding_assistant_and_keeps_its_rules() -> None:
