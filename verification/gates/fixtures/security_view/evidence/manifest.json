@@ -1,0 +1,10 @@
+{
+  "agentce_bundle_version": 1,
+  "domain": "security-view-fixture",
+  "files": [
+    {
+      "path": "events/subject.jsonl",
+      "sha256": "19f8aa7c4702a47375ee4135e613c4adcf0f706583c9f99369c1f6731b2cfe8d"
+    }
+  ]
+}

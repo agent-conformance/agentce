@@ -3,6 +3,21 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.13.0
+
+- Added `VG-SECURITY-VIEW`: the security view (18.16, Hill 8's security lens: OWASP ASI, MITRE ATLAS,
+  and the OWASP Agent Control Standard on the baseline controls) restricts its `standards_citations`
+  to exactly `owasp-asi-2026`/`mitre-atlas`/`owasp-acs`, never diverges from the same run's own
+  `activity.json` (`actions_by_effect_class`/drift), and matches a committed golden byte-for-byte on a
+  dedicated fixture (`verification/gates/fixtures/security_view/`) whose one subject supplies a
+  hostile-named (`<script>alert(1)`), undeclared, `effect_class: irreversible` `ToolCall`, a denied
+  `AuthzCheck`, and an undeclared `ModelCall`. `--for security` writing `security.json`/`.md`/`.html`
+  through a real `assess` run is Python-only today (TypeScript and Java have no `--for`/multi-format
+  `write_report` yet, a pre-existing, disclosed scope gap); the cross-engine parity claim instead runs
+  the pure `compute_security_view`/`SecurityView.compute` function itself, through each engine's
+  test-only `security-view` CLI verb, over a shared `activity_and_assertions.json` payload, and checks
+  all three print byte-identical JSON.
+
 ## 0.12.0
 
 - Added `VG-PROJECT-TIME`: the installed Python wheel, offline from an empty directory, turns a

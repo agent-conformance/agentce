@@ -1,0 +1,22 @@
+# Applicability profile for the VG-SECURITY-VIEW gate fixture (verification/gates/security_view.sh).
+# One subject, no `declared_tools`/`declared_models`, and an empty `catalogs` list -- an empty
+# `catalogs` list (not an explicit `--catalog`/`--catalog-dir`) is what makes an assessment evaluate
+# the real, vendored baseline catalog (`agentce.bundled.DEFAULT_LENS`), the same mechanism
+# `baseline_lens_engines.sh` already proves identical across all three engines. The baseline catalog
+# is where C1-C3 (18.16) added the mitre-atlas/owasp-acs crosswalk entries this gate's citations come
+# from; every control in it is evaluated for every subject regardless of outcome
+# (`agentce.assess._assert_control` attaches a control's `crosswalk` to its assertion even when the
+# outcome is `not_applicable`/`not_assessed`/`insufficient_evidence`), so this fixture needs no
+# evidence engineered to make any control pass -- only the three drift/denial/hostile-name facts
+# `compute_security_view` reads from `activity.py`'s own rollup.
+profile_version: 1
+observation_window:
+  start: "2026-01-01T00:00:00Z"
+  end: "2026-02-01T00:00:00Z"
+content_capture:
+  mode: hashes_only
+catalogs: []
+subjects:
+  - id: "spiffe://corp/agents/security-view-fixture"
+    name: "Security view gate fixture subject"
+    role: "both"

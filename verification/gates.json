@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.11.0",
+  "suite_version": "0.13.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -532,6 +532,42 @@
         }
       ],
       "fix_hint": "run the four agentce catalog commands from website/src/content/docs/docs/catalog-authoring.md locally and read the exact key any step reports"
+    },
+    {
+      "id": "VG-SECURITY-VIEW",
+      "title": "The security view (18.16, Hill 8) restricts standards citations to owasp-asi-2026/mitre-atlas/owasp-acs, never diverges from the run's own activity.json, matches a committed golden, and all three engines' compute_security_view agree byte-for-byte over a shared fixture",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/security_view.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 900,
+      "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
+      "rubric": {
+        "pass": "the python engine's real `assess --for security` run over the fixture writes security.json/.md/.html with sections in order, security.json matches the committed golden byte-for-byte, standards_citations names exactly owasp-asi-2026/mitre-atlas/owasp-acs, actions_by_effect_class/drift equal the run's own activity.json, `report --validate` exits 0, and all three engines' compute_security_view print byte-identical JSON over the shared activity_and_assertions.json fixture",
+        "fail": "any citation from a framework outside the three named ones (or one of the three missing), security.json differs from the golden or from the run's own activity.json, a required file is missing, `report --validate` refuses the output, or any engine's compute_security_view disagrees with python's"
+      },
+      "faults": [
+        {
+          "description": "the framework allow-list filter is dropped from the citations comprehension, so standards_citations leaks every crosswalk entry regardless of framework",
+          "file": "engines/python/agentce/security_view.py",
+          "search": "            for e in a.crosswalk\n            if e.get(\"framework\") in _CITED_FRAMEWORKS\n",
+          "replace": "            for e in a.crosswalk\n"
+        },
+        {
+          "description": "actions_by_effect_class is hard-coded to a fixed, all-zero dict instead of passing activity's own value through, so security.json silently diverges from the run's own activity.json",
+          "file": "engines/python/agentce/security_view.py",
+          "search": "        \"actions_by_effect_class\": activity[\"actions_by_effect_class\"],\n",
+          "replace": "        \"actions_by_effect_class\": {c: 0 for c in activity[\"actions_by_effect_class\"]},\n"
+        }
+      ],
+      "fix_hint": "run verification/gates/security_view.sh and read the FAIL lines; the reference implementation is engines/python/agentce/security_view.py (compute_security_view), ported field-for-field in engines/typescript/src/securityView.ts and engines/java/src/main/java/org/agentce/SecurityView.java."
     }
   ]
 }

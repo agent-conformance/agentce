@@ -1,0 +1,8 @@
+# Domain ontology binding for the VG-SECURITY-VIEW gate fixture. The fixture's events carry no
+# Decision, so this declares no decision type beyond the one the applicability-profile schema and
+# the domain loader expect a non-empty `decision_types` list to exist (matching
+# fixtures/blind_spots/domain.linkml.yaml's own minimal precedent).
+decision_types:
+  - id: "dom:SecurityViewFixtureDecision"
+    subclass_of: "agentce:ConsequentialDecision"
+    consequential: true
