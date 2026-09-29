@@ -1047,7 +1047,24 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "catalog_dir_digests": catalog_dir_digests,
         }
     )
-    activity = summarize_activity(ingested.accepted, profile_obj)
+    declared_subject_ids: frozenset[str] | None = None
+    if scanned is not None:
+        # Computed AFTER scan_records ran (never before, from `declared` alone): a solo real agent id
+        # discovered on the records-folder path must auto-declare itself, matching 18.4's own
+        # "a fresh, unedited first run shows nothing as undeclared" promise for declared_tools/
+        # declared_models -- computing this before the scan would wrongly flag that lone agent as
+        # undeclared on every single-agent folder.
+        if declared is not None:
+            declared_subject_ids = frozenset({declared.subjects[0].id})
+        else:
+            discovered_subjects = scanned.profile["subjects"]
+            if len(discovered_subjects) == 1:
+                declared_subject_ids = frozenset({discovered_subjects[0]["id"]})
+            else:
+                declared_subject_ids = frozenset()
+    activity = summarize_activity(
+        ingested.accepted, profile_obj, declared_subject_ids=declared_subject_ids
+    )
     blind_spots = compute_blind_spots(
         evaluated, profile_obj, catalogs, ingested.accepted
     )

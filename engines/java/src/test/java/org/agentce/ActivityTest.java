@@ -7,7 +7,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -82,6 +84,7 @@ class ActivityTest {
         activity.get("denied_or_blocked").forEach(n -> assertEquals(0, n.asInt()));
         assertEquals(List.of(), texts(activity.get("undeclared").get("models")));
         assertEquals(List.of(), texts(activity.get("undeclared").get("tools")));
+        assertEquals(List.of(), texts(activity.get("undeclared").get("agents")));
     }
 
     @Test
@@ -150,6 +153,7 @@ class ActivityTest {
         ObjectNode activity = Activity.summarizeActivity(events, emptyProfile());
         assertEquals(List.of("gpt-x"), texts(activity.get("undeclared").get("models")));
         assertEquals(List.of("search"), texts(activity.get("undeclared").get("tools")));
+        assertEquals(List.of(SUBJECT), texts(activity.get("undeclared").get("agents")));
     }
 
     @Test
@@ -167,6 +171,46 @@ class ActivityTest {
                 List.of(event("ToolCall", obj("tool", obj("name", "search", "server", "s", "protocol", "mcp"))));
         ObjectNode activity = Activity.summarizeActivity(events, profileWith(List.of("search")));
         assertTrue(texts(activity.get("undeclared").get("tools")).isEmpty());
+    }
+
+    private static JsonNode agentEvent(String agentId, String name) {
+        ObjectNode data = obj(
+                "@type", "ToolCall",
+                "agent", obj("id", agentId),
+                "tool", obj("name", name, "server", "s", "protocol", "mcp"));
+        return obj("id", "e-" + agentId + "-" + name, "subject", SUBJECT, "data", data);
+    }
+
+    private static Profile twoSubjectProfile() {
+        Profile profile = new Profile();
+        for (String id : List.of("A", "B")) {
+            Profile.Subject subject = new Profile.Subject();
+            subject.id = id;
+            subject.role = "both";
+            profile.subjects.add(subject);
+        }
+        profile.catalogs.add("eu-ai-act@2026.09");
+        return profile;
+    }
+
+    @Test
+    void undeclaredAgentsDefaultsToEverySubjectTheProfileDeclares() {
+        // Profile declares {A, B}; events show {A, C}. Omitting declaredSubjectIds falls back to
+        // the profile's own subjects, so only C (never declared at all) is undeclared.
+        List<JsonNode> events = List.of(agentEvent("A", "t1"), agentEvent("C", "t2"));
+        ObjectNode activity = Activity.summarizeActivity(events, twoSubjectProfile());
+        assertEquals(List.of("C"), texts(activity.get("undeclared").get("agents")));
+    }
+
+    @Test
+    void explicitDeclaredSubjectIdsOverridesTheProfileNotSupplementsIt() {
+        // The SAME events and profile, but an explicit, empty declaredSubjectIds: nothing was
+        // declared on this path, so every observed agent -- including A, which the profile itself
+        // names -- is undeclared. Proves the parameter drives the result once given, not the profile.
+        List<JsonNode> events = List.of(agentEvent("A", "t1"), agentEvent("C", "t2"));
+        Set<String> declaredSubjectIds = new LinkedHashSet<>();
+        ObjectNode activity = Activity.summarizeActivity(events, twoSubjectProfile(), declaredSubjectIds);
+        assertEquals(List.of("A", "C"), texts(activity.get("undeclared").get("agents")));
     }
 
     @Test

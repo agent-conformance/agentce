@@ -359,10 +359,16 @@ public final class Report {
         undeclared.get("tools").forEach(n -> tools.add(n.asText()));
         List<String> models = new ArrayList<>();
         undeclared.get("models").forEach(n -> models.add(n.asText()));
-        if (tools.isEmpty() && models.isEmpty()) {
+        List<String> agents = new ArrayList<>();
+        undeclared.get("agents").forEach(n -> agents.add(n.asText()));
+        if (tools.isEmpty() && models.isEmpty() && agents.isEmpty()) {
             return List.of(cat.get("report.activity_none_undeclared"));
         }
         List<String> lines = new ArrayList<>();
+        if (!agents.isEmpty()) {
+            lines.add(cat.get("report.activity_undeclared_agents_label") + ": "
+                    + agents.stream().map(Report::sanitizeForMarkdown).collect(Collectors.joining(", ")));
+        }
         if (!tools.isEmpty()) {
             lines.add(cat.get("report.activity_undeclared_tools_label") + ": "
                     + tools.stream().map(Report::sanitizeForMarkdown).collect(Collectors.joining(", ")));

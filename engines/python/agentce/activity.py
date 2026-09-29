@@ -51,14 +51,19 @@ def _declared(profile: Profile, field: str) -> set[str]:
 
 
 def summarize_activity(
-    events: list[dict[str, Any]], profile: Profile
+    events: list[dict[str, Any]],
+    profile: Profile,
+    declared_subject_ids: frozenset[str] | None = None,
 ) -> dict[str, Any]:
     """Return the counted facts ``events`` show, compared against what ``profile`` declares.
 
     ``undeclared`` names every distinct tool and model name the events show that no subject's
     ``declared_tools``/``declared_models`` names -- honestly "not declared yet", never "suspicious":
     a profile that declares neither leaves every tool and model in that list, which is the correct
-    first-run answer, not a false positive.
+    first-run answer, not a false positive. ``undeclared.agents`` is the same idea for agent ids: by
+    default (``declared_subject_ids`` omitted) every subject in ``profile`` counts as declared, exactly
+    as today; a caller that discovers subjects rather than being told them (the records-folder scan)
+    passes its own, independently-derived ``declared_subject_ids`` instead.
     """
     agents: set[str] = set()
     models: set[tuple[str, str, str]] = set()
@@ -124,6 +129,11 @@ def summarize_activity(
 
     declared_tools = _declared(profile, "declared_tools")
     declared_models = _declared(profile, "declared_models")
+    declared_agents = (
+        declared_subject_ids
+        if declared_subject_ids is not None
+        else {s.id for s in profile.subjects}
+    )
     return {
         "agents": sorted(agents),
         "models": [
@@ -140,5 +150,6 @@ def summarize_activity(
         "undeclared": {
             "models": sorted(observed_models - declared_models),
             "tools": sorted(observed_tools - declared_tools),
+            "agents": sorted(agents - declared_agents),
         },
     }

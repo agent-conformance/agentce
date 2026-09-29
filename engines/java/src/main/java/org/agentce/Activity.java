@@ -54,6 +54,15 @@ public final class Activity {
      * never "suspicious": a profile that declares neither leaves every tool and model in that list,
      * which is the correct first-run answer, not a false positive. */
     public static ObjectNode summarizeActivity(List<JsonNode> events, Profile profile) {
+        return summarizeActivity(events, profile, null);
+    }
+
+    /** Overload taking an explicit, independently-derived set of declared subject ids for
+     * {@code undeclared.agents} (a caller that discovers subjects rather than being told them, such
+     * as the records-folder scan); {@code null} defaults to every subject in {@code profile}, exactly
+     * as the two-argument overload above. */
+    public static ObjectNode summarizeActivity(
+            List<JsonNode> events, Profile profile, Set<String> declaredSubjectIds) {
         Set<String> agents = new TreeSet<>(Json::byteCompare);
         // Ordered, and deduplicated, elementwise by byte order (matching Python's tuple sort) via
         // Arrays.compare: a joined-string key (e.g. on "\u0000") is not safe here, since two different
@@ -138,6 +147,11 @@ public final class Activity {
             declaredTools.addAll(subject.declaredTools);
             declaredModels.addAll(subject.declaredModels);
         }
+        Set<String> declaredAgents = declaredSubjectIds;
+        if (declaredAgents == null) {
+            declaredAgents = new LinkedHashSet<>();
+            for (Profile.Subject subject : profile.subjects) declaredAgents.add(subject.id);
+        }
 
         ObjectNode out = Json.nodes().objectNode();
         ArrayNode agentsArr = out.putArray("agents");
@@ -171,10 +185,14 @@ public final class Activity {
         for (String m : observedModels) if (!declaredModels.contains(m)) undeclaredModels.add(m);
         TreeSet<String> undeclaredTools = new TreeSet<>(Json::byteCompare);
         for (String t : observedTools) if (!declaredTools.contains(t)) undeclaredTools.add(t);
+        TreeSet<String> undeclaredAgents = new TreeSet<>(Json::byteCompare);
+        for (String a : agents) if (!declaredAgents.contains(a)) undeclaredAgents.add(a);
         ArrayNode undeclaredModelsArr = undeclared.putArray("models");
         undeclaredModels.forEach(undeclaredModelsArr::add);
         ArrayNode undeclaredToolsArr = undeclared.putArray("tools");
         undeclaredTools.forEach(undeclaredToolsArr::add);
+        ArrayNode undeclaredAgentsArr = undeclared.putArray("agents");
+        undeclaredAgents.forEach(undeclaredAgentsArr::add);
 
         return out;
     }

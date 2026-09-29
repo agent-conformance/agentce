@@ -298,13 +298,23 @@ function activityTallyText(
 }
 
 function activityUndeclaredLines(
-  undeclared: { tools: string[]; models: string[] },
+  undeclared: { tools: string[]; models: string[]; agents: string[] },
   cat: Record<string, string>,
 ): string[] {
-  if (undeclared.tools.length === 0 && undeclared.models.length === 0) {
+  if (
+    undeclared.tools.length === 0 &&
+    undeclared.models.length === 0 &&
+    undeclared.agents.length === 0
+  ) {
     return [cat["report.activity_none_undeclared"] as string];
   }
   const lines: string[] = [];
+  if (undeclared.agents.length > 0) {
+    lines.push(
+      `${cat["report.activity_undeclared_agents_label"]}: ` +
+        `${undeclared.agents.map((name) => sanitizeForMarkdown(name)).join(", ")}`,
+    );
+  }
   if (undeclared.tools.length > 0) {
     lines.push(
       `${cat["report.activity_undeclared_tools_label"]}: ` +

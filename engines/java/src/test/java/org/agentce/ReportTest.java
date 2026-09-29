@@ -124,6 +124,7 @@ class ReportTest {
         ObjectNode undeclared = out.putObject("undeclared");
         undeclared.putArray("models").add(name);
         undeclared.putArray("tools").add(name);
+        undeclared.putArray("agents").add(name);
         return out;
     }
 

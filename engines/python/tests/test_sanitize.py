@@ -382,7 +382,7 @@ def _report_fields(value: str) -> tuple[dict, dict, list[Assertion]]:
         "actions_by_effect_class": {c: 0 for c in EFFECT_CLASSES},
         "approvals_by_recorder": {c: 0 for c in RECORDER_CLASSES},
         "denied_or_blocked": {k: 0 for k in DENIED_KINDS},
-        "undeclared": {"models": [value], "tools": [value]},
+        "undeclared": {"models": [value], "tools": [value], "agents": [value]},
     }
     blind_spots = {
         "blind_spots": [

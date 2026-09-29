@@ -54,7 +54,7 @@ export interface Activity {
   actions_by_effect_class: Record<string, number>;
   approvals_by_recorder: Record<string, number>;
   denied_or_blocked: Record<string, number>;
-  undeclared: { models: string[]; tools: string[] };
+  undeclared: { models: string[]; tools: string[]; agents: string[] };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -82,8 +82,15 @@ function compareTuple(a: string[], b: string[]): number {
  * `undeclared` names every distinct tool and model name the events show that no subject's
  * `declaredTools`/`declaredModels` names -- honestly "not declared yet", never "suspicious": a
  * profile that declares neither leaves every tool and model in that list, which is the correct
- * first-run answer, not a false positive. */
-export function summarizeActivity(events: Event[], profile: Profile): Activity {
+ * first-run answer, not a false positive. `undeclared.agents` is the same idea for agent ids: by
+ * default (`declaredSubjectIds` omitted) every subject in `profile` counts as declared, exactly as
+ * today; a caller that discovers subjects rather than being told them passes its own,
+ * independently-derived `declaredSubjectIds` instead. */
+export function summarizeActivity(
+  events: Event[],
+  profile: Profile,
+  declaredSubjectIds?: ReadonlySet<string>,
+): Activity {
   const agents = new Set<string>();
   const models = new Map<string, string[]>();
   const tools = new Map<string, string[]>();
@@ -149,6 +156,8 @@ export function summarizeActivity(events: Event[], profile: Profile): Activity {
     for (const t of subject.declaredTools) declaredTools.add(t);
     for (const m of subject.declaredModels) declaredModels.add(m);
   }
+  const declaredAgents =
+    declaredSubjectIds ?? new Set(profile.subjects.map((s) => s.id));
 
   return {
     agents: [...agents].sort(byteCompare),
@@ -168,6 +177,7 @@ export function summarizeActivity(events: Event[], profile: Profile): Activity {
     undeclared: {
       models: [...observedModels].filter((m) => !declaredModels.has(m)).sort(byteCompare),
       tools: [...observedTools].filter((t) => !declaredTools.has(t)).sort(byteCompare),
+      agents: [...agents].filter((a) => !declaredAgents.has(a)).sort(byteCompare),
     },
   };
 }

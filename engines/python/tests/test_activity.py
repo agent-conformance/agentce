@@ -51,7 +51,7 @@ def test_empty_run_reports_all_zero_counts() -> None:
     assert all(n == 0 for n in activity["actions_by_effect_class"].values())
     assert all(n == 0 for n in activity["approvals_by_recorder"].values())
     assert all(n == 0 for n in activity["denied_or_blocked"].values())
-    assert activity["undeclared"] == {"models": [], "tools": []}
+    assert activity["undeclared"] == {"models": [], "tools": [], "agents": []}
 
 
 def test_counts_agents_models_and_tools() -> None:
@@ -127,7 +127,11 @@ def test_undeclared_tool_and_model_are_honest_not_yet_declared() -> None:
         ),
     ]
     activity = summarize_activity(events, Profile())
-    assert activity["undeclared"] == {"models": ["gpt-x"], "tools": ["search"]}
+    assert activity["undeclared"] == {
+        "models": ["gpt-x"],
+        "tools": ["search"],
+        "agents": [SUBJECT],
+    }
 
 
 def test_declaring_a_tool_removes_it_from_undeclared() -> None:
@@ -199,6 +203,49 @@ def test_a_nul_byte_in_one_field_cannot_collide_with_the_next_field() -> None:
     ]
     activity = summarize_activity(events, Profile())
     assert len(activity["tools"]) == 2
+
+
+def _agent_event(agent_id: str, name: str) -> dict[str, Any]:
+    return {
+        "id": f"e-{agent_id}-{name}",
+        "subject": SUBJECT,
+        "data": {
+            "@type": "ToolCall",
+            "agent": {"id": agent_id},
+            "tool": {"name": name, "server": "s", "protocol": "mcp"},
+        },
+    }
+
+
+def _two_subject_profile() -> Profile:
+    return Profile.from_dict(
+        {
+            "catalogs": ["eu-ai-act@2026.09"],
+            "subjects": [
+                {"id": "A", "role": "both"},
+                {"id": "B", "role": "both"},
+            ],
+        }
+    )
+
+
+def test_undeclared_agents_defaults_to_every_subject_the_profile_declares() -> None:
+    # Profile declares {A, B}; events show {A, C}. Omitting declared_subject_ids falls back
+    # to the profile's own subjects, so only C (never declared at all) is undeclared.
+    events = [_agent_event("A", "t1"), _agent_event("C", "t2")]
+    activity = summarize_activity(events, _two_subject_profile())
+    assert activity["undeclared"]["agents"] == ["C"]
+
+
+def test_explicit_declared_subject_ids_overrides_the_profile_not_supplements_it() -> None:
+    # The SAME events and profile, but an explicit, empty declared_subject_ids: nothing was
+    # declared on this path, so every observed agent -- including A, which the profile itself
+    # names -- is undeclared. Proves the parameter drives the result once given, not the profile.
+    events = [_agent_event("A", "t1"), _agent_event("C", "t2")]
+    activity = summarize_activity(
+        events, _two_subject_profile(), declared_subject_ids=frozenset()
+    )
+    assert activity["undeclared"]["agents"] == ["A", "C"]
 
 
 def test_activity_is_order_independent() -> None:

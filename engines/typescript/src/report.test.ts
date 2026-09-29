@@ -163,7 +163,7 @@ function hostileActivity(name: string): Activity {
     actions_by_effect_class: zero(EFFECT_CLASSES),
     approvals_by_recorder: zero(RECORDER_CLASSES),
     denied_or_blocked: zero(DENIED_KINDS),
-    undeclared: { models: [name], tools: [name] },
+    undeclared: { models: [name], tools: [name], agents: [name] },
   };
 }
 

@@ -251,9 +251,14 @@ def _activity_tally_text(
 def _activity_undeclared_lines(
     undeclared: dict[str, list[str]], cat: dict[str, str]
 ) -> list[str]:
-    if not (undeclared["tools"] or undeclared["models"]):
+    if not (undeclared["tools"] or undeclared["models"] or undeclared["agents"]):
         return [cat["report.activity_none_undeclared"]]
     lines = []
+    if undeclared["agents"]:
+        lines.append(
+            f"{cat['report.activity_undeclared_agents_label']}: "
+            + ", ".join(sanitize_for_markdown(name) for name in undeclared["agents"])
+        )
     if undeclared["tools"]:
         lines.append(
             f"{cat['report.activity_undeclared_tools_label']}: "

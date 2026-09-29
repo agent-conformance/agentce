@@ -145,7 +145,7 @@ def test_report_leads_with_what_your_agents_did(tmp_path: Path) -> None:
             "policy_denied": 0,
             "refused": 0,
         },
-        "undeclared": {"models": [], "tools": []},
+        "undeclared": {"models": [], "tools": [], "agents": []},
     }
 
 
@@ -350,7 +350,7 @@ def _hostile_activity(name: str) -> dict[str, object]:
         "actions_by_effect_class": {c: 0 for c in EFFECT_CLASSES},
         "approvals_by_recorder": {c: 0 for c in RECORDER_CLASSES},
         "denied_or_blocked": {k: 0 for k in DENIED_KINDS},
-        "undeclared": {"models": [name], "tools": [name]},
+        "undeclared": {"models": [name], "tools": [name], "agents": [name]},
     }
 
 

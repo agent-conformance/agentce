@@ -80,10 +80,11 @@
     "undeclared": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["models", "tools"],
+      "required": ["models", "tools", "agents"],
       "properties": {
         "models": {"type": "array", "items": {"type": "string"}},
-        "tools": {"type": "array", "items": {"type": "string"}}
+        "tools": {"type": "array", "items": {"type": "string"}},
+        "agents": {"type": "array", "items": {"type": "string"}}
       }
     }
   }
