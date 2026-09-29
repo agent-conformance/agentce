@@ -250,6 +250,15 @@ def assess_subjects(
     return assertions
 
 
+def deviations_by_control(
+    deviations: list[dict[str, Any]] | None,
+) -> dict[str, dict[str, Any]]:
+    """Index a deviation register by its ``control`` field. Shared by every reader of an
+    already-loaded register (``apply_deviations``, the limitations renderer, ``render_oscal``,
+    ``compute_auditor_view``) so the keying rule lives in one place."""
+    return {str(d.get("control")): d for d in (deviations or [])}
+
+
 def apply_deviations(
     assertions: list[Assertion],
     deviations: list[dict[str, Any]],
@@ -266,7 +275,8 @@ def apply_deviations(
     returned unchanged and the control id is collected into the second return value (``expired``) so
     the caller can report it as an ignored, expired deviation (a limitation, never a lint failure;
     ``readiness.deviation_lint`` only rejects an *applied* deviation that has since expired)."""
-    by_control = {str(d.get("control")): d for d in deviations}
+    by_control = deviations_by_control(deviations)
+    as_of_date = parse_date(as_of)
     expired: list[str] = []
     applied: list[Assertion] = []
     for assertion in assertions:
@@ -279,7 +289,6 @@ def apply_deviations(
             applied.append(assertion)
             continue
         expiry = parse_date(entry.get("expiry"))
-        as_of_date = parse_date(as_of)
         if expiry is not None and as_of_date is not None and expiry < as_of_date:
             expired.append(assertion.control)
             applied.append(assertion)

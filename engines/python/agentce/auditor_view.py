@@ -20,6 +20,7 @@ from typing import Any
 
 from . import messages
 from .assertions import Assertion, aggregate
+from .assess import deviations_by_control
 
 #: Modes whose ``not_assessed`` outcome gets the disclosed not-yet-evaluated note: a checklist answer
 #: cannot be recorded as a live outcome yet (``readiness.checklist_lint``'s own docstring), so this
@@ -72,7 +73,7 @@ def compute_auditor_view(
     every other/test caller is unaffected. Deterministic: no wall-clock, no locale, no assertion-order
     dependency (``clauses`` is sorted by ``(control, subject)``, ``by_clause`` by ``(framework,
     clause)`` with its control ids deduplicated and sorted)."""
-    by_control = {str(d.get("control")): d for d in (deviations or [])}
+    by_control = deviations_by_control(deviations)
     cat = messages.catalogue()
     note = cat["report.manual_checklist_not_yet_evaluated"]
 

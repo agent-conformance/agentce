@@ -41,7 +41,7 @@ from . import (
 )
 from .activity import DENIED_KINDS, RECORDER_CLASSES, summarize_activity
 from .assertions import Assertion, aggregate, check_dc5
-from .assess import index_by_subject, requirement_met
+from .assess import deviations_by_control, index_by_subject, requirement_met
 from .auditor_view import compute_auditor_view
 from .catalog import Catalog, ControlSpec, catalog_provenance_digest
 from .profile import Profile, Subject
@@ -1422,7 +1422,7 @@ def render_oscal(
     risk entry for it -- no fact the records do not support."""
     ordered = sorted(assertions, key=lambda x: (x.subject, x.control))
     when = _oscal_timestamp(assertions)
-    deviations_by_control = {str(d.get("control")): d for d in (deviations or [])}
+    by_control_deviation = deviations_by_control(deviations)
 
     observations: list[dict[str, Any]] = []
     findings: list[dict[str, Any]] = []
@@ -1467,9 +1467,7 @@ def render_oscal(
             "links": [{"href": f"urn:agentce:control:{a.control}", "rel": "control"}],
             "related-observations": [{"observation-uuid": obs_uuid}],
         }
-        deviation_entry = (
-            deviations_by_control.get(a.deviation) if a.deviation else None
-        )
+        deviation_entry = by_control_deviation.get(a.deviation) if a.deviation else None
         if deviation_entry is not None:
             risk_uuid = _uuid_raw("risk", safe_control, safe_subject)
             risks.append(
@@ -2632,6 +2630,12 @@ def _now() -> str:
     return datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def applied_deviation_ids(assertions: list[Assertion]) -> list[str]:
+    """The sorted, deduplicated ids of every control a deviation was actually applied to -- the
+    ``deviations[]`` fact ``claim.json`` and the public statement both carry (SPEC §9.1)."""
+    return sorted({a.deviation for a in assertions if a.deviation})
+
+
 #: The fixed statement text every claim carries (SPEC §9.1; ``claim.schema.json``'s ``statement`` const).
 _CLAIM_STATEMENT = (
     "This report states conformance to the named catalogs as evaluated by the named engine over "
@@ -2645,6 +2649,7 @@ def _build_claim(
     catalogs: list[Catalog],
     operator: str,
     limitations: list[str] | None = None,
+    deviations: list[str] | None = None,
 ) -> dict[str, Any]:
     """The conformance claim body (SPEC §9.1, ``claim.schema.json``): the scoped, content-addressed
     statement of what was assessed, against what catalogs, that ``agentce sign`` attaches a claimant
@@ -2670,7 +2675,8 @@ def _build_claim(
         # ``limitations`` is optional in claim.schema.json, so an ordinary claim omits it; a claim
         # produced over an unverified catalog carries what the claimant is signing over (SPEC §8.7).
         body["limitations"] = limitations
-    deviations = sorted({a.deviation for a in assertions if a.deviation})
+    if deviations is None:
+        deviations = applied_deviation_ids(assertions)
     if deviations:
         # claim.schema.json's own `deviations[]` field (SPEC §9.1): a signed claim is otherwise silent
         # about a real deviation applied to what it attests.
@@ -2819,6 +2825,7 @@ def write_report(
         outputs[name] = _digest_bytes(data)
 
     counts = aggregate(assertions)
+    applied_deviations = applied_deviation_ids(assertions)
     write_github_step_summary(
         assertions,
         counts,
@@ -3054,7 +3061,7 @@ def write_report(
             render_public_statement(
                 assertions,
                 catalogs=[f"{c.id}@{c.version}" for c in catalogs],
-                deviations=sorted({a.deviation for a in assertions if a.deviation}),
+                deviations=applied_deviations,
             ),
         )
 
@@ -3149,6 +3156,7 @@ def write_report(
             catalogs=catalogs,
             operator=operator,
             limitations=limitations,
+            deviations=applied_deviations,
         )
         (out_dir / "claim.json").write_text(
             json.dumps(claim, sort_keys=True, indent=2) + "\n", encoding="utf-8"

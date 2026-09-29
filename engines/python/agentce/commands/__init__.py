@@ -45,7 +45,12 @@ from .. import (
 from ..activity import summarize_activity
 from ..applicability import resolve as resolve_applicability
 from ..assertions import Assertion, aggregate
-from ..assess import apply_deviations, assess_subjects, evaluated_nothing
+from ..assess import (
+    apply_deviations,
+    assess_subjects,
+    deviations_by_control,
+    evaluated_nothing,
+)
 from ..blind_spots import catalog_support_view, compute_blind_spots
 from ..bundle import copy_bundle, load_bundle
 from ..canonical import canonical_string, canonicalize
@@ -79,6 +84,7 @@ from ..report import (
     ASSESS_DEFAULT_EMIT,
     _package_digest,
     activity_cli_lines,
+    applied_deviation_ids,
     blind_spots_cli_lines,
     has_invisible_codepoint,
     preset_cli_lines,
@@ -1051,7 +1057,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         )
         if deviation_expired:
             deviation_cat = messages.catalogue(_opt_str(ns, "report_language") or "en")
-            deviation_by_control = {str(d.get("control")): d for d in deviations}
+            deviation_by_control = deviations_by_control(deviations)
             for control in deviation_expired:
                 limitations.append(
                     i18n_format.format_message(
@@ -1649,7 +1655,7 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
         rendering = render_public_statement(
             assertions,
             catalogs=catalogs,
-            deviations=sorted({a.deviation for a in assertions if a.deviation}),
+            deviations=applied_deviation_ids(assertions),
         )
     else:  # pack
         role = _opt_str(ns, "role")
