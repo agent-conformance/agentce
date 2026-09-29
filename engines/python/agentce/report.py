@@ -1265,8 +1265,9 @@ def _buyer_answer_html(entry: dict[str, Any], cat: dict[str, str]) -> str:
 
 
 def _buyer_counts_table_md(counts: dict[str, int], cat: dict[str, str]) -> list[str]:
+    labels = [_outcome_label(cat, o) for o in _STATEMENT_OUTCOMES]
     return [
-        "| " + " | ".join(_STATEMENT_OUTCOMES) + " |",
+        "| " + " | ".join(labels) + " |",
         "|" + "|".join("---" for _ in _STATEMENT_OUTCOMES) + "|",
         "| " + " | ".join(str(counts.get(o, 0)) for o in _STATEMENT_OUTCOMES) + " |",
     ]
@@ -1274,7 +1275,8 @@ def _buyer_counts_table_md(counts: dict[str, int], cat: dict[str, str]) -> list[
 
 def _buyer_counts_table_html(counts: dict[str, int], cat: dict[str, str]) -> str:
     head = "".join(
-        f'<th scope="col">{html.escape(o)}</th>' for o in _STATEMENT_OUTCOMES
+        f'<th scope="col">{html.escape(_outcome_label(cat, o))}</th>'
+        for o in _STATEMENT_OUTCOMES
     )
     row = "".join(f"<td>{counts.get(o, 0)}</td>" for o in _STATEMENT_OUTCOMES)
     return f"<table><thead><tr>{head}</tr></thead><tbody><tr>{row}</tr></tbody></table>"

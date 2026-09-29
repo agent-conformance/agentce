@@ -21,6 +21,7 @@ from typing import Any
 
 from . import messages
 from .assertions import Assertion, aggregate
+from .auditor_view import _MANUAL_MODES
 
 #: The two questionnaire frameworks this view answers, in fixed render order (a tuple, not a set --
 #: deterministic order matters for the rendered page and the golden file). ``caiq`` first: it is the
@@ -43,52 +44,37 @@ BUYER_QUESTIONNAIRE_TITLES: dict[str, str] = {
     "ai-controls-matrix": "the AI Controls Matrix",
 }
 
-#: Modes whose ``not_assessed`` outcome gets the disclosed not-yet-evaluated note (the
-#: ``auditor_view._MANUAL_MODES`` idiom, reused verbatim).
-_MANUAL_MODES = frozenset({"manual", "semi-automated"})
+def _ref_key(ref: dict[str, str]) -> tuple[str, str, str]:
+    """A check-ref's (subject, control, control_version) triple, matched against the same triple on
+    an ``Assertion``. A check-ref also carries ``catalog``, which ``Assertion`` does not -- this can
+    tie across two catalogs that happen to share a control id and version; a real but narrow,
+    disclosed limitation (no other view in this codebase resolves it either)."""
+    return (ref["subject"], ref["control"], ref["control_version"])
 
 
-def _check_ref_matches(ref: dict[str, str], a: Assertion) -> bool:
-    """Whether a ``compute_blind_spots`` check-ref names the same (subject, control,
-    control_version) triple as ``a``. A check-ref also carries ``catalog``, which ``Assertion`` does
-    not -- this can tie across two catalogs that happen to share a control id and version; a real but
-    narrow, disclosed limitation (no other view in this codebase resolves it either)."""
-    return (
-        ref["subject"] == a.subject
-        and ref["control"] == a.control
-        and ref["control_version"] == a.control_version
-    )
-
-
-def _buyer_gap_step(a: Assertion, blind_spots: dict[str, Any]) -> dict[str, Any] | None:
-    """The "not enough evidence" gap step for an ``insufficient_evidence`` answer, or ``None`` when
-    ``a``'s triple matches neither of :func:`agentce.blind_spots.compute_blind_spots`'s own two
-    buckets (an assertion outcome other than ``insufficient_evidence`` never reaches this function at
-    all, so ``None`` here means only "not classified in either bucket", never "not looked up").
-
-    Never raises: a caller that renders ``write_report``'s own ``blind_spots`` local always has it
-    (normalized to an empty-but-present shape before this view ever runs), but a direct caller (a
-    test, a re-render from ``assertions.json`` alone) may pass a genuinely empty ``blind_spots``; that
-    is an honest "no step known", not a bug to assert against."""
-    missing = [
-        {
+def _buyer_gap_step_index(blind_spots: dict[str, Any]) -> dict[tuple[str, str, str], dict[str, Any]]:
+    """Build the (subject, control, control_version) -> gap-step index once per run, instead of
+    re-scanning :func:`agentce.blind_spots.compute_blind_spots`'s two buckets for every
+    ``insufficient_evidence`` answer (this view's only caller,
+    :func:`compute_buyer_view`, may see one such answer per crosswalk entry, and every one of them
+    depends only on the assertion's own triple, not on which crosswalk entry triggered the lookup)."""
+    index: dict[tuple[str, str, str], dict[str, Any]] = {}
+    missing_by_key: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for bs in blind_spots.get("blind_spots", []):
+        entry = {
             "event": bs["event"],
             "class": bs["class"],
             "ladder_rung": bs["ladder_rung"],
             "owner_key": bs["owner_key"],
             "step_kind": bs["step_kind"],
         }
-        for bs in blind_spots.get("blind_spots", [])
-        if any(
-            _check_ref_matches(ref, a)
-            for ref in bs["unlocked_checks"] + bs["needed_by_checks"]
-        )
-    ]
-    if missing:
-        return {"kind": "blind_spot", "missing": missing}
-    if any(_check_ref_matches(ref, a) for ref in blind_spots.get("no_population", [])):
-        return {"kind": "no_population"}
-    return None
+        for ref in bs["unlocked_checks"] + bs["needed_by_checks"]:
+            missing_by_key.setdefault(_ref_key(ref), []).append(entry)
+    for key, missing in missing_by_key.items():
+        index[key] = {"kind": "blind_spot", "missing": missing}
+    for ref in blind_spots.get("no_population", []):
+        index.setdefault(_ref_key(ref), {"kind": "no_population"})
+    return index
 
 
 def compute_buyer_view(
@@ -112,6 +98,7 @@ def compute_buyer_view(
     stable, disambiguated order."""
     cat = messages.catalogue()
     note = cat["report.manual_checklist_not_yet_evaluated"]
+    gap_step_index = _buyer_gap_step_index(blind_spots)
 
     answers: list[dict[str, Any]] = []
     for a in assertions:
@@ -130,7 +117,7 @@ def compute_buyer_view(
                 "verified": bool(xw.get("verified", False)),
                 "evidence": [e.to_json() for e in a.evidence],
                 "gap_step": (
-                    _buyer_gap_step(a, blind_spots)
+                    gap_step_index.get((a.subject, a.control, a.control_version))
                     if a.outcome == "insufficient_evidence"
                     else None
                 ),
