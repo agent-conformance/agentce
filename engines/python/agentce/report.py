@@ -519,6 +519,181 @@ def blind_spots_cli_lines(
     return lines
 
 
+def _agent_dirname(subject_id: str) -> str:
+    """The traversal-proof, collision-resistant directory name ``write_report`` writes a subject's
+    own report under (``agents/<dirname>/``, 18.14 C3) -- the single formula both ``write_report``
+    (which creates the directory) and :func:`_project_agent_view_rows`/the undeclared-agents section
+    (which link to it) must share, so it is defined once here rather than duplicated at each call
+    site."""
+    return f"{_safe(subject_id)[:40]}-{_uuid(subject_id)[:8]}"
+
+
+def _project_agent_view_rows(
+    project_view: dict[str, Any],
+    activity_by_subject: dict[str, dict[str, Any]],
+    cat: dict[str, str],
+) -> list[dict[str, str]]:
+    """One row per agent, in ``project_view["agents"]``'s own order (never re-sorted here): the
+    sanitised id, its report's directory name, the declared/undeclared badge, the verdict-and-counts
+    cell, and the what-it-did cell -- shared by the Markdown and HTML renderings exactly like
+    ``_activity_rows``."""
+    rows = []
+    for agent in project_view["agents"]:
+        activity = activity_by_subject.get(agent["id"], {})
+        counts = agent["summary"]["counts"]
+        label_of = {outcome: _outcome_label(cat, outcome) for outcome in counts}
+        verdict_label = cat[f"verdict.{agent['summary']['verdict']}"]
+        agents_observed = (
+            ", ".join(_sanitize_field(a) for a in activity.get("agents", []))
+            or cat["report.activity_none_agents"]
+        )
+        rows.append(
+            {
+                "id": _sanitize_field(agent["id"]),
+                "dirname": _agent_dirname(agent["id"]),
+                "badge": (
+                    cat["report.project_declared_badge"]
+                    if agent["declared"]
+                    else cat["report.project_undeclared_badge"]
+                ),
+                "verdict": f"{verdict_label} ({_activity_tally_text(counts, label_of)})",
+                "what_it_did": i18n_format.format_message(
+                    cat["report.project_what_it_did_cell"],
+                    agents=agents_observed,
+                    actions=_activity_tally_text(
+                        activity.get("actions_by_effect_class", {})
+                    ),
+                ),
+            }
+        )
+    return rows
+
+
+def _project_top_gap_rows(
+    top_gaps: list[dict[str, Any]], cat: dict[str, str]
+) -> list[tuple[str, str]]:
+    """As :func:`_blind_spot_rows`, but each row also names the agents this gap touches
+    (``compute_project_view``'s own ``top_gaps``, C2) -- the project view's per-gap agent list, not
+    a per-agent re-scoping."""
+    rows = _blind_spot_rows(top_gaps, cat)
+    return [
+        (
+            label,
+            value
+            + " "
+            + i18n_format.format_message(
+                cat["report.project_top_gap_agents"],
+                agents=", ".join(_sanitize_field(a) for a in entry["agents"]),
+            ),
+        )
+        for (label, value), entry in zip(rows, top_gaps, strict=True)
+    ]
+
+
+def render_project_md(
+    project_view: dict[str, Any],
+    activity_by_subject: dict[str, dict[str, Any]],
+    *,
+    language: str = messages.DEFAULT_LANGUAGE,
+) -> str:
+    """The project view (Hill 7, 18.14 C3): every agent this run assessed, side by side -- a summary
+    row per agent (declared or discovered), the top gaps across the whole project naming which
+    agents each touches, then the agents nobody declared, each linking to its own full report under
+    ``agents/<dirname>/``."""
+    cat = messages.catalogue(language)
+    rows = _project_agent_view_rows(project_view, activity_by_subject, cat)
+    lines = [
+        f"# {cat['report.project_title']}",
+        "",
+        f"## {cat['report.project_heading']}",
+        "",
+        f"| {cat['report.project_agent_column']} | {cat['report.project_declared_column']} | "
+        f"{cat['report.project_verdict_column']} | {cat['report.project_what_it_did_column']} |",
+        "|---|---|---|---|",
+    ]
+    lines += [
+        f"| [{row['id']}](agents/{row['dirname']}/report.md) | {row['badge']} | "
+        f"{row['verdict']} | {row['what_it_did']} |"
+        for row in rows
+    ]
+    lines += ["", f"## {cat['report.project_top_gaps_heading']}", ""]
+    gap_rows = _project_top_gap_rows(project_view["top_gaps"], cat)
+    if gap_rows:
+        lines += [f"- `{label}`: {value}" for label, value in gap_rows]
+    else:
+        lines.append(f"- {cat['report.no_gaps']}")
+    if project_view["undeclared_agents"]:
+        lines += ["", f"## {cat['report.project_undeclared_heading']}", ""]
+        lines += [
+            f"- `{_sanitize_field(agent_id)}` -- "
+            f"[{cat['report.project_agent_report_link']}]"
+            f"(agents/{_agent_dirname(agent_id)}/report.md)"
+            for agent_id in project_view["undeclared_agents"]
+        ]
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def render_project_html(
+    project_view: dict[str, Any],
+    activity_by_subject: dict[str, dict[str, Any]],
+    *,
+    language: str = messages.DEFAULT_LANGUAGE,
+) -> str:
+    """As :func:`render_project_md`, rendered as the same self-contained, escaped, WCAG 2.2 AA page
+    shape as :func:`render_report_html`."""
+    cat = messages.catalogue(language)
+    rows = _project_agent_view_rows(project_view, activity_by_subject, cat)
+    title = html.escape(cat["report.project_title"])
+    body_rows = "".join(
+        f'<tr><td><a href="agents/{row["dirname"]}/report.html">'
+        f"{html.escape(row['id'])}</a></td>"
+        f"<td>{html.escape(row['badge'])}</td><td>{html.escape(row['verdict'])}</td>"
+        f"<td>{html.escape(row['what_it_did'])}</td></tr>"
+        for row in rows
+    )
+    gap_rows = _project_top_gap_rows(project_view["top_gaps"], cat)
+    gaps_html = (
+        f"<ul>{_li_items(gap_rows)}</ul>"
+        if gap_rows
+        else f"<p>{html.escape(cat['report.no_gaps'])}</p>"
+    )
+    undeclared_html = ""
+    if project_view["undeclared_agents"]:
+        items = "".join(
+            f"<li>{sanitize_for_html(agent_id)} -- "
+            f'<a href="agents/{_agent_dirname(agent_id)}/report.html">'
+            f"{html.escape(cat['report.project_agent_report_link'])}</a></li>"
+            for agent_id in project_view["undeclared_agents"]
+        )
+        undeclared_html = (
+            '<section aria-labelledby="project-undeclared"><h2 id="project-undeclared">'
+            f"{html.escape(cat['report.project_undeclared_heading'])}</h2>"
+            f"<ul>{items}</ul></section>"
+        )
+    return (
+        f'<!doctype html><html lang="{html.escape(language)}"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<meta http-equiv="Content-Security-Policy" '
+        "content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\">"
+        f"<title>{title}</title><style>{_HTML_STYLE}</style></head><body>"
+        f"<main><h1>{title}</h1>"
+        '<section aria-labelledby="project-agents"><h2 id="project-agents">'
+        f"{html.escape(cat['report.project_heading'])}</h2>"
+        f"<table><caption>{html.escape(cat['report.project_heading'])}</caption>"
+        f'<thead><tr><th scope="col">{html.escape(cat["report.project_agent_column"])}</th>'
+        f'<th scope="col">{html.escape(cat["report.project_declared_column"])}</th>'
+        f'<th scope="col">{html.escape(cat["report.project_verdict_column"])}</th>'
+        f'<th scope="col">{html.escape(cat["report.project_what_it_did_column"])}</th>'
+        "</tr></thead>"
+        f"<tbody>{body_rows}</tbody></table></section>"
+        '<section aria-labelledby="project-top-gaps"><h2 id="project-top-gaps">'
+        f"{html.escape(cat['report.project_top_gaps_heading'])}</h2>{gaps_html}</section>"
+        f"{undeclared_html}"
+        "</main></body></html>\n"
+    )
+
+
 def _reproduce_command(invocation: list[str] | None) -> str:
     return "agentce " + " ".join(invocation) if invocation else "agentce quickstart"
 

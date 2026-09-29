@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/report/project.schema.json",
+  "title": "AgentCE project view",
+  "description": "project.json in the report directory: every agent this run assessed, side by side -- one summary row per subject whether declared or discovered only from the records, the agents no profile declared, and the top blind spots across the whole project, each naming which agents it touches. Written only when a run assesses more than one subject; never affects an outcome or the verdict.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agents", "undeclared_agents", "top_gaps"],
+  "$defs": {
+    "check_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject", "catalog", "control", "control_version"],
+      "properties": {
+        "subject": {"type": "string"},
+        "catalog": {"type": "string"},
+        "control": {"type": "string"},
+        "control_version": {"type": "string"}
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conformant",
+        "non-conformant",
+        "partial",
+        "not_applicable",
+        "not_assessed",
+        "insufficient_evidence"
+      ],
+      "properties": {
+        "conformant": {"type": "integer", "minimum": 0},
+        "non-conformant": {"type": "integer", "minimum": 0},
+        "partial": {"type": "integer", "minimum": 0},
+        "not_applicable": {"type": "integer", "minimum": 0},
+        "not_assessed": {"type": "integer", "minimum": 0},
+        "insufficient_evidence": {"type": "integer", "minimum": 0}
+      }
+    },
+    "gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "controls", "more"],
+      "properties": {
+        "outcome": {"type": "string", "enum": ["non-conformant", "partial", "insufficient_evidence", "not_assessed"]},
+        "controls": {"type": "array", "items": {"type": "string"}},
+        "more": {"type": "integer", "minimum": 0}
+      }
+    }
+  },
+  "properties": {
+    "agents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "declared", "summary", "blind_spots_count", "agents_observed"],
+        "properties": {
+          "id": {"type": "string"},
+          "declared": {"type": "boolean"},
+          "summary": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["verdict", "counts", "top_gaps"],
+            "properties": {
+              "verdict": {"type": "string", "enum": ["conformant", "incomplete", "non-conformant"]},
+              "counts": {"$ref": "#/$defs/counts"},
+              "top_gaps": {"type": "array", "items": {"$ref": "#/$defs/gap"}}
+            }
+          },
+          "blind_spots_count": {"type": "integer", "minimum": 0},
+          "agents_observed": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "undeclared_agents": {"type": "array", "items": {"type": "string"}},
+    "top_gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event",
+          "class",
+          "ladder_rung",
+          "owner_key",
+          "step_kind",
+          "supplying_adapters",
+          "checks_unlocked",
+          "unlocked_checks",
+          "needed_by",
+          "needed_by_checks",
+          "agents"
+        ],
+        "properties": {
+          "event": {"type": "string"},
+          "class": {"type": "string", "enum": ["self_report", "enforcement_point", "independent_system"]},
+          "ladder_rung": {"type": "integer", "enum": [1, 2, 3, 4]},
+          "owner_key": {"type": "string", "enum": ["agent_team", "platform_or_security", "ticketing_or_iam"]},
+          "step_kind": {"type": "string", "enum": ["code_change", "request"]},
+          "supplying_adapters": {"type": "array", "items": {"type": "string"}},
+          "checks_unlocked": {"type": "integer", "minimum": 0},
+          "unlocked_checks": {"type": "array", "items": {"$ref": "#/$defs/check_ref"}},
+          "needed_by": {"type": "integer", "minimum": 0},
+          "needed_by_checks": {"type": "array", "items": {"$ref": "#/$defs/check_ref"}},
+          "agents": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}

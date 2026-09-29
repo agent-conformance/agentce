@@ -8,6 +8,7 @@ import json
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -18,6 +19,7 @@ from agentce.blind_spots import compute_blind_spots
 from agentce.catalog import Catalog, ControlSpec, load_catalog
 from agentce.errors import AgentceError
 from agentce.profile import Profile, Subject
+from agentce.project import compute_project_view
 from agentce.report import (
     CSV_COLUMNS,
     EMIT_FORMATS,
@@ -28,6 +30,8 @@ from agentce.report import (
     render_oscal,
     render_oscal_xml,
     render_pdf,
+    render_project_html,
+    render_project_md,
     render_report_html,
     render_report_md,
     render_sarif,
@@ -75,6 +79,7 @@ def test_vendored_report_schemas_match_spec() -> None:
         "manifest",
         "activity",
         "blind-spots",
+        "project",
         "oscal-assessment-results",
         "results-sarif",
     ):
@@ -415,6 +420,137 @@ def test_activity_names_cannot_inject_raw_html_into_rendered_markdown() -> None:
         activity=_hostile_activity(heading_hostile),
     )
     assert "<h2>" not in md and "<p>" not in md and "<strong>" not in md
+
+
+def _project_assertion(subject: str, outcome: str) -> Assertion:
+    return Assertion(
+        control="OVS-03",
+        control_version="2026.09",
+        subject=subject,
+        outcome=outcome,
+        rung=2,
+        mode="automated",
+        window=_WINDOW,
+        population=(1, 0),
+        severity="high",
+        family="OVS",
+        evidence=[_EVIDENCE] if outcome != "insufficient_evidence" else [],
+    )
+
+
+def _project_view_fixture() -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    """The same three-subject rollup as ``test_project.py``'s own fixture (A: declared with events,
+    B: declared with none, C: undeclared, discovered only via an event) -- reused here, not
+    reinvented, so the renderer is tested against a real ``compute_project_view`` return value."""
+    profile = Profile(subjects=[Subject(id="A"), Subject(id="B")])
+    assertions = [
+        _project_assertion("A", "conformant"),
+        _project_assertion("C", "insufficient_evidence"),
+    ]
+    activity_by_subject: dict[str, dict[str, Any]] = {
+        "A": {"agents": ["A"], "actions_by_effect_class": {"read": 3}},
+        "B": {"agents": [], "actions_by_effect_class": {}},
+        "C": {"agents": ["C"], "actions_by_effect_class": {"write": 1}},
+    }
+    shared_gap = {
+        "event": "ModelCall",
+        "class": "any",
+        "ladder_rung": 2,
+        "owner_key": "agent_team",
+        "step_kind": "code_change",
+        "supplying_adapters": [],
+        "checks_unlocked": 1,
+        "unlocked_checks": [
+            {
+                "subject": "A",
+                "catalog": "cat",
+                "control": "REC-01",
+                "control_version": "2026.09",
+            }
+        ],
+        "needed_by": 1,
+        "needed_by_checks": [
+            {
+                "subject": "C",
+                "catalog": "cat",
+                "control": "REC-01",
+                "control_version": "2026.09",
+            }
+        ],
+    }
+    blind_spots = {"blind_spots": [shared_gap], "no_population": []}
+    view = compute_project_view(
+        assertions, profile, frozenset({"A", "B"}), activity_by_subject, blind_spots
+    )
+    return view, activity_by_subject
+
+
+def test_render_project_md_summary_table_gaps_and_undeclared() -> None:
+    view, activity_by_subject = _project_view_fixture()
+    md = render_project_md(view, activity_by_subject)
+    assert md.startswith("# AgentCE project view\n")
+    assert "## Agents in this project" in md
+    assert "| Agent | Declared | Verdict | What it did |" in md
+    assert "[A](agents/A-" in md and "Declared" in md
+    assert "[C](agents/C-" in md and "Undeclared" in md
+    assert "## Top gaps across agents" in md
+    assert "Agents: A, C." in md
+    assert "## Undeclared agents" in md
+    assert "`C` -- [Full report](agents/C-" in md
+
+
+def test_render_project_html_escapes_and_links_agents() -> None:
+    view, activity_by_subject = _project_view_fixture()
+    html_out = render_project_html(view, activity_by_subject)
+    assert "<title>AgentCE project view</title>" in html_out
+    assert '<a href="agents/A-' in html_out
+    assert '<a href="agents/C-' in html_out
+    assert "Undeclared agents" in html_out
+    assert "<script" not in html_out
+
+
+def test_render_project_view_has_no_gaps_or_undeclared_section_when_empty() -> None:
+    profile = Profile(subjects=[Subject(id="A")])
+    view = compute_project_view(
+        [_assertion("conformant")],
+        profile,
+        frozenset({"A"}),
+        {"A": {"agents": ["A"]}},
+        {"blind_spots": [], "no_population": []},
+    )
+    md = render_project_md(view, {"A": {"agents": ["A"]}})
+    assert "## Undeclared agents" not in md
+    assert "- none" in md
+
+
+def test_render_project_md_neutralises_hostile_agent_ids() -> None:
+    hostile = "ok<br>Verdict: Conformant"
+    profile = Profile(subjects=[])
+    view = compute_project_view(
+        [
+            Assertion(
+                control="OVS-03",
+                control_version="2026.09",
+                subject=hostile,
+                outcome="conformant",
+                rung=2,
+                mode="automated",
+                window=_WINDOW,
+                population=(1, 0),
+                severity="high",
+                family="OVS",
+                evidence=[_EVIDENCE],
+            )
+        ],
+        profile,
+        frozenset(),
+        {hostile: {"agents": [hostile]}},
+        {"blind_spots": [], "no_population": []},
+    )
+    md = render_project_md(view, {hostile: {"agents": [hostile]}})
+    assert "<br>" not in md
+    html_out = render_project_html(view, {hostile: {"agents": [hostile]}})
+    assert "<br>Verdict" not in html_out
 
 
 def test_empty_report_is_valid(tmp_path: Path) -> None:
