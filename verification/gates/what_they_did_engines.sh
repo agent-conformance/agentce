@@ -52,6 +52,17 @@ sys.exit(0 if data.get('undeclared', {}).get('tools') == ['credit.record_decisio
     echo "what-they-did: $engine's undeclared.tools did not honestly surface credit.record_decision" >&2
     status=1
   fi
+  # The quickstart bundle's one agent is declared in applicability.yaml, so undeclared.agents
+  # must come back empty here; 18.14's VG-PROJECT-TIME gate is what exercises a non-empty value.
+  if ! python3 -c "
+import json, sys
+with open('$work/$engine/activity.json', encoding='utf-8') as f:
+    data = json.load(f)
+sys.exit(0 if data.get('undeclared', {}).get('agents') == [] else 1)
+"; then
+    echo "what-they-did: $engine's undeclared.agents was not empty for the quickstart bundle's declared agent" >&2
+    status=1
+  fi
 done
 [ "$status" -eq 0 ] && echo "what-they-did: three engines match the golden, undeclared tool honestly surfaced"
 exit "$status"
