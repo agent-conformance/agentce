@@ -2353,10 +2353,13 @@ def write_report(
         no_pop_by_subject = no_population_by_subject(
             blind_spots.get("no_population", [])
         )
+        assertions_by_subject: dict[str, list[Assertion]] = {}
+        for assertion in assertions:
+            assertions_by_subject.setdefault(assertion.subject, []).append(assertion)
         for subject_id in project_subject_ids:
             dirname = _agent_dirname(subject_id)
             (out_dir / "agents" / dirname).mkdir(parents=True, exist_ok=True)
-            subject_assertions = [a for a in assertions if a.subject == subject_id]
+            subject_assertions = assertions_by_subject.get(subject_id, [])
             subject_activity = project_activity_by_subject[subject_id]
             subject_blind_spots = {
                 "blind_spots": gaps_by_subject.get(subject_id, []),

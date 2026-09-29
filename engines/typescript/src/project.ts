@@ -19,6 +19,19 @@ import { summarize } from "./verdict";
 /** How many blind spots `computeProjectView` lists at the top level. */
 export const MAX_TOP_GAPS = 5;
 
+/** The distinct subjects a global blind-spot entry's own check-refs name, byte-sorted. */
+function entrySubjects(entry: {
+  unlocked_checks: CheckRef[];
+  needed_by_checks: CheckRef[];
+}): string[] {
+  return [
+    ...new Set([
+      ...entry.unlocked_checks.map((cr) => cr.subject),
+      ...entry.needed_by_checks.map((cr) => cr.subject),
+    ]),
+  ].sort(byteCompare);
+}
+
 /**
  * Group `computeBlindSpots`'s global `blind_spots` list by the subjects each entry actually names,
  * RE-SCOPING each entry's `unlocked_checks`/`needed_by_checks`/`checks_unlocked`/`needed_by` to that
@@ -28,13 +41,7 @@ export const MAX_TOP_GAPS = 5;
 export function blindSpotsBySubject(blindSpots: BlindSpots): Map<string, BlindSpot[]> {
   const bySubject = new Map<string, BlindSpot[]>();
   for (const entry of blindSpots.blind_spots) {
-    const subjects = [
-      ...new Set([
-        ...entry.unlocked_checks.map((cr) => cr.subject),
-        ...entry.needed_by_checks.map((cr) => cr.subject),
-      ]),
-    ].sort(byteCompare);
-    for (const subject of subjects) {
+    for (const subject of entrySubjects(entry)) {
       const ownUnlocked = entry.unlocked_checks.filter((cr) => cr.subject === subject);
       const ownNeeded = entry.needed_by_checks.filter((cr) => cr.subject === subject);
       const ownEntry: BlindSpot = {
@@ -106,8 +113,17 @@ export function computeProjectView(
     ...new Set([...assertions.map((a) => a.subject), ...profile.subjects.map((s) => s.id)]),
   ].sort(byteCompare);
 
+  const assertionsBySubject = new Map<string, Assertion[]>();
+  for (const assertion of assertions) {
+    const list = assertionsBySubject.get(assertion.subject);
+    if (list) {
+      list.push(assertion);
+    } else {
+      assertionsBySubject.set(assertion.subject, [assertion]);
+    }
+  }
   const agents: ProjectAgentRow[] = subjectIds.map((subjectId) => {
-    const subjectAssertions = assertions.filter((a) => a.subject === subjectId);
+    const subjectAssertions = assertionsBySubject.get(subjectId) ?? [];
     const summary = summarize(subjectAssertions);
     return {
       id: subjectId,
@@ -124,12 +140,7 @@ export function computeProjectView(
 
   const topGaps = blindSpots.blind_spots.slice(0, MAX_TOP_GAPS).map((entry) => ({
     ...entry,
-    agents: [
-      ...new Set([
-        ...entry.unlocked_checks.map((cr) => cr.subject),
-        ...entry.needed_by_checks.map((cr) => cr.subject),
-      ]),
-    ].sort(byteCompare),
+    agents: entrySubjects(entry),
   }));
 
   return { agents, undeclared_agents: undeclaredAgents, top_gaps: topGaps };

@@ -1150,10 +1150,19 @@ export function writeReport(
     writeJson("project.json", projectView);
     const gapsBySubject = blindSpotsBySubject(blindSpots);
     const noPopBySubject = noPopulationBySubject(blindSpots.no_population);
+    const assertionsBySubject = new Map<string, Assertion[]>();
+    for (const assertion of assertions) {
+      const list = assertionsBySubject.get(assertion.subject);
+      if (list) {
+        list.push(assertion);
+      } else {
+        assertionsBySubject.set(assertion.subject, [assertion]);
+      }
+    }
     for (const subjectId of projectSubjectIds) {
       const subjectDirname = agentDirname(subjectId);
       mkdirSync(join(outDir, "agents", subjectDirname), { recursive: true });
-      const subjectAssertions = assertions.filter((a) => a.subject === subjectId);
+      const subjectAssertions = assertionsBySubject.get(subjectId) ?? [];
       // Populated above for every id in `projectSubjectIds`, including this one.
       const subjectActivity = projectActivityBySubject.get(subjectId) as Activity;
       const subjectBlindSpots: BlindSpots = {

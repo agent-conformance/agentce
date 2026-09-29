@@ -12,11 +12,19 @@ from __future__ import annotations
 from typing import Any
 
 from .assertions import Assertion
+from .assess import index_by_subject
 from .profile import Profile
 from .verdict import summarize
 
 #: How many blind spots ``compute_project_view`` lists at the top level.
 MAX_TOP_GAPS = 5
+
+
+def _entry_subjects(entry: dict[str, Any]) -> list[str]:
+    """The distinct subjects a global blind-spot entry's own check-refs name, byte-sorted."""
+    return sorted(
+        {cr["subject"] for cr in entry["unlocked_checks"] + entry["needed_by_checks"]}
+    )
 
 
 def blind_spots_by_subject(
@@ -31,10 +39,7 @@ def blind_spots_by_subject(
     for entry in blind_spots.get("blind_spots", []):
         unlocked = entry["unlocked_checks"]
         needed = entry["needed_by_checks"]
-        subjects = sorted(
-            {cr["subject"] for cr in unlocked} | {cr["subject"] for cr in needed}
-        )
-        for subject in subjects:
+        for subject in _entry_subjects(entry):
             own_unlocked = [cr for cr in unlocked if cr["subject"] == subject]
             own_needed = [cr for cr in needed if cr["subject"] == subject]
             own_entry = dict(entry)
@@ -51,11 +56,9 @@ def no_population_by_subject(
 ) -> dict[str, list[dict[str, str]]]:
     """Group ``compute_blind_spots``'s global ``no_population`` list by each entry's own ``subject``
     field: unlike ``blind_spots``, every ``no_population`` entry already names exactly one subject, so
-    no re-scoping is needed, only grouping."""
-    by_subject: dict[str, list[dict[str, str]]] = {}
-    for entry in no_population:
-        by_subject.setdefault(entry["subject"], []).append(entry)
-    return by_subject
+    no re-scoping is needed, only grouping -- exactly what ``index_by_subject`` (``assess.py``)
+    already does for events."""
+    return index_by_subject(no_population)
 
 
 def compute_project_view(
@@ -73,13 +76,16 @@ def compute_project_view(
     spots per subject. Deterministic: no wall-clock, no locale, no filesystem-order dependency.
     """
     by_subject = blind_spots_by_subject(blind_spots)
+    assertions_by_subject: dict[str, list[Assertion]] = {}
+    for assertion in assertions:
+        assertions_by_subject.setdefault(assertion.subject, []).append(assertion)
     subject_ids = sorted(
         {a.subject for a in assertions} | {s.id for s in profile.subjects}
     )
 
     agents: list[dict[str, Any]] = []
     for subject_id in subject_ids:
-        subject_assertions = [a for a in assertions if a.subject == subject_id]
+        subject_assertions = assertions_by_subject.get(subject_id, [])
         agents.append(
             {
                 "id": subject_id,
@@ -98,15 +104,7 @@ def compute_project_view(
     )
 
     top_gaps = [
-        {
-            **entry,
-            "agents": sorted(
-                {
-                    cr["subject"]
-                    for cr in entry["unlocked_checks"] + entry["needed_by_checks"]
-                }
-            ),
-        }
+        {**entry, "agents": _entry_subjects(entry)}
         for entry in blind_spots.get("blind_spots", [])[:MAX_TOP_GAPS]
     ]
 
