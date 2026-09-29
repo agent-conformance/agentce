@@ -1,0 +1,26 @@
+id: BUY-01
+version: "2026.09"
+title: "Fixture control the buyer view's caiq question answers conformant"
+description: >
+  Gate fixture only (verification/gates/buyer_view.sh): the fixture's shared Decision event carries
+  both `agent` and `time`, so this control's shape (requiring prov:wasAssociatedWith) is satisfied --
+  conformant. Its own event id carries a hostile `<script>alert(1)</script>` fragment (the AUV-01
+  pattern, moved here since only a conformant/non-conformant/partial outcome ever carries evidence,
+  assess.py:171-175): this is where the buyer view's escaped-evidence-ref check lives.
+crosswalk:
+  - {framework: caiq, clause: "IAM-13.1", relation: maps, verified_against_text: false}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: any
+  minimum_evidence:
+    - {event: Decision, class: any}
+  shape: shapes/BUY-01.ttl
+expectations:
+  - {id: F1, text: "Fixture-only; not a real requirement."}
+severity: high
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+test_cases: []

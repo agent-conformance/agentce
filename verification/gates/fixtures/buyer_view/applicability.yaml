@@ -1,0 +1,15 @@
+# Applicability profile for the VG-BUYER-VIEW gate fixture (verification/gates/buyer_view.sh).
+# One subject, the fixture-only BUY-01..04 catalog loaded via --catalog-dir.
+profile_version: 1
+observation_window:
+  start: "2026-01-01T00:00:00Z"
+  end: "2026-02-01T00:00:00Z"
+content_capture:
+  mode: hashes_only
+catalogs: []
+subjects:
+  - id: "spiffe://corp/agents/buyer-view-fixture"
+    name: "Buyer-view gate fixture subject"
+    role: "both"
+    declared_decision_types:
+      - "dom:BuyerFixtureDecision"

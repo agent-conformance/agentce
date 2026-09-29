@@ -1,0 +1,10 @@
+{
+  "agentce_bundle_version": 1,
+  "domain": "buyer-view-fixture",
+  "files": [
+    {
+      "path": "events/subject.jsonl",
+      "sha256": "49ec14f0448a7cdac55b0e9594b018d51da967f4488b8361110630ecca011954"
+    }
+  ]
+}

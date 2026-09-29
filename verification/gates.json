@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.15.0",
+  "suite_version": "0.16.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -602,6 +602,40 @@
         }
       ],
       "fix_hint": "run verification/gates/auditor_view.sh and read the FAIL lines; the reference implementation is engines/python/agentce/auditor_view.py (compute_auditor_view) and engines/python/agentce/report.py (render_auditor_md/render_auditor_html, and render_oscal's deviation risks[])."
+    },
+    {
+      "id": "VG-BUYER-VIEW",
+      "title": "The buyer view (18.18, Hill 8's buyer lens) renders generated CAIQ/AI Controls Matrix questionnaire answers, a one-page summary, and how to check this report, matching a committed golden with hostile text always escaped and out-of-scope controls absent from the answer set",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/buyer_view.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 300,
+      "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
+      "rubric": {
+        "pass": "a real `assess --for buyer` run writes buyer.json/.md/.html (never report.md/.html) matching the committed golden byte-for-byte, exit code 0; BUY-01 (caiq/IAM-13.1) answers conformant with its evidence ref present and HTML-escaped; BUY-02 (caiq, a hostile clause id) answers insufficient_evidence with the exact catalogue answer text, a non-null gap_step, and its hostile clause id HTML-escaped; BUY-03 (eu-ai-act only) and BUY-04 (no crosswalk) are both absent from answers; the ai-controls-matrix section shows the disclosed empty-framework text; the caiq section's heading names caiq/4.0.2 verbatim, next to it; buyer.json's counts equal a fresh aggregate() over the run's own assertions.json; `agentce report --validate` exits 0",
+        "fail": "any of the above fact, file, or golden-match check fails, a stray report.md/.html appears, a hostile fragment renders unescaped, or an out-of-scope control leaks into answers"
+      },
+      "faults": [
+        {
+          "description": "BUYER_FRAMEWORKS is widened to include an unintended third framework (eu-ai-act), so a control mapped only to eu-ai-act (BUY-03) leaks into buyer.json's answers instead of staying absent",
+          "file": "engines/python/agentce/buyer_view.py",
+          "search": "BUYER_FRAMEWORKS: tuple[str, ...] = (\"caiq\", \"ai-controls-matrix\")\n",
+          "replace": "BUYER_FRAMEWORKS: tuple[str, ...] = (\"caiq\", \"ai-controls-matrix\", \"eu-ai-act\")\n"
+        },
+        {
+          "description": "the per-outcome report.buyer_answer_insufficient_evidence message key is deleted from the vendored catalogue, so rendering BUY-02's answer raises KeyError and the gate's own run_assess exits non-zero instead of the fixture's real exit code 0",
+          "file": "engines/python/agentce/data/i18n/messages.en.json",
+          "search": "  \"report.buyer_answer_insufficient_evidence\": \"The records don't show enough evidence yet for {control} to answer this question.\",\n",
+          "replace": ""
+        }
+      ],
+      "fix_hint": "run verification/gates/buyer_view.sh and read the FAIL lines; the reference implementation is engines/python/agentce/buyer_view.py (compute_buyer_view) and engines/python/agentce/report.py (render_buyer_md/render_buyer_html)."
     }
   ]
 }

@@ -1,0 +1,23 @@
+id: BUY-04
+version: "2026.09"
+title: "Fixture control with no crosswalk entry at all"
+description: >
+  Gate fixture only (verification/gates/buyer_view.sh): conformant, with no crosswalk entry -- also
+  absent from buyer.json's answers, the same "maps to nothing" semantics as BUY-03 by a different
+  route (no entry to select from, rather than an entry naming an out-of-scope framework).
+crosswalk: []
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: any
+  minimum_evidence:
+    - {event: Decision, class: any}
+  shape: shapes/BUY-04.ttl
+expectations:
+  - {id: F1, text: "Fixture-only; not a real requirement."}
+severity: low
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+test_cases: []

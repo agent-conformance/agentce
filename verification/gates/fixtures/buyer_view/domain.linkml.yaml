@@ -1,0 +1,5 @@
+# Domain ontology binding for the VG-BUYER-VIEW gate fixture (verification/gates/buyer_view.sh).
+decision_types:
+  - id: "dom:BuyerFixtureDecision"
+    subclass_of: "agentce:ConsequentialDecision"
+    consequential: true

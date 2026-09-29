@@ -1,0 +1,24 @@
+id: BUY-03
+version: "2026.09"
+title: "Fixture control mapped only to a non-questionnaire framework"
+description: >
+  Gate fixture only (verification/gates/buyer_view.sh): conformant, but its only crosswalk entry cites
+  eu-ai-act, not caiq/ai-controls-matrix -- the buyer view's "maps to nothing in scope, not nothing"
+  semantics: present in this run's assertions.json, absent from buyer.json's answers.
+crosswalk:
+  - {framework: eu-ai-act, clause: "Art. 12", relation: maps, verified_against_text: false}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: any
+  minimum_evidence:
+    - {event: Decision, class: any}
+  shape: shapes/BUY-03.ttl
+expectations:
+  - {id: F1, text: "Fixture-only; not a real requirement."}
+severity: low
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+test_cases: []

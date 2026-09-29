@@ -3,6 +3,19 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.16.0
+
+- Added `VG-BUYER-VIEW`: the buyer view (18.18, Hill 8's buyer lens: "does this vendor's agent meet
+  what I asked?") renders generated CAIQ/AI Controls Matrix questionnaire answers grouped by question,
+  a one-page summary, and how to check this report -- matching a committed golden byte-for-byte on a
+  dedicated fixture (`verification/gates/fixtures/buyer_view/`, a four-control catalog over one shared
+  event that carries both `agent` and `time`, unlike the auditor_view fixture's event). BUY-01's own
+  evidence event id and BUY-02's own clause id each carry a distinct `<script>` fragment that every
+  rendering must escape, never emit raw; BUY-03 (mapped only to eu-ai-act) and BUY-04 (no crosswalk
+  entry) must both stay absent from the answer set ("maps to nothing in scope, not nothing").
+  `buyer.json`'s `counts` are checked against a fresh `aggregate()` over the same run's own
+  `assertions.json`, never a `report.json` (which does not exist).
+
 ## 0.15.0
 
 - Changed `VG-AUDIENCE-PRESETS`: the `auditor` preset (added alongside `VG-AUDITOR-VIEW` in 0.14.0) was

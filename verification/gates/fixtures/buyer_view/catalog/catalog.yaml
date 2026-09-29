@@ -1,0 +1,10 @@
+# A small, dedicated catalog for VG-BUYER-VIEW (18.18): four controls that exercise every section of
+# the buyer view over one shared Decision event (carries both `agent` and `time`, unlike the
+# auditor_view fixture's event) -- BUY-01 conformant with a caiq answer and a hostile evidence-event
+# id; BUY-02 insufficient_evidence with a caiq answer whose own clause id carries a second, distinct
+# hostile fragment; BUY-03 conformant but mapped only to eu-ai-act (absent from buyer.json's answers);
+# BUY-04 conformant with no crosswalk entry at all (also absent). Not a base or third-party catalog;
+# loaded only via --catalog-dir --allow-unverified-catalog by this gate's own script.
+id: buyer-view-fixture
+version: "2026.09"
+title: "VG-BUYER-VIEW gate fixture"
