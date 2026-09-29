@@ -1,11 +1,16 @@
-# Deviation register template (SPEC §10). This skill NEVER populates the register (rule S-3); the
-# operator adds entries and a named person confirms each (S-8). Left empty here on purpose.
+# Deviation register template (SPEC §6.5, §13.3.4; spec/report/deviation-register.schema.json). This
+# skill NEVER populates the register (rule S-3); the operator adds entries and a named person confirms
+# each (S-8). Left empty here on purpose. A lint-clean, unexpired entry flips its control's
+# non-conformant outcome to partial when `assess --deviations` runs; an expired one is ignored and
+# reported as a limitation, never applied.
 deviations: []
-# Example entry (operator-authored):
+# Example entry (operator-authored), every field required except granted/evidence_refs:
 # deviations:
 #   - control: "OVS-01"
-#     kind: compensating_control        # compensating_control | accepted_risk | not_applicable
-#     rationale: "<why>"
-#     evidence_ref: "<pointer>"
-#     confirmed_by: "<reviewer@org>"
-#     expires: "2027-01-01T00:00:00Z"
+#     rationale: "<why this deviation is accepted>"
+#     compensating_control: "<what mitigates the gap instead>"
+#     owner: "<accountable party; must differ from approver>"
+#     approver: "<the named person who confirmed this, per S-8>"
+#     granted: "2026-01-01T00:00:00Z"
+#     expiry: "2026-06-01T00:00:00Z"
+#     evidence_refs: ["<pointer to supporting evidence>"]

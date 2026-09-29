@@ -1953,6 +1953,30 @@ def test_assess_an_unquoted_yaml_expiry_date_is_still_checked_against_as_of(
     assert any(_DEV_CONTROL in limit for limit in manifest.get("limitations", []))
 
 
+def test_assess_refuses_a_deviation_whose_expiry_is_not_a_valid_date_rather_than_silently_applying_it(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An expiry that is present but unparseable (a bare integer with no separators, or a garbage
+    string) must refuse the run, not silently apply the deviation with its expiry check skipped."""
+    dev = tmp_path / "deviations.yaml"
+    dev.write_text(
+        "deviations:\n"
+        f"  - control: {_DEV_CONTROL}\n"
+        '    rationale: "r"\n'
+        '    compensating_control: "c"\n'
+        '    owner: "user:owner@example.com"\n'
+        '    approver: "user:approver@example.com"\n'
+        '    granted: "2025-08-01T00:00:00.000Z"\n'
+        "    expiry: 20210101\n",  # a bare int, not a YAML date -- unparseable, not a known-good shape
+        encoding="utf-8",
+    )
+    out = tmp_path / "o"
+    code = cli.main(_dev_argv(out, dev, "--json"))
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "input.deviation_invalid"
+
+
 def test_assess_ignores_and_reports_an_expired_deviation(tmp_path: Path) -> None:
     dev = _deviations_yaml(
         tmp_path, granted="2025-08-01T00:00:00.000Z", expiry="2025-12-01T00:00:00.000Z"

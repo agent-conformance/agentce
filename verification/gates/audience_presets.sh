@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
 # Build gate helper for VG-AUDIENCE-PRESETS: `agentce assess --for <preset>` resolves to the exact,
-# documented `--emit` set for each of the five audience presets (engineering, compliance, security,
-# ci, share), and the `CI` environment variable extends -- never replaces -- the legacy default when
-# neither `--for` nor `--emit` is given (contracts/P18-18.7.md).
+# documented `--emit` set for each of the six audience presets (engineering, compliance, security,
+# ci, share, auditor), and the `CI` environment variable extends -- never replaces -- the legacy
+# default when neither `--for` nor `--emit` is given (contracts/P18-18.7.md; auditor added by
+# contracts/P18-18.17.md's blast_radius).
 #
-# Seven real CLI invocations over one dedicated fixture catalog (AUD-01, verification/gates/fixtures/
+# Eight real CLI invocations over one dedicated fixture catalog (AUD-01, verification/gates/fixtures/
 # audience_presets/ -- one control the fixture's evidence bundle never satisfies, so every run reaches
 # a non-passing outcome and the `engineering` preset's skill/<subject>/findings/ is never empty):
-#   1-5. `assess --for <preset>` for each of the five presets -> the written file set under `--out`
+#   1-6. `assess --for <preset>` for each of the six presets -> the written file set under `--out`
 #        equals exactly the hand-written expected table below (never imported from the package under
 #        test, so editing PRESET_EMIT cannot also edit what this gate expects).
-#   6.   `env CI=true assess` with no `--for`/`--emit` -> the legacy default's files PLUS
+#   7.   `env CI=true assess` with no `--for`/`--emit` -> the legacy default's files PLUS
 #        report.junit.xml (additive, not the minimal `ci` preset's files).
-#   7.   `env -u CI assess` with no `--for`/`--emit` -> exactly the legacy default (no junit) -- the
-#        control run that an "always extend" regression would fail even though it might pass 6.
-# `agentce report --validate` is run over each of the five presets (exit 0 required); `engineering`'s
+#   8.   `env -u CI assess` with no `--for`/`--emit` -> exactly the legacy default (no junit) -- the
+#        control run that an "always extend" regression would fail even though it might pass 7.
+# `agentce report --validate` is run over each of the six presets (exit 0 required); `engineering`'s
 # remediation-package.json is additionally validated against the vendored schema directly (that
 # schema already exists but `validate_report` never applies it to this file).
 #
@@ -51,7 +52,7 @@ run_validate() {
   (cd "$root/engines/python" && env -u VIRTUAL_ENV PYTHONDONTWRITEBYTECODE=1 uv run --frozen agentce report --validate "$work/$1" >/dev/null)
 }
 
-for preset in engineering compliance security ci share; do
+for preset in engineering compliance security ci share auditor; do
   run_assess unset "$preset" --for "$preset"
   run_validate "$preset"
 done
@@ -114,6 +115,9 @@ EXPECTED = {
     "security": ALWAYS | MD_HTML | {"results.sarif", "security.md", "security.html", "security.json"},
     "ci": ALWAYS | {"results.sarif", "report.junit.xml"},
     "share": ALWAYS | MD_HTML | PACK | {"report.pdf", "public-statement.md"},
+    "auditor": ALWAYS
+    | PACK
+    | {"auditor.md", "auditor.html", "auditor.json", "oscal-ar.json", "oscal-ar.xml"},
     # The CI-detection control pair (D1/N7): additive over the legacy default, never the minimal
     # `ci` preset's files.
     "ci-auto": LEGACY_DEFAULT | {"report.junit.xml"},
@@ -141,7 +145,7 @@ if problems:
     sys.exit(1)
 
 print(
-    "audience-presets: all 5 presets and the CI-detection control pair match their expected file "
+    "audience-presets: all 6 presets and the CI-detection control pair match their expected file "
     "sets; engineering's remediation-package.json validates against its schema"
 )
 PY

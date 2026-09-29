@@ -80,6 +80,42 @@ def test_deviation_lint_refuses_insufficient(tmp_path: Path, capsys) -> None:
     )
 
 
+def test_deviation_lint_accepts_a_report_whose_deviation_is_already_applied(
+    tmp_path: Path, capsys
+) -> None:
+    """The finding-1 regression on the skill's own path: a fresh `assess --deviations` run already
+    flips `outcome` to `partial` and stamps `deviation`, so a re-lint against that same report must
+    not re-reject it for "got partial" (18.17 round 2 B3: this script had its own copy of the bug)."""
+    report = _report(
+        tmp_path,
+        [{"control": "OVS-03", "outcome": "partial", "subject": "s", "deviation": "OVS-03"}],
+    )
+    dev = tmp_path / "dev.yaml"
+    dev.write_text(
+        yaml.safe_dump(
+            {
+                "deviations": [
+                    {
+                        "control": "OVS-03",
+                        "rationale": "x",
+                        "compensating_control": "y",
+                        "owner": "a",
+                        "approver": "b",
+                        "granted": "2026-01-01",
+                        "expiry": "2026-03-01",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    code = deviation_lint.body(
+        ["--deviations", str(dev), "--report", str(report), "--json"]
+    )
+    assert code == OK
+    assert json.loads(capsys.readouterr().out)["problems"] == []
+
+
 def test_checklist_lint_valid(tmp_path: Path, capsys) -> None:
     rec = tmp_path / "OVS-09.yaml"
     rec.write_text(

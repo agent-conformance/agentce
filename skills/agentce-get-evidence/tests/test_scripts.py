@@ -229,6 +229,37 @@ def test_skill_is_for_the_coding_assistant_and_keeps_its_rules() -> None:
     assert rules == [f"S-{n}" for n in range(1, 11)]
 
 
+def test_deviations_template_example_matches_the_real_register_shape() -> None:
+    """The template's commented example must be the real, current six-field register shape
+    (18.17 round 2 N6): a copy of a stale example lints as `input.deviation_invalid`."""
+    from importlib import resources
+
+    import jsonschema
+    import yaml
+
+    from agentce import readiness
+
+    template = (ROOT / "assets" / "deviations.template.yaml").read_text(encoding="utf-8")
+    example_lines = [
+        line[2:] if line.startswith("# ") else line[1:]
+        for line in template.splitlines()
+        if line.startswith("#   ") or line.startswith("# deviations:")
+    ]
+    register = yaml.safe_load("\n".join(example_lines))
+    schema = json.loads(
+        resources.files("agentce.data.schemas")
+        .joinpath("deviation-register.schema.json")
+        .read_text("utf-8")
+    )
+    jsonschema.validate(register, schema)
+    problems = readiness.deviation_lint(
+        register["deviations"],
+        control_ids={"OVS-01"},
+        outcomes_by_control={"OVS-01": frozenset({"non-conformant"})},
+    )
+    assert problems == []
+
+
 def test_version_mismatch_gate_returns_exit_3(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     # If SKILL.md pins do not match the engine, every script stops with exit 3 (S-5).
     monkeypatch.setattr(

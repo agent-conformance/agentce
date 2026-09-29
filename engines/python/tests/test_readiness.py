@@ -273,6 +273,29 @@ def test_deviation_lint_rejects_a_duplicate_entry_for_the_same_control() -> None
     assert any("duplicate deviation entry" in p for p in problems)
 
 
+def test_deviation_lint_rejects_an_unparseable_granted_or_expiry_rather_than_silently_skipping_it() -> (
+    None
+):
+    problems = deviation_lint(
+        [_deviation(expiry="not-a-date")],
+        control_ids={"OVS-03"},
+        outcomes_by_control={"OVS-03": frozenset({"non-conformant"})},
+    )
+    assert any("expiry is not a valid ISO-8601 date" in p for p in problems)
+    non_string = deviation_lint(
+        [_deviation(expiry=20210101)],
+        control_ids={"OVS-03"},
+        outcomes_by_control={"OVS-03": frozenset({"non-conformant"})},
+    )
+    assert any("expiry is not a valid ISO-8601 date" in p for p in non_string)
+    granted = deviation_lint(
+        [_deviation(granted="not-a-date")],
+        control_ids={"OVS-03"},
+        outcomes_by_control={"OVS-03": frozenset({"non-conformant"})},
+    )
+    assert any("granted is not a valid ISO-8601 date" in p for p in granted)
+
+
 def test_deviation_lint_rejects_insufficient_evidence_even_alongside_a_non_conformant_outcome() -> (
     None
 ):

@@ -226,10 +226,16 @@ def deviation_lint(
             problems.append(
                 f"{control}: the approver must be a person distinct from the owner"
             )
-        granted, expiry = (
-            parse_date(deviation.get("granted")),
-            parse_date(deviation.get("expiry")),
-        )
+        granted_raw, expiry_raw = deviation.get("granted"), deviation.get("expiry")
+        granted, expiry = parse_date(granted_raw), parse_date(expiry_raw)
+        for date_field, raw, parsed in (
+            ("granted", granted_raw, granted),
+            ("expiry", expiry_raw, expiry),
+        ):
+            if raw and parsed is None:
+                problems.append(
+                    f"{control}: {date_field} is not a valid ISO-8601 date ({raw!r})"
+                )
         if granted and expiry and (expiry - granted).days > max_days:
             problems.append(f"{control}: deviation lifetime exceeds {max_days} days")
         if (

@@ -21,7 +21,7 @@
           "owner": {"type": "string", "description": "The accountable party; deviation_lint refuses approver == owner."},
           "approver": {"type": "string"},
           "granted": {"type": "string", "format": "date-time"},
-          "expiry": {"type": "string", "format": "date-time", "description": "deviation_lint refuses an expired or over-long deviation."},
+          "expiry": {"type": "string", "format": "date-time", "description": "deviation_lint refuses a deviation whose lifetime (expiry minus granted) exceeds the catalog maximum. An expiry that has already passed as of an applied deviation's reference date is not refused: it is ignored and reported as a limitation (SPEC 13.3.4)."},
           "evidence_refs": {"type": "array", "items": {"type": "string"}}
         }
       }
