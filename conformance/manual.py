@@ -267,7 +267,7 @@ def _deviation_lint_refuses() -> bool:
             }
         ],
         control_ids={"OVS-03", "INT-01"},
-        outcome_by_control={"OVS-03": "insufficient_evidence"},
+        outcomes_by_control={"OVS-03": frozenset({"insufficient_evidence"})},
     )
     int_family = deviation_lint(
         [
@@ -282,7 +282,7 @@ def _deviation_lint_refuses() -> bool:
             }
         ],
         control_ids={"INT-01"},
-        outcome_by_control={"INT-01": "non-conformant"},
+        outcomes_by_control={"INT-01": frozenset({"non-conformant"})},
     )
     return any("insufficient_evidence" in p for p in insufficient) and any(
         "INT family" in p for p in int_family

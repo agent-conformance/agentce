@@ -24,7 +24,7 @@ import tempfile
 from collections.abc import Iterable
 from contextlib import redirect_stdout
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +35,7 @@ from .. import (
     SPEC_VERSION,
     __version__,
     bundled,
+    i18n_format,
     messages,
     no_ml,
     readiness,
@@ -44,7 +45,7 @@ from .. import (
 from ..activity import summarize_activity
 from ..applicability import resolve as resolve_applicability
 from ..assertions import Assertion, aggregate
-from ..assess import assess_subjects, evaluated_nothing
+from ..assess import apply_deviations, assess_subjects, evaluated_nothing
 from ..blind_spots import catalog_support_view, compute_blind_spots
 from ..bundle import copy_bundle, load_bundle
 from ..canonical import canonical_string, canonicalize
@@ -92,6 +93,7 @@ from ..report import (
     write_report,
 )
 from ..result import CommandResult
+from ..safe_yaml import load_untrusted_yaml
 from ..state import StateDir, window_end
 from ..store import GraphStore
 from ..verdict import GAP_OUTCOMES
@@ -588,6 +590,19 @@ def _verify_report(
                 "the packaged domain binding was altered after signing; regenerate and re-sign "
                 "the report.",
             )
+    deviation_digest = inputs.get("deviation_register_digest")
+    deviations_path = report_dir / "bundle" / "deviations.yaml"
+    if deviation_digest is not None:
+        if (
+            not deviations_path.is_file()
+            or signing.sha256_prefixed(deviations_path.read_bytes()) != deviation_digest
+        ):
+            raise InputError(
+                "verify.report_evidence_tampered",
+                "bundle/deviations.yaml is missing or does not match its recorded digest.",
+                "the packaged deviation register was altered after signing; regenerate and "
+                "re-sign the report.",
+            )
     catalog_dir_order = packaging.get("catalog_dir_order", [])
     catalog_dir_digests = packaging.get("catalog_dir_digests", {})
     for position, label in enumerate(catalog_dir_order):
@@ -635,6 +650,8 @@ def _verify_report(
         ]
         if domain_digest is not None:
             argv += ["--domain", str(domain_path)]
+        if deviation_digest is not None:
+            argv += ["--deviations", str(deviations_path)]
         if vendored_labels:
             argv += ["--catalog", ",".join(vendored_labels)]
         argv += catalog_dir_args
@@ -902,9 +919,10 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     )
     out_dir = Path(out)
     domain_path_early = _opt_str(ns, "domain")
+    deviations_path = _opt_str(ns, "deviations")
     if package_for_sharing:
         _check_package_path_overlap(
-            out_dir, bundle, profile, domain_path_early, raw_catalog_dirs
+            out_dir, bundle, profile, domain_path_early, raw_catalog_dirs, deviations_path
         )
     if scanned is not None:
         scanned.write(out_dir, write_profile=derived_profile)
@@ -927,6 +945,8 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         shutil.copy2(profile, bundle_out / "applicability.yaml")
         if domain_path_early is not None:
             shutil.copy2(domain_path_early, bundle_out / "domain.linkml.yaml")
+        if deviations_path is not None:
+            shutil.copy2(deviations_path, bundle_out / "deviations.yaml")
         for i, raw_dir in enumerate(raw_catalog_dirs):
             src_dir = _require_dir(
                 raw_dir, key="catalog-dir", what="the catalog directory"
@@ -983,6 +1003,54 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     late_events: dict[str, int] = {}
     runtime_drift: list[dict[str, Any]] = []
     new_window_end = window_end(profile_obj, ingested.accepted)
+    # Deviation application (SPEC §13.3.4 Stage 2): lint the register against what this run actually
+    # found, apply it, and record the register's digest -- all before Stage 6a's incremental state and
+    # `write_report`, so `evaluated`'s flipped outcomes and `limitations`' expired-and-ignored entries
+    # are what everything downstream (state, manifest, claim, every rendering) sees.
+    deviations: list[dict[str, Any]] = []
+    deviation_register_digest: str | None = None
+    if deviations_path is not None:
+        deviation_file = _require_file(
+            deviations_path, key="deviations", what="the deviation register"
+        )
+        deviations = _load_deviation_register(deviation_file)
+        outcomes_by_control: dict[str, set[str]] = {}
+        for a in evaluated:
+            outcomes_by_control.setdefault(a.control, set()).add(a.outcome)
+        control_ids = {c.id for cat in catalogs for c in cat.controls}
+        problems = readiness.deviation_lint(
+            deviations,
+            control_ids=control_ids,
+            outcomes_by_control={
+                control: frozenset(outcomes)
+                for control, outcomes in outcomes_by_control.items()
+            },
+            as_of=new_window_end,
+        )
+        if problems:
+            raise InputError(
+                "input.deviation_invalid",
+                f"the deviation register at {deviations_path!r} is invalid: "
+                + "; ".join(problems),
+                "correct the deviation register and re-run.",
+            )
+        evaluated, deviation_expired = apply_deviations(
+            evaluated, deviations, as_of=new_window_end
+        )
+        if deviation_expired:
+            deviation_cat = messages.catalogue(_opt_str(ns, "report_language") or "en")
+            deviation_by_control = {str(d.get("control")): d for d in deviations}
+            for control in deviation_expired:
+                limitations.append(
+                    i18n_format.format_message(
+                        deviation_cat["readiness.deviation_expired_ignored"],
+                        control=control,
+                        expiry=deviation_by_control.get(control, {}).get("expiry", ""),
+                    )
+                )
+        deviation_register_digest = signing.sha256_prefixed(
+            deviation_file.read_bytes()
+        )
     if state_arg is not None:
         state = StateDir.load(
             Path(state_arg)
@@ -1024,6 +1092,8 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         reverify_argv += ["--catalog-dir", _scrub_path(catalog_dir)]
     if domain_path is not None:
         reverify_argv += ["--domain", _scrub_path(domain_path)]
+    if deviations_path is not None:
+        reverify_argv += ["--deviations", _scrub_path(deviations_path)]
     extra_outputs: dict[str, bytes] = {}
     if runtime_drift:
         extra_outputs["runtime_drift.jsonl"] = (
@@ -1085,6 +1155,8 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         blind_spots=blind_spots,
         applicability_profile_digest=applicability_profile_digest,
         domain_binding_digest=domain_binding_digest,
+        deviation_register_digest=deviation_register_digest,
+        deviations=deviations,
         profile=profile_obj,
         declared_subject_ids=declared_subject_ids,
         for_preset=for_preset,
@@ -1294,12 +1366,61 @@ def _verify_catalog_dirs(
     return limitations
 
 
+def _load_deviation_register(path: Path) -> list[dict[str, Any]]:
+    """Load and validate a deviation register's *shape* (SPEC §13.3.4): a mapping with a top-level
+    ``deviations`` list of mappings, refused as ``input.deviation_invalid`` rather than crashing on
+    hostile or malformed YAML (a non-mapping top level, a ``deviations`` key that is not a list, or a
+    non-mapping entry). Every ``granted``/``expiry`` value that YAML parsed as a ``date``/``datetime``
+    (an unquoted ``expiry: 2021-12-31``) is normalized to its ISO string form, so an unquoted date
+    validates and compares exactly like a quoted one -- ``deviation_lint``'s and
+    ``apply_deviations``'s own date checks would otherwise silently treat it as absent, bypassing both
+    the 180-day cap and the expiry check. Used by both ``cmd_assess`` and ``cmd_readiness``; this is
+    the shape-check only, not full ``deviation-register.schema.json`` validation (``deviation_lint``
+    remains the established level of rigor for the register's *content*)."""
+    data = (
+        load_untrusted_yaml(
+            path, key="input.deviation_invalid", what="the deviation register"
+        )
+        or {}
+    )
+    if not isinstance(data, dict):
+        raise InputError(
+            "input.deviation_invalid",
+            f"the deviation register at {str(path)!r} is not a mapping.",
+            "the register must be a mapping with a top-level `deviations:` list.",
+        )
+    raw = data.get("deviations", [])
+    if not isinstance(raw, list):
+        raise InputError(
+            "input.deviation_invalid",
+            f"the deviation register at {str(path)!r}'s `deviations` key is not a list.",
+            "`deviations:` must be a list of deviation entries.",
+        )
+    entries: list[dict[str, Any]] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            raise InputError(
+                "input.deviation_invalid",
+                f"the deviation register at {str(path)!r} has a deviation entry that is not a "
+                "mapping.",
+                "each entry under `deviations:` must be a mapping of the register's own fields.",
+            )
+        entries.append(
+            {
+                k: (str(v) if isinstance(v, (date, datetime)) else v)
+                for k, v in entry.items()
+            }
+        )
+    return entries
+
+
 def _check_package_path_overlap(
     out_dir: Path,
     bundle: Path,
     profile: Path,
     domain_path: str | None,
     catalog_dirs: list[str],
+    deviations_path: str | None = None,
 ) -> None:
     """Refuse (``input.package_path_overlap``) before anything is written when ``--out`` is, contains,
     or sits inside any input path ``--package-for-sharing`` will copy from (SPEC 18.8 D4): packaging
@@ -1309,6 +1430,8 @@ def _check_package_path_overlap(
     candidates: list[tuple[str, Path]] = [("--bundle", bundle), ("--profile", profile)]
     if domain_path is not None:
         candidates.append(("--domain", Path(domain_path)))
+    if deviations_path is not None:
+        candidates.append(("--deviations", Path(deviations_path)))
     for raw_dir in catalog_dirs:
         candidates.append(("--catalog-dir", Path(raw_dir)))
     for label, path in candidates:
@@ -1513,7 +1636,11 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
     elif fmt == "sarif":
         rendering = json.dumps(render_sarif(assertions), sort_keys=True, indent=2)
     elif fmt == "public":
-        rendering = render_public_statement(assertions, catalogs=catalogs)
+        rendering = render_public_statement(
+            assertions,
+            catalogs=catalogs,
+            deviations=sorted({a.deviation for a in assertions if a.deviation}),
+        )
     else:  # pack
         role = _opt_str(ns, "role")
         by_subject: dict[str, list[Assertion]] = {}
@@ -2676,12 +2803,9 @@ def cmd_readiness(ns: argparse.Namespace) -> CommandResult:
     deviations: list[dict[str, Any]] = []
     dev_path = _opt_str(ns, "deviations")
     if dev_path:
-        loaded = yaml.safe_load(
-            _require_file(
-                dev_path, key="deviations", what="the deviation register"
-            ).read_text("utf-8")
+        deviations = _load_deviation_register(
+            _require_file(dev_path, key="deviations", what="the deviation register")
         )
-        deviations = list((loaded or {}).get("deviations", []))
     verdict = readiness.compute_readiness(
         report_dir,
         severities=_readiness_severities(ns),

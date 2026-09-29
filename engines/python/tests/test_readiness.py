@@ -159,7 +159,7 @@ def test_valid_deviation_lints_clean() -> None:
     problems = deviation_lint(
         [_deviation()],
         control_ids={"OVS-03"},
-        outcome_by_control={"OVS-03": "non-conformant"},
+        outcomes_by_control={"OVS-03": frozenset({"non-conformant"})},
     )
     assert problems == []
 
@@ -168,7 +168,7 @@ def test_deviation_on_insufficient_is_refused() -> None:
     problems = deviation_lint(
         [_deviation()],
         control_ids={"OVS-03"},
-        outcome_by_control={"OVS-03": "insufficient_evidence"},
+        outcomes_by_control={"OVS-03": frozenset({"insufficient_evidence"})},
     )
     assert any("insufficient_evidence" in p for p in problems)
 
@@ -177,7 +177,7 @@ def test_deviation_on_int_family_is_refused() -> None:
     problems = deviation_lint(
         [_deviation(control="INT-01")],
         control_ids={"INT-01"},
-        outcome_by_control={"INT-01": "non-conformant"},
+        outcomes_by_control={"INT-01": frozenset({"non-conformant"})},
     )
     assert any("INT family" in p for p in problems)
 
@@ -186,7 +186,7 @@ def test_deviation_requires_distinct_approver_and_fields() -> None:
     problems = deviation_lint(
         [_deviation(approver="alice", rationale="")],
         control_ids={"OVS-03"},
-        outcome_by_control={"OVS-03": "non-conformant"},
+        outcomes_by_control={"OVS-03": frozenset({"non-conformant"})},
     )
     assert any("distinct" in p for p in problems)
     assert any("missing rationale" in p for p in problems)
@@ -196,14 +196,99 @@ def test_deviation_expiry_within_max() -> None:
     problems = deviation_lint(
         [_deviation(expiry="2027-01-01")],
         control_ids={"OVS-03"},
-        outcome_by_control={"OVS-03": "non-conformant"},
+        outcomes_by_control={"OVS-03": frozenset({"non-conformant"})},
     )
     assert any("lifetime exceeds" in p for p in problems)
 
 
 def test_unknown_control_is_refused() -> None:
     problems = deviation_lint(
-        [_deviation(control="ZZZ-99")], control_ids={"OVS-03"}, outcome_by_control={}
+        [_deviation(control="ZZZ-99")], control_ids={"OVS-03"}, outcomes_by_control={}
+    )
+    assert any("not in the catalog" in p for p in problems)
+
+
+def test_deviation_lint_accepts_multi_subject_control_regardless_of_iteration_order() -> (
+    None
+):
+    outcomes = frozenset({"non-conformant", "conformant"})
+    a = deviation_lint(
+        [_deviation()], control_ids={"OVS-03"}, outcomes_by_control={"OVS-03": outcomes}
+    )
+    b = deviation_lint(
+        [_deviation()],
+        control_ids={"OVS-03"},
+        outcomes_by_control={"OVS-03": frozenset(reversed(list(outcomes)))},
+    )
+    assert a == b == []
+
+
+def test_deviation_lint_skips_the_outcome_check_for_an_already_applied_control() -> None:
+    problems = deviation_lint(
+        [_deviation()],
+        control_ids={"OVS-03"},
+        outcomes_by_control={"OVS-03": frozenset({"partial"})},
+        applied_controls=frozenset({"OVS-03"}),
+    )
+    assert problems == []
+
+
+def test_deviation_lint_rejects_an_applied_deviation_that_has_expired() -> None:
+    problems = deviation_lint(
+        [_deviation(expiry="2020-01-01", granted="2019-08-01")],
+        control_ids={"OVS-03"},
+        outcomes_by_control={"OVS-03": frozenset({"partial"})},
+        applied_controls=frozenset({"OVS-03"}),
+        as_of="2026-01-01",
+    )
+    assert any("applied deviation has expired" in p for p in problems)
+
+
+def test_deviation_lint_does_not_reject_an_unexpired_or_not_yet_applied_entry() -> None:
+    unexpired = deviation_lint(
+        [_deviation(expiry="2027-01-01", granted="2026-11-01")],
+        control_ids={"OVS-03"},
+        outcomes_by_control={"OVS-03": frozenset({"partial"})},
+        applied_controls=frozenset({"OVS-03"}),
+        as_of="2026-12-01",
+    )
+    assert not any("expired" in p for p in unexpired)
+    not_yet_applied = deviation_lint(
+        [_deviation(expiry="2020-01-01")],
+        control_ids={"OVS-03"},
+        outcomes_by_control={"OVS-03": frozenset({"non-conformant"})},
+        as_of="2026-01-01",
+    )
+    assert not any("expired" in p for p in not_yet_applied)
+
+
+def test_deviation_lint_rejects_a_duplicate_entry_for_the_same_control() -> None:
+    problems = deviation_lint(
+        [_deviation(), _deviation()],
+        control_ids={"OVS-03"},
+        outcomes_by_control={"OVS-03": frozenset({"non-conformant"})},
+    )
+    assert any("duplicate deviation entry" in p for p in problems)
+
+
+def test_deviation_lint_rejects_insufficient_evidence_even_alongside_a_non_conformant_outcome() -> (
+    None
+):
+    problems = deviation_lint(
+        [_deviation()],
+        control_ids={"OVS-03"},
+        outcomes_by_control={
+            "OVS-03": frozenset({"non-conformant", "insufficient_evidence"})
+        },
+    )
+    assert any("insufficient_evidence" in p for p in problems)
+
+
+def test_deviation_lint_rejects_a_deviation_for_a_control_not_in_the_run() -> None:
+    problems = deviation_lint(
+        [_deviation(control="OVS-99")],
+        control_ids={"OVS-03"},
+        outcomes_by_control={},
     )
     assert any("not in the catalog" in p for p in problems)
 
@@ -215,6 +300,50 @@ def test_invalid_deviation_makes_report_not_ready(tmp_path: Path) -> None:
     )
     verdict = compute_readiness(
         report, severities=_SEVERITIES, deviations=[_deviation(expiry="2027-06-01")]
+    )
+    assert verdict["verdict"] == NOT_READY
+
+
+def test_compute_readiness_accepts_a_report_whose_deviation_was_already_applied(
+    tmp_path: Path,
+) -> None:
+    """A re-lint after ``assess.apply_deviations`` sees ``outcome: partial`` and ``deviation`` set --
+    the finding-1 regression: readiness must not reject the very state assess produces."""
+    report = _report(
+        tmp_path,
+        assertions=[
+            {
+                "control": "OVS-03",
+                "outcome": "partial",
+                "deviation": "OVS-03",
+                "subject": "s",
+                "window": {"start": "2026-01-01", "end": "2026-02-01"},
+            }
+        ],
+    )
+    verdict = compute_readiness(
+        report, severities=_SEVERITIES, deviations=[_deviation()]
+    )
+    assert verdict["verdict"] != NOT_READY
+
+
+def test_compute_readiness_not_ready_when_an_applied_deviation_has_expired(
+    tmp_path: Path,
+) -> None:
+    report = _report(
+        tmp_path,
+        assertions=[
+            {
+                "control": "OVS-03",
+                "outcome": "partial",
+                "deviation": "OVS-03",
+                "subject": "s",
+                "window": {"start": "2026-01-01", "end": "2026-02-01"},
+            }
+        ],
+    )
+    verdict = compute_readiness(
+        report, severities=_SEVERITIES, deviations=[_deviation(expiry="2020-01-01")]
     )
     assert verdict["verdict"] == NOT_READY
 

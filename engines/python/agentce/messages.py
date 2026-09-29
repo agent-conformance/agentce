@@ -19,7 +19,7 @@ DEFAULT_LANGUAGE = "en"
 
 #: Which of the catalogue's keys this module renders. Their English text lives in the vendored
 #: catalogue, never hardcoded in this module.
-_REPORT_KEY_PREFIXES = ("report.", "verdict.", "next.", "outcome.")
+_REPORT_KEY_PREFIXES = ("report.", "verdict.", "next.", "outcome.", "readiness.")
 
 
 @functools.cache

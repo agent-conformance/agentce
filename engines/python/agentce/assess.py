@@ -10,6 +10,7 @@ evaluated in Phase 1; other rungs become ``not_assessed`` until their evaluators
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
 
 from .applicability import effective_roles
@@ -20,6 +21,7 @@ from .domain import DomainBinding
 from .graph import build_graph
 from .iri import event_iri
 from .profile import Profile, Subject
+from .readiness import parse_date
 from .store import GraphStore
 from .structural import evaluate_shape, within_tolerance
 
@@ -246,3 +248,45 @@ def assess_subjects(
                     )
                 )
     return assertions
+
+
+def apply_deviations(
+    assertions: list[Assertion],
+    deviations: list[dict[str, Any]],
+    *,
+    as_of: str,
+) -> tuple[list[Assertion], list[str]]:
+    """Apply an already-linted deviation register to ``assertions`` (SPEC §13.3.4 Stage 2): every
+    ``non-conformant`` assertion whose control has a matching, unexpired register entry becomes
+    ``partial`` and carries that control's id as ``deviation``. Pure: never mutates its inputs, never
+    reads a clock or the filesystem itself (``as_of`` is the caller's already-computed, deterministic
+    reference date).
+
+    An entry whose ``expiry`` is before ``as_of`` is never applied -- the matching assertion is
+    returned unchanged and the control id is collected into the second return value (``expired``) so
+    the caller can report it as an ignored, expired deviation (a limitation, never a lint failure;
+    ``readiness.deviation_lint`` only rejects an *applied* deviation that has since expired)."""
+    by_control = {str(d.get("control")): d for d in deviations}
+    expired: list[str] = []
+    applied: list[Assertion] = []
+    for assertion in assertions:
+        entry = (
+            by_control.get(assertion.control)
+            if assertion.outcome == "non-conformant"
+            else None
+        )
+        if entry is None:
+            applied.append(assertion)
+            continue
+        expiry = parse_date(entry.get("expiry"))
+        as_of_date = parse_date(as_of)
+        if expiry is not None and as_of_date is not None and expiry < as_of_date:
+            expired.append(assertion.control)
+            applied.append(assertion)
+            continue
+        applied.append(
+            dataclasses.replace(
+                assertion, outcome="partial", deviation=assertion.control
+            )
+        )
+    return applied, expired

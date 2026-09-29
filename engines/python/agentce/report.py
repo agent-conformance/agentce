@@ -1129,18 +1129,31 @@ def _oscal_timestamp(assertions: list[Assertion]) -> str:
     return min(a.window[0] for a in assertions)
 
 
-def render_oscal(assertions: list[Assertion]) -> dict[str, Any]:
+def render_oscal(
+    assertions: list[Assertion],
+    *,
+    deviations: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Render ``oscal-ar.json`` as an importable NIST OSCAL 1.1.2 Assessment Results document (SPEC
     §9, §9.4): every result carries real ``observations[]`` built from the assertion's own evidence
     pointers, every finding resolves to the observation that backs it and links to its real control id
     so a GRC platform can trace the finding to the requirement it assesses. No catalog object is
     needed here -- the control id alone is the traceable token (SPEC §7.3's control ids are globally
-    unique) -- so this keeps its existing ``(assertions)`` signature."""
+    unique).
+
+    ``deviations`` (18.17, SPEC.md:1166): the same already-linted register ``assess.apply_deviations``
+    applied, so every finding whose assertion carries a ``deviation`` gets one ``risks[]`` entry citing
+    its finding uuid, with ``mitigating-factors`` from the matching register entry's
+    ``compensating_control``. Never fabricated: a finding whose register detail is unavailable (this
+    function called without ``deviations``, e.g. re-rendering from ``assertions.json`` alone) gets no
+    risk entry for it -- no fact the records do not support."""
     ordered = sorted(assertions, key=lambda x: (x.subject, x.control))
     when = _oscal_timestamp(assertions)
+    deviations_by_control = {str(d.get("control")): d for d in (deviations or [])}
 
     observations: list[dict[str, Any]] = []
     findings: list[dict[str, Any]] = []
+    risks: list[dict[str, Any]] = []
     for a in ordered:
         # `control`/`subject` back both this assertion's observation and its finding, so convert each
         # once and reuse it rather than converting twice per assertion (`_uuid` would otherwise be
@@ -1181,6 +1194,34 @@ def render_oscal(assertions: list[Assertion]) -> dict[str, Any]:
             "links": [{"href": f"urn:agentce:control:{a.control}", "rel": "control"}],
             "related-observations": [{"observation-uuid": obs_uuid}],
         }
+        deviation_entry = (
+            deviations_by_control.get(a.deviation) if a.deviation else None
+        )
+        if deviation_entry is not None:
+            risk_uuid = _uuid_raw("risk", safe_control, safe_subject)
+            risks.append(
+                {
+                    "uuid": risk_uuid,
+                    "title": f"Accepted deviation for {a.control} on {a.subject}.",
+                    "description": (
+                        f"{a.control} is non-conformant for {a.subject}; a deviation was "
+                        "reviewed and accepted (SPEC §13.3.4)."
+                    ),
+                    "statement": str(deviation_entry.get("rationale", "")),
+                    "status": "deviation-approved",
+                    "mitigating-factors": [
+                        {
+                            "uuid": _uuid_raw(
+                                "mitigating-factor", safe_control, safe_subject
+                            ),
+                            "description": str(
+                                deviation_entry.get("compensating_control", "")
+                            ),
+                        }
+                    ],
+                }
+            )
+            finding["related-risks"] = [{"risk-uuid": risk_uuid}]
         findings.append(finding)
 
     result: dict[str, Any] = {
@@ -1197,6 +1238,8 @@ def render_oscal(assertions: list[Assertion]) -> dict[str, Any]:
         result["observations"] = observations
     if findings:
         result["findings"] = findings
+    if risks:
+        result["risks"] = risks
 
     return {
         "assessment-results": {
@@ -2265,6 +2308,7 @@ def build_manifest(
     started_at: str | None = None,
     applicability_profile_digest: str | None = None,
     domain_binding_digest: str | None = None,
+    deviation_register_digest: str | None = None,
 ) -> dict[str, Any]:
     package_digest = _package_digest()
     host = hashlib.sha256(
@@ -2279,6 +2323,8 @@ def build_manifest(
         inputs["applicability_profile_digest"] = applicability_profile_digest
     if domain_binding_digest is not None:
         inputs["domain_binding_digest"] = domain_binding_digest
+    if deviation_register_digest is not None:
+        inputs["deviation_register_digest"] = deviation_register_digest
     manifest: dict[str, Any] = {
         "agentce_manifest_version": 1,
         "engine": {
@@ -2351,6 +2397,11 @@ def _build_claim(
         # ``limitations`` is optional in claim.schema.json, so an ordinary claim omits it; a claim
         # produced over an unverified catalog carries what the claimant is signing over (SPEC §8.7).
         body["limitations"] = limitations
+    deviations = sorted({a.deviation for a in assertions if a.deviation})
+    if deviations:
+        # claim.schema.json's own `deviations[]` field (SPEC §9.1): a signed claim is otherwise silent
+        # about a real deviation applied to what it attests.
+        body["deviations"] = deviations
     claim_id = "sha256:" + hashlib.sha256(canonical.canonicalize(body)).hexdigest()
     return {"claim_id": claim_id, **body}
 
@@ -2400,6 +2451,8 @@ def write_report(
     blind_spots: dict[str, Any] | None = None,
     applicability_profile_digest: str | None = None,
     domain_binding_digest: str | None = None,
+    deviation_register_digest: str | None = None,
+    deviations: list[dict[str, Any]] | None = None,
     profile: Profile | None = None,
     declared_subject_ids: frozenset[str] | None = None,
     for_preset: str | None = None,
@@ -2441,10 +2494,13 @@ def write_report(
     fail ``compute_blind_spots``'s positional pairing against any non-empty ``assertions`` (RFC 0008
     Sec.6), so every real call site must compute and pass its own.
 
-    ``applicability_profile_digest``/``domain_binding_digest`` (sha256 of the resolved profile/domain
-    file bytes, computed by the caller) land in ``manifest.json``'s existing, previously-unpopulated
-    schema properties of the same names (18.8) -- present on every run regardless of whether it was
-    packaged for sharing.
+    ``applicability_profile_digest``/``domain_binding_digest``/``deviation_register_digest`` (sha256 of
+    the resolved profile/domain/deviation-register file bytes, computed by the caller) land in
+    ``manifest.json``'s existing, previously-unpopulated schema properties of the same names (18.8) --
+    present on every run regardless of whether it was packaged for sharing. ``deviations`` (the same
+    already-linted register ``assess.apply_deviations`` applied) feeds ``render_oscal``'s risk entries,
+    ``render_public_statement``'s and ``claim.json``'s accepted-deviations list, and the auditor view
+    (18.17) -- never re-validated here, never a second source of truth.
 
     ``profile``/``declared_subject_ids`` (18.14, Hill 7): when ``profile`` names more than one
     subject, every agent's records go side by side -- ``project.md``/``.html``/``.json`` (the project
@@ -2666,7 +2722,7 @@ def write_report(
 
     oscal_doc: dict[str, Any] | None = None
     if wants("oscal") or wants("oscal_xml"):
-        oscal_doc = render_oscal(assertions)
+        oscal_doc = render_oscal(assertions, deviations=deviations)
     if (wants("oscal") or wants("oscal_xml")) and oscal_doc is not None:
         # oscal-ar.xml is a serialization of this same object (SPEC §9.4): write the JSON source
         # alongside it even when only `oscal_xml` was requested, so the two never diverge.
@@ -2693,6 +2749,7 @@ def write_report(
             render_public_statement(
                 assertions,
                 catalogs=[f"{c.id}@{c.version}" for c in catalogs],
+                deviations=sorted({a.deviation for a in assertions if a.deviation}),
             ),
         )
 
@@ -2783,7 +2840,10 @@ def write_report(
         # claim.json is unsigned here (SPEC §9.1: the engine never signs its own claim); it exists
         # so the already-built `agentce sign --as claimant|assessor` can reach and sign a real run.
         claim = _build_claim(
-            assertions, catalogs=catalogs, operator=operator, limitations=limitations
+            assertions,
+            catalogs=catalogs,
+            operator=operator,
+            limitations=limitations,
         )
         (out_dir / "claim.json").write_text(
             json.dumps(claim, sort_keys=True, indent=2) + "\n", encoding="utf-8"
@@ -2801,6 +2861,7 @@ def write_report(
         started_at=started_at,
         applicability_profile_digest=applicability_profile_digest,
         domain_binding_digest=domain_binding_digest,
+        deviation_register_digest=deviation_register_digest,
     )
     (out_dir / "manifest.json").write_text(
         json.dumps(manifest, sort_keys=True, indent=2), encoding="utf-8"

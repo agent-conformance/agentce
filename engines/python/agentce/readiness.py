@@ -63,7 +63,10 @@ def _schema(name: str) -> dict[str, Any]:
     return parsed
 
 
-def _parse_date(value: Any) -> date | None:
+def parse_date(value: Any) -> date | None:
+    """Parse an ISO 8601 date or datetime string to a ``date``; anything else (not a string, or not
+    parseable) is ``None`` -- never an exception, so a hostile or malformed field is simply absent for
+    comparison, not a crash."""
     if not isinstance(value, str):
         return None
     try:
@@ -134,13 +137,27 @@ def compute_readiness(
                 )
 
     if deviations:
-        outcome_by_control = {
-            str(a.get("control")): str(a.get("outcome")) for a in assertions
-        }
+        outcomes_by_control: dict[str, set[str]] = {}
+        applied_controls: set[str] = set()
+        window_ends: list[str] = []
+        for a in assertions:
+            control = str(a.get("control"))
+            outcomes_by_control.setdefault(control, set()).add(str(a.get("outcome")))
+            if a.get("deviation"):
+                applied_controls.add(control)
+            window = a.get("window") or {}
+            end = window.get("end")
+            if end:
+                window_ends.append(str(end))
         problems = deviation_lint(
             deviations,
             control_ids=set(severities),
-            outcome_by_control=outcome_by_control,
+            outcomes_by_control={
+                control: frozenset(outcomes)
+                for control, outcomes in outcomes_by_control.items()
+            },
+            applied_controls=frozenset(applied_controls),
+            as_of=max(window_ends) if window_ends else None,
         )
         reasons.extend(f"invalid deviation: {p}" for p in problems)
 
@@ -158,31 +175,49 @@ def deviation_lint(
     deviations: list[dict[str, Any]],
     *,
     control_ids: set[str],
-    outcome_by_control: dict[str, str],
+    outcomes_by_control: dict[str, frozenset[str]],
+    applied_controls: frozenset[str] = frozenset(),
+    as_of: str | None = None,
     max_days: int = DEFAULT_MAX_DEVIATION_DAYS,
 ) -> list[str]:
     """Enforce the deviation rules of SPEC §13.3.4: the control exists and its outcome was
     ``non-conformant`` (never ``insufficient_evidence``), no deviation touches the INT family, every
     field is present, the approver is a named person distinct from the owner, and the deviation
-    expires within the catalog's maximum lifetime."""
+    expires within the catalog's maximum lifetime.
+
+    ``outcomes_by_control`` carries every outcome recorded for a control across every subject in this
+    run (not a single collapsed value), so the accept/reject verdict never depends on assertion
+    iteration order. A control already in ``applied_controls`` (its deviation was applied by
+    ``assess.apply_deviations``) skips the outcome re-check entirely -- its outcome is now ``partial``,
+    which a fresh readiness re-lint must not reject -- but is instead checked, when ``as_of`` is given,
+    against its own ``expiry``: an *applied* deviation that has since expired is flagged. An expiry on a
+    not-yet-applied entry is never a lint failure (that is ``apply_deviations``'s job: ignored and
+    reported, never refused)."""
     problems: list[str] = []
+    seen_controls: set[str] = set()
+    as_of_date = parse_date(as_of) if as_of is not None else None
     for deviation in deviations:
         control = str(deviation.get("control", ""))
+        if control in seen_controls:
+            problems.append(f"{control}: duplicate deviation entry for this control")
+        seen_controls.add(control)
         if control not in control_ids:
             problems.append(f"{control or '<none>'}: control is not in the catalog")
         if control.split("-", 1)[0] == _INT_FAMILY:
             problems.append(
                 f"{control}: the INT family cannot be deviated (integrity and coverage)"
             )
-        outcome = outcome_by_control.get(control)
-        if outcome == "insufficient_evidence":
-            problems.append(
-                f"{control}: insufficient_evidence is an evidence gap, not a risk acceptance"
-            )
-        elif outcome is not None and outcome != "non-conformant":
-            problems.append(
-                f"{control}: only a non-conformant outcome may be deviated (got {outcome})"
-            )
+        if control not in applied_controls:
+            outcomes = outcomes_by_control.get(control, frozenset())
+            if "insufficient_evidence" in outcomes:
+                problems.append(
+                    f"{control}: insufficient_evidence is an evidence gap, not a risk acceptance"
+                )
+            elif outcomes and "non-conformant" not in outcomes:
+                problems.append(
+                    f"{control}: only a non-conformant outcome may be deviated "
+                    f"(got {', '.join(sorted(outcomes))})"
+                )
         for field in _DEVIATION_FIELDS:
             if not deviation.get(field):
                 problems.append(f"{control}: deviation is missing {field}")
@@ -192,11 +227,20 @@ def deviation_lint(
                 f"{control}: the approver must be a person distinct from the owner"
             )
         granted, expiry = (
-            _parse_date(deviation.get("granted")),
-            _parse_date(deviation.get("expiry")),
+            parse_date(deviation.get("granted")),
+            parse_date(deviation.get("expiry")),
         )
         if granted and expiry and (expiry - granted).days > max_days:
             problems.append(f"{control}: deviation lifetime exceeds {max_days} days")
+        if (
+            as_of_date is not None
+            and expiry is not None
+            and control in applied_controls
+            and expiry < as_of_date
+        ):
+            problems.append(
+                f"{control}: applied deviation has expired (expiry {deviation.get('expiry')})"
+            )
     return problems
 
 
