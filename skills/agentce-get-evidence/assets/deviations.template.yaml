@@ -4,7 +4,7 @@
 # non-conformant outcome to partial when `assess --deviations` runs; an expired one is ignored and
 # reported as a limitation, never applied.
 deviations: []
-# Example entry (operator-authored), every field required except granted/evidence_refs:
+# Example entry (operator-authored), every field required except evidence_refs:
 # deviations:
 #   - control: "OVS-01"
 #     rationale: "<why this deviation is accepted>"
