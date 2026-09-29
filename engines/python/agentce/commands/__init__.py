@@ -24,7 +24,7 @@ import tempfile
 from collections.abc import Iterable
 from contextlib import redirect_stdout
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -1421,13 +1421,8 @@ def _load_deviation_register(path: Path) -> list[dict[str, Any]]:
                 "mapping.",
                 "each entry under `deviations:` must be a mapping of the register's own fields.",
             )
-        entries.append(
-            {
-                k: (str(v) if isinstance(v, (date, datetime)) else v)
-                for k, v in entry.items()
-            }
-        )
-    return entries
+        entries.append(entry)
+    return readiness.normalize_deviation_dates(entries)
 
 
 def _check_package_path_overlap(

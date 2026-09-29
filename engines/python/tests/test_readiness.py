@@ -16,6 +16,7 @@ from agentce.readiness import (
     claim_check,
     compute_readiness,
     deviation_lint,
+    normalize_deviation_dates,
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -294,6 +295,41 @@ def test_deviation_lint_rejects_an_unparseable_granted_or_expiry_rather_than_sil
         outcomes_by_control={"OVS-03": frozenset({"non-conformant"})},
     )
     assert any("granted is not a valid ISO-8601 date" in p for p in granted)
+
+
+def test_normalize_deviation_dates_converts_yaml_date_objects_to_their_iso_string() -> (
+    None
+):
+    """Every caller that loads a register straight off disk (an unquoted `expiry: 2026-03-01` YAML
+    parses as a `date`, not a `str`) must call this before `deviation_lint`/`compute_readiness`, or
+    `parse_date` silently treats the field as absent (round-2 regression: two `agentce-prepare-to-share`
+    scripts called `deviation_lint`/`compute_readiness` directly on an un-normalized register)."""
+    from datetime import date, datetime
+
+    normalized = normalize_deviation_dates(
+        [
+            {
+                "control": "OVS-03",
+                "granted": date(2026, 1, 1),
+                "expiry": datetime(2026, 3, 1, 0, 0, 0),
+                "rationale": "already a string",
+            }
+        ]
+    )
+    assert normalized == [
+        {
+            "control": "OVS-03",
+            "granted": "2026-01-01",
+            "expiry": "2026-03-01 00:00:00",
+            "rationale": "already a string",
+        }
+    ]
+    problems = deviation_lint(
+        normalized,
+        control_ids={"OVS-03"},
+        outcomes_by_control={"OVS-03": frozenset({"non-conformant"})},
+    )
+    assert not any("not a valid ISO-8601 date" in p for p in problems)
 
 
 def test_deviation_lint_rejects_insufficient_evidence_even_alongside_a_non_conformant_outcome() -> (

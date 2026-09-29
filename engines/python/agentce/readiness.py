@@ -63,6 +63,25 @@ def _schema(name: str) -> dict[str, Any]:
     return parsed
 
 
+def normalize_deviation_dates(
+    deviations: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Normalize a deviation register's ``granted``/``expiry`` values that YAML parsed as a
+    ``date``/``datetime`` (an unquoted ``expiry: 2021-12-31``) to their ISO string form, so an
+    unquoted date validates and compares exactly like a quoted one -- :func:`deviation_lint` and
+    :func:`compute_readiness` would otherwise treat it as absent via :func:`parse_date`, bypassing
+    both the 180-day cap and the expiry check. Every caller that loads a register straight off disk
+    (``cmd_assess``/``cmd_readiness`` and the ``agentce-prepare-to-share`` skill scripts) must call
+    this before passing entries to either function."""
+    return [
+        {
+            k: (str(v) if isinstance(v, (date, datetime)) else v)
+            for k, v in entry.items()
+        }
+        for entry in deviations
+    ]
+
+
 def parse_date(value: Any) -> date | None:
     """Parse an ISO 8601 date or datetime string to a ``date``; anything else (not a string, or not
     parseable) is ``None`` -- never an exception, so a hostile or malformed field is simply absent for
