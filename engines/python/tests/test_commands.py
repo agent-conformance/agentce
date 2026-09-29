@@ -117,6 +117,15 @@ _TOKEN_FILES: dict[str, tuple[str, ...]] = {
     ),
 }
 
+#: Files a preset gates outside `--emit` entirely (18.16's `for_preset` mechanism,
+#: contracts/P18-18.16.md `foundational_thinking`) -- kept separate from `_TOKEN_FILES`/`_PRESET_PAIRS`
+#: precisely because `commands.PRESET_EMIT` (asserted equal to `_PRESET_PAIRS` above) must stay
+#: `{"sarif", "md", "html"}` for `security`, unchanged by this item (TRADEOFFS row 18). RED if a future
+#: change drops one of the three files from the `security` preset's output.
+_PRESET_VIEW_FILES: dict[str, tuple[str, ...]] = {
+    "security": ("security.md", "security.html", "security.json"),
+}
+
 
 def test_for_preset_matches_documented_set_pairs() -> None:
     from agentce import commands
@@ -244,6 +253,11 @@ def test_for_each_preset_writes_exactly_its_set(tmp_path: Path, preset: str) -> 
             assert matches, f"{preset}: no file matches {pattern!r}"
             for match in matches:
                 expected.add(str(match.relative_to(out)))
+    for pattern in _PRESET_VIEW_FILES.get(preset, ()):
+        matches = sorted(out.glob(pattern))
+        assert matches, f"{preset}: no file matches {pattern!r}"
+        for match in matches:
+            expected.add(str(match.relative_to(out)))
     actual = {str(p.relative_to(out)) for p in out.rglob("*") if p.is_file()}
     assert actual == expected, (
         preset,

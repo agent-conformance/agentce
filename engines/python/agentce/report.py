@@ -49,6 +49,7 @@ from .project import (
     compute_project_view,
     no_population_by_subject,
 )
+from .security_view import FRAMEWORK_VERSIONS, compute_security_view
 
 #: The empty, honest answer for a caller with no assertions to explain (write_report's own
 #: docstring): never recomputed from an empty `Profile()`, unlike `activity`'s fallback -- an empty
@@ -69,6 +70,7 @@ _OPTIONAL_ARTIFACT_SCHEMAS = {
     "oscal-ar.json": "oscal-assessment-results",
     "results.sarif": "results-sarif",
     "project.json": "project",
+    "security.json": "security",
 }
 _ARTIFACT_SCHEMAS = {**_MANDATORY_ARTIFACT_SCHEMAS, **_OPTIONAL_ARTIFACT_SCHEMAS}
 _SARIF_LEVEL = {
@@ -696,6 +698,180 @@ def render_project_html(
         '<section aria-labelledby="project-top-gaps"><h2 id="project-top-gaps">'
         f"{html.escape(cat['report.project_top_gaps_heading'])}</h2>{gaps_html}</section>"
         f"{undeclared_html}"
+        "</main></body></html>\n"
+    )
+
+
+def _security_tool_access_lines(
+    tool_access: list[dict[str, str]], cat: dict[str, str]
+) -> list[str]:
+    """One line per tool this run called -- name, server, and protocol, all event-derived strings
+    sanitised before they reach Markdown/terminal output (SPEC §7 injection hardening, 18.21)."""
+    if not tool_access:
+        return [cat["report.security_tool_access_none"]]
+    return [
+        f"{_sanitize_field(t['name'])} ({_sanitize_field(t['server'])}, "
+        f"{_sanitize_field(t['protocol'])})"
+        for t in tool_access
+    ]
+
+
+def _security_effect_class_text(actions_by_effect_class: dict[str, int]) -> str:
+    """``_activity_tally_text`` over the same counts, ``irreversible`` moved first (the security
+    reader's own priority) -- every other key keeps its existing order."""
+    reordered = {
+        "irreversible": actions_by_effect_class.get("irreversible", 0),
+        **{k: v for k, v in actions_by_effect_class.items() if k != "irreversible"},
+    }
+    return _activity_tally_text(reordered)
+
+
+def _security_drift_lines(
+    drift: dict[str, list[str]], cat: dict[str, str]
+) -> list[str]:
+    """As :func:`_activity_undeclared_lines`, restricted to the two fields the security view's
+    ``drift`` carries (no ``agents`` key -- this view is a whole-run posture, not a per-agent one)."""
+    if not (drift["tools"] or drift["models"]):
+        return [cat["report.security_drift_none"]]
+    lines = []
+    if drift["tools"]:
+        lines.append(
+            f"{cat['report.activity_undeclared_tools_label']}: "
+            + ", ".join(sanitize_for_markdown(name) for name in drift["tools"])
+        )
+    if drift["models"]:
+        lines.append(
+            f"{cat['report.activity_undeclared_models_label']}: "
+            + ", ".join(sanitize_for_markdown(name) for name in drift["models"])
+        )
+    return lines
+
+
+def _security_citation_text(entry: dict[str, Any], cat: dict[str, str]) -> str:
+    """One clause citation with its framework's version (Role-views' "standard, catalog, version and
+    clause" rule) -- ``_crosswalk_text``'s "(clause reference unverified)" label reused verbatim."""
+    version = FRAMEWORK_VERSIONS.get(entry["framework"], "")
+    framework = (
+        f"{entry['framework']} {version}".strip() if version else entry["framework"]
+    )
+    text = f"{framework} {entry['clause']}".strip()
+    if entry.get("verified") is not True:
+        text += f" {cat['report.crosswalk_unverified']}"
+    return text
+
+
+def _security_citation_rows(
+    citations: list[dict[str, Any]], cat: dict[str, str]
+) -> list[tuple[str, str]]:
+    """``(control, citation text)`` for every ``standards_citations`` entry, in the view's own order
+    (already deduplicated and sorted by :func:`agentce.security_view.compute_security_view`) -- the
+    control id is the row's check-id link (Role-views' own requirement)."""
+    return [
+        (
+            _sanitize_field(entry["control"]),
+            sanitize_for_markdown(_security_citation_text(entry, cat)),
+        )
+        for entry in citations
+    ]
+
+
+def render_security_md(
+    security: dict[str, Any], *, language: str = messages.DEFAULT_LANGUAGE
+) -> str:
+    """The security view (18.16): tool access, actions by effect class (irreversible leads),
+    enforcement-point evidence, drift, then each cited control's OWASP agentic (ASI)/MITRE ATLAS/OWASP
+    Agent Control Standard clauses -- run-level facts only (SPEC §7.3, no per-action join exists)."""
+    cat = messages.catalogue(language)
+    lines = [
+        f"# {cat['report.security_title']}",
+        "",
+        cat["report.security_intro"],
+        "",
+        f"## {cat['report.security_tool_access_heading']}",
+        "",
+    ]
+    lines += [
+        f"- {line}"
+        for line in _security_tool_access_lines(security["tool_access"], cat)
+    ]
+    lines += [
+        "",
+        f"## {cat['report.security_effect_class_heading']}",
+        "",
+        f"- {_security_effect_class_text(security['actions_by_effect_class'])}",
+        "",
+        f"## {cat['report.security_enforcement_heading']}",
+        "",
+        f"- {cat['report.security_enforcement_scope_note']}",
+        f"- {cat['report.activity_approvals_label']}: "
+        f"{_activity_tally_text(security['enforcement_point_evidence']['approvals_by_recorder'], {k: cat[f'report.activity_recorder_{k}'] for k in RECORDER_CLASSES})}",
+        f"- {cat['report.activity_denied_label']}: "
+        f"{_activity_tally_text(security['enforcement_point_evidence']['denied_or_blocked'], {k: cat[f'report.activity_denied_{k}'] for k in DENIED_KINDS})}",
+        "",
+        f"## {cat['report.security_drift_heading']}",
+        "",
+    ]
+    lines += [f"- {line}" for line in _security_drift_lines(security["drift"], cat)]
+    lines += ["", f"## {cat['report.security_citations_heading']}", ""]
+    citation_rows = _security_citation_rows(security["standards_citations"], cat)
+    if citation_rows:
+        lines += [f"- `{control}`: {text}" for control, text in citation_rows]
+    else:
+        lines.append(f"- {cat['report.security_citations_none']}")
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def render_security_html(
+    security: dict[str, Any], *, language: str = messages.DEFAULT_LANGUAGE
+) -> str:
+    """As :func:`render_security_md`, rendered as the same self-contained, escaped, WCAG 2.2 AA page
+    shape as :func:`render_report_html`."""
+    cat = messages.catalogue(language)
+    title = html.escape(cat["report.security_title"])
+    tool_items = "".join(
+        f"<li>{sanitize_for_html(line)}</li>"
+        for line in _security_tool_access_lines(security["tool_access"], cat)
+    )
+    approvals_text = _activity_tally_text(
+        security["enforcement_point_evidence"]["approvals_by_recorder"],
+        {k: cat[f"report.activity_recorder_{k}"] for k in RECORDER_CLASSES},
+    )
+    denied_text = _activity_tally_text(
+        security["enforcement_point_evidence"]["denied_or_blocked"],
+        {k: cat[f"report.activity_denied_{k}"] for k in DENIED_KINDS},
+    )
+    drift_items = "".join(
+        f"<li>{sanitize_for_html(line)}</li>"
+        for line in _security_drift_lines(security["drift"], cat)
+    )
+    citation_rows = _security_citation_rows(security["standards_citations"], cat)
+    citations_html = (
+        f"<ul>{_li_items(citation_rows)}</ul>"
+        if citation_rows
+        else f"<p>{html.escape(cat['report.security_citations_none'])}</p>"
+    )
+    return (
+        f'<!doctype html><html lang="{html.escape(language)}"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<meta http-equiv="Content-Security-Policy" '
+        "content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\">"
+        f"<title>{title}</title><style>{_HTML_STYLE}</style></head><body>"
+        f"<main><h1>{title}</h1><p>{html.escape(cat['report.security_intro'])}</p>"
+        '<section aria-labelledby="security-tool-access"><h2 id="security-tool-access">'
+        f"{html.escape(cat['report.security_tool_access_heading'])}</h2><ul>{tool_items}</ul></section>"
+        '<section aria-labelledby="security-effect-class"><h2 id="security-effect-class">'
+        f"{html.escape(cat['report.security_effect_class_heading'])}</h2>"
+        f"<p>{html.escape(_security_effect_class_text(security['actions_by_effect_class']))}</p></section>"
+        '<section aria-labelledby="security-enforcement"><h2 id="security-enforcement">'
+        f"{html.escape(cat['report.security_enforcement_heading'])}</h2>"
+        f"<p>{html.escape(cat['report.security_enforcement_scope_note'])}</p>"
+        f"<p>{html.escape(cat['report.activity_approvals_label'])}: {html.escape(approvals_text)}</p>"
+        f"<p>{html.escape(cat['report.activity_denied_label'])}: {html.escape(denied_text)}</p></section>"
+        '<section aria-labelledby="security-drift"><h2 id="security-drift">'
+        f"{html.escape(cat['report.security_drift_heading'])}</h2><ul>{drift_items}</ul></section>"
+        '<section aria-labelledby="security-citations"><h2 id="security-citations">'
+        f"{html.escape(cat['report.security_citations_heading'])}</h2>{citations_html}</section>"
         "</main></body></html>\n"
     )
 
@@ -2205,6 +2381,7 @@ def write_report(
     domain_binding_digest: str | None = None,
     profile: Profile | None = None,
     declared_subject_ids: frozenset[str] | None = None,
+    for_preset: str | None = None,
 ) -> dict[str, Any]:
     """Write every report artifact for ``assertions`` and return the reproducibility manifest.
 
@@ -2254,7 +2431,15 @@ def write_report(
     ``agents/<dirname>/``, and the root ``report.md``/``.html`` become the project view. A single
     subject (or no ``profile``) writes exactly what this function always wrote. ``declared_subject_ids``
     mirrors :func:`agentce.activity.summarize_activity`'s own parameter and default (every subject in
-    ``profile`` counts as declared when omitted)."""
+    ``profile`` counts as declared when omitted).
+
+    ``for_preset`` (18.16): ``"security"`` additionally writes ``security.md``/``.html``/``.json`` (the
+    security view, :func:`agentce.security_view.compute_security_view`) -- a genuinely new mechanism,
+    not a reuse of the project view's subject-count gate. ``security.json`` is written whenever
+    ``for_preset == "security"``, the same "always written regardless of ``wants``" treatment
+    ``project.json`` gets; ``security.md``/``.html`` still respect ``wants("md")``/``wants("html")``
+    since the ``security`` preset's own emit set already selects both. Any other value, including
+    ``None``, writes nothing new here."""
     check_dc5(
         assertions
     )  # DC-5: refuse a supporting verdict without an evidence pointer
@@ -2437,6 +2622,25 @@ def write_report(
                     activity=activity,
                     blind_spots=blind_spots,
                 ),
+            )
+
+    # 18.16: the security view is gated on `for_preset`, not `emit` -- a genuinely new mechanism
+    # (foundational_thinking, contracts/P18-18.16.md), independent of the project view's subject-count
+    # gate above. `security.json` is always written for this preset, like `project.json` is always
+    # written for a multi-subject profile; `.md`/`.html` still follow `wants()` since the `security`
+    # preset's own emit set already selects both.
+    if for_preset == "security":
+        security_view = compute_security_view(activity, assertions)
+        write_json("security.json", security_view)
+        if wants("md"):
+            write_text(
+                "security.md",
+                render_security_md(security_view, language=report_language),
+            )
+        if wants("html"):
+            write_text(
+                "security.html",
+                render_security_html(security_view, language=report_language),
             )
 
     oscal_doc: dict[str, Any] | None = None

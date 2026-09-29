@@ -113,7 +113,9 @@ EMIT_FORMATS = REPORT_FORMATS + (
 )
 #: The audience presets `assess --for` resolves to an `--emit` set (SPEC §13.4; contracts/P18-18.7.md).
 #: Each preset is a fixed, hand-picked subset of :data:`EMIT_FORMATS` for one reader; it is sugar for
-#: `--emit`, never a new rendering pipeline.
+#: `--emit`, and a preset may also gate one additional, view-specific artifact set outside `--emit`
+#: entirely (`security` gates `security.md`/`.html`/`.json`, 18.16) -- never a new rendering pipeline
+#: for the formats :data:`EMIT_FORMATS` itself already names.
 PRESET_EMIT: dict[str, frozenset[str]] = {
     "engineering": frozenset({"md", "html", "skill", "remediation"}),
     "compliance": frozenset({"oscal", "oscal_xml", "public", "pack", "csv"}),
@@ -1085,6 +1087,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         domain_binding_digest=domain_binding_digest,
         profile=profile_obj,
         declared_subject_ids=declared_subject_ids,
+        for_preset=for_preset,
     )
     if state is not None:
         state.record(loaded.digest, out_dir / "manifest.json", new_window_end)

@@ -111,7 +111,7 @@ EXPECTED = {
     "compliance": ALWAYS
     | PACK
     | {"oscal-ar.json", "oscal-ar.xml", "public-statement.md", "report.csv"},
-    "security": ALWAYS | MD_HTML | {"results.sarif"},
+    "security": ALWAYS | MD_HTML | {"results.sarif", "security.md", "security.html", "security.json"},
     "ci": ALWAYS | {"results.sarif", "report.junit.xml"},
     "share": ALWAYS | MD_HTML | PACK | {"report.pdf", "public-statement.md"},
     # The CI-detection control pair (D1/N7): additive over the legacy default, never the minimal
