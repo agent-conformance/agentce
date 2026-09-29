@@ -1176,9 +1176,19 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
 
 def _widen_with_real_ids(scanned: ScannedRecords, subject_id: str) -> frozenset[str]:
     """Auto-declare ``subject_id`` (always ``DEFAULT_SUBJECT`` at both call sites) plus whatever real
-    agent id(s) ``scanned.events`` themselves name (0 or 1 of them, the same extraction
-    ``summarize_activity`` already does) -- see the call sites' own comment for why this is safe."""
+    agent id the events name, ONLY when there is at most one of them. On the `declared is None`
+    fresh-scan call site this guard is always satisfied (C4's merge rule only collapses to one
+    discovered subject when 0-or-1 real ids were observed). On the `--profile` call site it is NOT
+    always satisfied: `scan_records(subject=declared.subjects[0].id)` forces EVERY event onto the one
+    declared subject regardless of how many distinct real agent ids they name, so a records folder
+    that has grown a second, genuinely undeclared agent since the profile was derived can carry 2+
+    real ids here -- widening unconditionally would auto-declare that new agent too (verifier round 3's
+    finding). Only 0 or 1 real ids is the case this widening is safe for; 2+ real ids means at least
+    one of them is genuinely undeclared, so `subject_id` (DEFAULT_SUBJECT) alone is returned and every
+    real id stays undeclared, exactly as it would with no widening at all."""
     real_ids = summarize_activity(scanned.events, Profile())["agents"]
+    if len(real_ids) > 1:
+        return frozenset({subject_id})
     return frozenset({subject_id, *real_ids})
 
 

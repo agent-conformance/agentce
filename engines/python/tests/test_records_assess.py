@@ -650,6 +650,43 @@ def test_a_records_folder_with_one_real_agent_shows_nothing_as_undeclared(
     )
 
 
+def test_a_second_real_agent_appearing_under_a_re_fed_single_agent_profile_is_undeclared(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verifier round 3's finding: `_widen_with_real_ids` must widen `DEFAULT_SUBJECT` with a real
+    agent id ONLY when the records folder names at most one -- the `--profile` branch's own
+    `scan_records(subject=declared.subjects[0].id)` forces every event onto the one declared subject
+    regardless of real agent count, so a folder that has grown a genuinely new, undeclared agent since
+    the profile was derived must not have that new agent silently swept into "declared" by the widening
+    meant only for re-feeding an unedited single-agent profile back to itself."""
+    records = tmp_path / "records"
+    out_a = tmp_path / "out-a"
+    _run(["assess", str(_records(records)), "--out", str(out_a)], capsys)
+
+    grown = tmp_path / "grown"
+    shutil.copytree(records, grown)
+    shutil.copy(_FIXTURES / "datadog" / "input.json", grown / "fraud.json")
+    out_b = tmp_path / "out-b"
+    code, env = _run(
+        [
+            "assess",
+            str(grown),
+            "--profile",
+            str(out_a / "applicability.yaml"),
+            "--out",
+            str(out_b),
+        ],
+        capsys,
+    )
+
+    assert code == 0
+    activity = json.loads((out_b / "activity.json").read_text(encoding="utf-8"))
+    assert activity["undeclared"]["agents"] == [
+        "spiffe://corp/agents/credit-underwriter",
+        "spiffe://corp/agents/fraud-detection-agent",
+    ]
+
+
 def test_renamed_and_reordered_files_give_the_same_result_with_multiple_agents(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
