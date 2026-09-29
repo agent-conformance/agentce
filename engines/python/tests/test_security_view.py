@@ -273,8 +273,8 @@ def test_render_security_md_with_language_de_does_not_crash_and_falls_back() -> 
     """As `test_rendering.py::test_catalogue_falls_back_to_english`: no German translation exists yet
     for the security view's own keys (18.14's own precedent for a per-view language smoke test does
     not exist under any name -- confirmed by search, so this is a fresh test, not a port), so the
-    German-language render must fall back to the English text rather than raising or leaving a
-    missing-key placeholder."""
+    German-language render must fall back to the English text rather than raising or leaving an
+    unresolved message key in the output."""
     view = compute_security_view(
         _EMPTY_ACTIVITY,
         [
