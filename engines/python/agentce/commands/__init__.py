@@ -1058,23 +1058,22 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         # discovered on the records-folder path must auto-declare itself, matching 18.4's own
         # "a fresh, unedited first run shows nothing as undeclared" promise for declared_tools/
         # declared_models -- computing this before the scan would wrongly flag that lone agent as
-        # undeclared on every single-agent folder.
+        # undeclared on every single-agent folder. DEFAULT_SUBJECT never matches a real observed
+        # agent id (`records/__init__.py`'s grouping rule never promotes a solo real id to be the
+        # subject itself), so widening it with the real id(s) the events themselves name can never
+        # suppress a genuinely undeclared agent's own detection -- true whether DEFAULT_SUBJECT
+        # reaches here as a fresh scan's own sole discovered subject, or as a re-fed derived
+        # applicability.yaml naming that same sentinel (a hand-authored profile naming a real agent
+        # never lands here, since a real id is never DEFAULT_SUBJECT).
         if declared is not None:
             declared_subject_ids = frozenset({declared.subjects[0].id})
+            if declared.subjects[0].id == DEFAULT_SUBJECT:
+                declared_subject_ids = _widen_with_real_ids(scanned, DEFAULT_SUBJECT)
         else:
             discovered_subjects = scanned.profile["subjects"]
             if len(discovered_subjects) == 1:
-                # The sole discovered subject on this branch is always DEFAULT_SUBJECT (0 or 1 real
-                # agent ids observed, `records/__init__.py`'s grouping rule never promotes a solo real
-                # id to be the subject itself) -- but `undeclared.agents` compares against the REAL
-                # observed agent ids `summarize_activity` extracts from `data.agent.id`, not against
-                # the subject id. Auto-declaring the subject id alone can never satisfy that promise;
-                # also declaring whatever real id the events themselves name (0 or 1 of them, the same
-                # extraction `summarize_activity` already does) is what actually keeps a lone real
-                # agent from being flagged undeclared.
-                real_ids = summarize_activity(scanned.events, Profile())["agents"]
-                declared_subject_ids = frozenset(
-                    {discovered_subjects[0]["id"], *real_ids}
+                declared_subject_ids = _widen_with_real_ids(
+                    scanned, discovered_subjects[0]["id"]
                 )
             else:
                 declared_subject_ids = frozenset()
@@ -1173,6 +1172,14 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         f"assessed {len(evaluated)} (control, subject) pairs; {non_conformant} non-conformant"
     )
     return result
+
+
+def _widen_with_real_ids(scanned: ScannedRecords, subject_id: str) -> frozenset[str]:
+    """Auto-declare ``subject_id`` (always ``DEFAULT_SUBJECT`` at both call sites) plus whatever real
+    agent id(s) ``scanned.events`` themselves name (0 or 1 of them, the same extraction
+    ``summarize_activity`` already does) -- see the call sites' own comment for why this is safe."""
+    real_ids = summarize_activity(scanned.events, Profile())["agents"]
+    return frozenset({subject_id, *real_ids})
 
 
 def _records_subject(declared: Profile | None) -> str | None:

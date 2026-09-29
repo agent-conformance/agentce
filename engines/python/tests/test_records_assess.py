@@ -621,6 +621,34 @@ def test_a_records_folder_with_one_real_agent_shows_nothing_as_undeclared(
         )[0]
     )
 
+    # Round 2's verifier finding: the SAME promise must hold on a re-run with the tool's own,
+    # unedited derived profile, not only on the first run. `agentce init`'s own output for this
+    # exact folder always names DEFAULT_SUBJECT (never the real agent id, C4's merge rule) as its
+    # sole subject, so re-feeding it via `--profile` must not re-flag the same lone real agent.
+    out2 = tmp_path / "out2"
+    code2, env2 = _run(
+        [
+            "assess",
+            folder,
+            "--profile",
+            str(out / "applicability.yaml"),
+            "--out",
+            str(out2),
+        ],
+        capsys,
+    )
+    assert code2 == 0
+    activity2 = json.loads((out2 / "activity.json").read_text(encoding="utf-8"))
+    assert activity2["undeclared"]["agents"] == []
+    report_md2 = (out2 / "report.md").read_text(encoding="utf-8")
+    assert (
+        "Not yet declared in your profile" not in report_md2
+        or "Agents:"
+        not in report_md2.split("Not yet declared in your profile", 1)[1].split(
+            "Where your records can't show it yet", 1
+        )[0]
+    )
+
 
 def test_renamed_and_reordered_files_give_the_same_result_with_multiple_agents(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
