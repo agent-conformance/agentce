@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.14.0",
+  "suite_version": "0.15.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -445,7 +445,7 @@
     },
     {
       "id": "VG-AUDIENCE-PRESETS",
-      "title": "agentce assess --for {engineering,compliance,security,ci,share} resolves to the documented --emit set; CI is detected automatically and only ever extends the legacy default, never replaces it",
+      "title": "agentce assess --for {engineering,compliance,security,ci,share,auditor} resolves to the documented --emit set; CI is detected automatically and only ever extends the legacy default, never replaces it",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -458,7 +458,7 @@
       "timeout_s": 180,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
-        "pass": "over the dedicated AUD-01 fixture catalog, `assess --for <preset>` for each of engineering/compliance/security/ci/share writes exactly the hand-written expected file set for that preset (never extra, never missing); `agentce report --validate` exits 0 for every preset's output, and engineering's remediation-package.json validates against spec/report/remediation-package.schema.json directly; `env CI=true assess` with neither --for nor --emit writes the legacy default's files plus report.junit.xml (additive); `env -u CI assess` with neither flag writes exactly the legacy default (no junit)",
+        "pass": "over the dedicated AUD-01 fixture catalog, `assess --for <preset>` for each of engineering/compliance/security/ci/share/auditor writes exactly the hand-written expected file set for that preset (never extra, never missing); `agentce report --validate` exits 0 for every preset's output, and engineering's remediation-package.json validates against spec/report/remediation-package.schema.json directly; `env CI=true assess` with neither --for nor --emit writes the legacy default's files plus report.junit.xml (additive); `env -u CI assess` with neither flag writes exactly the legacy default (no junit)",
         "fail": "any preset's written file set differs from its hand-written expectation, report --validate fails for any preset, the remediation-package.json fails schema validation, the CI=true run does not gain report.junit.xml on top of the legacy default, or the CI-unset run gains it when it should not"
       },
       "faults": [

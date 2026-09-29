@@ -3,6 +3,13 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.15.0
+
+- Changed `VG-AUDIENCE-PRESETS`: the `auditor` preset (added alongside `VG-AUDITOR-VIEW` in 0.14.0) was
+  wired into `verification/gates/audience_presets.sh`'s own loop and fixture assertions but the gate's
+  registry `title`/`rubric` text in `gates.json` still named only the five presets that predate it
+  (18.17 round-2 verifier finding N11) -- now names all six.
+
 ## 0.14.0
 
 - Added `VG-AUDITOR-VIEW`: the auditor view (18.17, Hill 8's auditor lens: "can I rely on this, clause
