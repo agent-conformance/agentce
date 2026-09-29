@@ -271,3 +271,36 @@ test("digest-tree prints one catalog directory's real content digest", () => {
   ).trim();
   assert.equal(lines[0], expected);
 });
+
+test("security-view CLI verb runs the fixture and prints a standards_citations array", () => {
+  const lines: string[] = [];
+  const original = console.log;
+  console.log = (line: string) => lines.push(line);
+  let exitCode: number;
+  try {
+    exitCode = main([
+      "security-view",
+      join(
+        __dirname,
+        "..",
+        "..",
+        "..",
+        "verification",
+        "gates",
+        "fixtures",
+        "security_view",
+        "activity_and_assertions.json",
+      ),
+    ]);
+  } finally {
+    console.log = original;
+  }
+  assert.equal(exitCode, 0);
+  const securityView = JSON.parse(lines[0] as string);
+  const citations = securityView.standards_citations as { framework: string }[];
+  assert.ok(Array.isArray(citations));
+  assert.deepEqual(
+    new Set(citations.map((c) => c.framework)),
+    new Set(["owasp-asi-2026", "mitre-atlas", "owasp-acs"]),
+  );
+});

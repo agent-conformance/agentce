@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -313,6 +314,19 @@ class CliTest {
         Path fixture = REPO.resolve("spec/model/test-vectors/digest-tree");
         String expected = Catalog.digestTree(fixture, Set.of("catalog.sig.json", "catalog.yaml"));
         assertEquals(expected + "\n", captureStdout("digest-tree", fixture.toString()));
+    }
+
+    @Test
+    void securityViewVerbRunsTheFixtureAndPrintsAStandardsCitationsArray() {
+        Path fixture = REPO.resolve("verification/gates/fixtures/security_view/activity_and_assertions.json");
+        String out = captureStdout("security-view", fixture.toString());
+        JsonNode citations = Json.parse(out).get("standards_citations");
+        assertTrue(citations.isArray());
+        Set<String> frameworks = new HashSet<>();
+        for (JsonNode citation : citations) {
+            frameworks.add(citation.get("framework").asText());
+        }
+        assertEquals(Set.of("owasp-asi-2026", "mitre-atlas", "owasp-acs"), frameworks);
     }
 
     @Test
