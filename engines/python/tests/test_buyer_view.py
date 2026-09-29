@@ -299,9 +299,7 @@ def test_buyer_view_over_the_bundled_default_lens_shows_the_real_caiq_answers(
         ("IAM-13.1", "REC-01"),
         ("LOG-08.1", "REC-04"),
         ("CCC-07.1", "DOC-01"),
-        ("SEF-05.1", "INC-01"),
         ("SEF-06.1", "INC-02"),
-        ("LOG-04.1", "INT-01"),
     }
     assert buyer["by_question"]["ai-controls-matrix"] == {}
     assertions_json = json.loads((out / "assertions.json").read_text(encoding="utf-8"))

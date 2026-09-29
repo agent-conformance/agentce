@@ -20,23 +20,11 @@ obligations:
     rungs: [2]
     controls: [DOC-01]
     verified_against_text: false
-  - ref: "SEF-05.1"
-    obligation: Incident metrics are established and monitored -- adverse outcomes are linked to their consequential decision.
-    schema_elements: [Decision, Outcome]
-    rungs: [2]
-    controls: [INC-01]
-    verified_against_text: false
   - ref: "SEF-06.1"
     obligation: Incidents are triaged through a defined process -- every recorded incident names its accountable actor.
     schema_elements: [Incident]
     rungs: [2]
     controls: [INC-02]
-    verified_against_text: false
-  - ref: "LOG-04.1"
-    obligation: Audit-log access is restricted with unique access accountability -- consequential tool calls are captured by an enforcement-point source, not the agent's own self-report.
-    schema_elements: [ToolCall]
-    rungs: [2]
-    controls: [INT-01]
     verified_against_text: false
   - ref: "IAM-13.1"
     obligation: Users are uniquely identifiable, or individuals can be associated with the identifier used -- every consequential decision records the acting agent.

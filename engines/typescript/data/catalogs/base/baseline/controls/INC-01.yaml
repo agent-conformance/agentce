@@ -4,7 +4,6 @@ title: Adverse outcomes are linked to their consequential decision
 crosswalk:
   - {framework: eu-ai-act, clause: "Art. 72", relation: maps, verified_against_text: false}
   - {framework: nist-ai-rmf, clause: "MEASURE 2.3", relation: maps, verified_against_text: false}
-  - {framework: caiq, clause: "SEF-05.1", relation: maps, verified_against_text: false}
 applicability:
   applies_to_roles: [both]
 evaluation:
