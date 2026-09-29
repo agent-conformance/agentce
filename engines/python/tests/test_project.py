@@ -110,7 +110,7 @@ def test_three_subject_rollup_declared_undeclared_and_top_gaps() -> None:
         _assertion("C", "REC-01", "insufficient_evidence"),
     ]
     declared_subject_ids = frozenset({"A", "B"})
-    activity_by_subject = {
+    activity_by_subject: dict[str, dict[str, Any]] = {
         "A": {"agents": ["A"]},
         "B": {"agents": []},
         "C": {"agents": ["C"]},

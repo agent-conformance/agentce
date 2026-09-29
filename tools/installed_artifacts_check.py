@@ -565,6 +565,127 @@ def check_records(runner: Runner, *, offline_install: bool) -> list[str]:
         return _records_problems(runner, venv, empty, "wheel", started)
 
 
+def _fixture_agent_id(fixture: str) -> str:
+    """The real agent id the adapter's own expected output names for ``fixture`` -- read the same way
+    :func:`_expected_events` reads an event count, so this check and the fixture it drives can never
+    drift apart by hand."""
+    first = json.loads(
+        (_OTEL_FIXTURES / fixture / "expected.jsonl").read_text("utf-8").splitlines()[0]
+    )
+    return str(first["data"]["agent"]["id"])
+
+
+#: The two real agent ids the `datadog`/`langfuse` fixtures name (18.14, VG-PROJECT-TIME) -- the same
+#: fixture combination `test_records_assess.py`'s own `_multi_agent_records` helper uses, read from
+#: the fixtures themselves rather than duplicated by hand.
+_PROJECT_REAL_AGENTS = frozenset(
+    {_fixture_agent_id("datadog"), _fixture_agent_id("langfuse")}
+)
+
+
+def _project_problems(
+    runner: Runner, venv: Path, empty: Path, label: str, started: float
+) -> list[str]:
+    """``agentce assess <folder> --for risk-lead`` from the installed package, offline, over a
+    records folder naming two distinct agents plus one file with no agent id at all, and NO
+    ``--profile`` (so every discovered agent is genuinely undeclared, Hill 7's own scenario): exits 0,
+    writes ``project.md``/``project.json`` listing all three discovered subjects (the two real agent
+    ids plus the id-less ``DEFAULT_SUBJECT`` catch-all), ``undeclared_agents`` names exactly the two
+    real agent ids, each real agent's own ``agents/<dirname>/assertions.json`` names only that agent's
+    own findings, and the whole run finishes inside the first-report budget counted from ``started``."""
+    agentce = str(venv / "bin" / "agentce")
+    fixtures = [
+        ("datadog", "fraud.json"),
+        ("langfuse", "checkout.json"),
+        ("openinference-rag", "rag.json"),
+    ]
+    folder = _records_folder(empty / "records-project", fixtures)
+    workdir = empty / "project"
+    workdir.mkdir()
+    out = workdir / "out"
+    proc = runner.run(
+        [agentce, "assess", str(folder), "--for", "risk-lead", "--json"],
+        workdir,
+        offline=True,
+    )
+    finished = time.monotonic()
+    problems: list[str] = []
+    if proc.returncode != 0:
+        problems.append(_fail(f"{label}: assess <folder> --for risk-lead", proc))
+    else:
+        try:
+            project = json.loads((out / "project.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            problems.append(
+                f"{label}: the project run left no readable project.json: {exc}"
+            )
+            project = None
+        if project is not None:
+            subject_ids = {row["id"] for row in project.get("agents", [])}
+            if (
+                len(subject_ids) != len(_PROJECT_REAL_AGENTS) + 1
+                or not _PROJECT_REAL_AGENTS <= subject_ids
+            ):
+                problems.append(
+                    f"{label}: project.json lists {sorted(subject_ids)}, "
+                    "not the two real agents plus the catch-all"
+                )
+            if set(project.get("undeclared_agents", [])) != _PROJECT_REAL_AGENTS:
+                problems.append(
+                    f"{label}: undeclared_agents is {project.get('undeclared_agents')}, "
+                    "not exactly the two real agent ids"
+                )
+            agents_dir = out / "agents"
+            if not agents_dir.is_dir():
+                problems.append(f"{label}: the project run wrote no agents/ directory")
+            else:
+                owners: set[str] = set()
+                for entry in sorted(agents_dir.iterdir()):
+                    try:
+                        own = json.loads(
+                            (entry / "assertions.json").read_text(encoding="utf-8")
+                        )
+                    except (OSError, ValueError) as exc:
+                        problems.append(
+                            f"{label}: {entry.name}/assertions.json unreadable: {exc}"
+                        )
+                        continue
+                    subjects = {a["subject"] for a in own}
+                    if len(subjects) != 1:
+                        problems.append(
+                            f"{label}: {entry.name}/assertions.json names "
+                            f"{sorted(subjects)}, not exactly one subject"
+                        )
+                        continue
+                    owners.update(subjects)
+                missing = _PROJECT_REAL_AGENTS - owners
+                if missing:
+                    problems.append(
+                        f"{label}: no own report directory for {sorted(missing)}"
+                    )
+    budget = _budget_problem(label, finished - started, FIRST_REPORT_BUDGET_S)
+    return problems + ([budget] if budget else [])
+
+
+def check_project(runner: Runner, *, offline_install: bool) -> list[str]:
+    """Build the wheel, install it, and time the risk-lead project view from a multi-agent records
+    folder, with no --profile (Hill 7)."""
+    with _scratch("agentce-project-") as raw:
+        tmp = Path(raw)
+        assert _outside_checkout(tmp)
+        wheel = _build_wheel(runner, tmp, offline_install=offline_install)
+        if isinstance(wheel, str):
+            return [wheel]
+        started = time.monotonic()
+        installed = _install(
+            runner, wheel, tmp, "wheel", offline_install=offline_install
+        )
+        if isinstance(installed, str):
+            return [installed]
+        venv, empty = installed
+        return _project_problems(runner, venv, empty, "wheel", started)
+
+
 def _generate_kms_key(runner: Runner, venv: Path, tmp: Path, name: str) -> Path:
     """A throwaway Ed25519 test key (never committed), written with the venv's own ``cryptography``
     (a transitive dependency of the installed package -- this project takes no direct dependency on
@@ -1694,14 +1815,17 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
 CHECKS = {
     "python": check_python,
     "records": check_records,
+    "project": check_project,
     "rerun": check_rerun,
     "own_rules": check_own_rules,
     "npm": check_npm,
     "jar": check_jar,
 }
-# `all` covers the package kinds; `records`, `rerun` and `own_rules` are their own build gates' own
-# checks.
-ALL_KINDS = tuple(k for k in CHECKS if k not in ("records", "rerun", "own_rules"))
+# `all` covers the package kinds; `records`, `project`, `rerun` and `own_rules` are their own build
+# gates' own checks.
+ALL_KINDS = tuple(
+    k for k in CHECKS if k not in ("records", "project", "rerun", "own_rules")
+)
 
 
 def run_all(

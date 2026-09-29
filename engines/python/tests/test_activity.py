@@ -237,7 +237,9 @@ def test_undeclared_agents_defaults_to_every_subject_the_profile_declares() -> N
     assert activity["undeclared"]["agents"] == ["C"]
 
 
-def test_explicit_declared_subject_ids_overrides_the_profile_not_supplements_it() -> None:
+def test_explicit_declared_subject_ids_overrides_the_profile_not_supplements_it() -> (
+    None
+):
     # The SAME events and profile, but an explicit, empty declared_subject_ids: nothing was
     # declared on this path, so every observed agent -- including A, which the profile itself
     # names -- is undeclared. Proves the parameter drives the result once given, not the profile.

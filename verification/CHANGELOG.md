@@ -3,6 +3,16 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.12.0
+
+- Added `VG-PROJECT-TIME`: the installed Python wheel, offline from an empty directory, turns a
+  records folder naming two distinct agents (plus one file with no agent id at all) into the
+  risk-lead/CIO project view with no `--profile`, so every discovered agent is genuinely undeclared
+  (Hill 7). `project.md`/`project.json` list all three discovered subjects, `undeclared_agents` names
+  exactly the two real agent ids, and each real agent's own `agents/<dirname>/assertions.json` names
+  only that agent's own findings -- all within the five-minute first-report budget counted from the
+  start of the install.
+
 ## 0.11.0
 
 - Added `VG-PROJECT-VIEW`: the three engines compute the same project view over a dedicated 3-subject
