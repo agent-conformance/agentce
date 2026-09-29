@@ -233,9 +233,15 @@ allow:
 
   - path: spec/catalogs/base/eu-ai-act/crosswalk/README.md
     pattern: placeholder
-    count: 4
+    count: 5
     class: legitimate
-    justification: "Explains the placeholder crosswalk files for standards that are not yet published."
+    justification: "Explains the placeholder crosswalk files for standards that are not yet published or not independently confirmable."
+
+  - path: spec/catalogs/base/eu-ai-act/crosswalk/ai-controls-matrix.yaml
+    pattern: placeholder
+    count: 5
+    class: legitimate
+    justification: "Honest status: placeholder rows for the AI Controls Matrix (AICM) v1.1 -- published, but its objective spreadsheet is gated behind a CSA download not independently obtainable at this project's confidence bar."
 
   - path: spec/catalogs/base/eu-ai-act/crosswalk/iso-iec-24970.yaml
     pattern: placeholder
@@ -397,9 +403,15 @@ allow:
 
   - path: engines/python/agentce/data/catalogs/base/eu-ai-act/crosswalk/README.md
     pattern: placeholder
-    count: 4
+    count: 5
     class: legitimate
     justification: "Byte-identical vendored copy of spec/catalogs/base/eu-ai-act/crosswalk/README.md, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/python/agentce/data/catalogs/base/eu-ai-act/crosswalk/ai-controls-matrix.yaml
+    pattern: placeholder
+    count: 5
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/catalogs/base/eu-ai-act/crosswalk/ai-controls-matrix.yaml, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
 
   - path: engines/python/agentce/data/catalogs/base/eu-ai-act/crosswalk/iso-iec-24970.yaml
     pattern: placeholder
@@ -445,9 +457,15 @@ allow:
 
   - path: engines/typescript/data/catalogs/base/eu-ai-act/crosswalk/README.md
     pattern: placeholder
-    count: 4
+    count: 5
     class: legitimate
     justification: "Byte-identical vendored copy of spec/catalogs/base/eu-ai-act/crosswalk/README.md, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/typescript/data/catalogs/base/eu-ai-act/crosswalk/ai-controls-matrix.yaml
+    pattern: placeholder
+    count: 5
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/catalogs/base/eu-ai-act/crosswalk/ai-controls-matrix.yaml, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
 
   - path: engines/typescript/data/catalogs/base/eu-ai-act/crosswalk/iso-iec-24970.yaml
     pattern: placeholder
@@ -493,9 +511,15 @@ allow:
 
   - path: engines/java/src/main/resources/catalogs/base/eu-ai-act/crosswalk/README.md
     pattern: placeholder
-    count: 4
+    count: 5
     class: legitimate
     justification: "Byte-identical vendored copy of spec/catalogs/base/eu-ai-act/crosswalk/README.md, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/java/src/main/resources/catalogs/base/eu-ai-act/crosswalk/ai-controls-matrix.yaml
+    pattern: placeholder
+    count: 5
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/catalogs/base/eu-ai-act/crosswalk/ai-controls-matrix.yaml, which carries the same hits for the reason its own entry gives; a sync test holds the two equal."
 
   - path: engines/java/src/main/resources/catalogs/base/eu-ai-act/crosswalk/iso-iec-24970.yaml
     pattern: placeholder
