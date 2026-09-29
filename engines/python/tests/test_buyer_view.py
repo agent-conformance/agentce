@@ -291,9 +291,10 @@ def test_buyer_view_over_the_bundled_default_lens_shows_the_real_caiq_answers(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Closes critic B7/N1: a real `agentce assess --for buyer` subprocess run against the shipped
-    `baseline@2026.09` default lens (not only the dedicated small gate fixture) must show the six real
+    `baseline@2026.09` default lens (not only the dedicated small gate fixture) must show the four real
     CAIQ answers this item's catalog change added -- the check that would have caught B1's schema-enum
-    gap before a critic had to. `corpus/quickstart/applicability.yaml` pins `eu-ai-act@2026.09` only,
+    gap before a critic had to (narrowed from six to four in 7793959, which dropped two weak mappings).
+    `corpus/quickstart/applicability.yaml` pins `eu-ai-act@2026.09` only,
     so the profile's own `catalogs` key is dropped first (the `_assess_without_a_catalog` idiom,
     `test_baseline_lens.py:299-323`) to fall through to the default baseline lens."""
     profile = yaml.safe_load(
