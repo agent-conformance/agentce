@@ -190,5 +190,64 @@ if ! (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce re
   status=1
 fi
 
-[ "$status" -eq 0 ] && echo "buyer-view: python's real assess --for buyer run matches the golden, every answer's facts (conformant/insufficient_evidence, hostile escaping, out-of-scope absence) hold, and report --validate accepts the output"
+# check (j): the unverified-clause label (SPEC §7.3) appears next to BUY-01/IAM-13.1 and
+# BUY-02/LOG-04.1's row in both pages -- both fixture crosswalk entries carry
+# verified_against_text: false (verifier round-1 F1: this label was computed but never rendered).
+for f in "$py_out/buyer.md" "$py_out/buyer.html"; do
+  if [ -f "$f" ]; then
+    hits="$(grep -o 'clause reference unverified' "$f" | wc -l | tr -d ' ')"
+    if [ "$hits" -lt 2 ]; then
+      echo "buyer-view: $f shows the unverified-clause label $hits time(s), expected at least 2 (BUY-01 and BUY-02)" >&2
+      status=1
+    fi
+  fi
+done
+
+# check (k): the "not enough evidence" gap step (BUY-02's own missing enforcement_point requirement,
+# not just the fixed per-outcome sentence check (c) already covers) renders in both pages
+# (verifier round-1 F2: this line could be deleted with the gate still green).
+for f in "$py_out/buyer.md" "$py_out/buyer.html"; do
+  if [ -f "$f" ] && ! grep -q 'Decision.*enforcement_point.*a request to platform or security' "$f"; then
+    echo "buyer-view: $f missing BUY-02's specific gap-step text (Decision/enforcement_point)" >&2
+    status=1
+  fi
+done
+
+# check (l): the summary counts table renders this run's real counts (3 conformant, 1 insufficient
+# evidence, the rest zero) -- the table itself was never checked before (verifier round-1 F2).
+if [ -f "$py_out/buyer.md" ] && ! grep -qF '| 3 | 0 | 0 | 0 | 0 | 1 |' "$py_out/buyer.md"; then
+  echo "buyer-view: buyer.md's summary table is missing or does not show this run's real counts" >&2
+  status=1
+fi
+if [ -f "$py_out/buyer.html" ] && ! grep -qF '<td>3</td><td>0</td><td>0</td><td>0</td><td>0</td><td>1</td>' "$py_out/buyer.html"; then
+  echo "buyer-view: buyer.html's summary table is missing or does not show this run's real counts" >&2
+  status=1
+fi
+
+# check (m): BUY-01's evidence ref renders in buyer.md too, not only buyer.html (verifier round-1 F2).
+if [ -f "$py_out/buyer.md" ] && ! grep -q 'Evidence: `agentce:event/buyer-view-fixture-dec1' "$py_out/buyer.md"; then
+  echo "buyer-view: buyer.md is missing BUY-01's evidence ref line" >&2
+  status=1
+fi
+
+# check (n): a packaged run (--package-for-sharing) exercises the packaged "how to check this report"
+# line (report.buyer_how_to_check, N6) -- the unpackaged branch above never reaches it, so it had no
+# coverage at all (verifier round-1 F2).
+pkg_out="$work/packaged"
+set +e
+(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce assess \
+  --bundle "$fixture/evidence" --profile "$fixture/applicability.yaml" \
+  --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" \
+  --allow-unverified-catalog --for buyer --package-for-sharing --out "$pkg_out" >/dev/null 2>&1)
+pkg_code=$?
+set -e
+if [ "$pkg_code" -ne 0 ]; then
+  echo "buyer-view: packaged assess exited $pkg_code, expected 0" >&2
+  status=1
+elif [ -f "$pkg_out/buyer.md" ] && ! grep -q 'agentce verify --report' "$pkg_out/buyer.md"; then
+  echo "buyer-view: packaged buyer.md missing the packaged how-to-check line (agentce verify --report ...)" >&2
+  status=1
+fi
+
+[ "$status" -eq 0 ] && echo "buyer-view: python's real assess --for buyer run matches the golden, every answer's facts (conformant/insufficient_evidence, hostile escaping, out-of-scope absence, unverified-clause label, gap step, counts table, packaged how-to-check) hold, and report --validate accepts the output"
 exit "$status"

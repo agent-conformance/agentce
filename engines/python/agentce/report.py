@@ -1216,6 +1216,16 @@ def _buyer_gap_lines(entry: dict[str, Any], cat: dict[str, str]) -> list[str]:
     return lines
 
 
+def _buyer_unverified_suffix(entry: dict[str, Any], cat: dict[str, str]) -> str:
+    """The unverified-clause label (SPEC §7.3), per row rather than per question heading: two rows
+    under one question can cite different crosswalk entries whose ``verified`` flags differ."""
+    return (
+        ""
+        if entry.get("verified") is True
+        else f" {cat['report.crosswalk_unverified']}"
+    )
+
+
 def _buyer_answer_md(entry: dict[str, Any], cat: dict[str, str]) -> list[str]:
     """One answer: control, version, subject, the fixed per-outcome text, the evidence refs
     themselves (not a count -- closes critic B3(c)/B4a, the `_auditor_clause_md` idiom), the gap step
@@ -1223,7 +1233,12 @@ def _buyer_answer_md(entry: dict[str, Any], cat: dict[str, str]) -> list[str]:
     control = _sanitize_field(entry["control"])
     version = _sanitize_field(entry["control_version"])
     subject = _sanitize_field(entry["subject"])
-    text = sanitize_for_markdown(_buyer_answer_text(entry, cat))
+    # `_buyer_unverified_suffix` is fixed catalogue text (like `manual_checklist_note` below), not
+    # record-derived -- appended after sanitizing, never sanitised itself (sanitizing would strip its
+    # leading space and truncate a real catalogue message at `_SANITIZE_CAP`).
+    text = sanitize_for_markdown(
+        _buyer_answer_text(entry, cat)
+    ) + _buyer_unverified_suffix(entry, cat)
     lines = [f"- **{control}** @ `{version}` (`{subject}`): {text}"]
     if entry["evidence"]:
         refs = ", ".join(f"`{_sanitize_field(e['ref'])}`" for e in entry["evidence"])
@@ -1245,7 +1260,11 @@ def _buyer_answer_html(entry: dict[str, Any], cat: dict[str, str]) -> str:
     control = sanitize_for_html(entry["control"])
     version = sanitize_for_html(entry["control_version"])
     subject = sanitize_for_html(entry["subject"])
-    text = html.escape(_buyer_answer_text(entry, cat))
+    # As in `_buyer_answer_md`: fixed catalogue text, escaped (HTML-safe either way) but not run
+    # through the record-sanitizer.
+    text = html.escape(_buyer_answer_text(entry, cat)) + html.escape(
+        _buyer_unverified_suffix(entry, cat)
+    )
     header = f"<strong>{control}</strong> @ <code>{version}</code> ({subject}): {text}"
     sub_items = ""
     if entry["evidence"]:

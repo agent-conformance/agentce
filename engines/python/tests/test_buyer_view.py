@@ -18,6 +18,7 @@ import yaml
 from agentce import cli
 from agentce.assertions import Assertion, EvidencePointer, aggregate
 from agentce.buyer_view import compute_buyer_view
+from agentce.report import render_buyer_html, render_buyer_md
 
 _WINDOW = ("2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -219,6 +220,31 @@ def test_buyer_json_validates_against_its_schema() -> None:
     blind_spots = {"blind_spots": [], "no_population": [_check_ref(a)]}
     view = compute_buyer_view([a], blind_spots)
     jsonschema.validate(view, _SCHEMA)  # must not raise
+
+
+def test_render_buyer_labels_an_unverified_clause_but_not_a_verified_one() -> None:
+    """SPEC §7.3 (verifier round-1 F1): a crosswalk entry carrying ``verified_against_text: false``
+    must show the "(clause reference unverified)" label next to its answer row, and a verified one
+    must not -- per row, not per question heading, since two rows of one question can differ."""
+    unverified = _assertion(
+        "REC-01",
+        crosswalk=[{"framework": "caiq", "clause": "IAM-13.1", "verified": False}],
+    )
+    verified = _assertion(
+        "REC-04",
+        crosswalk=[{"framework": "caiq", "clause": "IAM-13.1", "verified": True}],
+    )
+    view = compute_buyer_view([unverified, verified], _EMPTY_BLIND_SPOTS)
+    md = render_buyer_md(view)
+    html_out = render_buyer_html(view)
+    rec01_line = next(line for line in md.splitlines() if "REC-01" in line)
+    rec04_line = next(line for line in md.splitlines() if "REC-04" in line)
+    assert "clause reference unverified" in rec01_line
+    assert "clause reference unverified" not in rec04_line
+    rec01_html = html_out[html_out.index("REC-01") : html_out.index("REC-01") + 200]
+    rec04_html = html_out[html_out.index("REC-04") : html_out.index("REC-04") + 200]
+    assert "clause reference unverified" in rec01_html
+    assert "clause reference unverified" not in rec04_html
 
 
 def test_compute_buyer_view_is_order_independent_over_many_assertions() -> None:
