@@ -595,6 +595,33 @@ def test_a_records_folder_with_one_agent_id_still_derives_one_default_subject(
     assert {e["subject"] for e in events} == {"agentce:subject/local"}
 
 
+def test_a_records_folder_with_one_real_agent_shows_nothing_as_undeclared(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """C1 regression: a records folder naming exactly one real agent id (plus id-less events) is a
+    fresh, unedited first run -- 18.4's own promise ("nothing shows as undeclared") must hold for the
+    agent itself, not only for tools and models. `_records()`'s sole discovered subject is always
+    `DEFAULT_SUBJECT` (the F1 test above), which never appears in any event's own `data.agent.id`, so
+    auto-declaring the subject id alone cannot satisfy this; the real, observed agent id must be
+    auto-declared too."""
+    folder = str(_records(tmp_path / "records"))
+    out = tmp_path / "out"
+
+    code, env = _run(["assess", folder, "--out", str(out)], capsys)
+
+    assert code == 0
+    activity = json.loads((out / "activity.json").read_text(encoding="utf-8"))
+    assert activity["undeclared"]["agents"] == []
+    report_md = (out / "report.md").read_text(encoding="utf-8")
+    assert "Not yet declared in your profile" in report_md
+    assert (
+        "Agents:"
+        not in report_md.split("Not yet declared in your profile", 1)[1].split(
+            "Where your records can't show it yet", 1
+        )[0]
+    )
+
+
 def test_renamed_and_reordered_files_give_the_same_result_with_multiple_agents(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

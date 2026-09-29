@@ -1064,7 +1064,18 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         else:
             discovered_subjects = scanned.profile["subjects"]
             if len(discovered_subjects) == 1:
-                declared_subject_ids = frozenset({discovered_subjects[0]["id"]})
+                # The sole discovered subject on this branch is always DEFAULT_SUBJECT (0 or 1 real
+                # agent ids observed, `records/__init__.py`'s grouping rule never promotes a solo real
+                # id to be the subject itself) -- but `undeclared.agents` compares against the REAL
+                # observed agent ids `summarize_activity` extracts from `data.agent.id`, not against
+                # the subject id. Auto-declaring the subject id alone can never satisfy that promise;
+                # also declaring whatever real id the events themselves name (0 or 1 of them, the same
+                # extraction `summarize_activity` already does) is what actually keeps a lone real
+                # agent from being flagged undeclared.
+                real_ids = summarize_activity(scanned.events, Profile())["agents"]
+                declared_subject_ids = frozenset(
+                    {discovered_subjects[0]["id"], *real_ids}
+                )
             else:
                 declared_subject_ids = frozenset()
     activity = summarize_activity(
