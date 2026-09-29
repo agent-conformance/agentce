@@ -11,7 +11,7 @@ import deviation_lint
 import read_outcomes
 import report_readiness
 import yaml
-from _common import FINDINGS, OK
+from _common import _SKILL_MD, FINDINGS, OK, read_frontmatter
 
 
 def _report(
@@ -169,10 +169,8 @@ def test_pins_gate_runs(tmp_path: Path, capsys) -> None:
 
 
 def test_skill_is_for_the_coding_assistant_and_never_signs() -> None:
-    skill = (Path(__file__).resolve().parent.parent / "SKILL.md").read_text(
-        encoding="utf-8"
-    )
-    front = skill.split("---")[1]
-    assert "name: agentce-prepare-to-share" in front
-    assert "never for the agent being checked" in " ".join(front.split())
+    front = read_frontmatter()
+    assert front["name"] == "agentce-prepare-to-share"
+    assert "never for the agent being checked" in " ".join(front["description"].split())
+    skill = _SKILL_MD.read_text(encoding="utf-8")
     assert "and never signs anything." in " ".join(skill.split())

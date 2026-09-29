@@ -71,7 +71,7 @@ def _composite_refused() -> bool:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Phase-4 P4.4 check-report skill gate."
+        description="Phase-4 P4.4 prepare-to-share skill gate."
     )
     parser.add_argument(
         "--json", action="store_true", help="emit machine-readable JSON"

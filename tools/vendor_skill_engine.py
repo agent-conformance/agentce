@@ -13,12 +13,10 @@ file, never a relative path back into the monorepo.
     vendor_skill_engine.py               check every skill's vendored wheel unpacks to the same files
                                           and bytes a fresh build of engines/python produces (the CI
                                           guard: fails on drift)
-    vendor_skill_engine.py --write       rebuild the wheel and re-vendor it into every skill; then run
-                                          `uv lock --refresh-package agent-conformance` in each skill
-                                          directory yourself and commit both (plain `uv lock` does not
-                                          re-hash a local path wheel whose filename is unchanged, so it
-                                          silently leaves the old hash pinned -- this check does not
-                                          catch that; only a real `uv sync --frozen` does)
+    vendor_skill_engine.py --write       rebuild the wheel, re-vendor it into every skill, and re-lock
+                                          each skill with `uv lock --refresh-package agent-conformance`
+                                          (plain `uv lock` does not re-hash a local path wheel whose
+                                          filename is unchanged, so it would leave the old hash pinned)
     vendor_skill_engine.py --self-test   prove --check discriminates: a corrupted vendored wheel and a
                                           version-stale filename both fail, an in-sync one passes
 
@@ -117,11 +115,15 @@ def cmd_write() -> int:
         wheel = build_wheel(Path(raw) / "dist")
         for skill in SKILLS:
             write_vendor(skill, wheel)
-            print(f"vendored {wheel.name} into skills/{skill}/vendor/")
-    print(
-        "Next: run `uv lock --refresh-package agent-conformance` inside each skill directory and commit "
-        "pyproject.toml, uv.lock, and vendor/*.whl together."
-    )
+            # The wheel keeps its version and filename, so a plain `uv lock` would keep the old hash.
+            proc = _run(
+                ["uv", "lock", "--refresh-package", "agent-conformance"],
+                ROOT / "skills" / skill,
+            )
+            if proc.returncode != 0:
+                raise RuntimeError(f"uv lock failed in skills/{skill}:\n{proc.stderr}")
+            print(f"vendored {wheel.name} into skills/{skill}/vendor/ and re-locked")
+    print("Next: commit pyproject.toml, uv.lock, and vendor/*.whl together.")
     return 0
 
 

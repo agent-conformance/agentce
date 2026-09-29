@@ -141,7 +141,7 @@ def test_preflight_flags_a_dangling_ref(tmp_path: Path) -> None:
 # --- explain_insufficient. ------------------------------------------------------------------------
 
 
-def test_explain_groups_by_cause_and_suggests_an_adapter(tmp_path: Path) -> None:
+def test_explain_groups_by_root_cause(tmp_path: Path) -> None:
     assertions = tmp_path / "assertions.json"
     assertions.write_text(
         json.dumps(
@@ -187,10 +187,28 @@ def test_explain_groups_by_cause_and_suggests_an_adapter(tmp_path: Path) -> None
     not ADAPTERS.is_dir(),
     reason="adapters/ support matrices only exist in the monorepo checkout, not a standalone skill install",
 )
-def test_explain_suggests_an_adapter_from_the_support_matrices() -> None:
+def test_the_repo_mcp_gateway_matrix_supplies_authorization() -> None:
     # The mcp-gateway adapter can supply refs.authorization (SPEC 12.3).
     supplies = explain_insufficient._adapters_supplying(ADAPTERS)
     assert "mcp-gateway" in supplies["refs.authorization"]
+
+
+def test_explain_suggests_the_adapter_a_support_matrix_names(tmp_path: Path) -> None:
+    matrix = tmp_path / "gateway" / "support-matrix.yaml"
+    matrix.parent.mkdir()
+    matrix.write_text(
+        "adapter: gateway\nevents:\n  ToolCall:\n    members: [refs.authorization]\n",
+        encoding="utf-8",
+    )
+    missing = {
+        "outcome": "insufficient_evidence",
+        "missing_members": ["refs.authorization"],
+    }
+    report = explain_insufficient.explain(
+        [{"control": "OVS-01", **missing}],
+        explain_insufficient._adapters_supplying(tmp_path),
+    )
+    assert report["root_causes"][0]["suggested_adapters"] == ["gateway"]
 
 
 def test_without_support_matrices_nothing_is_suggested(tmp_path: Path) -> None:
@@ -199,10 +217,10 @@ def test_without_support_matrices_nothing_is_suggested(tmp_path: Path) -> None:
 
 
 def test_skill_is_for_the_coding_assistant_and_keeps_its_rules() -> None:
+    front = _common.read_frontmatter()
+    assert front["name"] == "agentce-get-evidence"
+    assert "never for the agent being checked" in " ".join(front["description"].split())
     skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
-    front = skill.split("---")[1]
-    assert "name: agentce-get-evidence" in front
-    assert "never for the agent being checked" in " ".join(front.split())
     rules = [
         line.split("|")[1].strip()
         for line in skill.splitlines()
