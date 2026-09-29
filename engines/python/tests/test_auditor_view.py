@@ -13,7 +13,7 @@ from typing import Any
 
 import jsonschema
 
-from agentce.assertions import Assertion, EvidencePointer
+from agentce.assertions import Assertion, EvidencePointer, aggregate
 from agentce.auditor_view import compute_auditor_view
 
 _WINDOW = ("2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
@@ -161,8 +161,6 @@ def test_manual_mode_with_a_real_outcome_carries_no_note() -> None:
 
 
 def test_counts_matches_aggregate_of_the_same_assertions() -> None:
-    from agentce.assertions import aggregate
-
     assertions = [
         _assertion("OVS-03", outcome="conformant"),
         _assertion("REC-01", "spiffe://corp/agents/b", outcome="non-conformant"),

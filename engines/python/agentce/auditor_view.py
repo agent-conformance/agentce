@@ -26,26 +26,31 @@ from .assertions import Assertion, aggregate
 #: view states that honestly rather than staying silent.
 _MANUAL_MODES = frozenset({"manual", "semi-automated"})
 
+#: The register record's own six required fields (deviation-register.schema.json), copied verbatim.
+_DEVIATION_FIELDS = (
+    "rationale",
+    "compensating_control",
+    "owner",
+    "approver",
+    "granted",
+    "expiry",
+)
+
 
 def _deviation_detail(
     deviation: str, by_control: dict[str, dict[str, Any]]
 ) -> dict[str, Any]:
     """The matching register entry for ``deviation`` (an assertion's own ``deviation`` field, its
     control id), verbatim -- or, when no register was passed (a report re-rendered from
-    ``assertions.json`` alone, with no live ``--deviations`` file available), a register-unavailable
-    stub naming only the control id. Never re-validated here: the register was already linted by
+    ``assertions.json`` alone, with no live ``--deviations`` file available), a minimal record naming
+    only the control id. Never re-validated here: the register was already linted by
     :func:`agentce.readiness.deviation_lint` before :func:`agentce.assess.apply_deviations` used it;
     this function only reads it."""
     entry = by_control.get(deviation)
     if entry is None:
         return {"control": deviation}
     detail: dict[str, Any] = {
-        "rationale": str(entry.get("rationale", "")),
-        "compensating_control": str(entry.get("compensating_control", "")),
-        "owner": str(entry.get("owner", "")),
-        "approver": str(entry.get("approver", "")),
-        "granted": str(entry.get("granted", "")),
-        "expiry": str(entry.get("expiry", "")),
+        field: str(entry.get(field, "")) for field in _DEVIATION_FIELDS
     }
     if entry.get("evidence_refs"):
         detail["evidence_refs"] = [str(ref) for ref in entry["evidence_refs"]]
