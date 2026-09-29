@@ -631,8 +631,8 @@ def test_a_records_folder_with_one_real_agent_shows_nothing_as_undeclared(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """C1: a records folder naming exactly one real agent id (plus id-less events) is a fresh, unedited
-    first run -- 18.4's promise ("nothing shows as undeclared") holds for the agent itself, not only
-    for tools and models, because the derived profile names that agent."""
+    first run. 18.4's promise ("nothing shows as undeclared") holds for the agent itself, not only for
+    tools and models, because the derived profile names that agent."""
     folder = str(_records(tmp_path / "records"))
     out = tmp_path / "out"
 
