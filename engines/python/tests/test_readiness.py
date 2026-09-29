@@ -17,6 +17,7 @@ from agentce.readiness import (
     compute_readiness,
     deviation_lint,
     normalize_deviation_dates,
+    parse_date,
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -297,13 +298,27 @@ def test_deviation_lint_rejects_an_unparseable_granted_or_expiry_rather_than_sil
     assert any("granted is not a valid ISO-8601 date" in p for p in granted)
 
 
+def test_parse_date_accepts_an_already_parsed_date_or_datetime() -> None:
+    """`parse_date` must handle a `date`/`datetime` object directly, not just a `str`: an unquoted
+    YAML date (`expiry: 2026-03-01`) parses to a `date`, not a `str`, before it ever reaches this
+    function. Accepting it here -- not just via `normalize_deviation_dates` at the loading boundary --
+    means a caller that forgets that normalization step still gets a correct parse instead of a
+    falsely-invalid or silently-absent field (round-2 regression: two `agentce-prepare-to-share`
+    scripts called `deviation_lint`/`compute_readiness` directly on an un-normalized register, and
+    `deviation_lint`'s own round-1 unparseable-date check treated the resulting `date` object as
+    invalid)."""
+    from datetime import date, datetime
+
+    assert parse_date(date(2026, 3, 1)) == date(2026, 3, 1)
+    assert parse_date(datetime(2026, 3, 1, 12, 30)) == date(2026, 3, 1)
+
+
 def test_normalize_deviation_dates_converts_yaml_date_objects_to_their_iso_string() -> (
     None
 ):
-    """Every caller that loads a register straight off disk (an unquoted `expiry: 2026-03-01` YAML
-    parses as a `date`, not a `str`) must call this before `deviation_lint`/`compute_readiness`, or
-    `parse_date` silently treats the field as absent (round-2 regression: two `agentce-prepare-to-share`
-    scripts called `deviation_lint`/`compute_readiness` directly on an un-normalized register)."""
+    """`normalize_deviation_dates` additionally normalizes a register's `date`/`datetime` fields to
+    their ISO string form at the loading boundary, so every consumer that renders a register entry
+    verbatim (not just the ones that call `parse_date`) sees a JSON-serializable string."""
     from datetime import date, datetime
 
     normalized = normalize_deviation_dates(

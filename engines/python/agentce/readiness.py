@@ -83,9 +83,16 @@ def normalize_deviation_dates(
 
 
 def parse_date(value: Any) -> date | None:
-    """Parse an ISO 8601 date or datetime string to a ``date``; anything else (not a string, or not
-    parseable) is ``None`` -- never an exception, so a hostile or malformed field is simply absent for
-    comparison, not a crash."""
+    """Parse an ISO 8601 date or datetime string, or an already-parsed ``date``/``datetime`` (what a
+    YAML loader turns an *unquoted* date into), to a ``date``; anything else (not parseable) is
+    ``None`` -- never an exception, so a hostile or malformed field is simply absent for comparison,
+    not a crash. Accepting ``date``/``datetime`` directly, not just ``str``, means a caller that reads
+    a register straight off disk and forgets :func:`normalize_deviation_dates` still gets a correct
+    parse here rather than a silently-absent or falsely-invalid field."""
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
     if not isinstance(value, str):
         return None
     try:
