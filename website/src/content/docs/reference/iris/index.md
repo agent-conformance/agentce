@@ -1,9 +1,9 @@
 ---
 title: Canonical IRIs
-description: Every one of the 22 canonical, dereferenceable IRIs the specification defines.
+description: Every one of the 23 canonical, dereferenceable IRIs the specification defines.
 ---
 
-Every canonical, dereferenceable IRI the specification defines (SPEC §6, §9; `website/iri-manifest.json`), 22 in total: the JSON-LD context, the RDF vocabulary, and every JSON Schema an engine or a report validates against. Each is served byte-identically at its own canonical path and, here, linked to a human-readable page.
+Every canonical, dereferenceable IRI the specification defines (SPEC §6, §9; `website/iri-manifest.json`), 23 in total: the JSON-LD context, the RDF vocabulary, and every JSON Schema an engine or a report validates against. Each is served byte-identically at its own canonical path and, here, linked to a human-readable page.
 
 | IRI | Page | Content type |
 |---|---|---|
@@ -25,6 +25,7 @@ Every canonical, dereferenceable IRI the specification defines (SPEC §6, §9; `
 | `/spec/report/quarantine.schema.json` | [AgentCE quarantine record](/reference/report-schemas/quarantine/) | application/schema+json |
 | `/spec/report/remediation-package.schema.json` | [AgentCE remediation package](/reference/report-schemas/remediation-package/) | application/schema+json |
 | `/spec/report/results-sarif.schema.json` | [AgentCE SARIF results (profile)](/reference/report-schemas/results-sarif/) | application/schema+json |
+| `/spec/report/security.schema.json` | [AgentCE security view](/reference/report-schemas/security/) | application/schema+json |
 | `/spec/rules/checklist.schema.json` | [AgentCE manual checklist](/reference/iris/spec-rules-checklist/) | application/schema+json |
 | `/spec/rules/control.schema.json` | [AgentCE control](/reference/iris/spec-rules-control/) | application/schema+json |
 | `/spec/rules/metric.schema.json` | [AgentCE metric specification](/reference/iris/spec-rules-metric/) | application/schema+json |

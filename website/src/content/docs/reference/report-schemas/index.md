@@ -21,3 +21,4 @@ One page per JSON Schema in `spec/report/` (SPEC §9), the schemas every engine 
 | [`quarantine.schema.json`](/reference/report-schemas/quarantine/) | AgentCE quarantine record |
 | [`remediation-package.schema.json`](/reference/report-schemas/remediation-package/) | AgentCE remediation package |
 | [`results-sarif.schema.json`](/reference/report-schemas/results-sarif/) | AgentCE SARIF results (profile) |
+| [`security.schema.json`](/reference/report-schemas/security/) | AgentCE security view |

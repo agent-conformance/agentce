@@ -90,6 +90,11 @@
     "content_type": "application/schema+json"
   },
   {
+    "path": "/spec/report/security.schema.json",
+    "source": "spec/report/security.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
     "path": "/spec/rules/checklist.schema.json",
     "source": "spec/rules/checklist.schema.json",
     "content_type": "application/schema+json"

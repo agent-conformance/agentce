@@ -6,13 +6,15 @@ session's real code against real inputs."""
 
 from __future__ import annotations
 
+from typing import Any
+
 from agentce.assertions import Assertion
 from agentce.security_view import compute_security_view
 from agentce.report import render_security_html, render_security_md
 
 _WINDOW = ("2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
 
-_EMPTY_ACTIVITY = {
+_EMPTY_ACTIVITY: dict[str, Any] = {
     "agents": [],
     "models": [],
     "tools": [],
