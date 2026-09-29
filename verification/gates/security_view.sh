@@ -34,10 +34,9 @@
 # property) -- exit code 1 (`ExitCode.FINDINGS`), not 0, which this script checks for explicitly
 # rather than letting a bare `set -e` treat a real, expected finding as a script bug.
 #
-# The golden (security_view_golden.json) is always a capture of the Python engine's own
-# canonicalized `security.json`. `security.md`/`.html` are not claimed byte-identical against
-# anything else (matching `report.md`'s own precedent) -- only their section order is checked.
-# Regenerate with:
+# The two goldens (security_view_golden.json, security_view_golden.md) are always a capture of the
+# Python engine's own canonicalized `security.json` and rendered `security.md` [r2 F7]; `security.html`
+# is not separately pinned (matching `report.md`/`report.html`'s own precedent). Regenerate with:
 #   verification/gates/security_view.sh --write
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -153,12 +152,8 @@ if [ -f "$py_out/security.json" ]; then
   fi
 fi
 if [ -f "$py_out/security.md" ]; then
-  actual_headings="$(grep -o '^## .*' "$py_out/security.md" || true)"
-  expected_headings="$(printf '## Tool access\n## Actions by effect class\n## Enforcement-point evidence\n## Drift\n## Standards citations')"
-  if [ "$actual_headings" != "$expected_headings" ]; then
-    echo "security-view: python's security.md section order is wrong (got: $actual_headings)" >&2
-    status=1
-  fi
+  # The section-order-only check this replaced is now strictly subsumed by the byte-for-byte
+  # golden compare below: any heading reordered is also content that differs from the golden.
   if ! cmp -s "$md_golden" "$py_out/security.md"; then
     echo "security-view: python security.md differs from the committed golden $md_golden" >&2
     status=1
