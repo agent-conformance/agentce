@@ -223,7 +223,9 @@ def test_deviation_lint_accepts_multi_subject_control_regardless_of_iteration_or
     assert a == b == []
 
 
-def test_deviation_lint_skips_the_outcome_check_for_an_already_applied_control() -> None:
+def test_deviation_lint_skips_the_outcome_check_for_an_already_applied_control() -> (
+    None
+):
     problems = deviation_lint(
         [_deviation()],
         control_ids={"OVS-03"},

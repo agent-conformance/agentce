@@ -922,7 +922,12 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     deviations_path = _opt_str(ns, "deviations")
     if package_for_sharing:
         _check_package_path_overlap(
-            out_dir, bundle, profile, domain_path_early, raw_catalog_dirs, deviations_path
+            out_dir,
+            bundle,
+            profile,
+            domain_path_early,
+            raw_catalog_dirs,
+            deviations_path,
         )
     if scanned is not None:
         scanned.write(out_dir, write_profile=derived_profile)
@@ -1048,9 +1053,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
                         expiry=deviation_by_control.get(control, {}).get("expiry", ""),
                     )
                 )
-        deviation_register_digest = signing.sha256_prefixed(
-            deviation_file.read_bytes()
-        )
+        deviation_register_digest = signing.sha256_prefixed(deviation_file.read_bytes())
     if state_arg is not None:
         state = StateDir.load(
             Path(state_arg)

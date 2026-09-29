@@ -25,6 +25,7 @@ _CATALOG = _ROOT / "spec" / "i18n" / "messages.en.json"
 _ERROR_CATALOGUE = _ROOT / "engines" / "python" / "agentce" / "error_catalogue.py"
 _REPORT = _ROOT / "engines" / "python" / "agentce" / "report.py"
 _VERDICT = _ROOT / "engines" / "python" / "agentce" / "verdict.py"
+_COMMANDS = _ROOT / "engines" / "python" / "agentce" / "commands" / "__init__.py"
 
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z0-9_-]+)+$")
 
@@ -63,7 +64,7 @@ def _error_catalogue_refs(source: str) -> set[str]:
 #: Names the modules subscript to look a key up in the catalogue (report.py uses `cat`,
 #: verdict.py uses `catalogue`); scoping to these avoids matching unrelated string literals
 #: (filenames, Markdown/HTML/PDF template text) that merely happen to contain a dot.
-_CATALOG_VAR_NAMES = frozenset({"cat", "catalogue", "catalog"})
+_CATALOG_VAR_NAMES = frozenset({"cat", "catalogue", "catalog", "deviation_cat"})
 
 
 def _key_expr(expr: ast.expr) -> tuple[str | None, str | None]:
@@ -154,6 +155,7 @@ def check(
     error_catalogue_path: Path = _ERROR_CATALOGUE,
     report_path: Path = _REPORT,
     verdict_path: Path = _VERDICT,
+    commands_path: Path | None = _COMMANDS,
 ) -> list[str]:
     problems: list[str] = []
     defined: set[str] = set(json.loads(catalog_path.read_text(encoding="utf-8")).keys())
@@ -162,7 +164,10 @@ def check(
         _error_catalogue_refs(error_catalogue_path.read_text(encoding="utf-8"))
     )
     prefixes: set[str] = set()
-    for path in (report_path, verdict_path):
+    paths = [report_path, verdict_path]
+    if commands_path is not None:
+        paths.append(commands_path)
+    for path in paths:
         literals, pfx = _literal_and_prefix_refs(path.read_text(encoding="utf-8"))
         referenced |= literals
         prefixes |= pfx
@@ -213,6 +218,7 @@ def self_test() -> int:
             error_catalogue_path=d / "error_catalogue.py",
             report_path=d / "report.py",
             verdict_path=d / "verdict.py",
+            commands_path=None,
         )
 
     good_problems = run("good")
