@@ -155,9 +155,9 @@ allow:
 
   - path: engines/python/agentce/report.py
     pattern: placeholder
-    count: 26
+    count: 28
     class: legitimate
-    justification: "sanitize_for_markdown/sanitize_for_html's placeholder parameter and the _SANITIZE_EMPTY_NAME_PLACEHOLDER/_SANITIZE_EMPTY_FIELD_PLACEHOLDER fallback strings ('(unnamed)'/'(empty)') name the rendered text for an empty field value; not an unfinished stub."
+    justification: "sanitize_for_markdown/sanitize_for_html's placeholder parameter and the _SANITIZE_EMPTY_NAME_PLACEHOLDER/_SANITIZE_EMPTY_FIELD_PLACEHOLDER fallback strings ('(unnamed)'/'(empty)') name the rendered text for an empty field value; not an unfinished stub. 18.18 added one more sanitize_for_html call (buyer-view evidence refs), which cites the placeholder= parameter and the _SANITIZE_EMPTY_FIELD_PLACEHOLDER constant, +2."
 
   - path: engines/python/agentce/commands/__init__.py
     pattern: placeholder
