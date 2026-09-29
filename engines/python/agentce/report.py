@@ -1218,12 +1218,11 @@ def _buyer_gap_lines(entry: dict[str, Any], cat: dict[str, str]) -> list[str]:
 
 def _buyer_unverified_suffix(entry: dict[str, Any], cat: dict[str, str]) -> str:
     """The unverified-clause label (SPEC §7.3), per row rather than per question heading: two rows
-    under one question can cite different crosswalk entries whose ``verified`` flags differ."""
-    return (
-        ""
-        if entry.get("verified") is True
-        else f" {cat['report.crosswalk_unverified']}"
-    )
+    under one question can cite different crosswalk entries whose ``verified`` flags differ.
+    Delegates the check to ``_crosswalk_text`` (the `_security_citation_text` idiom) rather than
+    re-testing the ``verified`` flag a second time -- only the label half of its output is wanted
+    here, so ``clause``/``framework`` are passed empty and stripped back off."""
+    return _crosswalk_text({**entry, "framework": "", "clause": ""}, cat)
 
 
 def _buyer_answer_md(entry: dict[str, Any], cat: dict[str, str]) -> list[str]:
@@ -1262,8 +1261,8 @@ def _buyer_answer_html(entry: dict[str, Any], cat: dict[str, str]) -> str:
     subject = sanitize_for_html(entry["subject"])
     # As in `_buyer_answer_md`: fixed catalogue text, escaped (HTML-safe either way) but not run
     # through the record-sanitizer.
-    text = html.escape(_buyer_answer_text(entry, cat)) + html.escape(
-        _buyer_unverified_suffix(entry, cat)
+    text = html.escape(
+        _buyer_answer_text(entry, cat) + _buyer_unverified_suffix(entry, cat)
     )
     header = f"<strong>{control}</strong> @ <code>{version}</code> ({subject}): {text}"
     sub_items = ""
