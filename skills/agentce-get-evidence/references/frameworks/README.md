@@ -9,7 +9,6 @@ where to add `agentce-emit` for the events a framework does not surface. They ar
 - [openai-agents](openai-agents.md)
 - [claude-agent-sdk](claude-agent-sdk.md)
 - [google-adk](google-adk.md)
-- [crewai](crewai.md)
 - [custom-loop](custom-loop.md)
 
 Where no note exists for a framework, use the generic guidance in `references/instrument.md`: enable the
