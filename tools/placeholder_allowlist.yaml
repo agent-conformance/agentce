@@ -147,6 +147,12 @@ allow:
     class: legitimate
     justification: "Asserts the starter profile keeps its fill-in source marker when the user picks a non-default framework; the marker is init scaffolding, not unfinished work."
 
+  - path: verification/gates/auditor_view_golden.json
+    pattern: example-domain
+    count: 2
+    class: legitimate
+    justification: "A committed golden capture of a real assess run over verification/gates/fixtures/auditor_view/deviations.yaml, whose owner/approver fields use the reserved example.com domain (RFC 2606); the golden file itself sits outside a fixtures/ path so the example-domain exemption does not match it by path alone."
+
   - path: engines/python/agentce/report.py
     pattern: placeholder
     count: 26
