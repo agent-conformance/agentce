@@ -72,6 +72,7 @@ _PRESET_PAIRS: dict[str, frozenset[str]] = {
     "security": frozenset({"sarif", "md", "html"}),
     "ci": frozenset({"sarif", "junit"}),
     "share": frozenset({"md", "html", "pdf", "public", "pack"}),
+    "risk-lead": frozenset({"md", "html"}),
 }
 
 #: Every file a run writes regardless of `--emit`/`--for` (contracts/P18-18.7.md C1).

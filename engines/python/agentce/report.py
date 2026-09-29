@@ -43,7 +43,12 @@ from .activity import DENIED_KINDS, RECORDER_CLASSES, summarize_activity
 from .assertions import Assertion, aggregate, check_dc5
 from .assess import index_by_subject, requirement_met
 from .catalog import Catalog, ControlSpec, catalog_provenance_digest
-from .profile import Profile
+from .profile import Profile, Subject
+from .project import (
+    blind_spots_by_subject,
+    compute_project_view,
+    no_population_by_subject,
+)
 
 #: The empty, honest answer for a caller with no assertions to explain (write_report's own
 #: docstring): never recomputed from an empty `Profile()`, unlike `activity`'s fallback -- an empty
@@ -63,6 +68,7 @@ _MANDATORY_ARTIFACT_SCHEMAS = {
 _OPTIONAL_ARTIFACT_SCHEMAS = {
     "oscal-ar.json": "oscal-assessment-results",
     "results.sarif": "results-sarif",
+    "project.json": "project",
 }
 _ARTIFACT_SCHEMAS = {**_MANDATORY_ARTIFACT_SCHEMAS, **_OPTIONAL_ARTIFACT_SCHEMAS}
 _SARIF_LEVEL = {
@@ -2197,6 +2203,8 @@ def write_report(
     blind_spots: dict[str, Any] | None = None,
     applicability_profile_digest: str | None = None,
     domain_binding_digest: str | None = None,
+    profile: Profile | None = None,
+    declared_subject_ids: frozenset[str] | None = None,
 ) -> dict[str, Any]:
     """Write every report artifact for ``assertions`` and return the reproducibility manifest.
 
@@ -2238,7 +2246,15 @@ def write_report(
     ``applicability_profile_digest``/``domain_binding_digest`` (sha256 of the resolved profile/domain
     file bytes, computed by the caller) land in ``manifest.json``'s existing, previously-unpopulated
     schema properties of the same names (18.8) -- present on every run regardless of whether it was
-    packaged for sharing."""
+    packaged for sharing.
+
+    ``profile``/``declared_subject_ids`` (18.14, Hill 7): when ``profile`` names more than one
+    subject, every agent's records go side by side -- ``project.md``/``.html``/``.json`` (the project
+    view, :func:`agentce.project.compute_project_view`) plus each subject's own full report under
+    ``agents/<dirname>/``, and the root ``report.md``/``.html`` become the project view. A single
+    subject (or no ``profile``) writes exactly what this function always wrote. ``declared_subject_ids``
+    mirrors :func:`agentce.activity.summarize_activity`'s own parameter and default (every subject in
+    ``profile`` counts as declared when omitted)."""
     check_dc5(
         assertions
     )  # DC-5: refuse a supporting verdict without an evidence pointer
@@ -2290,32 +2306,135 @@ def write_report(
     for name, data in (extra_outputs or {}).items():
         write_bytes(name, data)
 
+    # 18.14 C3: every agent's records side by side (Hill 7) -- only when `profile` names more than
+    # one subject; a single subject (or no `profile`) leaves every byte below unchanged.
+    project_view: dict[str, Any] | None = None
+    project_activity_by_subject: dict[str, dict[str, Any]] = {}
+    project_subject_ids: list[str] = []
+    if profile is not None and len(profile.subjects) > 1:
+        resolved_declared = (
+            declared_subject_ids
+            if declared_subject_ids is not None
+            else frozenset(s.id for s in profile.subjects)
+        )
+        project_subject_ids = sorted(
+            {a.subject for a in assertions} | {s.id for s in profile.subjects}
+        )
+        project_events_by_subject = index_by_subject(events or [])
+        declared_subjects_by_id = {s.id: s for s in profile.subjects}
+        for subject_id in project_subject_ids:
+            declared_subject = declared_subjects_by_id.get(subject_id)
+            subject_profile = Profile(
+                subjects=[
+                    declared_subject
+                    if declared_subject is not None
+                    else Subject(id=subject_id)
+                ]
+            )
+            subject_declared_ids = (
+                frozenset({subject_id})
+                if subject_id in resolved_declared
+                else frozenset()
+            )
+            project_activity_by_subject[subject_id] = summarize_activity(
+                project_events_by_subject.get(subject_id, []),
+                subject_profile,
+                declared_subject_ids=subject_declared_ids,
+            )
+        project_view = compute_project_view(
+            assertions,
+            profile,
+            resolved_declared,
+            project_activity_by_subject,
+            blind_spots,
+        )
+        write_json("project.json", project_view)
+        gaps_by_subject = blind_spots_by_subject(blind_spots)
+        no_pop_by_subject = no_population_by_subject(
+            blind_spots.get("no_population", [])
+        )
+        for subject_id in project_subject_ids:
+            dirname = _agent_dirname(subject_id)
+            (out_dir / "agents" / dirname).mkdir(parents=True, exist_ok=True)
+            subject_assertions = [a for a in assertions if a.subject == subject_id]
+            subject_activity = project_activity_by_subject[subject_id]
+            subject_blind_spots = {
+                "blind_spots": gaps_by_subject.get(subject_id, []),
+                "no_population": no_pop_by_subject.get(subject_id, []),
+            }
+            write_json(
+                f"agents/{dirname}/assertions.json",
+                [a.to_json() for a in subject_assertions],
+            )
+            write_json(f"agents/{dirname}/activity.json", subject_activity)
+            write_json(f"agents/{dirname}/blind-spots.json", subject_blind_spots)
+            if wants("md"):
+                write_text(
+                    f"agents/{dirname}/report.md",
+                    render_report_md(
+                        subject_assertions,
+                        aggregate(subject_assertions),
+                        language=report_language,
+                        catalogs=catalogs,
+                        invocation=invocation,
+                        activity=subject_activity,
+                        blind_spots=subject_blind_spots,
+                    ),
+                )
+            if wants("html"):
+                write_text(
+                    f"agents/{dirname}/report.html",
+                    render_report_html(
+                        subject_assertions,
+                        aggregate(subject_assertions),
+                        language=report_language,
+                        catalogs=catalogs,
+                        invocation=invocation,
+                        activity=subject_activity,
+                        blind_spots=subject_blind_spots,
+                    ),
+                )
+
     if wants("md"):
-        write_text(
-            "report.md",
-            render_report_md(
-                assertions,
-                counts,
-                language=report_language,
-                catalogs=catalogs,
-                invocation=invocation,
-                activity=activity,
-                blind_spots=blind_spots,
-            ),
-        )
+        if project_view is not None:
+            project_md = render_project_md(
+                project_view, project_activity_by_subject, language=report_language
+            )
+            write_text("project.md", project_md)
+            write_text("report.md", project_md)
+        else:
+            write_text(
+                "report.md",
+                render_report_md(
+                    assertions,
+                    counts,
+                    language=report_language,
+                    catalogs=catalogs,
+                    invocation=invocation,
+                    activity=activity,
+                    blind_spots=blind_spots,
+                ),
+            )
     if wants("html"):
-        write_text(
-            "report.html",
-            render_report_html(
-                assertions,
-                counts,
-                language=report_language,
-                catalogs=catalogs,
-                invocation=invocation,
-                activity=activity,
-                blind_spots=blind_spots,
-            ),
-        )
+        if project_view is not None:
+            project_html = render_project_html(
+                project_view, project_activity_by_subject, language=report_language
+            )
+            write_text("project.html", project_html)
+            write_text("report.html", project_html)
+        else:
+            write_text(
+                "report.html",
+                render_report_html(
+                    assertions,
+                    counts,
+                    language=report_language,
+                    catalogs=catalogs,
+                    invocation=invocation,
+                    activity=activity,
+                    blind_spots=blind_spots,
+                ),
+            )
 
     oscal_doc: dict[str, Any] | None = None
     if wants("oscal") or wants("oscal_xml"):

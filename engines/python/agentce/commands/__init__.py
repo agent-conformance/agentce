@@ -120,6 +120,10 @@ PRESET_EMIT: dict[str, frozenset[str]] = {
     "security": frozenset({"sarif", "md", "html"}),
     "ci": frozenset({"sarif", "junit"}),
     "share": frozenset({"md", "html", "pdf", "public", "pack"}),
+    #: Risk lead / CIO (18.14, Hill 7): the project view across every agent, side by side --
+    #: `md`/`html` render `project.*`/`agents/<dirname>/*` whenever `--profile` declares more than
+    #: one subject, the same two formats `security` already renders.
+    "risk-lead": frozenset({"md", "html"}),
 }
 #: `CI` values treated as "not in CI" (the `ci-info` convention): unset, empty, or one of these,
 #: case-insensitively. Jenkins (`JENKINS_URL`/`BUILD_ID`) and Azure Pipelines (`TF_BUILD`) are not
@@ -1087,6 +1091,8 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         blind_spots=blind_spots,
         applicability_profile_digest=applicability_profile_digest,
         domain_binding_digest=domain_binding_digest,
+        profile=profile_obj,
+        declared_subject_ids=declared_subject_ids,
     )
     if state is not None:
         state.record(loaded.digest, out_dir / "manifest.json", new_window_end)

@@ -1217,6 +1217,131 @@ def test_write_report_emit_validates_clean(tmp_path: Path) -> None:
     assert validate_report(tmp_path) == []
 
 
+# --- 18.14 C3: write_report's project view (Hill 7) ---------------------------------------------
+
+
+def test_write_report_single_subject_is_unchanged(tmp_path: Path) -> None:
+    """A `profile` naming exactly one subject writes nothing new (18.14 C3's byte-identity
+    promise): no `project.*`, no `agents/` directory."""
+    write_report(
+        tmp_path,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+        profile=Profile(subjects=[Subject(id="spiffe://corp/agents/a")]),
+    )
+    for name in ("project.md", "project.html", "project.json", "agents"):
+        assert not (tmp_path / name).exists(), name
+
+
+def test_write_report_multi_subject_writes_project_view(tmp_path: Path) -> None:
+    profile = Profile(subjects=[Subject(id="A"), Subject(id="B")])
+    events = [
+        {
+            "id": "e1",
+            "subject": "A",
+            "data": {
+                "@type": "ToolCall",
+                "agent": {"id": "A"},
+                "tool": {"name": "x"},
+                "effect_class": "read",
+            },
+        },
+        {
+            "id": "e2",
+            "subject": "C",
+            "data": {
+                "@type": "ToolCall",
+                "agent": {"id": "C"},
+                "tool": {"name": "y"},
+                "effect_class": "write",
+            },
+        },
+    ]
+    assertions = [
+        _project_assertion("A", "conformant"),
+        _project_assertion("B", "conformant"),
+        _project_assertion("C", "insufficient_evidence"),
+    ]
+    manifest = write_report(
+        tmp_path,
+        assertions,
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+        events=events,
+        profile=profile,
+    )
+    for name in (
+        "project.md",
+        "project.html",
+        "project.json",
+        "report.md",
+        "report.html",
+    ):
+        assert (tmp_path / name).is_file(), name
+    assert (tmp_path / "report.md").read_bytes() == (
+        tmp_path / "project.md"
+    ).read_bytes()
+    assert (tmp_path / "report.html").read_bytes() == (
+        tmp_path / "project.html"
+    ).read_bytes()
+    project = json.loads((tmp_path / "project.json").read_text(encoding="utf-8"))
+    assert project["undeclared_agents"] == ["C"]
+    for subject_id in ("A", "B", "C"):
+        dirname = next(
+            d.name
+            for d in (tmp_path / "agents").iterdir()
+            if d.name.startswith(f"{subject_id}-")
+        )
+        agent_dir = tmp_path / "agents" / dirname
+        for name in (
+            "report.md",
+            "report.html",
+            "activity.json",
+            "blind-spots.json",
+            "assertions.json",
+        ):
+            assert (agent_dir / name).is_file(), name
+        own_assertions = json.loads(
+            (agent_dir / "assertions.json").read_text(encoding="utf-8")
+        )
+        assert {a["subject"] for a in own_assertions} == {subject_id}
+    assert "project.json" in manifest["outputs"]
+    assert validate_report(tmp_path) == []
+
+
+def test_write_report_multi_subject_hostile_ids_get_distinct_directories(
+    tmp_path: Path,
+) -> None:
+    """No overwrite, no traversal outside `out_dir`, no `OSError`, even for ids that collide under
+    `_safe` or case-insensitively, or that are `.`/`..`/300 characters long (18.14 C3, round 2's
+    F4 disposition: the 8-hex-character uuid suffix is collision-resistant, not collision-proof)."""
+    ids = ["..", ".", "a/b", "a:b", "ABC", "abc", "x" * 300]
+    profile = Profile(subjects=[Subject(id=ids[0]), Subject(id=ids[1])])
+    assertions = [_project_assertion(i, "conformant") for i in ids]
+    write_report(
+        tmp_path,
+        assertions,
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+        profile=profile,
+        # `pack`'s own `packs/<subject>/` naming (untouched by this item) does not truncate a
+        # long subject id the way `_agent_dirname` does; narrowed to the formats this check
+        # covers so the pre-existing, out-of-scope `pack` path is not exercised here.
+        emit=frozenset({"md", "html"}),
+    )
+    agents_dir = tmp_path / "agents"
+    entries = list(agents_dir.iterdir())
+    dirnames = sorted(d.name for d in entries)
+    assert len(dirnames) == 7
+    assert len(set(dirnames)) == 7
+    resolved_parent = agents_dir.resolve()
+    for entry in entries:
+        assert entry.is_dir()
+        assert entry.resolve().parent == resolved_parent
+    assert validate_report(tmp_path) == []
+
+
 # --- validate_report: the new optional artifacts ----------------------------------------------
 
 

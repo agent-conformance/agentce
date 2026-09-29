@@ -544,6 +544,37 @@ def test_a_records_folder_with_multiple_agents_derives_one_subject_per_agent(
     ]
 
 
+def test_records_folder_multi_agent_for_risk_lead_writes_project_view(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """18.14 C5: the risk-lead/CIO preset over a records folder that discovers more than one agent
+    writes the project view -- every discovered agent side by side. A records-folder run cannot know
+    which of several discovered agents an adopter meant to declare, so C1 leaves all of them
+    undeclared (Hill 7's "undeclared agents listed")."""
+    folder = str(_multi_agent_records(tmp_path / "records"))
+    out = tmp_path / "out"
+
+    code, env = _run(
+        ["assess", folder, "--for", "risk-lead", "--out", str(out)], capsys
+    )
+
+    assert code == 0
+    for name in ("project.md", "project.html", "project.json"):
+        assert (out / name).is_file(), name
+    assert (out / "report.md").read_bytes() == (out / "project.md").read_bytes()
+    assert (out / "report.html").read_bytes() == (out / "project.html").read_bytes()
+    project = json.loads((out / "project.json").read_text(encoding="utf-8"))
+    # `agentce:subject/local` (the id-less-events subject) carries no `data.agent.id` of its own, so
+    # it is never in any row's `agents_observed` and cannot appear here -- only a subject with a real,
+    # observed agent id can (`compute_project_view`'s own definition of "undeclared").
+    assert set(project["undeclared_agents"]) == {
+        "spiffe://corp/agents/checkout-copilot",
+        "spiffe://corp/agents/fraud-detection-agent",
+    }
+    agent_dirs = sorted(p.name for p in (out / "agents").iterdir())
+    assert len(agent_dirs) == 3
+
+
 def test_a_records_folder_with_one_agent_id_still_derives_one_default_subject(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
