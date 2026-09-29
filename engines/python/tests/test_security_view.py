@@ -1,18 +1,23 @@
 """compute_security_view/render_security_md/render_security_html: the security-framed selection of
-already-computed activity/crosswalk facts (18.16). Full contract's remaining C4 test list (schema
-validation, cross-engine diff, committed golden, hostile-name escaping in context, determinism over
-shuffled assertion order) is a future session's work per the item's journal; this file proves this
-session's real code against real inputs."""
+already-computed activity/crosswalk facts (18.16). Cross-engine diff and the committed golden are C5's
+build-gate work (verification/gates/security_view.sh); this file proves this session's real code
+against real inputs, including a full `assess --for security` run against the quickstart fixture."""
 
 from __future__ import annotations
 
+import json
+import random
+from pathlib import Path
 from typing import Any
 
+from agentce import cli
 from agentce.assertions import Assertion
+from agentce.report import render_security_html, render_security_md, validate_report
 from agentce.security_view import compute_security_view
-from agentce.report import render_security_html, render_security_md
 
 _WINDOW = ("2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_QUICKSTART = _REPO_ROOT / "corpus" / "quickstart"
 
 _EMPTY_ACTIVITY: dict[str, Any] = {
     "agents": [],
@@ -170,3 +175,123 @@ def test_render_security_shows_citation_with_framework_version_and_unverified_la
     md = render_security_md(view)
     assert "mitre-atlas 2026.09 AML.T0051" in md
     assert "(clause reference unverified)" in md
+
+
+def test_compute_security_view_is_order_independent_over_many_assertions() -> None:
+    """As `test_activity.py::test_activity_is_order_independent`: a real determinism proof over more
+    than two assertions (contract C4's own named "shuffled assertion order" test), distinct from the
+    two-assertion dedup case above."""
+    assertions = [
+        _assertion(
+            control,
+            [
+                {
+                    "framework": "mitre-atlas",
+                    "clause": f"AML.T0{n}",
+                    "verified": n % 2 == 0,
+                }
+            ],
+        )
+        for n, control in enumerate(
+            ["ROB-02", "OVS-03", "INT-01", "REC-01", "REC-04"], start=51
+        )
+    ]
+    forward = compute_security_view(_EMPTY_ACTIVITY, assertions)
+    reversed_view = compute_security_view(_EMPTY_ACTIVITY, list(reversed(assertions)))
+    shuffled = list(assertions)
+    random.Random(0).shuffle(shuffled)
+    shuffled_view = compute_security_view(_EMPTY_ACTIVITY, shuffled)
+    assert reversed_view == forward
+    assert shuffled_view == forward
+    assert len(forward["standards_citations"]) == 5
+
+
+def _assess_security(out: Path) -> int:
+    return cli.main(
+        [
+            "assess",
+            "--bundle",
+            str(_QUICKSTART / "evidence"),
+            "--profile",
+            str(_QUICKSTART / "applicability.yaml"),
+            "--domain",
+            str(_QUICKSTART / "domain.linkml.yaml"),
+            "--out",
+            str(out),
+            "--for",
+            "security",
+        ]
+    )
+
+
+def test_write_report_for_security_preset_writes_security_artifacts(
+    tmp_path: Path,
+) -> None:
+    out_with = tmp_path / "with"
+    assert _assess_security(out_with) == 0
+    for name in ("security.md", "security.html", "security.json"):
+        assert (out_with / name).is_file(), name
+
+    out_without = tmp_path / "without"
+    assert (
+        cli.main(
+            [
+                "assess",
+                "--bundle",
+                str(_QUICKSTART / "evidence"),
+                "--profile",
+                str(_QUICKSTART / "applicability.yaml"),
+                "--domain",
+                str(_QUICKSTART / "domain.linkml.yaml"),
+                "--out",
+                str(out_without),
+            ]
+        )
+        == 0
+    )
+    for name in ("security.md", "security.html", "security.json"):
+        assert not (out_without / name).exists(), name
+
+
+def test_security_json_validates_against_its_schema(tmp_path: Path) -> None:
+    out = tmp_path / "o"
+    assert _assess_security(out) == 0
+    assert validate_report(out) == []
+
+
+def test_security_json_matches_activity_json_for_shared_fields(tmp_path: Path) -> None:
+    out = tmp_path / "o"
+    assert _assess_security(out) == 0
+    security = json.loads((out / "security.json").read_text(encoding="utf-8"))
+    activity = json.loads((out / "activity.json").read_text(encoding="utf-8"))
+    assert security["actions_by_effect_class"] == activity["actions_by_effect_class"]
+    assert security["drift"]["tools"] == activity["undeclared"]["tools"]
+    assert security["drift"]["models"] == activity["undeclared"]["models"]
+
+
+def test_render_security_md_with_language_de_does_not_crash_and_falls_back() -> None:
+    """As `test_rendering.py::test_catalogue_falls_back_to_english`: no German translation exists yet
+    for the security view's own keys (18.14's own precedent for a per-view language smoke test does
+    not exist under any name -- confirmed by search, so this is a fresh test, not a port), so the
+    German-language render must fall back to the English text rather than raising or leaving a
+    missing-key placeholder."""
+    view = compute_security_view(
+        _EMPTY_ACTIVITY,
+        [
+            _assertion(
+                "ROB-02",
+                [
+                    {
+                        "framework": "mitre-atlas",
+                        "clause": "AML.T0051",
+                        "verified": False,
+                    }
+                ],
+            )
+        ],
+    )
+    md = render_security_md(view, language="de")
+    html_out = render_security_html(view, language="de")
+    assert "AgentCE security view" in md
+    assert "AgentCE doesn't block anything." in md
+    assert "AgentCE security view" in html_out
