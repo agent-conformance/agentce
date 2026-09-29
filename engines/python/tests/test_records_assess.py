@@ -79,6 +79,20 @@ def _manifest(out: Path) -> dict[str, Any]:
     return loaded
 
 
+def _activity(out: Path) -> dict[str, Any]:
+    loaded: dict[str, Any] = json.loads((out / "activity.json").read_text("utf-8"))
+    return loaded
+
+
+def _events(out: Path) -> list[dict[str, Any]]:
+    """Every event in the run's rebuilt records bundle."""
+    return [
+        json.loads(line)
+        for path in (out / "records-bundle" / "events").glob("*.jsonl")
+        for line in path.read_text(encoding="utf-8").splitlines()
+    ]
+
+
 def test_a_records_folder_is_assessed_with_no_flag(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -483,11 +497,7 @@ def test_a_profile_with_one_subject_gives_the_records_that_subject(
     out = tmp_path / "out"
     _run(["assess", folder, "--profile", str(mine), "--out", str(out)], capsys)
 
-    events = [
-        json.loads(line)
-        for path in (out / "records-bundle" / "events").glob("*.jsonl")
-        for line in path.read_text(encoding="utf-8").splitlines()
-    ]
+    events = _events(out)
     assert {e["subject"] for e in events} == {"spiffe://corp/agents/mine"}
     assert {a["subject"] for a in _assertions(out)} == {"spiffe://corp/agents/mine"}
 
@@ -526,11 +536,7 @@ def test_a_records_folder_with_multiple_agents_derives_one_subject_per_agent(
     code, env = _run(["assess", folder, "--out", str(out)], capsys)
 
     assert code == 0
-    events = [
-        json.loads(line)
-        for path in (out / "records-bundle" / "events").glob("*.jsonl")
-        for line in path.read_text(encoding="utf-8").splitlines()
-    ]
+    events = _events(out)
     assert {e["subject"] for e in events} == {
         "spiffe://corp/agents/checkout-copilot",
         "spiffe://corp/agents/fraud-detection-agent",
@@ -589,11 +595,7 @@ def test_a_records_folder_with_one_agent_id_names_that_agent_as_its_subject(
     code, env = _run(["assess", folder, "--out", str(out)], capsys)
 
     assert code == 0
-    events = [
-        json.loads(line)
-        for path in (out / "records-bundle" / "events").glob("*.jsonl")
-        for line in path.read_text(encoding="utf-8").splitlines()
-    ]
+    events = _events(out)
     assert {e["subject"] for e in events} == {"spiffe://corp/agents/credit-underwriter"}
     profile = yaml.safe_load((out / "applicability.yaml").read_text(encoding="utf-8"))
     assert [s["id"] for s in profile["subjects"]] == [
@@ -619,13 +621,9 @@ def test_a_records_folder_naming_no_agent_keeps_the_default_subject(
     code, env = _run(["assess", str(folder), "--out", str(out)], capsys)
 
     assert code == 0
-    events = [
-        json.loads(line)
-        for path in (out / "records-bundle" / "events").glob("*.jsonl")
-        for line in path.read_text(encoding="utf-8").splitlines()
-    ]
+    events = _events(out)
     assert {e["subject"] for e in events} == {"agentce:subject/local"}
-    activity = json.loads((out / "activity.json").read_text(encoding="utf-8"))
+    activity = _activity(out)
     assert activity["undeclared"]["agents"] == []
 
 
@@ -641,7 +639,7 @@ def test_a_records_folder_with_one_real_agent_shows_nothing_as_undeclared(
     code, env = _run(["assess", folder, "--out", str(out)], capsys)
 
     assert code == 0
-    activity = json.loads((out / "activity.json").read_text(encoding="utf-8"))
+    activity = _activity(out)
     assert activity["undeclared"]["agents"] == []
     report_md = (out / "report.md").read_text(encoding="utf-8")
     assert "Not yet declared in your profile" in report_md
@@ -667,7 +665,7 @@ def test_a_records_folder_with_one_real_agent_shows_nothing_as_undeclared(
         capsys,
     )
     assert code2 == 0
-    activity2 = json.loads((out2 / "activity.json").read_text(encoding="utf-8"))
+    activity2 = _activity(out2)
     assert activity2["undeclared"]["agents"] == []
     report_md2 = (out2 / "report.md").read_text(encoding="utf-8")
     assert (
@@ -679,23 +677,29 @@ def test_a_records_folder_with_one_real_agent_shows_nothing_as_undeclared(
     )
 
 
-def test_a_second_real_agent_appearing_under_a_re_fed_single_agent_profile_is_undeclared(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize("keep_first_agent", [True, False], ids=["grown", "replaced"])
+def test_a_new_agent_under_a_re_fed_single_agent_profile_is_undeclared(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], keep_first_agent: bool
 ) -> None:
-    """Verifier round 3's repro: a records folder that has grown a second agent since its profile was
-    derived. The profile names only the first agent, so only the new one is undeclared."""
+    """Verifier round 3's repro and residual: the tool's own derived single-agent profile, re-fed over
+    a folder that has since grown a second agent (grown) or whose agent was replaced by a different
+    lone one (replaced). The profile names only the first agent, so the new one is undeclared either
+    way; counting the agents the folder names now could not tell these two cases apart."""
     records = tmp_path / "records"
     out_a = tmp_path / "out-a"
     _run(["assess", str(_records(records)), "--out", str(out_a)], capsys)
 
-    grown = tmp_path / "grown"
-    shutil.copytree(records, grown)
-    shutil.copy(_FIXTURES / "datadog" / "input.json", grown / "fraud.json")
+    later = tmp_path / "later"
+    if keep_first_agent:
+        shutil.copytree(records, later)
+    else:
+        later.mkdir()
+    shutil.copy(_FIXTURES / "datadog" / "input.json", later / "fraud.json")
     out_b = tmp_path / "out-b"
     code, env = _run(
         [
             "assess",
-            str(grown),
+            str(later),
             "--profile",
             str(out_a / "applicability.yaml"),
             "--out",
@@ -705,41 +709,7 @@ def test_a_second_real_agent_appearing_under_a_re_fed_single_agent_profile_is_un
     )
 
     assert code == 0
-    activity = json.loads((out_b / "activity.json").read_text(encoding="utf-8"))
-    assert activity["undeclared"]["agents"] == [
-        "spiffe://corp/agents/fraud-detection-agent"
-    ]
-
-
-def test_a_different_lone_agent_under_a_re_fed_single_agent_profile_is_undeclared(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Verifier round 3's residual: a derived profile re-fed over a folder where its agent was replaced
-    by a different lone agent. The profile names the first agent, not the new one, so the new one is
-    undeclared; counting the agents the folder names now could not tell these two cases apart."""
-    records = tmp_path / "records"
-    out_a = tmp_path / "out-a"
-    _run(["assess", str(_records(records)), "--out", str(out_a)], capsys)
-
-    replaced = tmp_path / "replaced"
-    replaced.mkdir()
-    shutil.copy(_FIXTURES / "datadog" / "input.json", replaced / "fraud.json")
-    out_b = tmp_path / "out-b"
-    code, env = _run(
-        [
-            "assess",
-            str(replaced),
-            "--profile",
-            str(out_a / "applicability.yaml"),
-            "--out",
-            str(out_b),
-        ],
-        capsys,
-    )
-
-    assert code == 0
-    activity = json.loads((out_b / "activity.json").read_text(encoding="utf-8"))
-    assert activity["undeclared"]["agents"] == [
+    assert _activity(out_b)["undeclared"]["agents"] == [
         "spiffe://corp/agents/fraud-detection-agent"
     ]
 

@@ -1052,18 +1052,13 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "catalog_dir_digests": catalog_dir_digests,
         }
     )
+    # "Declared" means named in the profile (None: every profile subject). A derived profile names each
+    # agent the scan saw by its own id, so a fresh single-agent run shows nothing undeclared (18.4) and a
+    # re-fed profile declares exactly the agent it was derived from. The one exception: a fresh run that
+    # discovered several agents declares none of them, since nobody has named them yet (Hill 7).
     declared_subject_ids: frozenset[str] | None = None
-    if scanned is not None:
-        # "Declared" means named in the profile. A derived profile names each agent the scan saw by its
-        # own id (a lone agent included), so a fresh single-agent run shows nothing undeclared (18.4) and
-        # a re-fed profile declares exactly the agent it was derived from. A fresh run that discovered
-        # several agents declares none of them: nobody has named them yet (Hill 7).
-        if declared is not None:
-            declared_subject_ids = frozenset(s.id for s in declared.subjects)
-        elif len(scanned.subjects) == 1:
-            declared_subject_ids = frozenset(scanned.subjects)
-        else:
-            declared_subject_ids = frozenset()
+    if scanned is not None and declared is None and len(scanned.subjects) > 1:
+        declared_subject_ids = frozenset()
     activity = summarize_activity(
         ingested.accepted, profile_obj, declared_subject_ids=declared_subject_ids
     )
