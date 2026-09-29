@@ -18,6 +18,8 @@ from agentce.security_view import compute_security_view
 _WINDOW = ("2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _QUICKSTART = _REPO_ROOT / "corpus" / "quickstart"
+_GATE_FIXTURE = _REPO_ROOT / "verification" / "gates" / "fixtures" / "security_view"
+_GATE_GOLDEN = _REPO_ROOT / "verification" / "gates" / "security_view_golden.json"
 
 _EMPTY_ACTIVITY: dict[str, Any] = {
     "agents": [],
@@ -295,3 +297,31 @@ def test_render_security_md_with_language_de_does_not_crash_and_falls_back() -> 
     assert "AgentCE security view" in md
     assert "AgentCE doesn't block anything." in md
     assert "AgentCE security view" in html_out
+
+
+def test_security_json_matches_committed_golden(tmp_path: Path) -> None:
+    """`verification/gates/security_view.sh` (C5) captures this same fixture's real `security.json`
+    as the committed golden; this test proves the C4 code that gate script exercises produces that
+    exact output on a fresh run, byte-for-byte, so a code change that silently drifts the view is
+    caught here too, not only by the build gate. The fixture's own real verdict is non-conformant
+    (ROB-02 fails its shape's `prov:used` property), so `assess` exits 1 (ExitCode.FINDINGS), not 0."""
+    out = tmp_path / "o"
+    exit_code = cli.main(
+        [
+            "assess",
+            "--bundle",
+            str(_GATE_FIXTURE / "evidence"),
+            "--profile",
+            str(_GATE_FIXTURE / "applicability.yaml"),
+            "--domain",
+            str(_GATE_FIXTURE / "domain.linkml.yaml"),
+            "--out",
+            str(out),
+            "--for",
+            "security",
+        ]
+    )
+    assert exit_code == 1
+    security = json.loads((out / "security.json").read_text(encoding="utf-8"))
+    golden = json.loads(_GATE_GOLDEN.read_text(encoding="utf-8"))
+    assert security == golden
