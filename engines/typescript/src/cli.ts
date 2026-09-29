@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { homedir } from "node:os";
 import { basename, join, relative, resolve as resolvePath, sep } from "node:path";
 import { load } from "js-yaml";
-import { summarizeActivity } from "./activity";
+import { type Activity, summarizeActivity } from "./activity";
 import { resolve as resolveApplicability } from "./applicability";
 import { type Assertion, aggregate, assertionFromJson, assertionToJson } from "./assertions";
 import { assessSubjects, evaluatedNothing } from "./assess";
@@ -42,6 +42,7 @@ import {
   writeReport,
 } from "./report";
 import { CommandResult } from "./result";
+import { computeSecurityView } from "./securityView";
 import { StateDir, windowEnd } from "./state";
 import { GraphStore } from "./store";
 import { byteCompare, sortKeysDeep, writeJsonl } from "./util";
@@ -656,6 +657,24 @@ export function main(argv: string[]): number {
       return ExitCode.INPUT_ERROR;
     }
     console.log(catalogProvenanceDigest(dir));
+    return 0;
+  }
+
+  // security-view is a plain computation seam (the same pattern as `numerics`/`digest-tree` above),
+  // driven by the security-view build gate's cross-engine diff (18.16, C5): it reads a fixture file
+  // with `{activity, assertions}`, runs `computeSecurityView`, and prints the result as JSON -- not
+  // part of the public `assess` command surface (no engine here has `--for`/multi-format
+  // `write_report` yet, TRADEOFFS row 8).
+  if (command === "security-view") {
+    const fixturePath = argv[1];
+    if (fixturePath === undefined) {
+      console.error("security-view: a fixture file path is required");
+      return ExitCode.INPUT_ERROR;
+    }
+    const data = JSON.parse(readFileSync(fixturePath, "utf-8"));
+    const activity = data.activity as Activity;
+    const assertions = (data.assertions as unknown[]).map(assertionFromJson);
+    console.log(JSON.stringify(computeSecurityView(activity, assertions)));
     return 0;
   }
 
