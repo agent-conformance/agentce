@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/report/buyer.schema.json",
+  "title": "AgentCE buyer view",
+  "description": "buyer.json in the report directory. It answers \"does this vendor's agent meet what I asked?\": one entry per (assertion, crosswalk citation) whose framework is a generated questionnaire this run cites (CAIQ, the AI Controls Matrix), grouped for reading by question in `by_question`. A question with zero mapped controls is simply absent, never a fabricated answer; \"not enough evidence\" names the concrete next step where one is known. This view adds no new fact and no new outcome; it is a different selection of the same assertions, and it is not itself a certification. AgentCE writes it only with `--for buyer`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["answers", "by_question", "counts"],
+  "$defs": {
+    "outcome": {
+      "type": "string",
+      "enum": ["conformant", "non-conformant", "partial", "not_applicable", "not_assessed", "insufficient_evidence"]
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["conformant", "non-conformant", "partial", "not_applicable", "not_assessed", "insufficient_evidence"],
+      "properties": {
+        "conformant": {"type": "integer", "minimum": 0},
+        "non-conformant": {"type": "integer", "minimum": 0},
+        "partial": {"type": "integer", "minimum": 0},
+        "not_applicable": {"type": "integer", "minimum": 0},
+        "not_assessed": {"type": "integer", "minimum": 0},
+        "insufficient_evidence": {"type": "integer", "minimum": 0}
+      }
+    },
+    "gap_step": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "missing"],
+          "properties": {
+            "kind": {"const": "blind_spot"},
+            "missing": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["event", "class", "ladder_rung", "owner_key", "step_kind"],
+                "properties": {
+                  "event": {"type": "string"},
+                  "class": {"type": "string"},
+                  "ladder_rung": {"type": "integer", "minimum": 1, "maximum": 4},
+                  "owner_key": {"type": "string"},
+                  "step_kind": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": {"const": "no_population"}
+          }
+        }
+      ]
+    },
+    "answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["framework", "question", "control", "control_version", "subject", "outcome", "mode", "verified", "evidence", "gap_step"],
+      "properties": {
+        "framework": {"type": "string", "enum": ["caiq", "ai-controls-matrix"]},
+        "question": {"type": "string"},
+        "control": {"type": "string"},
+        "control_version": {"type": "string"},
+        "subject": {"type": "string"},
+        "outcome": {"$ref": "#/$defs/outcome"},
+        "mode": {"type": "string", "enum": ["automated", "semi-automated", "manual"]},
+        "verified": {"type": "boolean"},
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["ref", "digest", "source_class"],
+            "properties": {
+              "ref": {"type": "string"},
+              "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+              "source_class": {"type": "string", "enum": ["self_report", "enforcement_point", "independent_system"]}
+            }
+          }
+        },
+        "gap_step": {"$ref": "#/$defs/gap_step"},
+        "manual_checklist_note": {"type": "string"}
+      }
+    }
+  },
+  "properties": {
+    "answers": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/answer"}
+    },
+    "by_question": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "counts": {"$ref": "#/$defs/counts"}
+  }
+}

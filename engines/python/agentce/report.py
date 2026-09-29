@@ -43,6 +43,12 @@ from .activity import DENIED_KINDS, RECORDER_CLASSES, summarize_activity
 from .assertions import Assertion, aggregate, check_dc5
 from .assess import deviations_by_control, index_by_subject, requirement_met
 from .auditor_view import compute_auditor_view
+from .buyer_view import (
+    BUYER_FRAMEWORKS,
+    BUYER_QUESTIONNAIRE_TITLES,
+    BUYER_QUESTIONNAIRE_VERSIONS,
+    compute_buyer_view,
+)
 from .catalog import Catalog, ControlSpec, catalog_provenance_digest
 from .profile import Profile, Subject
 from .project import (
@@ -73,6 +79,7 @@ _OPTIONAL_ARTIFACT_SCHEMAS = {
     "project.json": "project",
     "security.json": "security",
     "auditor.json": "auditor",
+    "buyer.json": "buyer",
 }
 _ARTIFACT_SCHEMAS = {**_MANDATORY_ARTIFACT_SCHEMAS, **_OPTIONAL_ARTIFACT_SCHEMAS}
 _SARIF_LEVEL = {
@@ -1171,6 +1178,259 @@ def render_auditor_html(
         f"{html.escape(cat['report.auditor_rerun_heading'])}</h2>"
         f"<p>Reproduce: <code>{html.escape(_reproduce_command(argv))}</code></p></section>"
         "</main></body></html>\n"
+    )
+
+
+def _buyer_answer_text(entry: dict[str, Any], cat: dict[str, str]) -> str:
+    """The fixed per-outcome answer sentence (18.4's rule: template text, never model-written prose),
+    the control id filled in via `{control}` -- the only record-derived part, sanitised before it
+    reaches the (fixed, safe) catalogue template."""
+    control = _sanitize_field(entry["control"])
+    return i18n_format.format_message(
+        cat[f"report.buyer_answer_{entry['outcome']}"], control=control
+    )
+
+
+def _buyer_gap_lines(entry: dict[str, Any], cat: dict[str, str]) -> list[str]:
+    """The "not enough evidence" step for one ``insufficient_evidence`` answer (closing critic B4b):
+    the blind-spot step text (:func:`_blind_spot_owner_label`/:func:`_blind_spot_step_text`, reused
+    directly, not duplicated) per missing requirement, the fixed no-population sentence, or the fixed
+    disclosed fallback when neither bucket matched (N3: never a fabricated claim, never a crash)."""
+    gap_step = entry["gap_step"]
+    if gap_step is None:
+        return [cat["report.buyer_gap_step_unavailable"]]
+    if gap_step["kind"] == "no_population":
+        return [
+            i18n_format.format_message(
+                cat["report.blind_spots_no_population_text"],
+                control=_sanitize_field(entry["control"]),
+            )
+        ]
+    lines: list[str] = []
+    for missing in gap_step["missing"]:
+        owner_label = _blind_spot_owner_label(missing["owner_key"], cat)
+        step = _blind_spot_step_text(missing["step_kind"], owner_label, cat)
+        event = _sanitize_field(missing["event"])
+        cls = _sanitize_field(missing["class"])
+        lines.append(f"`{event}` (`{cls}`): {step}")
+    return lines
+
+
+def _buyer_answer_md(entry: dict[str, Any], cat: dict[str, str]) -> list[str]:
+    """One answer: control, version, subject, the fixed per-outcome text, the evidence refs
+    themselves (not a count -- closes critic B3(c)/B4a, the `_auditor_clause_md` idiom), the gap step
+    when insufficient (B4b), and the manual-checklist disclosure when one applies."""
+    control = _sanitize_field(entry["control"])
+    version = _sanitize_field(entry["control_version"])
+    subject = _sanitize_field(entry["subject"])
+    text = sanitize_for_markdown(_buyer_answer_text(entry, cat))
+    lines = [f"- **{control}** @ `{version}` (`{subject}`): {text}"]
+    if entry["evidence"]:
+        refs = ", ".join(f"`{_sanitize_field(e['ref'])}`" for e in entry["evidence"])
+        lines.append(f"  - {cat['report.evidence_label']}: {refs}")
+    if entry["outcome"] == "insufficient_evidence":
+        lines += [
+            f"  - {sanitize_for_markdown(g)}" for g in _buyer_gap_lines(entry, cat)
+        ]
+    if "manual_checklist_note" in entry:
+        # Fixed catalogue text (`auditor_view.py`'s own idiom), never sanitised -- sanitising would
+        # truncate it at `_SANITIZE_CAP`, corrupting a real catalogue message.
+        lines.append(f"  - {entry['manual_checklist_note']}")
+    return lines
+
+
+def _buyer_answer_html(entry: dict[str, Any], cat: dict[str, str]) -> str:
+    """As :func:`_buyer_answer_md`, one ``<li>`` with a nested ``<ul>`` -- the `_auditor_clause_html`
+    idiom."""
+    control = sanitize_for_html(entry["control"])
+    version = sanitize_for_html(entry["control_version"])
+    subject = sanitize_for_html(entry["subject"])
+    text = html.escape(_buyer_answer_text(entry, cat))
+    header = f"<strong>{control}</strong> @ <code>{version}</code> ({subject}): {text}"
+    sub_items = ""
+    if entry["evidence"]:
+        refs = ", ".join(
+            sanitize_for_html(e["ref"], placeholder=_SANITIZE_EMPTY_FIELD_PLACEHOLDER)
+            for e in entry["evidence"]
+        )
+        sub_items += f"<li>{html.escape(cat['report.evidence_label'])}: {refs}</li>"
+    if entry["outcome"] == "insufficient_evidence":
+        for gap_line in _buyer_gap_lines(entry, cat):
+            sub_items += f"<li>{html.escape(gap_line)}</li>"
+    if "manual_checklist_note" in entry:
+        sub_items += f"<li>{html.escape(entry['manual_checklist_note'])}</li>"
+    if sub_items:
+        return f"<li>{header}<ul>{sub_items}</ul></li>"
+    return f"<li>{header}</li>"
+
+
+def _buyer_counts_table_md(counts: dict[str, int], cat: dict[str, str]) -> list[str]:
+    return [
+        "| " + " | ".join(_STATEMENT_OUTCOMES) + " |",
+        "|" + "|".join("---" for _ in _STATEMENT_OUTCOMES) + "|",
+        "| " + " | ".join(str(counts.get(o, 0)) for o in _STATEMENT_OUTCOMES) + " |",
+    ]
+
+
+def _buyer_counts_table_html(counts: dict[str, int], cat: dict[str, str]) -> str:
+    head = "".join(
+        f'<th scope="col">{html.escape(o)}</th>' for o in _STATEMENT_OUTCOMES
+    )
+    row = "".join(f"<td>{counts.get(o, 0)}</td>" for o in _STATEMENT_OUTCOMES)
+    return f"<table><thead><tr>{head}</tr></thead><tbody><tr>{row}</tr></tbody></table>"
+
+
+def _buyer_how_to_check_md(
+    cat: dict[str, str], *, packaged: bool | None, folder: str, argv: list[str]
+) -> list[str]:
+    lines = [f"## {cat['report.auditor_rerun_heading']}", ""]
+    if packaged:
+        lines.append(
+            i18n_format.format_message(cat["report.buyer_how_to_check"], folder=folder)
+        )
+    else:
+        lines.append(cat["report.buyer_how_to_check_unpackaged"])
+    lines.append(f"- Reproduce: `{_reproduce_command(argv)}`")
+    return lines
+
+
+def _buyer_how_to_check_html(
+    cat: dict[str, str], *, packaged: bool | None, folder: str, argv: list[str]
+) -> str:
+    if packaged:
+        line = html.escape(
+            i18n_format.format_message(cat["report.buyer_how_to_check"], folder=folder)
+        )
+    else:
+        line = html.escape(cat["report.buyer_how_to_check_unpackaged"])
+    reproduce = html.escape(_reproduce_command(argv))
+    return f"<p>{line}</p><p>Reproduce: <code>{reproduce}</code></p>"
+
+
+def render_buyer_md(
+    buyer: dict[str, Any],
+    *,
+    language: str = messages.DEFAULT_LANGUAGE,
+    invocation: list[str] | None = None,
+    reverify_command: list[str] | None = None,
+    packaged: bool | None = None,
+    report_folder: str = ".",
+) -> str:
+    """The buyer view (18.18): generated questionnaire answers grouped by question, a one-page
+    summary, and how to check this report. Adds no new outcome and no new rollup (SPEC §9.2):
+    ``buyer`` is :func:`agentce.buyer_view.compute_buyer_view`'s own output, rendered as-is."""
+    cat = messages.catalogue(language)
+    argv = list(reverify_command) if reverify_command else list(invocation or [])
+    answers = buyer["answers"]
+    by_question = buyer["by_question"]
+    lines = [
+        f"# {cat['report.buyer_title']}",
+        "",
+        cat["report.buyer_intro"],
+        "",
+    ]
+    lines += _buyer_how_to_check_md(
+        cat, packaged=packaged, folder=report_folder, argv=argv
+    )
+    lines += [
+        "",
+        f"## {cat['report.buyer_summary_heading']}",
+        "",
+    ]
+    lines += _buyer_counts_table_md(buyer["counts"], cat)
+    for framework in BUYER_FRAMEWORKS:
+        title = BUYER_QUESTIONNAIRE_TITLES.get(framework, framework)
+        version = BUYER_QUESTIONNAIRE_VERSIONS.get(framework, "")
+        heading = i18n_format.format_message(
+            cat["report.buyer_not_a_certification"], framework=title, version=version
+        )
+        lines += ["", f"## {sanitize_for_markdown(heading)}", ""]
+        questions = by_question.get(framework, {})
+        if not questions:
+            none_text = i18n_format.format_message(
+                cat["report.buyer_framework_none"], framework=title, version=version
+            )
+            lines.append(f"_{sanitize_for_markdown(none_text)}_")
+            continue
+        for question in sorted(questions):
+            lines.append(f"### {_sanitize_field(question)}")
+            lines.append("")
+            for index in questions[question]:
+                lines += _buyer_answer_md(answers[index], cat)
+            lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def render_buyer_html(
+    buyer: dict[str, Any],
+    *,
+    language: str = messages.DEFAULT_LANGUAGE,
+    invocation: list[str] | None = None,
+    reverify_command: list[str] | None = None,
+    packaged: bool | None = None,
+    report_folder: str = ".",
+) -> str:
+    """As :func:`render_buyer_md`, the same self-contained, escaped, WCAG 2.2 AA page shape as
+    :func:`render_report_html`."""
+    cat = messages.catalogue(language)
+    argv = list(reverify_command) if reverify_command else list(invocation or [])
+    answers = buyer["answers"]
+    by_question = buyer["by_question"]
+    title = html.escape(cat["report.buyer_title"])
+    sections = [
+        '<section aria-labelledby="buyer-rerun"><h2 id="buyer-rerun">'
+        f"{html.escape(cat['report.auditor_rerun_heading'])}</h2>"
+        + _buyer_how_to_check_html(
+            cat, packaged=packaged, folder=report_folder, argv=argv
+        )
+        + "</section>",
+        '<section aria-labelledby="buyer-summary"><h2 id="buyer-summary">'
+        f"{html.escape(cat['report.buyer_summary_heading'])}</h2>"
+        f"{_buyer_counts_table_html(buyer['counts'], cat)}</section>",
+    ]
+    for framework in BUYER_FRAMEWORKS:
+        fw_title = BUYER_QUESTIONNAIRE_TITLES.get(framework, framework)
+        version = BUYER_QUESTIONNAIRE_VERSIONS.get(framework, "")
+        heading = html.escape(
+            i18n_format.format_message(
+                cat["report.buyer_not_a_certification"],
+                framework=fw_title,
+                version=version,
+            )
+        )
+        section_id = f"buyer-{html.escape(framework)}"
+        questions = by_question.get(framework, {})
+        if not questions:
+            none_text = html.escape(
+                i18n_format.format_message(
+                    cat["report.buyer_framework_none"],
+                    framework=fw_title,
+                    version=version,
+                )
+            )
+            body = f"<p>{none_text}</p>"
+        else:
+            question_items = ""
+            for question in sorted(questions):
+                answer_items = "".join(
+                    _buyer_answer_html(answers[i], cat) for i in questions[question]
+                )
+                question_items += (
+                    f"<li>{sanitize_for_html(question)}<ul>{answer_items}</ul></li>"
+                )
+            body = f"<ul>{question_items}</ul>"
+        sections.append(
+            f'<section aria-labelledby="{section_id}"><h2 id="{section_id}">{heading}</h2>{body}</section>'
+        )
+    return (
+        f'<!doctype html><html lang="{html.escape(language)}"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<meta http-equiv="Content-Security-Policy" '
+        "content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\">"
+        f"<title>{title}</title><style>{_HTML_STYLE}</style></head><body>"
+        f"<main><h1>{title}</h1><p>{html.escape(cat['report.buyer_intro'])}</p>"
+        + "".join(sections)
+        + "</main></body></html>\n"
     )
 
 
@@ -2735,6 +2995,7 @@ def write_report(
     profile: Profile | None = None,
     declared_subject_ids: frozenset[str] | None = None,
     for_preset: str | None = None,
+    buyer_packaged: bool = False,
 ) -> dict[str, Any]:
     """Write every report artifact for ``assertions`` and return the reproducibility manifest.
 
@@ -3029,6 +3290,37 @@ def write_report(
             "auditor.html",
             render_auditor_html(
                 auditor_view, language=report_language, reverify_command=rerun_argv
+            ),
+        )
+
+    # 18.18: the buyer view is gated on `for_preset`, like `auditor` above; `buyer.md`/`.html` are
+    # always written for this preset, the same "always written" idiom. `blind_spots` is the already-
+    # computed sibling artifact `compute_project_view` already threads the same way (foundational_
+    # thinking) -- never `None` at this point (normalized above).
+    if for_preset == "buyer":
+        buyer_view = compute_buyer_view(assertions, blind_spots, counts=counts)
+        write_json("buyer.json", buyer_view)
+        rerun_argv = (
+            list(reverify_command) if reverify_command else list(invocation or [])
+        )
+        write_text(
+            "buyer.md",
+            render_buyer_md(
+                buyer_view,
+                language=report_language,
+                reverify_command=rerun_argv,
+                packaged=buyer_packaged,
+                report_folder=str(out_dir),
+            ),
+        )
+        write_text(
+            "buyer.html",
+            render_buyer_html(
+                buyer_view,
+                language=report_language,
+                reverify_command=rerun_argv,
+                packaged=buyer_packaged,
+                report_folder=str(out_dir),
             ),
         )
 

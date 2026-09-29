@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Build gate helper for VG-AUDIENCE-PRESETS: `agentce assess --for <preset>` resolves to the exact,
-# documented `--emit` set for each of the six audience presets (engineering, compliance, security,
-# ci, share, auditor), and the `CI` environment variable extends -- never replaces -- the legacy
-# default when neither `--for` nor `--emit` is given (contracts/P18-18.7.md; auditor added by
-# contracts/P18-18.17.md's blast_radius).
+# documented `--emit` set for each of the seven audience presets (engineering, compliance, security,
+# ci, share, auditor, buyer), and the `CI` environment variable extends -- never replaces -- the
+# legacy default when neither `--for` nor `--emit` is given (contracts/P18-18.7.md; auditor added by
+# contracts/P18-18.17.md's blast_radius; buyer added by contracts/P18-18.18.md's blast_radius).
 #
 # Eight real CLI invocations over one dedicated fixture catalog (AUD-01, verification/gates/fixtures/
 # audience_presets/ -- one control the fixture's evidence bundle never satisfies, so every run reaches
@@ -52,7 +52,7 @@ run_validate() {
   (cd "$root/engines/python" && env -u VIRTUAL_ENV PYTHONDONTWRITEBYTECODE=1 uv run --frozen agentce report --validate "$work/$1" >/dev/null)
 }
 
-for preset in engineering compliance security ci share auditor; do
+for preset in engineering compliance security ci share auditor buyer; do
   run_assess unset "$preset" --for "$preset"
   run_validate "$preset"
 done
@@ -118,6 +118,7 @@ EXPECTED = {
     "auditor": ALWAYS
     | PACK
     | {"auditor.md", "auditor.html", "auditor.json", "oscal-ar.json", "oscal-ar.xml"},
+    "buyer": ALWAYS | PACK | {"buyer.md", "buyer.html", "buyer.json"},
     # The CI-detection control pair (D1/N7): additive over the legacy default, never the minimal
     # `ci` preset's files.
     "ci-auto": LEGACY_DEFAULT | {"report.junit.xml"},
@@ -145,7 +146,7 @@ if problems:
     sys.exit(1)
 
 print(
-    "audience-presets: all 6 presets and the CI-detection control pair match their expected file "
+    "audience-presets: all 7 presets and the CI-detection control pair match their expected file "
     "sets; engineering's remediation-package.json validates against its schema"
 )
 PY

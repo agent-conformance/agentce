@@ -27,6 +27,7 @@ _REPORT = _ROOT / "engines" / "python" / "agentce" / "report.py"
 _VERDICT = _ROOT / "engines" / "python" / "agentce" / "verdict.py"
 _COMMANDS = _ROOT / "engines" / "python" / "agentce" / "commands" / "__init__.py"
 _AUDITOR_VIEW = _ROOT / "engines" / "python" / "agentce" / "auditor_view.py"
+_BUYER_VIEW = _ROOT / "engines" / "python" / "agentce" / "buyer_view.py"
 
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z0-9_-]+)+$")
 
@@ -158,6 +159,7 @@ def check(
     verdict_path: Path = _VERDICT,
     commands_path: Path | None = _COMMANDS,
     auditor_view_path: Path | None = _AUDITOR_VIEW,
+    buyer_view_path: Path | None = _BUYER_VIEW,
 ) -> list[str]:
     problems: list[str] = []
     defined: set[str] = set(json.loads(catalog_path.read_text(encoding="utf-8")).keys())
@@ -171,6 +173,8 @@ def check(
         paths.append(commands_path)
     if auditor_view_path is not None:
         paths.append(auditor_view_path)
+    if buyer_view_path is not None:
+        paths.append(buyer_view_path)
     for path in paths:
         literals, pfx = _literal_and_prefix_refs(path.read_text(encoding="utf-8"))
         referenced |= literals
@@ -224,6 +228,7 @@ def self_test() -> int:
             verdict_path=d / "verdict.py",
             commands_path=None,
             auditor_view_path=None,
+            buyer_view_path=None,
         )
 
     good_problems = run("good")

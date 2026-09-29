@@ -45,6 +45,11 @@
     "content_type": "application/schema+json"
   },
   {
+    "path": "/spec/report/buyer.schema.json",
+    "source": "spec/report/buyer.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
     "path": "/spec/report/claim.schema.json",
     "source": "spec/report/claim.schema.json",
     "content_type": "application/schema+json"

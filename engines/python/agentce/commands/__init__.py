@@ -141,6 +141,12 @@ PRESET_EMIT: dict[str, frozenset[str]] = {
     #: too), never gated by the shared `md`/`html` emit tokens, which would also write the unrelated
     #: ordinary `report.md`/`.html` (altitude review, contracts/P18-18.17.md C3's own file-set).
     "auditor": frozenset({"oscal", "oscal_xml", "pack"}),
+    #: Buyer (18.18): generated questionnaire answers (CAIQ / the AI Controls Matrix), a one-page
+    #: summary, and how to check this report. `md`/`html` are always written for this preset, the
+    #: same `auditor.json`/`.md`/`.html` "always written" idiom `auditor` above already uses -- one
+    #: evidence pack per subject (`pack`) is the "how to check this report" artifact beyond the
+    #: view's own rendered pages; no `oscal`/`oscal_xml` (auditor's territory).
+    "buyer": frozenset({"pack"}),
 }
 #: `CI` values treated as "not in CI" (the `ci-info` convention): unset, empty, or one of these,
 #: case-insensitively. Jenkins (`JENKINS_URL`/`BUILD_ID`) and Azure Pipelines (`TF_BUILD`) are not
@@ -1176,6 +1182,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         profile=profile_obj,
         declared_subject_ids=declared_subject_ids,
         for_preset=for_preset,
+        buyer_packaged=package_for_sharing,
     )
     if state is not None:
         state.record(loaded.digest, out_dir / "manifest.json", new_window_end)
