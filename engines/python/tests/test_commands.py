@@ -1787,3 +1787,303 @@ def test_catalog_sign_tamper_after_signing_fails_verification(
     trust = signing.load_trust_root(trust_path)
     with pytest.raises(signing.VerificationError):
         signing.verify_catalog_directory(directory, trust)
+
+
+# --- 18.17 C1: `--deviations` applies deviations for real (contracts/P18-18.17.md). ---
+
+_DEV_FIXTURE = (
+    _AUD_FIXTURE  # same audience_presets fixture the C1 package-for-sharing tests use.
+)
+_DEV_CONTROL = "REC-04"  # non-conformant in this fixture, outside the INT family.
+
+
+def _deviations_yaml(tmp_path: Path, **over: str) -> Path:
+    import yaml
+
+    fields = {
+        "control": _DEV_CONTROL,
+        "rationale": "test rationale",
+        "compensating_control": "manual review",
+        "owner": "user:owner@example.com",
+        "approver": "user:approver@example.com",
+        "granted": "2026-01-01T00:00:00.000Z",
+        "expiry": "2026-06-01T00:00:00.000Z",
+    }
+    fields.update(over)
+    path = tmp_path / "deviations.yaml"
+    path.write_text(yaml.safe_dump({"deviations": [fields]}), encoding="utf-8")
+    return path
+
+
+def _dev_argv(
+    out: Path, deviations: Path, *extra: str, bundle: Path | None = None
+) -> list[str]:
+    return [
+        "assess",
+        "--bundle",
+        str(bundle if bundle is not None else _DEV_FIXTURE / "evidence"),
+        "--profile",
+        str(_DEV_FIXTURE / "applicability.yaml"),
+        "--domain",
+        str(_DEV_FIXTURE / "domain.linkml.yaml"),
+        "--deviations",
+        str(deviations),
+        "--out",
+        str(out),
+        *extra,
+    ]
+
+
+def _dev_assertion(out: Path, control: str = _DEV_CONTROL) -> dict[str, Any]:
+    assertions = json.loads((out / "assertions.json").read_text())
+    return next(a for a in assertions if a["control"] == control)
+
+
+def _signable_dev_bundle(tmp_path: Path) -> Path:
+    """A copy of `_DEV_FIXTURE`'s single-event bundle with a real, verifying integrity chain
+    (the shipped fixture's own event carries none, by design, so its stream is `failed` and
+    `sign`/`verify --report` always refuse it -- unrelated to deviations). Everything else
+    (the control outcomes 18.17 deviates) is unchanged."""
+    from conftest import write_bundle
+
+    from agentce.integrity import GENESIS_PREV, recompute_hash
+
+    event = json.loads(
+        (_DEV_FIXTURE / "evidence" / "events" / "subject.jsonl")
+        .read_text(encoding="utf-8")
+        .strip()
+    )
+    event["data"]["integrity"] = {
+        "prev": GENESIS_PREV,
+        "stream": f"{event['source']}|{event['subject']}",
+        "strength": "export_chained",
+    }
+    event["data"]["integrity"]["hash"] = recompute_hash(event)
+    return write_bundle(tmp_path / "signable-evidence", [json.dumps(event)])
+
+
+def test_assess_with_deviations_flag_produces_partial_outcome_end_to_end(
+    tmp_path: Path,
+) -> None:
+    dev = _deviations_yaml(tmp_path)
+    out = tmp_path / "o"
+    cli.main(_dev_argv(out, dev))
+    a = _dev_assertion(out)
+    assert a["outcome"] == "partial"
+    assert a["deviation"] == _DEV_CONTROL
+
+
+def test_assess_refuses_an_invalid_deviation_register(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    dev = tmp_path / "deviations.yaml"
+    dev.write_text("deviations:\n  - control: ZZZ-99\n", encoding="utf-8")
+    out = tmp_path / "o"
+    code = cli.main(_dev_argv(out, dev, "--json"))
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "input.deviation_invalid"
+
+
+def test_assess_refuses_a_deviations_file_that_is_not_valid_yaml(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    dev = tmp_path / "deviations.yaml"
+    dev.write_text("not: a: mapping: at: all: [", encoding="utf-8")
+    out = tmp_path / "o"
+    code = cli.main(_dev_argv(out, dev, "--json"))
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "input.deviation_invalid"
+
+
+def test_assess_refuses_a_deviations_register_whose_deviations_key_is_not_a_list(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    dev = tmp_path / "deviations.yaml"
+    dev.write_text("deviations:\n  x: 1\n", encoding="utf-8")
+    out = tmp_path / "o"
+    code = cli.main(_dev_argv(out, dev, "--json"))
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "input.deviation_invalid"
+
+
+@pytest.mark.parametrize(
+    "content",
+    [f"deviations: {_DEV_CONTROL}\n", f"deviations: [{_DEV_CONTROL}]\n"],
+)
+def test_assess_refuses_a_deviations_register_whose_deviations_key_is_a_scalar_or_a_list_of_scalars(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], content: str
+) -> None:
+    dev = tmp_path / "deviations.yaml"
+    dev.write_text(content, encoding="utf-8")
+    out = tmp_path / "o"
+    code = cli.main(_dev_argv(out, dev, "--json"))
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "input.deviation_invalid"
+
+
+def test_assess_an_unquoted_yaml_expiry_date_is_still_checked_against_as_of(
+    tmp_path: Path,
+) -> None:
+    """An unquoted YAML date (parsed by the YAML loader as a `date`, not a `str`) must be
+    normalized before comparison, not silently treated as absent (round 2 B4)."""
+    dev = tmp_path / "deviations.yaml"
+    dev.write_text(
+        "deviations:\n"
+        f"  - control: {_DEV_CONTROL}\n"
+        '    rationale: "r"\n'
+        '    compensating_control: "c"\n'
+        '    owner: "user:owner@example.com"\n'
+        '    approver: "user:approver@example.com"\n'
+        '    granted: "2025-08-01T00:00:00.000Z"\n'
+        "    expiry: 2025-12-01\n",  # unquoted -- a YAML date, long expired vs. the fixture's window
+        encoding="utf-8",
+    )
+    out = tmp_path / "o"
+    cli.main(_dev_argv(out, dev))
+    a = _dev_assertion(out)
+    assert a["outcome"] == "non-conformant"
+    assert a.get("deviation") is None
+    manifest = json.loads((out / "manifest.json").read_text())
+    assert any(_DEV_CONTROL in limit for limit in manifest.get("limitations", []))
+
+
+def test_assess_ignores_and_reports_an_expired_deviation(tmp_path: Path) -> None:
+    dev = _deviations_yaml(
+        tmp_path, granted="2025-08-01T00:00:00.000Z", expiry="2025-12-01T00:00:00.000Z"
+    )
+    out = tmp_path / "o"
+    cli.main(_dev_argv(out, dev))
+    a = _dev_assertion(out)
+    assert a["outcome"] == "non-conformant"
+    assert a.get("deviation") is None
+    manifest = json.loads((out / "manifest.json").read_text())
+    assert any(_DEV_CONTROL in limit for limit in manifest.get("limitations", []))
+
+
+def test_readiness_accepts_a_report_after_assess_applied_a_deviation_end_to_end(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The finding-1 regression, at the CLI level: `readiness` must not reject the very
+    `outcome: partial` state a real `assess --deviations` run just produced. Uses the signable
+    bundle (real integrity chain) since readiness blocks on integrity regardless of deviations,
+    and that is not what this test is proving."""
+    bundle = _signable_dev_bundle(tmp_path)
+    dev = _deviations_yaml(tmp_path)
+    out = tmp_path / "o"
+    cli.main(_dev_argv(out, dev, bundle=bundle))
+    capsys.readouterr()
+    code = cli.main(["readiness", str(out), "--deviations", str(dev), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["verdict"] != "NOT READY"
+    assert code == 0
+
+
+def test_assess_deviations_flag_is_recorded_in_manifest_and_reverify_argv(
+    tmp_path: Path,
+) -> None:
+    from agentce import signing
+
+    dev = _deviations_yaml(tmp_path)
+    out = tmp_path / "o"
+    cli.main(_dev_argv(out, dev, "--emit", "remediation"))
+    manifest = json.loads((out / "manifest.json").read_text())
+    assert manifest["inputs"]["deviation_register_digest"] == signing.sha256_prefixed(
+        dev.read_bytes()
+    )
+    packages = list(out.glob("remediation/*/remediation-package.json"))
+    assert packages
+    package = json.loads(packages[0].read_text())
+    finding = next(f for f in package["findings"] if f["control"] == "DOC-01")
+    assert "--deviations" in finding["acceptance"]["reverify_command"]
+
+
+def test_assess_package_for_sharing_copies_the_deviation_register(
+    tmp_path: Path,
+) -> None:
+    dev = _deviations_yaml(tmp_path)
+    out = tmp_path / "o"
+    assert cli.main(_dev_argv(out, dev, "--package-for-sharing")) in (0, 1)
+    copied = out / "bundle" / "deviations.yaml"
+    assert copied.is_file()
+    assert copied.read_bytes() == dev.read_bytes()
+
+
+def test_verify_report_reruns_with_the_packaged_deviation_register_and_reproduces_partial(
+    tmp_path: Path,
+) -> None:
+    bundle = _signable_dev_bundle(tmp_path)
+    dev = _deviations_yaml(tmp_path)
+    out = tmp_path / "o"
+    cli.main(_dev_argv(out, dev, "--package-for-sharing", bundle=bundle))
+    a = _dev_assertion(out)
+    assert a["outcome"] == "partial"
+    key_path = tmp_path / "claimant.pem"
+    _write_kms_key(key_path)
+    assert (
+        cli.main(
+            [
+                "sign",
+                str(out),
+                "--as",
+                "claimant",
+                "--profile",
+                "kms",
+                "--key",
+                str(key_path),
+                "--write-trust-root",
+            ]
+        )
+        == 0
+    )
+    assert cli.main(["verify", "--report", str(out)]) == 0
+
+
+def test_report_public_statement_lists_accepted_deviations(tmp_path: Path) -> None:
+    dev = _deviations_yaml(tmp_path)
+    out = tmp_path / "o"
+    cli.main(_dev_argv(out, dev, "--emit", "public"))
+    statement = (out / "public-statement.md").read_text(encoding="utf-8")
+    assert _DEV_CONTROL in statement
+
+
+def test_report_claim_lists_accepted_deviations(tmp_path: Path) -> None:
+    dev = _deviations_yaml(tmp_path)
+    out = tmp_path / "o"
+    cli.main(_dev_argv(out, dev))
+    claim = json.loads((out / "claim.json").read_text())
+    assert claim["deviations"] == [_DEV_CONTROL]
+
+
+def test_deviation_partial_outcome_is_consistent_across_report_consumers(
+    tmp_path: Path,
+) -> None:
+    """Cross-consumer consistency (blast_radius, contracts/P18-18.17.md): every consumer of a
+    deviated assertion agrees it is `partial` -- `assertions.json` itself, a fresh `aggregate()`
+    recount, `claim.json`'s accepted-deviations list, and `oscal-ar.json`'s matching finding."""
+    from agentce.assertions import Assertion, aggregate
+
+    dev = _deviations_yaml(tmp_path)
+    out = tmp_path / "o"
+    cli.main(_dev_argv(out, dev, "--for", "compliance"))
+    assertions_json = json.loads((out / "assertions.json").read_text())
+    dev_entry = next(a for a in assertions_json if a["control"] == _DEV_CONTROL)
+    assert dev_entry["outcome"] == "partial"
+
+    counts = aggregate([Assertion.from_json(a) for a in assertions_json])
+    assert counts["partial"] >= 1
+
+    claim = json.loads((out / "claim.json").read_text())
+    assert _DEV_CONTROL in claim["deviations"]
+
+    oscal = json.loads((out / "oscal-ar.json").read_text())
+    finding = next(
+        f
+        for f in oscal["assessment-results"]["results"][0]["findings"]
+        if f["title"].startswith(_DEV_CONTROL)
+    )
+    assert finding["target"]["status"]["reason"] == "partial"
+    assert finding.get("related-risks")

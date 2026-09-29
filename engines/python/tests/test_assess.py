@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 from typing import Any
 
-from agentce.assess import assess_subjects
+from agentce.assess import apply_deviations, assess_subjects
 from agentce.catalog import load_catalog
 from agentce.domain import DomainBinding
 from agentce.profile import Profile
@@ -110,3 +111,89 @@ def test_role_mismatch_is_not_applicable() -> None:
         _events("OVS-03/passed.jsonl"), profile, [catalog], domain
     )
     assert _outcomes(assertions)["OVS-03"] == "conformant"
+
+
+# --- 18.17 C1: `apply_deviations` (contracts/P18-18.17.md). ---
+
+
+def _deviation(**over: object) -> dict[str, object]:
+    base: dict[str, object] = {
+        "control": "OVS-03",
+        "rationale": "compensated",
+        "compensating_control": "manual review",
+        "owner": "alice",
+        "approver": "bob",
+        "granted": "2026-01-01",
+        "expiry": "2027-01-01",
+    }
+    base.update(over)
+    return base
+
+
+def _non_conformant_ovs03() -> Any:
+    catalog = load_catalog(_BASE)
+    domain = DomainBinding.load(_BASE / "test" / "domain.yaml")
+    assertions = assess_subjects(
+        _events("OVS-03/failed.jsonl"), _profile(), [catalog], domain
+    )
+    return next(a for a in assertions if a.control == "OVS-03")
+
+
+def test_apply_deviations_flips_non_conformant_to_partial_and_stamps_control_id() -> (
+    None
+):
+    ovs = _non_conformant_ovs03()
+    applied, expired = apply_deviations([ovs], [_deviation()], as_of=ovs.window[1])
+    assert expired == []
+    assert applied[0].outcome == "partial"
+    assert applied[0].deviation == "OVS-03"
+
+
+def test_apply_deviations_leaves_conformant_and_insufficient_evidence_untouched() -> (
+    None
+):
+    catalog = load_catalog(_BASE)
+    domain = DomainBinding.load(_BASE / "test" / "domain.yaml")
+    assertions = assess_subjects(
+        _events("OVS-03/passed.jsonl"), _profile(), [catalog], domain
+    )
+    conformant = next(a for a in assertions if a.control == "OVS-03")
+    assert conformant.outcome == "conformant"
+    insufficient = dataclasses.replace(conformant, outcome="insufficient_evidence")
+    applied, expired = apply_deviations(
+        [conformant, insufficient], [_deviation()], as_of=conformant.window[1]
+    )
+    assert expired == []
+    assert applied[0] == conformant
+    assert applied[1] == insufficient
+
+
+def test_apply_deviations_skips_and_reports_an_expired_entry() -> None:
+    ovs = _non_conformant_ovs03()
+    applied, expired = apply_deviations(
+        [ovs], [_deviation(expiry="2020-01-01")], as_of=ovs.window[1]
+    )
+    assert expired == ["OVS-03"]
+    assert applied[0].outcome == "non-conformant"
+    assert applied[0].deviation is None
+
+
+def test_apply_deviations_is_pure() -> None:
+    ovs = _non_conformant_ovs03()
+    before = dataclasses.replace(ovs)
+    apply_deviations([ovs], [_deviation()], as_of=ovs.window[1])
+    assert ovs == before
+
+
+def test_apply_deviations_of_empty_inputs_is_a_no_op() -> None:
+    ovs = _non_conformant_ovs03()
+    applied_empty_assertions, expired_empty_assertions = apply_deviations(
+        [], [_deviation()], as_of="2026-01-01"
+    )
+    assert applied_empty_assertions == []
+    assert expired_empty_assertions == []
+    applied_empty_deviations, expired_empty_deviations = apply_deviations(
+        [ovs], [], as_of="2026-01-01"
+    )
+    assert applied_empty_deviations == [ovs]
+    assert expired_empty_deviations == []
