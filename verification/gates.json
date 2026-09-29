@@ -353,8 +353,8 @@
         {
           "description": "the records-folder declared_subject_ids computation for several discovered agents is changed from an empty set (nobody was declared) to every discovered agent's own id, so a genuinely undeclared agent is wrongly marked declared and disappears from undeclared_agents",
           "file": "engines/python/agentce/commands/__init__.py",
-          "search": "                declared_subject_ids = frozenset()\n",
-          "replace": "                declared_subject_ids = frozenset(\n                    s[\"id\"] for s in discovered_subjects\n                )\n"
+          "search": "            declared_subject_ids = frozenset()\n",
+          "replace": "            declared_subject_ids = frozenset(scanned.subjects)\n"
         }
       ],
       "fix_hint": "Run the gate's command: the untimed correctness proof is engines/python/tests/test_records_assess.py::test_records_folder_multi_agent_for_risk_lead_writes_project_view, the timed installed-package check is tools/installed_artifacts_check.py project; the reference computation is declared_subject_ids in engines/python/agentce/commands/__init__.py's cmd_assess."
