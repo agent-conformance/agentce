@@ -149,7 +149,7 @@ allow:
 
   - path: engines/python/agentce/report.py
     pattern: placeholder
-    count: 22
+    count: 26
     class: legitimate
     justification: "sanitize_for_markdown/sanitize_for_html's placeholder parameter and the _SANITIZE_EMPTY_NAME_PLACEHOLDER/_SANITIZE_EMPTY_FIELD_PLACEHOLDER fallback strings ('(unnamed)'/'(empty)') name the rendered text for an empty field value; not an unfinished stub."
 
