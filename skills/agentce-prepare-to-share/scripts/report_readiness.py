@@ -16,6 +16,7 @@ import yaml
 from _common import FINDINGS, INPUT_ERROR, OK, arg_value, emit, run_guarded
 
 from agentce import readiness
+from agentce.bundled import catalogs_dir
 from agentce.catalog import load_catalog
 
 
@@ -27,8 +28,10 @@ def _catalog_dirs(argv: list[str]) -> list[Path]:
     ]
     if dirs:
         return dirs
-    repo = Path(__file__).resolve().parents[3]
-    base = repo / "spec" / "catalogs" / "base"
+    # The catalogs the engine itself ships, resolved through the installed package (SPEC
+    # §13.4 AX-1) -- never a walk up from ``__file__`` to a monorepo checkout, which does not
+    # exist once this skill is installed standalone (SPEC §13.3).
+    base = catalogs_dir() / "base"
     return [p.parent for p in sorted(base.glob("*/catalog.yaml"))]
 
 

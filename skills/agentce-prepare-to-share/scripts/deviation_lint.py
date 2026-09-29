@@ -15,23 +15,23 @@ import yaml
 from _common import FINDINGS, INPUT_ERROR, OK, arg_value, emit, run_guarded
 
 from agentce import readiness
+from agentce.bundled import catalogs_dir
 from agentce.catalog import load_catalog
 
 
 def _control_ids(argv: list[str]) -> set[str]:
     ids: set[str] = set()
-    repo = Path(__file__).resolve().parents[3]
     dirs = [
         Path(argv[i + 1])
         for i, a in enumerate(argv)
         if a == "--catalog-dir" and i + 1 < len(argv)
     ]
     if not dirs:
+        # The catalogs the engine itself ships, resolved through the installed package
+        # (SPEC §13.4 AX-1) -- never a walk up from ``__file__`` to a monorepo checkout,
+        # which does not exist once this skill is installed standalone (SPEC §13.3).
         dirs = [
-            p.parent
-            for p in sorted(
-                (repo / "spec" / "catalogs" / "base").glob("*/catalog.yaml")
-            )
+            p.parent for p in sorted((catalogs_dir() / "base").glob("*/catalog.yaml"))
         ]
     for directory in dirs:
         ids.update(c.id for c in load_catalog(directory).controls)
