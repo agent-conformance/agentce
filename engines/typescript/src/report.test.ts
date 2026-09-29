@@ -313,6 +313,184 @@ test("writeReport emits every artifact and a well-formed manifest", () => {
   assert.equal(onDisk.startsWith('{\n  "agentce_manifest_version": 1,'), true);
 });
 
+// --- 18.14 C3: the project view (Hill 7) -- every agent's records side by side ---
+
+function projectProfile(subjectIds: string[]) {
+  return {
+    profileVersion: 1,
+    observationWindow: {},
+    catalogs: [],
+    subjects: subjectIds.map((id) => ({
+      id,
+      name: null,
+      role: null,
+      evidenceSources: [],
+      coverageDenominators: [],
+      declaredDecisionTypes: [],
+      declaredOversight: {},
+      declaredComponents: [],
+      declaredTools: [],
+      declaredModels: [],
+    })),
+  };
+}
+
+function projectAssertion(subject: string, outcome = "conformant") {
+  return makeAssertion({
+    control: "REC-01",
+    controlVersion: "2026.09",
+    subject,
+    outcome,
+    rung: 2,
+    mode: "automated",
+    window: ["2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"],
+    population: [1, 0],
+    severity: "high",
+    // DC-5: a conformant/non-conformant/partial outcome must cite evidence.
+    evidence: [{ ref: `agentce:event/${subject}`, digest: "sha256:0", sourceClass: "self_report" }],
+    family: "REC",
+  });
+}
+
+test("writeReport with a one-subject profile writes exactly what it always wrote", () => {
+  const assertions = ovsFailedAssertions();
+  const withoutProfile = mkdtempSync(join(tmpdir(), "agentce-report-noprofile-"));
+  const withProfile = mkdtempSync(join(tmpdir(), "agentce-report-oneprofile-"));
+  writeReport(withoutProfile, assertions, {
+    bundleDigest: "sha256:abc",
+    catalogs: ["base/eu-ai-act@1"],
+    operator: "ecs",
+    invocation: ["conformance", "p1"],
+  });
+  writeReport(withProfile, assertions, {
+    bundleDigest: "sha256:abc",
+    catalogs: ["base/eu-ai-act@1"],
+    operator: "ecs",
+    invocation: ["conformance", "p1"],
+    profile: projectProfile([SUBJECT]),
+  });
+  assert.equal(
+    readFileSync(join(withProfile, "report.md"), "utf-8"),
+    readFileSync(join(withoutProfile, "report.md"), "utf-8"),
+  );
+  assert.equal(
+    readFileSync(join(withProfile, "report.html"), "utf-8"),
+    readFileSync(join(withoutProfile, "report.html"), "utf-8"),
+  );
+  assert.equal(existsSync(join(withProfile, "project.json")), false);
+  assert.equal(existsSync(join(withProfile, "agents")), false);
+});
+
+test("writeReport with a multi-subject profile writes the project view side by side, plus per-agent drill-down", () => {
+  const assertions = [
+    projectAssertion("A", "conformant"),
+    projectAssertion("B", "non-conformant"),
+    projectAssertion("C", "insufficient_evidence"),
+  ];
+  const events = [{ subject: "C", data: { "@type": "ToolCall", agent: { id: "C" } } }];
+  const blindSpots: BlindSpots = {
+    blind_spots: [
+      {
+        event: "Decision",
+        class: "any",
+        ladder_rung: 2,
+        owner_key: "agent_team",
+        step_kind: "code_change",
+        supplying_adapters: [],
+        checks_unlocked: 2,
+        unlocked_checks: [
+          { subject: "A", catalog: "cat", control: "REC-01", control_version: "2026.09" },
+          { subject: "C", catalog: "cat", control: "REC-01", control_version: "2026.09" },
+        ],
+        needed_by: 0,
+        needed_by_checks: [],
+      },
+    ],
+    no_population: [],
+  };
+  const outDir = mkdtempSync(join(tmpdir(), "agentce-report-project-"));
+  writeReport(outDir, assertions, {
+    bundleDigest: "sha256:abc",
+    catalogs: ["base/eu-ai-act@1"],
+    operator: "ecs",
+    invocation: ["assess", "p1"],
+    blindSpots,
+    events,
+    profile: projectProfile(["A", "B"]),
+  });
+
+  for (const name of ["project.md", "project.html", "project.json"]) {
+    assert.equal(existsSync(join(outDir, name)), true, `${name} should exist`);
+  }
+  assert.equal(
+    readFileSync(join(outDir, "report.md"), "utf-8"),
+    readFileSync(join(outDir, "project.md"), "utf-8"),
+  );
+  assert.equal(
+    readFileSync(join(outDir, "report.html"), "utf-8"),
+    readFileSync(join(outDir, "project.html"), "utf-8"),
+  );
+
+  const projectView = JSON.parse(readFileSync(join(outDir, "project.json"), "utf-8")) as {
+    agents: Array<{ id: string; declared: boolean }>;
+    undeclared_agents: string[];
+  };
+  assert.deepEqual(
+    projectView.agents.map((a) => [a.id, a.declared]),
+    [
+      ["A", true],
+      ["B", true],
+      ["C", false],
+    ],
+  );
+  assert.deepEqual(projectView.undeclared_agents, ["C"]);
+
+  const projectMd = readFileSync(join(outDir, "project.md"), "utf-8");
+  assert.ok(projectMd.includes("Undeclared agents"));
+  assert.ok(projectMd.includes("Top gaps across agents"));
+  assert.ok(projectMd.includes("Agents: A, C."));
+
+  for (const agent of projectView.agents) {
+    assert.ok(projectMd.includes(agent.id), `${agent.id} should be named in project.md`);
+  }
+  const agentReportMatch = /agents\/([^)]+)\/report\.md/.exec(projectMd);
+  assert.ok(agentReportMatch, "project.md should link to at least one agents/<dirname>/report.md");
+  const dirname = (agentReportMatch as RegExpExecArray)[1] as string;
+  assert.equal(existsSync(join(outDir, "agents", dirname, "report.md")), true);
+  assert.equal(existsSync(join(outDir, "agents", dirname, "activity.json")), true);
+  assert.equal(existsSync(join(outDir, "agents", dirname, "blind-spots.json")), true);
+  assert.equal(existsSync(join(outDir, "agents", dirname, "assertions.json")), true);
+});
+
+test("writeReport gives hostile agent ids distinct agents/<dirname>/ directories", () => {
+  // The long id is capped at 200, not 300: `packs/<subject>/pack.json` (pre-existing, unrelated to
+  // this item) uses the raw `safe()` name with no length cap, so a longer id trips the filesystem's
+  // own ~255-byte component limit before this item's own `agentDirname` (which does cap, at 40) is
+  // ever reached -- the same latent limitation the Python reference's own hostile-id test sidesteps.
+  const hostileIds = ["..", ".", "a/b", "a\\b", "A".repeat(200)];
+  const assertions = hostileIds.map((id) => projectAssertion(id));
+  const outDir = mkdtempSync(join(tmpdir(), "agentce-report-hostile-"));
+  writeReport(outDir, assertions, {
+    bundleDigest: "sha256:abc",
+    catalogs: ["base/eu-ai-act@1"],
+    operator: "ecs",
+    invocation: ["assess", "p1"],
+    profile: projectProfile(hostileIds),
+  });
+  const projectView = JSON.parse(readFileSync(join(outDir, "project.json"), "utf-8")) as {
+    agents: Array<{ id: string }>;
+  };
+  assert.equal(projectView.agents.length, hostileIds.length);
+  const md = readFileSync(join(outDir, "project.md"), "utf-8");
+  const dirnames = new Set(
+    [...md.matchAll(/agents\/([^)]+)\/report\.md/g)].map((m) => m[1] as string),
+  );
+  assert.equal(dirnames.size, hostileIds.length, [...dirnames].join(", "));
+  for (const dirname_ of dirnames) {
+    assert.equal(existsSync(join(outDir, "agents", dirname_, "report.md")), true);
+  }
+});
+
 // --- digestTree / catalog provenance digest (item 18.22: a real catalog content digest, never
 // sha256:000...0) ---
 

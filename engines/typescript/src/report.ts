@@ -16,11 +16,19 @@ import { dirname, join } from "node:path";
 import type { Activity } from "./activity";
 import { DENIED_KINDS, RECORDER_CLASSES, summarizeActivity } from "./activity";
 import { type Assertion, aggregate, assertionToJson, checkDc5 } from "./assertions";
+import { indexBySubject } from "./assess";
 import type { BlindSpot, BlindSpots, CheckRef } from "./blindSpots";
 import { canonicalize } from "./canonical";
 import type { Catalog, ControlSpec } from "./catalog";
+import type { Event } from "./graph";
 import { DEFAULT_LANGUAGE, catalogue } from "./messages";
-import { profileFromDict } from "./profile";
+import { type Profile, type Subject, profileFromDict } from "./profile";
+import {
+  type ProjectView,
+  blindSpotsBySubject,
+  computeProjectView,
+  noPopulationBySubject,
+} from "./project";
 import { byteCompare, sortKeysDeep } from "./util";
 import { gapText, summarize as summarizeVerdict } from "./verdict";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
@@ -630,6 +638,166 @@ export function renderReportHtml(
   return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${csp}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1>${activitySection}${blindSpotsSection}${verdictSection}<section aria-labelledby="summary"><h2 id="summary">${escapeHtml(cat["report.summary_heading"] as string)}</h2><ul>${summary}</ul></section><section aria-labelledby="assertions"><h2 id="assertions">${escapeHtml(cat["report.assertions_heading"] as string)}</h2><table><tr><th>Control</th><th>Subject</th><th>Outcome</th></tr>${bodyRows}</table></section></main></body></html>\n`;
 }
 
+/** The traversal-proof, collision-resistant directory name `writeReport` writes a subject's own
+ * report under (`agents/<dirname>/`, 18.14 C3) -- the one formula both `writeReport` (which creates
+ * the directory) and `projectAgentViewRows`/the undeclared-agents section (which link to it) share,
+ * mirroring the Python reference's `_agent_dirname`. */
+function agentDirname(subjectId: string): string {
+  return `${safe(subjectId).slice(0, 40)}-${uuid5(subjectId).slice(0, 8)}`;
+}
+
+/** Minimal named-placeholder substitution (`{name}` -> value) for the two project-view message
+ * templates that need it -- `formatPlural` (verdict.ts) already covers the catalogue's one ICU
+ * plural template, so this is deliberately narrower than a general formatter (mirrors the Python
+ * reference's `i18n_format.format_message` for this non-plural case). */
+function formatTemplate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (whole, key: string) => vars[key] ?? whole);
+}
+
+interface ProjectAgentDisplayRow {
+  id: string;
+  dirname: string;
+  badge: string;
+  verdict: string;
+  whatItDid: string;
+}
+
+/** One row per agent, in `projectView.agents`'s own order (never re-sorted here): the sanitised id,
+ * its report's directory name, the declared/undeclared badge, the verdict-and-counts cell, and the
+ * what-it-did cell -- shared by the Markdown and HTML renderings exactly like `activityRows`. */
+function projectAgentViewRows(
+  projectView: ProjectView,
+  activityBySubject: Map<string, Activity>,
+  cat: Record<string, string>,
+): ProjectAgentDisplayRow[] {
+  return projectView.agents.map((agent) => {
+    const activity = activityBySubject.get(agent.id);
+    const counts = agent.summary.counts;
+    const labelOf: Record<string, string> = {};
+    for (const outcome of Object.keys(counts)) labelOf[outcome] = outcomeLabel(cat, outcome);
+    const verdictLabel = cat[`verdict.${agent.summary.verdict}`] as string;
+    const agentsObserved =
+      (activity?.agents ?? []).map((a) => sanitizeField(a)).join(", ") ||
+      (cat["report.activity_none_agents"] as string);
+    return {
+      id: sanitizeField(agent.id),
+      dirname: agentDirname(agent.id),
+      badge: agent.declared
+        ? (cat["report.project_declared_badge"] as string)
+        : (cat["report.project_undeclared_badge"] as string),
+      verdict: `${verdictLabel} (${activityTallyText(counts, labelOf)})`,
+      whatItDid: formatTemplate(cat["report.project_what_it_did_cell"] as string, {
+        agents: agentsObserved,
+        actions: activityTallyText(activity?.actions_by_effect_class ?? {}),
+      }),
+    };
+  });
+}
+
+/** As `blindSpotRows`, but each row also names the agents this gap touches (`computeProjectView`'s
+ * own `top_gaps`, C2) -- the project view's per-gap agent list, not a per-agent re-scoping. */
+function projectTopGapRows(
+  topGaps: ProjectView["top_gaps"],
+  cat: Record<string, string>,
+): [string, string][] {
+  return blindSpotRows(topGaps).map(([label, value], i) => {
+    const agents = topGaps[i]?.agents ?? [];
+    const suffix = formatTemplate(cat["report.project_top_gap_agents"] as string, {
+      agents: agents.map((a) => sanitizeField(a)).join(", "),
+    });
+    return [label, `${value} ${suffix}`];
+  });
+}
+
+/** The project view (Hill 7, 18.14 C3): every agent this run assessed, side by side -- a summary row
+ * per agent (declared or discovered), the top gaps across the whole project naming which agents
+ * each touches, then the agents nobody declared, each linking to its own full report under
+ * `agents/<dirname>/`. */
+export function renderProjectMd(
+  projectView: ProjectView,
+  activityBySubject: Map<string, Activity>,
+  language: string = DEFAULT_LANGUAGE,
+): string {
+  const cat = catalogue(language);
+  const rows = projectAgentViewRows(projectView, activityBySubject, cat);
+  const lines = [
+    `# ${cat["report.project_title"]}`,
+    "",
+    `## ${cat["report.project_heading"]}`,
+    "",
+    `| ${cat["report.project_agent_column"]} | ${cat["report.project_declared_column"]} | ` +
+      `${cat["report.project_verdict_column"]} | ${cat["report.project_what_it_did_column"]} |`,
+    "|---|---|---|---|",
+  ];
+  for (const row of rows) {
+    lines.push(
+      `| [${row.id}](agents/${row.dirname}/report.md) | ${row.badge} | ` +
+        `${row.verdict} | ${row.whatItDid} |`,
+    );
+  }
+  lines.push("", `## ${cat["report.project_top_gaps_heading"]}`, "");
+  const gapRows = projectTopGapRows(projectView.top_gaps, cat);
+  if (gapRows.length > 0) {
+    for (const [label, value] of gapRows) lines.push(`- \`${label}\`: ${value}`);
+  } else {
+    lines.push(`- ${cat["report.no_gaps"]}`);
+  }
+  if (projectView.undeclared_agents.length > 0) {
+    lines.push("", `## ${cat["report.project_undeclared_heading"]}`, "");
+    for (const agentId of projectView.undeclared_agents) {
+      lines.push(
+        `- \`${sanitizeField(agentId)}\` -- [${cat["report.project_agent_report_link"]}]` +
+          `(agents/${agentDirname(agentId)}/report.md)`,
+      );
+    }
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+/** As `renderProjectMd`, rendered as the same self-contained, escaped, WCAG 2.2 AA page shape as
+ * `renderReportHtml`. */
+export function renderProjectHtml(
+  projectView: ProjectView,
+  activityBySubject: Map<string, Activity>,
+  language: string = DEFAULT_LANGUAGE,
+): string {
+  const cat = catalogue(language);
+  const rows = projectAgentViewRows(projectView, activityBySubject, cat);
+  const title = escapeHtml(cat["report.project_title"] as string);
+  const bodyRows = rows
+    .map(
+      (row) =>
+        `<tr><td><a href="agents/${row.dirname}/report.html">${escapeHtml(row.id)}</a></td>` +
+        `<td>${escapeHtml(row.badge)}</td><td>${escapeHtml(row.verdict)}</td>` +
+        `<td>${escapeHtml(row.whatItDid)}</td></tr>`,
+    )
+    .join("");
+  const gapRows = projectTopGapRows(projectView.top_gaps, cat);
+  const gapsHtml =
+    gapRows.length > 0
+      ? `<ul>${gapRows
+          .map(
+            ([label, value]) =>
+              `<li><strong>${escapeHtml(label)}</strong>: ${escapeHtml(value)}</li>`,
+          )
+          .join("")}</ul>`
+      : `<p>${escapeHtml(cat["report.no_gaps"] as string)}</p>`;
+  let undeclaredHtml = "";
+  if (projectView.undeclared_agents.length > 0) {
+    const items = projectView.undeclared_agents
+      .map(
+        (agentId) =>
+          `<li>${sanitizeForHtml(agentId)} -- ` +
+          `<a href="agents/${agentDirname(agentId)}/report.html">` +
+          `${escapeHtml(cat["report.project_agent_report_link"] as string)}</a></li>`,
+      )
+      .join("");
+    undeclaredHtml = `<section aria-labelledby="project-undeclared"><h2 id="project-undeclared">${escapeHtml(cat["report.project_undeclared_heading"] as string)}</h2><ul>${items}</ul></section>`;
+  }
+  const csp = "default-src 'none'; style-src 'unsafe-inline'; img-src 'none'";
+  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${csp}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1><section aria-labelledby="project-agents"><h2 id="project-agents">${escapeHtml(cat["report.project_heading"] as string)}</h2><table><tr><th>${escapeHtml(cat["report.project_agent_column"] as string)}</th><th>${escapeHtml(cat["report.project_declared_column"] as string)}</th><th>${escapeHtml(cat["report.project_verdict_column"] as string)}</th><th>${escapeHtml(cat["report.project_what_it_did_column"] as string)}</th></tr>${bodyRows}</table></section><section aria-labelledby="project-top-gaps"><h2 id="project-top-gaps">${escapeHtml(cat["report.project_top_gaps_heading"] as string)}</h2>${gapsHtml}</section>${undeclaredHtml}</main></body></html>\n`;
+}
+
 /** A deterministic OSCAL date-time for this run: the earliest evidence-window start across the
  * assertions, so it reflects what was actually reviewed rather than the run's wall clock. A run
  * with no assertions falls back to a fixed epoch, never `now()`. */
@@ -887,6 +1055,32 @@ export interface WriteReportOptions {
    * report section; computed by the caller, once, since it is also needed for the terminal summary
    * and the `--json` envelope. A caller that leaves it out gets the honest empty answer. */
   blindSpots?: BlindSpots;
+  /** The run's accepted events (18.14 C3): needed only to re-summarise activity per subject when
+   * `profile` names more than one subject; a single subject (or no `profile`) never reads this. */
+  events?: Event[];
+  /** 18.14 (Hill 7): when `profile` names more than one subject, every agent's records go side by
+   * side -- `project.md`/`.html`/`.json` (`computeProjectView`) plus each subject's own full report
+   * under `agents/<dirname>/`, and the root `report.md`/`.html` become the project view. A single
+   * subject (or no `profile`) writes exactly what this function always wrote. */
+  profile?: Profile;
+  /** Mirrors `summarizeActivity`'s own parameter and default: every subject in `profile` counts as
+   * declared when omitted. */
+  declaredSubjectIds?: ReadonlySet<string>;
+}
+
+function bareSubject(id: string): Subject {
+  return {
+    id,
+    name: null,
+    role: null,
+    evidenceSources: [],
+    coverageDenominators: [],
+    declaredDecisionTypes: [],
+    declaredOversight: {},
+    declaredComponents: [],
+    declaredTools: [],
+    declaredModels: [],
+  };
 }
 
 /** Write every report artifact for `assertions` and return the reproducibility manifest. */
@@ -917,11 +1111,95 @@ export function writeReport(
   writeJson("assertions.json", assertions.map(assertionToJson));
   writeJson("activity.json", activity);
   writeJson("blind-spots.json", blindSpots);
-  writeTextFile("report.md", renderReportMd(assertions, counts, language, activity, blindSpots));
-  writeTextFile(
-    "report.html",
-    renderReportHtml(assertions, counts, language, activity, blindSpots),
-  );
+
+  // 18.14 C3: every agent's records side by side (Hill 7) -- only when `profile` names more than
+  // one subject; a single subject (or no `profile`) leaves every byte below unchanged.
+  let projectView: ProjectView | undefined;
+  const projectActivityBySubject = new Map<string, Activity>();
+  const profile = options.profile;
+  if (profile !== undefined && profile.subjects.length > 1) {
+    const resolvedDeclared = new Set(
+      options.declaredSubjectIds ?? profile.subjects.map((s) => s.id),
+    );
+    const projectSubjectIds = [
+      ...new Set([...assertions.map((a) => a.subject), ...profile.subjects.map((s) => s.id)]),
+    ].sort(byteCompare);
+    const eventsBySubject = indexBySubject(options.events ?? []);
+    const declaredSubjectsById = new Map(profile.subjects.map((s) => [s.id, s]));
+    for (const subjectId of projectSubjectIds) {
+      const declaredSubject = declaredSubjectsById.get(subjectId);
+      const subjectProfile: Profile = {
+        ...profile,
+        subjects: [declaredSubject ?? bareSubject(subjectId)],
+      };
+      const subjectDeclaredIds = resolvedDeclared.has(subjectId)
+        ? new Set([subjectId])
+        : new Set<string>();
+      projectActivityBySubject.set(
+        subjectId,
+        summarizeActivity(eventsBySubject.get(subjectId) ?? [], subjectProfile, subjectDeclaredIds),
+      );
+    }
+    projectView = computeProjectView(
+      assertions,
+      profile,
+      resolvedDeclared,
+      projectActivityBySubject,
+      blindSpots,
+    );
+    writeJson("project.json", projectView);
+    const gapsBySubject = blindSpotsBySubject(blindSpots);
+    const noPopBySubject = noPopulationBySubject(blindSpots.no_population);
+    for (const subjectId of projectSubjectIds) {
+      const subjectDirname = agentDirname(subjectId);
+      mkdirSync(join(outDir, "agents", subjectDirname), { recursive: true });
+      const subjectAssertions = assertions.filter((a) => a.subject === subjectId);
+      // Populated above for every id in `projectSubjectIds`, including this one.
+      const subjectActivity = projectActivityBySubject.get(subjectId) as Activity;
+      const subjectBlindSpots: BlindSpots = {
+        blind_spots: gapsBySubject.get(subjectId) ?? [],
+        no_population: noPopBySubject.get(subjectId) ?? [],
+      };
+      writeJson(`agents/${subjectDirname}/assertions.json`, subjectAssertions.map(assertionToJson));
+      writeJson(`agents/${subjectDirname}/activity.json`, subjectActivity);
+      writeJson(`agents/${subjectDirname}/blind-spots.json`, subjectBlindSpots);
+      writeTextFile(
+        `agents/${subjectDirname}/report.md`,
+        renderReportMd(
+          subjectAssertions,
+          aggregate(subjectAssertions),
+          language,
+          subjectActivity,
+          subjectBlindSpots,
+        ),
+      );
+      writeTextFile(
+        `agents/${subjectDirname}/report.html`,
+        renderReportHtml(
+          subjectAssertions,
+          aggregate(subjectAssertions),
+          language,
+          subjectActivity,
+          subjectBlindSpots,
+        ),
+      );
+    }
+  }
+
+  if (projectView !== undefined) {
+    const projectMd = renderProjectMd(projectView, projectActivityBySubject, language);
+    writeTextFile("project.md", projectMd);
+    writeTextFile("report.md", projectMd);
+    const projectHtml = renderProjectHtml(projectView, projectActivityBySubject, language);
+    writeTextFile("project.html", projectHtml);
+    writeTextFile("report.html", projectHtml);
+  } else {
+    writeTextFile("report.md", renderReportMd(assertions, counts, language, activity, blindSpots));
+    writeTextFile(
+      "report.html",
+      renderReportHtml(assertions, counts, language, activity, blindSpots),
+    );
+  }
   writeJson("oscal-ar.json", renderOscal(assertions));
   writeJson("results.sarif", renderSarif(assertions, options.catalogObjects ?? []));
 

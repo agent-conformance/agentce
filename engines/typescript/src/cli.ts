@@ -421,6 +421,8 @@ function runAssess(options: AssessOptions): CommandResult {
     supersedes,
     activity,
     blindSpots,
+    events: ingested.accepted,
+    profile: profileObj,
   });
   if (state !== null) {
     state.record(bundle.digest, join(out, "manifest.json"), newWindowEnd);
