@@ -32,7 +32,9 @@ options:
                         (default: the profile's catalogs, else the baseline)
   --profile PROFILE     the applicability profile file
   --deviations DEVIATIONS
-                        the deviation register file
+                        the deviation register file: a lint-clean, unexpired
+                        entry flips its control's non-conformant outcome to
+                        partial
   --domain DOMAIN       the domain ontology binding file
   --catalog-dir CATALOG_DIR
                         a catalog directory to evaluate (repeatable)

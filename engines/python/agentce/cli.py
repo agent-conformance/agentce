@@ -133,7 +133,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="catalog ids, comma-separated: <id@ver>[,<id@ver>...] (default: the profile's catalogs, else the baseline)",
     )
     p.add_argument("--profile", help="the applicability profile file")
-    p.add_argument("--deviations", help="the deviation register file")
+    p.add_argument(
+        "--deviations",
+        help="the deviation register file: a lint-clean, unexpired entry flips its control's "
+        "non-conformant outcome to partial",
+    )
     p.add_argument("--domain", help="the domain ontology binding file")
     p.add_argument(
         "--catalog-dir",
