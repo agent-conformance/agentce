@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Comparator;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -28,17 +27,6 @@ public final class SecurityView {
      * {@code nist-ai-rmf}, {@code aiuc-1}) are out of scope for this view.
      */
     private static final Set<String> CITED_FRAMEWORKS = Set.of("owasp-asi-2026", "mitre-atlas", "owasp-acs");
-
-    /**
-     * Each framework's own {@code version:} field, copied by hand from its crosswalk file under {@code
-     * spec/catalogs/base/eu-ai-act/crosswalk/}. Crosswalk files are not engine-loaded at assessment
-     * time (the crosswalk README's own hygiene rule), so this is the one place a version bump is made
-     * when a cited framework's file changes; consulted only by a render layer to show "mitre-atlas
-     * 2026.09" rather than a bare framework id next to a clause. {@code security.json} itself carries
-     * no version field.
-     */
-    public static final Map<String, String> FRAMEWORK_VERSIONS =
-            Map.of("owasp-asi-2026", "2025.12", "mitre-atlas", "2026.09", "owasp-acs", "0.1.0");
 
     private record Citation(String control, String framework, String clause, boolean verified) {}
 

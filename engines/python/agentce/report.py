@@ -749,15 +749,13 @@ def _security_drift_lines(
 
 def _security_citation_text(entry: dict[str, Any], cat: dict[str, str]) -> str:
     """One clause citation with its framework's version (Role-views' "standard, catalog, version and
-    clause" rule) -- ``_crosswalk_text``'s "(clause reference unverified)" label reused verbatim."""
+    clause" rule) -- delegates the "(clause reference unverified)" label to ``_crosswalk_text``
+    rather than re-checking the ``verified`` flag a second time."""
     version = FRAMEWORK_VERSIONS.get(entry["framework"], "")
     framework = (
         f"{entry['framework']} {version}".strip() if version else entry["framework"]
     )
-    text = f"{framework} {entry['clause']}".strip()
-    if entry.get("verified") is not True:
-        text += f" {cat['report.crosswalk_unverified']}"
-    return text
+    return _crosswalk_text({**entry, "framework": framework}, cat)
 
 
 def _security_citation_rows(
@@ -772,6 +770,27 @@ def _security_citation_rows(
             sanitize_for_markdown(_security_citation_text(entry, cat)),
         )
         for entry in citations
+    ]
+
+
+def _security_enforcement_rows(
+    enforcement: dict[str, dict[str, int]], cat: dict[str, str]
+) -> list[tuple[str, str]]:
+    """``(label, value)`` for the approvals/denied rows -- the one place the label set is decided,
+    shared by the Markdown and HTML renderings (as :func:`_activity_rows`)."""
+    recorder_labels = {
+        k: cat[f"report.activity_recorder_{k}"] for k in RECORDER_CLASSES
+    }
+    denied_labels = {k: cat[f"report.activity_denied_{k}"] for k in DENIED_KINDS}
+    return [
+        (
+            cat["report.activity_approvals_label"],
+            _activity_tally_text(enforcement["approvals_by_recorder"], recorder_labels),
+        ),
+        (
+            cat["report.activity_denied_label"],
+            _activity_tally_text(enforcement["denied_or_blocked"], denied_labels),
+        ),
     ]
 
 
@@ -803,10 +822,14 @@ def render_security_md(
         f"## {cat['report.security_enforcement_heading']}",
         "",
         f"- {cat['report.security_enforcement_scope_note']}",
-        f"- {cat['report.activity_approvals_label']}: "
-        f"{_activity_tally_text(security['enforcement_point_evidence']['approvals_by_recorder'], {k: cat[f'report.activity_recorder_{k}'] for k in RECORDER_CLASSES})}",
-        f"- {cat['report.activity_denied_label']}: "
-        f"{_activity_tally_text(security['enforcement_point_evidence']['denied_or_blocked'], {k: cat[f'report.activity_denied_{k}'] for k in DENIED_KINDS})}",
+    ]
+    lines += [
+        f"- {label}: {value}"
+        for label, value in _security_enforcement_rows(
+            security["enforcement_point_evidence"], cat
+        )
+    ]
+    lines += [
         "",
         f"## {cat['report.security_drift_heading']}",
         "",
@@ -833,13 +856,12 @@ def render_security_html(
         f"<li>{sanitize_for_html(line)}</li>"
         for line in _security_tool_access_lines(security["tool_access"], cat)
     )
-    approvals_text = _activity_tally_text(
-        security["enforcement_point_evidence"]["approvals_by_recorder"],
-        {k: cat[f"report.activity_recorder_{k}"] for k in RECORDER_CLASSES},
+    enforcement_rows = _security_enforcement_rows(
+        security["enforcement_point_evidence"], cat
     )
-    denied_text = _activity_tally_text(
-        security["enforcement_point_evidence"]["denied_or_blocked"],
-        {k: cat[f"report.activity_denied_{k}"] for k in DENIED_KINDS},
+    enforcement_items = "".join(
+        f"<p>{html.escape(label)}: {html.escape(value)}</p>"
+        for label, value in enforcement_rows
     )
     drift_items = "".join(
         f"<li>{sanitize_for_html(line)}</li>"
@@ -866,8 +888,7 @@ def render_security_html(
         '<section aria-labelledby="security-enforcement"><h2 id="security-enforcement">'
         f"{html.escape(cat['report.security_enforcement_heading'])}</h2>"
         f"<p>{html.escape(cat['report.security_enforcement_scope_note'])}</p>"
-        f"<p>{html.escape(cat['report.activity_approvals_label'])}: {html.escape(approvals_text)}</p>"
-        f"<p>{html.escape(cat['report.activity_denied_label'])}: {html.escape(denied_text)}</p></section>"
+        f"{enforcement_items}</section>"
         '<section aria-labelledby="security-drift"><h2 id="security-drift">'
         f"{html.escape(cat['report.security_drift_heading'])}</h2><ul>{drift_items}</ul></section>"
         '<section aria-labelledby="security-citations"><h2 id="security-citations">'

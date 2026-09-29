@@ -19,18 +19,6 @@ import { byteCompare } from "./util";
  * `aiuc-1`) are out of scope for this view. */
 const CITED_FRAMEWORKS = new Set(["owasp-asi-2026", "mitre-atlas", "owasp-acs"]);
 
-/** Each framework's own `version:` field, copied by hand from its crosswalk file under
- * `spec/catalogs/base/eu-ai-act/crosswalk/`. Crosswalk files are not engine-loaded at assessment
- * time (the crosswalk README's own hygiene rule), so this is the one place a version bump is made
- * when a cited framework's file changes; consulted only by a render layer to show "mitre-atlas
- * 2026.09" rather than a bare framework id next to a clause. `security.json` itself carries no
- * version field. */
-export const FRAMEWORK_VERSIONS: Record<string, string> = {
-  "owasp-asi-2026": "2025.12",
-  "mitre-atlas": "2026.09",
-  "owasp-acs": "0.1.0",
-};
-
 export interface StandardsCitation {
   control: string;
   framework: string;

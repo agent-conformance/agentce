@@ -29,6 +29,7 @@ website pages match a fresh publish. Neither opens a socket.
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import os
 import re
@@ -99,10 +100,11 @@ def _links(text: str) -> list[str]:
 # --- Generators (reference pages from the sources). ---
 
 
+@functools.lru_cache(maxsize=1)
 def _security_intro() -> str:
     """The security view's fixed intro sentence, read live from the Python engine's own English
     message catalogue (never a copy pasted here) so the docs and the rendered `security.md`/`.html`
-    can never drift apart (18.16 C6)."""
+    can never drift apart (18.16 C6). Cached: both the repo-docs and the site generator call this."""
     path = (
         REPO_ROOT
         / "engines"
