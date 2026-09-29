@@ -5,8 +5,8 @@ description: >
   report depends on, run the assessment, complete the manual checklists and deviations, and compute
   the readiness verdict. Use when asked to run the assessment, prepare the conformance report for
   review, decide whether a report can be signed, complete the manual checks, record a deviation, or
-  explain an insufficient-evidence or non-conformant outcome. For the developer's or reviewer's AI
-  coding assistant, never for the agent being checked.
+  explain an insufficient-evidence or non-conformant outcome. This skill is for the developer's or
+  reviewer's AI coding assistant, never for the agent being checked.
 license: Apache-2.0
 metadata:
   spec_version: "0.6"

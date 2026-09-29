@@ -4,8 +4,8 @@ description: >
   Onboard an AI-agent codebase to the Agent Conformance Engine: declare subjects and decision types,
   instrument chokepoints so the deployment emits canonical evidence, and iterate until a bundle
   validates with the minimum evidence for the target controls. Use when asked to prepare an agent for
-  conformance assessment, produce AgentCE evidence, or resolve insufficient_evidence findings. For
-  the developer's or reviewer's AI coding assistant, never for the agent being checked.
+  conformance assessment, produce AgentCE evidence, or resolve insufficient_evidence findings. This
+  skill is for the developer's or reviewer's AI coding assistant, never for the agent being checked.
 license: Apache-2.0
 metadata:
   spec_version: "0.6"

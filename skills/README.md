@@ -44,8 +44,8 @@ uv run --frozen pytest -q                                            # agentce-p
 This works because each skill vendors a real wheel of `engines/python` under its own `vendor/`
 directory (`pyproject.toml`'s `[tool.uv.sources]` resolves `agent-conformance` from that local file,
 never a relative path back into this repository). `tools/vendor_skill_engine.py` keeps every skill's
-vendored wheel in sync with `engines/python`; run it with `--write` after a change to the engine (it also re-locks
-each skill) and commit the rebuilt `vendor/*.whl` alongside the skill's `uv.lock`.
+vendored wheel in sync with `engines/python`; run it with `--write` after a change to the engine. It rebuilds the
+wheel and re-locks each skill; commit the new `vendor/*.whl` together with the skill's `uv.lock`.
 
 ## Version table
 
