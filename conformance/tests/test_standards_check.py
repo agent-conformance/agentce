@@ -22,6 +22,16 @@ def test_real_artifacts_validate() -> None:
     assert result["crosswalks"] >= 7
 
 
+def test_crosswalk_file_count_includes_new_frameworks() -> None:
+    """18.16 C1-C3 added `mitre-atlas.yaml` and `owasp-acs.yaml` beside the 7 crosswalks that predate
+    it, without disturbing `artifacts_valid` (structurally sound, real event types and controls)."""
+    crosswalks = sorted(p.name for p in standards_check.CROSSWALK_DIR.glob("*.yaml"))
+    assert len(crosswalks) == 9, crosswalks
+    assert {"mitre-atlas.yaml", "owasp-acs.yaml"} <= set(crosswalks)
+    result = standards_check.run_standards_check()
+    assert result["artifacts_valid"] is True, result["problems"]
+
+
 def test_oscal_matches_a_fresh_generation() -> None:
     committed = standards_check.OSCAL_INSTANCE.read_text("utf-8")
     regenerated = standards_check.oscal_builder.render(
