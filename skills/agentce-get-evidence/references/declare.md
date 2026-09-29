@@ -1,6 +1,6 @@
 # Phase A — Declare
 
-The procedure for the declaration phase of `agentce-onboard` (SPEC §13.3.3 Phase A). Produces
+The procedure for the declaration phase of `agentce-get-evidence` (SPEC §13.3.3 Phase A). Produces
 `agentce/applicability.yaml`, `agentce/domain.linkml.yaml`, `agentce/reference/`, and an empty
 `agentce/deviations.yaml` (template only — never populated by this skill, S-3).
 

@@ -556,23 +556,23 @@ jobs:
         run: |
           python3 tools/vendor_skill_engine.py --self-test
           python3 tools/vendor_skill_engine.py
-      - name: agentce-onboard runs standalone, no sibling engines/ checkout
+      - name: agentce-get-evidence runs standalone, no sibling engines/ checkout
         run: |
           set -euo pipefail
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
-          cp -R skills/agentce-onboard "$work/installed-skill"
+          cp -R skills/agentce-get-evidence "$work/installed-skill"
           rm -rf "$work/installed-skill/.venv" "$work/installed-skill/.mypy_cache" "$work/installed-skill/.ruff_cache" "$work/installed-skill/__pycache__"
           cd "$work/installed-skill"
           out="$(uv run --frozen python3 scripts/lint_profile.py --self-test --json)"
           echo "$out"
           echo "$out" | grep -q '"self_test": "ok"'
-      - name: agentce-check-report runs standalone, no sibling engines/ checkout
+      - name: agentce-prepare-to-share runs standalone, no sibling engines/ checkout
         run: |
           set -euo pipefail
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
-          cp -R skills/agentce-check-report "$work/installed-skill"
+          cp -R skills/agentce-prepare-to-share "$work/installed-skill"
           rm -rf "$work/installed-skill/.venv" "$work/installed-skill/.mypy_cache" "$work/installed-skill/.ruff_cache" "$work/installed-skill/__pycache__"
           cd "$work/installed-skill"
           uv run --frozen pytest -q -p no:cacheprovider

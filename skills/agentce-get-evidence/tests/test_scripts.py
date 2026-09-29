@@ -183,6 +183,19 @@ def test_explain_groups_by_cause_and_suggests_an_adapter(tmp_path: Path) -> None
     )
 
 
+def test_skill_is_for_the_coding_assistant_and_keeps_its_rules() -> None:
+    skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+    front = skill.split("---")[1]
+    assert "name: agentce-get-evidence" in front
+    assert "never for the agent being checked" in " ".join(front.split())
+    rules = [
+        line.split("|")[1].strip()
+        for line in skill.splitlines()
+        if line.startswith("| S-")
+    ]
+    assert rules == [f"S-{n}" for n in range(1, 11)]
+
+
 def test_version_mismatch_gate_returns_exit_3(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     # If SKILL.md pins do not match the engine, every script stops with exit 3 (S-5).
     monkeypatch.setattr(

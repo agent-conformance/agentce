@@ -4,7 +4,7 @@ The readiness verdict logic lives here, in the engine, never in a skill (SPEC §
 depends on a skill script. ``compute_readiness`` reads a finished report directory and returns one of
 ``READY``, ``READY WITH LIMITATIONS``, or ``NOT READY`` with reasons, implementing the stage-4
 post-run checks of §13.3.4. ``deviation_lint``, ``checklist_lint``, and ``claim_check`` are the
-manual-protocol linters the ``agentce-check-report`` skill wraps; each returns a list of problems
+manual-protocol linters the ``agentce-prepare-to-share`` skill wraps; each returns a list of problems
 (empty means clean). All checks are deterministic and read-only over their inputs.
 """
 

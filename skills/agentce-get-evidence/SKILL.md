@@ -1,10 +1,11 @@
 ---
-name: agentce-onboard
+name: agentce-get-evidence
 description: >
   Onboard an AI-agent codebase to the Agent Conformance Engine: declare subjects and decision types,
   instrument chokepoints so the deployment emits canonical evidence, and iterate until a bundle
   validates with the minimum evidence for the target controls. Use when asked to prepare an agent for
-  conformance assessment, produce AgentCE evidence, or resolve insufficient_evidence findings.
+  conformance assessment, produce AgentCE evidence, or resolve insufficient_evidence findings. For
+  the developer's or reviewer's AI coding assistant, never for the agent being checked.
 license: Apache-2.0
 metadata:
   spec_version: "0.6"
@@ -13,7 +14,7 @@ metadata:
   skill_version: "1.0.0"
 ---
 
-# agentce-onboard
+# agentce-get-evidence
 
 Prepare an AI-agent deployment so it produces **canonical AgentCE evidence** and its bundle passes
 `agentce validate` and `agentce assess` with the minimum evidence for the target controls. This skill

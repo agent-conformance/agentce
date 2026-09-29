@@ -1,4 +1,4 @@
-"""Phase-4 P4.4 orchestrator: the agentce-check-report skill's script tests and composite refusal.
+"""Phase-4 P4.4 orchestrator: the agentce-prepare-to-share skill's script tests and composite refusal.
 
 Runs the skill's script tests in the skill's own environment and confirms that a composite-score
 request is refused (DC-4). ``python check_report.py --json`` prints
@@ -17,7 +17,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 _REPO = Path(__file__).resolve().parent.parent
-_SKILL = _REPO / "skills" / "agentce-check-report"
+_SKILL = _REPO / "skills" / "agentce-prepare-to-share"
 
 
 def _tests_pass() -> bool:

@@ -1,4 +1,4 @@
-"""Shared plumbing for the agentce-onboard scripts (SPEC 13.3.2).
+"""Shared plumbing for the agentce-prepare-to-share scripts (SPEC 13.3.2).
 
 Every bundled script is a pure function of its inputs: deterministic, offline, model-free, sorted
 output, stable exit codes, and JSON alongside human text (rule S-4). Before doing anything else a

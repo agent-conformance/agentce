@@ -104,7 +104,7 @@ def test_docs_and_skills_name_the_one_applicability_file() -> None:
             for tree in (
                 "docs",
                 "website/src/content/docs",
-                "skills/agentce-onboard",
+                "skills/agentce-get-evidence",
             )
             for p in (_REPO_ROOT / tree).rglob("*")
             if p.is_file() and p.suffix in {".md", ".mdx", ".yaml"}

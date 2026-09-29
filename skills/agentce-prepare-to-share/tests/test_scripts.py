@@ -1,4 +1,4 @@
-"""Tests for the agentce-check-report skill scripts (SPEC §13.3.4)."""
+"""Tests for the agentce-prepare-to-share skill scripts (SPEC §13.3.4)."""
 
 from __future__ import annotations
 
@@ -166,3 +166,13 @@ def test_pins_gate_runs(tmp_path: Path, capsys) -> None:
     from _common import run_guarded
 
     assert run_guarded(["--report", str(report), "--json"], report_readiness.body) == OK
+
+
+def test_skill_is_for_the_coding_assistant_and_never_signs() -> None:
+    skill = (Path(__file__).resolve().parent.parent / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    front = skill.split("---")[1]
+    assert "name: agentce-prepare-to-share" in front
+    assert "never for the agent being checked" in " ".join(front.split())
+    assert "and never signs anything." in " ".join(skill.split())

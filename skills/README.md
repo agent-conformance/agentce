@@ -6,8 +6,8 @@ component) are its own; these rules keep a skill from compromising them from eit
 
 | Skill | Purpose | Status |
 |---|---|---|
-| [`agentce-onboard`](agentce-onboard/) | Declare, instrument, and iterate a codebase until its bundle validates with the minimum evidence for the target controls. | built |
-| `agentce-check-report` | Pre-run checks, manual checklists, deviations, and reading outcomes on the report side. | later phase |
+| [`agentce-get-evidence`](agentce-get-evidence/) | Declare, instrument, and iterate a codebase until its bundle validates with the minimum evidence for the target controls. | built |
+| [`agentce-prepare-to-share`](agentce-prepare-to-share/) | Pre-run checks, manual checklists, deviations, and reading outcomes on the report side. | built |
 | [`evals/`](evals/) | Skill evaluation tasks and recorded results (§13.3.5). | scaffold |
 
 ## Trust rules (every skill obeys these; SPEC §13.3.2)
@@ -37,17 +37,19 @@ folder anywhere (a zip, an assistant's skill directory, a registry checkout) and
 directly, with no sibling `engines/` checkout beside it —
 
 ```sh
-uv run --frozen python3 scripts/lint_profile.py --self-test --json   # agentce-onboard
+uv run --frozen python3 scripts/lint_profile.py --self-test --json   # agentce-get-evidence
+uv run --frozen pytest -q                                            # agentce-prepare-to-share
 ```
 
 This works because each skill vendors a real wheel of `engines/python` under its own `vendor/`
 directory (`pyproject.toml`'s `[tool.uv.sources]` resolves `agent-conformance` from that local file,
 never a relative path back into this repository). `tools/vendor_skill_engine.py` keeps every skill's
 vendored wheel in sync with `engines/python`; run it with `--write` after a change to the engine and
-commit the rebuilt `vendor/*.whl` alongside the skill's re-locked `uv.lock`.
+commit the rebuilt `vendor/*.whl` alongside the skill's `uv.lock`, re-locked with
+`uv lock --refresh-package agent-conformance` (a plain `uv lock` keeps the old wheel hash).
 
 ## Version table
 
 | Skill | skill_version | spec_version | cli_version | catalog_versions |
 |---|---|---|---|---|
-| `agentce-onboard` | 1.0.0 | 0.6 | >=0.1.0,<0.2 | eu-ai-act@2026.09 |
+| `agentce-get-evidence` | 1.0.0 | 0.6 | >=0.1.0,<0.2 | eu-ai-act@2026.09 |

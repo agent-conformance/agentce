@@ -18,7 +18,7 @@ dependencies = [
     { name = "regex" },
 ]
 wheels = [
-    { filename = "agent_conformance-0.1.0-py3-none-any.whl", hash = "sha256:1552dce676542a2f417b0658f95b202a059809ba82b41d7071a0417be8047afb" },
+    { filename = "agent_conformance-0.1.0-py3-none-any.whl", hash = "sha256:2d43b64bb3f1a64ec0b47551318795c2822c3abc779af01c59baf17bfd8266b2" },
 ]
 
 [package.metadata]
@@ -31,7 +31,7 @@ requires-dist = [
 ]
 
 [[package]]
-name = "agentce-skill-onboard"
+name = "agentce-skill-prepare-to-share"
 version = "0.0.1"
 source = { virtual = "." }
 dependencies = [

@@ -69,7 +69,7 @@ agentce validate --bundle /tmp/bundle
 Agent-side emission is `self_report`. Where a gateway, policy engine, or identity provider sits in
 front of a call, take its record through the matching adapter (`mcp-gateway`, `policy-engines`,
 `identity`) as `enforcement_point` evidence, and do not also emit agent-side — the adapter's record is
-the one an assessor trusts. The `agentce-onboard` skill inventories chokepoints and tells you which
+the one an assessor trusts. The `agentce-get-evidence` skill inventories chokepoints and tells you which
 have an enforcement point available.
 
 ## From a session to an assessment
@@ -82,8 +82,8 @@ have an enforcement point available.
    `incomplete` and the run exits 1, never hidden. `--dry-run` only plans the job.
 2. `agentce validate --bundle <dir>` — fix quarantines until it is clean.
 3. `agentce assess --bundle <dir> --catalog eu-ai-act@2026.09 --profile agentce/applicability.yaml`.
-4. Resolve any `insufficient_evidence` with the `agentce-onboard` skill's `explain_insufficient`, then
+4. Resolve any `insufficient_evidence` with the `agentce-get-evidence` skill's `explain_insufficient`, then
    re-emit and re-assess.
 
-For the full declare → instrument → validate procedure, use the **agentce-onboard** skill
-(`skills/agentce-onboard/`).
+For the full declare → instrument → validate procedure, use the **agentce-get-evidence** skill
+(`skills/agentce-get-evidence/`).

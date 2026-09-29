@@ -2,9 +2,9 @@
 """vendor_skill_engine - keep each skill's vendored engine wheel in sync with `engines/python`
 (SPEC §13.3: skills/* must be one-command installable).
 
-Both approved skills (`skills/agentce-onboard`, `skills/agentce-check-report`) import `agentce` at
+Both approved skills (`skills/agentce-get-evidence`, `skills/agentce-prepare-to-share`) import `agentce` at
 runtime (the S-5 version-pin check in each skill's `_common.py`, and `agentce.readiness` /
-`agentce.catalog` in `agentce-check-report`'s scripts) -- it is a real dependency, not dead code. A
+`agentce.catalog` in `agentce-prepare-to-share`'s scripts) -- it is a real dependency, not dead code. A
 skill folder must install and self-test standing alone: copied out of this monorepo, with no sibling
 `engines/` checkout beside it. So each skill vendors a real wheel of `engines/python` under its own
 `vendor/` directory and its `pyproject.toml` / `uv.lock` resolve `agent-conformance` from that local
@@ -38,7 +38,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PY_ENGINE = ROOT / "engines" / "python"
-SKILLS = ("agentce-onboard", "agentce-check-report")
+SKILLS = ("agentce-get-evidence", "agentce-prepare-to-share")
 
 
 def _source_line(wheel_name: str) -> str:
@@ -119,7 +119,7 @@ def cmd_write() -> int:
             write_vendor(skill, wheel)
             print(f"vendored {wheel.name} into skills/{skill}/vendor/")
     print(
-        "Next: run `uv lock` inside each skill directory and commit "
+        "Next: run `uv lock --refresh-package agent-conformance` inside each skill directory and commit "
         "pyproject.toml, uv.lock, and vendor/*.whl together."
     )
     return 0

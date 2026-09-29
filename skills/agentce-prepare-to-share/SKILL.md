@@ -1,11 +1,12 @@
 ---
-name: agentce-check-report
+name: agentce-prepare-to-share
 description: >
   Verify an Agent Conformance Engine report before it is signed: check the human-supplied inputs the
   report depends on, run the assessment, complete the manual checklists and deviations, and compute
   the readiness verdict. Use when asked to run the assessment, prepare the conformance report for
   review, decide whether a report can be signed, complete the manual checks, record a deviation, or
-  explain an insufficient-evidence or non-conformant outcome.
+  explain an insufficient-evidence or non-conformant outcome. For the developer's or reviewer's AI
+  coding assistant, never for the agent being checked.
 license: Apache-2.0
 metadata:
   spec_version: "0.6"
@@ -14,7 +15,7 @@ metadata:
   skill_version: "1.0.0"
 ---
 
-# agentce-check-report
+# agentce-prepare-to-share
 
 Prepare an AgentCE report for review and signature. This skill checks the inputs the report inherits,
 runs the deterministic assessment, records the human-supplied manual checks and deviations, and

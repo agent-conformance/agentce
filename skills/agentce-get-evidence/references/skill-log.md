@@ -1,6 +1,6 @@
 # The skill log
 
-Every run of `agentce-onboard` appends one JSON object per line to `agentce/skill-log.jsonl` in the
+Every run of `agentce-get-evidence` appends one JSON object per line to `agentce/skill-log.jsonl` in the
 target repository (rule S-7). The log is the skill's own provenance: what it did, against which
 versions, and which judgement calls a person confirmed. It is written in the target repo at run time —
 it is not shipped in this package.
