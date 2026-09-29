@@ -1054,29 +1054,16 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     )
     declared_subject_ids: frozenset[str] | None = None
     if scanned is not None:
-        # Computed AFTER scan_records ran (never before, from `declared` alone): a solo real agent id
-        # discovered on the records-folder path must auto-declare itself, matching 18.4's own
-        # "a fresh, unedited first run shows nothing as undeclared" promise for declared_tools/
-        # declared_models -- computing this before the scan would wrongly flag that lone agent as
-        # undeclared on every single-agent folder. DEFAULT_SUBJECT never matches a real observed
-        # agent id (`records/__init__.py`'s grouping rule never promotes a solo real id to be the
-        # subject itself), so widening it with the real id(s) the events themselves name can never
-        # suppress a genuinely undeclared agent's own detection -- true whether DEFAULT_SUBJECT
-        # reaches here as a fresh scan's own sole discovered subject, or as a re-fed derived
-        # applicability.yaml naming that same sentinel (a hand-authored profile naming a real agent
-        # never lands here, since a real id is never DEFAULT_SUBJECT).
+        # "Declared" means named in the profile. A derived profile names each agent the scan saw by its
+        # own id (a lone agent included), so a fresh single-agent run shows nothing undeclared (18.4) and
+        # a re-fed profile declares exactly the agent it was derived from. A fresh run that discovered
+        # several agents declares none of them: nobody has named them yet (Hill 7).
         if declared is not None:
-            declared_subject_ids = frozenset({declared.subjects[0].id})
-            if declared.subjects[0].id == DEFAULT_SUBJECT:
-                declared_subject_ids = _widen_with_real_ids(scanned, DEFAULT_SUBJECT)
+            declared_subject_ids = frozenset(s.id for s in declared.subjects)
+        elif len(scanned.subjects) == 1:
+            declared_subject_ids = frozenset(scanned.subjects)
         else:
-            discovered_subjects = scanned.profile["subjects"]
-            if len(discovered_subjects) == 1:
-                declared_subject_ids = _widen_with_real_ids(
-                    scanned, discovered_subjects[0]["id"]
-                )
-            else:
-                declared_subject_ids = frozenset()
+            declared_subject_ids = frozenset()
     activity = summarize_activity(
         ingested.accepted, profile_obj, declared_subject_ids=declared_subject_ids
     )
@@ -1172,24 +1159,6 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         f"assessed {len(evaluated)} (control, subject) pairs; {non_conformant} non-conformant"
     )
     return result
-
-
-def _widen_with_real_ids(scanned: ScannedRecords, subject_id: str) -> frozenset[str]:
-    """Auto-declare ``subject_id`` (always ``DEFAULT_SUBJECT`` at both call sites) plus whatever real
-    agent id the events name, ONLY when there is at most one of them. On the `declared is None`
-    fresh-scan call site this guard is always satisfied (C4's merge rule only collapses to one
-    discovered subject when 0-or-1 real ids were observed). On the `--profile` call site it is NOT
-    always satisfied: `scan_records(subject=declared.subjects[0].id)` forces EVERY event onto the one
-    declared subject regardless of how many distinct real agent ids they name, so a records folder
-    that has grown a second, genuinely undeclared agent since the profile was derived can carry 2+
-    real ids here -- widening unconditionally would auto-declare that new agent too (verifier round 3's
-    finding). Only 0 or 1 real ids is the case this widening is safe for; 2+ real ids means at least
-    one of them is genuinely undeclared, so `subject_id` (DEFAULT_SUBJECT) alone is returned and every
-    real id stays undeclared, exactly as it would with no widening at all."""
-    real_ids = summarize_activity(scanned.events, Profile())["agents"]
-    if len(real_ids) > 1:
-        return frozenset({subject_id})
-    return frozenset({subject_id, *real_ids})
 
 
 def _records_subject(declared: Profile | None) -> str | None:

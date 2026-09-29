@@ -377,10 +377,12 @@ def scan(
                 event["subject"] = _real_id(event) or DEFAULT_SUBJECT
         else:
             # Zero or exactly one distinct agent: nothing to disambiguate, so every event (including
-            # any id-less ones) stays on DEFAULT_SUBJECT -- today's exact, unchanged behaviour.
-            resulting_subjects = [DEFAULT_SUBJECT]
+            # any id-less ones) goes to one subject. It is the agent the records name, so the derived
+            # profile declares that agent by its own id; DEFAULT_SUBJECT only when no event names one.
+            only = next(iter(real_ids), DEFAULT_SUBJECT)
+            resulting_subjects = [only]
             for event in by_id.values():
-                event["subject"] = DEFAULT_SUBJECT
+                event["subject"] = only
 
     if not read and any(item["reason"] == NO_GENAI_SPANS for item in unrecognised):
         raise InputError(

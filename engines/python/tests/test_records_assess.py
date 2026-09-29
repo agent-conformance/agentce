@@ -575,12 +575,14 @@ def test_records_folder_multi_agent_for_risk_lead_writes_project_view(
     assert len(agent_dirs) == 3
 
 
-def test_a_records_folder_with_one_agent_id_still_derives_one_default_subject(
+def test_a_records_folder_with_one_agent_id_names_that_agent_as_its_subject(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """The F1 regression test: `_records()`'s fixture carries exactly one real `gen_ai.agent.id`
-    (credit-underwriter) alongside id-less events; a lone real id must not be promoted to be the
-    subject id, since there is nothing to disambiguate -- output stays byte-identical to before C4."""
+    """`_records()`'s fixture carries exactly one real `gen_ai.agent.id` (credit-underwriter) alongside
+    id-less events: every event goes to one subject, and that subject is the agent the records name,
+    so the derived profile declares that agent by its own id."""
+    import yaml
+
     folder = str(_records(tmp_path / "records"))
     out = tmp_path / "out"
 
@@ -592,18 +594,47 @@ def test_a_records_folder_with_one_agent_id_still_derives_one_default_subject(
         for path in (out / "records-bundle" / "events").glob("*.jsonl")
         for line in path.read_text(encoding="utf-8").splitlines()
     ]
+    assert {e["subject"] for e in events} == {"spiffe://corp/agents/credit-underwriter"}
+    profile = yaml.safe_load((out / "applicability.yaml").read_text(encoding="utf-8"))
+    assert [s["id"] for s in profile["subjects"]] == [
+        "spiffe://corp/agents/credit-underwriter"
+    ]
+
+
+def test_a_records_folder_naming_no_agent_keeps_the_default_subject(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """With no `gen_ai.agent.id` anywhere there is no agent to name, so the one subject stays
+    `agentce:subject/local` and nothing shows as undeclared."""
+    folder = tmp_path / "records"
+    folder.mkdir()
+    document = (
+        (_FIXTURES / "otel-genai-chat" / "input.json")
+        .read_text(encoding="utf-8")
+        .replace('"gen_ai.agent.id"', '"x.unrelated"')
+    )
+    (folder / "chat.json").write_text(document, encoding="utf-8")
+    out = tmp_path / "out"
+
+    code, env = _run(["assess", str(folder), "--out", str(out)], capsys)
+
+    assert code == 0
+    events = [
+        json.loads(line)
+        for path in (out / "records-bundle" / "events").glob("*.jsonl")
+        for line in path.read_text(encoding="utf-8").splitlines()
+    ]
     assert {e["subject"] for e in events} == {"agentce:subject/local"}
+    activity = json.loads((out / "activity.json").read_text(encoding="utf-8"))
+    assert activity["undeclared"]["agents"] == []
 
 
 def test_a_records_folder_with_one_real_agent_shows_nothing_as_undeclared(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """C1 regression: a records folder naming exactly one real agent id (plus id-less events) is a
-    fresh, unedited first run -- 18.4's own promise ("nothing shows as undeclared") must hold for the
-    agent itself, not only for tools and models. `_records()`'s sole discovered subject is always
-    `DEFAULT_SUBJECT` (the F1 test above), which never appears in any event's own `data.agent.id`, so
-    auto-declaring the subject id alone cannot satisfy this; the real, observed agent id must be
-    auto-declared too."""
+    """C1: a records folder naming exactly one real agent id (plus id-less events) is a fresh, unedited
+    first run -- 18.4's promise ("nothing shows as undeclared") holds for the agent itself, not only
+    for tools and models, because the derived profile names that agent."""
     folder = str(_records(tmp_path / "records"))
     out = tmp_path / "out"
 
@@ -621,10 +652,8 @@ def test_a_records_folder_with_one_real_agent_shows_nothing_as_undeclared(
         )[0]
     )
 
-    # Round 2's verifier finding: the SAME promise must hold on a re-run with the tool's own,
-    # unedited derived profile, not only on the first run. `agentce init`'s own output for this
-    # exact folder always names DEFAULT_SUBJECT (never the real agent id, C4's merge rule) as its
-    # sole subject, so re-feeding it via `--profile` must not re-flag the same lone real agent.
+    # The same promise holds on a re-run with the tool's own, unedited derived profile: it names the
+    # agent, so re-feeding it via `--profile` declares exactly that agent.
     out2 = tmp_path / "out2"
     code2, env2 = _run(
         [
@@ -653,12 +682,8 @@ def test_a_records_folder_with_one_real_agent_shows_nothing_as_undeclared(
 def test_a_second_real_agent_appearing_under_a_re_fed_single_agent_profile_is_undeclared(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Verifier round 3's finding: `_widen_with_real_ids` must widen `DEFAULT_SUBJECT` with a real
-    agent id ONLY when the records folder names at most one -- the `--profile` branch's own
-    `scan_records(subject=declared.subjects[0].id)` forces every event onto the one declared subject
-    regardless of real agent count, so a folder that has grown a genuinely new, undeclared agent since
-    the profile was derived must not have that new agent silently swept into "declared" by the widening
-    meant only for re-feeding an unedited single-agent profile back to itself."""
+    """Verifier round 3's repro: a records folder that has grown a second agent since its profile was
+    derived. The profile names only the first agent, so only the new one is undeclared."""
     records = tmp_path / "records"
     out_a = tmp_path / "out-a"
     _run(["assess", str(_records(records)), "--out", str(out_a)], capsys)
@@ -682,8 +707,40 @@ def test_a_second_real_agent_appearing_under_a_re_fed_single_agent_profile_is_un
     assert code == 0
     activity = json.loads((out_b / "activity.json").read_text(encoding="utf-8"))
     assert activity["undeclared"]["agents"] == [
-        "spiffe://corp/agents/credit-underwriter",
-        "spiffe://corp/agents/fraud-detection-agent",
+        "spiffe://corp/agents/fraud-detection-agent"
+    ]
+
+
+def test_a_different_lone_agent_under_a_re_fed_single_agent_profile_is_undeclared(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verifier round 3's residual: a derived profile re-fed over a folder where its agent was replaced
+    by a different lone agent. The profile names the first agent, not the new one, so the new one is
+    undeclared; counting the agents the folder names now could not tell these two cases apart."""
+    records = tmp_path / "records"
+    out_a = tmp_path / "out-a"
+    _run(["assess", str(_records(records)), "--out", str(out_a)], capsys)
+
+    replaced = tmp_path / "replaced"
+    replaced.mkdir()
+    shutil.copy(_FIXTURES / "datadog" / "input.json", replaced / "fraud.json")
+    out_b = tmp_path / "out-b"
+    code, env = _run(
+        [
+            "assess",
+            str(replaced),
+            "--profile",
+            str(out_a / "applicability.yaml"),
+            "--out",
+            str(out_b),
+        ],
+        capsys,
+    )
+
+    assert code == 0
+    activity = json.loads((out_b / "activity.json").read_text(encoding="utf-8"))
+    assert activity["undeclared"]["agents"] == [
+        "spiffe://corp/agents/fraud-detection-agent"
     ]
 
 
