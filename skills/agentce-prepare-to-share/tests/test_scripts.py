@@ -32,6 +32,26 @@ def _report(
     return out
 
 
+def _unquoted_date_deviations(tmp_path: Path) -> Path:
+    """A deviation register whose `granted`/`expiry` are unquoted YAML dates (parsed as `date`
+    objects, not `str`), for the round-2 regression tests: the engine's own `agentce assess
+    --deviations` accepts this shape via its normalizing loader (SPEC §13.3.4), so both skill scripts
+    must accept it too."""
+    dev = tmp_path / "dev.yaml"
+    dev.write_text(
+        "deviations:\n"
+        "  - control: OVS-03\n"
+        '    rationale: "x"\n'
+        '    compensating_control: "y"\n'
+        '    owner: "a"\n'
+        '    approver: "b"\n'
+        "    granted: 2026-01-01\n"  # unquoted -- a YAML date, not a str
+        "    expiry: 2026-03-01\n",  # unquoted -- a YAML date, not a str
+        encoding="utf-8",
+    )
+    return dev
+
+
 def test_report_readiness_ready(tmp_path: Path, capsys) -> None:
     report = _report(
         tmp_path, [{"control": "OVS-03", "outcome": "conformant", "subject": "s"}]
@@ -66,18 +86,7 @@ def test_report_readiness_accepts_an_unquoted_yaml_expiry_the_same_way_assess_do
             }
         ],
     )
-    dev = tmp_path / "dev.yaml"
-    dev.write_text(
-        "deviations:\n"
-        "  - control: OVS-03\n"
-        '    rationale: "x"\n'
-        '    compensating_control: "y"\n'
-        '    owner: "a"\n'
-        '    approver: "b"\n'
-        "    granted: 2026-01-01\n"  # unquoted -- a YAML date, not a str
-        "    expiry: 2026-03-01\n",  # unquoted -- a YAML date, not a str
-        encoding="utf-8",
-    )
+    dev = _unquoted_date_deviations(tmp_path)
     code = report_readiness.body(
         ["--report", str(report), "--deviations", str(dev), "--json"]
     )
@@ -175,18 +184,7 @@ def test_deviation_lint_accepts_an_unquoted_yaml_date_the_same_way_the_engine_do
         tmp_path,
         [{"control": "OVS-03", "outcome": "non-conformant", "subject": "s"}],
     )
-    dev = tmp_path / "dev.yaml"
-    dev.write_text(
-        "deviations:\n"
-        "  - control: OVS-03\n"
-        '    rationale: "x"\n'
-        '    compensating_control: "y"\n'
-        '    owner: "a"\n'
-        '    approver: "b"\n'
-        "    granted: 2026-01-01\n"  # unquoted -- a YAML date, not a str
-        "    expiry: 2026-03-01\n",  # unquoted -- a YAML date, not a str
-        encoding="utf-8",
-    )
+    dev = _unquoted_date_deviations(tmp_path)
     code = deviation_lint.body(
         ["--deviations", str(dev), "--report", str(report), "--json"]
     )
