@@ -3,6 +3,18 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.11.0
+
+- Added `VG-PROJECT-VIEW`: the three engines compute the same project view over a dedicated 3-subject
+  fixture (`verification/gates/fixtures/project_view/`) -- one subject missing only a ModelCall, the
+  other missing both a ModelCall and a ToolCall for the same control, and one of the two subjects'
+  events naming a third agent identity no subject declares (Hill 7). Each engine's `project.json` is
+  byte-identical to a committed golden, `undeclared_agents` honestly names the undeclared identity,
+  `top_gaps` names a real blind spot spanning both fixture subjects, and each engine's rendered
+  `project.md` matches its own committed golden. A single-subject run (VG-BLIND-SPOTS' own fixture,
+  reused) writes no project-view artifact on any engine, closing the `> 1` vs `>= 1` subject-count
+  regression a 3-subject-only fixture could never catch.
+
 ## 0.10.0
 
 - Added `VG-OWN-RULES`: an operator installs fresh and, from an empty directory, authors a from-scratch

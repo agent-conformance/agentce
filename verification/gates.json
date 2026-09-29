@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.10.0",
+  "suite_version": "0.11.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -294,6 +294,42 @@
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/blind_spots.py, ported field-for-field in engines/typescript/src/blindSpots.ts and engines/java/src/main/java/org/agentce/BlindSpots.java."
+    },
+    {
+      "id": "VG-PROJECT-VIEW",
+      "title": "The three engines compute the same project view -- every agent's records side by side, an undeclared agent listed, a top gap naming which agents it touches -- and a single-subject run stays unchanged",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/project_view_engines.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 900,
+      "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
+      "rubric": {
+        "pass": "the 1-subject fixture (verification/gates/fixtures/blind_spots/) writes no project.json/project.md/project.html/agents/ on any engine; each engine's 3-subject fixture (verification/gates/fixtures/project_view/) project.json is byte-identical to the committed golden (project_view_golden.json), undeclared_agents correctly names the one agent no subject declares, top_gaps names a real cross-agent blind spot naming both fixture subjects, and each engine's rendered project.md matches its own committed golden (project_view_golden_<engine>.md)",
+        "fail": "the 1-subject fixture gains a spurious project view on any engine, a 3-subject engine's project.json differs from the golden, the undeclared agent is missing, top_gaps is empty or does not name both subjects, or an engine's project.md differs from its own golden"
+      },
+      "faults": [
+        {
+          "description": "the undeclared-agents set-difference is inverted to an intersection, so a real undeclared agent silently disappears",
+          "file": "engines/python/agentce/project.py",
+          "search": "    undeclared_agents = sorted(\n        {agent_id for row in agents for agent_id in row[\"agents_observed\"]}\n        - declared_subject_ids\n    )\n",
+          "replace": "    undeclared_agents = sorted(\n        {agent_id for row in agents for agent_id in row[\"agents_observed\"]}\n        & declared_subject_ids\n    )\n"
+        },
+        {
+          "description": "the subject-count gate is loosened from > 1 to >= 1, so a single-subject run spuriously gains a project view",
+          "file": "engines/python/agentce/report.py",
+          "search": "    if profile is not None and len(profile.subjects) > 1:\n",
+          "replace": "    if profile is not None and len(profile.subjects) >= 1:\n"
+        }
+      ],
+      "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/project.py (undeclared_agents, top_gaps) and the `write_report` gate in engines/python/agentce/report.py, ported field-for-field in engines/typescript/src/project.ts + report.ts and engines/java/src/main/java/org/agentce/Project.java + Report.java."
     },
     {
       "id": "VG-DIFF",

@@ -1,0 +1,14 @@
+{
+  "agentce_bundle_version": 1,
+  "domain": "project-view-fixture",
+  "files": [
+    {
+      "path": "events/a.jsonl",
+      "sha256": "0cb0bf3719cebd4dd8470cb44d9cdded21e08d48d3cc0612399fa87608086771"
+    },
+    {
+      "path": "events/b.jsonl",
+      "sha256": "cb5592538a77b4aec9b0ca8ad855c15ec27d49ac2c1972646f1d21ab3ec5cdf3"
+    }
+  ]
+}

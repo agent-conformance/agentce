@@ -1,0 +1,24 @@
+id: PROJ-01
+version: "2026.09"
+title: Fixture control requiring a ModelCall and a ToolCall
+description: >
+  Gate fixture only (verification/gates/project_view_engines.sh): requires a ModelCall and a ToolCall.
+  Subject A's own events supply the ToolCall but not the ModelCall (one requirement missing -- the
+  blind-spots "unlocked" case, RFC 0008 Sec.2); subject B's own events supply neither (both missing --
+  the "needed_by" case). Both land in the SAME (event, class) groups, so `compute_project_view`'s
+  `top_gaps` entry for this control genuinely names both subjects (18.14 Hill 7).
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: any
+  minimum_evidence:
+    - {event: ModelCall, class: any}
+    - {event: ToolCall, class: any}
+  shape: shapes/PROJ-01.ttl
+expectations:
+  - {id: F1, text: "Fixture-only; not a real requirement."}
+severity: high
+tolerance: {kind: count, max: 0}
+test_cases: []

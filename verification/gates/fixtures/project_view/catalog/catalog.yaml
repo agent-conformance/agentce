@@ -1,0 +1,7 @@
+# A small, dedicated catalog for VG-PROJECT-VIEW: one control both fixture subjects are assessed
+# against, so a single missing-evidence group (RFC 0008 Sec.2) genuinely spans both of them -- the
+# project view's own "top gaps across agents" case (18.14 Hill 7). Not a base or third-party catalog;
+# loaded only via --catalog-dir --allow-unverified-catalog by this gate's own script.
+id: project-view-fixture
+version: "2026.09"
+title: "VG-PROJECT-VIEW gate fixture"

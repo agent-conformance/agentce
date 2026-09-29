@@ -1,0 +1,22 @@
+# Applicability profile for the VG-PROJECT-VIEW gate fixture (verification/gates/project_view_engines.sh).
+# Two declared subjects; a third agent id ("delegate", see evidence/events/b.jsonl) surfaces only
+# inside subject B's own events and is never declared here -- the project view's own
+# `undeclared_agents` case (18.14 Hill 7).
+profile_version: 1
+observation_window:
+  start: "2026-01-01T00:00:00Z"
+  end: "2026-02-01T00:00:00Z"
+content_capture:
+  mode: hashes_only
+catalogs: []
+subjects:
+  - id: "spiffe://corp/agents/project-view-fixture-a"
+    name: "Project-view gate fixture subject A"
+    role: "both"
+    declared_decision_types:
+      - "dom:ProjectFixtureDecision"
+  - id: "spiffe://corp/agents/project-view-fixture-b"
+    name: "Project-view gate fixture subject B"
+    role: "both"
+    declared_decision_types:
+      - "dom:ProjectFixtureDecision"

@@ -1,0 +1,5 @@
+# Domain ontology binding for the VG-PROJECT-VIEW gate fixture (verification/gates/project_view_engines.sh).
+decision_types:
+  - id: "dom:ProjectFixtureDecision"
+    subclass_of: "agentce:ConsequentialDecision"
+    consequential: true
