@@ -1,0 +1,23 @@
+id: AUV-02
+version: "2026.09"
+title: "Fixture control the register's expired deviation must ignore"
+description: >
+  Gate fixture only (verification/gates/auditor_view.sh): same shape and same non-conformant outcome
+  as AUV-01, but the register's AUV-02 entry expired before this run's window end -- `apply_deviations`
+  leaves it `non-conformant` and reports the expiry as an ignored, limitations-only deviation.
+crosswalk: []
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: any
+  minimum_evidence:
+    - {event: Decision, class: any}
+  shape: shapes/AUV-02.ttl
+expectations:
+  - {id: F1, text: "Fixture-only; not a real requirement."}
+severity: high
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+test_cases: []

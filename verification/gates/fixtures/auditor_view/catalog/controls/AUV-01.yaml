@@ -1,0 +1,23 @@
+id: AUV-01
+version: "2026.09"
+title: "Fixture control the register's unexpired deviation accepts"
+description: >
+  Gate fixture only (verification/gates/auditor_view.sh): the fixture's one Decision event carries no
+  `agent`, so this control's shape (requiring `prov:wasAssociatedWith`) fails -- non-conformant --
+  before the deviation register's unexpired AUV-01 entry applies and flips it to `partial`.
+crosswalk: []
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: any
+  minimum_evidence:
+    - {event: Decision, class: any}
+  shape: shapes/AUV-01.ttl
+expectations:
+  - {id: F1, text: "Fixture-only; not a real requirement."}
+severity: high
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+test_cases: []

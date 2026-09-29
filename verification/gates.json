@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.13.0",
+  "suite_version": "0.14.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -568,6 +568,40 @@
         }
       ],
       "fix_hint": "run verification/gates/security_view.sh and read the FAIL lines; the reference implementation is engines/python/agentce/security_view.py (compute_security_view), ported field-for-field in engines/typescript/src/securityView.ts and engines/java/src/main/java/org/agentce/SecurityView.java."
+    },
+    {
+      "id": "VG-AUDITOR-VIEW",
+      "title": "The auditor view (18.17, Hill 8) renders clause-by-clause results with the evidence trail, by-clause index, accepted and expired deviations, a manual-mode control's disclosed note, and a deviation's OSCAL risk entry, matching a committed golden with hostile text always escaped",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/auditor_view.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 300,
+      "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
+      "rubric": {
+        "pass": "a real `assess --deviations <fixture>/deviations.yaml --for auditor` run writes auditor.json/.md/.html (never report.md/.html) matching the committed golden byte-for-byte; AUV-01's unexpired deviation applies (outcome partial, full owner/approver/rationale verbatim, an OSCAL risk entry with matching mitigating-factors, target.status.reason == partial); AUV-02's expired deviation is ignored (stays non-conformant, no deviation field, reported as a limitation); AUV-03 (manual) stays not_assessed with the disclosed note; AUV-04's crosswalk entry appears under by_clause; auditor.json's counts equal a fresh aggregate() over the run's own assertions.json; manifest.json carries deviation_register_digest; the re-run command in auditor.md/.html itself includes --deviations; the hostile evidence ref and deviation rationale render escaped in both .md and .html; `agentce report --validate` exits 0",
+        "fail": "any of the above fact, file, or golden-match check fails, a stray report.md/.html appears, or hostile text renders unescaped"
+      },
+      "faults": [
+        {
+          "description": "apply_deviations is skipped entirely (deviation_expired hard-coded to an empty list, the register never applied), so a non-conformant control with an unexpired deviation stays non-conformant instead of becoming partial",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "        evaluated, deviation_expired = apply_deviations(\n            evaluated, deviations, as_of=new_window_end\n        )\n",
+          "replace": "        deviation_expired: list[str] = []\n"
+        },
+        {
+          "description": "_deviation_detail drops the approver field, so a rendered deviation object matches neither of auditor.schema.json's oneOf branches and schema validation fails",
+          "file": "engines/python/agentce/auditor_view.py",
+          "search": "_DEVIATION_FIELDS = (\n    \"rationale\",\n    \"compensating_control\",\n    \"owner\",\n    \"approver\",\n    \"granted\",\n    \"expiry\",\n)\n",
+          "replace": "_DEVIATION_FIELDS = (\n    \"rationale\",\n    \"compensating_control\",\n    \"owner\",\n    \"granted\",\n    \"expiry\",\n)\n"
+        }
+      ],
+      "fix_hint": "run verification/gates/auditor_view.sh and read the FAIL lines; the reference implementation is engines/python/agentce/auditor_view.py (compute_auditor_view) and engines/python/agentce/report.py (render_auditor_md/render_auditor_html, and render_oscal's deviation risks[])."
     }
   ]
 }

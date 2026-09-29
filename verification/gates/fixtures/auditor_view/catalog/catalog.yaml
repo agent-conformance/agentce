@@ -1,0 +1,10 @@
+# A small, dedicated catalog for VG-AUDITOR-VIEW (18.17): four controls that exercise every section
+# of the auditor view over one shared Decision node (no `agent` -> fails every control whose shape
+# requires `prov:wasAssociatedWith`; its `time` -> passes every control whose shape only requires
+# `prov:atTime`) -- AUV-01/AUV-02 non-conformant (one gets an unexpired deviation, one an expired one
+# the run must ignore and report), AUV-03 manual-mode (stays `not_assessed`), AUV-04 conformant with
+# a crosswalk entry (exercises `by_clause`). Not a base or third-party catalog; loaded only via
+# --catalog-dir --allow-unverified-catalog by this gate's own script.
+id: auditor-view-fixture
+version: "2026.09"
+title: "VG-AUDITOR-VIEW gate fixture"

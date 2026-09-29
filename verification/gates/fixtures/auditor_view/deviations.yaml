@@ -1,0 +1,22 @@
+# Deviation register for the VG-AUDITOR-VIEW gate fixture (verification/gates/auditor_view.sh):
+# AUV-01's entry is unexpired at the fixture's window end (2026-02-01) and gets applied; AUV-02's
+# entry expired 2025-11-01, before that window end, so apply_deviations ignores it and the run
+# reports it as a limitation. The AUV-01 rationale carries a hostile fragment (round-2 N9): the
+# auditor view must render it escaped, never as raw markup.
+deviation_register_version: 1
+deviations:
+  - control: AUV-01
+    rationale: "Accepted pending remediation. <script>alert(1)</script>"
+    compensating_control: "Manual quarterly review of AUV-01 subjects."
+    owner: "user:ops-lead@example.com"
+    approver: "user:ciso@example.com"
+    granted: "2026-01-01T00:00:00.000Z"
+    expiry: "2026-06-01T00:00:00.000Z"
+    evidence_refs: ["reference/auv-01-remediation-plan.md"]
+  - control: AUV-02
+    rationale: "Expired before this run's window end; must be ignored, not applied."
+    compensating_control: "N/A -- expired."
+    owner: "user:ops-lead@example.com"
+    approver: "user:ciso@example.com"
+    granted: "2025-06-01T00:00:00.000Z"
+    expiry: "2025-11-01T00:00:00.000Z"

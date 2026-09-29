@@ -3,6 +3,19 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.14.0
+
+- Added `VG-AUDITOR-VIEW`: the auditor view (18.17, Hill 8's auditor lens: "can I rely on this, clause
+  by clause?") renders every clause with its full evidence trail, a `by_clause` navigation index, an
+  accepted deviation's full owner/approver/rationale detail, an expired deviation ignored and reported
+  rather than applied, a `manual`-mode control's disclosed not-yet-evaluated note, and the OSCAL risk
+  entry a deviation now adds -- matching a committed golden byte-for-byte on a dedicated fixture
+  (`verification/gates/fixtures/auditor_view/`, a four-control catalog over one shared event) whose
+  register entry carries a `<script>alert(1)</script>` fragment that every rendering must escape,
+  never emit raw. `auditor.json`'s `counts` are checked against a fresh `aggregate()` over the same
+  run's own `assertions.json`, never a `report.json` (which does not exist), and the re-run command
+  printed in `auditor.md`/`.html` itself is checked to include `--deviations`.
+
 ## 0.13.0
 
 - Added `VG-SECURITY-VIEW`: the security view (18.16, Hill 8's security lens: OWASP ASI, MITRE ATLAS,

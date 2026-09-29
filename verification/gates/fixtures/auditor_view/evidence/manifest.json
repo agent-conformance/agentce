@@ -1,0 +1,10 @@
+{
+  "agentce_bundle_version": 1,
+  "domain": "auditor-view-fixture",
+  "files": [
+    {
+      "path": "events/subject.jsonl",
+      "sha256": "61c824e5304761b168d85303a3f4fd9cd5bc5539e9dcc17b80e9ecf44d7d7e27"
+    }
+  ]
+}

@@ -68,9 +68,10 @@ options:
                         engineering (html, md, remediation, skill); compliance
                         (csv, oscal, oscal_xml, pack, public); security (html,
                         md, sarif); ci (junit, sarif); share (html, md, pack,
-                        pdf, public); risk-lead (html, md). CI detected
-                        automatically (adds junit to the default) when neither
-                        --for nor --emit is given.
+                        pdf, public); risk-lead (html, md); auditor (oscal,
+                        oscal_xml, pack). CI detected automatically (adds
+                        junit to the default) when neither --for nor --emit is
+                        given.
   --fail-on FAIL_ON     gate the exit code on a tiny deterministic expression
                         over assertion fields (control, subject, outcome,
                         severity, family, rung, mode), e.g. 'outcome=="non-
