@@ -46,6 +46,47 @@ def test_report_readiness_not_ready_on_integrity(tmp_path: Path, capsys) -> None
     assert json.loads(capsys.readouterr().out)["verdict"] == "NOT READY"
 
 
+def test_report_readiness_accepts_an_unquoted_yaml_expiry_the_same_way_assess_does(
+    tmp_path: Path, capsys
+) -> None:
+    """`compute_readiness` calls `deviation_lint` too, so the same regression as
+    `deviation_lint.py`'s applies here: an unquoted (YAML date-typed, not `str`) `expiry` on an
+    already-applied deviation must not be misreported as an invalid deviation, when the fresh
+    `assess --deviations` run that produced this exact report already applied it and found it valid
+    (18.17 round 2 finding (c))."""
+    report = _report(
+        tmp_path,
+        [
+            {
+                "control": "OVS-03",
+                "outcome": "partial",
+                "subject": "s",
+                "deviation": "OVS-03",
+                "window": {"end": "2026-02-01T00:00:00Z"},
+            }
+        ],
+    )
+    dev = tmp_path / "dev.yaml"
+    dev.write_text(
+        "deviations:\n"
+        "  - control: OVS-03\n"
+        '    rationale: "x"\n'
+        '    compensating_control: "y"\n'
+        '    owner: "a"\n'
+        '    approver: "b"\n'
+        "    granted: 2026-01-01\n"  # unquoted -- a YAML date, not a str
+        "    expiry: 2026-03-01\n",  # unquoted -- a YAML date, not a str
+        encoding="utf-8",
+    )
+    code = report_readiness.body(
+        ["--report", str(report), "--deviations", str(dev), "--json"]
+    )
+    verdict = json.loads(capsys.readouterr().out)
+    assert code == OK
+    assert verdict["verdict"] != "NOT READY"
+    assert verdict["reasons"] == []
+
+
 def test_deviation_lint_refuses_insufficient(tmp_path: Path, capsys) -> None:
     report = _report(
         tmp_path,
@@ -88,7 +129,14 @@ def test_deviation_lint_accepts_a_report_whose_deviation_is_already_applied(
     not re-reject it for "got partial" (18.17 round 2 B3: this script had its own copy of the bug)."""
     report = _report(
         tmp_path,
-        [{"control": "OVS-03", "outcome": "partial", "subject": "s", "deviation": "OVS-03"}],
+        [
+            {
+                "control": "OVS-03",
+                "outcome": "partial",
+                "subject": "s",
+                "deviation": "OVS-03",
+            }
+        ],
     )
     dev = tmp_path / "dev.yaml"
     dev.write_text(
@@ -107,6 +155,36 @@ def test_deviation_lint_accepts_a_report_whose_deviation_is_already_applied(
                 ]
             }
         ),
+        encoding="utf-8",
+    )
+    code = deviation_lint.body(
+        ["--deviations", str(dev), "--report", str(report), "--json"]
+    )
+    assert code == OK
+    assert json.loads(capsys.readouterr().out)["problems"] == []
+
+
+def test_deviation_lint_accepts_an_unquoted_yaml_date_the_same_way_the_engine_does(
+    tmp_path: Path, capsys
+) -> None:
+    """The skill's own bare `yaml.safe_load` used to reach `readiness.deviation_lint` unnormalized,
+    so an unquoted (YAML date-typed, not `str`) `granted`/`expiry` -- which `agentce assess
+    --deviations` accepts via its own normalizing loader -- was misreported here as `not a valid
+    ISO-8601 date` (18.17 round 2 finding (c))."""
+    report = _report(
+        tmp_path,
+        [{"control": "OVS-03", "outcome": "non-conformant", "subject": "s"}],
+    )
+    dev = tmp_path / "dev.yaml"
+    dev.write_text(
+        "deviations:\n"
+        "  - control: OVS-03\n"
+        '    rationale: "x"\n'
+        '    compensating_control: "y"\n'
+        '    owner: "a"\n'
+        '    approver: "b"\n'
+        "    granted: 2026-01-01\n"  # unquoted -- a YAML date, not a str
+        "    expiry: 2026-03-01\n",  # unquoted -- a YAML date, not a str
         encoding="utf-8",
     )
     code = deviation_lint.body(

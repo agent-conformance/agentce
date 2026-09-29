@@ -63,7 +63,9 @@ def body(argv: list[str]) -> int:
     dev_file = arg_value(argv, "--deviations")
     if dev_file:
         loaded = yaml.safe_load(Path(dev_file).read_text("utf-8")) or {}
-        deviations = list(loaded.get("deviations", []))
+        deviations = readiness.normalize_deviation_dates(
+            list(loaded.get("deviations", []))
+        )
     verdict = readiness.compute_readiness(
         Path(report), severities=_severities(argv), deviations=deviations, gaps=gaps
     )

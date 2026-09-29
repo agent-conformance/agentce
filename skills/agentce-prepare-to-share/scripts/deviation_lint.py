@@ -52,8 +52,12 @@ def body(argv: list[str]) -> int:
             human="INPUT ERROR: pass --deviations <file> --report <report-dir>",
         )
         return INPUT_ERROR
-    deviations = list(
-        (yaml.safe_load(Path(dev_file).read_text("utf-8")) or {}).get("deviations", [])
+    deviations = readiness.normalize_deviation_dates(
+        list(
+            (yaml.safe_load(Path(dev_file).read_text("utf-8")) or {}).get(
+                "deviations", []
+            )
+        )
     )
     assertions = json.loads((Path(report) / "assertions.json").read_text("utf-8"))
     outcomes_by_control: dict[str, set[str]] = {}
