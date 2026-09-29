@@ -496,7 +496,17 @@ def _assert_container_not_broken(payload: str) -> None:
         # false mismatch.
         if base_line == adv_line:
             continue
-        assert base_line.replace(benign_span, "") == adv_line.replace(payload_span, "")
+        # Cap the removal at the number of genuine substitutions the baseline line shows (counted
+        # with the collision-free benign span): a global replace() would also eat a short payload
+        # span that happens to recur inside unrelated fixed vocabulary later on the same line (e.g.
+        # `"auto"` inside the fixed mode label `"automated"`), which is a test-harness false
+        # positive, not a container break. Real substitutions in this template always precede any
+        # such fixed text, so replacing left-to-right up to that count still strips every genuine
+        # occurrence.
+        substitutions = base_line.count(benign_span)
+        assert base_line.replace(benign_span, "", substitutions) == adv_line.replace(
+            payload_span, "", substitutions
+        )
 
     assert _tag_skeleton(baseline_html) == _tag_skeleton(adversarial_html)
     assert len(baseline_cli) == len(adversarial_cli)
