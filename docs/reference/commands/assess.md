@@ -84,3 +84,11 @@ global options:
 ```
 
 Exit codes follow the [common CLI scheme](index.md#exit-codes).
+
+## Security copy
+
+`--for security` writes `security.json`/`.md`/`.html` alongside the SARIF and Markdown files that preset has always written (SPEC §8.5, [`security.schema.json`](../report-schemas/security.md)). Both `security.md` and `security.html` open with this fixed sentence:
+
+> AgentCE doesn't block anything. It reads what your guardrails recorded and shows where they could have stopped an action and where nothing could have.
+
+AgentCE positions itself as working with your runtime guardrails, never as one.

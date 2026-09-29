@@ -99,6 +99,38 @@ def _links(text: str) -> list[str]:
 # --- Generators (reference pages from the sources). ---
 
 
+def _security_intro() -> str:
+    """The security view's fixed intro sentence, read live from the Python engine's own English
+    message catalogue (never a copy pasted here) so the docs and the rendered `security.md`/`.html`
+    can never drift apart (18.16 C6)."""
+    path = (
+        REPO_ROOT
+        / "engines"
+        / "python"
+        / "agentce"
+        / "data"
+        / "i18n"
+        / "messages.en.json"
+    )
+    return json.loads(path.read_text("utf-8"))["report.security_intro"]
+
+
+def _security_copy_section(schema_link: str) -> str:
+    """Appended to the `assess` command page only: the security view's own fixed copy, quoted
+    verbatim from the same catalogue key `report.security_intro` that `render_security_md`/
+    `render_security_html` already render it from -- this section documents that sentence, it does
+    not introduce a second copy of it. ``schema_link`` is the relative (repo docs) or absolute (site)
+    link to the schema page, since the two generators use different link conventions."""
+    return (
+        "\n## Security copy\n\n"
+        "`--for security` writes `security.json`/`.md`/`.html` alongside the SARIF and Markdown "
+        f"files that preset has always written (SPEC §8.5, [`security.schema.json`]({schema_link})). "
+        "Both `security.md` and `security.html` open with this fixed sentence:\n\n"
+        f"> {_security_intro()}\n\n"
+        "AgentCE positions itself as working with your runtime guardrails, never as one.\n"
+    )
+
+
 def _command_rows() -> list[tuple[str, str, str]]:
     """(name, summary, help text) for every real CLI subcommand, sorted by name."""
     from agentce.cli import build_parser
@@ -131,6 +163,7 @@ def _command_pages() -> dict[Path, str]:
             f"{help_text}\n"
             "```\n\n"
             "Exit codes follow the [common CLI scheme](index.md#exit-codes).\n"
+            f"{_security_copy_section('../report-schemas/security.md') if name == 'assess' else ''}"
         )
     rows = "\n".join(
         f"| [`agentce {name}`]({name}.md) | {summary} |" for name, summary, _ in entries
@@ -713,6 +746,7 @@ def _site_command_pages() -> dict[Path, str]:
             f"{help_text}\n"
             "```\n\n"
             "Exit codes follow the [common CLI scheme](/reference/commands/#exit-codes).\n"
+            f"{_security_copy_section('/reference/report-schemas/security/') if name == 'assess' else ''}"
         )
         pages[target / f"{name}.md"] = (
             _frontmatter(f"agentce {name}", description) + body
