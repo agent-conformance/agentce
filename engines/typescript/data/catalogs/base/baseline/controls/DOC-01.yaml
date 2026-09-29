@@ -5,6 +5,7 @@ crosswalk:
   - {framework: eu-ai-act, clause: "Art. 11 / Annex IV", relation: maps, verified_against_text: false}
   - {framework: iso-42001, clause: "8.1", relation: maps, verified_against_text: false}
   - {framework: iso-42001, clause: "A.10.4", relation: maps, verified_against_text: false}
+  - {framework: caiq, clause: "CCC-07.1", relation: maps, verified_against_text: false}
 applicability:
   applies_to_roles: [both]
 evaluation:

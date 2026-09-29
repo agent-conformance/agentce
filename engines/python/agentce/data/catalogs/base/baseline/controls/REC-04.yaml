@@ -16,6 +16,7 @@ crosswalk:
   - {framework: owasp-asi-2026, clause: "T8", relation: maps, verified_against_text: false}
   - {framework: mitre-atlas, clause: "AML.T0073", relation: maps, verified_against_text: false}
   - {framework: mitre-atlas, clause: "AML.T0074", relation: maps, verified_against_text: false}
+  - {framework: caiq, clause: "LOG-08.1", relation: maps, verified_against_text: false}
 applicability:
   applies_to_roles: [both]
 evaluation:

@@ -18,6 +18,8 @@ ladder rungs, and base-catalog control ids. These are traceability matrices for 
 | `mitre-atlas.yaml` | MITRE ATLAS adversarial-ML technique taxonomy | active |
 | `owasp-acs.yaml` | OWASP Agent Control Standard (ACS) | active |
 | `aiuc-1.yaml` | AIUC-1 AI agent certification standard | active |
+| `caiq.yaml` | CSA Consensus Assessments Initiative Questionnaire (CAIQ) v4.0.2 | active |
+| `ai-controls-matrix.yaml` | CSA AI Controls Matrix (AICM) v1.1 | placeholder (gated download) |
 | `pren-18229-1.yaml` | prEN 18229-1 (logging, transparency, oversight) | placeholder (draft) |
 | `iso-iec-24970.yaml` | ISO/IEC 24970 (AI system logging) | placeholder (draft) |
 

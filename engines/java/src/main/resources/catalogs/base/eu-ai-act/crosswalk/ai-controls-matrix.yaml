@@ -1,0 +1,25 @@
+# CSA AI Controls Matrix (AICM) v1.1 crosswalk PLACEHOLDER: AICM v1.1 (247 control objectives, 18
+# domains, published 2026-07-14) is real and published, but its objective-level spreadsheet is gated
+# behind a CSA email-registration download that could not be independently obtained at this project's
+# confidence bar (verify to ~92% or drop it) -- not "not yet published" (unlike prEN 18229-1), just not
+# independently confirmable today. This file reserves the framework id and records the honest reason
+# for the placeholder rather than fabricate any objective id (SPEC 7.3).
+#
+# Objective identifiers only; no CSA text is reproduced. Every row carries `status: placeholder` and
+# `verified_against_text: false` until the real spreadsheet is obtained and a reviewer authors and
+# verifies the objective-level mapping.
+framework: ai-controls-matrix
+title: "AI Controls Matrix (AICM) v1.1"
+version: "1.1"
+status: placeholder
+source:
+  publisher: "Cloud Security Alliance"
+  identifier: "AI Controls Matrix (AICM) v1.1"
+obligations:
+  - ref: "(pending: gated download)"
+    obligation: Anticipated -- the AICM v1.1 objective spreadsheet is published but gated behind CSA email registration; no objective id has been independently confirmed at this project's confidence bar.
+    schema_elements: []
+    rungs: []
+    controls: []
+    status: placeholder
+    verified_against_text: false

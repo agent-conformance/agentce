@@ -41,7 +41,7 @@
         "properties": {
           "framework": {
             "type": "string",
-            "enum": ["eu-ai-act", "iso-42001", "nist-ai-rmf", "owasp-asi-2026", "aiuc-1", "mitre-atlas", "owasp-acs"]
+            "enum": ["eu-ai-act", "iso-42001", "nist-ai-rmf", "owasp-asi-2026", "aiuc-1", "mitre-atlas", "owasp-acs", "caiq", "ai-controls-matrix"]
           },
           "clause": {"type": "string"},
           "relation": {"type": "string", "enum": ["implements", "supports", "maps", "mitigates"]},

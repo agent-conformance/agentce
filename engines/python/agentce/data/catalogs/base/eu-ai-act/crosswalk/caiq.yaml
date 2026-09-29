@@ -1,0 +1,52 @@
+# CSA Consensus Assessments Initiative Questionnaire (CAIQ) v4.0.2 crosswalk: the CAIQ questions
+# AgentCE's runtime evidence answers today, mapped to base-catalog control ids.
+#
+# Question identifiers only; no CSA question text is reproduced (SPEC 7.3). CAIQ v4.0.2's own license
+# permits personal, informational, non-commercial use and forbids modification or redistribution of the
+# document itself; the `obligation` field below is AgentCE's own statement of what its evidence shows
+# for that question, never CSA's question text. Every reference carries `verified_against_text: false`
+# until a reviewer with the licensed CAIQ v4.0.2 workbook confirms the mapping (SPEC 7.3).
+framework: caiq
+title: "Consensus Assessments Initiative Questionnaire (CAIQ) v4.0.2"
+version: "4.0.2"
+status: active
+source:
+  publisher: "Cloud Security Alliance"
+  identifier: "Consensus Assessments Initiative Questionnaire (CAIQ) v4.0.2"
+obligations:
+  - ref: "CCC-07.1"
+    obligation: Deviation from the declared operating components is detected and notified -- the record shows what actually ran against what was declared.
+    schema_elements: [Decision]
+    rungs: [2]
+    controls: [DOC-01]
+    verified_against_text: false
+  - ref: "SEF-05.1"
+    obligation: Incident metrics are established and monitored -- adverse outcomes are linked to their consequential decision.
+    schema_elements: [Decision, Outcome]
+    rungs: [2]
+    controls: [INC-01]
+    verified_against_text: false
+  - ref: "SEF-06.1"
+    obligation: Incidents are triaged through a defined process -- every recorded incident names its accountable actor.
+    schema_elements: [Incident]
+    rungs: [2]
+    controls: [INC-02]
+    verified_against_text: false
+  - ref: "LOG-04.1"
+    obligation: Audit-log access is restricted with unique access accountability -- consequential tool calls are captured by an enforcement-point source, not the agent's own self-report.
+    schema_elements: [ToolCall]
+    rungs: [2]
+    controls: [INT-01]
+    verified_against_text: false
+  - ref: "IAM-13.1"
+    obligation: Users are uniquely identifiable, or individuals can be associated with the identifier used -- every consequential decision records the acting agent.
+    schema_elements: [Decision]
+    rungs: [2]
+    controls: [REC-01]
+    verified_against_text: false
+  - ref: "LOG-08.1"
+    obligation: Audit records are generated with relevant security information -- consequential decisions are recorded with actor and time.
+    schema_elements: [Decision]
+    rungs: [2]
+    controls: [REC-04]
+    verified_against_text: false

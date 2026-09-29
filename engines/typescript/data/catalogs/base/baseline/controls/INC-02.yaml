@@ -10,6 +10,7 @@ crosswalk:
   - {framework: nist-ai-rmf, clause: "MANAGE 4.3", relation: maps, verified_against_text: false}
   - {framework: nist-ai-rmf, clause: "MEASURE 3.1", relation: maps, verified_against_text: false}
   - {framework: iso-42001, clause: "9.1", relation: maps, verified_against_text: false}
+  - {framework: caiq, clause: "SEF-06.1", relation: maps, verified_against_text: false}
 applicability:
   applies_to_roles: [deployer, provider]
 evaluation:

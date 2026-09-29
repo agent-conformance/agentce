@@ -9,4 +9,4 @@ Consequential decisions are recorded with actor and time.
 | Rung | 2 |
 | Catalog | EU AI Act base catalog (base); NIST AI Risk Management Framework (AI RMF 1.0) base catalog (base); Baseline catalog: the checks the standards share (base) |
 
-Crosswalked to clause(s) A.5.2, A.6.2.6, A.6.2.8, AML.T0073, AML.T0074, Art. 12, Art. 19, Art. 19 / 26(6), GOVERN 4.2, T6, T8. Clause numbers only are cited; standard text is never reproduced.
+Crosswalked to clause(s) A.5.2, A.6.2.6, A.6.2.8, AML.T0073, AML.T0074, Art. 12, Art. 19, Art. 19 / 26(6), GOVERN 4.2, LOG-08.1, T6, T8. Clause numbers only are cited; standard text is never reproduced.
