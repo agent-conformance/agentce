@@ -44,6 +44,7 @@ BUYER_QUESTIONNAIRE_TITLES: dict[str, str] = {
     "ai-controls-matrix": "the AI Controls Matrix",
 }
 
+
 def _ref_key(ref: dict[str, str]) -> tuple[str, str, str]:
     """A check-ref's (subject, control, control_version) triple, matched against the same triple on
     an ``Assertion``. A check-ref also carries ``catalog``, which ``Assertion`` does not -- this can
@@ -52,7 +53,9 @@ def _ref_key(ref: dict[str, str]) -> tuple[str, str, str]:
     return (ref["subject"], ref["control"], ref["control_version"])
 
 
-def _buyer_gap_step_index(blind_spots: dict[str, Any]) -> dict[tuple[str, str, str], dict[str, Any]]:
+def _buyer_gap_step_index(
+    blind_spots: dict[str, Any],
+) -> dict[tuple[str, str, str], dict[str, Any]]:
     """Build the (subject, control, control_version) -> gap-step index once per run, instead of
     re-scanning :func:`agentce.blind_spots.compute_blind_spots`'s two buckets for every
     ``insufficient_evidence`` answer (this view's only caller,
