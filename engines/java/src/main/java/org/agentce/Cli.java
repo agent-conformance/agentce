@@ -67,6 +67,26 @@ public final class Cli {
             return 0;
         }
 
+        // security-view is a plain computation seam (the same pattern as `numerics`/`digest-tree`
+        // above), driven by the security-view build gate's cross-engine diff (18.16, C5): it reads a
+        // fixture file with {activity, assertions}, runs SecurityView.compute, and prints the result
+        // as JSON -- not part of the public `assess` command surface (no engine here has
+        // `--for`/multi-format `write_report` yet, TRADEOFFS row 8).
+        if ("security-view".equals(command)) {
+            if (args.length < 2) {
+                System.err.println("security-view: a fixture file path is required");
+                return ExitCode.INPUT_ERROR.code;
+            }
+            JsonNode data = Json.parseFile(Paths.get(args[1]));
+            ObjectNode activity = (ObjectNode) data.get("activity");
+            List<Assertions.Assertion> assertions = new ArrayList<>();
+            for (JsonNode a : data.get("assertions")) {
+                assertions.add(Assertions.fromJson(a));
+            }
+            System.out.println(SecurityView.compute(activity, assertions).toString());
+            return 0;
+        }
+
         boolean json = Arrays.asList(args).contains("--json");
         CommandResult result;
         try {
