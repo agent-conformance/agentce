@@ -189,6 +189,7 @@
   "report.for_ci_detected": "CI detected: emitting {formats}",
   "report.for_preset_used": "Report preset: {preset} ({formats})",
   "report.gaps_more": "{n, plural, one {+# more gap} other {+# more gaps}}",
+  "report.manual_checklist_not_yet_evaluated": "recording this control's checklist answer as a live outcome is not built yet (SPEC §13.3.4 Stage 3); it stays not_assessed until then. See agentce-prepare-to-share's checklist procedure for the next step.",
   "report.next_step_heading": "Next step",
   "report.no_controls": "No controls were evaluated.",
   "report.no_gaps": "none",

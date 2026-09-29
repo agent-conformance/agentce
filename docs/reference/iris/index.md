@@ -1,6 +1,6 @@
 # Canonical IRIs
 
-Every canonical, dereferenceable IRI the specification defines (SPEC §6, §9; `website/iri-manifest.json`), 23 in total: the JSON-LD context, the RDF vocabulary, and every JSON Schema an engine or a report validates against. Each is served byte-identically at its own canonical path and, here, linked to a human-readable page.
+Every canonical, dereferenceable IRI the specification defines (SPEC §6, §9; `website/iri-manifest.json`), 24 in total: the JSON-LD context, the RDF vocabulary, and every JSON Schema an engine or a report validates against. Each is served byte-identically at its own canonical path and, here, linked to a human-readable page.
 
 | IRI | Page | Content type |
 |---|---|---|
@@ -11,6 +11,7 @@ Every canonical, dereferenceable IRI the specification defines (SPEC §6, §9; `
 | `/spec/report/activity.schema.json` | [AgentCE activity summary](../report-schemas/activity.md) | application/schema+json |
 | `/spec/report/applicability-statement.schema.json` | [AgentCE applicability statement](../report-schemas/applicability-statement.md) | application/schema+json |
 | `/spec/report/assertions.schema.json` | [AgentCE assertions](../report-schemas/assertions.md) | application/schema+json |
+| `/spec/report/auditor.schema.json` | [AgentCE auditor view](../report-schemas/auditor.md) | application/schema+json |
 | `/spec/report/blind-spots.schema.json` | [AgentCE blind spots](../report-schemas/blind-spots.md) | application/schema+json |
 | `/spec/report/claim.schema.json` | [AgentCE conformance claim](../report-schemas/claim.md) | application/schema+json |
 | `/spec/report/deviation-register.schema.json` | [AgentCE deviation register](../report-schemas/deviation-register.md) | application/schema+json |

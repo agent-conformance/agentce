@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/report/auditor.schema.json",
+  "title": "AgentCE auditor view",
+  "description": "auditor.json in the report directory. It answers \"can I rely on this, clause by clause?\": one entry per (control, subject), full evidence trail, accepted deviations with their approvers, and, for a control this run couldn't evaluate yet, an honest not-yet-evaluated note rather than a fabricated result. `by_clause` groups the same entries' own control ids under every external framework clause they cite. This view adds no new fact and no new outcome; it is a different selection of the same assertions, and it is not itself a certification. AgentCE writes it only with `--for auditor`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["clauses", "by_clause", "counts"],
+  "$defs": {
+    "outcome": {
+      "type": "string",
+      "enum": ["conformant", "non-conformant", "partial", "not_applicable", "not_assessed", "insufficient_evidence"]
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["conformant", "non-conformant", "partial", "not_applicable", "not_assessed", "insufficient_evidence"],
+      "properties": {
+        "conformant": {"type": "integer", "minimum": 0},
+        "non-conformant": {"type": "integer", "minimum": 0},
+        "partial": {"type": "integer", "minimum": 0},
+        "not_applicable": {"type": "integer", "minimum": 0},
+        "not_assessed": {"type": "integer", "minimum": 0},
+        "insufficient_evidence": {"type": "integer", "minimum": 0}
+      }
+    },
+    "deviation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["rationale", "compensating_control", "owner", "approver", "granted", "expiry"],
+          "properties": {
+            "rationale": {"type": "string"},
+            "compensating_control": {"type": "string"},
+            "owner": {"type": "string"},
+            "approver": {"type": "string"},
+            "granted": {"type": "string"},
+            "expiry": {"type": "string"},
+            "evidence_refs": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["control"],
+          "properties": {
+            "control": {"type": "string"}
+          }
+        }
+      ]
+    },
+    "clause": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["control", "control_version", "subject", "outcome", "mode", "rung", "evidence", "crosswalk"],
+      "properties": {
+        "control": {"type": "string"},
+        "control_version": {"type": "string"},
+        "subject": {"type": "string"},
+        "outcome": {"$ref": "#/$defs/outcome"},
+        "mode": {"type": "string", "enum": ["automated", "semi-automated", "manual"]},
+        "rung": {"type": "integer", "minimum": 0, "maximum": 4},
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["ref", "digest", "source_class"],
+            "properties": {
+              "ref": {"type": "string"},
+              "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+              "source_class": {"type": "string", "enum": ["self_report", "enforcement_point", "independent_system"]}
+            }
+          }
+        },
+        "crosswalk": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["framework", "clause"],
+            "properties": {
+              "framework": {"type": "string"},
+              "clause": {"type": "string"},
+              "verified": {"type": "boolean"}
+            }
+          }
+        },
+        "deviation": {"$ref": "#/$defs/deviation"},
+        "manual_checklist_note": {"type": "string"}
+      }
+    }
+  },
+  "properties": {
+    "clauses": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/clause"}
+    },
+    "by_clause": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "counts": {"$ref": "#/$defs/counts"}
+  }
+}

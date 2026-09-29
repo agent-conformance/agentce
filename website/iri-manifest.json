@@ -35,6 +35,11 @@
     "content_type": "application/schema+json"
   },
   {
+    "path": "/spec/report/auditor.schema.json",
+    "source": "spec/report/auditor.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
     "path": "/spec/report/blind-spots.schema.json",
     "source": "spec/report/blind-spots.schema.json",
     "content_type": "application/schema+json"

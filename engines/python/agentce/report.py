@@ -71,6 +71,7 @@ _OPTIONAL_ARTIFACT_SCHEMAS = {
     "results.sarif": "results-sarif",
     "project.json": "project",
     "security.json": "security",
+    "auditor.json": "auditor",
 }
 _ARTIFACT_SCHEMAS = {**_MANDATORY_ARTIFACT_SCHEMAS, **_OPTIONAL_ARTIFACT_SCHEMAS}
 _SARIF_LEVEL = {

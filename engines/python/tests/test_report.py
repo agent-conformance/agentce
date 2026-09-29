@@ -82,6 +82,7 @@ def test_vendored_report_schemas_match_spec() -> None:
         "project",
         "oscal-assessment-results",
         "results-sarif",
+        "auditor",
     ):
         vendored = (
             _REPO_ROOT / "engines/python/agentce/data/schemas" / f"{name}.schema.json"

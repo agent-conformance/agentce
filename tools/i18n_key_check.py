@@ -1,14 +1,14 @@
 """Repository check: every message key referenced in engine code is defined in the vendored
 catalogue, and every defined key is referenced from somewhere (SPEC §13.4 AX-6).
 
-Scans the three modules that read from ``spec/i18n/messages.en.json`` at import or render time:
+Scans the modules that read from ``spec/i18n/messages.en.json`` at import or render time:
 ``error_catalogue.py`` (every key of its ``_KINDS`` registry implies a required
-``errors.<key>.cause``/``errors.<key>.fix`` pair) and ``report.py``/``verdict.py`` (``report.``/
-``verdict.``/``next.``/``outcome.`` keys, read either as a literal string subscript or as an
-f-string with one trailing variable, e.g. ``cat[f"verdict.{state}"]``, which is treated as a
-reference to every catalogue key sharing that literal prefix). ``tools/errors_check.py`` already
-verifies a declared key's cause/fix are non-empty; this check is the complementary one: whether the
-declared set and the referenced set agree at all.
+``errors.<key>.cause``/``errors.<key>.fix`` pair), ``report.py``/``verdict.py``/``commands/__init__.py``/
+``auditor_view.py`` (``report.``/``verdict.``/``next.``/``outcome.``/``readiness.`` keys, read either as
+a literal string subscript or as an f-string with one trailing variable, e.g.
+``cat[f"verdict.{state}"]``, which is treated as a reference to every catalogue key sharing that
+literal prefix). ``tools/errors_check.py`` already verifies a declared key's cause/fix are non-empty;
+this check is the complementary one: whether the declared set and the referenced set agree at all.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ _ERROR_CATALOGUE = _ROOT / "engines" / "python" / "agentce" / "error_catalogue.p
 _REPORT = _ROOT / "engines" / "python" / "agentce" / "report.py"
 _VERDICT = _ROOT / "engines" / "python" / "agentce" / "verdict.py"
 _COMMANDS = _ROOT / "engines" / "python" / "agentce" / "commands" / "__init__.py"
+_AUDITOR_VIEW = _ROOT / "engines" / "python" / "agentce" / "auditor_view.py"
 
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z0-9_-]+)+$")
 
@@ -156,6 +157,7 @@ def check(
     report_path: Path = _REPORT,
     verdict_path: Path = _VERDICT,
     commands_path: Path | None = _COMMANDS,
+    auditor_view_path: Path | None = _AUDITOR_VIEW,
 ) -> list[str]:
     problems: list[str] = []
     defined: set[str] = set(json.loads(catalog_path.read_text(encoding="utf-8")).keys())
@@ -167,6 +169,8 @@ def check(
     paths = [report_path, verdict_path]
     if commands_path is not None:
         paths.append(commands_path)
+    if auditor_view_path is not None:
+        paths.append(auditor_view_path)
     for path in paths:
         literals, pfx = _literal_and_prefix_refs(path.read_text(encoding="utf-8"))
         referenced |= literals
@@ -219,6 +223,7 @@ def self_test() -> int:
             report_path=d / "report.py",
             verdict_path=d / "verdict.py",
             commands_path=None,
+            auditor_view_path=None,
         )
 
     good_problems = run("good")
