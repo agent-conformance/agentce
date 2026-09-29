@@ -270,6 +270,122 @@ class ReportTest {
         assertTrue(onDisk.startsWith("{\n  \"agentce_manifest_version\": 1,"), "manifest is Python-style pretty JSON");
     }
 
+    // --- 18.14 C3: the project view (Hill 7) -- a faithful port of the Python reference's own
+    // `test_write_report_single_subject_is_unchanged`/`..._multi_subject_writes_project_view`/
+    // `..._multi_subject_hostile_ids_get_distinct_directories`. ---
+
+    private static final String[] PROJECT_WINDOW = {"2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"};
+
+    private static Assertions.Assertion projectAssertion(String subject, String outcome) {
+        Assertions.Assertion a = new Assertions.Assertion();
+        a.control = "OVS-03";
+        a.controlVersion = "2026.09";
+        a.subject = subject;
+        a.outcome = outcome;
+        a.rung = 2;
+        a.mode = "automated";
+        a.window = PROJECT_WINDOW;
+        a.population = new int[] {1, 0};
+        a.severity = "high";
+        a.family = "OVS";
+        if (!"insufficient_evidence".equals(outcome)) {
+            a.evidence.add(new Assertions.EvidencePointer("evidence/e1", "sha256:" + "a".repeat(64), "self_report"));
+        }
+        return a;
+    }
+
+    private static Profile projectProfile(List<String> subjectIds) {
+        Profile profile = new Profile();
+        for (String id : subjectIds) {
+            Profile.Subject subject = new Profile.Subject();
+            subject.id = id;
+            profile.subjects.add(subject);
+        }
+        return profile;
+    }
+
+    @Test
+    void writeReportSingleSubjectProfileIsUnchanged(@TempDir Path outDir) throws IOException {
+        Report.writeReport(
+                outDir, List.of(projectAssertion("spiffe://corp/agents/a", "conformant")), "sha256:" + "a".repeat(64),
+                List.of("base/eu-ai-act@1"), "ecs", List.of(), List.of(), "en", List.of(), null, null,
+                projectProfile(List.of("spiffe://corp/agents/a")), null, null);
+        for (String name : List.of("project.md", "project.html", "project.json", "agents")) {
+            assertFalse(Files.exists(outDir.resolve(name)), name + " should not exist");
+        }
+    }
+
+    @Test
+    void writeReportMultiSubjectWritesProjectView(@TempDir Path outDir) throws IOException {
+        List<JsonNode> events = List.of(
+                Json.parse("{\"id\":\"e1\",\"subject\":\"A\",\"data\":{\"@type\":\"ToolCall\","
+                        + "\"agent\":{\"id\":\"A\"},\"tool\":{\"name\":\"x\"},\"effect_class\":\"read\"}}"),
+                Json.parse("{\"id\":\"e2\",\"subject\":\"C\",\"data\":{\"@type\":\"ToolCall\","
+                        + "\"agent\":{\"id\":\"C\"},\"tool\":{\"name\":\"y\"},\"effect_class\":\"write\"}}"));
+        List<Assertions.Assertion> assertions = List.of(
+                projectAssertion("A", "conformant"), projectAssertion("B", "conformant"),
+                projectAssertion("C", "insufficient_evidence"));
+        ObjectNode manifest = Report.writeReport(
+                outDir, assertions, "sha256:" + "a".repeat(64), List.of("base/eu-ai-act@1"), "ecs", List.of(),
+                List.of(), "en", List.of(), null, null, projectProfile(List.of("A", "B")), null, events);
+
+        for (String name : List.of("project.md", "project.html", "project.json", "report.md", "report.html")) {
+            assertTrue(Files.exists(outDir.resolve(name)), name + " should exist");
+        }
+        assertEquals(Files.readString(outDir.resolve("project.md")), Files.readString(outDir.resolve("report.md")));
+        assertEquals(Files.readString(outDir.resolve("project.html")), Files.readString(outDir.resolve("report.html")));
+
+        JsonNode projectView = Json.parseFile(outDir.resolve("project.json"));
+        List<String> undeclared = new ArrayList<>();
+        projectView.get("undeclared_agents").forEach(n -> undeclared.add(n.asText()));
+        assertEquals(List.of("C"), undeclared);
+
+        for (String subjectId : List.of("A", "B", "C")) {
+            Path agentDir;
+            try (var entries = Files.list(outDir.resolve("agents"))) {
+                agentDir = entries.filter(p -> p.getFileName().toString().startsWith(subjectId + "-"))
+                        .findFirst()
+                        .orElseThrow();
+            }
+            for (String name : List.of("report.md", "report.html", "activity.json", "blind-spots.json", "assertions.json")) {
+                assertTrue(Files.exists(agentDir.resolve(name)), name + " should exist for " + subjectId);
+            }
+            JsonNode ownAssertions = Json.parseFile(agentDir.resolve("assertions.json"));
+            for (JsonNode a : ownAssertions) {
+                assertEquals(subjectId, a.get("subject").asText());
+            }
+        }
+        assertTrue(manifest.get("outputs").has("project.json"));
+    }
+
+    @Test
+    void writeReportMultiSubjectHostileIdsGetDistinctDirectories(@TempDir Path outDir) throws IOException {
+        // The longer id is capped at 200, not 300: `packs/<subject>/pack.json` (pre-existing,
+        // unrelated to this item) uses the raw `safe()` name with no length cap, so a longer id
+        // trips the filesystem's own ~255-byte component limit before this item's own
+        // `agentDirname` (which does cap, at 40) is ever reached -- the same latent limitation the
+        // Python/TypeScript references' own hostile-id tests sidestep.
+        List<String> ids = List.of("..", ".", "a/b", "a\\b", "A".repeat(200));
+        List<Assertions.Assertion> assertions = new ArrayList<>();
+        for (String id : ids) {
+            assertions.add(projectAssertion(id, "conformant"));
+        }
+        Report.writeReport(
+                outDir, assertions, "sha256:" + "a".repeat(64), List.of("base/eu-ai-act@1"), "ecs", List.of(),
+                List.of(), "en", List.of(), null, null, projectProfile(ids), null, null);
+
+        List<Path> entries;
+        try (var stream = Files.list(outDir.resolve("agents"))) {
+            entries = stream.toList();
+        }
+        assertEquals(ids.size(), entries.size());
+        Path resolvedParent = outDir.resolve("agents").toRealPath();
+        for (Path entry : entries) {
+            assertTrue(Files.isDirectory(entry));
+            assertEquals(resolvedParent, entry.toRealPath().getParent());
+        }
+    }
+
     // --- buildManifest's real catalog digest (item 18.22: never sha256:000...0) -- the same shared
     // fixture tree CatalogTest's digestTree tests and TypeScript's report.test.ts read. ---
 

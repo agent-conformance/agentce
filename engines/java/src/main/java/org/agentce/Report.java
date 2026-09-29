@@ -15,8 +15,10 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -607,6 +609,181 @@ public final class Report {
         return sorted;
     }
 
+    /** The traversal-proof, collision-resistant directory name {@link #writeReport} writes a
+     * subject's own report under ({@code agents/<dirname>/}, 18.14 C3) -- the one formula both
+     * {@link #writeReport} (which creates the directory) and {@link #projectAgentViewRows}/the
+     * undeclared-agents section (which link to it) share, mirroring the Python reference's
+     * {@code _agent_dirname}. {@code uuid(subjectId)} (not the raw {@code uuid5}) matches Python's
+     * {@code _uuid(subject_id)}, which also namespaces with {@code "agentce:"}. */
+    private static String agentDirname(String subjectId) {
+        String s = safe(subjectId);
+        return s.substring(0, Math.min(s.length(), 40)) + "-" + uuid(subjectId).substring(0, 8);
+    }
+
+    private record ProjectAgentRow(String id, String dirname, String badge, String verdict, String whatItDid) {}
+
+    /** One row per agent, in {@code projectView["agents"]}'s own order (never re-sorted here): the
+     * sanitised id, its report's directory name, the declared/undeclared badge, the
+     * verdict-and-counts cell, and the what-it-did cell -- shared by the Markdown and HTML
+     * renderings exactly like {@link #activityRows}. */
+    private static List<ProjectAgentRow> projectAgentViewRows(
+            ObjectNode projectView, Map<String, ObjectNode> activityBySubject, Map<String, String> cat) {
+        List<ProjectAgentRow> rows = new ArrayList<>();
+        for (JsonNode agentNode : projectView.get("agents")) {
+            ObjectNode agent = (ObjectNode) agentNode;
+            String id = agent.get("id").asText();
+            ObjectNode activity = activityBySubject.get(id);
+            ObjectNode counts = (ObjectNode) agent.get("summary").get("counts");
+            Map<String, String> labelOf = new LinkedHashMap<>();
+            counts.fieldNames().forEachRemaining(outcome -> labelOf.put(outcome, outcomeLabel(cat, outcome)));
+            String verdictLabel = cat.get("verdict." + agent.get("summary").get("verdict").asText());
+            List<String> agentsObserved = new ArrayList<>();
+            if (activity != null) {
+                activity.get("agents").forEach(n -> agentsObserved.add(sanitizeField(n.asText())));
+            }
+            String agentsObservedText =
+                    agentsObserved.isEmpty() ? cat.get("report.activity_none_agents") : String.join(", ", agentsObserved);
+            ObjectNode actionsByEffectClass =
+                    activity != null ? (ObjectNode) activity.get("actions_by_effect_class") : Json.nodes().objectNode();
+            String whatItDid = cat.get("report.project_what_it_did_cell")
+                    .replace("{agents}", agentsObservedText)
+                    .replace("{actions}", activityTallyText(actionsByEffectClass, null));
+            rows.add(new ProjectAgentRow(
+                    sanitizeField(id),
+                    agentDirname(id),
+                    agent.get("declared").asBoolean()
+                            ? cat.get("report.project_declared_badge")
+                            : cat.get("report.project_undeclared_badge"),
+                    verdictLabel + " (" + activityTallyText(counts, labelOf) + ")",
+                    whatItDid));
+        }
+        return rows;
+    }
+
+    /** As {@link #blindSpotRows}, but each row also names the agents this gap touches
+     * ({@code computeProjectView}'s own {@code top_gaps}, C2) -- the project view's per-gap agent
+     * list, not a per-agent re-scoping. */
+    private static List<Map.Entry<String, String>> projectTopGapRows(ArrayNode topGaps, Map<String, String> cat) {
+        List<Map.Entry<String, String>> baseRows = blindSpotRows(topGaps);
+        List<Map.Entry<String, String>> rows = new ArrayList<>();
+        for (int i = 0; i < baseRows.size(); i++) {
+            ObjectNode gap = (ObjectNode) topGaps.get(i);
+            List<String> agents = new ArrayList<>();
+            gap.get("agents").forEach(n -> agents.add(sanitizeField(n.asText())));
+            String suffix = cat.get("report.project_top_gap_agents").replace("{agents}", String.join(", ", agents));
+            Map.Entry<String, String> base = baseRows.get(i);
+            rows.add(Map.entry(base.getKey(), base.getValue() + " " + suffix));
+        }
+        return rows;
+    }
+
+    /** The project view (Hill 7, 18.14 C3): every agent this run assessed, side by side -- a
+     * summary row per agent (declared or discovered), the top gaps across the whole project naming
+     * which agents each touches, then the agents nobody declared, each linking to its own full
+     * report under {@code agents/<dirname>/}. */
+    public static String renderProjectMd(
+            ObjectNode projectView, Map<String, ObjectNode> activityBySubject, String language) {
+        Map<String, String> cat = Messages.catalogue(language);
+        List<ProjectAgentRow> rows = projectAgentViewRows(projectView, activityBySubject, cat);
+        List<String> lines = new ArrayList<>();
+        lines.add("# " + cat.get("report.project_title"));
+        lines.add("");
+        lines.add("## " + cat.get("report.project_heading"));
+        lines.add("");
+        lines.add("| " + cat.get("report.project_agent_column") + " | " + cat.get("report.project_declared_column")
+                + " | " + cat.get("report.project_verdict_column") + " | "
+                + cat.get("report.project_what_it_did_column") + " |");
+        lines.add("|---|---|---|---|");
+        for (ProjectAgentRow row : rows) {
+            lines.add("| [" + row.id() + "](agents/" + row.dirname() + "/report.md) | " + row.badge() + " | "
+                    + row.verdict() + " | " + row.whatItDid() + " |");
+        }
+        lines.add("");
+        lines.add("## " + cat.get("report.project_top_gaps_heading"));
+        lines.add("");
+        ArrayNode topGaps = (ArrayNode) projectView.get("top_gaps");
+        List<Map.Entry<String, String>> gapRows = projectTopGapRows(topGaps, cat);
+        if (!gapRows.isEmpty()) {
+            for (Map.Entry<String, String> gr : gapRows) {
+                lines.add("- `" + gr.getKey() + "`: " + gr.getValue());
+            }
+        } else {
+            lines.add("- " + cat.get("report.no_gaps"));
+        }
+        ArrayNode undeclared = (ArrayNode) projectView.get("undeclared_agents");
+        if (undeclared.size() > 0) {
+            lines.add("");
+            lines.add("## " + cat.get("report.project_undeclared_heading"));
+            lines.add("");
+            for (JsonNode idNode : undeclared) {
+                String agentId = idNode.asText();
+                lines.add("- `" + sanitizeField(agentId) + "` -- [" + cat.get("report.project_agent_report_link")
+                        + "](agents/" + agentDirname(agentId) + "/report.md)");
+            }
+        }
+        lines.add("");
+        return String.join("\n", lines) + "\n";
+    }
+
+    /** As {@link #renderProjectMd}, rendered as the same self-contained, escaped, WCAG 2.2 AA page
+     * shape as {@link #renderReportHtml}. */
+    public static String renderProjectHtml(
+            ObjectNode projectView, Map<String, ObjectNode> activityBySubject, String language) {
+        Map<String, String> cat = Messages.catalogue(language);
+        List<ProjectAgentRow> rows = projectAgentViewRows(projectView, activityBySubject, cat);
+        String title = esc(cat.get("report.project_title"));
+        StringBuilder bodyRows = new StringBuilder();
+        for (ProjectAgentRow row : rows) {
+            bodyRows.append("<tr><td><a href=\"agents/").append(row.dirname()).append("/report.html\">")
+                    .append(esc(row.id())).append("</a></td><td>").append(esc(row.badge())).append("</td><td>")
+                    .append(esc(row.verdict())).append("</td><td>").append(esc(row.whatItDid())).append("</td></tr>");
+        }
+        ArrayNode topGaps = (ArrayNode) projectView.get("top_gaps");
+        List<Map.Entry<String, String>> gapRows = projectTopGapRows(topGaps, cat);
+        String gapsHtml;
+        if (!gapRows.isEmpty()) {
+            StringBuilder items = new StringBuilder();
+            for (Map.Entry<String, String> gr : gapRows) {
+                items.append("<li><strong>").append(esc(gr.getKey())).append("</strong>: ")
+                        .append(esc(gr.getValue())).append("</li>");
+            }
+            gapsHtml = "<ul>" + items + "</ul>";
+        } else {
+            gapsHtml = "<p>" + esc(cat.get("report.no_gaps")) + "</p>";
+        }
+        ArrayNode undeclared = (ArrayNode) projectView.get("undeclared_agents");
+        String undeclaredHtml = "";
+        if (undeclared.size() > 0) {
+            StringBuilder items = new StringBuilder();
+            for (JsonNode idNode : undeclared) {
+                String agentId = idNode.asText();
+                items.append("<li>").append(sanitizeForHtml(agentId)).append(" -- <a href=\"agents/")
+                        .append(agentDirname(agentId)).append("/report.html\">")
+                        .append(esc(cat.get("report.project_agent_report_link"))).append("</a></li>");
+            }
+            undeclaredHtml = "<section aria-labelledby=\"project-undeclared\"><h2 id=\"project-undeclared\">"
+                    + esc(cat.get("report.project_undeclared_heading")) + "</h2><ul>" + items + "</ul></section>";
+        }
+        return "<!doctype html><html lang=\"" + esc(language) + "\"><head><meta charset=\"utf-8\">"
+                + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                + "<meta http-equiv=\"Content-Security-Policy\" "
+                + "content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\">"
+                + "<title>" + title + "</title><style>" + HTML_STYLE + "</style></head><body>"
+                + "<main><h1>" + title + "</h1>"
+                + "<section aria-labelledby=\"project-agents\"><h2 id=\"project-agents\">"
+                + esc(cat.get("report.project_heading")) + "</h2>"
+                + "<table><caption>" + esc(cat.get("report.project_heading")) + "</caption>"
+                + "<thead><tr><th scope=\"col\">" + esc(cat.get("report.project_agent_column")) + "</th>"
+                + "<th scope=\"col\">" + esc(cat.get("report.project_declared_column")) + "</th>"
+                + "<th scope=\"col\">" + esc(cat.get("report.project_verdict_column")) + "</th>"
+                + "<th scope=\"col\">" + esc(cat.get("report.project_what_it_did_column")) + "</th></tr></thead>"
+                + "<tbody>" + bodyRows + "</tbody></table></section>"
+                + "<section aria-labelledby=\"project-top-gaps\"><h2 id=\"project-top-gaps\">"
+                + esc(cat.get("report.project_top_gaps_heading")) + "</h2>" + gapsHtml + "</section>"
+                + undeclaredHtml
+                + "</main></body></html>\n";
+    }
+
     /** {@code activity} feeds the "what your agents did" section that leads the report (18.4);
      * {@code blindSpots} feeds the not-enough-evidence section right after it (18.5); either may be
      * {@code null} for a bare re-render with neither available. */
@@ -1012,6 +1189,30 @@ public final class Report {
             Path outDir, List<Assertions.Assertion> assertions, String bundleDigest, List<String> catalogs,
             String operator, List<String> invocation, List<String> supersedes, String reportLanguage,
             List<Catalog> catalogObjects, ObjectNode activity, ObjectNode blindSpots) {
+        return writeReport(
+                outDir, assertions, bundleDigest, catalogs, operator, invocation, supersedes, reportLanguage,
+                catalogObjects, activity, blindSpots, null, null, null);
+    }
+
+    private static Profile.Subject bareSubject(String id) {
+        Profile.Subject subject = new Profile.Subject();
+        subject.id = id;
+        return subject;
+    }
+
+    /** As the eleven-argument {@link #writeReport}, but also accepts {@code profile}/
+     * {@code declaredSubjectIds}/{@code events} (18.14 C3, Hill 7): when {@code profile} names more
+     * than one subject, every agent's records go side by side -- {@code project.md}/{@code .html}/
+     * {@code .json} ({@link Project#computeProjectView}) plus each subject's own full report under
+     * {@code agents/<dirname>/}, and the root {@code report.md}/{@code .html} become the project
+     * view. A single subject (or no {@code profile}) writes exactly what the eleven-argument
+     * overload always wrote. {@code events} is read only to re-summarise activity per subject;
+     * {@code declaredSubjectIds} defaults to every subject named in {@code profile}. */
+    public static ObjectNode writeReport(
+            Path outDir, List<Assertions.Assertion> assertions, String bundleDigest, List<String> catalogs,
+            String operator, List<String> invocation, List<String> supersedes, String reportLanguage,
+            List<Catalog> catalogObjects, ObjectNode activity, ObjectNode blindSpots,
+            Profile profile, Set<String> declaredSubjectIds, List<JsonNode> events) {
         Assertions.checkDc5(assertions);
         try {
             Files.createDirectories(outDir);
@@ -1028,14 +1229,104 @@ public final class Report {
             outputs.put("blind-spots.json", writeJson(outDir, "blind-spots.json", blindSpotsNode));
 
             Map<String, Integer> counts = Assertions.aggregate(assertions);
-            outputs.put(
-                    "report.md",
-                    writeText(outDir, "report.md",
-                            renderReportMd(assertions, counts, reportLanguage, activityNode, blindSpotsNode)));
-            outputs.put(
-                    "report.html",
-                    writeText(outDir, "report.html",
-                            renderReportHtml(assertions, counts, reportLanguage, activityNode, blindSpotsNode)));
+
+            // 18.14 C3: every agent's records side by side (Hill 7) -- only when `profile` names
+            // more than one subject; a single subject (or no `profile`) leaves every byte below
+            // unchanged.
+            ObjectNode projectView = null;
+            Map<String, ObjectNode> projectActivityBySubject = new LinkedHashMap<>();
+            if (profile != null && profile.subjects.size() > 1) {
+                Set<String> resolvedDeclared = declaredSubjectIds;
+                if (resolvedDeclared == null) {
+                    resolvedDeclared = new LinkedHashSet<>();
+                    for (Profile.Subject s : profile.subjects) {
+                        resolvedDeclared.add(s.id);
+                    }
+                }
+                TreeSet<String> projectSubjectIds = new TreeSet<>(Json::byteCompare);
+                for (Assertions.Assertion a : assertions) {
+                    projectSubjectIds.add(a.subject);
+                }
+                for (Profile.Subject s : profile.subjects) {
+                    projectSubjectIds.add(s.id);
+                }
+                Map<String, List<JsonNode>> eventsBySubject = Assess.indexBySubject(events != null ? events : List.of());
+                Map<String, Profile.Subject> declaredSubjectsById = new LinkedHashMap<>();
+                for (Profile.Subject s : profile.subjects) {
+                    declaredSubjectsById.put(s.id, s);
+                }
+                for (String subjectId : projectSubjectIds) {
+                    Profile.Subject declaredSubject = declaredSubjectsById.get(subjectId);
+                    Profile subjectProfile = new Profile();
+                    subjectProfile.subjects.add(declaredSubject != null ? declaredSubject : bareSubject(subjectId));
+                    Set<String> subjectDeclaredIds =
+                            resolvedDeclared.contains(subjectId) ? Set.of(subjectId) : Set.of();
+                    projectActivityBySubject.put(
+                            subjectId,
+                            Activity.summarizeActivity(
+                                    eventsBySubject.getOrDefault(subjectId, List.of()), subjectProfile,
+                                    subjectDeclaredIds));
+                }
+                projectView = Project.computeProjectView(
+                        assertions, profile, resolvedDeclared, projectActivityBySubject, blindSpotsNode);
+                outputs.put("project.json", writeJson(outDir, "project.json", projectView));
+                Map<String, List<ObjectNode>> gapsBySubject = Project.blindSpotsBySubject(blindSpotsNode);
+                Map<String, List<ObjectNode>> noPopBySubject =
+                        Project.noPopulationBySubject((ArrayNode) blindSpotsNode.get("no_population"));
+                Map<String, List<Assertions.Assertion>> assertionsBySubject = new LinkedHashMap<>();
+                for (Assertions.Assertion a : assertions) {
+                    assertionsBySubject.computeIfAbsent(a.subject, k -> new ArrayList<>()).add(a);
+                }
+                for (String subjectId : projectSubjectIds) {
+                    String dirname = agentDirname(subjectId);
+                    String rel = "agents/" + dirname;
+                    Files.createDirectories(outDir.resolve(rel));
+                    List<Assertions.Assertion> subjectAssertions =
+                            assertionsBySubject.getOrDefault(subjectId, List.of());
+                    ObjectNode subjectActivity = projectActivityBySubject.get(subjectId);
+                    ObjectNode subjectBlindSpots = Json.nodes().objectNode();
+                    ArrayNode subjectGaps = subjectBlindSpots.putArray("blind_spots");
+                    gapsBySubject.getOrDefault(subjectId, List.of()).forEach(subjectGaps::add);
+                    ArrayNode subjectNoPop = subjectBlindSpots.putArray("no_population");
+                    noPopBySubject.getOrDefault(subjectId, List.of()).forEach(subjectNoPop::add);
+
+                    ArrayNode subjectAssertionsJson = Json.nodes().arrayNode();
+                    for (Assertions.Assertion a : subjectAssertions) {
+                        subjectAssertionsJson.add(a.toJson());
+                    }
+                    outputs.put(rel + "/assertions.json", writeJson(outDir, rel + "/assertions.json", subjectAssertionsJson));
+                    outputs.put(rel + "/activity.json", writeJson(outDir, rel + "/activity.json", subjectActivity));
+                    outputs.put(
+                            rel + "/blind-spots.json", writeJson(outDir, rel + "/blind-spots.json", subjectBlindSpots));
+                    Map<String, Integer> subjectCounts = Assertions.aggregate(subjectAssertions);
+                    outputs.put(
+                            rel + "/report.md",
+                            writeText(outDir, rel + "/report.md", renderReportMd(
+                                    subjectAssertions, subjectCounts, reportLanguage, subjectActivity, subjectBlindSpots)));
+                    outputs.put(
+                            rel + "/report.html",
+                            writeText(outDir, rel + "/report.html", renderReportHtml(
+                                    subjectAssertions, subjectCounts, reportLanguage, subjectActivity, subjectBlindSpots)));
+                }
+            }
+
+            if (projectView != null) {
+                String projectMd = renderProjectMd(projectView, projectActivityBySubject, reportLanguage);
+                outputs.put("project.md", writeText(outDir, "project.md", projectMd));
+                outputs.put("report.md", writeText(outDir, "report.md", projectMd));
+                String projectHtml = renderProjectHtml(projectView, projectActivityBySubject, reportLanguage);
+                outputs.put("project.html", writeText(outDir, "project.html", projectHtml));
+                outputs.put("report.html", writeText(outDir, "report.html", projectHtml));
+            } else {
+                outputs.put(
+                        "report.md",
+                        writeText(outDir, "report.md",
+                                renderReportMd(assertions, counts, reportLanguage, activityNode, blindSpotsNode)));
+                outputs.put(
+                        "report.html",
+                        writeText(outDir, "report.html",
+                                renderReportHtml(assertions, counts, reportLanguage, activityNode, blindSpotsNode)));
+            }
             outputs.put("oscal-ar.json", writeJson(outDir, "oscal-ar.json", renderOscal(assertions)));
             outputs.put("results.sarif", writeJson(outDir, "results.sarif", renderSarif(assertions, catalogObjects)));
 

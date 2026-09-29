@@ -70,6 +70,19 @@ public final class Messages {
         m.put("report.activity_denied_authz_denied", "blocked by an authorization check");
         m.put("report.activity_denied_policy_denied", "blocked by policy");
         m.put("report.activity_denied_refused", "the agent refused");
+        m.put("report.project_agent_column", "Agent");
+        m.put("report.project_agent_report_link", "Full report");
+        m.put("report.project_declared_badge", "Declared");
+        m.put("report.project_declared_column", "Declared");
+        m.put("report.project_heading", "Agents in this project");
+        m.put("report.project_title", "AgentCE project view");
+        m.put("report.project_top_gap_agents", "Agents: {agents}.");
+        m.put("report.project_top_gaps_heading", "Top gaps across agents");
+        m.put("report.project_undeclared_badge", "Undeclared");
+        m.put("report.project_undeclared_heading", "Undeclared agents");
+        m.put("report.project_verdict_column", "Verdict");
+        m.put("report.project_what_it_did_cell", "agents: {agents}; actions: {actions}");
+        m.put("report.project_what_it_did_column", "What it did");
         return m;
     }
 

@@ -512,7 +512,8 @@ public final class Cli {
         Report.writeReport(
                 out, evaluated, bundle.digest, resolved.labels(),
                 operatorEnv != null ? operatorEnv : "unknown",
-                invocation, supersedes, Messages.DEFAULT_LANGUAGE, resolved.catalogs(), activity, blindSpots);
+                invocation, supersedes, Messages.DEFAULT_LANGUAGE, resolved.catalogs(), activity, blindSpots,
+                profileObj, null, ingested.accepted);
         if (state != null) {
             state.record(bundle.digest, out.resolve("manifest.json"), newWindowEnd);
         }
