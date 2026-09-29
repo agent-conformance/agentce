@@ -43,6 +43,7 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 fixture="$root/verification/gates/fixtures/security_view"
 golden="$root/verification/gates/security_view_golden.json"
+md_golden="$root/verification/gates/security_view_golden.md"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
@@ -107,6 +108,7 @@ if [ "${1:-}" = "--write" ]; then
     exit 1
   fi
   cp "$work/python/security.json" "$golden"
+  cp "$work/python/security.md" "$md_golden"
   # activity_and_assertions.json: the shared cross-engine diff input for compute_security_view (C4),
   # built once from the Python engine's own real run.
   python3 - "$work/python/activity.json" "$work/python/assertions.json" "$fixture/activity_and_assertions.json" <<'PY'
@@ -155,6 +157,10 @@ if [ -f "$py_out/security.md" ]; then
   expected_headings="$(printf '## Tool access\n## Actions by effect class\n## Enforcement-point evidence\n## Drift\n## Standards citations')"
   if [ "$actual_headings" != "$expected_headings" ]; then
     echo "security-view: python's security.md section order is wrong (got: $actual_headings)" >&2
+    status=1
+  fi
+  if ! cmp -s "$md_golden" "$py_out/security.md"; then
+    echo "security-view: python security.md differs from the committed golden $md_golden" >&2
     status=1
   fi
 fi

@@ -193,6 +193,35 @@ def test_no_baseline_citation_is_invented() -> None:
     assert _invented_citations(_BASELINE) == []
 
 
+@pytest.mark.parametrize(
+    ("control_id", "expected_pairs"),
+    [
+        (
+            "ROB-02",
+            {
+                ("mitre-atlas", "AML.T0051"),
+                ("mitre-atlas", "AML.T0051.001"),
+                ("mitre-atlas", "AML.T0080"),
+                ("mitre-atlas", "AML.T0080.000"),
+            },
+        ),
+        ("OVS-03", {("mitre-atlas", "AML.T0101")}),
+        ("INT-01", {("mitre-atlas", "AML.T0101"), ("mitre-atlas", "AML.T0108")}),
+        ("REC-01", {("owasp-acs", "Hook_SubagentStart+Hook_SubagentStop")}),
+        ("REC-04", {("mitre-atlas", "AML.T0073"), ("mitre-atlas", "AML.T0074")}),
+    ],
+)
+def test_18_16_baseline_controls_cite_their_new_mitre_atlas_and_owasp_acs_pairs(
+    control_id: str, expected_pairs: set[tuple[str, str]]
+) -> None:
+    """18.16 C3: the crosswalk this item added is read live from each control's own YAML on disk
+    (not re-derived), so a future edit that drops or mistypes one of these pairs is caught here."""
+    path = _BASELINE / "controls" / f"{control_id}.yaml"
+    control = yaml.safe_load(path.read_text(encoding="utf-8"))
+    pairs = {(e["framework"], e["clause"]) for e in control["crosswalk"]}
+    assert expected_pairs <= pairs
+
+
 def test_the_baseline_covers_the_shared_areas_and_cites_only_clause_level_standards() -> (
     None
 ):

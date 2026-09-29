@@ -20,6 +20,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _QUICKSTART = _REPO_ROOT / "corpus" / "quickstart"
 _GATE_FIXTURE = _REPO_ROOT / "verification" / "gates" / "fixtures" / "security_view"
 _GATE_GOLDEN = _REPO_ROOT / "verification" / "gates" / "security_view_golden.json"
+_GATE_GOLDEN_MD = _REPO_ROOT / "verification" / "gates" / "security_view_golden.md"
 
 _EMPTY_ACTIVITY: dict[str, Any] = {
     "agents": [],
@@ -325,3 +326,6 @@ def test_security_json_matches_committed_golden(tmp_path: Path) -> None:
     security = json.loads((out / "security.json").read_text(encoding="utf-8"))
     golden = json.loads(_GATE_GOLDEN.read_text(encoding="utf-8"))
     assert security == golden
+    assert (out / "security.md").read_text(encoding="utf-8") == _GATE_GOLDEN_MD.read_text(
+        encoding="utf-8"
+    )
