@@ -13,10 +13,17 @@ import sys
 from pathlib import Path
 
 import yaml
-from _common import FINDINGS, INPUT_ERROR, OK, arg_value, emit, run_guarded
+from _common import (
+    FINDINGS,
+    INPUT_ERROR,
+    OK,
+    arg_value,
+    default_catalog_dirs,
+    emit,
+    run_guarded,
+)
 
 from agentce import readiness
-from agentce.bundled import catalogs_dir
 from agentce.catalog import load_catalog
 
 
@@ -26,13 +33,7 @@ def _catalog_dirs(argv: list[str]) -> list[Path]:
         for i, a in enumerate(argv)
         if a == "--catalog-dir" and i + 1 < len(argv)
     ]
-    if dirs:
-        return dirs
-    # The catalogs the engine itself ships, resolved through the installed package (SPEC
-    # §13.4 AX-1) -- never a walk up from ``__file__`` to a monorepo checkout, which does not
-    # exist once this skill is installed standalone (SPEC §13.3).
-    base = catalogs_dir() / "base"
-    return [p.parent for p in sorted(base.glob("*/catalog.yaml"))]
+    return dirs or default_catalog_dirs()
 
 
 def _severities(argv: list[str]) -> dict[str, str]:

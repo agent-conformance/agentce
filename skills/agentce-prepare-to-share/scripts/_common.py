@@ -125,3 +125,13 @@ def arg_value(argv: list[str], flag: str) -> str | None:
         if index + 1 < len(argv):
             return argv[index + 1]
     return None
+
+
+def default_catalog_dirs() -> list[Path]:
+    """The catalogs the engine itself ships, resolved through the installed package (SPEC §13.4
+    AX-1) -- never a walk up from ``__file__`` to a monorepo checkout, which does not exist once
+    this skill is installed standalone (SPEC §13.3). The fallback both ``deviation_lint`` and
+    ``report_readiness`` use when the caller passes no ``--catalog-dir``."""
+    from agentce.bundled import catalogs_dir
+
+    return [p.parent for p in sorted((catalogs_dir() / "base").glob("*/catalog.yaml"))]
