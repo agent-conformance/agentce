@@ -40,6 +40,11 @@ SOURCE_CLASS = "self_report"
 BUNDLE_DIR = "records-bundle"
 DERIVED_PROFILE_FILE = "applicability.yaml"
 
+#: The subject id a records-folder scan uses when it has nothing more specific to call an agent: no
+#: real `gen_ai.agent.id` was found, or a solo one was (18.14 C4). Also `commands.cmd_init`'s and
+#: `agentce_emit.auto()`'s own default subject; a test holds all three equal.
+DEFAULT_SUBJECT = "agentce:subject/local"
+
 #: Recorded in the manifest and the claim of every records-folder run (SPEC §8.7): traces carry no decision
 #: records, so an empty population says the records show none, not that the control does not apply.
 RECORDS_LIMITATION = (
@@ -59,7 +64,7 @@ class ScannedRecords:
     """What a records folder held: the adapted events and the summary of how they were found."""
 
     events: list[dict[str, Any]]
-    subject: str
+    subjects: list[str]
     summary: dict[str, Any]
     _sources: dict[str, str] = field(default_factory=dict)
     #: The bytes of each source's event stream, keyed by source URI, built (and size-checked) by scan.
@@ -73,30 +78,39 @@ class ScannedRecords:
         run shows nothing as undeclared (18.4); anything new a later run sees is the useful signal."""
         times = [str(e["time"]) for e in self.events]
         # `summarize_activity` is the one place that extracts tool/model names from events
-        # (agentce.activity); reuse it rather than re-deriving the same names here.
-        seen = summarize_activity(self.events, Profile())
+        # (agentce.activity); reuse it rather than re-deriving the same names here. Each subject's
+        # `declared_tools`/`declared_models` come from that subject's own event slice (18.14 C4):
+        # evidence_sources stays the same global list on every subject entry since sources are not
+        # naturally partitioned by agent.
+        evidence_sources = [
+            {
+                "adapter": ADAPTER,
+                "source": source,
+                "class": self._sources[source],
+                "class_justification": _CLASS_JUSTIFICATION,
+            }
+            for source in sorted(self._sources)
+        ]
+        subjects = []
+        for sid in self.subjects:
+            seen = summarize_activity(
+                [e for e in self.events if e["subject"] == sid], Profile()
+            )
+            subjects.append(
+                {
+                    "id": sid,
+                    "name": "Agent records",
+                    "role": "deployer",
+                    "evidence_sources": evidence_sources,
+                    "declared_tools": [t["name"] for t in seen["tools"]],
+                    "declared_models": [m["name"] for m in seen["models"]],
+                }
+            )
         return {
             "profile_version": 1,
             "observation_window": {"start": min(times), "end": max(times)},
             "catalogs": [bundled.DEFAULT_LENS],
-            "subjects": [
-                {
-                    "id": self.subject,
-                    "name": "Agent records",
-                    "role": "deployer",
-                    "evidence_sources": [
-                        {
-                            "adapter": ADAPTER,
-                            "source": source,
-                            "class": self._sources[source],
-                            "class_justification": _CLASS_JUSTIFICATION,
-                        }
-                        for source in sorted(self._sources)
-                    ],
-                    "declared_tools": [t["name"] for t in seen["tools"]],
-                    "declared_models": [m["name"] for m in seen["models"]],
-                }
-            ],
+            "subjects": subjects,
         }
 
     def write(self, out_dir: Path, *, write_profile: bool) -> Path:
@@ -254,8 +268,13 @@ def _read(path: Path, subject: str) -> _FileRead | str:
     return read
 
 
-def scan(folder: Path, *, subject: str, exclude: Path | None = None) -> ScannedRecords:
+def scan(
+    folder: Path, *, subject: str | None, exclude: Path | None = None
+) -> ScannedRecords:
     """Read every recognised trace export under ``folder``; refuse a folder with none.
+
+    ``subject`` is the one subject an adopter's ``--profile`` declares, forced onto every event
+    unchanged; ``None`` discovers subjects from each event's own ``gen_ai.agent.id`` instead (18.14 C4).
 
     ``exclude`` is the run's ``--out``: when it lies strictly inside the folder its files are never read
     as records, and a previous run's bundle under it never is, wherever it lies."""
@@ -303,7 +322,7 @@ def scan(folder: Path, *, subject: str, exclude: Path | None = None) -> ScannedR
                 {"path": rel, "reason": "a symlink that leaves the folder is not read"}
             )
             continue
-        got = _read(path, subject)
+        got = _read(path, subject if subject is not None else DEFAULT_SUBJECT)
         if isinstance(got, str):
             unrecognised.append({"path": rel, "reason": got})
             continue
@@ -333,6 +352,35 @@ def scan(folder: Path, *, subject: str, exclude: Path | None = None) -> ScannedR
                 {"path": rel, "line": number, "reason": reason}
                 for number, reason in got.bad_lines[: MAX_LISTED_LINES - len(bad_lines)]
             ]
+
+    def _real_id(event: dict[str, Any]) -> str | None:
+        """The event's own ``gen_ai.agent.id``, already stamped onto ``data.agent`` by the adapter's
+        ``_agent_ref`` (no new parsing); ``None`` when the span carried no agent identity."""
+        data = event.get("data")
+        agent = data.get("agent") if isinstance(data, dict) else None
+        agent_id = agent.get("id") if isinstance(agent, dict) else None
+        return agent_id if isinstance(agent_id, str) else None
+
+    if subject is not None:
+        # An adopter's own --profile names one subject: force every event to it, unchanged (round 2's
+        # N2 fix -- the discovery merge rule below runs only when subject is None).
+        resulting_subjects = [subject]
+    else:
+        real_ids = {rid for e in by_id.values() if (rid := _real_id(e)) is not None}
+        if len(real_ids) >= 2:
+            # Two or more distinct agents: one subject per id, plus a DEFAULT_SUBJECT catch-all only
+            # if some event carries no id at all -- never guess an id-less event into a named agent.
+            resulting_subjects = sorted(real_ids)
+            if any(_real_id(e) is None for e in by_id.values()):
+                resulting_subjects.append(DEFAULT_SUBJECT)
+            for event in by_id.values():
+                event["subject"] = _real_id(event) or DEFAULT_SUBJECT
+        else:
+            # Zero or exactly one distinct agent: nothing to disambiguate, so every event (including
+            # any id-less ones) stays on DEFAULT_SUBJECT -- today's exact, unchanged behaviour.
+            resulting_subjects = [DEFAULT_SUBJECT]
+            for event in by_id.values():
+                event["subject"] = DEFAULT_SUBJECT
 
     if not read and any(item["reason"] == NO_GENAI_SPANS for item in unrecognised):
         raise InputError(
@@ -378,7 +426,7 @@ def scan(folder: Path, *, subject: str, exclude: Path | None = None) -> ScannedR
     }
     return ScannedRecords(
         events=events,
-        subject=subject,
+        subjects=resulting_subjects,
         summary=summary,
         _sources=sources,
         _streams=streams,

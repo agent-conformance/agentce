@@ -57,6 +57,16 @@ def _records(folder: Path) -> Path:
     return folder
 
 
+def _multi_agent_records(folder: Path) -> Path:
+    """A records folder naming two distinct agents (datadog: fraud-detection-agent, langfuse:
+    checkout-copilot) plus one file with no agent id at all (openinference-rag)."""
+    folder.mkdir(parents=True, exist_ok=True)
+    shutil.copy(_FIXTURES / "datadog" / "input.json", folder / "fraud.json")
+    shutil.copy(_FIXTURES / "langfuse" / "input.json", folder / "checkout.json")
+    shutil.copy(_FIXTURES / "openinference-rag" / "input.json", folder / "rag.json")
+    return folder
+
+
 def _assertions(out: Path) -> list[dict[str, Any]]:
     loaded: list[dict[str, Any]] = json.loads(
         (out / "assertions.json").read_text(encoding="utf-8")
@@ -503,6 +513,68 @@ def test_a_profile_with_several_subjects_is_refused_for_a_records_folder(
     )
     assert code == 3 and env["error"]["key"] == "input.records_subject_ambiguous"
     assert not out.exists()
+
+
+def test_a_records_folder_with_multiple_agents_derives_one_subject_per_agent(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import yaml
+
+    folder = str(_multi_agent_records(tmp_path / "records"))
+    out = tmp_path / "out"
+
+    code, env = _run(["assess", folder, "--out", str(out)], capsys)
+
+    assert code == 0
+    events = [
+        json.loads(line)
+        for path in (out / "records-bundle" / "events").glob("*.jsonl")
+        for line in path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert {e["subject"] for e in events} == {
+        "spiffe://corp/agents/checkout-copilot",
+        "spiffe://corp/agents/fraud-detection-agent",
+        "agentce:subject/local",
+    }
+    profile = yaml.safe_load((out / "applicability.yaml").read_text(encoding="utf-8"))
+    assert [s["id"] for s in profile["subjects"]] == [
+        "spiffe://corp/agents/checkout-copilot",
+        "spiffe://corp/agents/fraud-detection-agent",
+        "agentce:subject/local",
+    ]
+
+
+def test_a_records_folder_with_one_agent_id_still_derives_one_default_subject(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The F1 regression test: `_records()`'s fixture carries exactly one real `gen_ai.agent.id`
+    (credit-underwriter) alongside id-less events; a lone real id must not be promoted to be the
+    subject id, since there is nothing to disambiguate -- output stays byte-identical to before C4."""
+    folder = str(_records(tmp_path / "records"))
+    out = tmp_path / "out"
+
+    code, env = _run(["assess", folder, "--out", str(out)], capsys)
+
+    assert code == 0
+    events = [
+        json.loads(line)
+        for path in (out / "records-bundle" / "events").glob("*.jsonl")
+        for line in path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert {e["subject"] for e in events} == {"agentce:subject/local"}
+
+
+def test_renamed_and_reordered_files_give_the_same_result_with_multiple_agents(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    one = _multi_agent_records(tmp_path / "one")
+    two = tmp_path / "two"
+    two.mkdir()
+    for index, name in enumerate(["fraud.json", "checkout.json", "rag.json"]):
+        shutil.copy(one / name, two / f"{9 - index}-{name}")
+    _, first = _run(["assess", str(one), "--out", str(tmp_path / "o1")], capsys)
+    _, second = _run(["assess", str(two), "--out", str(tmp_path / "o2")], capsys)
+    assert first["bundle_digest"] == second["bundle_digest"]
 
 
 def test_a_file_with_a_byte_order_mark_is_read(

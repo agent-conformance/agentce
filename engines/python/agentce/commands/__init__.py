@@ -68,6 +68,7 @@ from ..profile import Profile
 from ..quarantine import counts_by_reason, write_quarantine
 from ..records import (
     BUNDLE_DIR,
+    DEFAULT_SUBJECT,
     DERIVED_PROFILE_FILE,
     RECORDS_LIMITATION,
     ScannedRecords,
@@ -1157,12 +1158,12 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     return result
 
 
-def _records_subject(declared: Profile | None) -> str:
+def _records_subject(declared: Profile | None) -> str | None:
     """The subject a records folder is assessed as: the one subject an adopter's own profile declares,
-    else the engine's default. A folder is one subject; a profile declaring several cannot say which of
-    them the records are about."""
+    else ``None`` to let ``scan()`` discover one subject per distinct agent id in the records (18.14 C4).
+    A profile declaring several subjects cannot say which of them the records are about."""
     if declared is None:
-        return DEFAULT_SUBJECT
+        return None
     if not declared.subjects:
         raise InputError(
             "input.profile_invalid",
@@ -2843,10 +2844,9 @@ _FRAMEWORK_ADAPTER = {
     "custom-loop": "agentce-emit",
 }
 INIT_ROLES = ("deployer", "provider", "both")
-#: The identities ``agentce_emit.auto()`` emits under when nothing is configured (its
-#: ``DEFAULT_SUBJECT`` and ``DEFAULT_SOURCE``); ``init`` writes the same strings so a bare init and a
-#: bare ``auto()`` describe one subject and one source. A test holds the two packages equal.
-DEFAULT_SUBJECT = "agentce:subject/local"
+#: The identity ``agentce_emit.auto()`` emits under when nothing is configured (its
+#: ``DEFAULT_SOURCE``); ``init`` writes the same string (``DEFAULT_SUBJECT``, from ``..records``) so a
+#: bare init and a bare ``auto()`` describe one subject and one source. A test holds the two packages equal.
 DEFAULT_EMIT_SOURCE = "urn:agentce:emit:local"
 
 
