@@ -56,13 +56,26 @@ def body(argv: list[str]) -> int:
         (yaml.safe_load(Path(dev_file).read_text("utf-8")) or {}).get("deviations", [])
     )
     assertions = json.loads((Path(report) / "assertions.json").read_text("utf-8"))
-    outcome_by_control = {
-        str(a.get("control")): str(a.get("outcome")) for a in assertions
-    }
+    outcomes_by_control: dict[str, set[str]] = {}
+    applied_controls: set[str] = set()
+    window_ends: list[str] = []
+    for a in assertions:
+        control = str(a.get("control"))
+        outcomes_by_control.setdefault(control, set()).add(str(a.get("outcome")))
+        if a.get("deviation"):
+            applied_controls.add(control)
+        end = (a.get("window") or {}).get("end")
+        if end:
+            window_ends.append(str(end))
     problems = readiness.deviation_lint(
         deviations,
         control_ids=_control_ids(argv),
-        outcome_by_control=outcome_by_control,
+        outcomes_by_control={
+            control: frozenset(outcomes)
+            for control, outcomes in outcomes_by_control.items()
+        },
+        applied_controls=frozenset(applied_controls),
+        as_of=max(window_ends) if window_ends else None,
     )
     emit(
         {"problems": problems, "clean": not problems},
