@@ -156,8 +156,7 @@ export function summarizeActivity(
     for (const t of subject.declaredTools) declaredTools.add(t);
     for (const m of subject.declaredModels) declaredModels.add(m);
   }
-  const declaredAgents =
-    declaredSubjectIds ?? new Set(profile.subjects.map((s) => s.id));
+  const declaredAgents = declaredSubjectIds ?? new Set(profile.subjects.map((s) => s.id));
 
   return {
     agents: [...agents].sort(byteCompare),

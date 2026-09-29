@@ -55,7 +55,7 @@ test("empty run reports all zero counts", () => {
     Object.values(activity.denied_or_blocked).every((n) => n === 0),
     true,
   );
-  assert.deepEqual(activity.undeclared, { models: [], tools: [] });
+  assert.deepEqual(activity.undeclared, { models: [], tools: [], agents: [] });
 });
 
 test("counts agents, models, and tools", () => {
@@ -123,7 +123,11 @@ test("undeclared tool and model are honest, not yet declared", () => {
     event("ModelCall", { model: { provider: "openai", name: "gpt-x", version_or_digest: "1" } }),
   ];
   const activity = summarizeActivity(events, emptyProfile());
-  assert.deepEqual(activity.undeclared, { models: ["gpt-x"], tools: ["search"] });
+  assert.deepEqual(activity.undeclared, {
+    models: ["gpt-x"],
+    tools: ["search"],
+    agents: ["spiffe://corp/agents/a"],
+  });
 });
 
 test("declaring a tool removes it from undeclared", () => {
