@@ -73,6 +73,7 @@ _PRESET_PAIRS: dict[str, frozenset[str]] = {
     "ci": frozenset({"sarif", "junit"}),
     "share": frozenset({"md", "html", "pdf", "public", "pack"}),
     "risk-lead": frozenset({"md", "html"}),
+    "auditor": frozenset({"oscal", "oscal_xml", "pack"}),
 }
 
 #: Every file a run writes regardless of `--emit`/`--for` (contracts/P18-18.7.md C1).
@@ -124,6 +125,7 @@ _TOKEN_FILES: dict[str, tuple[str, ...]] = {
 #: change drops one of the three files from the `security` preset's output.
 _PRESET_VIEW_FILES: dict[str, tuple[str, ...]] = {
     "security": ("security.md", "security.html", "security.json"),
+    "auditor": ("auditor.md", "auditor.html", "auditor.json"),
 }
 
 

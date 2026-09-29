@@ -13,11 +13,14 @@ from typing import Any
 
 import jsonschema
 
+from agentce import cli
 from agentce.assertions import Assertion, EvidencePointer, aggregate
 from agentce.auditor_view import compute_auditor_view
+from agentce.report import render_auditor_html, render_auditor_md, validate_report
 
 _WINDOW = ("2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
 _REPO_ROOT = Path(__file__).resolve().parents[3]
+_QUICKSTART = _REPO_ROOT / "corpus" / "quickstart"
 _SCHEMA = json.loads(
     (_REPO_ROOT / "spec/report/auditor.schema.json").read_text(encoding="utf-8")
 )
@@ -243,3 +246,164 @@ def test_hostile_deviation_and_evidence_text_passes_through_unescaped_at_compute
     view = compute_auditor_view(assertions, deviations=[entry])
     assert view["clauses"][0]["deviation"]["rationale"] == hostile
     assert view["clauses"][0]["evidence"][0]["ref"] == hostile
+
+
+def test_render_auditor_md_never_empty_on_a_quiet_run() -> None:
+    view = compute_auditor_view([])
+    text = render_auditor_md(view)
+    assert "AgentCE auditor view" in text
+    for heading in (
+        "Clauses",
+        "By clause",
+        "Deviations",
+        "Manual checklists",
+        "OSCAL and evidence bundle",
+        "How to re-run",
+    ):
+        assert heading in text, heading
+
+
+def test_render_auditor_md_and_html_escape_hostile_deviation_and_evidence_text() -> (
+    None
+):
+    hostile = "<script>alert(1)</script>"
+    entry = {**_DEVIATION_ENTRY, "rationale": hostile, "approver": hostile}
+    assertions = [
+        _assertion(
+            "OVS-03",
+            outcome="partial",
+            deviation="OVS-03",
+            crosswalk=[{"framework": "eu-ai-act", "clause": "Art. 14"}],
+            evidence=[
+                EvidencePointer(
+                    ref=hostile, digest="sha256:" + "a" * 64, source_class="self_report"
+                )
+            ],
+        )
+    ]
+    view = compute_auditor_view(assertions, deviations=[entry])
+    md = render_auditor_md(view)
+    html_out = render_auditor_html(view)
+    assert "<script>" not in md
+    assert "<script>" not in html_out
+    assert "alert(1)" in md  # neutralised, not dropped
+    assert "alert(1)" in html_out
+
+
+def test_render_auditor_deviation_unavailable_when_register_missing() -> None:
+    """A clause carrying a ``deviation`` whose register entry is unavailable at render time
+    (:func:`agentce.auditor_view._deviation_detail`'s minimal ``{control}``-only form) gets the
+    honest disclosure, not a KeyError or a fabricated detail."""
+    assertions = [_assertion("OVS-03", outcome="partial", deviation="OVS-03")]
+    view = compute_auditor_view(assertions)  # no `deviations` register passed
+    md = render_auditor_md(view)
+    html_out = render_auditor_html(view)
+    assert "OVS-03" in md and "was not available" in md
+    assert "OVS-03" in html_out and "was not available" in html_out
+
+
+def test_render_auditor_manual_checklist_note_is_not_truncated() -> None:
+    """`manual_checklist_note` is fixed catalogue text, not record-derived (SPEC §13.3.4 Stage 3's
+    disclosure sentence, over 200 characters) -- sanitising it like an evidence ref would truncate it
+    at `_SANITIZE_CAP` and corrupt a real catalogue message, so it must render in full."""
+    assertions = [_assertion("DAT-04", outcome="not_assessed", mode="manual")]
+    view = compute_auditor_view(assertions)
+    md = render_auditor_md(view)
+    html_out = render_auditor_html(view)
+    assert "agentce-prepare-to-share's checklist procedure for the next step." in md
+    assert "checklist procedure for the next step." in html_out
+
+
+def test_render_auditor_reproduce_line_prefers_reverify_command_over_invocation() -> (
+    None
+):
+    """C3's own discrimination (round 2 B1): the re-run line must use ``reverify_command`` (which
+    C1 threads ``--deviations`` into), never the positional ``invocation``, so re-running the printed
+    command reproduces the same ``partial`` outcome rather than dropping the deviation."""
+    view = compute_auditor_view([_assertion("OVS-03")])
+    md = render_auditor_md(
+        view,
+        invocation=["assess", "--for", "auditor"],
+        reverify_command=["assess", "--for", "auditor", "--deviations", "reg.yaml"],
+    )
+    assert "--deviations reg.yaml" in md
+    assert "agentce assess --for auditor --deviations reg.yaml" in md
+
+
+def _assess_auditor(out: Path, extra: list[str] | None = None) -> int:
+    return cli.main(
+        [
+            "assess",
+            "--bundle",
+            str(_QUICKSTART / "evidence"),
+            "--profile",
+            str(_QUICKSTART / "applicability.yaml"),
+            "--domain",
+            str(_QUICKSTART / "domain.linkml.yaml"),
+            "--out",
+            str(out),
+            "--for",
+            "auditor",
+            *(extra or []),
+        ]
+    )
+
+
+def test_write_report_for_auditor_preset_writes_auditor_artifacts(
+    tmp_path: Path,
+) -> None:
+    out_with = tmp_path / "with"
+    assert _assess_auditor(out_with) == 0
+    for name in ("auditor.md", "auditor.html", "auditor.json"):
+        assert (out_with / name).is_file(), name
+
+    out_without = tmp_path / "without"
+    assert (
+        cli.main(
+            [
+                "assess",
+                "--bundle",
+                str(_QUICKSTART / "evidence"),
+                "--profile",
+                str(_QUICKSTART / "applicability.yaml"),
+                "--domain",
+                str(_QUICKSTART / "domain.linkml.yaml"),
+                "--out",
+                str(out_without),
+            ]
+        )
+        == 0
+    )
+    for name in ("auditor.md", "auditor.html", "auditor.json"):
+        assert not (out_without / name).exists(), name
+
+
+def test_write_report_auditor_artifacts_validate_against_their_schemas(
+    tmp_path: Path,
+) -> None:
+    out = tmp_path / "o"
+    assert _assess_auditor(out) == 0
+    assert validate_report(out) == []
+
+
+def test_auditor_json_counts_matches_aggregate_of_assertions(tmp_path: Path) -> None:
+    """C3's own repo test (round 2 B2): ``auditor.json``'s ``counts`` must equal a fresh
+    :func:`agentce.assertions.aggregate` call over the same run's ``assertions.json``, byte-for-byte --
+    never compared against a nonexistent ``report.json``."""
+    out = tmp_path / "o"
+    assert _assess_auditor(out) == 0
+    auditor = json.loads((out / "auditor.json").read_text(encoding="utf-8"))
+    assertions_json = json.loads((out / "assertions.json").read_text(encoding="utf-8"))
+    assertions = [Assertion.from_json(a) for a in assertions_json]
+    assert auditor["counts"] == aggregate(assertions)
+
+
+def test_render_auditor_md_with_language_de_does_not_crash_and_falls_back() -> None:
+    """As `test_render_security_md_with_language_de_does_not_crash_and_falls_back`: no German
+    translation exists yet for the auditor view's own keys, so the German render must fall back to
+    the English text rather than raising or leaving an unresolved message key in the output."""
+    view = compute_auditor_view([_assertion("OVS-03")])
+    md = render_auditor_md(view, language="de")
+    html_out = render_auditor_html(view, language="de")
+    assert "AgentCE auditor view" in md
+    assert "AgentCE auditor view" in html_out

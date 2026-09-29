@@ -58,14 +58,20 @@ def _deviation_detail(
 
 
 def compute_auditor_view(
-    assertions: list[Assertion], deviations: list[dict[str, Any]] | None = None
+    assertions: list[Assertion],
+    deviations: list[dict[str, Any]] | None = None,
+    *,
+    counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """Return the clause-by-clause selection of ``assertions`` for a whole run.
 
     ``deviations`` is the same already-linted register :func:`agentce.assess.apply_deviations` applied
-    (never re-validated here). Deterministic: no wall-clock, no locale, no assertion-order dependency
-    (``clauses`` is sorted by ``(control, subject)``, ``by_clause`` by ``(framework, clause)`` with its
-    control ids deduplicated and sorted)."""
+    (never re-validated here). ``counts`` lets a caller that already holds
+    :func:`agentce.assertions.aggregate`'s result over the same ``assertions`` (``write_report`` always
+    does) pass it straight through instead of a second full pass; omitting it recomputes it here, so
+    every other/test caller is unaffected. Deterministic: no wall-clock, no locale, no assertion-order
+    dependency (``clauses`` is sorted by ``(control, subject)``, ``by_clause`` by ``(framework,
+    clause)`` with its control ids deduplicated and sorted)."""
     by_control = {str(d.get("control")): d for d in (deviations or [])}
     cat = messages.catalogue()
     note = cat["report.manual_checklist_not_yet_evaluated"]
@@ -102,5 +108,5 @@ def compute_auditor_view(
             }
             for framework, clause_map in sorted(by_clause.items())
         },
-        "counts": aggregate(assertions),
+        "counts": counts if counts is not None else aggregate(assertions),
     }

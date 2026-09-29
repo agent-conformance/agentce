@@ -42,6 +42,7 @@ from . import (
 from .activity import DENIED_KINDS, RECORDER_CLASSES, summarize_activity
 from .assertions import Assertion, aggregate, check_dc5
 from .assess import index_by_subject, requirement_met
+from .auditor_view import compute_auditor_view
 from .catalog import Catalog, ControlSpec, catalog_provenance_digest
 from .profile import Profile, Subject
 from .project import (
@@ -900,6 +901,277 @@ def render_security_html(
 
 def _reproduce_command(invocation: list[str] | None) -> str:
     return "agentce " + " ".join(invocation) if invocation else "agentce quickstart"
+
+
+#: The register record's own six required fields, in the order the auditor view renders them --
+#: matching :data:`agentce.auditor_view._DEVIATION_FIELDS`'s own order, each paired with its label key.
+_AUDITOR_DEVIATION_LABEL_KEYS: dict[str, str] = {
+    "rationale": "report.auditor_deviation_rationale",
+    "compensating_control": "report.auditor_deviation_compensating_control",
+    "owner": "report.auditor_deviation_owner",
+    "approver": "report.auditor_deviation_approver",
+    "granted": "report.auditor_deviation_granted",
+    "expiry": "report.auditor_deviation_expiry",
+}
+
+
+def _auditor_clause_md(entry: dict[str, Any], cat: dict[str, str]) -> list[str]:
+    """One clause: its control, version, subject, outcome and mode, then its crosswalk citations and
+    evidence refs as their own lines -- the :func:`_finding_md` idiom, every field sourced from
+    evidence or a third-party catalog sanitised before it reaches Markdown (SPEC §7)."""
+    control = _sanitize_field(entry["control"])
+    version = _sanitize_field(entry["control_version"])
+    subject = _sanitize_field(entry["subject"])
+    outcome = sanitize_for_markdown(_outcome_label(cat, entry["outcome"]))
+    mode = _sanitize_field(entry["mode"])
+    lines = [f"- **{control}** @ `{version}` (`{subject}`) -> **{outcome}** ({mode})"]
+    lines += [
+        f"  - `{sanitize_for_markdown(_crosswalk_text(xw, cat))}`"
+        for xw in entry["crosswalk"]
+    ]
+    if entry["evidence"]:
+        refs = ", ".join(f"`{_sanitize_field(e['ref'])}`" for e in entry["evidence"])
+        lines.append(f"  - {cat['report.evidence_label']}: {refs}")
+    return lines
+
+
+def _auditor_clause_html(entry: dict[str, Any], cat: dict[str, str]) -> str:
+    """As :func:`_auditor_clause_md`, one ``<tr>`` -- the :func:`_row_html` idiom."""
+    evidence = ""
+    if entry["evidence"]:
+        refs = ", ".join(
+            sanitize_for_html(e["ref"], placeholder=_SANITIZE_EMPTY_FIELD_PLACEHOLDER)
+            for e in entry["evidence"]
+        )
+        evidence = f"{html.escape(cat['report.evidence_label'])}: {refs}"
+    crosswalk = "; ".join(
+        sanitize_for_html(_crosswalk_text(xw, cat)) for xw in entry["crosswalk"]
+    )
+    return (
+        f"<tr><td>{sanitize_for_html(entry['control'])}</td>"
+        f"<td>{sanitize_for_html(entry['control_version'])}</td>"
+        f"<td>{sanitize_for_html(entry['subject'])}</td>"
+        f"<td>{sanitize_for_html(_outcome_label(cat, entry['outcome']))}</td>"
+        f"<td>{sanitize_for_html(entry['mode'])}</td>"
+        f"<td>{crosswalk}</td><td>{evidence}</td></tr>"
+    )
+
+
+def _auditor_by_clause_md(
+    by_clause: dict[str, dict[str, list[str]]], cat: dict[str, str]
+) -> list[str]:
+    """One line per ``(framework, clause)``, already sorted and deduplicated by
+    :func:`agentce.auditor_view.compute_auditor_view` -- iteration order is preserved, not re-sorted
+    here, so this stays deterministic."""
+    lines: list[str] = []
+    for framework, clauses in by_clause.items():
+        for clause, control_ids in clauses.items():
+            fw = _sanitize_field(framework)
+            cl = _sanitize_field(clause)
+            ids = ", ".join(f"`{_sanitize_field(c)}`" for c in control_ids)
+            lines.append(f"- **{fw}** {cl}: {ids}")
+    return lines
+
+
+def _auditor_by_clause_html(
+    by_clause: dict[str, dict[str, list[str]]], cat: dict[str, str]
+) -> str:
+    items: list[str] = []
+    for framework, clauses in by_clause.items():
+        for clause, control_ids in clauses.items():
+            fw = sanitize_for_html(framework)
+            cl = sanitize_for_html(clause)
+            ids = ", ".join(sanitize_for_html(c) for c in control_ids)
+            items.append(f"<li><strong>{fw}</strong> {cl}: {ids}</li>")
+    return "".join(items)
+
+
+def _auditor_deviation_md(entry: dict[str, Any], cat: dict[str, str]) -> list[str]:
+    """The register's full detail for one deviated clause, verbatim (never re-validated here) --
+    or, when the register was unavailable at render time, the honest disclosure that only the
+    control id survived (:func:`agentce.auditor_view._deviation_detail`'s minimal form)."""
+    control = _sanitize_field(entry["control"])
+    subject = _sanitize_field(entry["subject"])
+    deviation = entry["deviation"]
+    header = f"- **{control}** (`{subject}`)"
+    if "rationale" not in deviation:
+        note = i18n_format.format_message(
+            cat["report.auditor_deviation_unavailable"], control=control
+        )
+        return [f"{header}: {note}"]
+    lines = [header]
+    for field, label_key in _AUDITOR_DEVIATION_LABEL_KEYS.items():
+        value = sanitize_for_markdown(str(deviation.get(field, "")))
+        lines.append(f"  - {cat[label_key]}: {value}")
+    if deviation.get("evidence_refs"):
+        refs = ", ".join(f"`{_sanitize_field(r)}`" for r in deviation["evidence_refs"])
+        lines.append(f"  - {cat['report.evidence_label']}: {refs}")
+    return lines
+
+
+def _auditor_deviation_html(entry: dict[str, Any], cat: dict[str, str]) -> str:
+    """As :func:`_auditor_deviation_md`, one ``<li>`` with its own nested ``<ul>``."""
+    control = sanitize_for_html(entry["control"])
+    subject = sanitize_for_html(entry["subject"])
+    deviation = entry["deviation"]
+    if "rationale" not in deviation:
+        note = i18n_format.format_message(
+            cat["report.auditor_deviation_unavailable"],
+            control=sanitize_for_html(
+                entry["control"], placeholder=_SANITIZE_EMPTY_FIELD_PLACEHOLDER
+            ),
+        )
+        return f"<li><strong>{control}</strong> ({subject}): {note}</li>"
+    items = "".join(
+        f"<li>{html.escape(cat[label_key])}: "
+        f"{sanitize_for_html(str(deviation.get(field, '')))}</li>"
+        for field, label_key in _AUDITOR_DEVIATION_LABEL_KEYS.items()
+    )
+    if deviation.get("evidence_refs"):
+        refs = ", ".join(sanitize_for_html(r) for r in deviation["evidence_refs"])
+        items += f"<li>{html.escape(cat['report.evidence_label'])}: {refs}</li>"
+    return f"<li><strong>{control}</strong> ({subject})<ul>{items}</ul></li>"
+
+
+def _auditor_manual_md(entry: dict[str, Any], cat: dict[str, str]) -> str:
+    # `manual_checklist_note` is fixed catalogue text (`compute_auditor_view`'s own
+    # `report.manual_checklist_not_yet_evaluated`), never record-derived -- unlike `control`/`subject`,
+    # it is not sanitised (sanitizing it would truncate it at `_SANITIZE_CAP`, corrupting a real
+    # catalogue message, not neutralising a hostile one).
+    control = _sanitize_field(entry["control"])
+    subject = _sanitize_field(entry["subject"])
+    return f"- **{control}** (`{subject}`): {entry['manual_checklist_note']}"
+
+
+def _auditor_manual_html(entry: dict[str, Any], cat: dict[str, str]) -> str:
+    control = sanitize_for_html(entry["control"])
+    subject = sanitize_for_html(entry["subject"])
+    note = html.escape(entry["manual_checklist_note"])
+    return f"<li><strong>{control}</strong> ({subject}): {note}</li>"
+
+
+def render_auditor_md(
+    auditor: dict[str, Any],
+    *,
+    language: str = messages.DEFAULT_LANGUAGE,
+    invocation: list[str] | None = None,
+    reverify_command: list[str] | None = None,
+) -> str:
+    """The auditor view (18.17): clause-by-clause, with the full evidence trail, accepted deviations,
+    manual-checklist disclosures, and a pointer to the OSCAL/evidence-pack bundle. Adds no new outcome
+    and no new rollup (SPEC §9.2): ``auditor`` is :func:`agentce.auditor_view.compute_auditor_view`'s
+    own output, rendered as-is."""
+    cat = messages.catalogue(language)
+    argv = list(reverify_command) if reverify_command else list(invocation or [])
+    clauses = auditor["clauses"]
+    lines = [
+        f"# {cat['report.auditor_title']}",
+        "",
+        cat["report.auditor_intro"],
+        "",
+        f"## {cat['report.auditor_clauses_heading']}",
+        "",
+    ]
+    if not clauses:
+        lines.append(f"_{cat['report.no_controls']}_")
+    else:
+        for entry in clauses:
+            lines += _auditor_clause_md(entry, cat)
+    lines += ["", f"## {cat['report.auditor_by_clause_heading']}", ""]
+    by_clause_lines = _auditor_by_clause_md(auditor["by_clause"], cat)
+    lines += by_clause_lines or [f"_{cat['report.auditor_by_clause_none']}_"]
+    lines += ["", f"## {cat['report.auditor_deviations_heading']}", ""]
+    deviated = [e for e in clauses if "deviation" in e]
+    if deviated:
+        for entry in deviated:
+            lines += _auditor_deviation_md(entry, cat)
+    else:
+        lines.append(f"_{cat['report.auditor_deviations_none']}_")
+    lines += ["", f"## {cat['report.auditor_manual_heading']}", ""]
+    manual = [e for e in clauses if "manual_checklist_note" in e]
+    if manual:
+        lines += [_auditor_manual_md(e, cat) for e in manual]
+    else:
+        lines.append(f"_{cat['report.auditor_manual_none']}_")
+    lines += [
+        "",
+        f"## {cat['report.auditor_oscal_heading']}",
+        "",
+        cat["report.auditor_oscal_text"],
+        "",
+        f"## {cat['report.auditor_rerun_heading']}",
+        "",
+        f"- Reproduce: `{_reproduce_command(argv)}`",
+        "",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def render_auditor_html(
+    auditor: dict[str, Any],
+    *,
+    language: str = messages.DEFAULT_LANGUAGE,
+    invocation: list[str] | None = None,
+    reverify_command: list[str] | None = None,
+) -> str:
+    """As :func:`render_auditor_md`, the same self-contained, escaped, WCAG 2.2 AA page shape as
+    :func:`render_report_html`."""
+    cat = messages.catalogue(language)
+    argv = list(reverify_command) if reverify_command else list(invocation or [])
+    clauses = auditor["clauses"]
+    title = html.escape(cat["report.auditor_title"])
+    clause_rows = (
+        "".join(_auditor_clause_html(e, cat) for e in clauses)
+        if clauses
+        else f'<tr><td colspan="7">{html.escape(cat["report.no_controls"])}</td></tr>'
+    )
+    by_clause_items = _auditor_by_clause_html(auditor["by_clause"], cat)
+    by_clause_html = (
+        f"<ul>{by_clause_items}</ul>"
+        if by_clause_items
+        else f"<p>{html.escape(cat['report.auditor_by_clause_none'])}</p>"
+    )
+    deviated = [e for e in clauses if "deviation" in e]
+    deviations_html = (
+        f"<ul>{''.join(_auditor_deviation_html(e, cat) for e in deviated)}</ul>"
+        if deviated
+        else f"<p>{html.escape(cat['report.auditor_deviations_none'])}</p>"
+    )
+    manual = [e for e in clauses if "manual_checklist_note" in e]
+    manual_html = (
+        f"<ul>{''.join(_auditor_manual_html(e, cat) for e in manual)}</ul>"
+        if manual
+        else f"<p>{html.escape(cat['report.auditor_manual_none'])}</p>"
+    )
+    return (
+        f'<!doctype html><html lang="{html.escape(language)}"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<meta http-equiv="Content-Security-Policy" '
+        "content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\">"
+        f"<title>{title}</title><style>{_HTML_STYLE}</style></head><body>"
+        f"<main><h1>{title}</h1><p>{html.escape(cat['report.auditor_intro'])}</p>"
+        '<section aria-labelledby="auditor-clauses"><h2 id="auditor-clauses">'
+        f"{html.escape(cat['report.auditor_clauses_heading'])}</h2>"
+        f"<table><caption>{html.escape(cat['report.auditor_clauses_heading'])}</caption>"
+        '<thead><tr><th scope="col">Control</th><th scope="col">Version</th>'
+        '<th scope="col">Subject</th><th scope="col">Outcome</th>'
+        '<th scope="col">Mode</th><th scope="col">Crosswalk</th>'
+        '<th scope="col">Evidence</th></tr></thead>'
+        f"<tbody>{clause_rows}</tbody></table></section>"
+        '<section aria-labelledby="auditor-by-clause"><h2 id="auditor-by-clause">'
+        f"{html.escape(cat['report.auditor_by_clause_heading'])}</h2>{by_clause_html}</section>"
+        '<section aria-labelledby="auditor-deviations"><h2 id="auditor-deviations">'
+        f"{html.escape(cat['report.auditor_deviations_heading'])}</h2>{deviations_html}</section>"
+        '<section aria-labelledby="auditor-manual"><h2 id="auditor-manual">'
+        f"{html.escape(cat['report.auditor_manual_heading'])}</h2>{manual_html}</section>"
+        '<section aria-labelledby="auditor-oscal"><h2 id="auditor-oscal">'
+        f"{html.escape(cat['report.auditor_oscal_heading'])}</h2>"
+        f"<p>{html.escape(cat['report.auditor_oscal_text'])}</p></section>"
+        '<section aria-labelledby="auditor-rerun"><h2 id="auditor-rerun">'
+        f"{html.escape(cat['report.auditor_rerun_heading'])}</h2>"
+        f"<p>Reproduce: <code>{html.escape(_reproduce_command(argv))}</code></p></section>"
+        "</main></body></html>\n"
+    )
 
 
 def _lenses_text() -> str:
@@ -2516,8 +2788,13 @@ def write_report(
     not a reuse of the project view's subject-count gate. ``security.json`` is written whenever
     ``for_preset == "security"``, the same "always written regardless of ``wants``" treatment
     ``project.json`` gets; ``security.md``/``.html`` still respect ``wants("md")``/``wants("html")``
-    since the ``security`` preset's own emit set already selects both. Any other value, including
-    ``None``, writes nothing new here."""
+    since the ``security`` preset's own emit set already selects both. ``"auditor"`` always writes
+    ``auditor.json``/``.md``/``.html`` (the auditor view, 18.17,
+    :func:`agentce.auditor_view.compute_auditor_view`), unconditionally like ``project.json``/
+    ``security.json`` above -- unlike ``security``, never gated by ``wants("md")``/``wants("html")``,
+    since ``PRESET_EMIT["auditor"]`` deliberately excludes those shared tokens (they already mean
+    "also render the ordinary ``report.md``/``.html``"). Any other value, including ``None``, writes
+    nothing new here."""
     check_dc5(
         assertions
     )  # DC-5: refuse a supporting verdict without an evidence pointer
@@ -2720,6 +2997,33 @@ def write_report(
                 "security.html",
                 render_security_html(security_view, language=report_language),
             )
+
+    # 18.17: the auditor view is gated on `for_preset`, like `security` above, but `auditor.md`/`.html`
+    # are always written for this preset, the same as `auditor.json` -- unlike `security`, `"md"`/
+    # `"html"` are not in `PRESET_EMIT["auditor"]` (blast_radius, altitude review: those tokens already
+    # have a fixed, shared meaning at the `wants("md")`/`wants("html")` branches above -- "also render
+    # the ordinary report.md/.html" -- and reusing them here would silently write those too, which the
+    # auditor preset's own build gate (VG-AUDITOR-VIEW) does not expect).
+    if for_preset == "auditor":
+        auditor_view = compute_auditor_view(
+            assertions, deviations=deviations, counts=counts
+        )
+        write_json("auditor.json", auditor_view)
+        rerun_argv = (
+            list(reverify_command) if reverify_command else list(invocation or [])
+        )
+        write_text(
+            "auditor.md",
+            render_auditor_md(
+                auditor_view, language=report_language, reverify_command=rerun_argv
+            ),
+        )
+        write_text(
+            "auditor.html",
+            render_auditor_html(
+                auditor_view, language=report_language, reverify_command=rerun_argv
+            ),
+        )
 
     oscal_doc: dict[str, Any] | None = None
     if wants("oscal") or wants("oscal_xml"):

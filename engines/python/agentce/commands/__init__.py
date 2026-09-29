@@ -128,6 +128,13 @@ PRESET_EMIT: dict[str, frozenset[str]] = {
     #: `md`/`html` render `project.*`/`agents/<dirname>/*` whenever `--profile` declares more than
     #: one subject, the same two formats `security` already renders.
     "risk-lead": frozenset({"md", "html"}),
+    #: Auditor (18.17): the compliance preset's core (`oscal`/`oscal_xml`/`pack`, minus `public`/`csv`,
+    #: which the auditor view's own OSCAL/evidence-bundle pointer section already covers). `md`/`html`
+    #: are deliberately absent -- unlike `security`, `auditor.md`/`.html` are always written for this
+    #: preset (the `security.json`/`auditor.json` "always written" idiom, extended to `.md`/`.html`
+    #: too), never gated by the shared `md`/`html` emit tokens, which would also write the unrelated
+    #: ordinary `report.md`/`.html` (altitude review, contracts/P18-18.17.md C3's own file-set).
+    "auditor": frozenset({"oscal", "oscal_xml", "pack"}),
 }
 #: `CI` values treated as "not in CI" (the `ci-info` convention): unset, empty, or one of these,
 #: case-insensitively. Jenkins (`JENKINS_URL`/`BUILD_ID`) and Azure Pipelines (`TF_BUILD`) are not
