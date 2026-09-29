@@ -70,6 +70,11 @@
     "content_type": "application/schema+json"
   },
   {
+    "path": "/spec/report/project.schema.json",
+    "source": "spec/report/project.schema.json",
+    "content_type": "application/schema+json"
+  },
+  {
     "path": "/spec/report/quarantine.schema.json",
     "source": "spec/report/quarantine.schema.json",
     "content_type": "application/schema+json"

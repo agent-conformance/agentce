@@ -17,6 +17,7 @@ One page per JSON Schema in `spec/report/` (SPEC §9), the schemas every engine 
 | [`manifest.schema.json`](/reference/report-schemas/manifest/) | AgentCE reproducibility manifest |
 | [`oscal-assessment-results.schema.json`](/reference/report-schemas/oscal-assessment-results/) | AgentCE OSCAL Assessment Results (profile) |
 | [`oscal-component-definition.schema.json`](/reference/report-schemas/oscal-component-definition/) | AgentCE OSCAL Component Definition (profile) |
+| [`project.schema.json`](/reference/report-schemas/project/) | AgentCE project view |
 | [`quarantine.schema.json`](/reference/report-schemas/quarantine/) | AgentCE quarantine record |
 | [`remediation-package.schema.json`](/reference/report-schemas/remediation-package/) | AgentCE remediation package |
 | [`results-sarif.schema.json`](/reference/report-schemas/results-sarif/) | AgentCE SARIF results (profile) |

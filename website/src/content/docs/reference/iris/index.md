@@ -1,9 +1,9 @@
 ---
 title: Canonical IRIs
-description: Every one of the 21 canonical, dereferenceable IRIs the specification defines.
+description: Every one of the 22 canonical, dereferenceable IRIs the specification defines.
 ---
 
-Every canonical, dereferenceable IRI the specification defines (SPEC §6, §9; `website/iri-manifest.json`), 21 in total: the JSON-LD context, the RDF vocabulary, and every JSON Schema an engine or a report validates against. Each is served byte-identically at its own canonical path and, here, linked to a human-readable page.
+Every canonical, dereferenceable IRI the specification defines (SPEC §6, §9; `website/iri-manifest.json`), 22 in total: the JSON-LD context, the RDF vocabulary, and every JSON Schema an engine or a report validates against. Each is served byte-identically at its own canonical path and, here, linked to a human-readable page.
 
 | IRI | Page | Content type |
 |---|---|---|
@@ -21,6 +21,7 @@ Every canonical, dereferenceable IRI the specification defines (SPEC §6, §9; `
 | `/spec/report/manifest.schema.json` | [AgentCE reproducibility manifest](/reference/report-schemas/manifest/) | application/schema+json |
 | `/spec/report/oscal-assessment-results.schema.json` | [AgentCE OSCAL Assessment Results (profile)](/reference/report-schemas/oscal-assessment-results/) | application/schema+json |
 | `/spec/report/oscal-component-definition.schema.json` | [AgentCE OSCAL Component Definition (profile)](/reference/report-schemas/oscal-component-definition/) | application/schema+json |
+| `/spec/report/project.schema.json` | [AgentCE project view](/reference/report-schemas/project/) | application/schema+json |
 | `/spec/report/quarantine.schema.json` | [AgentCE quarantine record](/reference/report-schemas/quarantine/) | application/schema+json |
 | `/spec/report/remediation-package.schema.json` | [AgentCE remediation package](/reference/report-schemas/remediation-package/) | application/schema+json |
 | `/spec/report/results-sarif.schema.json` | [AgentCE SARIF results (profile)](/reference/report-schemas/results-sarif/) | application/schema+json |
