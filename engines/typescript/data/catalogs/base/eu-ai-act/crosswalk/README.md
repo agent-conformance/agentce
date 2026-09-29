@@ -15,6 +15,8 @@ ladder rungs, and base-catalog control ids. These are traceability matrices for 
 | `iso-42001.yaml` | ISO/IEC 42001:2023 AI management system | active |
 | `nist-ai-rmf.yaml` | NIST AI Risk Management Framework 1.0 | active |
 | `owasp-asi-2026.yaml` | OWASP Agentic Security Initiative threat taxonomy | active |
+| `mitre-atlas.yaml` | MITRE ATLAS adversarial-ML technique taxonomy | active |
+| `owasp-acs.yaml` | OWASP Agent Control Standard (ACS) | active |
 | `aiuc-1.yaml` | AIUC-1 AI agent certification standard | active |
 | `pren-18229-1.yaml` | prEN 18229-1 (logging, transparency, oversight) | placeholder (draft) |
 | `iso-iec-24970.yaml` | ISO/IEC 24970 (AI system logging) | placeholder (draft) |

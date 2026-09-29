@@ -3,7 +3,7 @@
     {
       "id": "baseline",
       "version": "2026.09",
-      "digest": "sha256:6043537e7696d9a1767527ec7ddf45c4782f7071f8e3b71f1f3535a3a90f6b54",
+      "digest": "sha256:0245e98a53fa0182ee80caf512802089c1fa67d360c98ba10e94391353591097",
       "source_path": "spec/catalogs/base/baseline",
       "signing": {
         "signature_file": "catalog.sig.json",
@@ -14,7 +14,7 @@
     {
       "id": "eu-ai-act",
       "version": "2026.09",
-      "digest": "sha256:e1985104a239563f1e43e02ff845af64bc2adc9b2d01693041eee637400e7b28",
+      "digest": "sha256:2cb26c73bad88d26a507d83f9983e6955f28344d6154add4ff8ed06e24dad9b7",
       "source_path": "spec/catalogs/base/eu-ai-act",
       "signing": {
         "signature_file": "catalog.sig.json",

@@ -1,0 +1,88 @@
+# MITRE ATLAS crosswalk: the adversarial-ML technique classes whose detection or traceability
+# AgentCE's runtime evidence supports, mapped to AgentCE schema elements, correctness-ladder rungs,
+# and base-catalog control ids.
+#
+# Technique identifiers only; no source text is reproduced. The `obligation` field is AgentCE's own
+# statement of what its evidence makes detectable or reconstructable for that technique -- AgentCE is
+# an assessment engine, not a runtime guard, so it evidences that the events needed to detect or trace
+# a technique are present and typed, not that the technique is prevented. Every reference carries
+# `verified_against_text: false` until a reviewer confirms the mapping against the source (SPEC 7.3).
+framework: mitre-atlas
+title: "MITRE ATLAS (Adversarial Threat Landscape for Artificial-Intelligence Systems)"
+version: "2026.09"
+source:
+  publisher: MITRE
+  identifier: "atlas.mitre.org"
+obligations:
+  - ref: "AML.T0051"
+    obligation: Prompt injection is traceable -- an instruction's source class distinguishes user/operator origin from tool-output, retrieved, or untrusted-memory origin.
+    schema_elements: [Instruction, Decision]
+    rungs: [2, 4]
+    controls: [ROB-02]
+    verified_against_text: false
+  - ref: "AML.T0051.001"
+    obligation: Indirect prompt injection is traceable -- the same source-class distinction applies when untrusted content arrives via a tool result.
+    schema_elements: [Instruction, Decision]
+    rungs: [2, 4]
+    controls: [ROB-02]
+    verified_against_text: false
+  - ref: "AML.T0053"
+    obligation: AI agent tool invocation is traceable -- each tool call is attributed and gated by a recorded authorization check.
+    schema_elements: [ToolCall, AuthzCheck, PolicyDecision]
+    rungs: [2]
+    controls: []
+    verified_against_text: false
+  - ref: "AML.T0080"
+    obligation: AI agent context poisoning is traceable -- memory writes into an agent's persistent context are traceable to their source.
+    schema_elements: [MemoryWrite, MemoryRead]
+    rungs: [2]
+    controls: [ROB-02]
+    verified_against_text: false
+  - ref: "AML.T0080.000"
+    obligation: A read of poisoned memory is recoverable, distinguishing what was read from what was written.
+    schema_elements: [MemoryWrite, MemoryRead]
+    rungs: [2]
+    controls: [ROB-02]
+    verified_against_text: false
+  - ref: "AML.T0081"
+    obligation: Modification of an AI agent's configuration is evidenced indirectly, via the comparison between observed and declared tools and models.
+    schema_elements: [ToolCall, ModelCall]
+    rungs: [1]
+    controls: []
+    verified_against_text: false
+  - ref: "AML.T0086"
+    obligation: Exfiltration via AI agent tool invocation is distinguishable -- a tool call's side-effect class separates a write or external-communication call from a read.
+    schema_elements: [ToolCall]
+    rungs: [1]
+    controls: []
+    verified_against_text: false
+  - ref: "AML.T0073"
+    obligation: Impersonation is traceable -- the acting identity is attested.
+    schema_elements: [Attestation, DelegationIssued]
+    rungs: [2]
+    controls: [REC-04]
+    verified_against_text: false
+  - ref: "AML.T0074"
+    obligation: Masquerading is traceable -- a delegation binds an issuing principal to a subject.
+    schema_elements: [Attestation, DelegationIssued]
+    rungs: [2]
+    controls: [REC-04]
+    verified_against_text: false
+  - ref: "AML.T0101"
+    obligation: Data destruction via AI agent tool invocation is distinguished -- an irreversible tool call is identified and, when consequential, gated by a recorded oversight decision.
+    schema_elements: [ToolCall, Decision]
+    rungs: [2]
+    controls: [INT-01, OVS-03]
+    verified_against_text: false
+  - ref: "AML.T0034.002"
+    obligation: Agentic resource consumption is traceable -- a budget-exceeded refusal is a distinct, recorded reason class.
+    schema_elements: [ToolCall, Refusal]
+    rungs: [1]
+    controls: []
+    verified_against_text: false
+  - ref: "AML.T0108"
+    obligation: AI agent command and control is traceable -- every participating agent is attested and its delegations and outcomes are attributed.
+    schema_elements: [Attestation, DelegationIssued, Outcome]
+    rungs: [2]
+    controls: [INT-01]
+    verified_against_text: false

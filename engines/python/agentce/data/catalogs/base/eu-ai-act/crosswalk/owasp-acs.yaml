@@ -1,0 +1,53 @@
+# OWASP Agent Control Standard crosswalk: the ACS lifecycle hooks and decision fields whose
+# traceability AgentCE's runtime evidence supports, mapped to AgentCE schema elements, correctness-
+# ladder rungs, and base-catalog control ids.
+#
+# Hook and field identifiers only; no source text is reproduced. The `obligation` field is AgentCE's
+# own statement of what its evidence makes detectable or reconstructable for that hook or field --
+# AgentCE is an assessment engine, not a runtime guard, so it evidences that the events needed to
+# detect or trace the hook's concern are present and typed, not that the hook is enforced. Every
+# reference carries `verified_against_text: false` until a reviewer confirms the mapping against the
+# source (SPEC 7.3).
+framework: owasp-acs
+title: "OWASP Agent Control Standard (ACS)"
+version: "0.1.0"
+source:
+  publisher: OWASP
+  identifier: "genai.owasp.org/resource/agent-control-standard-acs"
+obligations:
+  - ref: "Hook_ToolCallRequest+Hook_ToolCallResult"
+    obligation: A tool call's authorization decision is recorded before and after execution.
+    schema_elements: [ToolCall, AuthzCheck, PolicyDecision]
+    rungs: [2]
+    controls: []
+    verified_against_text: false
+  - ref: "decision"
+    obligation: AgentCE's own policy-decision outcome is evidenced for every gated action, covering four of ACS's five decision values; the fifth, `defer`, has no AgentCE equivalent.
+    schema_elements: [PolicyDecision]
+    rungs: [2]
+    controls: []
+    verified_against_text: false
+  - ref: "reasoning+policy_references"
+    obligation: A policy decision's reasons and the policy or engine that produced it are recorded.
+    schema_elements: [PolicyDecision]
+    rungs: [2]
+    controls: []
+    verified_against_text: false
+  - ref: "Hook_SessionStart+Hook_SessionEnd"
+    obligation: A session's lifetime is bounded and attributable.
+    schema_elements: [Instruction, Outcome]
+    rungs: [0]
+    controls: []
+    verified_against_text: false
+  - ref: "Hook_SubagentStart+Hook_SubagentStop"
+    obligation: A sub-agent spawned during a run is itself attested and attributed.
+    schema_elements: [Attestation, DelegationIssued]
+    rungs: [2]
+    controls: [REC-01]
+    verified_against_text: false
+  - ref: "Hook_AgbomSnapshot+Hook_AgbomChanged"
+    obligation: AgentCE's comparison between observed and declared tools and models is a partial, independently-derived analogue of an AgBOM inventory, not an AgBOM consumer.
+    schema_elements: [ToolCall, ModelCall]
+    rungs: [1]
+    controls: []
+    verified_against_text: false

@@ -12,6 +12,7 @@ crosswalk:
   - {framework: iso-42001, clause: "A.9.2", relation: maps, verified_against_text: false}
   - {framework: owasp-asi-2026, clause: "T10", relation: maps, verified_against_text: false}
   - {framework: owasp-asi-2026, clause: "T7", relation: maps, verified_against_text: false}
+  - {framework: mitre-atlas, clause: "AML.T0101", relation: maps, verified_against_text: false}
 interpretations: [IR-11]
 applicability:
   applies_to_roles: [both]
