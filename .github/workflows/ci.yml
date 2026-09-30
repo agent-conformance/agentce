@@ -558,6 +558,8 @@ jobs:
       - name: Skill-emitter unit tests
         working-directory: engines/python
         run: uv run --frozen pytest -q -p no:cacheprovider tests/test_skill_emit.py tests/test_remediation.py
+      - name: Vendor the engine wheel for this run (18.54: not committed on phase commits)
+        run: python3 tools/vendor_skill_engine.py --write
       - name: Every skill's vendored engine wheel matches a fresh build (self-test then check)
         run: |
           python3 tools/vendor_skill_engine.py --self-test
@@ -583,6 +585,8 @@ jobs:
           rm -rf "$work/installed-skill/.venv" "$work/installed-skill/.mypy_cache" "$work/installed-skill/.ruff_cache" "$work/installed-skill/__pycache__"
           cd "$work/installed-skill"
           uv run --frozen pytest -q -p no:cacheprovider
+      - name: A release-shaped commit still installs each skill standalone, offline (18.54, S-10)
+        run: uv run --project tools --frozen python tools/skill_release_shape_check.py --no-network
 
   reusable-ci-artifacts:
     # A platform team gates a build on an AgentCE assessment through one of three artifacts: the

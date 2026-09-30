@@ -44,8 +44,20 @@ uv run --frozen pytest -q                                            # agentce-p
 This works because each skill vendors a real wheel of `engines/python` under its own `vendor/`
 directory (`pyproject.toml`'s `[tool.uv.sources]` resolves `agent-conformance` from that local file,
 never a relative path back into this repository). `tools/vendor_skill_engine.py` keeps every skill's
-vendored wheel in sync with `engines/python`; run it with `--write` after a change to the engine. It rebuilds the
-wheel and re-locks each skill; commit the new `vendor/*.whl` together with the skill's `uv.lock`.
+vendored wheel in sync with `engines/python`; run it with `--write` to rebuild the wheel and re-lock
+each skill.
+
+**`vendor/*.whl` and `uv.lock` are not committed on everyday phase commits** (18.54): the wheel changes
+on every engine change, and committing it every time made each one another CI run for no reason
+(`MAINTAINER-INBOX` row 27). CI runs `tools/vendor_skill_engine.py --write` itself before testing either
+skill, so the standalone self-tests above still exercise a real, freshly built wheel on every run. The
+sync test still proves each skill bundles the engine it was tested with, just without a commit recording
+it. Only the commit a release tag points at carries `vendor/*.whl` and `uv.lock`, written there by
+`tools/vendor_skill_engine.py --write` as the last step of cutting that release, so a commit-pinned
+checkout of the tag keeps working exactly as documented above: one command, standalone, offline.
+`tools/skill_release_shape_check.py` proves it. It builds a release-shaped commit, copies each skill
+folder out alone, and runs both self-test commands above from it with networking disabled; its
+`--self-test` proves a release commit with a missing or stale wheel turns that check red.
 
 ## Version table
 

@@ -25,3 +25,9 @@ node_modules/
 
 # Performance harness output (conformance/perf.py --run)
 conformance/perf-results.json
+
+# Skill-vendored engine wheel and lock (18.54): built fresh by CI on every phase commit, tracked only
+# on the commit a release tag points at, by tools/vendor_skill_engine.py --write (see skills/README.md
+# "Install and pin (S-10)").
+skills/*/vendor/*.whl
+skills/*/uv.lock
