@@ -1062,7 +1062,17 @@ function cmdSign(argv: string[]): CommandResult {
       "produce the report first: `agentce assess … --out <report-dir>`.",
     );
   }
-  const claim = JSON.parse(readFileSync(claimPath, "utf-8")) as Record<string, unknown>;
+  const parsedClaim: unknown = JSON.parse(readFileSync(claimPath, "utf-8"));
+  if (parsedClaim === null || typeof parsedClaim !== "object" || Array.isArray(parsedClaim)) {
+    // Matches Python's `claim.setdefault("signatures", [])` (AttributeError on a non-dict claim)
+    // and Java's `(ObjectNode) Json.parseFile(claimPath)` cast (ClassCastException) -- both crash
+    // into `internal.unexpected` rather than silently appending a "signatures" property that
+    // `JSON.stringify` would then drop from a top-level array (18.26 round-2 verifier finding).
+    throw new Error(
+      `claim.json does not hold an object (got ${Array.isArray(parsedClaim) ? "array" : parsedClaim === null ? "null" : typeof parsedClaim})`,
+    );
+  }
+  const claim = parsedClaim as Record<string, unknown>;
 
   const signer = signSigner(args.key, profile);
   const subjects = signSubjects(reportDir, claim);

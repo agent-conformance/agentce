@@ -1200,6 +1200,34 @@ test("sign: a missing claim.json gives sign.no_claim", () => {
   }
 });
 
+test("sign: an array-shaped claim.json refuses with internal.unexpected, leaving the file untouched", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-sign-"));
+  try {
+    const report = readinessReport(dir);
+    const claimPath = join(report, "claim.json");
+    writeFileSync(claimPath, JSON.stringify([1, 2]));
+    const before = readFileSync(claimPath);
+    const { path: keyPath } = edKeyFile(dir);
+    const { exitCode, envelope } = runJson([
+      "sign",
+      report,
+      "--as",
+      "claimant",
+      "--profile",
+      "kms",
+      "--key",
+      keyPath,
+    ]);
+    assert.equal(exitCode, 3);
+    const error = envelope.error as { message_key: string };
+    assert.equal(error.message_key, "internal.unexpected");
+    assert.deepEqual(readFileSync(claimPath), before);
+    assert.equal(existsSync(join(report, "signatures")), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("sign: profile kms with no --key gives sign.kms_key_missing", () => {
   const dir = mkdtempSync(join(tmpdir(), "agentce-cli-sign-"));
   try {
