@@ -976,7 +976,7 @@ public final class Report {
         Map<String, String> observationUuid = new LinkedHashMap<>();
         ArrayNode observations = Json.nodes().arrayNode();
         for (Assertions.Assertion a : ordered) {
-            String key = a.control + " " + a.subject;
+            String key = a.control + "\0" + a.subject;
             String obsUuid = uuid("observation", a.control, a.subject);
             observationUuid.put(key, obsUuid);
             ObjectNode observation = observations.addObject();
@@ -1000,7 +1000,7 @@ public final class Report {
 
         ArrayNode findings = Json.nodes().arrayNode();
         for (Assertions.Assertion a : ordered) {
-            String key = a.control + " " + a.subject;
+            String key = a.control + "\0" + a.subject;
             ObjectNode finding = findings.addObject();
             finding.put("uuid", uuid("finding", a.control, a.subject));
             finding.put("title", a.control + " for " + a.subject);
