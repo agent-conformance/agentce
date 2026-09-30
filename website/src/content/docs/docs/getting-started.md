@@ -24,13 +24,13 @@ You need two things on your machine before the first command:
   `curl -LsSf https://astral.sh/uv/install.sh | sh`, or follow the instructions at
   [astral.sh/uv](https://docs.astral.sh/uv/getting-started/installation/).
 
-The engine signs and verifies with Ed25519 through the `cryptography` package, pinned to a release
-with no known advisories. That package ships prebuilt wheels for Linux and for Apple-silicon macOS, so
-the command below installs with nothing else on those platforms. Intel macOS has no prebuilt wheel:
-the first install compiles `cryptography` from source and needs [Rust](https://rustup.rs) and OpenSSL 3
-(`brew install openssl@3`, then `export OPENSSL_DIR="$(brew --prefix openssl@3)"`). Every pull request
-installs the engine and runs the quickstart on Linux, Apple-silicon macOS, and Intel macOS. Windows is
-not part of that matrix.
+The engine signs and verifies with Ed25519 through the `cryptography` package. On Linux, Windows, and
+Apple-silicon macOS that resolves to a release with no known advisories, and the command below installs
+with nothing else. No `cryptography` release since 49.0.0 publishes an Intel-macOS wheel, so on Intel
+macOS the install resolves the last release that does instead — the 48.x line, which carries advisories
+the newer releases clear (ADR 0024 has the trade-off). That install is still a prebuilt wheel, not a
+source build. Every pull request installs the engine and runs the quickstart on Linux, Apple-silicon
+macOS, and Intel macOS. Windows is not part of that matrix.
 
 After installing, `uv run --project engines/python agentce doctor --project corpus/quickstart` reports
 the Python version and whether `cryptography` came from a prebuilt wheel or a source build, and names

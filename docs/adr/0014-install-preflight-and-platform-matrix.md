@@ -3,6 +3,15 @@
 Status: accepted
 Spec refs: §13.4 AX-1, AX-5, AX-8
 
+Amendment: ADR 0024 replaced the "keep the pin" decision below for Intel macOS. The source build this
+ADR relies on needs a Rust toolchain and OpenSSL 3 that a fresh machine does not have by default, so
+the one documented install command did not actually work there without first installing both by hand
+— friction the stated prerequisite never removed, only disclosed. 0024 pins Intel macOS to an older
+`cryptography` release with a real prebuilt wheel instead, trading newer advisory fixes for an install
+that needs nothing beyond `uv`. The preflight design below (`doctor`'s `environment` section, the
+platform matrix, the wheel-provenance check) is unchanged and still governs; only the Intel-macOS
+branch of "what to pin" moved to 0024.
+
 ## Context
 
 The reference engine signs and verifies with Ed25519 through `cryptography`, pinned at `>=50,<51`
