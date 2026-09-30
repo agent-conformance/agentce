@@ -230,6 +230,19 @@ public final class Readiness {
                     + "|[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\\.[0-9_]*"
                     + "|[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN))$");
 
+    /** A cheap first-character gate before running either PyYAML resolve regex against a plain
+     * scalar: both patterns above only ever match a string starting with a digit, {@code +}, {@code
+     * -}, or {@code .} -- every other plain scalar (a control id, a reason string, ...) can skip both
+     * regex matches entirely. Purely an optimization; {@code true} is not itself a guarantee of a
+     * match, only a necessary precondition. */
+    private static boolean couldBeNumeric(String text) {
+        if (text.isEmpty()) {
+            return false;
+        }
+        char c = text.charAt(0);
+        return (c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.';
+    }
+
     /** PyYAML's {@code construct_yaml_int} ({@code yaml/constructor.py:237-263}), copied verbatim:
      * strip {@code _}, take the sign, then dispatch on the {@code 0b}/{@code 0x}/leading-{@code
      * 0}/colon-sexagesimal/plain-decimal forms in that exact order (order matters, since these
@@ -324,11 +337,13 @@ public final class Readiness {
             if (tag.equals(Tag.TIMESTAMP)) {
                 return new PyyamlTimestamp(text);
             }
-            if (PYYAML_INT_RESOLVE_RE.matcher(text).matches()) {
-                return pyyamlConstructInt(text);
-            }
-            if (PYYAML_FLOAT_RESOLVE_RE.matcher(text).matches()) {
-                return pyyamlConstructFloat(text);
+            if (couldBeNumeric(text)) {
+                if (PYYAML_INT_RESOLVE_RE.matcher(text).matches()) {
+                    return pyyamlConstructInt(text);
+                }
+                if (PYYAML_FLOAT_RESOLVE_RE.matcher(text).matches()) {
+                    return pyyamlConstructFloat(text);
+                }
             }
             return text;
         }

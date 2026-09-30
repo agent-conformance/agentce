@@ -94,7 +94,7 @@ _PARSE_DATE_RE = re.compile(
     r"(?:[T ](?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})"
     r"(?:\.\d+)?(?P<offset>Z|[+-]\d{2}:?\d{2})?)?$"
 )
-_OFFSET_RE = re.compile(r"^([+-])(\d{2}):?(\d{2})$")
+_OFFSET_RE = re.compile(r"^[+-](\d{2}):?(\d{2})$")
 
 
 def parse_date(value: Any) -> date | None:
@@ -131,7 +131,7 @@ def parse_date(value: Any) -> date | None:
             offset_match = _OFFSET_RE.match(offset)
             if offset_match is None:
                 return None
-            if int(offset_match.group(2)) > 23 or int(offset_match.group(3)) > 59:
+            if int(offset_match.group(1)) > 23 or int(offset_match.group(2)) > 59:
                 return None
     return result
 

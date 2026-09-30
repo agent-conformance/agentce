@@ -150,6 +150,20 @@ const PYYAML_FLOAT_RESOLVE_RE =
  * own adversarial fixtures exercise fits in `number`'s safe integer range, and downstream code only
  * ever calls {@link pyStr}/{@link pyTruthy}-equivalent checks or `pyEquals` on the result, never
  * arithmetic that would need arbitrary precision. */
+/** PyYAML's colon-sexagesimal base-60 place-value sum (`int(v, 60)`-equivalent for a
+ * `":"`-separated value, e.g. `"1:30"` -> `90`), shared between {@link pyyamlConstructInt} and
+ * {@link pyyamlConstructFloat} since both dispatch to it identically. */
+function sexagesimalToNumber(value: string): number {
+  const digits = value.split(":").map(Number).reverse();
+  let base = 1;
+  let out = 0;
+  for (const digit of digits) {
+    out += digit * base;
+    base *= 60;
+  }
+  return out;
+}
+
 function pyyamlConstructInt(data: string): number {
   let value = data.replace(/_/g, "");
   let sign = 1;
@@ -172,14 +186,7 @@ function pyyamlConstructInt(data: string): number {
     return sign * Number.parseInt(value, 8);
   }
   if (value.includes(":")) {
-    const digits = value.split(":").map(Number).reverse();
-    let base = 1;
-    let out = 0;
-    for (const digit of digits) {
-      out += digit * base;
-      base *= 60;
-    }
-    return sign * out;
+    return sign * sexagesimalToNumber(value);
   }
   return sign * Number.parseInt(value, 10);
 }
@@ -202,14 +209,7 @@ function pyyamlConstructFloat(data: string): number {
     return Number.NaN;
   }
   if (value.includes(":")) {
-    const digits = value.split(":").map(Number).reverse();
-    let base = 1;
-    let out = 0;
-    for (const digit of digits) {
-      out += digit * base;
-      base *= 60;
-    }
-    return sign * out;
+    return sign * sexagesimalToNumber(value);
   }
   return sign * Number(value);
 }

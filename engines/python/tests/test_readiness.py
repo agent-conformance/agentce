@@ -307,9 +307,13 @@ def test_parse_date_rejects_fromisoformats_extra_forms_rfc_3339_only() -> None:
     already reject all four; this is the cross-engine vector proving Python now agrees."""
     assert parse_date("20211231") is None  # basic format (no separators)
     assert parse_date("2021-W52-5") is None  # ISO week date
-    assert parse_date("2021-12-31T10") is None  # hour-only precision, no minutes/seconds
+    assert (
+        parse_date("2021-12-31T10") is None
+    )  # hour-only precision, no minutes/seconds
     assert parse_date("2021-12-31T10:30") is None  # minute precision, no seconds
-    assert parse_date("2021-12-31T10:30:00") == date(2021, 12, 31)  # RFC 3339 still accepted
+    assert parse_date("2021-12-31T10:30:00") == date(
+        2021, 12, 31
+    )  # RFC 3339 still accepted
 
 
 def test_parse_date_accepts_an_already_parsed_date_or_datetime() -> None:
