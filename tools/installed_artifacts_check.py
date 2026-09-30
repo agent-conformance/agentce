@@ -66,6 +66,7 @@ import assess_smoke_check
 import catalog_digest_check
 import diff_parity_check
 import readiness_parity_check
+import sign_parity_check
 
 ROOT = Path(__file__).resolve().parent.parent
 PY_ENGINE = ROOT / "engines" / "python"
@@ -1414,13 +1415,19 @@ def _readiness_json_problems(
     problems: list[str] = []
     verdict = envelope.get("verdict")
     if verdict != expected_verdict:
-        problems.append(f"readiness --json: verdict={verdict!r}, expected {expected_verdict!r}")
+        problems.append(
+            f"readiness --json: verdict={verdict!r}, expected {expected_verdict!r}"
+        )
     if returncode != expected_exit:
-        problems.append(f"readiness --json: exit {returncode}, expected {expected_exit}")
+        problems.append(
+            f"readiness --json: exit {returncode}, expected {expected_exit}"
+        )
     report_path = envelope.get("report")
     report = Path(report_path) if report_path else None
     if report is None or not report.is_file():
-        problems.append(f"readiness --json: report file {report_path!r} does not exist on disk")
+        problems.append(
+            f"readiness --json: report file {report_path!r} does not exist on disk"
+        )
         return problems
     lines = report.read_text(encoding="utf-8").splitlines()
     expected_first_line = f"# Report readiness — {expected_verdict}"
@@ -1464,7 +1471,15 @@ def _readiness_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
     problems: list[str] = []
     report1, extra1 = scenarios["1-clean"].build(fixture_dir)
     proc = runner.run(
-        [*exe, "readiness", str(report1), *extra1, "--catalog-dir", str(catalog_dir), "--json"],
+        [
+            *exe,
+            "readiness",
+            str(report1),
+            *extra1,
+            "--catalog-dir",
+            str(catalog_dir),
+            "--json",
+        ],
         cwd,
         offline=True,
     )
@@ -1477,7 +1492,15 @@ def _readiness_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
 
     report3, extra3 = scenarios["3-insufficient-evidence-no-gaps"].build(fixture_dir)
     proc = runner.run(
-        [*exe, "readiness", str(report3), *extra3, "--catalog-dir", str(catalog_dir), "--json"],
+        [
+            *exe,
+            "readiness",
+            str(report3),
+            *extra3,
+            "--catalog-dir",
+            str(catalog_dir),
+            "--json",
+        ],
         cwd,
         offline=True,
     )
@@ -1490,6 +1513,126 @@ def _readiness_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
 
     proc = runner.run([*exe, "readiness", "--json"], cwd, offline=True)
     problems += _readiness_missing_report_dir_problems(proc.stdout, proc.returncode)
+    return problems
+
+
+def _sign_ready_json_problems(
+    stdout: str, returncode: int, expected_keyid: str
+) -> list[str]:
+    """A `sign --json` envelope over a READY report must actually sign it: exit 0, the reported
+    `keyid` matching the known test key, and a real, readable detached signature file on disk whose
+    content is a DSSE envelope over an in-toto Statement (item 18.26's own C4) -- a `sign` that
+    signs an unready report the same way as a ready one (the contract's own named seeded fault, "a
+    sign implementation that writes a signature without checking readiness first") is caught by
+    `_sign_not_ready_json_problems` below, not here."""
+    try:
+        envelope = json.loads(stdout)
+    except ValueError:
+        return [f"sign --json: output is not JSON: {stdout.strip()[:200]!r}"]
+    problems: list[str] = []
+    if returncode != 0:
+        problems.append(f"sign --json: exit {returncode}, expected 0")
+    keyid = envelope.get("keyid")
+    if keyid != expected_keyid:
+        problems.append(f"sign --json: keyid={keyid!r}, expected {expected_keyid!r}")
+    sig_path = envelope.get("signature")
+    sig = Path(sig_path) if sig_path else None
+    if sig is None or not sig.is_file():
+        problems.append(
+            f"sign --json: signature file {sig_path!r} does not exist on disk"
+        )
+        return problems
+    try:
+        detached = json.loads(sig.read_text(encoding="utf-8"))
+    except ValueError:
+        problems.append(f"sign --json: signature file {sig_path!r} is not valid JSON")
+        return problems
+    if detached.get("payloadType") != "application/vnd.in-toto+json":
+        problems.append(
+            f"sign --json: signature payloadType={detached.get('payloadType')!r}, "
+            "expected 'application/vnd.in-toto+json'"
+        )
+    return problems
+
+
+def _sign_not_ready_json_problems(stdout: str, returncode: int) -> list[str]:
+    """A `sign --json` envelope over a NOT_READY report must refuse -- exit 3, `sign.not_ready` --
+    never sign it (item 18.25's own `_readiness_json_problems` "always READY" pattern, applied to
+    `sign`'s own readiness gate rather than `readiness` itself)."""
+    problems: list[str] = []
+    if returncode != 3:
+        problems.append(f"sign --json: exit {returncode}, expected 3")
+    try:
+        envelope = json.loads(stdout)
+    except ValueError:
+        return problems + [f"sign --json: output is not JSON: {stdout.strip()[:200]!r}"]
+    error = envelope.get("error", {})
+    key = error.get("key", error.get("message_key"))
+    if key != "sign.not_ready":
+        problems.append(f"sign --json: error key={key!r}, expected 'sign.not_ready'")
+    return problems
+
+
+def _sign_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
+    """`agentce sign <report-dir> --as claimant --profile kms --key <test-key.pem>` against
+    `tools/sign_parity_check.py`'s own READY (scenario 1) and NOT_READY (scenario 3) fixtures (item
+    18.26's C4), run against the installed artifact the way a user reaches it, network disabled."""
+    fixture_dir = cwd / "sign-fixture"
+    fixture_dir.mkdir(exist_ok=True)
+    scenarios = {s.name: s for s in readiness_parity_check.SCENARIOS}
+    keyid, _ = sign_parity_check.known_test_key()
+    key_path = sign_parity_check.TEST_KEY
+
+    problems: list[str] = []
+    report1, extra1 = scenarios["1-clean"].build(fixture_dir)
+    (report1 / "claim.json").write_text(
+        json.dumps({"claimant": {"org": "acme"}}), encoding="utf-8"
+    )
+    proc = runner.run(
+        [
+            *exe,
+            "sign",
+            str(report1),
+            *extra1,
+            "--as",
+            "claimant",
+            "--profile",
+            "kms",
+            "--key",
+            str(key_path),
+            "--json",
+        ],
+        cwd,
+        offline=True,
+    )
+    problems += [
+        f"scenario-1: {p}"
+        for p in _sign_ready_json_problems(proc.stdout, proc.returncode, keyid)
+    ]
+
+    report3, extra3 = scenarios["3-insufficient-evidence-no-gaps"].build(fixture_dir)
+    (report3 / "claim.json").write_text(json.dumps({}), encoding="utf-8")
+    proc = runner.run(
+        [
+            *exe,
+            "sign",
+            str(report3),
+            *extra3,
+            "--as",
+            "claimant",
+            "--profile",
+            "kms",
+            "--key",
+            str(key_path),
+            "--json",
+        ],
+        cwd,
+        offline=True,
+    )
+    problems += [
+        f"scenario-3: {p}"
+        for p in _sign_not_ready_json_problems(proc.stdout, proc.returncode)
+    ]
     return problems
 
 
@@ -1858,6 +2001,7 @@ def _npm_run_problems(
     ]
     problems += [f"npm: {p}" for p in _diff_problems(exe, runner, empty)]
     problems += [f"npm: {p}" for p in _readiness_problems(exe, runner, empty)]
+    problems += [f"npm: {p}" for p in _sign_problems(exe, runner, empty)]
     package = empty / "node_modules" / "@agent-conformance" / "cli"
     for rel in (
         "schema/agentce-evidence.schema.json",
@@ -1964,6 +2108,7 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
         ]
         problems += [f"jar: {p}" for p in _diff_problems(exe, runner, empty)]
         problems += [f"jar: {p}" for p in _readiness_problems(exe, runner, empty)]
+        problems += [f"jar: {p}" for p in _sign_problems(exe, runner, empty)]
         with zipfile.ZipFile(jar) as zf:
             names = set(zf.namelist())
         for entry in (
@@ -2446,7 +2591,9 @@ def self_test() -> int:
             report_dir = Path(raw) / "report"
             report_dir.mkdir()
             always_ready_report = report_dir / "report-readiness-2026-01-01.md"
-            always_ready_report.write_text("# Report readiness — READY\n", encoding="utf-8")
+            always_ready_report.write_text(
+                "# Report readiness — READY\n", encoding="utf-8"
+            )
             always_ready_envelope = json.dumps(
                 {"verdict": "READY", "reasons": [], "report": str(always_ready_report)}
             )
@@ -2475,11 +2622,71 @@ def self_test() -> int:
         if _readiness_missing_report_dir_problems(
             json.dumps({"error": {"message_key": "input.report_dir_missing"}}), 3
         ):
-            failures.append("a correct readiness missing-report_dir response was rejected")
+            failures.append(
+                "a correct readiness missing-report_dir response was rejected"
+            )
+
+        # 8. item 18.26's C4: a `sign` implementation that writes a signature without checking
+        #    readiness first (the contract's own named seeded fault) must be rejected on a
+        #    NOT_READY report even though it exits "successfully"; a correct refusal and a correct
+        #    signed envelope (with a real, readable detached signature file) must each be accepted.
+        unchecked_sign = json.dumps(
+            {
+                "keyid": "sha256:deadbeef",
+                "signature": "/nonexistent/claimant-kms.dsse.json",
+            }
+        )
+        if not _sign_not_ready_json_problems(unchecked_sign, 0):
+            failures.append(
+                "a sign implementation that signs a NOT_READY report without checking "
+                "readiness first was accepted"
+            )
+        good_refusal = json.dumps(
+            {
+                "error": {
+                    "message_key": "sign.not_ready",
+                    "detail": "the report is NOT READY: x.",
+                }
+            }
+        )
+        if _sign_not_ready_json_problems(good_refusal, 3):
+            failures.append("a correct sign NOT_READY refusal was rejected")
+        with tempfile.TemporaryDirectory(prefix="sign-selftest-") as raw:
+            sig_path = Path(raw) / "claimant-kms.dsse.json"
+            sig_path.write_text(
+                json.dumps(
+                    {
+                        "payloadType": "application/vnd.in-toto+json",
+                        "payload": "x",
+                        "signatures": [{"keyid": "sha256:deadbeef", "sig": "y"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            good_ready = json.dumps(
+                {"keyid": "sha256:deadbeef", "signature": str(sig_path)}
+            )
+            if _sign_ready_json_problems(good_ready, 0, "sha256:deadbeef"):
+                failures.append("a correct sign READY envelope was rejected")
+            wrong_keyid = json.dumps(
+                {"keyid": "sha256:wrong", "signature": str(sig_path)}
+            )
+            if not _sign_ready_json_problems(wrong_keyid, 0, "sha256:deadbeef"):
+                failures.append("a sign envelope with the wrong keyid was accepted")
+            missing_sig = json.dumps(
+                {
+                    "keyid": "sha256:deadbeef",
+                    "signature": str(Path(raw) / "missing.json"),
+                }
+            )
+            if not _sign_ready_json_problems(missing_sig, 0, "sha256:deadbeef"):
+                failures.append(
+                    "a sign envelope naming a signature file that does not exist was accepted"
+                )
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if not failures:
-        print("installed_artifacts_check self-test: 18 cases discriminate")
+        print("installed_artifacts_check self-test: 19 cases discriminate")
     return 1 if failures else 0
 
 
