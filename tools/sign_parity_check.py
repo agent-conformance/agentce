@@ -174,19 +174,18 @@ def _named_readiness_scenario(name: str) -> Any:
     return next(s for s in readiness_parity_check.SCENARIOS if s.name == name)
 
 
-def ready_fixture(
-    directory: Path, claim: dict[str, Any] | list[Any] | None = None
-) -> Path:
+def ready_fixture(directory: Path, claim: Any = None) -> Path:
     """The READY report-directory shape (18.25's scenario 1, reused directly) plus a `claim.json` to
     sign -- one independent copy per engine, so each engine's own `signatures[]` append is compared
-    without chaining through a shared mutable file. `claim` may be array-shaped (scenario 11): a
-    hostile `claim.json` need not carry a mapping at the top level."""
+    without chaining through a shared mutable file. A hostile `claim` (scenarios 11-14) may be any
+    JSON value, or raw `bytes` written as-is for content `json.dumps` cannot produce (trailing
+    garbage, invalid UTF-8)."""
     directory.mkdir(parents=True, exist_ok=True)
     report, _ = _named_readiness_scenario("1-clean").build(directory)
-    (report / "claim.json").write_text(
-        json.dumps(claim if claim is not None else {"claimant": {"org": "acme"}}),
-        encoding="utf-8",
-    )
+    if claim is None:
+        claim = {"claimant": {"org": "acme"}}
+    raw = claim if isinstance(claim, bytes) else json.dumps(claim).encode("utf-8")
+    (report / "claim.json").write_bytes(raw)
     return report
 
 
@@ -438,7 +437,7 @@ def _assert_claim_untouched(
     failures: list[str],
 ) -> None:
     """`claim.json` is byte-for-byte unchanged and no `signatures/` directory exists -- the shared
-    side-effect-free assertion scenarios 4 (--dry-run) and 11 (an array-shaped claim.json refusal)
+    side-effect-free assertion scenarios 4 (--dry-run) and 11-14 (malformed claim.json refusals)
     both make after a run that must not have written anything."""
     after = (report / "claim.json").read_bytes()
     if before != after:
@@ -686,48 +685,58 @@ def run_real_check() -> int:
                         f"{name}:{engine}: error key={key!r}, expected {expect_key!r}"
                     )
 
-        # Scenario 11 (18.26 round-2 verifier finding): an array-shaped `claim.json`. Python's
-        # `claim.setdefault("signatures", [])` and Java's `(ObjectNode) Json.parseFile(claimPath)`
-        # cast both crash into `internal.unexpected` on a non-dict claim; TS used to accept it
-        # silently, appending a "signatures" property that `JSON.stringify` then dropped from the
-        # top-level array -- exiting 0 while writing nothing. All three now refuse alike.
-        dirs = _per_engine_dirs(tmp, "s11")
-        reports = _build_reports(dirs, ready_fixture, [1, 2])
-        for engine, report in reports.items():
-            claim_path = report / "claim.json"
-            before = claim_path.read_bytes()
-            out, code = runners[engine](
-                [
-                    "--json",
-                    str(report),
-                    "--as",
-                    "claimant",
-                    "--profile",
-                    "kms",
-                    "--key",
-                    str(TEST_KEY),
-                ]
+        # Scenarios 11-14 (18.26 verifier rounds 2 and 3): a malformed `claim.json` is refused
+        # alike, `internal.unexpected`/exit 3, with nothing written. 11: array-shaped (TS used to
+        # append a property `JSON.stringify` then dropped, exiting 0). 12: a non-array
+        # `signatures` (TS and Java used to replace it with a fresh array; Python's `.append`
+        # crashes). 13: trailing content after the JSON value (Jackson's `readTree` used to ignore
+        # it). 14: invalid UTF-8 (TS's non-fatal decode used to substitute U+FFFD).
+        malformed_claims: list[tuple[str, Any]] = [
+            ("s11-array-claim", [1, 2]),
+            ("s12-signatures-null", {"claimant": {"org": "acme"}, "signatures": None}),
+            ("s12-signatures-string", {"claimant": {"org": "acme"}, "signatures": "x"}),
+            ("s12-signatures-object", {"claimant": {"org": "acme"}, "signatures": {}}),
+            ("s13-trailing-content", b'{"claimant": {"org": "acme"}} GARBAGE'),
+            ("s14-invalid-utf8", b'{"claimant": {"org": "acme\xff"}}'),
+        ]
+        for scenario, claim in malformed_claims:
+            reports = _build_reports(
+                _per_engine_dirs(tmp, scenario), ready_fixture, claim
             )
-            if code != 3:
-                failures.append(
-                    f"s11-array-claim:{engine}: exit {code}, expected 3 ({out.strip()[:200]!r})"
+            for engine, report in reports.items():
+                before = (report / "claim.json").read_bytes()
+                out, code = runners[engine](
+                    [
+                        "--json",
+                        str(report),
+                        "--as",
+                        "claimant",
+                        "--profile",
+                        "kms",
+                        "--key",
+                        str(TEST_KEY),
+                    ]
                 )
-            key = _error_key(out)
-            if key != "internal.unexpected":
-                failures.append(
-                    f"s11-array-claim:{engine}: error key={key!r}, expected 'internal.unexpected'"
+                if code != 3:
+                    failures.append(
+                        f"{scenario}:{engine}: exit {code}, expected 3 ({out.strip()[:200]!r})"
+                    )
+                key = _error_key(out)
+                if key != "internal.unexpected":
+                    failures.append(
+                        f"{scenario}:{engine}: error key={key!r}, expected 'internal.unexpected'"
+                    )
+                _assert_claim_untouched(
+                    report, before, engine, scenario, "refusing to sign", failures
                 )
-            _assert_claim_untouched(
-                report, before, engine, "s11-array-claim", "refusing to sign", failures
-            )
 
     for failure in failures:
         print(f"MISMATCH: {failure}", file=sys.stderr)
     if failures:
         return 1
     print(
-        "MATCH: sign kms-profile scenarios (happy path, trust-root, NOT_READY, dry-run, and 8 "
-        "refusal shapes) byte-identical and offline-verifying across python, typescript, java"
+        "MATCH: sign kms-profile scenarios (happy path, trust-root, NOT_READY, dry-run, 8 refusal "
+        "shapes, and 6 malformed claim.json shapes) byte-identical and offline-verifying across python, typescript, java"
     )
     return 0
 
