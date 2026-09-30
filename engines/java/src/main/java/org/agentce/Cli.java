@@ -1243,8 +1243,16 @@ public final class Cli {
         record.put("role", role);
         record.put("profile", profile);
         record.setAll(envelope);
-        ArrayNode signatures = claim.has("signatures") && claim.get("signatures").isArray()
-                ? (ArrayNode) claim.get("signatures")
+        // A present-but-non-array "signatures" (null, a string, an object) matches Python's
+        // `claim["signatures"].append(record)` crashing with AttributeError, not a silent
+        // replacement with a fresh array (18.26 round-3 verifier finding).
+        JsonNode existingSignatures = claim.get("signatures");
+        if (existingSignatures != null && !existingSignatures.isArray()) {
+            throw new IllegalArgumentException(
+                    "claim.json's \"signatures\" is not an array (got " + existingSignatures.getNodeType() + ")");
+        }
+        ArrayNode signatures = existingSignatures != null
+                ? (ArrayNode) existingSignatures
                 : claim.putArray("signatures");
         signatures.add(record);
         claim.set("signatures", signatures);

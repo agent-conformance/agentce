@@ -1,5 +1,6 @@
 package org.agentce;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -34,22 +35,36 @@ public final class Json {
         return JsonNodeFactory.instance;
     }
 
-    /** Parse a JSON document. */
+    /**
+     * Parse a JSON document, refusing trailing content after the root value. {@code readTree}
+     * alone stops at the end of the first value and silently ignores whatever follows; Python's
+     * {@code json.loads} and JavaScript's {@code JSON.parse} both refuse it, so a parser left
+     * un-checked here was the one engine that would sign a {@code claim.json} carrying appended
+     * garbage (18.26 round-3 verifier finding).
+     */
     public static JsonNode parse(String text) {
-        try {
-            return MAPPER.readTree(text);
+        try (JsonParser parser = MAPPER.getFactory().createParser(text)) {
+            JsonNode node = MAPPER.readTree(parser);
+            if (parser.nextToken() != null) {
+                throw new IllegalArgumentException("invalid JSON: unexpected trailing content after the document");
+            }
+            return node;
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("invalid JSON: " + e.getOriginalMessage(), e);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("cannot parse JSON: " + e.getMessage(), e);
         }
     }
 
     /** Parse a JSON file (UTF-8). */
     public static JsonNode parseFile(Path path) {
+        String text;
         try {
-            return MAPPER.readTree(Files.readString(path, StandardCharsets.UTF_8));
+            text = Files.readString(path, StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new IllegalArgumentException("cannot read JSON " + path + ": " + e.getMessage(), e);
         }
+        return parse(text);
     }
 
     /**
