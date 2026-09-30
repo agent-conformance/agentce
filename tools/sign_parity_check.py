@@ -174,10 +174,13 @@ def _named_readiness_scenario(name: str) -> Any:
     return next(s for s in readiness_parity_check.SCENARIOS if s.name == name)
 
 
-def ready_fixture(directory: Path, claim: dict[str, Any] | None = None) -> Path:
+def ready_fixture(
+    directory: Path, claim: dict[str, Any] | list[Any] | None = None
+) -> Path:
     """The READY report-directory shape (18.25's scenario 1, reused directly) plus a `claim.json` to
     sign -- one independent copy per engine, so each engine's own `signatures[]` append is compared
-    without chaining through a shared mutable file."""
+    without chaining through a shared mutable file. `claim` may be array-shaped (scenario 11): a
+    hostile `claim.json` need not carry a mapping at the top level."""
     directory.mkdir(parents=True, exist_ok=True)
     report, _ = _named_readiness_scenario("1-clean").build(directory)
     (report / "claim.json").write_text(
@@ -648,12 +651,54 @@ def run_real_check() -> int:
                         f"{name}:{engine}: error key={key!r}, expected {expect_key!r}"
                     )
 
+        # Scenario 11 (18.26 round-2 verifier finding): an array-shaped `claim.json`. Python's
+        # `claim.setdefault("signatures", [])` and Java's `(ObjectNode) Json.parseFile(claimPath)`
+        # cast both crash into `internal.unexpected` on a non-dict claim; TS used to accept it
+        # silently, appending a "signatures" property that `JSON.stringify` then dropped from the
+        # top-level array -- exiting 0 while writing nothing. All three now refuse alike.
+        dirs = _per_engine_dirs(tmp, "s11")
+        reports = _build_reports(dirs, ready_fixture, [1, 2])
+        for engine, report in reports.items():
+            claim_path = report / "claim.json"
+            before = claim_path.read_bytes()
+            out, code = runners[engine](
+                [
+                    "--json",
+                    str(report),
+                    "--as",
+                    "claimant",
+                    "--profile",
+                    "kms",
+                    "--key",
+                    str(TEST_KEY),
+                ]
+            )
+            if code != 3:
+                failures.append(
+                    f"s11-array-claim:{engine}: exit {code}, expected 3 ({out.strip()[:200]!r})"
+                )
+            got = json.loads(out).get("error", {})
+            key = got.get("key", got.get("message_key"))
+            if key != "internal.unexpected":
+                failures.append(
+                    f"s11-array-claim:{engine}: error key={key!r}, expected 'internal.unexpected'"
+                )
+            after = claim_path.read_bytes()
+            if before != after:
+                failures.append(
+                    f"s11-array-claim:{engine}: claim.json changed despite refusing to sign"
+                )
+            if (report / "signatures").exists():
+                failures.append(
+                    f"s11-array-claim:{engine}: a signatures/ directory was created despite refusing"
+                )
+
     for failure in failures:
         print(f"MISMATCH: {failure}", file=sys.stderr)
     if failures:
         return 1
     print(
-        "MATCH: sign kms-profile scenarios (happy path, trust-root, NOT_READY, dry-run, and 7 "
+        "MATCH: sign kms-profile scenarios (happy path, trust-root, NOT_READY, dry-run, and 8 "
         "refusal shapes) byte-identical and offline-verifying across python, typescript, java"
     )
     return 0
