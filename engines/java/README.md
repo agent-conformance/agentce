@@ -5,8 +5,8 @@ port of the reference engine. It implements the Engine Conformance Suite path so
 run` produces reports byte-identical to the other engines after RFC 8785 canonicalisation.
 
 The command-line tool implements `conformance run` (the conformance suite), `assess`, `validate`,
-`report`, `quickstart`, and `--version`. `report --validate` (schema validation of the report
-artifacts) is not yet ported; use the Python engine for that one check.
+`report` (including `report --validate`, schema validation of the report artifacts), `quickstart`, and
+`--version`.
 
 Every module cites the specification section it implements. The evaluation path has no learned
 component (SPEC §8.7, HR-1/HR-2); `no_ml` scans `gradle.lockfile` against the shared denylist.

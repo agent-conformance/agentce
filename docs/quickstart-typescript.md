@@ -7,9 +7,8 @@ RFC 8785 canonicalisation. Its evidence packs are byte-identical too, and its `o
 `results.sarif` are identical once the engine name and version each engine carries are set aside.
 
 The engine also implements `assess`, `validate`, `report`, and `quickstart` on the same evaluation path,
-so you can assess an agent's own evidence with it directly. `report --validate` (schema validation of the
-report artifacts) is not yet ported; use the Python engine for that one check — see the
-[main quickstart](quickstart.md).
+so you can assess an agent's own evidence with it directly. This includes `report --validate` (schema
+validation of the report artifacts); see the [main quickstart](quickstart.md).
 
 ## Prerequisites
 

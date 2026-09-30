@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -114,10 +116,64 @@ class CliTest {
     }
 
     @Test
-    void reportRefusesValidateAsNotYetPorted() {
-        JsonNode env = runJson("report", "--from", "assertions.json", "--validate");
+    void reportValidateRefusesAPathThatIsNotADirectory() {
+        JsonNode env = runJson("report", "--validate", "/nonexistent");
         assertEquals(3, env.get("exit_code").asInt());
-        assertEquals("input.report_validate_unsupported", env.get("error").get("message_key").asText());
+        assertEquals("input.validate_not_a_directory", env.get("error").get("message_key").asText());
+    }
+
+    @Test
+    void reportValidateAcceptsAGenuineAssessRunAndRejectsACorruptedOne(@TempDir Path out) throws IOException {
+        runJson(
+                "assess",
+                "--bundle", QUICKSTART.resolve("evidence").toString(),
+                "--profile", QUICKSTART.resolve("applicability.yaml").toString(),
+                "--domain", QUICKSTART.resolve("domain.linkml.yaml").toString(),
+                "--catalog-dir", CATALOG_DIR.toString(),
+                "--out", out.toString());
+        JsonNode clean = runJson("report", "--validate", out.toString());
+        assertEquals(0, clean.get("exit_code").asInt(), clean.get("problems").toString());
+        assertTrue(clean.get("valid").asBoolean());
+        assertEquals(0, clean.get("problems").size());
+
+        Path assertionsPath = out.resolve("assertions.json");
+        ArrayNode all = (ArrayNode) Json.parse(Files.readString(assertionsPath));
+        ((ObjectNode) all.get(0)).remove("control");
+        Files.writeString(assertionsPath, all.toString());
+        JsonNode corrupted = runJson("report", "--validate", out.toString());
+        assertEquals(3, corrupted.get("exit_code").asInt());
+        assertFalse(corrupted.get("valid").asBoolean());
+        boolean namesAssertions = false;
+        for (JsonNode p : corrupted.get("problems")) {
+            if (p.asText().contains("assertions.json")) {
+                namesAssertions = true;
+            }
+        }
+        assertTrue(namesAssertions, corrupted.get("problems").toString());
+    }
+
+    @Test
+    void reportValidateCatchesARealSchemaOnlyOscalViolationPastTheLocalProfile(@TempDir Path out) throws IOException {
+        runJson(
+                "assess",
+                "--bundle", QUICKSTART.resolve("evidence").toString(),
+                "--profile", QUICKSTART.resolve("applicability.yaml").toString(),
+                "--domain", QUICKSTART.resolve("domain.linkml.yaml").toString(),
+                "--catalog-dir", CATALOG_DIR.toString(),
+                "--out", out.toString());
+        Path oscalPath = out.resolve("oscal-ar.json");
+        ObjectNode oscal = (ObjectNode) Json.parse(Files.readString(oscalPath));
+        ((ObjectNode) oscal.get("assessment-results")).put("uuid", "not-a-uuid");
+        Files.writeString(oscalPath, oscal.toString());
+        JsonNode env = runJson("report", "--validate", out.toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        boolean namesNist = false;
+        for (JsonNode p : env.get("problems")) {
+            if (p.asText().startsWith("oscal-ar.json (NIST OSCAL 1.1.2): ")) {
+                namesNist = true;
+            }
+        }
+        assertTrue(namesNist, env.get("problems").toString());
     }
 
     @Test

@@ -717,16 +717,29 @@ public final class Cli {
         return result;
     }
 
-    /** Re-render a report from a committed {@code assertions.json} (SPEC §9.4); {@code --validate} and
-     * the {@code public} format are not yet ported and are refused with a named, honest error rather
-     * than a silent guess. */
+    /** Re-render a report from a committed {@code assertions.json} (SPEC §9.4), or, with {@code
+     * --validate}, schema-validate every artifact in a report directory at parity with the Python
+     * reference (item 18.27); the {@code public} format is not yet ported and is refused with a
+     * named, honest error rather than a silent guess. */
     private static CommandResult cmdReport(String[] args) {
         CommandResult result = new CommandResult("report");
         if (Arrays.asList(args).contains("--validate")) {
-            throw new InputError(
-                    "input.report_validate_unsupported",
-                    "the Java engine has no report --validate support.",
-                    "validate the report's artifacts against their vendored schemas with the Python engine.");
+            String reportDir = requireDir(flagValue(args, "validate"), "validate", "the report directory");
+            List<String> problems = ReportValidate.validateReport(Paths.get(reportDir));
+            result.data.put("report_dir", reportDir);
+            result.data.put("valid", problems.isEmpty());
+            ArrayNode problemsNode = Json.nodes().arrayNode();
+            for (String problem : problems) {
+                problemsNode.add(problem);
+            }
+            result.data.set("problems", problemsNode);
+            if (!problems.isEmpty()) {
+                result.addCode(ExitCode.INPUT_ERROR.code);
+                result.note(reportDir + ": " + problems.size() + " artifact(s) failed validation");
+            } else {
+                result.note(reportDir + ": all artifacts valid");
+            }
+            return result;
         }
         String source = requireFile(flagValue(args, "from"), "from", "the assertions file");
         String formatArg = flagValue(args, "format");
