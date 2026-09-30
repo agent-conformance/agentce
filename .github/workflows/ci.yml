@@ -79,6 +79,12 @@ jobs:
           python3 tools/container_recipe_check.py --self-test
           python3 tools/container_recipe_check.py
 
+      - name: No raw NUL byte in a tracked source file
+        run: |
+          set -e
+          python3 tools/nul_byte_check.py --self-test
+          python3 tools/nul_byte_check.py
+
   no-network:
     # Real offline guarantee: run an actual assessment inside a network namespace that has no route
     # off the host. Dependencies are synced online first; the assessment itself runs with networking
