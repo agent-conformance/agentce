@@ -33,7 +33,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cryptography", specifier = ">=50,<51" },
+    { name = "cryptography", specifier = ">=50,!=50.0.2,<51" },
     { name = "jsonschema", specifier = ">=4.21,<5" },
     { name = "pyyaml", specifier = ">=6,<7" },
     { name = "rdflib", specifier = ">=7,<8" },
