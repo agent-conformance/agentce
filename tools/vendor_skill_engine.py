@@ -21,13 +21,15 @@ file, never a relative path back into the monorepo.
                                           version-stale filename both fail, an in-sync one passes
     vendor_skill_engine.py --release     cut the release commit: --write, refuse if any other tracked
                                           file is left dirty by it, force-add the gitignored wheel and
-                                          lock for both skills by name, commit. This is the one piece of
-                                          code that actually cuts a release commit -- `skills/README.md`
-                                          "Install and pin (S-10)" tells a releaser to run this exact
-                                          command in a throwaway, detached worktree (never on a shared
-                                          branch), and `tools/skill_release_shape_check.py` runs this
-                                          same command, not a reimplementation of it, to prove the result
-                                          installs standalone and offline.
+                                          lock for both skills by name, commit. Idempotent: on a HEAD
+                                          that already is a release commit, validates it in place instead
+                                          of committing again. This is the one piece of code that actually
+                                          cuts a release commit -- `skills/README.md` "Install and pin
+                                          (S-10)" tells a releaser to run this exact command in a
+                                          throwaway, detached worktree (never on a shared branch), and
+                                          `tools/skill_release_shape_check.py` runs this same command,
+                                          not a reimplementation of it, to prove the result installs
+                                          standalone and offline.
 
 Standard library plus a `uv build`/`uv lock` subprocess; no network beyond what `uv build` itself
 needs (none once the local package cache holds engines/python's dependencies); no learned component.
@@ -183,30 +185,35 @@ def cmd_release() -> int:
     """Cut the release commit for real: `--write`, then force-add and commit the two now-gitignored
     paths per skill by name (`.gitignore` makes a plain `git add -A` silently skip them). Must run in a
     throwaway, detached worktree -- never on a shared branch -- so the wheel and lock never re-enter
-    that branch's tracked history; `skills/README.md` "Install and pin (S-10)" says so."""
+    that branch's tracked history; `skills/README.md` "Install and pin (S-10)" says so.
+
+    Idempotent: if HEAD already carries this exact wheel and lock for both skills (a second run on a
+    commit that already is a release commit -- the ordinary case right after a real cut), `git add -f`
+    finds nothing new to stage and this validates the existing commit in place instead of raising, so a
+    caller never needs its own copy of "is this already a release commit" to decide whether to call
+    `--release` at all."""
     cmd_write()
     assert_tree_clean(context="before the release commit")
     paths = release_paths()
     _git("add", "-f", "--", *paths)
-    if not _git("status", "--porcelain", "--", *paths):
-        raise RuntimeError(
-            "nothing staged for the release commit -- git add -f found no changes"
+    tracked = set(_git("ls-tree", "-r", "--name-only", "HEAD").splitlines())
+    if not _git("status", "--porcelain", "--", *paths) and all(
+        p in tracked for p in paths
+    ):
+        print(
+            f"ok: HEAD {_git('rev-parse', 'HEAD')} already carries the vendored wheel and lock for "
+            "both skills -- nothing to release"
         )
-    proc = subprocess.run(
-        [
-            "git",
-            "commit",
-            "-s",
-            "--no-verify",
-            "-m",
-            "release: vendor the engine wheel for this release commit",
-        ],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
+        return 0
+    # No hooks are configured in this repo (checked .git/hooks and for a pre-commit config); --no-verify
+    # is inert today and kept only for parity with the throwaway self-test commits, should hooks ever land.
+    _git(
+        "commit",
+        "-s",
+        "--no-verify",
+        "-m",
+        "release: vendor the engine wheel for this release commit",
     )
-    if proc.returncode != 0:
-        raise RuntimeError(f"git commit failed:\n{proc.stdout}\n{proc.stderr}")
     tracked = set(_git("ls-tree", "-r", "--name-only", "HEAD").splitlines())
     missing = [p for p in paths if p not in tracked]
     if missing:
