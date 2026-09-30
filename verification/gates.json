@@ -696,10 +696,10 @@
       },
       "faults": [
         {
-          "description": "the release-shape check stops force-adding the gitignored wheel and lock by name and falls back to a plain git add, which silently skips them, so the release commit it builds never actually carries them",
+          "description": "the release-shape check stops invoking the real release step and runs only the plain wheel build instead, so the release-shaped tree it builds never actually lands the wheel and lock in a tagged tree",
           "file": "tools/skill_release_shape_check.py",
-          "search": "    _git(\"add\", \"-f\", \"--\", *paths, cwd=worktree)",
-          "replace": "    _git(\"add\", \"-A\", \"--\", \"skills\", cwd=worktree)"
+          "search": "                \"--release\",",
+          "replace": "                \"--write\","
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; tools/skill_release_shape_check.py builds the release-shaped commit and runs the standalone install, tools/vendor_skill_engine.py builds and checks the wheel itself, and skills/README.md 'Install and pin (S-10)' documents the release procedure this gate proves."
