@@ -18,3 +18,6 @@ jobs:
         uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
         with:
           fail-on-severity: high
+          # cryptography 48.0.1 (the only Intel-macOS wheel since 49.0.0, ADR 0024): two advisories
+          # 50.x fixes, neither in a surface (PKCS#7, X.509 chain-building) this repository imports.
+          allow-ghsas: GHSA-g6cj-pr64-35w5,GHSA-jwv3-5hgf-82ww

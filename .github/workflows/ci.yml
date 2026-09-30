@@ -485,11 +485,12 @@ jobs:
           node engines/typescript/bin/agentce.js --version
 
   python-install-matrix:
-    # Proves the one documented command works off the maintainer's own architecture. The pinned,
-    # advisory-clean cryptography publishes prebuilt wheels for Linux and Apple-silicon macOS but none
-    # for Intel macOS, where the install compiles it from source; each leg installs the engine from
-    # the frozen lockfile, checks `agentce doctor` reports the wheel provenance the docs state for
-    # that platform, and runs the quickstart to a report.
+    # Proves the one documented command works off the maintainer's own architecture. cryptography
+    # publishes prebuilt wheels for Linux and Apple-silicon macOS on the 50.x line, and no release
+    # since 49.0.0 ships an Intel-macOS wheel, so darwin/x86_64 is pinned to the 48.x-line universal2
+    # wheel instead (ADR-0024): a real prebuilt binary, not a source build. Each leg installs the
+    # engine from the frozen lockfile, checks `agentce doctor` reports the wheel provenance the docs
+    # state for that platform, and runs the quickstart to a report.
     name: python-install-matrix (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -502,18 +503,13 @@ jobs:
           - os: macos-latest
             wheel: prebuilt
           - os: macos-15-intel
-            wheel: source-build
+            wheel: prebuilt
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Provide OpenSSL 3 for the source build (Intel macOS)
-        if: matrix.wheel == 'source-build'
-        run: |
-          brew list openssl@3 >/dev/null 2>&1 || brew install openssl@3
-          echo "OPENSSL_DIR=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
       - name: Sync the engine (frozen lockfile)
         working-directory: engines/python
         run: uv sync --frozen
