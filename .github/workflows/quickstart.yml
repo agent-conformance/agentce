@@ -187,6 +187,10 @@ jobs:
         run: |
           uv run --project tools --frozen python tools/diff_parity_check.py --self-test
           uv run --project tools --frozen python tools/diff_parity_check.py
+      - name: Cross-engine agentce readiness must agree (self-test, then the real invocations)
+        run: |
+          uv run --project tools --frozen python tools/readiness_parity_check.py --self-test
+          uv run --project tools --frozen python tools/readiness_parity_check.py
       - name: The check itself must be able to fail
         run: python3 tools/installed_artifacts_check.py --self-test
       - name: Build each artifact, install it outside the checkout, run it with no network
