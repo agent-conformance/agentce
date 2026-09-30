@@ -52,9 +52,10 @@ import {
 } from "./report";
 import { CommandResult } from "./result";
 import { computeSecurityView } from "./securityView";
+import { INTOTO_STATEMENT_TYPE, KmsSigner, type Signer, signStatement, signSubjects } from "./sign";
 import { StateDir, windowEnd } from "./state";
 import { GraphStore } from "./store";
-import { byteCompare, jsonStringifyAscii, sortKeysDeep, writeJsonl } from "./util";
+import { byteCompare, jsonStringifyAscii, pyRepr, sortKeysDeep, writeJsonl } from "./util";
 import { summarize } from "./verdict";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
@@ -865,6 +866,256 @@ function cmdReadiness(argv: string[]): CommandResult {
   return result;
 }
 
+const SIGN_ROLES = ["claimant", "assessor"] as const;
+const SIGN_PROFILES = ["sigstore-public", "sigstore-private", "kms"] as const;
+
+interface SignArgs {
+  reportDir: string | undefined;
+  asRole: string | undefined;
+  profile: string | undefined;
+  key: string | undefined;
+  dryRun: boolean;
+  writeTrustRoot: boolean;
+}
+
+function signUnrecognized(detail: string, fix: string): InputError {
+  return new InputError("input.sign_unrecognized_flag", detail, fix);
+}
+
+/** `agentce sign`'s argv, read the way Python's `sign` subparser (argparse, `allow_abbrev=False`)
+ * reads it: `--as`/`--profile`/`--key` take one value (separate or `=`-joined, the last one wins),
+ * `--dry-run`/`--write-trust-root` take none, `--` ends the options, and there is at most one
+ * positional -- the same shape `parseReadinessArgv` established for `readiness` in 18.25. Anything
+ * argparse would refuse throws `input.sign_unrecognized_flag` rather than being silently skipped. */
+function parseSignArgv(argv: string[]): SignArgs {
+  const flagFix =
+    "pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag.";
+  const parsed: SignArgs = {
+    reportDir: undefined,
+    asRole: undefined,
+    profile: undefined,
+    key: undefined,
+    dryRun: false,
+    writeTrustRoot: false,
+  };
+  let optionsEnded = false;
+  for (let i = 1; i < argv.length; i++) {
+    const token = argv[i] as string;
+    if (!optionsEnded && token === "--") {
+      optionsEnded = true;
+      continue;
+    }
+    if (!optionsEnded && looksLikeOption(token)) {
+      const eq = token.indexOf("=");
+      const name = eq >= 0 ? token.slice(0, eq) : token;
+      if (GLOBAL_BOOLEAN_FLAGS.has(name)) {
+        if (eq >= 0) {
+          throw signUnrecognized(`flag '${name}' takes no value.`, `drop the value: ${name}.`);
+        }
+        continue;
+      }
+      if (name === "--dry-run" || name === "--write-trust-root") {
+        if (eq >= 0) {
+          throw signUnrecognized(`flag '${name}' takes no value.`, `drop the value: ${name}.`);
+        }
+        if (name === "--dry-run") {
+          parsed.dryRun = true;
+        } else {
+          parsed.writeTrustRoot = true;
+        }
+        continue;
+      }
+      if (name !== "--as" && name !== "--profile" && name !== "--key") {
+        throw signUnrecognized(`unrecognized flag '${token}'.`, flagFix);
+      }
+      let value: string;
+      if (eq >= 0) {
+        value = token.slice(eq + 1);
+      } else {
+        const next = argv[i + 1];
+        if (next === undefined || looksLikeOption(next)) {
+          throw signUnrecognized(`flag '${name}' needs a value.`, `pass ${name} <value>.`);
+        }
+        value = next;
+        i++;
+      }
+      if (name === "--as") {
+        parsed.asRole = value;
+      } else if (name === "--profile") {
+        parsed.profile = value;
+      } else {
+        parsed.key = value;
+      }
+      continue;
+    }
+    if (parsed.reportDir !== undefined) {
+      throw signUnrecognized(
+        `unrecognized argument '${token}'.`,
+        "pass exactly one report directory: `agentce sign <report-dir> --as claimant|assessor`.",
+      );
+    }
+    parsed.reportDir = token;
+  }
+  return parsed;
+}
+
+/** Python's `dict.get(key, default)` restricted to the one shape this call site needs: `obj` may be
+ * any JSON value (a hostile `claim.json` need not carry a mapping at every level), and `default` is
+ * substituted only when `obj` is itself a plain mapping missing `key`, never when `obj` is some other
+ * type -- matching `claim.get("claimant", {}).get("org", "unset")`'s own attribute-style access only
+ * making sense on an actual mapping. */
+function pyGetField(obj: unknown, key: string, defaultValue: unknown): unknown {
+  if (obj !== null && typeof obj === "object" && !Array.isArray(obj)) {
+    const record = obj as Record<string, unknown>;
+    return key in record ? record[key] : defaultValue;
+  }
+  return defaultValue;
+}
+
+/** Resolves the operator's signing key for `agentce sign` (SPEC §9.1), matching `_sign_signer`
+ * exactly: `kms` signs with an operator-held `--key`; the two keyless `sigstore-*` profiles always
+ * refuse offline (this port never obtains a Fulcio certificate). */
+function signSigner(keyPath: string | undefined, profile: string): Signer {
+  if (profile === "kms") {
+    if (!keyPath) {
+      throw new InputError(
+        "sign.kms_key_missing",
+        "the kms profile signs with an operator-held key.",
+        "pass --key <ed25519-private-key.pem>.",
+      );
+    }
+    return KmsSigner.load(requireFile(keyPath, "key", "the signing key"));
+  }
+  throw new InputError(
+    "sign.keyless_offline",
+    `the ${profile} profile is keyless and obtains a certificate from a Fulcio instance (network); the engine does not sign it offline.`,
+    "use --profile kms --key <file> offline, or run keyless signing where the Fulcio and Rekor endpoints are reachable.",
+  );
+}
+
+/** `agentce sign` (SPEC §8.7, §9.1, item 18.26): the Ed25519/DSSE/in-toto signing flow, `kms` profile,
+ * matching the Python reference's `cmd_sign` byte for byte (see `sign.ts`). Refuses to sign unless the
+ * report's readiness verdict is not `NOT READY` (`agentce readiness`'s own gate, computed the same
+ * way). */
+function cmdSign(argv: string[]): CommandResult {
+  const result = new CommandResult("sign");
+  const args = parseSignArgv(argv);
+  const reportDir = requireDir(
+    args.reportDir,
+    "report_dir",
+    "the report directory",
+    "pass the report directory: `agentce sign <report-dir> --as claimant|assessor`.",
+  );
+  const role = args.asRole;
+  if (role !== "claimant" && role !== "assessor") {
+    throw new InputError(
+      "input.sign_role",
+      "--as must be `claimant` or `assessor`.",
+      "pass --as claimant|assessor.",
+    );
+  }
+  const profile = args.profile || "sigstore-public";
+  if (!(SIGN_PROFILES as readonly string[]).includes(profile)) {
+    throw new InputError(
+      "input.sign_profile",
+      `unknown signing profile ${pyRepr(profile)}.`,
+      `choose one of: ${SIGN_PROFILES.join(", ")}.`,
+    );
+  }
+  const writeTrustRoot = args.writeTrustRoot;
+  if (writeTrustRoot && profile !== "kms") {
+    throw new InputError(
+      "sign.trust_root_requires_kms",
+      `--write-trust-root needs an exportable public key; the ${pyRepr(profile)} profile has none.`,
+      "pass --profile kms --key <ed25519-private-key.pem> --write-trust-root.",
+    );
+  }
+  const dryRun = args.dryRun;
+  result.data.report_dir = reportDir;
+  result.data.as = role;
+  result.data.profile = profile;
+  result.data.dry_run = dryRun;
+
+  // The engine refuses to sign a report that is not ready to publish (SPEC §8.5); `sign` never takes
+  // its own `--catalog-dir`/`--gaps`/`--deviations` flags, so this always uses the bundled catalogs
+  // with no deviations/gaps.
+  const verdict = computeReadiness(reportDir, { severities: readinessSeverities([]) });
+  result.data.readiness = verdict.verdict;
+  if (verdict.verdict === NOT_READY) {
+    throw new InputError(
+      "sign.not_ready",
+      `the report is ${verdict.verdict}: ${verdict.reasons.join("; ")}.`,
+      "resolve the blocking reasons (agentce readiness <report-dir>) before signing.",
+    );
+  }
+
+  if (dryRun) {
+    result.note(`dry run: would sign the claim as ${role} (${profile})`);
+    return result;
+  }
+
+  const claimPath = join(reportDir, "claim.json");
+  if (!existsSync(claimPath) || !statSync(claimPath).isFile()) {
+    throw new InputError(
+      "sign.no_claim",
+      "the report directory has no claim.json to sign.",
+      "produce the report first: `agentce assess … --out <report-dir>`.",
+    );
+  }
+  const claim = JSON.parse(readFileSync(claimPath, "utf-8")) as Record<string, unknown>;
+
+  const signer = signSigner(args.key, profile);
+  const subjects = signSubjects(reportDir, claim);
+  const statement = {
+    _type: INTOTO_STATEMENT_TYPE,
+    subject: subjects,
+    predicateType: "https://agent-conformance.org/attestation/claim/v1",
+    predicate: {
+      role,
+      profile,
+      statement:
+        "This report states conformance to the named catalogs as evaluated by the named engine " +
+        "over the named evidence. It is not a legal compliance determination.",
+    },
+  };
+  const envelope = signStatement(statement, signer);
+  const record = { role, profile, ...envelope };
+  const signatures = Array.isArray(claim.signatures) ? (claim.signatures as unknown[]) : [];
+  signatures.push(record);
+  claim.signatures = signatures;
+  writeFileSync(claimPath, `${jsonStringifyAscii(sortKeysDeep(claim), 2)}\n`);
+  const sigDir = join(reportDir, "signatures");
+  mkdirSync(sigDir, { recursive: true });
+  const detached = join(sigDir, `${role}-${profile}.dsse.json`);
+  writeFileSync(detached, `${jsonStringifyAscii(sortKeysDeep(record), 2)}\n`);
+  result.data.signature = detached;
+  result.data.keyid = signer.keyid;
+  result.data.signatures = signatures.length;
+
+  if (writeTrustRoot) {
+    // A KmsSigner is the only signer reachable here: `writeTrustRoot` requires `profile === "kms"`
+    // (checked above), and `signSigner` only ever returns a KmsSigner for that profile -- asserted at
+    // runtime, matching Python's own `assert isinstance(signer, signing.KmsSigner)` at this same call
+    // site (`commands/__init__.py:2549`), not just a compile-time cast.
+    if (!(signer instanceof KmsSigner)) {
+      throw new Error("internal: --write-trust-root reached with a non-KmsSigner");
+    }
+    const kmsSigner = signer;
+    const claimant = pyGetField(claim, "claimant", {});
+    const org = pyGetField(claimant, "org", "unset");
+    const trustRootPath = join(reportDir, "trust-root.json");
+    const document = {
+      keys: {
+        [kmsSigner.keyid]: { public_key: kmsSigner.publicKeyB64, identity: org },
+      },
+    };
+    writeFileSync(trustRootPath, `${jsonStringifyAscii(sortKeysDeep(document), 2)}\n`);
+    result.data.trust_root = trustRootPath;
+  }
+  result.note(`signed ${basename(claimPath)} as ${role} (${profile})`);
+  return result;
+}
+
 function notImplemented(command: string): CommandResult {
   const result = new CommandResult(command);
   result.addCode(ExitCode.INPUT_ERROR);
@@ -978,6 +1229,8 @@ export function main(argv: string[]): number {
       result = cmdDiff(argv);
     } else if (command === "readiness") {
       result = cmdReadiness(argv);
+    } else if (command === "sign") {
+      result = cmdSign(argv);
     } else if (command === "quickstart") {
       result = cmdQuickstart(argv);
     } else if (command === "version") {
