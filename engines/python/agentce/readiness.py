@@ -90,11 +90,12 @@ def normalize_deviation_dates(
 #: (``2021-W52-5``), or reduced-precision (hour-only/minute-only) forms, which no producer this engine
 #: reads ever emits.
 _PARSE_DATE_RE = re.compile(
-    r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})"
+    r"(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})"
     r"(?:[T ](?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})"
-    r"(?:\.\d+)?(?P<offset>Z|[+-]\d{2}:?\d{2})?)?$"
+    r"(?:\.\d+)?(?P<offset>Z|[+-]\d{2}:?\d{2})?)?",
+    re.ASCII,
 )
-_OFFSET_RE = re.compile(r"^[+-](\d{2}):?(\d{2})$")
+_OFFSET_RE = re.compile(r"[+-](\d{2}):?(\d{2})", re.ASCII)
 
 
 def parse_date(value: Any) -> date | None:
@@ -111,7 +112,7 @@ def parse_date(value: Any) -> date | None:
         return value
     if not isinstance(value, str):
         return None
-    m = _PARSE_DATE_RE.match(value)
+    m = _PARSE_DATE_RE.fullmatch(value)
     if m is None:
         return None
     try:
@@ -128,7 +129,7 @@ def parse_date(value: Any) -> date | None:
             return None
         offset = m.group("offset")
         if offset is not None and offset != "Z":
-            offset_match = _OFFSET_RE.match(offset)
+            offset_match = _OFFSET_RE.fullmatch(offset)
             if offset_match is None:
                 return None
             if int(offset_match.group(1)) > 23 or int(offset_match.group(2)) > 59:

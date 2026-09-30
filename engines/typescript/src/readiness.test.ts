@@ -448,6 +448,15 @@ test("parseDate rejects fromisoformat's extra forms -- RFC 3339 only (2026-09-30
   assert.notEqual(parseDate("2021-12-31T10:30:00"), null); // RFC 3339 still accepted
 });
 
+test("parseDate rejects non-ASCII digits and a trailing newline (verifier round 2, F1)", () => {
+  // A Unicode-`\d`-and-`re.match`-with-trailing-`$` regex (Python's original F1 bug) accepts these;
+  // RFC 3339 requires ASCII digits and the whole string, not a prefix ending just before a newline.
+  assert.equal(parseDate("٢٠٢٦-٠١-٠١"), null); // Arabic-Indic digits
+  assert.equal(parseDate("２０２６-０１-０１"), null); // fullwidth digits
+  assert.equal(parseDate("2026-01-01\n"), null); // trailing newline
+  assert.notEqual(parseDate("2026-01-01"), null); // the equivalent ASCII date is still accepted
+});
+
 // --- loadDeviationRegister: PyYAML-matching implicit resolution --------------------------------
 
 function withTempFile(contents: string, run: (path: string) => void): void {
@@ -465,6 +474,30 @@ test("a quoted timestamp scalar is never rewritten, byte-identical to the source
       assert.equal(entry?.expiry, "2021-01-01T00:00:00Z");
     },
   );
+});
+
+test("a << merge key is honoured, an explicit key overrides the merged one (verifier round 2, F3)", () => {
+  withTempFile(
+    "deviations:\n" +
+      "  - <<: &base\n" +
+      "      rationale: shared\n" +
+      "      owner: alice\n" +
+      "    control: OVS-03\n" +
+      "    owner: carol\n",
+    (path) => {
+      const [entry] = loadDeviationRegister(path);
+      assert.equal(entry?.rationale, "shared"); // pulled in from the merge source
+      assert.equal(entry?.owner, "carol"); // the explicit local key wins over the merged one
+      assert.equal(entry?.control, "OVS-03");
+    },
+  );
+});
+
+test("a duplicate mapping key keeps the last value, matching PyYAML (verifier round 2, F4)", () => {
+  withTempFile("deviations:\n  - control: OVS-03\n    owner: alice\n    owner: carol\n", (path) => {
+    const [entry] = loadDeviationRegister(path);
+    assert.equal(entry?.owner, "carol");
+  });
 });
 
 test("an unquoted timestamp scalar is pythonized, matching PyYAML's str(datetime) rendering", () => {

@@ -739,6 +739,13 @@ function readinessSeverities(catalogDirs: string[]): Map<string, string> {
  * `report_dir` instead. */
 function readinessReportDirToken(argv: string[]): string | undefined {
   const valueFlags = new Set(["gaps", "deviations", "catalog-dir"]);
+  let reportDir: string | undefined;
+  // Scans every token, never returning at the first positional: a flag or a second positional
+  // written *after* `report_dir` must still be checked, not silently ignored. An earlier version
+  // returned as soon as it found `report_dir`, so a typo'd flag or a stray extra argument placed
+  // after it (`readiness rep --deviation dev.yaml`, prefix-typo'd for `--deviations`) was never
+  // seen by this function, fell through as an unconsumed token, and was simply not looked at --
+  // giving a false READY instead of the refusal Python's argparse gives for the same input.
   for (let i = 1; i < argv.length; i++) {
     const token = argv[i] as string;
     if (token === "--json" || token === "--debug" || token === "--quiet") {
@@ -755,9 +762,16 @@ function readinessReportDirToken(argv: string[]): string | undefined {
       i++; // also skip the value token
       continue;
     }
-    return token;
+    if (reportDir !== undefined) {
+      throw new InputError(
+        "input.readiness_unrecognized_flag",
+        `unrecognized argument '${token}'.`,
+        "pass exactly one report directory: `agentce readiness <report-dir>`.",
+      );
+    }
+    reportDir = token;
   }
-  return undefined;
+  return reportDir;
 }
 
 /** `agentce readiness` (SPEC §13.3.4 stage 4, item 18.25): the report-readiness verdict, matching the

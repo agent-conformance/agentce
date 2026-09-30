@@ -569,6 +569,17 @@ class ReadinessTest {
         assertNotNull(Readiness.parseDate("2021-12-31T10:30:00")); // RFC 3339 still accepted
     }
 
+    @Test
+    void parseDateRejectsNonAsciiDigitsAndATrailingNewline() {
+        // Verifier round 2, F1: this was already correct in Java (\d is ASCII-only, Matcher.matches()
+        // requires the whole string) -- this pins that Python's own regression fix (re.ASCII plus
+        // fullmatch) brought Python into agreement, not the other way around.
+        assertNull(Readiness.parseDate("٢٠٢٦-٠١-٠١")); // Arabic-Indic digits
+        assertNull(Readiness.parseDate("２０２６-０１-０１")); // fullwidth digits
+        assertNull(Readiness.parseDate("2026-01-01\n")); // trailing newline
+        assertNotNull(Readiness.parseDate("2026-01-01"));
+    }
+
     // --- loadDeviationRegister: PyYAML-matching implicit resolution --------------------------------
 
     private static Path writeYaml(Path dir, String contents) throws IOException {
@@ -607,6 +618,51 @@ class ReadinessTest {
         assertFalse(entries.get(0).path("rationale").asBoolean(true));
         assertTrue(entries.get(0).path("rationale").isBoolean());
         assertEquals("no", entries.get(1).path("rationale").asText());
+    }
+
+    @Test
+    void aMergeKeyIsHonouredAnExplicitKeyOverridesTheMergedOne(@TempDir Path dir) throws IOException {
+        // Verifier round 2, F3: SnakeYAML's compose() never resolves `<<`, unlike PyYAML's
+        // SafeLoader (flatten_mapping); Readiness.java's own loader must do it at the node level.
+        Path path = writeYaml(
+                dir,
+                "deviations:\n  - <<: &base\n      rationale: shared\n      owner: alice\n    control: OVS-03\n    owner: carol\n");
+        List<JsonNode> entries = Readiness.loadDeviationRegister(path);
+        assertEquals("shared", entries.get(0).path("rationale").asText());
+        assertEquals("carol", entries.get(0).path("owner").asText());
+        assertEquals("OVS-03", entries.get(0).path("control").asText());
+    }
+
+    @Test
+    void aDuplicateMappingKeyKeepsTheLastValueMatchingPyyaml(@TempDir Path dir) throws IOException {
+        // Verifier round 2, F4: this was already correct in Java (LinkedHashMap.put keeps document
+        // position but overwrites the value) -- pins it as a cross-engine vector alongside TS's fix.
+        Path path = writeYaml(dir, "deviations:\n  - control: OVS-03\n    owner: alice\n    owner: carol\n");
+        List<JsonNode> entries = Readiness.loadDeviationRegister(path);
+        assertEquals("carol", entries.get(0).path("owner").asText());
+    }
+
+    @Test
+    void aNanOrInfiniteFloatFieldNeverCrashesPyTruthyPyStrOrPyEquals(@TempDir Path dir) throws IOException {
+        // Verifier round 2, F2: the B3 PyYAML-float-grammar port added `.nan`/`.inf` resolution, and
+        // JsonNode.decimalValue() (BigDecimal) throws for both -- pyTruthy/pyStr/pyEquals must not
+        // call it for a non-integral number. `rationale: .nan` is truthy (Python: bool(float('nan'))
+        // is True), so the deviation is not flagged as missing that field.
+        Path path = writeYaml(
+                dir,
+                "deviations:\n  - control: OVS-03\n    rationale: .nan\n    compensating_control: cc\n"
+                        + "    owner: alice\n    approver: bob\n    granted: \"2026-01-01T00:00:00Z\"\n"
+                        + "    expiry: \"2026-12-31T00:00:00Z\"\n");
+        List<JsonNode> entries = Readiness.loadDeviationRegister(path);
+        assertTrue(entries.get(0).path("rationale").isDouble());
+        List<String> problems = Readiness.deviationLint(
+                entries,
+                Set.of("OVS-03"),
+                Map.of(),
+                Set.of(),
+                null,
+                Readiness.DEFAULT_MAX_DEVIATION_DAYS);
+        assertTrue(problems.stream().noneMatch(r -> r.contains("missing rationale")));
     }
 
     @Test

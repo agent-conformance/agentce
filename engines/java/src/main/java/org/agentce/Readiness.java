@@ -73,6 +73,14 @@ public final class Readiness {
             return value.bigIntegerValue().toString();
         }
         if (value.isNumber()) {
+            double d = value.doubleValue();
+            if (Double.isNaN(d) || Double.isInfinite(d)) {
+                // decimalValue() throws for NaN/Infinity (BigDecimal can't represent them). The
+                // exact text here ("NaN"/"Infinity" vs Python's "nan"/"inf") is the same already-
+                // accepted number-rendering divergence pyStr has for other float forms; this only
+                // closes the crash.
+                return Double.toString(d);
+            }
             return value.decimalValue().toString();
         }
         return value.toString();
@@ -149,7 +157,11 @@ public final class Readiness {
             return value.bigIntegerValue().signum() != 0;
         }
         if (value.isNumber()) {
-            return value.decimalValue().signum() != 0;
+            // A non-integral node can hold NaN/Infinity (from a YAML `.nan`/`.inf` scalar, e.g.),
+            // which BigDecimal cannot represent -- decimalValue() throws for those. doubleValue() is
+            // exact for every non-integral JSON number this engine produces and matches Python's own
+            // float truthiness: only 0.0/-0.0 is falsy; NaN and +/-Infinity are both truthy.
+            return value.doubleValue() != 0.0;
         }
         if (value.isArray() || value.isObject()) {
             return value.size() > 0;
@@ -195,7 +207,13 @@ public final class Readiness {
             return true;
         }
         if (a.isNumber() && b.isNumber()) {
-            return a.decimalValue().compareTo(b.decimalValue()) == 0;
+            if (a.isIntegralNumber() && b.isIntegralNumber()) {
+                return a.bigIntegerValue().equals(b.bigIntegerValue());
+            }
+            // At least one side is non-integral and may hold NaN/Infinity (BigDecimal can't
+            // represent those, so decimalValue() would throw). Primitive double `==` already
+            // matches Python's float equality here, including NaN != NaN.
+            return a.doubleValue() == b.doubleValue();
         }
         return false;
     }
@@ -356,12 +374,55 @@ public final class Readiness {
         }
         if (node instanceof MappingNode map) {
             Map<String, Object> out = new LinkedHashMap<>();
-            for (NodeTuple tuple : map.getValue()) {
+            for (NodeTuple tuple : flattenMapping(map)) {
                 out.put(String.valueOf(composeValue(tuple.getKeyNode())), composeValue(tuple.getValueNode()));
             }
             return out;
         }
         throw new IllegalStateException("unsupported YAML node: " + node.getNodeId());
+    }
+
+    /** PyYAML's own {@code flatten_mapping} ({@code yaml/constructor.py}), ported at the {@link Node}
+     * level so the ordinary compose-then-fold-into-a-{@link LinkedHashMap} step above (last {@code put}
+     * wins, exactly like Python's {@code dict[key] = value} during construction) reproduces merge-key
+     * precedence for free: a {@code <<: *anchor} (or {@code <<: [*a, *b, ...]}) key is replaced by its
+     * source mapping's own (recursively flattened) pairs, placed <b>before</b> this mapping's own
+     * explicit pairs -- so an explicit key always overrides a merged one, and for a sequence of
+     * sources, an earlier source overrides a later one (mirrors {@code flatten_mapping}'s own
+     * reversed-then-extended merge-list construction). A quoted {@code "<<"} scalar is not a merge key
+     * -- SnakeYAML's {@code Resolver} only tags a <i>plain</i> {@code <<} scalar {@link Tag#MERGE},
+     * exactly PyYAML's own "implicit resolution applies only to the plain style" rule. */
+    private static List<NodeTuple> flattenMapping(MappingNode map) {
+        List<NodeTuple> merged = new ArrayList<>();
+        List<NodeTuple> own = new ArrayList<>();
+        for (NodeTuple tuple : map.getValue()) {
+            Node keyNode = tuple.getKeyNode();
+            if (keyNode instanceof ScalarNode keyScalar && keyScalar.getTag().equals(Tag.MERGE)) {
+                Node valueNode = tuple.getValueNode();
+                if (valueNode instanceof MappingNode sourceMap) {
+                    merged.addAll(flattenMapping(sourceMap));
+                } else if (valueNode instanceof SequenceNode seq) {
+                    List<List<NodeTuple>> submerge = new ArrayList<>();
+                    for (Node subnode : seq.getValue()) {
+                        if (!(subnode instanceof MappingNode subMap)) {
+                            throw new IllegalStateException("while constructing a mapping: expected a mapping for merging, but found "
+                                    + subnode.getNodeId());
+                        }
+                        submerge.add(flattenMapping(subMap));
+                    }
+                    for (int i = submerge.size() - 1; i >= 0; i--) {
+                        merged.addAll(submerge.get(i));
+                    }
+                } else {
+                    throw new IllegalStateException("while constructing a mapping: expected a mapping or a list of mappings "
+                            + "for merging, but found " + valueNode.getNodeId());
+                }
+            } else {
+                own.add(tuple);
+            }
+        }
+        merged.addAll(own);
+        return merged;
     }
 
     /** {@link #pyTruthy}, over the raw {@link #composeValue} object graph (before conversion to {@link

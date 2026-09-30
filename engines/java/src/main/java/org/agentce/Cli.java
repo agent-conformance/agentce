@@ -872,6 +872,12 @@ public final class Cli {
      * a typo'd flag (e.g. {@code --gasp} for {@code --gaps}) is silently skipped and the *next*
      * token -- typically the flag's own value -- is misread as {@code report_dir} instead. */
     private static String readinessReportDirToken(String[] args) {
+        String reportDir = null;
+        // Scans every token, never returning at the first positional: a flag or a second positional
+        // written *after* report_dir must still be checked, not silently ignored -- an earlier
+        // version returned as soon as it found report_dir, so a typo'd flag or a stray extra
+        // argument placed after it fell through unchecked, giving a false READY instead of the
+        // refusal Python's argparse gives for the same input.
         for (int i = 1; i < args.length; i++) {
             String token = args[i];
             if ("--json".equals(token) || "--debug".equals(token) || "--quiet".equals(token)) {
@@ -887,9 +893,15 @@ public final class Cli {
                 i++; // also skip the value token
                 continue;
             }
-            return token;
+            if (reportDir != null) {
+                throw new InputError(
+                        "input.readiness_unrecognized_flag",
+                        "unrecognized argument '" + token + "'.",
+                        "pass exactly one report directory: `agentce readiness <report-dir>`.");
+            }
+            reportDir = token;
         }
-        return null;
+        return reportDir;
     }
 
     /** Every control's severity, from the given {@code --catalog-dir}s, else every vendored base

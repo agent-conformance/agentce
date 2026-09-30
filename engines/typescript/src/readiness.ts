@@ -259,6 +259,13 @@ const DEVIATION_REGISTER_SCHEMA = FAILSAFE_SCHEMA.extend({
     pyyamlIntType,
     pyyamlFloatType,
     pyyamlTimestampType,
+    // `<<: *anchor` merge keys (PyYAML's `SafeLoader` resolves and flattens these by default via
+    // `Resolver`/`SafeConstructor.flatten_mapping`, confirmed this item) -- reused from
+    // `DEFAULT_SCHEMA` like the `null` type above, since js-yaml's own merge-key handling in
+    // `storeMappingPair` triggers purely on this tag, keyed on the exact same `<<` scalar PyYAML
+    // matches; an explicit key still overrides a merged-in one, since js-yaml applies the merged
+    // pairs before the node's own explicit pairs, matching `flatten_mapping`'s ordering.
+    defaultImplicit("tag:yaml.org,2002:merge"),
   ],
 });
 
@@ -339,7 +346,13 @@ export function normalizeDeviationDates(
 export function loadDeviationRegister(path: string): Record<string, unknown>[] {
   let parsed: unknown;
   try {
-    parsed = yamlLoad(readFileSync(path, "utf-8"), { schema: DEVIATION_REGISTER_SCHEMA });
+    // `json: true` disables js-yaml's own duplicate-mapping-key error (PyYAML's `SafeLoader` never
+    // rejects a duplicate key -- `BaseConstructor.construct_mapping` just does `dict[key] = value` in
+    // document order, so the last occurrence wins, confirmed this item).
+    parsed = yamlLoad(readFileSync(path, "utf-8"), {
+      schema: DEVIATION_REGISTER_SCHEMA,
+      json: true,
+    });
   } catch {
     throw new InputError(
       "input.deviation_invalid",
