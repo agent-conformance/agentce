@@ -85,6 +85,8 @@
   "errors.input.sign_role.fix": "pass --as claimant|assessor.",
   "errors.input.sign_profile.cause": "unknown signing profile.",
   "errors.input.sign_profile.fix": "choose one of: sigstore-public, sigstore-private, kms.",
+  "errors.input.sign_unrecognized_flag.cause": "sign was given a flag it does not recognize.",
+  "errors.input.sign_unrecognized_flag.fix": "pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag.",
   "errors.sign.trust_root_requires_kms.cause": "--write-trust-root needs an exportable public key; the sigstore-public profile has none.",
   "errors.sign.trust_root_requires_kms.fix": "pass --profile kms --key <ed25519-private-key.pem> --write-trust-root.",
   "errors.sign.key_unreadable.cause": "the signing key file could not be parsed as an unencrypted PEM private key.",

@@ -54,6 +54,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.records_subject_ambiguous` | the profile declares several subjects, and a records folder is assessed as one. | declare one subject in the profile, or assess each agent's records folder separately. |
 | `input.sign_profile` | unknown signing profile. | choose one of: sigstore-public, sigstore-private, kms. |
 | `input.sign_role` | --as must be `claimant` or `assessor`. | pass --as claimant|assessor. |
+| `input.sign_unrecognized_flag` | sign was given a flag it does not recognize. | pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag. |
 | `input.trust_root_invalid` | the trust root supplied by --trust-root or AGENTCE_TRUST_ROOT could not be loaded. | pass --trust-root <file> pointing at a trust root in the form of the engine's vendored data/trust/dev-root.json. |
 | `internal.unexpected` | an unexpected internal error occurred. | re-run with --debug to see the stack trace, then file an issue. |
 | `sign.key_algorithm` | the signing key is not an Ed25519 private key. | supply an Ed25519 key (the algorithm the engine signs with, SPEC §8.7). |

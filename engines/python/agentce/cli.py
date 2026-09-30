@@ -82,6 +82,40 @@ def _readiness_unknown_error(token: str) -> InputError:
     )
 
 
+_SIGN_FLAG_FIX = (
+    "pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag."
+)
+
+
+def _sign_argv_error(cause: str, fix: str) -> InputError:
+    return InputError("input.sign_unrecognized_flag", cause, fix)
+
+
+def _sign_usage_error(message: str) -> InputError:
+    """argparse's usage error inside ``sign`` as the keyed error TypeScript and Java raise."""
+    if m := re.fullmatch(r"argument (--[\w-]+): expected one argument", message):
+        flag = m.group(1)
+        return _sign_argv_error(
+            f"flag '{flag}' needs a value.", f"pass {flag} <value>."
+        )
+    if m := re.fullmatch(r"argument (--[\w-]+): ignored explicit argument .*", message):
+        flag = m.group(1)
+        return _sign_argv_error(
+            f"flag '{flag}' takes no value.", f"drop the value: {flag}."
+        )
+    return _sign_argv_error(f"{message}.", _SIGN_FLAG_FIX)
+
+
+def _sign_unknown_error(token: str) -> InputError:
+    """The first token the ``sign`` subparser left unconsumed, as TypeScript and Java word it."""
+    if token.startswith("-") and token != "-":
+        return _sign_argv_error(f"unrecognized flag '{token}'.", _SIGN_FLAG_FIX)
+    return _sign_argv_error(
+        f"unrecognized argument '{token}'.",
+        "pass exactly one report directory: `agentce sign <report-dir> --as claimant|assessor`.",
+    )
+
+
 def _common_flags() -> _Parser:
     common = _Parser(add_help=False)
     group = common.add_argument_group("global options")
@@ -450,7 +484,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=commands.cmd_diff)
 
     p = sub.add_parser(
-        "sign", parents=[common], help="sign a report as claimant or assessor"
+        "sign",
+        parents=[common],
+        help="sign a report as claimant or assessor",
+        # No prefix matching, same as `readiness` (18.25): TS and Java refuse an abbreviated flag as
+        # unrecognized, so Python does too, with the same keyed error (18.26 round-2 verifier fix).
+        allow_abbrev=False,
+        on_error=_sign_usage_error,
     )
     p.add_argument("report_dir", nargs="?", help="the report directory")
     p.add_argument(
@@ -604,6 +644,12 @@ def _emit_error(err: AgentceError, *, command: str, want_json: bool) -> int:
     return int(err.exit_code)
 
 
+_UNKNOWN_ARGV_ERRORS: dict[str, Callable[[str], InputError]] = {
+    "readiness": _readiness_unknown_error,
+    "sign": _sign_unknown_error,
+}
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse ``argv`` (default ``sys.argv``), run the command, and return the process exit code."""
     parser = build_parser()
@@ -611,13 +657,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         ns, unknown = parser.parse_known_args(args)
         if unknown:
-            if getattr(ns, "command", None) != "readiness":
+            unknown_error = _UNKNOWN_ARGV_ERRORS.get(getattr(ns, "command", "") or "")
+            if unknown_error is None:
                 parser.error(f"unrecognized arguments: {' '.join(unknown)}")
-            raise _readiness_unknown_error(unknown[0])
+            raise unknown_error(unknown[0])
     except SystemExit as exc:  # argparse: -h/--version exit 0; usage errors exit 3
         return exc.code if isinstance(exc.code, int) else int(ExitCode.INPUT_ERROR)
-    except AgentceError as err:  # a keyed `readiness` usage error (see `_Parser`)
-        return _emit_error(err, command="readiness", want_json="--json" in args)
+    except AgentceError as err:  # a keyed `readiness`/`sign` usage error (`_Parser`)
+        command = "sign" if err.key.startswith("input.sign_") else "readiness"
+        return _emit_error(err, command=command, want_json="--json" in args)
 
     debug = bool(getattr(ns, "debug", False))
     quiet = bool(getattr(ns, "quiet", False))

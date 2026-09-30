@@ -73,6 +73,7 @@ _KINDS: dict[str, str] = {
     "input.readiness_unrecognized_flag": "error",
     "input.sign_role": "error",
     "input.sign_profile": "error",
+    "input.sign_unrecognized_flag": "error",
     "environment.cryptography_unavailable": "error",
     "environment.python_unsupported": "error",
     "internal.unexpected": "error",

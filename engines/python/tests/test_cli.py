@@ -905,6 +905,49 @@ def test_sign_bad_profile_gives_keyed_envelope(
     )
 
 
+@pytest.mark.parametrize("flag", ["--dry", "--pro", "--wri", "--js"])
+def test_sign_cli_refuses_an_abbreviated_flag(tmp_path: Path, flag: str) -> None:
+    """No prefix matching: TS and Java refuse an abbreviated flag, so Python's `sign` does too,
+    rather than silently reading `--dry` as `--dry-run` (18.26 round-2 verifier fix, mirrors 18.25's
+    `readiness` treatment)."""
+    extra = {"--pro": ["kms"], "--wri": []}
+    assert (
+        cli.main(
+            ["sign", str(tmp_path), "--as", "claimant", flag, *extra.get(flag, [])]
+        )
+        == 3
+    )
+
+
+@pytest.mark.parametrize(
+    ("argv", "cause"),
+    [
+        (["--dry"], "unrecognized flag '--dry'."),
+        (["--gasp=x"], "unrecognized flag '--gasp=x'."),
+        (["--key"], "flag '--key' needs a value."),
+        (["--key", "--dry-run"], "flag '--key' needs a value."),
+        (["--dry-run=1"], "flag '--dry-run' takes no value."),
+        (["second"], "unrecognized argument 'second'."),
+    ],
+)
+def test_sign_cli_usage_error_is_the_keyed_envelope(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    argv: list[str],
+    cause: str,
+) -> None:
+    """A `sign` usage error is the keyed `--json` envelope TS and Java give, worded alike, not
+    argparse's usage text (18.26 round-2 verifier fix, mirrors 18.25's `readiness` treatment)."""
+    code, env = run(
+        ["--json", "sign", str(tmp_path), "--as", "claimant", *argv], capsys
+    )
+    assert code == 3
+    assert (env["error"]["key"], env["error"]["cause"]) == (
+        "input.sign_unrecognized_flag",
+        cause,
+    )
+
+
 def test_human_output_without_json(
     make_bundle: Callable[..., Path],
     example_events: list[dict[str, Any]],
