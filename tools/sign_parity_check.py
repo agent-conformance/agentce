@@ -256,6 +256,15 @@ def _error_scenarios(directory: Path) -> list[tuple[str, list[str], str]]:
             [str(ready), "--as", "claimant", "--profile", "it's"],
             "input.sign_profile",
         ),
+        (
+            # 18.26 round-1 verifier FAIL 1: Python's `sign` gave a bare argparse usage error (no
+            # JSON envelope) for an unrecognized flag, while TS/Java raised a keyed
+            # `input.sign_unrecognized_flag`. Now all three refuse alike (cli.py's `_sign_usage_error`
+            # mirrors `readiness`'s 18.25 treatment).
+            "10-unrecognized-flag",
+            [str(ready), "--as", "claimant", "--bogus"],
+            "input.sign_unrecognized_flag",
+        ),
     ]
 
 
@@ -278,6 +287,43 @@ def self_test() -> int:
         failures.append(
             "comparator failed to catch a one-byte tamper between two 'engine output' strings"
         )
+
+    # 18.26 round-1 verifier FAIL 2: a seeded TS writer fault (4-space indent, no trailing newline on
+    # `claim.json`; compact JSON on the detached signature) passed the old `json.dumps(json.load(...),
+    # sort_keys=True)` comparison silently, since both sides parse to the same value. `_raw_file_text`
+    # plus `compare_ports` must catch this: same parsed value, different bytes.
+    record = {"role": "claimant", "profile": "kms", "keyid": "sha256:abc"}
+    canonical = json.dumps(record, indent=2, sort_keys=True) + "\n"
+    reformatted = (
+        json.dumps(record, indent=4) + "\n"
+    )  # not sort_keys=True, wider indent
+    if json.loads(canonical) != json.loads(reformatted):
+        failures.append(
+            "self-test setup bug: 'canonical' and 'reformatted' fixtures do not parse equal"
+        )
+    with tempfile.TemporaryDirectory(prefix="sign-parity-byte-selftest-") as raw_dir:
+        canonical_path = Path(raw_dir) / "canonical.json"
+        reformatted_path = Path(raw_dir) / "reformatted.json"
+        canonical_path.write_text(canonical, encoding="utf-8")
+        reformatted_path.write_text(reformatted, encoding="utf-8")
+        byte_failures: list[str] = []
+        a = _raw_file_text(canonical_path, byte_failures, "byte-selftest")
+        b = _raw_file_text(canonical_path, byte_failures, "byte-selftest")
+        c = _raw_file_text(reformatted_path, byte_failures, "byte-selftest")
+        if a is None or b is None or c is None:
+            failures.append(
+                "byte-selftest: _raw_file_text failed to read a fixture file"
+            )
+        else:
+            readiness_parity_check.compare_ports(
+                "byte-selftest", [a, b, c], byte_failures
+            )
+        if not byte_failures:
+            failures.append(
+                "raw-byte comparison failed to catch a writer-format divergence "
+                "(same parsed JSON, different bytes) -- the exact blind spot the 18.26 "
+                "round-1 verifier found"
+            )
 
     for name, expected_label in [
         ("test-key.pem", "-----BEGIN PRIVATE KEY-----"),
@@ -347,6 +393,17 @@ def _assert_valid_detached(
     return json.loads(Path(path_str).read_text(encoding="utf-8"))
 
 
+def _raw_file_text(path: Path, failures: list[str], label: str) -> str | None:
+    """The file's own bytes (decoded, never re-serialized), so `compare_ports` on this catches a
+    writer-format divergence (indentation, key order, a missing trailing newline) that a
+    parse-then-`json.dumps(sort_keys=True)` comparison would hide (18.26 round-1 verifier FAIL 2:
+    a seeded TS formatting fault passed self-reserialized comparison silently)."""
+    if not path.is_file():
+        failures.append(f"{label}: {path} does not exist on disk")
+        return None
+    return path.read_bytes().decode("utf-8")
+
+
 def run_real_check() -> int:
     failures: list[str] = []
     keyid, pub_b64 = known_test_key()
@@ -365,6 +422,8 @@ def run_real_check() -> int:
         }
         envelopes: dict[str, dict[str, Any]] = {}
         detached: dict[str, dict[str, Any]] = {}
+        detached_raw: dict[str, str] = {}
+        claim_raw: dict[str, str] = {}
         for engine, report in reports.items():
             out, code = runners[engine](
                 [
@@ -399,14 +458,29 @@ def run_real_check() -> int:
                     failures.append(
                         f"s1-ready:{engine}: signature did not verify offline against the known test key ({verify_out})"
                     )
+                raw_text = _raw_file_text(
+                    Path(envelopes[engine]["signature"]),
+                    failures,
+                    f"s1-ready:{engine}:detached-signature",
+                )
+                if raw_text is not None:
+                    detached_raw[engine] = raw_text
+                raw_text = _raw_file_text(
+                    report / "claim.json", failures, f"s1-ready:{engine}:claim.json"
+                )
+                if raw_text is not None:
+                    claim_raw[engine] = raw_text
 
-        if len(detached) == 3:
+        if len(detached_raw) == 3:
             readiness_parity_check.compare_ports(
-                "s1-ready:detached-signature",
-                [
-                    json.dumps(detached[e], sort_keys=True)
-                    for e in ("python", "typescript", "java")
-                ],
+                "s1-ready:detached-signature-bytes",
+                [detached_raw[e] for e in ("python", "typescript", "java")],
+                failures,
+            )
+        if len(claim_raw) == 3:
+            readiness_parity_check.compare_ports(
+                "s1-ready:claim.json-bytes",
+                [claim_raw[e] for e in ("python", "typescript", "java")],
                 failures,
             )
         if len(envelopes) == 3:
@@ -426,6 +500,7 @@ def run_real_check() -> int:
             dirs, ready_fixture, {"claimant": {"org": "acme corp"}}
         )
         trust_roots: dict[str, dict[str, Any]] = {}
+        trust_root_raw: dict[str, str] = {}
         for engine, report in reports.items():
             out, code = runners[engine](
                 [
@@ -462,13 +537,13 @@ def run_real_check() -> int:
                 failures.append(
                     f"s2-trust-root:{engine}: keys[keyid].identity={entry.get('identity')!r}, expected 'acme corp'"
                 )
-        if len(trust_roots) == 3:
+            raw_text = _raw_file_text(Path(path), failures, f"s2-trust-root:{engine}")
+            if raw_text is not None:
+                trust_root_raw[engine] = raw_text
+        if len(trust_root_raw) == 3:
             readiness_parity_check.compare_ports(
-                "s2-trust-root:document",
-                [
-                    json.dumps(trust_roots[e], sort_keys=True)
-                    for e in ("python", "typescript", "java")
-                ],
+                "s2-trust-root:document-bytes",
+                [trust_root_raw[e] for e in ("python", "typescript", "java")],
                 failures,
             )
 
@@ -579,7 +654,7 @@ def run_real_check() -> int:
     if failures:
         return 1
     print(
-        "MATCH: sign kms-profile scenarios (happy path, trust-root, NOT_READY, dry-run, and 6 "
+        "MATCH: sign kms-profile scenarios (happy path, trust-root, NOT_READY, dry-run, and 7 "
         "refusal shapes) byte-identical and offline-verifying across python, typescript, java"
     )
     return 0
