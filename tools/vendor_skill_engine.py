@@ -134,13 +134,6 @@ def cmd_write() -> int:
             if proc.returncode != 0:
                 raise RuntimeError(f"uv lock failed in skills/{skill}:\n{proc.stderr}")
             print(f"vendored {wheel.name} into skills/{skill}/vendor/ and re-locked")
-    print(
-        "Next: on an everyday phase commit, commit only pyproject.toml (uv.lock and vendor/*.whl are "
-        "gitignored, per skills/README.md 'Install and pin (S-10)'). On a release commit only, also "
-        "`git add -f` uv.lock and vendor/*.whl for both skills and commit them together, as the last "
-        "step before tagging -- tools/skill_release_shape_check.py proves that commit still installs "
-        "standalone and offline."
-    )
     return 0
 
 
@@ -153,6 +146,17 @@ def _git(*args: str, cwd: Path | None = None) -> str:
             f"git {' '.join(args)} failed:\n{proc.stdout}\n{proc.stderr}"
         )
     return proc.stdout.strip()
+
+
+def _head_is_detached() -> bool:
+    """`git symbolic-ref` fails (exit != 0) exactly when `HEAD` is detached -- the case `_git()` itself
+    can't express, since it treats every non-zero git exit as an error."""
+    return (
+        subprocess.run(
+            ["git", "symbolic-ref", "-q", "HEAD"], cwd=ROOT, capture_output=True
+        ).returncode
+        != 0
+    )
 
 
 def assert_tree_clean(*, context: str) -> None:
@@ -185,13 +189,22 @@ def cmd_release() -> int:
     """Cut the release commit for real: `--write`, then force-add and commit the two now-gitignored
     paths per skill by name (`.gitignore` makes a plain `git add -A` silently skip them). Must run in a
     throwaway, detached worktree -- never on a shared branch -- so the wheel and lock never re-enter
-    that branch's tracked history; `skills/README.md` "Install and pin (S-10)" says so.
+    that branch's tracked history; `skills/README.md` "Install and pin (S-10)" says so. Refuses outright
+    on a named branch (verifier round 2's P6: nothing previously stopped a releaser from running this on
+    `main`/`phase/**` by mistake, which would put the wheel and lock right back under tracking there).
 
     Idempotent: if HEAD already carries this exact wheel and lock for both skills (a second run on a
     commit that already is a release commit -- the ordinary case right after a real cut), `git add -f`
     finds nothing new to stage and this validates the existing commit in place instead of raising, so a
     caller never needs its own copy of "is this already a release commit" to decide whether to call
     `--release` at all."""
+    if not _head_is_detached():
+        branch = _git("rev-parse", "--abbrev-ref", "HEAD")
+        raise RuntimeError(
+            f"refusing to cut a release commit on branch '{branch}' -- run this in a throwaway, "
+            "detached worktree only (`git worktree add --detach <dir> HEAD && cd <dir>`), never on a "
+            "named branch, so the wheel and lock never re-enter that branch's tracked history"
+        )
     cmd_write()
     assert_tree_clean(context="before the release commit")
     paths = release_paths()
@@ -321,7 +334,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.self_test:
         return self_test()
     if args.write:
-        return cmd_write()
+        rc = cmd_write()
+        if rc == 0:
+            print(
+                "Next: on an everyday phase commit, commit only pyproject.toml (uv.lock and vendor/*.whl "
+                "are gitignored, per skills/README.md 'Install and pin (S-10)'). To cut a release, use "
+                "`--release` in a throwaway, detached worktree, never on this branch -- see S-10."
+            )
+        return rc
     if args.release:
         try:
             return cmd_release()

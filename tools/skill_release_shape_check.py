@@ -422,8 +422,31 @@ def check_ci_step_order() -> list[str]:
     return []
 
 
+def check_no_wheel_tracked_on_head(*, cwd: Path | None = None) -> list[str]:
+    """C1's own invariant ("no phase commit tracks a vendored wheel or lock under skills/") asserted on
+    every run of this script against its own real `HEAD` -- not only inside the throwaway worktree this
+    check builds to test a hypothetical release commit. `ci.yml` and `VG-SKILL-RELEASE-SHAPE` both run on
+    every push to `main`/`phase/**` (never on a release tag, which nothing here triggers on), so this is
+    what turns the standing gate red if a wheel or lock is ever committed back onto a branch by mistake
+    (verifier round 2's P7: `--release` run outside a detached worktree, or any other regression) --
+    C1 alone only ever ran once, as this item's own acceptance check."""
+    tracked = _git("ls-files", "skills", cwd=cwd).splitlines()
+    bad = [
+        p
+        for p in tracked
+        if (p.startswith("skills/") and "/vendor/" in p and p.endswith(".whl"))
+        or p.endswith("/uv.lock")
+    ]
+    if bad:
+        return [
+            f"HEAD tracks a vendored wheel or lock under skills/, which should only happen on a release "
+            f"commit cut off-branch: {bad}"
+        ]
+    return []
+
+
 def check(*, no_network: bool) -> dict[str, Any]:
-    ci_problems = check_ci_step_order()
+    ci_problems = check_ci_step_order() + check_no_wheel_tracked_on_head()
     with tempfile.TemporaryDirectory(prefix="agentce-release-shape-") as raw:
         tmp = Path(raw)
         try:
