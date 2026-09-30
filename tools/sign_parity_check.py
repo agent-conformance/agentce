@@ -308,15 +308,14 @@ def self_test() -> int:
         reformatted_path.write_text(reformatted, encoding="utf-8")
         byte_failures: list[str] = []
         a = _raw_file_text(canonical_path, byte_failures, "byte-selftest")
-        b = _raw_file_text(canonical_path, byte_failures, "byte-selftest")
         c = _raw_file_text(reformatted_path, byte_failures, "byte-selftest")
-        if a is None or b is None or c is None:
+        if a is None or c is None:
             failures.append(
                 "byte-selftest: _raw_file_text failed to read a fixture file"
             )
         else:
             readiness_parity_check.compare_ports(
-                "byte-selftest", [a, b, c], byte_failures
+                "byte-selftest", [a, a, c], byte_failures
             )
         if not byte_failures:
             failures.append(
@@ -401,7 +400,7 @@ def _raw_file_text(path: Path, failures: list[str], label: str) -> str | None:
     if not path.is_file():
         failures.append(f"{label}: {path} does not exist on disk")
         return None
-    return path.read_bytes().decode("utf-8")
+    return path.read_text(encoding="utf-8")
 
 
 def run_real_check() -> int:

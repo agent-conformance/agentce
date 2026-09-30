@@ -48,72 +48,56 @@ class _Parser(argparse.ArgumentParser):
         raise AssertionError("unreachable")  # pragma: no cover
 
 
+def _make_argv_errors(
+    key: str, flag_fix: str, value_placeholder: str, extra_arg_hint: str
+) -> tuple[Callable[[str], InputError], Callable[[str], InputError]]:
+    """A `(usage_error, unknown_error)` pair translating argparse's own wording into the keyed
+    `InputError` TypeScript and Java raise, for a subcommand that opts into this treatment
+    (`readiness`, 18.25; `sign`, 18.26 round-2) instead of argparse's bare, unkeyed usage error."""
+
+    def argv_error(cause: str, fix: str) -> InputError:
+        return InputError(key, cause, fix)
+
+    def usage_error(message: str) -> InputError:
+        if m := re.fullmatch(r"argument (--[\w-]+): expected one argument", message):
+            flag = m.group(1)
+            return argv_error(
+                f"flag '{flag}' needs a value.", f"pass {flag} {value_placeholder}."
+            )
+        if m := re.fullmatch(
+            r"argument (--[\w-]+): ignored explicit argument .*", message
+        ):
+            flag = m.group(1)
+            return argv_error(
+                f"flag '{flag}' takes no value.", f"drop the value: {flag}."
+            )
+        return argv_error(f"{message}.", flag_fix)
+
+    def unknown_error(token: str) -> InputError:
+        if token.startswith("-") and token != "-":
+            return argv_error(f"unrecognized flag '{token}'.", flag_fix)
+        return argv_error(f"unrecognized argument '{token}'.", extra_arg_hint)
+
+    return usage_error, unknown_error
+
+
 _READINESS_FLAG_FIX = "pass --gaps, --deviations, or --catalog-dir, or drop the flag."
-
-
-def _readiness_argv_error(cause: str, fix: str) -> InputError:
-    return InputError("input.readiness_unrecognized_flag", cause, fix)
-
-
-def _readiness_usage_error(message: str) -> InputError:
-    """argparse's usage error inside ``readiness`` as the keyed error TypeScript and Java raise."""
-    if m := re.fullmatch(r"argument (--[\w-]+): expected one argument", message):
-        flag = m.group(1)
-        return _readiness_argv_error(
-            f"flag '{flag}' needs a value.", f"pass {flag} <path>."
-        )
-    if m := re.fullmatch(r"argument (--[\w-]+): ignored explicit argument .*", message):
-        flag = m.group(1)
-        return _readiness_argv_error(
-            f"flag '{flag}' takes no value.", f"drop the value: {flag}."
-        )
-    return _readiness_argv_error(f"{message}.", _READINESS_FLAG_FIX)
-
-
-def _readiness_unknown_error(token: str) -> InputError:
-    """The first token the ``readiness`` subparser left unconsumed, as TypeScript and Java word it."""
-    if token.startswith("-") and token != "-":
-        return _readiness_argv_error(
-            f"unrecognized flag '{token}'.", _READINESS_FLAG_FIX
-        )
-    return _readiness_argv_error(
-        f"unrecognized argument '{token}'.",
-        "pass exactly one report directory: `agentce readiness <report-dir>`.",
-    )
-
+_readiness_usage_error, _readiness_unknown_error = _make_argv_errors(
+    "input.readiness_unrecognized_flag",
+    _READINESS_FLAG_FIX,
+    "<path>",
+    "pass exactly one report directory: `agentce readiness <report-dir>`.",
+)
 
 _SIGN_FLAG_FIX = (
     "pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag."
 )
-
-
-def _sign_argv_error(cause: str, fix: str) -> InputError:
-    return InputError("input.sign_unrecognized_flag", cause, fix)
-
-
-def _sign_usage_error(message: str) -> InputError:
-    """argparse's usage error inside ``sign`` as the keyed error TypeScript and Java raise."""
-    if m := re.fullmatch(r"argument (--[\w-]+): expected one argument", message):
-        flag = m.group(1)
-        return _sign_argv_error(
-            f"flag '{flag}' needs a value.", f"pass {flag} <value>."
-        )
-    if m := re.fullmatch(r"argument (--[\w-]+): ignored explicit argument .*", message):
-        flag = m.group(1)
-        return _sign_argv_error(
-            f"flag '{flag}' takes no value.", f"drop the value: {flag}."
-        )
-    return _sign_argv_error(f"{message}.", _SIGN_FLAG_FIX)
-
-
-def _sign_unknown_error(token: str) -> InputError:
-    """The first token the ``sign`` subparser left unconsumed, as TypeScript and Java word it."""
-    if token.startswith("-") and token != "-":
-        return _sign_argv_error(f"unrecognized flag '{token}'.", _SIGN_FLAG_FIX)
-    return _sign_argv_error(
-        f"unrecognized argument '{token}'.",
-        "pass exactly one report directory: `agentce sign <report-dir> --as claimant|assessor`.",
-    )
+_sign_usage_error, _sign_unknown_error = _make_argv_errors(
+    "input.sign_unrecognized_flag",
+    _SIGN_FLAG_FIX,
+    "<value>",
+    "pass exactly one report directory: `agentce sign <report-dir> --as claimant|assessor`.",
+)
 
 
 def _common_flags() -> _Parser:
