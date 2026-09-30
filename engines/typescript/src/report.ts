@@ -818,7 +818,7 @@ export function renderOscal(assertions: Assertion[]): Record<string, unknown> {
   const observationUuid = new Map<string, string>();
   const observations: Record<string, unknown>[] = [];
   for (const a of ordered) {
-    const key = `${a.control} ${a.subject}`;
+    const key = `${a.control}\0${a.subject}`;
     const obsUuid = uuid5("observation", a.control, a.subject);
     observationUuid.set(key, obsUuid);
     const observation: Record<string, unknown> = {
@@ -837,7 +837,7 @@ export function renderOscal(assertions: Assertion[]): Record<string, unknown> {
   }
 
   const findings = ordered.map((a) => {
-    const key = `${a.control} ${a.subject}`;
+    const key = `${a.control}\0${a.subject}`;
     return {
       uuid: uuid5("finding", a.control, a.subject),
       title: `${a.control} for ${a.subject}`,
