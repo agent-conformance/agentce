@@ -558,7 +558,7 @@ jobs:
       - name: Skill-emitter unit tests
         working-directory: engines/python
         run: uv run --frozen pytest -q -p no:cacheprovider tests/test_skill_emit.py tests/test_remediation.py
-      - name: Vendor the engine wheel for this run (18.54: not committed on phase commits)
+      - name: Vendor the engine wheel for this run (18.54, not committed on phase commits)
         run: python3 tools/vendor_skill_engine.py --write
       - name: Every skill's vendored engine wheel matches a fresh build (self-test then check)
         run: |
