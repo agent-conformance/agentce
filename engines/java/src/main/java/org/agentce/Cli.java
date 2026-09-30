@@ -108,6 +108,8 @@ public final class Cli {
                 result = cmdDiff(args);
             } else if ("readiness".equals(command)) {
                 result = cmdReadiness(args);
+            } else if ("sign".equals(command)) {
+                result = cmdSign(args);
             } else if ("quickstart".equals(command)) {
                 result = cmdQuickstart(args);
             } else if ("version".equals(command)) {
@@ -1039,6 +1041,253 @@ public final class Cli {
         }
         result.note(verdict.verdict() + ": " + verdict.reasons().size() + " reason(s), "
                 + verdict.limitations().size() + " limitation(s)");
+        return result;
+    }
+
+    private static final List<String> SIGN_PROFILES = List.of("sigstore-public", "sigstore-private", "kms");
+
+    /** {@code agentce sign}'s parsed args (see {@link #parseSignArgs}). */
+    private record SignArgs(
+            String reportDir, String asRole, String profile, String key, boolean dryRun, boolean writeTrustRoot) {}
+
+    private static InputError signUnrecognized(String detail, String fix) {
+        return new InputError("input.sign_unrecognized_flag", detail, fix);
+    }
+
+    /** {@code sign}'s own no-value flags, checked alongside {@link #GLOBAL_BOOLEAN_FLAGS} so
+     * {@link #parseSignArgs} rejects a value on either group with one check. */
+    private static final Set<String> SIGN_BOOLEAN_FLAGS = Set.of("--dry-run", "--write-trust-root");
+
+    /** {@code agentce sign}'s args, read the way Python's {@code sign} subparser (argparse,
+     * {@code allow_abbrev=False}) reads them: {@code --as}/{@code --profile}/{@code --key} take one
+     * value (separate or {@code =}-joined, the last one wins), {@code --dry-run}/
+     * {@code --write-trust-root} take none, {@code --} ends the options, and there is at most one
+     * positional -- the same shape {@link #parseReadinessArgs} established for {@code readiness} in
+     * 18.25. Anything argparse would refuse throws {@code input.sign_unrecognized_flag} rather than
+     * being silently skipped. */
+    private static SignArgs parseSignArgs(String[] args) {
+        String flagFix = "pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag.";
+        String reportDir = null;
+        String asRole = null;
+        String profile = null;
+        String key = null;
+        boolean dryRun = false;
+        boolean writeTrustRoot = false;
+        boolean optionsEnded = false;
+        for (int i = 1; i < args.length; i++) {
+            String token = args[i];
+            if (!optionsEnded && "--".equals(token)) {
+                optionsEnded = true;
+                continue;
+            }
+            if (!optionsEnded && looksLikeOption(token)) {
+                int eq = token.indexOf('=');
+                String name = eq >= 0 ? token.substring(0, eq) : token;
+                if (GLOBAL_BOOLEAN_FLAGS.contains(name) || SIGN_BOOLEAN_FLAGS.contains(name)) {
+                    if (eq >= 0) {
+                        throw signUnrecognized("flag '" + name + "' takes no value.", "drop the value: " + name + ".");
+                    }
+                    if ("--dry-run".equals(name)) {
+                        dryRun = true;
+                    } else if ("--write-trust-root".equals(name)) {
+                        writeTrustRoot = true;
+                    }
+                    continue;
+                }
+                if (!"--as".equals(name) && !"--profile".equals(name) && !"--key".equals(name)) {
+                    throw signUnrecognized("unrecognized flag '" + token + "'.", flagFix);
+                }
+                String value;
+                if (eq >= 0) {
+                    value = token.substring(eq + 1);
+                } else {
+                    if (i + 1 >= args.length || looksLikeOption(args[i + 1])) {
+                        throw signUnrecognized("flag '" + name + "' needs a value.", "pass " + name + " <value>.");
+                    }
+                    value = args[++i];
+                }
+                if ("--as".equals(name)) {
+                    asRole = value;
+                } else if ("--profile".equals(name)) {
+                    profile = value;
+                } else {
+                    key = value;
+                }
+                continue;
+            }
+            if (reportDir != null) {
+                throw signUnrecognized(
+                        "unrecognized argument '" + token + "'.",
+                        "pass exactly one report directory: `agentce sign <report-dir> --as claimant|assessor`.");
+            }
+            reportDir = token;
+        }
+        return new SignArgs(reportDir, asRole, profile, key, dryRun, writeTrustRoot);
+    }
+
+    /** Python's {@code dict.get(key, default)} restricted to the one shape this call site needs:
+     * {@code obj} may be any JSON value (a hostile {@code claim.json} need not carry a mapping at every
+     * level), and {@code default} is substituted only when {@code obj} is itself a plain object missing
+     * {@code key}, never when {@code obj} is some other type -- matching
+     * {@code claim.get("claimant", {}).get("org", "unset")}'s own attribute-style access only making
+     * sense on an actual mapping. */
+    private static JsonNode pyGetField(JsonNode obj, String key, JsonNode defaultValue) {
+        if (obj != null && obj.isObject() && obj.has(key)) {
+            return obj.get(key);
+        }
+        return defaultValue;
+    }
+
+    /** Resolves the operator's signing key for {@code agentce sign} (SPEC §9.1), matching
+     * {@code _sign_signer} exactly: {@code kms} signs with an operator-held {@code --key}; the two
+     * keyless {@code sigstore-*} profiles always refuse offline (this port never obtains a Fulcio
+     * certificate). */
+    private static Sign.Signer signSigner(String keyPath, String profile) {
+        if ("kms".equals(profile)) {
+            if (keyPath == null || keyPath.isEmpty()) {
+                throw new InputError(
+                        "sign.kms_key_missing",
+                        "the kms profile signs with an operator-held key.",
+                        "pass --key <ed25519-private-key.pem>.");
+            }
+            return Sign.KmsSigner.load(Paths.get(requireFile(keyPath, "key", "the signing key")));
+        }
+        throw new InputError(
+                "sign.keyless_offline",
+                "the " + profile + " profile is keyless and obtains a certificate from a Fulcio instance "
+                        + "(network); the engine does not sign it offline.",
+                "use --profile kms --key <file> offline, or run keyless signing where the Fulcio and "
+                        + "Rekor endpoints are reachable.");
+    }
+
+    /** {@code agentce sign} (SPEC §8.7, §9.1, item 18.26): the Ed25519/DSSE/in-toto signing flow,
+     * {@code kms} profile, matching the Python reference's {@code cmd_sign} byte for byte (see
+     * {@code Sign.java}). Refuses to sign unless the report's readiness verdict is not
+     * {@code NOT READY} ({@code agentce readiness}'s own gate, computed the same way). */
+    private static CommandResult cmdSign(String[] args) {
+        CommandResult result = new CommandResult("sign");
+        SignArgs parsed = parseSignArgs(args);
+        Path reportDir = Paths.get(requireDir(
+                parsed.reportDir(),
+                "report_dir",
+                "the report directory",
+                "pass the report directory: `agentce sign <report-dir> --as claimant|assessor`."));
+        String role = parsed.asRole();
+        if (!"claimant".equals(role) && !"assessor".equals(role)) {
+            throw new InputError(
+                    "input.sign_role", "--as must be `claimant` or `assessor`.", "pass --as claimant|assessor.");
+        }
+        String profile = parsed.profile() == null || parsed.profile().isEmpty() ? "sigstore-public" : parsed.profile();
+        if (!SIGN_PROFILES.contains(profile)) {
+            throw new InputError(
+                    "input.sign_profile",
+                    "unknown signing profile " + Readiness.pyRepr(Json.nodes().textNode(profile)) + ".",
+                    "choose one of: " + String.join(", ", SIGN_PROFILES) + ".");
+        }
+        boolean writeTrustRoot = parsed.writeTrustRoot();
+        if (writeTrustRoot && !"kms".equals(profile)) {
+            throw new InputError(
+                    "sign.trust_root_requires_kms",
+                    "--write-trust-root needs an exportable public key; the "
+                            + Readiness.pyRepr(Json.nodes().textNode(profile)) + " profile has none.",
+                    "pass --profile kms --key <ed25519-private-key.pem> --write-trust-root.");
+        }
+        boolean dryRun = parsed.dryRun();
+        result.data.put("report_dir", reportDir.toString());
+        result.data.put("as", role);
+        result.data.put("profile", profile);
+        result.data.put("dry_run", dryRun);
+
+        // The engine refuses to sign a report that is not ready to publish (SPEC §8.5); `sign` never
+        // takes its own `--catalog-dir`/`--gaps`/`--deviations` flags, so this always uses the bundled
+        // catalogs with no deviations/gaps.
+        Readiness.Verdict verdict =
+                Readiness.computeReadiness(reportDir, readinessSeverities(List.of()), List.of(), Set.of());
+        result.data.put("readiness", verdict.verdict());
+        if (Readiness.NOT_READY.equals(verdict.verdict())) {
+            throw new InputError(
+                    "sign.not_ready",
+                    "the report is " + verdict.verdict() + ": " + String.join("; ", verdict.reasons()) + ".",
+                    "resolve the blocking reasons (agentce readiness <report-dir>) before signing.");
+        }
+
+        if (dryRun) {
+            result.note("dry run: would sign the claim as " + role + " (" + profile + ")");
+            return result;
+        }
+
+        Path claimPath = reportDir.resolve("claim.json");
+        if (!Files.isRegularFile(claimPath)) {
+            throw new InputError(
+                    "sign.no_claim",
+                    "the report directory has no claim.json to sign.",
+                    "produce the report first: `agentce assess … --out <report-dir>`.");
+        }
+        ObjectNode claim = (ObjectNode) Json.parseFile(claimPath);
+
+        Sign.Signer signer = signSigner(parsed.key(), profile);
+        ArrayNode subjects = Sign.signSubjects(reportDir, claim);
+        ObjectNode statement = Json.nodes().objectNode();
+        statement.put("_type", Sign.INTOTO_STATEMENT_TYPE);
+        statement.set("subject", subjects);
+        statement.put("predicateType", "https://agent-conformance.org/attestation/claim/v1");
+        ObjectNode predicate = statement.putObject("predicate");
+        predicate.put("role", role);
+        predicate.put("profile", profile);
+        predicate.put(
+                "statement",
+                "This report states conformance to the named catalogs as evaluated by the named engine "
+                        + "over the named evidence. It is not a legal compliance determination.");
+        ObjectNode envelope = Sign.signStatement(statement, signer);
+        ObjectNode record = Json.nodes().objectNode();
+        record.put("role", role);
+        record.put("profile", profile);
+        record.setAll(envelope);
+        ArrayNode signatures = claim.has("signatures") && claim.get("signatures").isArray()
+                ? (ArrayNode) claim.get("signatures")
+                : claim.putArray("signatures");
+        signatures.add(record);
+        claim.set("signatures", signatures);
+        try {
+            Files.writeString(claimPath, Json.pretty(claim) + "\n");
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot write " + claimPath + ": " + e.getMessage(), e);
+        }
+        Path sigDir = reportDir.resolve("signatures");
+        try {
+            Files.createDirectories(sigDir);
+            Path detached = sigDir.resolve(role + "-" + profile + ".dsse.json");
+            Files.writeString(detached, Json.pretty(record) + "\n");
+            result.data.put("signature", detached.toString());
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot write to " + sigDir + ": " + e.getMessage(), e);
+        }
+        result.data.put("keyid", signer.keyid());
+        result.data.put("signatures", signatures.size());
+
+        if (writeTrustRoot) {
+            // A KmsSigner is the only signer reachable here: `writeTrustRoot` requires `profile ==
+            // "kms"` (checked above), and `signSigner` only ever returns a KmsSigner for that profile
+            // -- asserted at runtime, matching Python's own `assert isinstance(signer, KmsSigner)`.
+            if (!(signer instanceof Sign.KmsSigner kmsSigner)) {
+                throw new IllegalStateException("internal: --write-trust-root reached with a non-KmsSigner");
+            }
+            JsonNode claimant = pyGetField(claim, "claimant", Json.nodes().objectNode());
+            JsonNode org = pyGetField(claimant, "org", Json.nodes().textNode("unset"));
+            Path trustRootPath = reportDir.resolve("trust-root.json");
+            ObjectNode document = Json.nodes().objectNode();
+            ObjectNode keys = document.putObject("keys");
+            ObjectNode keyEntry = keys.putObject(kmsSigner.keyid());
+            keyEntry.put("public_key", kmsSigner.publicKeyB64());
+            keyEntry.set("identity", org);
+            try {
+                Files.writeString(trustRootPath, Json.pretty(document) + "\n");
+            } catch (IOException e) {
+                throw new IllegalStateException("cannot write " + trustRootPath + ": " + e.getMessage(), e);
+            }
+            result.data.put("trust_root", trustRootPath.toString());
+        }
+        result.note("signed " + claimPath.getFileName() + " as " + role + " (" + profile + ")");
         return result;
     }
 
