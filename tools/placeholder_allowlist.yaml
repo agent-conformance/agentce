@@ -159,6 +159,18 @@ allow:
     class: legitimate
     justification: "sanitize_for_markdown/sanitize_for_html's placeholder parameter and the _SANITIZE_EMPTY_NAME_PLACEHOLDER/_SANITIZE_EMPTY_FIELD_PLACEHOLDER fallback strings ('(unnamed)'/'(empty)') name the rendered text for an empty field value; not an unfinished stub. 18.18 added one more sanitize_for_html call (buyer-view evidence refs), which cites the placeholder= parameter and the _SANITIZE_EMPTY_FIELD_PLACEHOLDER constant, +2."
 
+  - path: engines/typescript/src/report.ts
+    pattern: placeholder
+    count: 16
+    class: legitimate
+    justification: "sanitizeForMarkdown/sanitizeForHtml's placeholder parameter and the SANITIZE_EMPTY_NAME_PLACEHOLDER/SANITIZE_EMPTY_FIELD_PLACEHOLDER fallback strings ('(unnamed)'/'(empty)'), mirroring the Python reference's report.py entry above; not an unfinished stub. Newly counted in item 18.24: a raw NUL byte at this file's own (control, subject) diff-key-joining site (fixed, MAINTAINER-NOTES 2026-09-29 'Report.java NUL bytes') made this scanner's own binary-content heuristic (tools/placeholder_sweep.py's `_read_text`, which returns None on any b'\\x00' byte) skip the whole file silently until the byte was removed, so this entry was never possible to add before now."
+
+  - path: engines/java/src/main/java/org/agentce/Report.java
+    pattern: placeholder
+    count: 22
+    class: legitimate
+    justification: "sanitizeForMarkdown/sanitizeForHtml's placeholder parameter and the SANITIZE_EMPTY_NAME_PLACEHOLDER/SANITIZE_EMPTY_FIELD_PLACEHOLDER fallback strings ('(unnamed)'/'(empty)'), mirroring the Python reference's report.py entry above; not an unfinished stub. Newly counted in item 18.24 for the same reason as the report.ts entry above: this file's own two raw NUL bytes hid it from this scanner until they were fixed this session."
+
   - path: engines/python/agentce/commands/__init__.py
     pattern: placeholder
     count: 1
