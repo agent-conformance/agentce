@@ -50,6 +50,7 @@ import {
   renderSarif,
   writeReport,
 } from "./report";
+import { validateReport } from "./reportValidate";
 import { CommandResult } from "./result";
 import { computeSecurityView } from "./securityView";
 import { INTOTO_STATEMENT_TYPE, KmsSigner, type Signer, signStatement, signSubjects } from "./sign";
@@ -574,16 +575,25 @@ function cmdQuickstart(argv: string[]): CommandResult {
   return result;
 }
 
-/** Re-render a report from a committed `assertions.json` (SPEC §9.4); `--validate` and the `public`
- * format are not yet ported and are refused with a named, honest error rather than a silent guess. */
+/** Re-render a report from a committed `assertions.json` (SPEC §9.4), or, with `--validate`, schema-
+ * validate every artifact in a report directory at parity with the Python reference (item 18.27); the
+ * `public` format is not yet ported and is refused with a named, honest error rather than a silent
+ * guess. */
 function cmdReport(argv: string[]): CommandResult {
   const result = new CommandResult("report");
   if (argv.includes("--validate")) {
-    throw new InputError(
-      "input.report_validate_unsupported",
-      "the TypeScript engine has no report --validate support.",
-      "validate the report's artifacts against their vendored schemas with the Python engine.",
-    );
+    const reportDir = requireDir(flagValue(argv, "validate"), "validate", "the report directory");
+    const problems = validateReport(reportDir);
+    result.data.report_dir = reportDir;
+    result.data.valid = problems.length === 0;
+    result.data.problems = problems;
+    if (problems.length > 0) {
+      result.addCode(ExitCode.INPUT_ERROR);
+      result.note(`${reportDir}: ${problems.length} artifact(s) failed validation`);
+    } else {
+      result.note(`${reportDir}: all artifacts valid`);
+    }
+    return result;
   }
   const source = requireFile(flagValue(argv, "from"), "from", "the assertions file");
   const format = flagValue(argv, "format") ?? "md";

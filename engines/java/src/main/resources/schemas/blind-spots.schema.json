@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/report/blind-spots.schema.json",
+  "title": "AgentCE blind spots",
+  "description": "blind-spots.json in the report directory: catalog evidence requirements no assertion's records can yet show, grouped by the one requirement that would satisfy them and ranked by how many checks it alone would unlock, each with an evidence-ladder rung, an owner, and whether the step is a code change or a request to another team. Built only from (assertions, catalogs); never affects an outcome or the verdict. No natural-language text is stored here -- the report renders owner_key/step_kind/event/class/checks_unlocked into the ladder's sentence per report language.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["blind_spots", "no_population"],
+  "$defs": {
+    "check_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject", "catalog", "control", "control_version"],
+      "properties": {
+        "subject": {"type": "string"},
+        "catalog": {"type": "string"},
+        "control": {"type": "string"},
+        "control_version": {"type": "string"}
+      }
+    }
+  },
+  "properties": {
+    "blind_spots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event",
+          "class",
+          "ladder_rung",
+          "owner_key",
+          "step_kind",
+          "supplying_adapters",
+          "checks_unlocked",
+          "unlocked_checks",
+          "needed_by",
+          "needed_by_checks"
+        ],
+        "properties": {
+          "event": {"type": "string"},
+          "class": {"type": "string", "enum": ["self_report", "enforcement_point", "independent_system"]},
+          "ladder_rung": {"type": "integer", "enum": [1, 2, 3, 4]},
+          "owner_key": {"type": "string", "enum": ["agent_team", "platform_or_security", "ticketing_or_iam"]},
+          "step_kind": {"type": "string", "enum": ["code_change", "request"]},
+          "supplying_adapters": {"type": "array", "items": {"type": "string"}},
+          "checks_unlocked": {"type": "integer", "minimum": 0},
+          "unlocked_checks": {"type": "array", "items": {"$ref": "#/$defs/check_ref"}},
+          "needed_by": {"type": "integer", "minimum": 0},
+          "needed_by_checks": {"type": "array", "items": {"$ref": "#/$defs/check_ref"}}
+        }
+      }
+    },
+    "no_population": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/check_ref"}
+    }
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/report/security.schema.json",
+  "title": "AgentCE security view",
+  "description": "security.json in the report directory. It shows this run's tool access, its actions by effect class, its enforcement-point evidence (approvals and denials), the tools and models your records show that no profile declared, and each baseline control's citations to OWASP agentic (ASI), MITRE ATLAS, and the OWASP Agent Control Standard. Every fact here is answered at the whole-run level: it names how many irreversible actions this run took next to how many approvals and denials it recorded, not which specific action a given check covers. AgentCE writes it only with `--for security`, alongside the existing SARIF, Markdown, and HTML files that preset has always written, and it never changes an outcome or the verdict.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tool_access",
+    "actions_by_effect_class",
+    "enforcement_point_evidence",
+    "drift",
+    "standards_citations"
+  ],
+  "$defs": {
+    "counts": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    }
+  },
+  "properties": {
+    "tool_access": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "server", "protocol"],
+        "properties": {
+          "name": {"type": "string"},
+          "server": {"type": "string"},
+          "protocol": {"type": "string"}
+        }
+      }
+    },
+    "actions_by_effect_class": {"$ref": "#/$defs/counts"},
+    "enforcement_point_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["denied_or_blocked", "approvals_by_recorder"],
+      "properties": {
+        "denied_or_blocked": {"$ref": "#/$defs/counts"},
+        "approvals_by_recorder": {"$ref": "#/$defs/counts"}
+      }
+    },
+    "drift": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tools", "models"],
+      "properties": {
+        "tools": {"type": "array", "items": {"type": "string"}},
+        "models": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "standards_citations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["control", "framework", "clause", "verified"],
+        "properties": {
+          "control": {"type": "string"},
+          "framework": {"type": "string", "enum": ["owasp-asi-2026", "mitre-atlas", "owasp-acs"]},
+          "clause": {"type": "string"},
+          "verified": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}

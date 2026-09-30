@@ -254,13 +254,82 @@ test("report re-renders a committed assertions.json to every supported format", 
   }
 });
 
-test("report --validate is refused honestly rather than silently skipped", () => {
+test("report --validate refuses a path that is not a directory", () => {
   const { exitCode, envelope } = runJson(["report", "--validate", "/nonexistent"]);
   assert.equal(exitCode, 3);
   assert.equal(
     (envelope.error as { message_key: string }).message_key,
-    "input.report_validate_unsupported",
+    "input.validate_not_a_directory",
   );
+});
+
+test("report --validate accepts a genuine assess run and rejects a corrupted one", () => {
+  const out = mkdtempSync(join(tmpdir(), "agentce-cli-report-validate-"));
+  try {
+    const quickstart = quickstartDir();
+    runJson([
+      "assess",
+      "--bundle",
+      join(quickstart, "evidence"),
+      "--profile",
+      join(quickstart, "applicability.yaml"),
+      "--catalog",
+      "eu-ai-act@2026.09",
+      "--out",
+      out,
+    ]);
+    const clean = runJson(["report", "--validate", out]);
+    assert.equal(clean.exitCode, 0, JSON.stringify(clean.envelope.problems));
+    assert.equal(clean.envelope.valid, true);
+    assert.deepEqual(clean.envelope.problems, []);
+
+    const assertionsPath = join(out, "assertions.json");
+    const assertions = JSON.parse(readFileSync(assertionsPath, "utf-8"));
+    assertions[0].control = undefined;
+    writeFileSync(assertionsPath, JSON.stringify(assertions));
+    const corrupted = runJson(["report", "--validate", out]);
+    assert.equal(corrupted.exitCode, 3);
+    assert.equal(corrupted.envelope.valid, false);
+    assert.ok(
+      (corrupted.envelope.problems as string[]).some((p) => p.includes("assertions.json")),
+      JSON.stringify(corrupted.envelope.problems),
+    );
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("report --validate catches a real-schema-only OSCAL violation past the local profile", () => {
+  const out = mkdtempSync(join(tmpdir(), "agentce-cli-report-validate-oscal-"));
+  try {
+    const quickstart = quickstartDir();
+    runJson([
+      "assess",
+      "--bundle",
+      join(quickstart, "evidence"),
+      "--profile",
+      join(quickstart, "applicability.yaml"),
+      "--catalog",
+      "eu-ai-act@2026.09",
+      "--out",
+      out,
+    ]);
+    const oscalPath = join(out, "oscal-ar.json");
+    const oscal = JSON.parse(readFileSync(oscalPath, "utf-8"));
+    oscal["assessment-results"].uuid = "not-a-uuid"; // AgentCE's local profile types uuid as a bare
+    // string (no pattern); only the real vendored NIST 1.1.2 schema enforces the UUID pattern.
+    writeFileSync(oscalPath, JSON.stringify(oscal));
+    const { exitCode, envelope } = runJson(["report", "--validate", out]);
+    assert.equal(exitCode, 3);
+    assert.ok(
+      (envelope.problems as string[]).some((p) =>
+        p.startsWith("oscal-ar.json (NIST OSCAL 1.1.2): "),
+      ),
+      JSON.stringify(envelope.problems),
+    );
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
 });
 
 test("version --json returns the same structured envelope every other command produces", () => {
