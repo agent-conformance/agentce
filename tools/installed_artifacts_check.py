@@ -64,6 +64,7 @@ from pathlib import Path
 
 import assess_smoke_check
 import catalog_digest_check
+import diff_parity_check
 
 ROOT = Path(__file__).resolve().parent.parent
 PY_ENGINE = ROOT / "engines" / "python"
@@ -1300,6 +1301,109 @@ def _version_problems(
     return problems
 
 
+def _diff_json_problems(
+    stdout: str,
+    returncode: int,
+    expected_len: int,
+    expected_keys: set[tuple[str, str]],
+) -> list[str]:
+    """A `diff --json` envelope must carry the real content-keyed delta, not merely exit
+    non-zero for some unrelated reason -- a `diff` that always answers "no differences" (item
+    18.24's own named seeded fault) is caught here by its `diff` array's shape, and separately
+    by the exit code being wrong whenever that array is non-empty."""
+    try:
+        envelope = json.loads(stdout)
+    except ValueError:
+        return [f"diff --json: output is not JSON: {stdout.strip()[:200]!r}"]
+    diff = envelope.get("diff")
+    if not isinstance(diff, list):
+        return ["diff --json: envelope has no 'diff' array"]
+    problems: list[str] = []
+    if len(diff) != expected_len:
+        problems.append(
+            f"diff --json: diff array has {len(diff)} entries, expected {expected_len}"
+        )
+    got_keys = {
+        (e.get("control"), e.get("subject")) for e in diff if isinstance(e, dict)
+    }
+    if got_keys != expected_keys:
+        problems.append(
+            f"diff --json: diff array keys {sorted(got_keys)!r}, "
+            f"expected {sorted(expected_keys)!r}"
+        )
+    if diff and returncode != 1:
+        problems.append(
+            f"diff --json: exit {returncode} on a real differing pair, expected 1"
+        )
+    return problems
+
+
+def _diff_md_problems(stdout: str) -> list[str]:
+    problems: list[str] = []
+    if "## What changed" not in stdout:
+        problems.append("diff --format md: missing the '## What changed' heading")
+    if "\n### " not in stdout:
+        problems.append(
+            "diff --format md: missing a '### ' subsection (closed/opened/other)"
+        )
+    return problems
+
+
+def _diff_missing_file_problems(stdout: str, returncode: int) -> list[str]:
+    problems: list[str] = []
+    if returncode != 3:
+        problems.append(f"diff missing-file: exit {returncode}, expected 3")
+    try:
+        envelope = json.loads(stdout)
+    except ValueError:
+        return problems + [
+            f"diff missing-file: output is not JSON: {stdout.strip()[:200]!r}"
+        ]
+    key = envelope.get("error", {}).get("message_key")
+    if key != "input.report_b_missing":
+        problems.append(
+            f"diff missing-file: error message_key={key!r}, expected "
+            "'input.report_b_missing'"
+        )
+    return problems
+
+
+def _diff_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
+    """`agentce diff <a> <b>` against the same fixture pair `tools/diff_parity_check.py`'s
+    cross-engine check uses (item 18.24's C3), run against the installed artifact the way a user
+    reaches it (C4): `--json`'s envelope, `--format md`'s rendering, the identical-pair case (exit
+    0), and the missing-second-file error case."""
+    fixture_dir = cwd / "diff-fixture"
+    fixture_dir.mkdir(exist_ok=True)
+    a_path, b_path = diff_parity_check.build_fixture(fixture_dir)
+    a_entries = json.loads(a_path.read_text(encoding="utf-8"))
+    b_entries = json.loads(b_path.read_text(encoding="utf-8"))
+    groups = diff_parity_check.what_changed_groups(a_entries, b_entries)
+    expected_keys = {entry[0] for group in groups.values() for entry in group}
+    expected_len = len(expected_keys)
+
+    problems: list[str] = []
+    proc = runner.run(
+        [*exe, "diff", str(a_path), str(b_path), "--json"], cwd, offline=True
+    )
+    problems += _diff_json_problems(
+        proc.stdout, proc.returncode, expected_len, expected_keys
+    )
+
+    proc = runner.run(
+        [*exe, "diff", str(a_path), str(b_path), "--format", "md"], cwd, offline=True
+    )
+    problems += _diff_md_problems(proc.stdout)
+
+    proc = runner.run([*exe, "diff", str(a_path), str(a_path)], cwd, offline=True)
+    if proc.returncode != 0:
+        problems.append(f"diff identical-pair: exit {proc.returncode}, expected 0")
+
+    proc = runner.run([*exe, "diff", str(a_path), "--json"], cwd, offline=True)
+    problems += _diff_missing_file_problems(proc.stdout, proc.returncode)
+    return problems
+
+
 _ZERO_DIGEST = "sha256:" + "0" * 64
 
 
@@ -1663,6 +1767,7 @@ def _npm_run_problems(
         f"npm: {p}"
         for p in _version_problems(exe, runner, empty, "agentce-ts", spec_version)
     ]
+    problems += [f"npm: {p}" for p in _diff_problems(exe, runner, empty)]
     package = empty / "node_modules" / "@agent-conformance" / "cli"
     for rel in (
         "schema/agentce-evidence.schema.json",
@@ -1767,6 +1872,7 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
             f"jar: {p}"
             for p in _version_problems(exe, runner, empty, "agentce-java", spec_version)
         ]
+        problems += [f"jar: {p}" for p in _diff_problems(exe, runner, empty)]
         with zipfile.ZipFile(jar) as zf:
             names = set(zf.namelist())
         for entry in (
@@ -2194,10 +2300,61 @@ def self_test() -> int:
             failures.append(
                 "a byte-identical html outcome tally was rejected over unrelated trailing content"
             )
+
+        # 6. item 18.24's C4: a `diff` implementation that always reports "no differences" (the
+        #    contract's own named seeded fault) must be rejected by the `--json` envelope check even
+        #    though it might still exit non-zero for an unrelated reason; a correct envelope, a
+        #    correct `--format md` rendering, and a correct missing-file error must each be accepted.
+        with tempfile.TemporaryDirectory(prefix="diff-selftest-") as raw:
+            diff_a, diff_b = diff_parity_check.build_fixture(Path(raw))
+            diff_groups = diff_parity_check.what_changed_groups(
+                json.loads(diff_a.read_text(encoding="utf-8")),
+                json.loads(diff_b.read_text(encoding="utf-8")),
+            )
+        diff_expected_keys = {
+            entry[0] for group in diff_groups.values() for entry in group
+        }
+        diff_expected_len = len(diff_expected_keys)
+        zero_changes_envelope = json.dumps({"diff": [], "changed": 0})
+        if not _diff_json_problems(
+            zero_changes_envelope, 1, diff_expected_len, diff_expected_keys
+        ):
+            failures.append(
+                "a diff implementation that always reports zero changes was accepted"
+            )
+        good_diff_envelope = json.dumps(
+            {
+                "diff": [
+                    {"control": control, "subject": subject}
+                    for control, subject in sorted(diff_expected_keys)
+                ],
+                "changed": diff_expected_len,
+            }
+        )
+        if _diff_json_problems(
+            good_diff_envelope, 1, diff_expected_len, diff_expected_keys
+        ):
+            failures.append("a correct diff --json envelope was rejected")
+        if not _diff_md_problems("no differences.\n"):
+            failures.append(
+                "a diff --format md rendering with no '## What changed' section was accepted"
+            )
+        if _diff_md_problems("## What changed\n\n### Closed (1)\n- x @ y: a -> b\n"):
+            failures.append("a correct diff --format md rendering was rejected")
+        if not _diff_missing_file_problems(
+            json.dumps({"error": {"message_key": "internal.unexpected"}}), 0
+        ):
+            failures.append(
+                "a diff missing-file response with the wrong exit code and key was accepted"
+            )
+        if _diff_missing_file_problems(
+            json.dumps({"error": {"message_key": "input.report_b_missing"}}), 3
+        ):
+            failures.append("a correct diff missing-file response was rejected")
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if not failures:
-        print("installed_artifacts_check self-test: 16 cases discriminate")
+        print("installed_artifacts_check self-test: 17 cases discriminate")
     return 1 if failures else 0
 
 
