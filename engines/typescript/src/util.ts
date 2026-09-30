@@ -49,6 +49,88 @@ export function writeJsonl(records: Iterable<unknown>, path: string): void {
 }
 
 /**
+ * Mirrors Python's implicit `str()` in an f-string for the handful of types a raw dict `.get()`
+ * result can be in this codebase: `null`/`undefined` (an absent or JSON `null` field) as `"None"`,
+ * matching Python's `None`; a boolean as `"True"`/`"False"`; anything else via plain `String()`
+ * (already a no-op for the only other case these call sites ever feed it, an existing string).
+ */
+export function pyStr(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "None";
+  }
+  if (typeof value === "boolean") {
+    return value ? "True" : "False";
+  }
+  return String(value);
+}
+
+/**
+ * A code point Python's `str.isprintable()` would call printable: `U+0020` itself, or a code point
+ * whose Unicode general category is neither `C*` (control/format/surrogate/private-use/unassigned)
+ * nor `Z*` other than `U+0020` (verified against an exhaustive Unicode 15.0 scan: 0 differences from
+ * this characterization).
+ */
+function isPrintableCodePoint(codePoint: number): boolean {
+  if (codePoint === 0x20) {
+    return true;
+  }
+  const ch = String.fromCodePoint(codePoint);
+  return !/\p{C}/u.test(ch) && !/\p{Z}/u.test(ch);
+}
+
+/**
+ * Mirrors Python's `repr()` for the narrow set of types this codebase ever feeds it (a string, a
+ * boolean, a finite number, or `null`/`undefined`): a string picks single quotes unless it contains
+ * a `'` and no `"`, in which case it switches to double quotes (exactly `repr`'s own quote-choice
+ * rule), escapes a literal backslash first, then the chosen quote character, then every
+ * non-{@link isPrintableCodePoint} code point as `\t`/`\n`/`\r` (the three literal two-character
+ * escapes), `\xHH` (<= 0xFF), `\uHHHH` (<= 0xFFFF), or `\UHHHHHHHH` (else) -- never a bare
+ * `\x09`/`\x0a`/`\x0d` for tab/newline/carriage-return, which `repr` always spells out as the named
+ * escape instead. An object or array (not reachable through this codebase's own schema-checked
+ * inputs) is an accepted, out-of-scope input: rendered some deterministic way, not pinned to match
+ * Python's `repr(dict)`/`repr(list)` character-for-character.
+ */
+export function pyRepr(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "None";
+  }
+  if (typeof value === "boolean") {
+    return value ? "True" : "False";
+  }
+  if (typeof value === "number") {
+    return String(value);
+  }
+  if (typeof value !== "string") {
+    return String(value);
+  }
+  const quote = value.includes("'") && !value.includes('"') ? '"' : "'";
+  let body = "";
+  for (const ch of value) {
+    const codePoint = ch.codePointAt(0) as number;
+    if (ch === "\\") {
+      body += "\\\\";
+    } else if (ch === quote) {
+      body += `\\${quote}`;
+    } else if (ch === "\t") {
+      body += "\\t";
+    } else if (ch === "\n") {
+      body += "\\n";
+    } else if (ch === "\r") {
+      body += "\\r";
+    } else if (isPrintableCodePoint(codePoint)) {
+      body += ch;
+    } else if (codePoint <= 0xff) {
+      body += `\\x${codePoint.toString(16).padStart(2, "0")}`;
+    } else if (codePoint <= 0xffff) {
+      body += `\\u${codePoint.toString(16).padStart(4, "0")}`;
+    } else {
+      body += `\\U${codePoint.toString(16).padStart(8, "0")}`;
+    }
+  }
+  return `${quote}${body}${quote}`;
+}
+
+/**
  * Recursively sort object keys, matching Python's `json.dumps(sort_keys=True)`. With
  * `JSON.stringify(sortKeysDeep(x), null, 2)` the output is byte-for-byte identical to
  * `json.dumps(x, sort_keys=True, indent=2)` for ASCII content.
