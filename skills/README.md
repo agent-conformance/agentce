@@ -47,17 +47,30 @@ never a relative path back into this repository). `tools/vendor_skill_engine.py`
 vendored wheel in sync with `engines/python`; run it with `--write` to rebuild the wheel and re-lock
 each skill.
 
-**`vendor/*.whl` and `uv.lock` are not committed on everyday phase commits** (18.54): the wheel changes
-on every engine change, and committing it every time made each one another CI run for no reason
-(`MAINTAINER-INBOX` row 27). CI runs `tools/vendor_skill_engine.py --write` itself before testing either
-skill, so the standalone self-tests above still exercise a real, freshly built wheel on every run. The
-sync test still proves each skill bundles the engine it was tested with, just without a commit recording
-it. Only the commit a release tag points at carries `vendor/*.whl` and `uv.lock`, written there by
-`tools/vendor_skill_engine.py --write` as the last step of cutting that release, so a commit-pinned
-checkout of the tag keeps working exactly as documented above: one command, standalone, offline.
-`tools/skill_release_shape_check.py` proves it. It builds a release-shaped commit, copies each skill
-folder out alone, and runs both self-test commands above from it with networking disabled; its
-`--self-test` proves a release commit with a missing or stale wheel turns that check red.
+**`vendor/*.whl` and `uv.lock` are not committed on everyday commits**: the wheel changes on every engine
+change, and committing it every time made each one another CI run for no reason. `.gitignore` excludes
+both paths; CI runs `tools/vendor_skill_engine.py --write` itself before testing either skill, so the
+standalone self-tests above still exercise a real, freshly built wheel on every run. The sync test still
+proves each skill bundles the engine it was tested with, just without a commit recording it.
+
+**A release commit is different.** As the last step of cutting a release, after `--write` rebuilds the
+wheel, force-add and commit the two now-gitignored paths for both skills before tagging:
+
+```sh
+tools/vendor_skill_engine.py --write
+git add -f skills/agentce-get-evidence/uv.lock skills/agentce-get-evidence/vendor/*.whl \
+           skills/agentce-prepare-to-share/uv.lock skills/agentce-prepare-to-share/vendor/*.whl
+git commit -s -m "release: vendor the engine wheel for this release commit"
+```
+
+That release commit carries `vendor/*.whl` and `uv.lock` for both skills, so a commit-pinned checkout of
+the tag it carries keeps working exactly as documented above: one command, standalone, offline.
+`tools/skill_release_shape_check.py` proves it. It builds a release-shaped commit the same way, extracts
+each skill folder from the committed tree alone, and runs both self-test commands above from it with
+networking disabled; it also rebuilds each wheel fresh from that commit's own `engines/python` and
+confirms it matches the committed one, byte for byte, so a release commit vendored before a later,
+uncommitted engine change would be caught even though its wheel still installs and runs. Its `--self-test`
+proves a release commit with a missing, corrupted or stale wheel turns that check red.
 
 ## Version table
 

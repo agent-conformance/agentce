@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.17.0",
+  "suite_version": "0.18.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -673,6 +673,36 @@
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/commands/__init__.py's cmd_sign, ported field-for-field in engines/typescript/src/sign.ts and engines/java/src/main/java/org/agentce/Sign.java."
+    },
+    {
+      "id": "VG-SKILL-RELEASE-SHAPE",
+      "title": "A release-shaped commit still carries a working, in-sync vendored engine wheel for both agent skills, standalone and offline",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/skill_release_shape.sh"
+      ],
+      "requires": [
+        "python3",
+        "uv",
+        "git"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "a throwaway release-shaped commit built by force-adding the gitignored vendored wheel and lock for both skills actually carries them in its git tree; extracting each skill folder from that commit alone and running its S-10 self-test passes standalone, offline, with no sibling engines/ checkout; the committed wheel matches a fresh build of that commit's own engines/python byte for byte; a release commit with a missing, corrupted or stale wheel turns the check red",
+        "fail": "the release-shaped commit never advances past HEAD or is missing the wheel/lock from its tree, a skill's standalone self-test fails or needs the network, the committed wheel does not match a fresh build of its own engines/python, or the self-test's three seeded faults (missing, corrupted, stale) fail to turn the check red"
+      },
+      "faults": [
+        {
+          "description": "the release-shape check stops force-adding the gitignored wheel and lock by name and falls back to a plain git add, which silently skips them, so the release commit it builds never actually carries them",
+          "file": "tools/skill_release_shape_check.py",
+          "search": "    _git(\"add\", \"-f\", \"--\", *paths, cwd=worktree)",
+          "replace": "    _git(\"add\", \"-A\", \"--\", \"skills\", cwd=worktree)"
+        }
+      ],
+      "fix_hint": "Run the gate's command and read the FAIL lines; tools/skill_release_shape_check.py builds the release-shaped commit and runs the standalone install, tools/vendor_skill_engine.py builds and checks the wheel itself, and skills/README.md 'Install and pin (S-10)' documents the release procedure this gate proves."
     }
   ]
 }

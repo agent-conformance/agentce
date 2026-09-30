@@ -3,6 +3,19 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.18.0
+
+- Added `VG-SKILL-RELEASE-SHAPE`: once everyday commits stop tracking the two agent skills' vendored
+  engine wheel and lock (18.54), the commit a release tag points at still force-adds and commits them,
+  so a commit-pinned checkout of that tag keeps installing standalone and offline exactly as
+  `skills/README.md`'s "Install and pin (S-10)" documents. Builds a throwaway release-shaped commit
+  with `tools/skill_release_shape_check.py`, extracts each skill folder from the committed tree alone
+  (never the worktree's working directory), and runs both skills' standalone self-tests offline; also
+  rebuilds each wheel fresh from that commit's own `engines/python` and confirms it matches the
+  committed one, catching a release commit vendored before a later, unvendored engine change. Its
+  seeded fault reverts the force-add to a plain `git add`, which `.gitignore` makes silently skip both
+  paths, so the release commit built that way never actually carries them.
+
 ## 0.17.0
 
 - Added `VG-SIGN`: the engine refuses to sign a report that is not ready to publish, and a

@@ -123,7 +123,13 @@ def cmd_write() -> int:
             if proc.returncode != 0:
                 raise RuntimeError(f"uv lock failed in skills/{skill}:\n{proc.stderr}")
             print(f"vendored {wheel.name} into skills/{skill}/vendor/ and re-locked")
-    print("Next: commit pyproject.toml, uv.lock, and vendor/*.whl together.")
+    print(
+        "Next: on an everyday phase commit, commit only pyproject.toml (uv.lock and vendor/*.whl are "
+        "gitignored, per skills/README.md 'Install and pin (S-10)'). On a release commit only, also "
+        "`git add -f` uv.lock and vendor/*.whl for both skills and commit them together, as the last "
+        "step before tagging -- tools/skill_release_shape_check.py proves that commit still installs "
+        "standalone and offline."
+    )
     return 0
 
 

@@ -3,35 +3,47 @@ carrying the vendored engine wheel (item 18.54, `skills/README.md` "Install and 
 
 Everyday phase commits no longer track `skills/*/vendor/*.whl` or `skills/*/uv.lock` (18.54). The wheel
 churned on every engine change (MAINTAINER-INBOX row 27). Only the commit a release tag points at still
-carries them, built there by `tools/vendor_skill_engine.py --write` as the last step of cutting a release.
-S-10 states that a commit-pinned checkout of that commit, whether a zip, an assistant's skill directory,
-or a registry checkout, is still one-command installable on its own, severed from this monorepo, with no
-sibling `engines/` checkout and no network beyond the one-time dependency install.
+carries them, force-added there as the last step of cutting a release (`skills/README.md` "Install and
+pin (S-10)"). S-10 states that a commit-pinned checkout of that commit, whether a zip, an assistant's
+skill directory, or a registry checkout, is still one-command installable on its own, severed from this
+monorepo, with no sibling `engines/` checkout and no network beyond the one-time dependency install.
 
 This check builds that commit and runs the install it describes, rather than only asserting its text:
 
     1. `git worktree add --detach` a throwaway checkout of HEAD, standing in for the commit a release tag
        will point at.
-    2. Run that worktree's own `tools/vendor_skill_engine.py --write` inside it (the release-time step),
-       and commit the result there. That commit is now release-shaped: it carries `vendor/*.whl` and
-       `uv.lock` for both skills, exactly as a real release commit would.
-    3. Copy each skill folder out of the worktree alone, into its own empty directory with no monorepo
-       beside it, and run the two S-10 self-test commands from `skills/README.md` there.
+    2. Run that worktree's own `tools/vendor_skill_engine.py --write` inside it (the release-time build
+       step), then force-add the gitignored wheel and lock for both skills and commit them. `git ls-tree`
+       on the resulting commit confirms every expected path actually landed in it -- `.gitignore` makes a
+       plain `git add -A` silently skip these paths, so a commit built that way would carry none of them
+       while still reporting success; this check fails loudly if that ever regresses.
+    3. Extract each skill folder from that commit with `git archive` (the committed tree, never the
+       worktree's working directory, which could carry stray uncommitted files) into its own empty
+       directory with no monorepo beside it, and run the two S-10 self-test commands from
+       `skills/README.md` there.
+    4. Rebuild each skill's wheel fresh from the release commit's own `engines/python` and diff it against
+       the committed vendored wheel (reusing `vendor_skill_engine.py`'s own check mode) -- a release commit
+       whose wheel was vendored before a later, unvendored engine change landed in the same commit is
+       stale, and the S-10 self-tests alone would not catch it (a stale-but-valid wheel still installs and
+       runs).
+    5. Confirm `ci.yml`'s `agent-skill-tests` job still runs these in order: vendor, then self-test/check,
+       then this script.
 
 `--no-network` runs step 3 under dead proxies, the same convention `installed_artifacts_check.py` uses:
 install steps may reach the network on a cold `uv` cache, every run step is offline. An accidental network
 call in the standalone self-test then fails loudly instead of silently succeeding over a live connection.
 
-`--self-test` proves the check discriminates. The good release-shaped commit passes. Two seeded faults, a
-release commit with a missing vendored wheel and one with a stale (corrupted) wheel whose bytes no longer
-match `uv.lock`'s pinned hash, each turn the standalone self-test red.
+`--self-test` proves the check discriminates. The good release-shaped commit passes. Three seeded faults
+each turn it red: a release commit with no vendored wheel at all, one with a corrupted wheel (bytes that
+no longer form a valid zip), and one whose wheel was vendored before a later engine-source change was
+folded into the same commit without re-vendoring (a real, valid wheel -- stale, not broken).
 
 Usage:
     skill_release_shape_check.py                 build a release-shaped commit and prove both skills
                                                    install and self-test standalone from it
     skill_release_shape_check.py --no-network     the same, with the standalone self-test run offline
-    skill_release_shape_check.py --self-test      prove a missing or stale wheel on the release commit
-                                                   turns the check red
+    skill_release_shape_check.py --self-test      prove a missing, corrupted or stale wheel on the
+                                                   release commit turns the check red
 """
 
 from __future__ import annotations
@@ -39,24 +51,40 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ("agentce-get-evidence", "agentce-prepare-to-share")
-STRIP_DIRS = {".venv", ".mypy_cache", ".ruff_cache", "__pycache__"}
 
 #: A dead proxy: any accidental network call fails, proving the standalone self-test runs offline
 #: (the same device `conformance/offline_bundle.py` uses for its own offline proof).
 _DEAD_PROXY = "http://127.0.0.1:9"
 
 SELF_TEST_CMDS: dict[str, list[str]] = {
-    "agentce-get-evidence": ["uv", "run", "--frozen", "python3", "scripts/lint_profile.py", "--self-test", "--json"],
-    "agentce-prepare-to-share": ["uv", "run", "--frozen", "pytest", "-q", "-p", "no:cacheprovider"],
+    "agentce-get-evidence": [
+        "uv",
+        "run",
+        "--frozen",
+        "python3",
+        "scripts/lint_profile.py",
+        "--self-test",
+        "--json",
+    ],
+    "agentce-prepare-to-share": [
+        "uv",
+        "run",
+        "--frozen",
+        "pytest",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+    ],
 }
 
 
@@ -64,7 +92,9 @@ class CheckFailure(Exception):
     """A real, named assertion failed."""
 
 
-def _run(cmd: list[str], *, cwd: Path, no_network: bool = False) -> subprocess.CompletedProcess[str]:
+def _run(
+    cmd: list[str], *, cwd: Path, no_network: bool = False
+) -> subprocess.CompletedProcess[str]:
     env = dict(os.environ)
     if no_network:
         env.update(
@@ -78,10 +108,63 @@ def _run(cmd: list[str], *, cwd: Path, no_network: bool = False) -> subprocess.C
 
 
 def _git(*args: str, cwd: Path | None = None) -> str:
-    proc = subprocess.run(["git", *args], cwd=cwd or ROOT, capture_output=True, text=True)
+    proc = subprocess.run(
+        ["git", *args], cwd=cwd or ROOT, capture_output=True, text=True
+    )
     if proc.returncode != 0:
-        raise CheckFailure(f"git {' '.join(args)} failed:\n{proc.stdout}\n{proc.stderr}")
+        raise CheckFailure(
+            f"git {' '.join(args)} failed:\n{proc.stdout}\n{proc.stderr}"
+        )
     return proc.stdout.strip()
+
+
+def _release_paths(worktree: Path) -> list[str]:
+    """The exact paths the release step must land in the commit: each skill's lock and wheel."""
+    paths: list[str] = []
+    for skill in SKILLS:
+        paths.append(f"skills/{skill}/uv.lock")
+        wheels = sorted((worktree / "skills" / skill / "vendor").glob("*.whl"))
+        if not wheels:
+            raise CheckFailure(f"no vendored wheel to commit for {skill}")
+        paths.append(f"skills/{skill}/vendor/{wheels[0].name}")
+    return paths
+
+
+def _commit_release_artifacts(worktree: Path, *, message: str) -> None:
+    """Force-add the gitignored vendor wheel and lock for both skills and commit them onto HEAD.
+
+    `.gitignore` excludes `skills/*/vendor/*.whl` and `skills/*/uv.lock` on everyday phase commits
+    (18.54); the release procedure documented in `skills/README.md` "Install and pin (S-10)" force-adds
+    exactly these paths as its last step before tagging. Force-add them by name rather than `git add -A`,
+    which silently skips gitignored files and would leave the release commit carrying none of them while
+    the `git add` and `git commit` calls both still exit 0.
+    """
+    paths = _release_paths(worktree)
+    _git("add", "-f", "--", *paths, cwd=worktree)
+    status = _git("status", "--porcelain", "--", *paths, cwd=worktree)
+    if not status:
+        raise CheckFailure(
+            "nothing staged for the release commit -- git add -f found no changes"
+        )
+    _git(
+        "-c",
+        "user.name=skill-release-shape-check",
+        "-c",
+        "user.email=skill-release-shape-check@localhost",
+        "commit",
+        "-m",
+        message,
+        "--no-verify",
+        cwd=worktree,
+    )
+    tracked = set(
+        _git("ls-tree", "-r", "--name-only", "HEAD", cwd=worktree).splitlines()
+    )
+    missing = [p for p in paths if p not in tracked]
+    if missing:
+        raise CheckFailure(
+            f"release commit is missing {missing} from its tree even after git add -f"
+        )
 
 
 def build_release_worktree(tmp: Path, *, vendor: bool = True) -> Path:
@@ -94,47 +177,117 @@ def build_release_worktree(tmp: Path, *, vendor: bool = True) -> Path:
     _git("worktree", "add", "--detach", str(worktree), "HEAD")
     if vendor:
         proc = subprocess.run(
-            [sys.executable, str(worktree / "tools" / "vendor_skill_engine.py"), "--write"],
+            [
+                sys.executable,
+                str(worktree / "tools" / "vendor_skill_engine.py"),
+                "--write",
+            ],
             cwd=worktree,
             capture_output=True,
             text=True,
         )
         if proc.returncode != 0:
-            raise CheckFailure(f"vendor_skill_engine.py --write failed in the worktree:\n{proc.stdout}\n{proc.stderr}")
-        _git("add", "-A", "--", "skills", cwd=worktree)
-        status = _git("status", "--porcelain", "--", "skills", cwd=worktree)
-        if status:
-            _git(
-                "-c", "user.name=skill-release-shape-check", "-c", "user.email=skill-release-shape-check@localhost",
-                "commit", "-m", "release: vendor the engine wheel for this release commit", "--no-verify",
-                cwd=worktree,
+            raise CheckFailure(
+                f"vendor_skill_engine.py --write failed in the worktree:\n{proc.stdout}\n{proc.stderr}"
             )
+        _commit_release_artifacts(
+            worktree, message="release: vendor the engine wheel for this release commit"
+        )
+    return worktree
+
+
+def corrupted_wheel_worktree(tmp: Path) -> Path:
+    """A release-shaped commit whose committed wheel bytes no longer form a valid zip. Amended into the
+    release commit itself (not left as an uncommitted, on-disk change), since step 3 now reads the
+    committed tree (`git archive`), not the worktree's working directory."""
+    worktree = build_release_worktree(tmp, vendor=True)
+    corrupted: list[str] = []
+    for skill in SKILLS:
+        wheels = sorted((worktree / "skills" / skill / "vendor").glob("*.whl"))
+        if not wheels:
+            raise CheckFailure(
+                f"self-test setup: no vendored wheel to corrupt for {skill}"
+            )
+        wheels[0].write_bytes(b"not a real wheel")
+        corrupted.append(f"skills/{skill}/vendor/{wheels[0].name}")
+    _git("add", "--", *corrupted, cwd=worktree)
+    _git(
+        "-c",
+        "user.name=skill-release-shape-check",
+        "-c",
+        "user.email=skill-release-shape-check@localhost",
+        "commit",
+        "--amend",
+        "--no-edit",
+        "--no-verify",
+        cwd=worktree,
+    )
     return worktree
 
 
 def stale_wheel_worktree(tmp: Path) -> Path:
-    """A release-shaped commit whose vendored wheel bytes no longer match `uv.lock`'s pinned hash."""
+    """A release-shaped commit whose wheel was vendored before a later engine-source change was folded
+    into the same commit without re-vendoring: a real, installable wheel, but stale against the commit's
+    own `engines/python`. Amended into the release commit itself, not a follow-up commit, so the sync
+    check (step 4) is what has to catch it -- the S-10 self-tests would pass on a stale-but-valid wheel.
+    """
     worktree = build_release_worktree(tmp, vendor=True)
-    for skill in SKILLS:
-        wheels = sorted((worktree / "skills" / skill / "vendor").glob("*.whl"))
-        if not wheels:
-            raise CheckFailure(f"self-test setup: no vendored wheel to corrupt for {skill}")
-        wheels[0].write_bytes(b"not a real wheel")
+    marker = worktree / "engines" / "python" / "agentce" / "__init__.py"
+    marker.write_text(
+        marker.read_text(encoding="utf-8")
+        + "\n# skill_release_shape_check stale-wheel self-test marker\n",
+        encoding="utf-8",
+    )
+    _git("add", "--", "engines/python/agentce/__init__.py", cwd=worktree)
+    _git(
+        "-c",
+        "user.name=skill-release-shape-check",
+        "-c",
+        "user.email=skill-release-shape-check@localhost",
+        "commit",
+        "--amend",
+        "--no-edit",
+        "--no-verify",
+        cwd=worktree,
+    )
     return worktree
 
 
-def copy_skill_out(worktree: Path, skill: str, dest_root: Path) -> Path:
-    """Copy one skill folder out of `worktree`, severed from the monorepo, into its own empty directory."""
+def copy_skill_out(
+    worktree: Path, skill: str, dest_root: Path, *, ref: str = "HEAD"
+) -> Path:
+    """Extract one skill folder from `ref`'s committed tree in `worktree`, severed from the monorepo.
+
+    `git archive` reads only what is actually committed at `ref` -- unlike copying the worktree's working
+    directory, a file that `_commit_release_artifacts` failed to commit (or that sits there stale from a
+    prior step) cannot leak into the standalone install this proves.
+    """
     dest = dest_root / skill
-    shutil.copytree(
-        worktree / "skills" / skill,
-        dest,
-        ignore=shutil.ignore_patterns(*STRIP_DIRS),
+    dest.mkdir(parents=True, exist_ok=True)
+    archive = subprocess.run(
+        ["git", "archive", ref, "--", f"skills/{skill}"],
+        cwd=worktree,
+        capture_output=True,
     )
+    if archive.returncode != 0:
+        raise CheckFailure(
+            f"git archive failed for {skill}: {archive.stderr.decode(errors='replace')}"
+        )
+    extract = subprocess.run(
+        ["tar", "-x", "-C", str(dest), "--strip-components=2"],
+        input=archive.stdout,
+        capture_output=True,
+    )
+    if extract.returncode != 0:
+        raise CheckFailure(
+            f"extracting {skill}'s archive failed: {extract.stderr.decode(errors='replace')}"
+        )
     return dest
 
 
-def run_standalone_self_test(skill_dir: Path, skill: str, *, no_network: bool) -> dict[str, Any]:
+def run_standalone_self_test(
+    skill_dir: Path, skill: str, *, no_network: bool
+) -> dict[str, Any]:
     proc = _run(SELF_TEST_CMDS[skill], cwd=skill_dir, no_network=no_network)
     ok = proc.returncode == 0
     if ok and skill == "agentce-get-evidence":
@@ -148,29 +301,115 @@ def run_standalone_self_test(skill_dir: Path, skill: str, *, no_network: bool) -
     }
 
 
+def check_release_commit_in_sync(worktree: Path) -> list[str]:
+    """Rebuild each skill's wheel fresh from the release commit's own `engines/python` and diff it
+    against the committed vendored wheel (`vendor_skill_engine.py`'s own check mode, run against the
+    worktree's checked-out state, which after `build_release_worktree` equals the release commit)."""
+    proc = subprocess.run(
+        [sys.executable, str(worktree / "tools" / "vendor_skill_engine.py")],
+        cwd=worktree,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        return [
+            f"release commit's vendored wheel is stale against its own engines/python:\n{proc.stdout}{proc.stderr}"
+        ]
+    return []
+
+
+def check_ci_step_order() -> list[str]:
+    """`ci.yml`'s `agent-skill-tests` job must run the vendor-write step before either skill's
+    self-test/check step, which must run before this script's own CI invocation -- a future edit that
+    reorders them would silently stop exercising a freshly built wheel."""
+    workflow = yaml.safe_load(
+        (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    )
+    steps = workflow["jobs"]["agent-skill-tests"]["steps"]
+    names = [step.get("name", "") for step in steps]
+
+    def _first_index(needle: str) -> int | None:
+        for i, name in enumerate(names):
+            if needle in name:
+                return i
+        return None
+
+    vendor_i = _first_index("Vendor the engine wheel for this run")
+    sync_i = _first_index("matches a fresh build")
+    release_i = _first_index("release-shaped commit still installs")
+    if vendor_i is None or sync_i is None or release_i is None:
+        return [
+            f"could not find all three agent-skill-tests CI steps by name (vendor={vendor_i}, sync={sync_i}, release-shape={release_i})"
+        ]
+    if not (vendor_i < sync_i < release_i):
+        return [
+            f"agent-skill-tests CI step order regressed: vendor={vendor_i}, sync={sync_i}, release-shape={release_i} (expected vendor < sync < release-shape)"
+        ]
+    return []
+
+
 def check(*, no_network: bool) -> dict[str, Any]:
+    ci_problems = check_ci_step_order()
     with tempfile.TemporaryDirectory(prefix="agentce-release-shape-") as raw:
         tmp = Path(raw)
         try:
             worktree = build_release_worktree(tmp)
+            sync_problems = check_release_commit_in_sync(worktree)
             results = []
             for skill in SKILLS:
                 skill_dir = copy_skill_out(worktree, skill, tmp / "installed")
-                results.append(run_standalone_self_test(skill_dir, skill, no_network=no_network))
+                results.append(
+                    run_standalone_self_test(skill_dir, skill, no_network=no_network)
+                )
         finally:
             _git("worktree", "remove", "--force", str(tmp / "release-worktree"))
             _git("worktree", "prune")
-    problems = [f"{r['skill']}: self-test failed (exit {r['returncode']})" for r in results if not r["ok"]]
+    problems = (
+        ci_problems
+        + sync_problems
+        + [
+            f"{r['skill']}: self-test failed (exit {r['returncode']})"
+            for r in results
+            if not r["ok"]
+        ]
+    )
     return {"no_network": no_network, "results": results, "problems": problems}
 
 
-def _assert_fault_is_red(tmp: Path, worktree: Path, *, label: str) -> None:
+def _assert_fault_is_red(
+    tmp: Path, worktree: Path, *, label: str, check_sync: bool = False
+) -> None:
+    if check_sync:
+        if not check_release_commit_in_sync(worktree):
+            raise CheckFailure(
+                f"{label}: the sync check passed on a release commit that should be stale"
+            )
+        return
     results = []
     for skill in SKILLS:
         skill_dir = copy_skill_out(worktree, skill, tmp / f"installed-{label}")
         results.append(run_standalone_self_test(skill_dir, skill, no_network=False))
     if all(r["ok"] for r in results):
-        raise CheckFailure(f"{label}: the standalone self-test passed with no working vendored wheel")
+        raise CheckFailure(
+            f"{label}: the standalone self-test passed with no working vendored wheel"
+        )
+
+
+def _run_fault(build: Any, *, label: str, check_sync: bool = False) -> str | None:
+    with tempfile.TemporaryDirectory(
+        prefix=f"agentce-release-shape-selftest-{label}-"
+    ) as raw:
+        tmp = Path(raw)
+        try:
+            worktree = build(tmp)
+            try:
+                _assert_fault_is_red(tmp, worktree, label=label, check_sync=check_sync)
+            except CheckFailure as exc:
+                return str(exc)
+        finally:
+            _git("worktree", "remove", "--force", str(tmp / "release-worktree"))
+            _git("worktree", "prune")
+    return None
 
 
 def self_test() -> int:
@@ -178,49 +417,48 @@ def self_test() -> int:
 
     good = check(no_network=True)
     if good["problems"]:
-        failures.append(f"a correctly release-shaped commit unexpectedly failed: {good['problems']}")
+        failures.append(
+            f"a correctly release-shaped commit unexpectedly failed: {good['problems']}"
+        )
 
-    with tempfile.TemporaryDirectory(prefix="agentce-release-shape-selftest-") as raw:
-        tmp = Path(raw)
-        try:
-            missing_wheel_worktree = build_release_worktree(tmp, vendor=False)
-            try:
-                _assert_fault_is_red(tmp, missing_wheel_worktree, label="missing-wheel")
-            except CheckFailure as exc:
-                failures.append(str(exc))
-        finally:
-            _git("worktree", "remove", "--force", str(tmp / "release-worktree"))
-            _git("worktree", "prune")
-
-    with tempfile.TemporaryDirectory(prefix="agentce-release-shape-selftest-") as raw:
-        tmp = Path(raw)
-        try:
-            stale_worktree = stale_wheel_worktree(tmp)
-            try:
-                _assert_fault_is_red(tmp, stale_worktree, label="stale-wheel")
-            except CheckFailure as exc:
-                failures.append(str(exc))
-        finally:
-            _git("worktree", "remove", "--force", str(tmp / "release-worktree"))
-            _git("worktree", "prune")
+    for label, build, check_sync in (
+        ("missing-wheel", lambda tmp: build_release_worktree(tmp, vendor=False), False),
+        ("corrupted-wheel", corrupted_wheel_worktree, False),
+        ("stale-wheel", stale_wheel_worktree, True),
+    ):
+        failure = _run_fault(build, label=label, check_sync=check_sync)
+        if failure:
+            failures.append(failure)
 
     if failures:
         for f in failures:
             print(f"SELF-TEST FAIL: {f}", file=sys.stderr)
         return 1
     print(
-        "self-test ok: a release-shaped commit installs standalone; a missing or stale vendored wheel "
-        "turns the standalone self-test red"
+        "self-test ok: a release-shaped commit installs standalone; a missing, corrupted or stale "
+        "vendored wheel turns the standalone self-test or the sync check red"
     )
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("--self-test", action="store_true", help="prove a missing/stale wheel turns the check red")
-    parser.add_argument("--no-network", action="store_true", help="run the standalone self-test under dead proxies")
-    parser.add_argument("--json", action="store_true", help="also print the machine-readable result")
+    group.add_argument(
+        "--self-test",
+        action="store_true",
+        help="prove a missing/corrupted/stale wheel turns the check red",
+    )
+    parser.add_argument(
+        "--no-network",
+        action="store_true",
+        help="run the standalone self-test under dead proxies",
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="also print the machine-readable result"
+    )
     args = parser.parse_args(argv)
 
     if args.self_test:
@@ -234,7 +472,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"FAIL: {p}", file=sys.stderr)
         return 1
     print(
-        "ok: a release-shaped commit carries a working vendored wheel; both skills install and "
+        "ok: a release-shaped commit carries a working, in-sync vendored wheel; both skills install and "
         f"self-test standalone{' offline' if args.no_network else ''}"
     )
     return 0
