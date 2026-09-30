@@ -65,6 +65,7 @@ from pathlib import Path
 import assess_smoke_check
 import catalog_digest_check
 import diff_parity_check
+import readiness_parity_check
 
 ROOT = Path(__file__).resolve().parent.parent
 PY_ENGINE = ROOT / "engines" / "python"
@@ -1400,6 +1401,98 @@ def _diff_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
     return problems
 
 
+def _readiness_json_problems(
+    stdout: str, returncode: int, expected_verdict: str, expected_exit: int
+) -> list[str]:
+    """A `readiness --json` envelope must carry the real computed verdict and a real, readable
+    `report-readiness-*.md` file on disk -- a `readiness` that always answers READY (item 18.25's own
+    named seeded fault) is caught here on scenario-3's own NOT_READY fixture."""
+    try:
+        envelope = json.loads(stdout)
+    except ValueError:
+        return [f"readiness --json: output is not JSON: {stdout.strip()[:200]!r}"]
+    problems: list[str] = []
+    verdict = envelope.get("verdict")
+    if verdict != expected_verdict:
+        problems.append(f"readiness --json: verdict={verdict!r}, expected {expected_verdict!r}")
+    if returncode != expected_exit:
+        problems.append(f"readiness --json: exit {returncode}, expected {expected_exit}")
+    report_path = envelope.get("report")
+    report = Path(report_path) if report_path else None
+    if report is None or not report.is_file():
+        problems.append(f"readiness --json: report file {report_path!r} does not exist on disk")
+        return problems
+    lines = report.read_text(encoding="utf-8").splitlines()
+    expected_first_line = f"# Report readiness — {expected_verdict}"
+    if not lines or lines[0] != expected_first_line:
+        problems.append(
+            f"readiness --json: report file's first line {lines[0] if lines else ''!r}, "
+            f"expected {expected_first_line!r}"
+        )
+    return problems
+
+
+def _readiness_missing_report_dir_problems(stdout: str, returncode: int) -> list[str]:
+    problems: list[str] = []
+    if returncode != 3:
+        problems.append(f"readiness missing report_dir: exit {returncode}, expected 3")
+    try:
+        envelope = json.loads(stdout)
+    except ValueError:
+        return problems + [
+            f"readiness missing report_dir: output is not JSON: {stdout.strip()[:200]!r}"
+        ]
+    key = envelope.get("error", {}).get("message_key")
+    if key != "input.report_dir_missing":
+        problems.append(
+            f"readiness missing report_dir: error message_key={key!r}, expected "
+            "'input.report_dir_missing'"
+        )
+    return problems
+
+
+def _readiness_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
+    """`agentce readiness <report-dir> --catalog-dir <dir>` against `tools/readiness_parity_check.py`'s
+    own scenario-1 (clean, READY) and scenario-3 (NOT_READY, no `--gaps`) fixtures (item 18.25's C3),
+    run against the installed artifact the way a user reaches it (C4): a missing `report_dir`
+    positional must return `input.report_dir_missing`, not a crash."""
+    fixture_dir = cwd / "readiness-fixture"
+    fixture_dir.mkdir(exist_ok=True)
+    catalog_dir = readiness_parity_check.CATALOG_DIR
+    scenarios = {s.name: s for s in readiness_parity_check.SCENARIOS}
+
+    problems: list[str] = []
+    report1, extra1 = scenarios["1-clean"].build(fixture_dir)
+    proc = runner.run(
+        [*exe, "readiness", str(report1), *extra1, "--catalog-dir", str(catalog_dir), "--json"],
+        cwd,
+        offline=True,
+    )
+    problems += [
+        f"scenario-1: {p}"
+        for p in _readiness_json_problems(
+            proc.stdout, proc.returncode, readiness_parity_check.READY, 0
+        )
+    ]
+
+    report3, extra3 = scenarios["3-insufficient-evidence-no-gaps"].build(fixture_dir)
+    proc = runner.run(
+        [*exe, "readiness", str(report3), *extra3, "--catalog-dir", str(catalog_dir), "--json"],
+        cwd,
+        offline=True,
+    )
+    problems += [
+        f"scenario-3: {p}"
+        for p in _readiness_json_problems(
+            proc.stdout, proc.returncode, readiness_parity_check.NOT_READY, 1
+        )
+    ]
+
+    proc = runner.run([*exe, "readiness", "--json"], cwd, offline=True)
+    problems += _readiness_missing_report_dir_problems(proc.stdout, proc.returncode)
+    return problems
+
+
 _ZERO_DIGEST = "sha256:" + "0" * 64
 
 
@@ -1764,6 +1857,7 @@ def _npm_run_problems(
         for p in _version_problems(exe, runner, empty, "agentce-ts", spec_version)
     ]
     problems += [f"npm: {p}" for p in _diff_problems(exe, runner, empty)]
+    problems += [f"npm: {p}" for p in _readiness_problems(exe, runner, empty)]
     package = empty / "node_modules" / "@agent-conformance" / "cli"
     for rel in (
         "schema/agentce-evidence.schema.json",
@@ -1869,6 +1963,7 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
             for p in _version_problems(exe, runner, empty, "agentce-java", spec_version)
         ]
         problems += [f"jar: {p}" for p in _diff_problems(exe, runner, empty)]
+        problems += [f"jar: {p}" for p in _readiness_problems(exe, runner, empty)]
         with zipfile.ZipFile(jar) as zf:
             names = set(zf.namelist())
         for entry in (
@@ -2342,10 +2437,49 @@ def self_test() -> int:
             json.dumps({"error": {"message_key": "input.report_b_missing"}}), 3
         ):
             failures.append("a correct diff missing-file response was rejected")
+
+        # 7. item 18.25's C4: a `readiness` implementation that always reports READY (the contract's
+        #    own named seeded fault) must be rejected on scenario-3's own NOT_READY fixture even
+        #    though it might still exit non-zero for an unrelated reason; a correct envelope and a
+        #    correct missing-`report_dir` error must each be accepted.
+        with tempfile.TemporaryDirectory(prefix="readiness-selftest-") as raw:
+            report_dir = Path(raw) / "report"
+            report_dir.mkdir()
+            always_ready_report = report_dir / "report-readiness-2026-01-01.md"
+            always_ready_report.write_text("# Report readiness — READY\n", encoding="utf-8")
+            always_ready_envelope = json.dumps(
+                {"verdict": "READY", "reasons": [], "report": str(always_ready_report)}
+            )
+            if not _readiness_json_problems(always_ready_envelope, 0, "NOT READY", 1):
+                failures.append(
+                    "a readiness implementation that always reports READY was accepted on a "
+                    "NOT_READY fixture"
+                )
+            good_report = report_dir / "report-readiness-2026-01-02.md"
+            good_report.write_text("# Report readiness — NOT READY\n", encoding="utf-8")
+            good_envelope = json.dumps(
+                {
+                    "verdict": "NOT READY",
+                    "reasons": ["integrity failed on stream gw"],
+                    "report": str(good_report),
+                }
+            )
+            if _readiness_json_problems(good_envelope, 1, "NOT READY", 1):
+                failures.append("a correct readiness --json envelope was rejected")
+        if not _readiness_missing_report_dir_problems(
+            json.dumps({"error": {"message_key": "internal.unexpected"}}), 0
+        ):
+            failures.append(
+                "a readiness missing-report_dir response with the wrong exit code and key was accepted"
+            )
+        if _readiness_missing_report_dir_problems(
+            json.dumps({"error": {"message_key": "input.report_dir_missing"}}), 3
+        ):
+            failures.append("a correct readiness missing-report_dir response was rejected")
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if not failures:
-        print("installed_artifacts_check self-test: 17 cases discriminate")
+        print("installed_artifacts_check self-test: 18 cases discriminate")
     return 1 if failures else 0
 
 
