@@ -151,11 +151,10 @@ claims:
   - id: firstrun.platforms
     text: >-
       The reference engine installs from its frozen lockfile and runs the quickstart to a report on
-      Linux (x86_64), Apple-silicon macOS, and Intel macOS. Linux and Apple-silicon macOS use a
-      prebuilt cryptography wheel; Intel macOS has none and compiles cryptography from source, which
-      needs Rust and OpenSSL 3. Getting Started states the prerequisites, and `agentce doctor`
-      reports the Python version and whether cryptography came from a prebuilt wheel or a source
-      build.
+      Linux (x86_64), Apple-silicon macOS, and Intel macOS. All three resolve a prebuilt cryptography
+      wheel; Intel macOS is pinned to the last release that still ships one (48.x), a known limitation
+      recorded in ADR-0024. Getting Started states this, and `agentce doctor` reports the Python
+      version and whether cryptography came from a prebuilt wheel or a source build.
     status: built
     pages:
       - website/src/content/docs/docs/getting-started.md
