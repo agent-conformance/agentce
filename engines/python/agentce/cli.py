@@ -49,7 +49,7 @@ class _Parser(argparse.ArgumentParser):
 
 
 def _make_argv_errors(
-    key: str, flag_fix: str, value_placeholder: str, extra_arg_hint: str
+    key: str, flag_fix: str, value_hint: str, extra_arg_hint: str
 ) -> tuple[Callable[[str], InputError], Callable[[str], InputError]]:
     """A `(usage_error, unknown_error)` pair translating argparse's own wording into the keyed
     `InputError` TypeScript and Java raise, for a subcommand that opts into this treatment
@@ -62,7 +62,7 @@ def _make_argv_errors(
         if m := re.fullmatch(r"argument (--[\w-]+): expected one argument", message):
             flag = m.group(1)
             return argv_error(
-                f"flag '{flag}' needs a value.", f"pass {flag} {value_placeholder}."
+                f"flag '{flag}' needs a value.", f"pass {flag} {value_hint}."
             )
         if m := re.fullmatch(
             r"argument (--[\w-]+): ignored explicit argument .*", message
