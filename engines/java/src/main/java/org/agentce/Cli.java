@@ -32,6 +32,10 @@ public final class Cli {
     private static final String DEFAULT_LENS = "baseline@2026.09";
     private static final List<String> REPORT_FORMATS = List.of("md", "html", "oscal", "sarif", "pack");
     private static final Set<String> VERDICT_OUTCOMES = Set.of("conformant", "non-conformant", "insufficient_evidence");
+    /** The same four flags Python's own top-level parser accepts for every command ({@code
+     * --debug}/{@code --quiet} are silently ignored here too, exactly as they are everywhere else in
+     * both engines today) -- skipped by {@link #positionalArgs}, never read as a positional. */
+    private static final Set<String> DIFF_SKIP_FLAGS = Set.of("--json", "--debug", "--quiet");
 
     public static void main(String[] args) {
         System.exit(run(args));
@@ -98,6 +102,8 @@ public final class Cli {
                 result = cmdAssess(args);
             } else if ("report".equals(command)) {
                 result = cmdReport(args);
+            } else if ("diff".equals(command)) {
+                result = cmdDiff(args);
             } else if ("quickstart".equals(command)) {
                 result = cmdQuickstart(args);
             } else if ("version".equals(command)) {
@@ -107,6 +113,17 @@ public final class Cli {
             }
         } catch (AgentceError exc) {
             result = errorResult(command == null ? "" : command, exc);
+        } catch (RuntimeException exc) {
+            // A non-AgentceError exception here would otherwise propagate to the JVM's default
+            // handler, which prints a stack trace and exits with code 1 -- colliding with
+            // ExitCode.FINDINGS, so a malformed-input crash would be indistinguishable from a real
+            // finding to a CI script gating on exit code. Matches Python's key and exit code only,
+            // not its full error envelope shape (a real, pre-existing, engine-wide difference this
+            // does not close).
+            String message = exc.getMessage() != null ? exc.getMessage() : exc.getClass().getName();
+            result = errorResult(
+                    command == null ? "" : command,
+                    new AgentceError("internal.unexpected", message, "file an issue with the input file that caused this."));
         }
         emit(result, json);
         return result.exitCode();
@@ -153,7 +170,12 @@ public final class Cli {
     }
 
     private static String requireFile(String raw, String key, String what) {
-        String fix = "pass --" + key + " <file>.";
+        return requireFile(raw, key, what, "pass --" + key + " <file>.");
+    }
+
+    /** {@link #requireFile}, with an explicit {@code fix} rather than the computed {@code --key}-style
+     * default -- {@code diff}'s two positional arguments (item 18.24) need diff-specific fix text. */
+    private static String requireFile(String raw, String key, String what, String fix) {
         if (raw == null) {
             throw new InputError("input." + key + "_missing", what + " is required.", fix);
         }
@@ -163,6 +185,35 @@ public final class Cli {
                     "input." + key + "_not_a_file", what + " '" + raw + "' is not an existing file.", fix);
         }
         return raw;
+    }
+
+    /** A hardened positional-argument scanner for {@code diff} (the first CLI verb in this engine with
+     * positional, not {@code --flag}, arguments). {@code args[0]} is the command name and is not itself
+     * scanned. Skips exactly {@link #DIFF_SKIP_FLAGS} and {@code --format <value>}, collecting every
+     * other token in order, but throws {@code input.diff_unrecognized_flag} on any other {@code
+     * --}-prefixed token instead of silently reading it as a positional. {@code --format=<value>}
+     * (single-token, {@code =}-joined) is out of scope, matching every other flag in both engines
+     * today. */
+    private static List<String> positionalArgs(String[] args) {
+        List<String> out = new ArrayList<>();
+        for (int i = 1; i < args.length; i++) {
+            String token = args[i];
+            if (DIFF_SKIP_FLAGS.contains(token)) {
+                continue;
+            }
+            if ("--format".equals(token)) {
+                i++; // also skip the value token, if any
+                continue;
+            }
+            if (token.startsWith("--")) {
+                throw new InputError(
+                        "input.diff_unrecognized_flag",
+                        "unrecognized flag '" + token + "'.",
+                        "pass --format text|json|md, or drop the flag.");
+            }
+            out.add(token);
+        }
+        return out;
     }
 
     /**
@@ -706,6 +757,90 @@ public final class Cli {
             result.data.put("out", out);
         }
         result.note(rendering);
+        return result;
+    }
+
+    private static ObjectNode changeToJson(Diff.Change change) {
+        ObjectNode node = Json.nodes().objectNode();
+        node.put("control", change.control());
+        node.put("subject", change.subject());
+        if (change.from() != null) {
+            node.put("from", change.from());
+        } else {
+            node.putNull("from");
+        }
+        if (change.to() != null) {
+            node.put("to", change.to());
+        } else {
+            node.putNull("to");
+        }
+        return node;
+    }
+
+    /** {@code agentce diff} (SPEC §9.3, item 18.6): a real, deterministic assertion-set diff, matching
+     * the Python reference's {@code cmd_diff} (see {@link Diff}). */
+    private static CommandResult cmdDiff(String[] args) {
+        CommandResult result = new CommandResult("diff");
+        List<String> positional = positionalArgs(args);
+        if (positional.size() > 2) {
+            throw new InputError(
+                    "input.diff_extra_argument",
+                    "diff takes exactly two positional arguments, got " + positional.size() + ".",
+                    "pass exactly two files: `agentce diff <report-a> <report-b>`.");
+        }
+        String fix = "pass two assertion files: `agentce diff <report-a> <report-b>`.";
+        String reportA = requireFile(positional.size() > 0 ? positional.get(0) : null, "report_a", "the first assertion set", fix);
+        String reportB = requireFile(positional.size() > 1 ? positional.get(1) : null, "report_b", "the second assertion set", fix);
+        String format = flagValue(args, "format");
+        if (format == null) {
+            format = "text";
+        }
+        if (!Diff.DIFF_FORMATS.contains(format)) {
+            throw new InputError(
+                    "input.diff_format",
+                    "--format must be one of " + String.join(", ", Diff.DIFF_FORMATS) + ", not '" + format + "'.",
+                    "pass --format text|json|md.");
+        }
+        result.data.put("report_a", Diff.normalizePosixPath(reportA));
+        result.data.put("report_b", Diff.normalizePosixPath(reportB));
+        JsonNode aNode = Json.parseFile(Paths.get(reportA));
+        JsonNode bNode = Json.parseFile(Paths.get(reportB));
+        List<Diff.Change> changes = Diff.diffAssertionSets((ArrayNode) aNode, (ArrayNode) bNode);
+        Map<String, List<Diff.Change>> grouped = Diff.whatChanged(changes);
+        result.data.put("changed", changes.size());
+        ArrayNode diffArr = result.data.putArray("diff");
+        for (Diff.Change change : changes) {
+            diffArr.add(changeToJson(change));
+        }
+        ObjectNode whatChangedNode = result.data.putObject("what_changed");
+        for (String key : List.of("closed", "opened", "other")) {
+            ArrayNode groupArr = whatChangedNode.putArray(key);
+            for (Diff.Change change : grouped.get(key)) {
+                groupArr.add(changeToJson(change));
+            }
+        }
+        if (!changes.isEmpty()) {
+            result.addCode(ExitCode.FINDINGS.code);
+        }
+        if (Arrays.asList(args).contains("--json")) {
+            // Never render a format only --json will discard -- mirrors Python's early return before
+            // any result.note call.
+            return result;
+        }
+        if ("md".equals(format)) {
+            for (String line : Diff.diffMdLines(grouped)) {
+                result.note(line);
+            }
+        } else if ("json".equals(format)) {
+            result.note(Json.pretty(result.data));
+        } else if (!changes.isEmpty()) {
+            result.note(changes.size() + " assertion(s) differ:");
+            for (Diff.Change change : changes) {
+                result.note("  " + Diff.diffChangeLine(change));
+            }
+        } else {
+            result.note("no differences");
+        }
         return result;
     }
 

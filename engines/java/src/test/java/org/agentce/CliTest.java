@@ -336,4 +336,135 @@ class CliTest {
         assertEquals("cli.not_implemented", env.get("error").get("message_key").asText());
         assertEquals("frobnicate", env.get("error").get("command").asText());
     }
+
+    // --- `diff` (item 18.24): a real, deterministic assertion-set diff, matching the Python
+    // reference's cmd_diff byte for byte. Mirrors cli.test.ts's diff block. ---
+
+    private static Path diffFixture(Path dir, String name, String recordsJson) {
+        try {
+            Path path = dir.resolve(name);
+            Files.writeString(path, recordsJson);
+            return path;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    void diffJsonEnvelopeCarriesReportAReportBChangedDiffWhatChangedExitOneOnARealChange(@TempDir Path dir) {
+        Path a = diffFixture(dir, "a.json", "[{\"control\":\"C-01\",\"subject\":\"s1\",\"outcome\":\"non-conformant\"}]");
+        Path b = diffFixture(dir, "b.json", "[{\"control\":\"C-01\",\"subject\":\"s1\",\"outcome\":\"conformant\"}]");
+        JsonNode env = runJson("diff", a.toString(), b.toString());
+        assertEquals(1, env.get("exit_code").asInt());
+        assertEquals(a.toString(), env.get("report_a").asText());
+        assertEquals(b.toString(), env.get("report_b").asText());
+        assertEquals(1, env.get("changed").asInt());
+        assertEquals(1, env.get("diff").size());
+        JsonNode change = env.get("diff").get(0);
+        assertEquals("C-01", change.get("control").asText());
+        assertEquals("s1", change.get("subject").asText());
+        assertEquals("non-conformant", change.get("from").asText());
+        assertEquals("conformant", change.get("to").asText());
+        assertEquals(1, env.get("what_changed").get("closed").size());
+        assertTrue(env.get("what_changed").get("opened").isEmpty());
+        assertTrue(env.get("what_changed").get("other").isEmpty());
+    }
+
+    @Test
+    void diffIdenticalInputsExitZeroTextNoDifferencesNoTrailingPeriod(@TempDir Path dir) {
+        Path a = diffFixture(dir, "a.json", "[{\"control\":\"C-01\",\"subject\":\"s1\",\"outcome\":\"conformant\"}]");
+        String out = captureStdout("diff", a.toString(), a.toString());
+        assertEquals("no differences\n", out);
+    }
+
+    @Test
+    void diffFormatMdIdenticalInputsTheFixedThreeLineSectionNoDifferencesWithAPeriod(@TempDir Path dir) {
+        Path a = diffFixture(dir, "a.json", "[{\"control\":\"C-01\",\"subject\":\"s1\",\"outcome\":\"conformant\"}]");
+        String out = captureStdout("diff", a.toString(), a.toString(), "--format", "md");
+        assertEquals("## What changed\n\nno differences.\n", out);
+    }
+
+    @Test
+    void diffFormatJsonWithoutJsonOneNoteLineByteEqualToTheSortedKeysEnvelopeData(@TempDir Path dir) {
+        Path a = diffFixture(dir, "a.json", "[]");
+        Path b = diffFixture(dir, "b.json", "[{\"control\":\"C-01\",\"subject\":\"s1\",\"outcome\":\"conformant\"}]");
+        String out = captureStdout("diff", a.toString(), b.toString(), "--format", "json");
+        JsonNode parsed = Json.parse(out); // the whole stdout is one println of a multi-line pretty-printed JSON note
+        assertEquals(1, parsed.get("changed").asInt());
+        assertEquals(a.toString(), parsed.get("report_a").asText());
+        assertTrue(!parsed.has("command"), "note-rendered JSON is result.data only, never the full envelope");
+    }
+
+    @Test
+    void diffMissingReportBGivesInputReportBMissingWithTheDiffSpecificFixTextExitThree(@TempDir Path dir) {
+        Path a = diffFixture(dir, "a.json", "[]");
+        JsonNode env = runJson("diff", a.toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.report_b_missing", env.get("error").get("message_key").asText());
+        assertEquals("pass two assertion files: `agentce diff <report-a> <report-b>`.", env.get("error").get("fix").asText());
+    }
+
+    @Test
+    void diffAMalformedInputFileGivesAKeyedInternalUnexpectedResultNeverACrash(@TempDir Path dir) {
+        Path a = diffFixture(dir, "a.json", "not json");
+        Path b = diffFixture(dir, "b.json", "[]");
+        JsonNode env = runJson("diff", a.toString(), b.toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("internal.unexpected", env.get("error").get("message_key").asText());
+    }
+
+    @Test
+    void diffAnExtraPositionalArgumentGivesInputDiffExtraArgument(@TempDir Path dir) {
+        Path a = diffFixture(dir, "a.json", "[]");
+        Path b = diffFixture(dir, "b.json", "[]");
+        Path c = diffFixture(dir, "c.json", "[]");
+        JsonNode env = runJson("diff", a.toString(), b.toString(), c.toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.diff_extra_argument", env.get("error").get("message_key").asText());
+    }
+
+    @Test
+    void diffAnUnrecognizedFlagGivesInputDiffUnrecognizedFlagNeverASilentPositionalRead(@TempDir Path dir) {
+        Path a = diffFixture(dir, "a.json", "[]");
+        Path b = diffFixture(dir, "b.json", "[]");
+        JsonNode env = runJson("diff", a.toString(), b.toString(), "--forma", "text");
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.diff_unrecognized_flag", env.get("error").get("message_key").asText());
+    }
+
+    @Test
+    void diffDebugAndQuietAreAcceptedAndSilentlyIgnoredMatchingEveryOtherCommand(@TempDir Path dir) {
+        Path a = diffFixture(dir, "a.json", "[]");
+        String out = captureStdout("diff", a.toString(), a.toString(), "--debug", "--quiet");
+        assertEquals("no differences\n", out);
+    }
+
+    @Test
+    void diffFormatOutsideTextJsonMdGivesInputDiffFormatWithTheExactPythonFixText(@TempDir Path dir) {
+        Path a = diffFixture(dir, "a.json", "[]");
+        Path b = diffFixture(dir, "b.json", "[]");
+        JsonNode env = runJson("diff", a.toString(), b.toString(), "--format", "yaml");
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.diff_format", env.get("error").get("message_key").asText());
+        assertEquals("pass --format text|json|md.", env.get("error").get("fix").asText());
+    }
+
+    @Test
+    void diffTheEchoedReportAReportBPathKeepsDotDotUnchanged(@TempDir Path dir) throws IOException {
+        diffFixture(dir, "a.json", "[]");
+        Files.createDirectory(dir.resolve("sub"));
+        String raw = dir + "/sub/../a.json"; // a real, existing file via '..'; the literal segment must survive the echo
+        Path b = diffFixture(dir, "b.json", "[]");
+        JsonNode env = runJson("diff", raw, b.toString());
+        assertTrue(env.get("report_a").asText().contains("sub/../a.json"), env.get("report_a").asText());
+    }
+
+    @Test
+    void diffJsonEscapesNonAsciiContentExactlyLikePythonsEnsureAsciiTrue(@TempDir Path dir) {
+        Path a = diffFixture(dir, "a.json", "[]");
+        Path b = diffFixture(dir, "b.json", "[{\"control\":\"cé\",\"subject\":\"😀\",\"outcome\":\"conformant\"}]");
+        String raw = captureStdout("diff", a.toString(), b.toString(), "--json");
+        assertTrue(raw.contains("c\\u00e9"), raw);
+        assertTrue(raw.contains("\\ud83d\\ude00"), raw);
+    }
 }
