@@ -25,8 +25,11 @@ _QUICKSTART = Path(__file__).resolve().parents[3] / "corpus" / "quickstart"
         ),
         (["cp311-abi3-musllinux_1_2_x86_64"], "prebuilt"),
         (["cp311-abi3-macosx_11_0_arm64"], "prebuilt"),
+        # The 48.x-line universal2 fat binary (ADR-0024): a real prebuilt wheel for Intel macOS.
+        (["cp311-abi3-macosx_10_9_universal2"], "prebuilt"),
         (["cp311-abi3-win_amd64"], "prebuilt"),
-        # No prebuilt wheel is published for macOS x86_64, so this tag can only be a local build.
+        # No release publishes an architecture-specific macOS x86_64 wheel, so this tag can only be a
+        # local build (unlike the universal2 fat binary above).
         (["cp312-abi3-macosx_10_12_x86_64"], "source-build"),
         (["cp312-abi3-linux_x86_64"], "source-build"),
         (["cp312-abi3-win32"], "source-build"),

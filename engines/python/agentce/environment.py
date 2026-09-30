@@ -1,10 +1,14 @@
 """Interpreter and toolchain preflight for ``agentce doctor`` (SPEC §13.4 AX-5).
 
 The engine signs and verifies with Ed25519 through ``cryptography``. That package publishes prebuilt
-wheels for Linux (glibc and musl), Windows x86_64, and macOS arm64 only; on any other platform (macOS
-x86_64 among them) installing the pinned release compiles it from source and needs a Rust toolchain
-and an OpenSSL 3 build. This module reads what the running interpreter actually has installed and
-reports it, so a user learns what is missing from ``agentce doctor`` instead of from a build failure.
+wheels for Linux (glibc and musl), Windows x86_64, and macOS arm64 for every release since 49.0.0; no
+release since then ships an Intel-macOS wheel (ADR-0024). ``engines/python/pyproject.toml`` and
+``adapters/supply-chain/pyproject.toml`` therefore pin darwin/x86_64 to the 48.x line instead, whose
+universal2 wheel (tagged ``macosx_10_9_universal2``) installs on Intel Macs as a real prebuilt
+binary, not a source build. Installing outside that matched set (for example a bare ``macosx_*_x86_64``
+tag, which no release publishes) still compiles from source and needs a Rust toolchain and an OpenSSL 3
+build. This module reads what the running interpreter actually has installed and reports it, so a user
+learns what is missing from ``agentce doctor`` instead of from a build failure.
 
 Nothing here is a constant standing in for a measurement: the interpreter version comes from
 ``sys.version_info``, and the wheel provenance from the installed distribution's own ``WHEEL`` file.
@@ -21,11 +25,14 @@ from typing import Any
 MINIMUM_PYTHON = (3, 12)
 
 #: Platform-tag prefixes for which ``cryptography`` publishes a prebuilt wheel. A wheel installed with
-#: any other platform tag was built locally, from source.
+#: any other platform tag was built locally, from source. ``macosx_10_9_universal2`` is the 48.x-line
+#: fat binary that gives Intel macOS a real prebuilt wheel (ADR-0024); it predates arm64-only wheels,
+#: so it also covers Apple-silicon macOS on that line.
 PREBUILT_PLATFORM_PREFIXES = (
     "manylinux",
     "musllinux",
     "macosx_11_0_arm64",
+    "macosx_10_9_universal2",
     "win_amd64",
 )
 
