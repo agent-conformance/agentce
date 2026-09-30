@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.16.0",
+  "suite_version": "0.17.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -636,6 +636,37 @@
         }
       ],
       "fix_hint": "run verification/gates/buyer_view.sh and read the FAIL lines; the reference implementation is engines/python/agentce/buyer_view.py (compute_buyer_view) and engines/python/agentce/report.py (render_buyer_md/render_buyer_html)."
+    },
+    {
+      "id": "VG-SIGN",
+      "title": "The engine refuses to sign a report that is not ready to publish, and a kms-profile signature verifies offline against the published public key, in all three engines",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/sign_command_engines.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 900,
+      "invariant": "An attestation is reported as verified only after its signature verifies against a trusted key.",
+      "rubric": {
+        "pass": "each engine refuses to sign the NOT_READY report (exit 3, error key sign.not_ready); each engine signs the READY report (exit 0), writes a detached DSSE/in-toto signature file, and that signature independently verifies offline against the known test key's public half via Python's own signing.verify_envelope; each engine's --write-trust-root run writes a trust-root.json whose keys[keyid].public_key matches the known test key exactly",
+        "fail": "any engine signs the NOT_READY report, refuses the READY report, writes a signature that does not verify offline against the known test key, or writes a trust-root.json whose public key does not match"
+      },
+      "faults": [
+        {
+          "description": "the readiness gate in cmd_sign is removed, so a NOT_READY report signs successfully instead of being refused",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    if verdict[\"verdict\"] == readiness.NOT_READY:\n        raise InputError(\n            \"sign.not_ready\",",
+          "replace": "    if False:\n        raise InputError(\n            \"sign.not_ready\","
+        }
+      ],
+      "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/commands/__init__.py's cmd_sign, ported field-for-field in engines/typescript/src/sign.ts and engines/java/src/main/java/org/agentce/Sign.java."
     }
   ]
 }

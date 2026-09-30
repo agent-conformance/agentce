@@ -3,6 +3,16 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.17.0
+
+- Added `VG-SIGN`: the engine refuses to sign a report that is not ready to publish, and a
+  `kms`-profile signature verifies offline against the published public key, in all three engines.
+  Builds the READY/NOT_READY report directories with `tools/sign_parity_check.py`'s own fixture
+  builders (the same ones its own cross-engine parity check uses) rather than a second,
+  independently-drifting fixture pair, then runs `sign` against each of the built Python, TypeScript
+  and Java engines and independently verifies every produced signature against the known test key via
+  Python's own `signing.verify_envelope`.
+
 ## 0.16.0
 
 - Added `VG-BUYER-VIEW`: the buyer view (18.18, Hill 8's buyer lens: "does this vendor's agent meet
