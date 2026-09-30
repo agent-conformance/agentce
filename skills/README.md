@@ -62,7 +62,7 @@ worktree's commit, push the tag, then remove the worktree:
 ```sh
 git worktree add --detach /tmp/agentce-release HEAD
 cd /tmp/agentce-release
-tools/vendor_skill_engine.py --release
+python3 tools/vendor_skill_engine.py --release
 git tag vX.Y.Z
 git push origin vX.Y.Z
 cd -
@@ -81,9 +81,10 @@ normal phase commit first, then cut the release again), then force-adds and comm
 That release commit carries `vendor/*.whl` and `uv.lock` for both skills, so a commit-pinned checkout of
 the tag it carries keeps working exactly as documented above: one command, standalone, offline.
 `tools/skill_release_shape_check.py` proves it, running this exact `--release` command rather than a
-second copy of its logic: on an ordinary phase commit it cuts one in a throwaway worktree and validates
-the result; on a commit that already is a release commit (the ordinary case once a release has been cut)
-it validates that commit directly instead of trying to cut a second one on top. Either way it extracts
+second copy of its logic, in a throwaway worktree built from the commit under test. `--release` is itself
+idempotent: on an ordinary phase commit it cuts a release commit on top; on a commit that already is a
+release commit (the ordinary case once a release has been cut) it finds nothing left to stage and
+validates that commit directly instead of trying to cut a second one on top. Either way the check extracts
 each skill folder from the committed tree alone and runs both self-test commands above from it with
 networking disabled; it also rebuilds each wheel fresh from that commit's own `engines/python` and
 confirms it matches the committed one, byte for byte, so a release commit vendored before a later,
