@@ -330,19 +330,11 @@ def self_test() -> int:
         # 18.26 round-2 verifier: `Path.read_text()` applies universal-newline translation, so a
         # CRLF-only writer divergence parsed to the same bytes as LF once read. Write the raw bytes
         # directly (never `write_text`, which would itself translate `\n` on some platforms) and
-        # confirm `_raw_file_text` now sees the CRLF as different from LF.
+        # confirm `_raw_file_text` preserves the CRLF rather than normalizing it away.
         crlf_path = Path(raw_dir) / "crlf.json"
-        lf_path = Path(raw_dir) / "lf.json"
         crlf_path.write_bytes(canonical.replace("\n", "\r\n").encode("utf-8"))
-        lf_path.write_bytes(canonical.encode("utf-8"))
-        newline_failures: list[str] = []
-        crlf_text = _raw_file_text(crlf_path, newline_failures, "byte-selftest-crlf")
-        lf_text = _raw_file_text(lf_path, newline_failures, "byte-selftest-crlf")
-        if crlf_text is None or lf_text is None:
-            failures.append(
-                "byte-selftest-crlf: _raw_file_text failed to read a fixture file"
-            )
-        elif crlf_text == lf_text:
+        crlf_text = _raw_file_text(crlf_path, failures, "byte-selftest-crlf")
+        if crlf_text is not None and "\r\n" not in crlf_text:
             failures.append(
                 "_raw_file_text normalized CRLF to LF on read, hiding a line-ending "
                 "divergence between engines -- the 18.26 round-2 verifier finding"
