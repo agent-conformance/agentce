@@ -18,7 +18,7 @@ another engine's real output. This check does. Mirrors `diff_parity_check.py`'s 
   edit to a fixture cannot silently stop exercising the case it is named for.
 * The real invocation runs Python's own `agentce readiness` (the console-script form, `uv run
   --frozen`, so this script's own environment never needs `agentce` installed) as the reference, the
-  built TypeScript `dist/cli.js`, and the built Java runnable jar, over each of the five scenarios --
+  built TypeScript `dist/cli.js`, and the built Java runnable jar, over each of the six scenarios --
   asserting the `--json` envelope's `verdict`/`reasons`/`limitations` fields and the generated
   `report-readiness-*.md` file's content (both date-stripped first, since the file name and its first
   line embed the wall-clock date) are byte-identical across all three engines, and their exit codes
@@ -219,6 +219,39 @@ def _scenario_5_deviations(directory: Path) -> tuple[Path, list[str]]:
     return report, ["--deviations", str(deviations)]
 
 
+def _deviation_register(directory: Path, name: str, expiries: list[str]) -> Path:
+    """A register with one otherwise-valid OVS-03 entry per YAML `expiry` scalar in `expiries`."""
+    lines = ["deviations:"]
+    for expiry in expiries:
+        lines += [
+            "  - control: OVS-03",
+            "    rationale: compensated",
+            "    compensating_control: manual review",
+            "    owner: alice",
+            "    approver: bob",
+            '    granted: "2026-01-01"',
+            f"    expiry: {expiry}",
+        ]
+    register = directory / name
+    register.write_text("\n".join([*lines, ""]), encoding="utf-8")
+    return register
+
+
+def _scenario_6_date_grammar(directory: Path) -> tuple[Path, list[str]]:
+    """(6) verifier round 2 F1: an `expiry` string that is RFC 3339 only under a Unicode `\\d` or a
+    `$` that matches before a trailing newline -- fullwidth digits, and a trailing `\\n` -- is refused
+    with the same reason text in every engine -- NOT READY."""
+    report = _report_dir(
+        directory,
+        "s6",
+        assertions=[{"control": "OVS-03", "outcome": "conformant", "subject": "s"}],
+    )
+    register = _deviation_register(
+        directory, "s6-deviations.yaml", ['"２０２６-03-01"', '"2026-03-01\\n"']
+    )
+    return report, ["--deviations", str(register)]
+
+
 SCENARIOS: list[Scenario] = [
     Scenario("1-clean", _scenario_1_clean, READY, 0),
     Scenario("2-regression", _scenario_2_regression, NOT_READY, 1),
@@ -227,16 +260,41 @@ SCENARIOS: list[Scenario] = [
         "4-insufficient-evidence-with-gaps", _scenario_4_gaps, READY_WITH_LIMITATIONS, 0
     ),
     Scenario("5-deviations", _scenario_5_deviations, NOT_READY, 1),
+    Scenario("6-date-grammar", _scenario_6_date_grammar, NOT_READY, 1),
 ]
+
+
+def _float_vectors(directory: Path) -> list[tuple[str, list[str]]]:
+    """Verifier round 2 F2: YAML `.nan`/`.inf` where a date belongs must be refused as an invalid
+    date, never crash (`internal.unexpected`). Each is (name, argv) and must give NOT READY, exit 1,
+    in all three engines. Only the verdict is compared: the reason text renders the float the way
+    each language does (`nan`/`NaN`), a known limitation owned by item 18.51."""
+    directory = directory / "floats"
+    directory.mkdir()
+    report = _report_dir(
+        directory,
+        "f",
+        assertions=[{"control": "OVS-03", "outcome": "conformant", "subject": "s"}],
+    )
+    return [
+        (
+            name,
+            [
+                str(report),
+                "--deviations",
+                str(_deviation_register(directory, f"{name}.yaml", [v])),
+            ],
+        )
+        for name, v in [("nan", ".nan"), ("inf", ".inf"), ("negative-inf", "-.inf")]
+    ]
 
 
 def _argv_vectors(directory: Path) -> list[tuple[str, list[str], int]]:
     """Argv shapes argparse reads in a particular way (18.25 round 3): each is (name, argv, the exit
     code Python's `readiness` subparser gives). Over scenario 3's report (a high-severity control with
     insufficient evidence), a gaps file naming it gives READY WITH LIMITATIONS (0) and an empty one
-    NOT READY (1), so a repeated flag shows which value an engine kept. Exit 3 is a refusal: Python's
-    is argparse's own usage error, TS/Java's the keyed `input.readiness_unrecognized_flag`, so only
-    the exit code is compared there."""
+    NOT READY (1), so a repeated flag shows which value an engine kept. Exit 3 is a refusal: the
+    keyed `input.readiness_unrecognized_flag` in every engine, its key and text compared."""
     directory = directory / "argv"
     directory.mkdir()
     report, _ = _scenario_3_no_gaps(directory)
@@ -283,6 +341,23 @@ def compare_ports(label: str, outputs: list[str], failures: list[str]) -> None:
     py, ts, java = outputs
     compare(label, py, ts, "python", "typescript", failures)
     compare(label, py, java, "python", "java", failures)
+
+
+def _error_fields(out: str) -> str:
+    """The `--json` error's key, text and fix, under either engine family's field names (Python's
+    `key`/`cause`, TypeScript and Java's `message_key`/`detail`). A refusal with no JSON envelope
+    (argparse's own usage error) has none, so it differs from any keyed one."""
+    try:
+        error = json.loads(out).get("error", {})
+    except json.JSONDecodeError:
+        return "no --json envelope"
+    return json.dumps(
+        [
+            error.get("key", error.get("message_key")),
+            error.get("cause", error.get("detail")),
+            error.get("fix"),
+        ]
+    )
 
 
 def _run(cmd: list[str], *, cwd: Path | None = None) -> tuple[str, int]:
@@ -497,18 +572,40 @@ def run_real_check() -> int:
                 failures.append(
                     f"argv:{name}: expected exit {expect} in all three engines, got {codes}"
                 )
-            elif expect != 3:
+            elif expect == 3:
+                compare_ports(
+                    f"argv:{name}:error",
+                    [_error_fields(out) for _, (out, _) in runs],
+                    failures,
+                )
+            else:
                 verdicts = [
                     json.dumps(json.loads(out).get("verdict")) for _, (out, _) in runs
                 ]
                 compare_ports(f"argv:{name}:verdict", verdicts, failures)
+
+        floats = _float_vectors(tmp)
+        for name, argv in floats:
+            runs = [
+                ("python", python_readiness(["--json", *argv])),
+                ("typescript", typescript_readiness(["--json", *argv])),
+                ("java", java_readiness(["--json", *argv])),
+            ]
+            for engine, (out, code) in runs:
+                verdict = json.loads(out).get("verdict") if code == 1 else None
+                if code != 1 or verdict != NOT_READY:
+                    failures.append(
+                        f"float:{name}: {engine} gave exit {code}, verdict {verdict!r}; "
+                        f"expected exit 1, {NOT_READY!r}"
+                    )
 
     for failure in failures:
         print(f"MISMATCH: {failure}", file=sys.stderr)
     if failures:
         return 1
     print(
-        f"MATCH: {len(SCENARIOS)} scenarios byte-identical and {len(vectors)} argv shapes read alike "
+        f"MATCH: {len(SCENARIOS)} scenarios byte-identical, {len(vectors)} argv shapes read alike "
+        f"and {len(floats)} float dates refused alike "
         "across python, typescript, java"
     )
     return 0

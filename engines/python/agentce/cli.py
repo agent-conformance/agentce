@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections.abc import Sequence
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from . import __version__, commands, exit_codes, logsetup
 from .errors import AgentceError
@@ -24,12 +25,56 @@ _log = logsetup.get_logger()
 
 
 class _Parser(argparse.ArgumentParser):
-    """An ``ArgumentParser`` whose usage errors exit ``3`` (input error), per the CLI scheme."""
+    """An ``ArgumentParser`` whose usage errors exit ``3`` (input error), per the CLI scheme.
+
+    With ``keyed_errors=True`` a usage error is instead raised as the keyed
+    ``input.readiness_unrecognized_flag`` error, worded as the TypeScript and Java engines word it.
+    """
+
+    def __init__(self, *args: Any, keyed_errors: bool = False, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._keyed_errors = keyed_errors
 
     def error(self, message: str) -> NoReturn:
+        if self._keyed_errors:
+            raise _readiness_usage_error(message)
         self.print_usage(sys.stderr)
         self.exit(int(ExitCode.INPUT_ERROR), f"{self.prog}: error: {message}\n")
         raise AssertionError("unreachable")  # pragma: no cover
+
+
+_READINESS_FLAG_FIX = "pass --gaps, --deviations, or --catalog-dir, or drop the flag."
+
+
+def _readiness_argv_error(cause: str, fix: str) -> AgentceError:
+    return AgentceError(key="input.readiness_unrecognized_flag", cause=cause, fix=fix)
+
+
+def _readiness_usage_error(message: str) -> AgentceError:
+    """argparse's usage error inside ``readiness`` as the keyed error TypeScript and Java raise."""
+    if m := re.fullmatch(r"argument (--[\w-]+): expected one argument", message):
+        flag = m.group(1)
+        return _readiness_argv_error(
+            f"flag '{flag}' needs a value.", f"pass {flag} <path>."
+        )
+    if m := re.fullmatch(r"argument (--[\w-]+): ignored explicit argument .*", message):
+        flag = m.group(1)
+        return _readiness_argv_error(
+            f"flag '{flag}' takes no value.", f"drop the value: {flag}."
+        )
+    return _readiness_argv_error(f"{message}.", _READINESS_FLAG_FIX)
+
+
+def _readiness_unknown_error(token: str) -> AgentceError:
+    """The first token the ``readiness`` subparser left unconsumed, as TypeScript and Java word it."""
+    if token.startswith("-") and token != "-":
+        return _readiness_argv_error(
+            f"unrecognized flag '{token}'.", _READINESS_FLAG_FIX
+        )
+    return _readiness_argv_error(
+        f"unrecognized argument '{token}'.",
+        "pass exactly one report directory: `agentce readiness <report-dir>`.",
+    )
 
 
 def _common_flags() -> _Parser:
@@ -430,8 +475,9 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[common],
         help="compute the report-readiness verdict (SPEC 13.3.4)",
         # No prefix matching (`--deviation` for `--deviations`): TS and Java refuse an abbreviated
-        # flag as unrecognized, so Python does too.
+        # flag as unrecognized, so Python does too, with the same keyed error.
         allow_abbrev=False,
+        keyed_errors=True,
     )
     p.add_argument("report_dir", nargs="?", help="the report directory")
     p.add_argument(
@@ -546,10 +592,17 @@ def _emit_error(err: AgentceError, *, command: str, want_json: bool) -> int:
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse ``argv`` (default ``sys.argv``), run the command, and return the process exit code."""
     parser = build_parser()
+    args = list(sys.argv[1:] if argv is None else argv)
     try:
-        ns = parser.parse_args(argv)
+        ns, unknown = parser.parse_known_args(args)
+        if unknown and getattr(ns, "command", None) != "readiness":
+            parser.error(f"unrecognized arguments: {' '.join(unknown)}")
+        if unknown:
+            raise _readiness_unknown_error(unknown[0])
     except SystemExit as exc:  # argparse: -h/--version exit 0; usage errors exit 3
         return exc.code if isinstance(exc.code, int) else int(ExitCode.INPUT_ERROR)
+    except AgentceError as err:  # a keyed `readiness` usage error (see `_Parser`)
+        return _emit_error(err, command="readiness", want_json="--json" in args)
 
     debug = bool(getattr(ns, "debug", False))
     quiet = bool(getattr(ns, "quiet", False))

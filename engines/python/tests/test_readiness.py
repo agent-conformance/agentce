@@ -603,3 +603,36 @@ def test_readiness_cli_refuses_an_abbreviated_flag(tmp_path: Path, flag: str) ->
         "--catalog": [str(catalog)],
     }
     assert cli.main(["readiness", str(report), flag, *extra.get(flag, [])]) == 3
+
+
+@pytest.mark.parametrize(
+    ("argv", "cause"),
+    [
+        (["--deviation", "x"], "unrecognized flag '--deviation'."),
+        (["--gasp=x"], "unrecognized flag '--gasp=x'."),
+        (["--gaps"], "flag '--gaps' needs a value."),
+        (["--gaps", "--quiet"], "flag '--gaps' needs a value."),
+        (["--quiet=1"], "flag '--quiet' takes no value."),
+        (["second"], "unrecognized argument 'second'."),
+    ],
+)
+def test_readiness_cli_usage_error_is_the_keyed_envelope(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], argv: list[str], cause: str
+) -> None:
+    """A readiness usage error is the keyed `--json` envelope TS and Java give, worded alike, not
+    argparse's usage text (18.25 round 3; the 18.24 parity rule)."""
+    report = _report(tmp_path, integrity=[{"status": "verified", "stream": "a"}])
+    assert cli.main(["--json", "readiness", str(report), *argv]) == 3
+    error = json.loads(capsys.readouterr().out)["error"]
+    assert (error["key"], error["cause"]) == (
+        "input.readiness_unrecognized_flag",
+        cause,
+    )
+
+
+def test_an_unknown_flag_on_another_command_is_still_argparse_usage(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Only `readiness` reads its usage errors as keyed errors; other commands keep argparse's."""
+    assert cli.main(["diff", "a.json", "b.json", "--bogus"]) == 3
+    assert "unrecognized arguments: --bogus" in capsys.readouterr().err
