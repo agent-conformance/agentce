@@ -221,18 +221,24 @@ class ReadinessTest {
 
     @Test
     void duplicateReasonsAreNeverDeduplicatedAndSortByByteCompareNotUtf16Order(@TempDir Path dir) throws IOException {
-        // U+FF21 fullwidth 'A' sorts after ASCII under byteCompare (UTF-8), but before it under a naive
-        // UTF-16/code-unit sort of the reason line's leading text. A record with a bad status but no
-        // `stream` field at all -- Python's own `record.get("status") in _BAD_INTEGRITY` never enters this
-        // branch for a record missing `status` entirely (`None` is not in the bad-status set), so only a
-        // present-bad-status/absent-stream combination can ever exercise the `None`-rendering path this
-        // fixture pins.
+        // U+FF21 (fullwidth 'A') is a BMP character: its UTF-16 code unit and its UTF-8 leading byte
+        // both exceed every ASCII byte, so a naive UTF-16 sort and byteCompare (UTF-8) *agree* on it --
+        // it does NOT by itself distinguish the two orders (verifier round-1 finding: an earlier version
+        // of this fixture claimed it did). U+1F600 ("grinning face"), an *astral* character represented
+        // as a UTF-16 surrogate pair (leading code unit 0xD83D = 55357, below U+FF21's 0xFF21 = 65313)
+        // but a 4-byte UTF-8 sequence (leading byte 0xF0 = 240, above U+FF21's leading byte 0xEF = 239),
+        // is what actually reverses the two orders relative to each other. A record with a bad status but
+        // no `stream` field at all -- Python's own `record.get("status") in _BAD_INTEGRITY` never enters
+        // this branch for a record missing `status` entirely (`None` is not in the bad-status set), so
+        // only a present-bad-status/absent-stream combination can ever exercise the `None`-rendering path
+        // this fixture pins.
         Path report = reportWithIntegrity(
                 dir,
                 List.of(
                         integrityRecord("failed", "gw"),
                         integrityRecord("failed", "gw"),
                         integrityRecord("failed", "Ａ"),
+                        integrityRecord("failed", "😀"),
                         integrityRecord("gap", null)));
         Readiness.Verdict verdict = Readiness.computeReadiness(report, SEVERITIES, List.of(), Set.of());
         long dupeCount = verdict.reasons().stream().filter(r -> r.equals("integrity failed on stream gw")).count();

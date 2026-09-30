@@ -122,9 +122,12 @@ def _scenario_1_clean(directory: Path) -> tuple[Path, list[str]]:
 def _scenario_2_regression(directory: Path) -> tuple[Path, list[str]]:
     """(2) the round-1/round-2 regression set, folded into one scenario: two `failed` integrity
     records naming the same stream from two different subjects (the identical reason string must
-    appear twice), a third naming a fullwidth/non-BMP stream (sorts before ASCII under `byteCompare`,
-    after it under a naive UTF-16 sort), and a fourth with no `status`/`stream` field at all (`None`
-    must render in its reason text) -- NOT READY."""
+    appear twice), a third naming a fullwidth/non-BMP-but-still-BMP stream (U+FF21, which agrees with
+    a naive UTF-16 sort and so does not by itself distinguish it from `byteCompare` -- verifier
+    round-1 finding), a fourth naming an *astral* stream (U+1F600, a UTF-16 surrogate pair that a
+    naive UTF-16 sort places before U+FF21 while `byteCompare`'s UTF-8 bytes place it after -- the
+    case that actually exercises the divergence), and a fifth with no `status`/`stream` field at all
+    (`None` must render in its reason text) -- NOT READY."""
     report = _report_dir(
         directory,
         "s2",
@@ -132,6 +135,7 @@ def _scenario_2_regression(directory: Path) -> tuple[Path, list[str]]:
             {"status": "failed", "stream": "gw"},
             {"status": "failed", "stream": "gw"},
             {"status": "failed", "stream": "Ａ"},
+            {"status": "failed", "stream": "😀"},
             {"status": "gap"},
         ],
     )
