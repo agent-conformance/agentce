@@ -454,10 +454,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("report_dir", nargs="?", help="the report directory")
     p.add_argument(
-        "--as", dest="as_role", choices=commands.SIGN_ROLES, help="the signing role"
+        # No `choices=`: an invalid value is a keyed `input.sign_role` error raised by `cmd_sign`
+        # itself, not argparse's own pre-envelope usage error -- the same `diff --format` pattern
+        # above. `metavar` keeps `--help`/usage text byte-identical to the old `choices=` rendering
+        # (a disclosed divergence, TRADEOFFS.md, 2026-09-30).
+        "--as",
+        dest="as_role",
+        metavar="{claimant,assessor}",
+        help="the signing role",
     )
     p.add_argument(
-        "--profile", choices=commands.SIGN_PROFILES, help="the signing profile"
+        # No `choices=`: same pattern, `input.sign_profile` fires from `cmd_sign` itself.
+        "--profile",
+        metavar="{sigstore-public,sigstore-private,kms}",
+        help="the signing profile",
     )
     p.add_argument(
         "--key", help="operator Ed25519 private key (PEM) for the kms profile"

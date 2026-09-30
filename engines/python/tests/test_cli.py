@@ -879,6 +879,32 @@ def test_sign_bad_role_is_usage_error() -> None:
     assert cli.main(["sign", "/tmp", "--as", "nobody"]) == 3
 
 
+def test_sign_bad_role_gives_keyed_envelope(capsys: pytest.CaptureFixture[str]) -> None:
+    """`cli.py`'s `sign` subparser used to declare `choices=SIGN_ROLES`, so an invalid `--as` value
+    never reached `cmd_sign`'s own `input.sign_role` check -- argparse raised its own bare usage error
+    first (no JSON envelope). This is now a keyed `InputError`, matching `diff --format`'s existing
+    no-`choices=` pattern (18.26 round-1/round-2 critic correction, MAINTAINER-NOTES 2026-09-30)."""
+    code, env = run(["sign", "/tmp", "--as", "bogus", "--json"], capsys)
+    assert code == 3
+    assert env["error"]["key"] == "input.sign_role"
+    assert env["error"]["cause"] == "--as must be `claimant` or `assessor`."
+    assert env["error"]["fix"] == "pass --as claimant|assessor."
+
+
+def test_sign_bad_profile_gives_keyed_envelope(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    code, env = run(
+        ["sign", "/tmp", "--as", "claimant", "--profile", "bogus", "--json"], capsys
+    )
+    assert code == 3
+    assert env["error"]["key"] == "input.sign_profile"
+    assert env["error"]["cause"] == "unknown signing profile 'bogus'."
+    assert (
+        env["error"]["fix"] == "choose one of: sigstore-public, sigstore-private, kms."
+    )
+
+
 def test_human_output_without_json(
     make_bundle: Callable[..., Path],
     example_events: list[dict[str, Any]],

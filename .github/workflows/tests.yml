@@ -36,6 +36,8 @@ jobs:
       - name: Test with a coverage floor
         working-directory: engines/python
         run: uv run --frozen pytest -q -p no:cacheprovider --cov=agentce --cov-fail-under=90
+      - name: Message catalogue is complete (every registered error has cause/fix text)
+        run: uv run --project engines/python --frozen python tools/errors_check.py
 
   typescript:
     name: typescript

@@ -52,10 +52,17 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.records_out_collides` | the output folder would overwrite records: it is the records folder, holds them, or lies inside that folder with files that are not a previous run's output. | choose an output folder outside the records folder with --out, or an empty one. |
 | `input.records_source_ambiguous` | both a records folder and --bundle were given. | pass either a folder of trace exports or --bundle <dir>, not both. |
 | `input.records_subject_ambiguous` | the profile declares several subjects, and a records folder is assessed as one. | declare one subject in the profile, or assess each agent's records folder separately. |
+| `input.sign_profile` | unknown signing profile. | choose one of: sigstore-public, sigstore-private, kms. |
+| `input.sign_role` | --as must be `claimant` or `assessor`. | pass --as claimant|assessor. |
 | `input.trust_root_invalid` | the trust root supplied by --trust-root or AGENTCE_TRUST_ROOT could not be loaded. | pass --trust-root <file> pointing at a trust root in the form of the engine's vendored data/trust/dev-root.json. |
 | `internal.unexpected` | an unexpected internal error occurred. | re-run with --debug to see the stack trace, then file an issue. |
-| `sign.key_unreadable` | the signing key file could not be parsed as an unencrypted PEM private key. | supply an unencrypted Ed25519 private key PEM (openssl genpkey -algorithm ed25519 -out key.pem, or agentce catalog sign --new-key <path>). |
-| `sign.trust_root_requires_kms` | --write-trust-root needs an exportable public key, and the sigstore-public and sigstore-private profiles have none. | pass --profile kms --key <ed25519-private-key.pem> together with --write-trust-root. |
+| `sign.key_algorithm` | the signing key is not an Ed25519 private key. | supply an Ed25519 key (the algorithm the engine signs with, SPEC §8.7). |
+| `sign.key_unreadable` | the signing key file could not be parsed as an unencrypted PEM private key. | supply an unencrypted Ed25519 private key PEM (`openssl genpkey -algorithm ed25519 -out key.pem`, or `agentce catalog sign --new-key <path>`). |
+| `sign.keyless_offline` | the profile is keyless and obtains a certificate from a Fulcio instance (network); the engine does not sign it offline. | use --profile kms --key <file> offline, or run keyless signing where the Fulcio and Rekor endpoints are reachable. |
+| `sign.kms_key_missing` | the kms profile signs with an operator-held key. | pass --key <ed25519-private-key.pem>. |
+| `sign.no_claim` | the report directory has no claim.json to sign. | produce the report first: `agentce assess … --out <report-dir>`. |
+| `sign.not_ready` | the report is not ready to sign. | resolve the blocking reasons (agentce readiness <report-dir>) before signing. |
+| `sign.trust_root_requires_kms` | --write-trust-root needs an exportable public key; the sigstore-public profile has none. | pass --profile kms --key <ed25519-private-key.pem> --write-trust-root. |
 | `verify.report_claim_malformed` | claim.json exists but is not valid JSON. | regenerate the report; claim.json must be well-formed JSON. |
 | `verify.report_claim_tampered` | claim.json does not match the digest the signature covers. | the claim was altered after signing; regenerate and re-sign the report. |
 | `verify.report_engine_mismatch` | the report was produced by a different engine build (version, spec version, or package digest) than the one re-running it. | install the same engine build the report names, then re-run verify. |
