@@ -165,9 +165,7 @@ public final class ReportValidate {
                 reader.next();
             }
             return List.of();
-        } catch (XMLStreamException e) {
-            return List.of(filename + ": invalid XML (" + e.getMessage() + ")");
-        } catch (IOException e) {
+        } catch (XMLStreamException | IOException e) {
             return List.of(filename + ": invalid XML (" + e.getMessage() + ")");
         }
     }
