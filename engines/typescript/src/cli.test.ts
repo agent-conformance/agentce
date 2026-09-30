@@ -651,6 +651,21 @@ test("readiness: a report_dir that is not a directory gives input.report_dir_not
   }
 });
 
+test("readiness: an unrecognized flag gives input.readiness_unrecognized_flag, never a silent misread of report_dir", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-readiness-"));
+  try {
+    const report = readinessReport(dir);
+    const { exitCode, envelope } = runJson(["readiness", "--gasp", report]);
+    assert.equal(exitCode, 3);
+    assert.equal(
+      (envelope.error as { message_key: string }).message_key,
+      "input.readiness_unrecognized_flag",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("readiness: a given-but-bad --gaps path is input.gaps_not_a_file", () => {
   const dir = mkdtempSync(join(tmpdir(), "agentce-cli-readiness-"));
   try {

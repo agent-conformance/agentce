@@ -866,7 +866,11 @@ public final class Cli {
      * --debug}/{@code --quiet}. */
     private static final Set<String> READINESS_VALUE_FLAGS = Set.of("gaps", "deviations", "catalog-dir");
 
-    /** {@code report_dir}'s value: the one positional token in {@code agentce readiness}'s args. */
+    /** {@code report_dir}'s value: the one positional token in {@code agentce readiness}'s args.
+     * Throws {@code input.readiness_unrecognized_flag} on any other {@code --}-prefixed token,
+     * mirroring {@link #positionalArgs}'s own {@code diff}-specific guard (item 18.24): without this,
+     * a typo'd flag (e.g. {@code --gasp} for {@code --gaps}) is silently skipped and the *next*
+     * token -- typically the flag's own value -- is misread as {@code report_dir} instead. */
     private static String readinessReportDirToken(String[] args) {
         for (int i = 1; i < args.length; i++) {
             String token = args[i];
@@ -874,9 +878,13 @@ public final class Cli {
                 continue;
             }
             if (token.startsWith("--")) {
-                if (READINESS_VALUE_FLAGS.contains(token.substring(2))) {
-                    i++; // also skip the value token
+                if (!READINESS_VALUE_FLAGS.contains(token.substring(2))) {
+                    throw new InputError(
+                            "input.readiness_unrecognized_flag",
+                            "unrecognized flag '" + token + "'.",
+                            "pass --gaps, --deviations, or --catalog-dir, or drop the flag.");
                 }
+                i++; // also skip the value token
                 continue;
             }
             return token;

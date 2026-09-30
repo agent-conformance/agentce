@@ -561,6 +561,15 @@ class CliTest {
     }
 
     @Test
+    void readinessAnUnrecognizedFlagGivesInputReadinessUnrecognizedFlagNeverASilentMisreadOfReportDir(
+            @TempDir Path dir) throws IOException {
+        Path report = readinessReport(dir);
+        JsonNode env = runJson("readiness", "--gasp", report.toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.readiness_unrecognized_flag", env.get("error").get("message_key").asText());
+    }
+
+    @Test
     void readinessAGivenButBadGapsPathIsInputGapsNotAFile(@TempDir Path dir) throws IOException {
         Path report = readinessReport(dir);
         JsonNode env = runJson(

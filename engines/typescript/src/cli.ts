@@ -732,7 +732,11 @@ function readinessSeverities(catalogDirs: string[]): Map<string, string> {
 /** `report_dir`'s value: the one positional token in `agentce readiness`'s argv, skipping `--json`/
  * `--debug`/`--quiet` (boolean) and `--gaps`/`--deviations`/`--catalog-dir` (each with a value) --
  * `readiness` has no `--format` flag in Python (confirmed by reading `cli.py`'s `readiness`
- * subparser: no `--format` argument at all), so none is recognized here either. */
+ * subparser: no `--format` argument at all), so none is recognized here either. Throws
+ * `input.readiness_unrecognized_flag` on any other `--`-prefixed token, mirroring `positionalArgs`'s
+ * own `diff`-specific guard (item 18.24): without this, a typo'd flag (e.g. `--gasp` for `--gaps`)
+ * is silently skipped and the *next* token -- typically the flag's own value -- is misread as
+ * `report_dir` instead. */
 function readinessReportDirToken(argv: string[]): string | undefined {
   const valueFlags = new Set(["gaps", "deviations", "catalog-dir"]);
   for (let i = 1; i < argv.length; i++) {
@@ -741,9 +745,14 @@ function readinessReportDirToken(argv: string[]): string | undefined {
       continue;
     }
     if (token.startsWith("--")) {
-      if (valueFlags.has(token.slice(2))) {
-        i++; // also skip the value token
+      if (!valueFlags.has(token.slice(2))) {
+        throw new InputError(
+          "input.readiness_unrecognized_flag",
+          `unrecognized flag '${token}'.`,
+          "pass --gaps, --deviations, or --catalog-dir, or drop the flag.",
+        );
       }
+      i++; // also skip the value token
       continue;
     }
     return token;

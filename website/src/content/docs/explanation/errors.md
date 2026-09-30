@@ -48,6 +48,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.package_requires_bundle` | --package-for-sharing works only with --bundle/--profile; a records-folder run cannot be reproduced from a --bundle re-run. | pass --bundle and --profile instead of a records folder, or drop --package-for-sharing. |
 | `input.profile_invalid` | the applicability profile is not safe YAML: a disallowed construct, or a structure nested too deeply to parse safely. | remove custom YAML tags and flatten deep nesting; regenerate the profile from `agentce init`. |
 | `input.profile_missing` | the applicability profile was not supplied. | pass --profile agentce/applicability.yaml (start from agentce init). |
+| `input.readiness_unrecognized_flag` | readiness was given a flag it does not recognize. | pass --gaps, --deviations, or --catalog-dir, or drop the flag. |
 | `input.records_no_genai_spans` | the folder holds OpenTelemetry traces, but none of their spans is a GenAI operation the engine maps. | instrument the agent with OpenTelemetry GenAI or OpenInference, then export its traces. |
 | `input.records_none_recognised` | the records folder holds no OpenTelemetry GenAI or OpenInference trace export the engine can read. | point assess at a folder of OTLP/JSON trace exports (.json, .jsonl or .ndjson). |
 | `input.records_not_a_directory` | the records folder does not exist or is not a directory. | pass a folder of OpenTelemetry GenAI or OpenInference trace exports. |

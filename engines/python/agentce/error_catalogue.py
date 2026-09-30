@@ -70,6 +70,7 @@ _KINDS: dict[str, str] = {
     "input.diff_field_not_string": "error",
     "input.diff_extra_argument": "error",
     "input.diff_unrecognized_flag": "error",
+    "input.readiness_unrecognized_flag": "error",
     "environment.cryptography_unavailable": "error",
     "environment.python_unsupported": "error",
     "internal.unexpected": "error",
