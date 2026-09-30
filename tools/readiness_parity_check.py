@@ -275,6 +275,32 @@ def self_test() -> int:
     if not caught:
         failures.append("comparator failed to catch a one-byte tamper between two 'engine output' strings")
 
+    # 1b. the report-read-order discipline (a verifier round found this vacuous once): all three
+    # engines write the same `report-readiness-<date>.md` path inside one shared report dir, each
+    # overwriting the last engine's file, so a read must happen immediately after that engine's own
+    # run -- reading all three only after all three runs would silently compare the last writer's
+    # file against itself under three different names. Simulates three sequential overwrites of one
+    # shared file and confirms an immediate read after each write captures that write's own content,
+    # distinct from what a deferred read (after every write) would return.
+    with tempfile.TemporaryDirectory(prefix="readiness-parity-selftest-order-") as raw:
+        shared = Path(raw) / "report-readiness-2026-01-01.md"
+        contents = ["# python\n", "# typescript\n", "# java\n"]
+        immediate: list[str] = []
+        for content in contents:
+            shared.write_text(content, encoding="utf-8")
+            immediate.append(shared.read_text(encoding="utf-8"))
+        if immediate != contents:
+            failures.append(
+                f"report-read-order self-test: an immediate read did not capture its own write "
+                f"(got {immediate!r}, expected {contents!r})"
+            )
+        deferred = [shared.read_text(encoding="utf-8") for _ in contents]
+        if deferred == immediate:
+            failures.append(
+                "report-read-order self-test: a deferred read (simulating the vacuous bug) matched "
+                "the immediate reads -- this self-test no longer distinguishes the two read orders"
+            )
+
     # 2. the fixture-shape self-test: each scenario's own from-scratch expectation actually holds.
     with tempfile.TemporaryDirectory(prefix="readiness-parity-selftest-") as raw:
         tmp = Path(raw)
@@ -327,9 +353,23 @@ def run_real_check() -> int:
             report, extra = scenario.build(tmp)
             args = [str(report), *extra, "--catalog-dir", str(CATALOG_DIR)]
 
+            # All three engines write the same `report-readiness-<date>.md` path inside the shared
+            # `report` dir, each overwriting the last engine's file. Reading a report's file must
+            # therefore happen immediately after that engine's own run, before the next engine
+            # overwrites it -- reading all three only after all three runs would silently compare the
+            # last engine's file against itself under three different names (round-2 B1: the read
+            # order, not just the shared path, made this comparison vacuous).
             py_out, py_code = python_readiness([*args, "--json"])
+            py_env = json.loads(py_out)
+            py_report = _strip_dates(Path(py_env["report"]).read_text(encoding="utf-8"))
+
             ts_out, ts_code = typescript_readiness([*args, "--json"])
+            ts_env = json.loads(ts_out)
+            ts_report = _strip_dates(Path(ts_env["report"]).read_text(encoding="utf-8"))
+
             java_out, java_code = java_readiness([*args, "--json"])
+            java_env = json.loads(java_out)
+            java_report = _strip_dates(Path(java_env["report"]).read_text(encoding="utf-8"))
 
             if not (py_code == scenario.expect_exit == ts_code == java_code):
                 failures.append(
@@ -337,9 +377,6 @@ def run_real_check() -> int:
                     f"python={py_code}, typescript={ts_code}, java={java_code}"
                 )
 
-            py_env = json.loads(py_out)
-            ts_env = json.loads(ts_out)
-            java_env = json.loads(java_out)
             for key in ("verdict", "reasons", "limitations"):
                 # `json.dumps` on a plain string round-trips to the same bytes a direct compare would
                 # use, so this one form covers both the scalar `verdict` and the list fields.
@@ -352,9 +389,6 @@ def run_real_check() -> int:
                     f"{scenario.expect_verdict!r} -- the fixture assumption above is wrong"
                 )
 
-            py_report = _strip_dates(Path(py_env["report"]).read_text(encoding="utf-8"))
-            ts_report = _strip_dates(Path(ts_env["report"]).read_text(encoding="utf-8"))
-            java_report = _strip_dates(Path(java_env["report"]).read_text(encoding="utf-8"))
             compare(f"{scenario.name}:report.md", py_report, ts_report, "python", "typescript", failures)
             compare(f"{scenario.name}:report.md", py_report, java_report, "python", "java", failures)
 

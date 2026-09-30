@@ -127,9 +127,109 @@ const pyyamlTimestampType = new YamlType("tag:yaml.org,2002:timestamp", {
   construct: (data: string): PyyamlTimestamp => ({ pyyamlTimestamp: data }),
 });
 
-/** `yaml.DEFAULT_SCHEMA`'s own compiled implicit type for `tag`, unchanged -- js-yaml's package
+/** PyYAML's own `Resolver`, `tag:yaml.org,2002:int` implicit-resolution regex (`yaml/resolver.py`),
+ * copied verbatim (stripped of `re.X`'s insignificant whitespace) -- deliberately narrower than
+ * js-yaml's own built-in int type (YAML 1.2, which also accepts a bare `0o` octal prefix PyYAML's
+ * YAML-1.1-based grammar never does: confirmed against real PyYAML, `0o17` stays the plain string
+ * `'0o17'`), and confirmed to accept what PyYAML's own grammar does: `0x`/`0b` prefixes, a
+ * leading-zero octal run, and a colon-separated sexagesimal integer. */
+const PYYAML_INT_RESOLVE_RE =
+  /^(?:[-+]?0b[0-1_]+|[-+]?0[0-7_]+|[-+]?(?:0|[1-9][0-9_]*)|[-+]?0x[0-9a-fA-F_]+|[-+]?[1-9][0-9_]*(?::[0-5]?[0-9])+)$/;
+
+/** PyYAML's own `Resolver`, `tag:yaml.org,2002:float` implicit-resolution regex (`yaml/resolver.py`),
+ * copied verbatim (stripped of `re.X`'s insignificant whitespace) -- js-yaml's own built-in float
+ * type disagrees on several of these forms (confirmed against real PyYAML), so this is used instead
+ * of js-yaml's implicit type, exactly like {@link PYYAML_INT_RESOLVE_RE} above. */
+const PYYAML_FLOAT_RESOLVE_RE =
+  /^(?:[-+]?[0-9][0-9_]*\.[0-9_]*(?:[eE][-+][0-9]+)?|\.[0-9][0-9_]*(?:[eE][-+][0-9]+)?|[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\.[0-9_]*|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN))$/;
+
+/** PyYAML's `construct_yaml_int` (`yaml/constructor.py:237-263`), copied verbatim: strip `_`, take
+ * the sign, then dispatch on the `0b`/`0x`/leading-`0`/colon-sexagesimal/plain-decimal forms in that
+ * exact order (order matters here, unlike the resolve regex above, since these prefixes overlap
+ * textually -- `0b101` starts with `0` too). Returns a plain JS `number`: every value this codebase's
+ * own adversarial fixtures exercise fits in `number`'s safe integer range, and downstream code only
+ * ever calls {@link pyStr}/{@link pyTruthy}-equivalent checks or `pyEquals` on the result, never
+ * arithmetic that would need arbitrary precision. */
+function pyyamlConstructInt(data: string): number {
+  let value = data.replace(/_/g, "");
+  let sign = 1;
+  if (value[0] === "-") {
+    sign = -1;
+  }
+  if (value[0] === "+" || value[0] === "-") {
+    value = value.slice(1);
+  }
+  if (value === "0") {
+    return 0;
+  }
+  if (value.startsWith("0b")) {
+    return sign * Number.parseInt(value.slice(2), 2);
+  }
+  if (value.startsWith("0x")) {
+    return sign * Number.parseInt(value.slice(2), 16);
+  }
+  if (value[0] === "0") {
+    return sign * Number.parseInt(value, 8);
+  }
+  if (value.includes(":")) {
+    const digits = value.split(":").map(Number).reverse();
+    let base = 1;
+    let out = 0;
+    for (const digit of digits) {
+      out += digit * base;
+      base *= 60;
+    }
+    return sign * out;
+  }
+  return sign * Number.parseInt(value, 10);
+}
+
+/** PyYAML's `construct_yaml_float` (`yaml/constructor.py:270-292`), copied verbatim: lower-case,
+ * strip `_`, take the sign, then dispatch on `.inf`/`.nan`/colon-sexagesimal/plain-decimal. */
+function pyyamlConstructFloat(data: string): number {
+  let value = data.replace(/_/g, "").toLowerCase();
+  let sign = 1;
+  if (value[0] === "-") {
+    sign = -1;
+  }
+  if (value[0] === "+" || value[0] === "-") {
+    value = value.slice(1);
+  }
+  if (value === ".inf") {
+    return sign * Number.POSITIVE_INFINITY;
+  }
+  if (value === ".nan") {
+    return Number.NaN;
+  }
+  if (value.includes(":")) {
+    const digits = value.split(":").map(Number).reverse();
+    let base = 1;
+    let out = 0;
+    for (const digit of digits) {
+      out += digit * base;
+      base *= 60;
+    }
+    return sign * out;
+  }
+  return sign * Number(value);
+}
+
+const pyyamlIntType = new YamlType("tag:yaml.org,2002:int", {
+  kind: "scalar",
+  resolve: (data: unknown) => typeof data === "string" && PYYAML_INT_RESOLVE_RE.test(data),
+  construct: pyyamlConstructInt,
+});
+
+const pyyamlFloatType = new YamlType("tag:yaml.org,2002:float", {
+  kind: "scalar",
+  resolve: (data: unknown) => typeof data === "string" && PYYAML_FLOAT_RESOLVE_RE.test(data),
+  construct: pyyamlConstructFloat,
+});
+
+/** `yaml.DEFAULT_SCHEMA`'s own compiled implicit type for `null`, unchanged -- js-yaml's package
  * `exports` field blocks a deep import of its internal `lib/type/*` modules, so this is the only
- * public way to reuse its already-PyYAML-matching `null`/`int`/`float` implicit types verbatim. */
+ * public way to reuse its already-PyYAML-matching `null` implicit type verbatim (confirmed against
+ * real PyYAML separately from `int`/`float` above, which needed their own ported types instead). */
 interface CompiledType extends YamlType {
   readonly tag: string;
 }
@@ -156,8 +256,8 @@ const DEVIATION_REGISTER_SCHEMA = FAILSAFE_SCHEMA.extend({
   implicit: [
     defaultImplicit("tag:yaml.org,2002:null"),
     pyyamlBoolType,
-    defaultImplicit("tag:yaml.org,2002:int"),
-    defaultImplicit("tag:yaml.org,2002:float"),
+    pyyamlIntType,
+    pyyamlFloatType,
     pyyamlTimestampType,
   ],
 });

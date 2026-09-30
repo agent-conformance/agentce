@@ -211,14 +211,102 @@ public final class Readiness {
 
     private static final Set<String> PYYAML_BOOL_TRUE = Set.of("yes", "true", "on");
 
-    /** Composes {@code node}'s raw YAML value tree (SnakeYAML's own {@code compose()} already resolves
-     * each scalar's tag with regexes byte-identical to PyYAML's own resolver -- confirmed against
-     * SnakeYAML 2.3 -- so no separate bool/timestamp resolution regex is needed in this engine, unlike
-     * TypeScript's js-yaml, whose default schema disagrees with PyYAML). A quoted scalar of any style
-     * is always a plain {@link String} regardless of its text (SnakeYAML's own {@code isPlain()},
-     * exactly PyYAML's "implicit resolution applies only to the plain scalar style" rule); an unquoted
-     * scalar resolves to {@code null}/{@link Boolean}/{@link BigInteger}/{@link Double}/{@link
-     * PyyamlTimestamp} by its resolved tag, or a plain {@link String} for any other tag. Never touches
+    /** PyYAML's own {@code Resolver}, {@code tag:yaml.org,2002:int} implicit-resolution regex
+     * ({@code yaml/resolver.py}), copied verbatim -- SnakeYAML's own {@code Tag.INT} resolution
+     * disagrees with this (confirmed against real SnakeYAML 2.3 and PyYAML: e.g. {@code 0o17} is an
+     * int to neither, but SnakeYAML also fails to tag {@code 0x1F}/{@code 0b101} as {@code Tag.INT}
+     * the way PyYAML's grammar does), so this engine tests the raw scalar text against its own
+     * PyYAML-ported regex instead of trusting SnakeYAML's resolved {@link Tag}, exactly like
+     * {@code readiness.ts}'s {@code PYYAML_INT_RESOLVE_RE}. */
+    private static final java.util.regex.Pattern PYYAML_INT_RESOLVE_RE = java.util.regex.Pattern.compile(
+            "^(?:[-+]?0b[0-1_]+|[-+]?0[0-7_]+|[-+]?(?:0|[1-9][0-9_]*)"
+                    + "|[-+]?0x[0-9a-fA-F_]+|[-+]?[1-9][0-9_]*(?::[0-5]?[0-9])+)$");
+
+    /** PyYAML's own {@code Resolver}, {@code tag:yaml.org,2002:float} implicit-resolution regex
+     * ({@code yaml/resolver.py}), copied verbatim -- same rationale as {@link #PYYAML_INT_RESOLVE_RE}. */
+    private static final java.util.regex.Pattern PYYAML_FLOAT_RESOLVE_RE = java.util.regex.Pattern.compile(
+            "^(?:[-+]?[0-9][0-9_]*\\.[0-9_]*(?:[eE][-+][0-9]+)?"
+                    + "|\\.[0-9][0-9_]*(?:[eE][-+][0-9]+)?"
+                    + "|[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\\.[0-9_]*"
+                    + "|[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN))$");
+
+    /** PyYAML's {@code construct_yaml_int} ({@code yaml/constructor.py:237-263}), copied verbatim:
+     * strip {@code _}, take the sign, then dispatch on the {@code 0b}/{@code 0x}/leading-{@code
+     * 0}/colon-sexagesimal/plain-decimal forms in that exact order (order matters, since these
+     * prefixes overlap textually -- {@code 0b101} starts with {@code 0} too). */
+    private static BigInteger pyyamlConstructInt(String data) {
+        String value = data.replace("_", "");
+        int sign = 1;
+        if (value.charAt(0) == '-') {
+            sign = -1;
+        }
+        if (value.charAt(0) == '+' || value.charAt(0) == '-') {
+            value = value.substring(1);
+        }
+        BigInteger magnitude;
+        if (value.equals("0")) {
+            return BigInteger.ZERO;
+        } else if (value.startsWith("0b")) {
+            magnitude = new BigInteger(value.substring(2), 2);
+        } else if (value.startsWith("0x")) {
+            magnitude = new BigInteger(value.substring(2), 16);
+        } else if (value.charAt(0) == '0') {
+            magnitude = new BigInteger(value, 8);
+        } else if (value.contains(":")) {
+            String[] parts = value.split(":");
+            BigInteger out = BigInteger.ZERO;
+            BigInteger base = BigInteger.ONE;
+            for (int i = parts.length - 1; i >= 0; i--) {
+                out = out.add(BigInteger.valueOf(Long.parseLong(parts[i])).multiply(base));
+                base = base.multiply(BigInteger.valueOf(60));
+            }
+            magnitude = out;
+        } else {
+            magnitude = new BigInteger(value);
+        }
+        return sign < 0 ? magnitude.negate() : magnitude;
+    }
+
+    /** PyYAML's {@code construct_yaml_float} ({@code yaml/constructor.py:270-292}), copied verbatim:
+     * lower-case, strip {@code _}, take the sign, then dispatch on {@code .inf}/{@code .nan}/
+     * colon-sexagesimal/plain-decimal. */
+    private static double pyyamlConstructFloat(String data) {
+        String value = data.replace("_", "").toLowerCase(Locale.ROOT);
+        int sign = 1;
+        if (value.charAt(0) == '-') {
+            sign = -1;
+        }
+        if (value.charAt(0) == '+' || value.charAt(0) == '-') {
+            value = value.substring(1);
+        }
+        if (value.equals(".inf")) {
+            return sign * Double.POSITIVE_INFINITY;
+        }
+        if (value.equals(".nan")) {
+            return Double.NaN;
+        }
+        if (value.contains(":")) {
+            String[] parts = value.split(":");
+            double out = 0;
+            double base = 1;
+            for (int i = parts.length - 1; i >= 0; i--) {
+                out += Double.parseDouble(parts[i]) * base;
+                base *= 60;
+            }
+            return sign * out;
+        }
+        return sign * Double.parseDouble(value);
+    }
+
+    /** Composes {@code node}'s raw YAML value tree. SnakeYAML's own {@code compose()} resolves each
+     * scalar's tag with regexes byte-identical to PyYAML's own resolver for {@code null}/{@code
+     * bool}/{@code timestamp} -- confirmed against SnakeYAML 2.3 -- so those three trust SnakeYAML's
+     * resolved {@link Tag} directly. {@code int}/{@code float} do NOT agree (confirmed the same way:
+     * SnakeYAML disagrees with PyYAML's YAML-1.1 grammar on several forms), so those two instead test
+     * the raw scalar text against {@link #PYYAML_INT_RESOLVE_RE}/{@link #PYYAML_FLOAT_RESOLVE_RE}
+     * directly, exactly like TypeScript's js-yaml custom types. A quoted scalar of any style is always
+     * a plain {@link String} regardless of its text (SnakeYAML's own {@code isPlain()}, exactly
+     * PyYAML's "implicit resolution applies only to the plain scalar style" rule). Never touches
      * Jackson's own YAML reader ({@link Yaml}, this engine's other loader) for this file. */
     private static Object composeValue(Node node) {
         if (node instanceof ScalarNode scalar) {
@@ -236,19 +324,11 @@ public final class Readiness {
             if (tag.equals(Tag.TIMESTAMP)) {
                 return new PyyamlTimestamp(text);
             }
-            if (tag.equals(Tag.INT)) {
-                try {
-                    return new BigInteger(text.replace("_", ""));
-                } catch (NumberFormatException e) {
-                    return text;
-                }
+            if (PYYAML_INT_RESOLVE_RE.matcher(text).matches()) {
+                return pyyamlConstructInt(text);
             }
-            if (tag.equals(Tag.FLOAT)) {
-                try {
-                    return Double.parseDouble(text.replace("_", ""));
-                } catch (NumberFormatException e) {
-                    return text;
-                }
+            if (PYYAML_FLOAT_RESOLVE_RE.matcher(text).matches()) {
+                return pyyamlConstructFloat(text);
             }
             return text;
         }

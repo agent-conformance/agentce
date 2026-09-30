@@ -148,9 +148,16 @@ test("duplicate reasons are never deduplicated, and sort by byteCompare, not UTF
     integrity: [
       { status: "failed", stream: "gw" },
       { status: "failed", stream: "gw" },
-      // U+FF21 fullwidth 'A' sorts after ASCII under byteCompare (UTF-8), but before it under a
-      // naive UTF-16/code-unit sort of the reason line's leading text.
+      // U+FF21 (fullwidth 'A') is a BMP character: its UTF-16 code unit (0xFF21) and its UTF-8
+      // first byte (0xEF) both exceed every ASCII byte, so a naive UTF-16 sort and byteCompare agree
+      // on it -- it does NOT by itself distinguish the two orders (round-2 verifier finding: an
+      // earlier version of this fixture claimed it did). U+1F600 ("grinning face"), an *astral*
+      // character represented as a UTF-16 surrogate pair (leading code unit 0xD83D = 55357, below
+      // U+FF21's 0xFF21 = 65313) but a 4-byte UTF-8 sequence (leading byte 0xF0 = 240, above U+FF21's
+      // leading byte 0xEF = 239), is what actually reverses the two orders relative to each other --
+      // confirmed: a naive UTF-16/code-unit sort places 😀 before Ａ, byteCompare places Ａ before 😀.
       { status: "failed", stream: "Ａ" },
+      { status: "failed", stream: "😀" },
       // A record with a bad status but no `stream` field at all -- Python's own `record.get("status")
       // in _BAD_INTEGRITY` never enters this branch for a record missing `status` entirely (`None`
       // is not in the bad-status set), so only a present-bad-status/absent-stream combination can
