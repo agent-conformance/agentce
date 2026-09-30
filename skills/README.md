@@ -88,8 +88,15 @@ validates that commit directly instead of trying to cut a second one on top. Eit
 each skill folder from the committed tree alone and runs both self-test commands above from it with
 networking disabled; it also rebuilds each wheel fresh from that commit's own `engines/python` and
 confirms it matches the committed one, byte for byte, so a release commit vendored before a later,
-uncommitted engine change would be caught even though its wheel still installs and runs. Its `--self-test`
-proves a release commit with a missing, corrupted or stale wheel turns that check red.
+uncommitted engine change would be caught even though its wheel still installs and runs.
+
+Two guards keep the wheel and lock off the branches. `--release` refuses to run on a named branch and
+commits nothing there. And on every push and pull request, `tools/skill_release_shape_check.py` fails if
+the commit under test tracks a wheel or lock under `skills/` while any branch contains that commit. A
+checkout of a release tag, which no branch contains, passes that test, and the check validates it as a
+release commit instead. Its `--self-test` shows that each of these turns the check red: a release commit
+with a missing, corrupted or stale wheel, a release cut on a drifted `pyproject.toml`, `--release` run on
+a branch, and a wheel and lock committed onto a branch by hand.
 
 ## Version table
 

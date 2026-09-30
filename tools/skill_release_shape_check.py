@@ -38,6 +38,9 @@ This check builds that commit and runs the install it describes, rather than onl
        runs).
     5. Confirm `ci.yml`'s `agent-skill-tests` job still runs these in order: vendor, then self-test/check,
        then this script.
+    6. Confirm the commit under test tracks no wheel or lock under `skills/` if any branch contains it. A
+       checkout of a release tag, which no branch contains, is exempt and checked as a release commit by
+       steps 1-4.
 
 `--no-network` runs step 3 under dead proxies, the same convention `installed_artifacts_check.py` uses:
 install steps may reach the network on a cold `uv` cache, every run step is offline. An accidental network
@@ -49,6 +52,8 @@ no longer form a valid zip), one whose wheel was vendored before a later engine-
 into the same commit without re-vendoring (a real, valid wheel -- stale, not broken), and an attempt to
 cut a release on top of a phase commit that bumped the engine version without ever running `--write`
 (the release step refuses outright rather than committing a wheel and lock next to a stale pyproject.toml).
+Two more cover the branches: `--release` run on a named branch must refuse and commit nothing, and a wheel
+and lock committed onto a branch by hand must turn step 6 red.
 
 Usage:
     skill_release_shape_check.py                 build a release-shaped commit and prove both skills
@@ -56,7 +61,8 @@ Usage:
     skill_release_shape_check.py --no-network     the same, with the standalone self-test run offline
     skill_release_shape_check.py --self-test      prove a missing, corrupted or stale wheel, or a
                                                    drifted pyproject.toml, on the release commit turns
-                                                   the check red
+                                                   the check red, and that a release or a wheel on a
+                                                   branch is refused or flagged
 """
 
 from __future__ import annotations
@@ -293,6 +299,11 @@ def _assert_already_cut_release_commit_validates() -> None:
                 f"of succeeding: {exc}"
             ) from exc
         try:
+            if standing_problems(cwd=second):
+                raise CheckFailure(
+                    f"already-cut-release-commit: the standing checks flagged a release commit no branch "
+                    f"contains: {standing_problems(cwd=second)}"
+                )
             if check_release_commit_in_sync(second):
                 raise CheckFailure(
                     "already-cut-release-commit: the sync check found drift on a release commit that "
@@ -308,6 +319,92 @@ def _assert_already_cut_release_commit_validates() -> None:
                     )
         finally:
             _remove_worktree(tmp / "release-worktree")
+
+
+def _branch_worktree(tmp: Path, label: str) -> tuple[Path, str]:
+    """A throwaway worktree of HEAD checked out on a throwaway named branch, standing in for `main` or a
+    phase branch. The caller removes both with `_remove_branch_worktree`."""
+    branch = f"skill-release-shape-selftest/{label}-{os.getpid()}"
+    worktree = tmp / f"branch-worktree-{label}"
+    _git("worktree", "add", "-b", branch, str(worktree), "HEAD")
+    return worktree, branch
+
+
+def _remove_branch_worktree(worktree: Path, branch: str) -> None:
+    _remove_worktree(worktree)
+    _git("branch", "-D", branch)
+
+
+def _assert_release_on_branch_is_refused(tmp: Path) -> None:
+    """Verifier round 2's P6: `--release` run on a named branch must refuse by name and commit nothing,
+    or the wheel and lock go straight back under tracking on that branch."""
+    worktree, branch = _branch_worktree(tmp, "release-on-branch")
+    try:
+        before = _git("rev-parse", "HEAD", cwd=worktree)
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(worktree / "tools" / "vendor_skill_engine.py"),
+                "--release",
+            ],
+            cwd=worktree,
+            capture_output=True,
+            text=True,
+        )
+        after = _git("rev-parse", "HEAD", cwd=worktree)
+        if (
+            proc.returncode == 0
+            or "refusing to cut a release commit on branch" not in proc.stderr
+        ):
+            raise CheckFailure(
+                f"release-on-branch: `--release` on branch '{branch}' did not refuse by name "
+                f"(exit {proc.returncode}):\n{proc.stdout}{proc.stderr}"
+            )
+        if after != before:
+            raise CheckFailure(
+                f"release-on-branch: `--release` refused but still moved '{branch}' from {before} to {after}"
+            )
+    finally:
+        _remove_branch_worktree(worktree, branch)
+
+
+def _assert_wheel_committed_on_branch_is_red(tmp: Path) -> None:
+    """Verifier round 2's P7: a wheel and lock committed onto a branch by hand, bypassing `--release`
+    entirely, must turn this script's standing checks red."""
+    worktree, branch = _branch_worktree(tmp, "wheel-on-branch")
+    try:
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(worktree / "tools" / "vendor_skill_engine.py"),
+                "--write",
+            ],
+            cwd=worktree,
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            raise CheckFailure(
+                f"wheel-on-branch: self-test setup: --write failed:\n{proc.stdout}{proc.stderr}"
+            )
+        paths = [
+            str(p.relative_to(worktree))
+            for skill in SKILLS
+            for p in (
+                *sorted((worktree / "skills" / skill / "vendor").glob("*.whl")),
+                worktree / "skills" / skill / "uv.lock",
+            )
+        ]
+        _git("add", "-f", "--", *paths, cwd=worktree)
+        _commit_as_bot(
+            worktree, "-m", "self-test: commit the wheel and lock onto a branch by hand"
+        )
+        if not standing_problems(cwd=worktree):
+            raise CheckFailure(
+                f"wheel-on-branch: the standing checks passed on branch '{branch}', which tracks {paths}"
+            )
+    finally:
+        _remove_branch_worktree(worktree, branch)
 
 
 def copy_skill_out(
@@ -422,14 +519,32 @@ def check_ci_step_order() -> list[str]:
     return []
 
 
+def _branches_containing_head(cwd: Path | None) -> list[str]:
+    """Every local or remote-tracking branch whose history contains `HEAD`. A release commit cut per S-10
+    sits on no branch -- only its tag points at it -- so this is empty on a checkout of a release tag and
+    non-empty on any phase commit (including CI's push checkout, and a pull request's
+    `refs/remotes/pull/<n>/merge`)."""
+    refs = _git(
+        "for-each-ref",
+        "--contains",
+        "HEAD",
+        "--format=%(refname)",
+        "refs/heads",
+        "refs/remotes",
+        cwd=cwd,
+    )
+    return refs.splitlines()
+
+
 def check_no_wheel_tracked_on_head(*, cwd: Path | None = None) -> list[str]:
-    """C1's own invariant ("no phase commit tracks a vendored wheel or lock under skills/") asserted on
-    every run of this script against its own real `HEAD` -- not only inside the throwaway worktree this
-    check builds to test a hypothetical release commit. `ci.yml` and `VG-SKILL-RELEASE-SHAPE` both run on
-    every push to `main`/`phase/**` (never on a release tag, which nothing here triggers on), so this is
-    what turns the standing gate red if a wheel or lock is ever committed back onto a branch by mistake
-    (verifier round 2's P7: `--release` run outside a detached worktree, or any other regression) --
-    C1 alone only ever ran once, as this item's own acceptance check."""
+    """C1's own invariant ("no phase commit tracks a vendored wheel or lock under skills/"), asserted on
+    every run of this script against its own real `HEAD`, not only once as this item's acceptance check.
+    `ci.yml` and `VG-SKILL-RELEASE-SHAPE` run on every push to `main`/`phase/**` and every pull request, so
+    a wheel or lock committed onto a branch by hand turns them red (verifier round 2's P7).
+
+    A checkout of a release tag legitimately tracks both, so the invariant applies only to a commit some
+    branch contains; a release commit no branch contains is validated as a release commit by the rest of
+    `check()` instead."""
     tracked = _git("ls-files", "skills", cwd=cwd).splitlines()
     bad = [
         p
@@ -437,16 +552,24 @@ def check_no_wheel_tracked_on_head(*, cwd: Path | None = None) -> list[str]:
         if (p.startswith("skills/") and "/vendor/" in p and p.endswith(".whl"))
         or p.endswith("/uv.lock")
     ]
-    if bad:
-        return [
-            f"HEAD tracks a vendored wheel or lock under skills/, which should only happen on a release "
-            f"commit cut off-branch: {bad}"
-        ]
-    return []
+    if not bad:
+        return []
+    branches = _branches_containing_head(cwd)
+    if not branches:
+        return []
+    return [
+        f"HEAD tracks a vendored wheel or lock under skills/ on a branch ({', '.join(branches)}); only a "
+        f"release commit cut off-branch with `vendor_skill_engine.py --release` may carry them: {bad}"
+    ]
+
+
+def standing_problems(*, cwd: Path | None = None) -> list[str]:
+    """The checks on the commit under test itself, before any release commit is built from it."""
+    return check_ci_step_order() + check_no_wheel_tracked_on_head(cwd=cwd)
 
 
 def check(*, no_network: bool) -> dict[str, Any]:
-    ci_problems = check_ci_step_order() + check_no_wheel_tracked_on_head()
+    ci_problems = standing_problems()
     with tempfile.TemporaryDirectory(prefix="agentce-release-shape-") as raw:
         tmp = Path(raw)
         try:
@@ -538,6 +661,18 @@ def self_test() -> int:
         except CheckFailure as exc:
             failures.append(str(exc))
 
+    for label, assertion in (
+        ("release-on-branch", _assert_release_on_branch_is_refused),
+        ("wheel-on-branch", _assert_wheel_committed_on_branch_is_red),
+    ):
+        with tempfile.TemporaryDirectory(
+            prefix=f"agentce-release-shape-selftest-{label}-"
+        ) as raw:
+            try:
+                assertion(Path(raw))
+            except CheckFailure as exc:
+                failures.append(str(exc))
+
     try:
         _assert_already_cut_release_commit_validates()
     except CheckFailure as exc:
@@ -550,8 +685,9 @@ def self_test() -> int:
     print(
         "self-test ok: a release-shaped commit installs standalone; a missing, corrupted or stale "
         "vendored wheel turns the standalone self-test or the sync check red; a release cut on top of a "
-        "drifted, uncommitted pyproject.toml is refused outright; a HEAD that already is a release "
-        "commit validates in place instead of crashing"
+        "drifted, uncommitted pyproject.toml is refused outright; `--release` on a named branch is "
+        "refused; a wheel and lock committed onto a branch turn the standing checks red; a HEAD that "
+        "already is a release commit validates in place instead of crashing"
     )
     return 0
 

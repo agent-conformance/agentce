@@ -12,9 +12,12 @@ fails if a gate in `gates.json` is not named in this file.
   with `tools/skill_release_shape_check.py`, extracts each skill folder from the committed tree alone
   (never the worktree's working directory), and runs both skills' standalone self-tests offline; also
   rebuilds each wheel fresh from that commit's own `engines/python` and confirms it matches the
-  committed one, catching a release commit vendored before a later, unvendored engine change. Its
-  seeded fault reverts the force-add to a plain `git add`, which `.gitignore` makes silently skip both
-  paths, so the release commit built that way never actually carries them.
+  committed one, catching a release commit vendored before a later, unvendored engine change. It also
+  fails when the commit under test tracks a wheel or lock under `skills/` and any branch contains it, and
+  its self-test shows that `vendor_skill_engine.py --release` refuses to run on a named branch. Its seeded
+  faults swap the check's `--release` call for a plain `--write`, so no release commit is ever cut;
+  drop the branch-wheel check from the standing checks; and make every commit look like one no branch
+  contains.
 
 ## 0.17.0
 
