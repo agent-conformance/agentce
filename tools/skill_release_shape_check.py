@@ -299,10 +299,11 @@ def _assert_already_cut_release_commit_validates() -> None:
                 f"of succeeding: {exc}"
             ) from exc
         try:
-            if standing_problems(cwd=second):
+            flagged = standing_problems(cwd=second)
+            if flagged:
                 raise CheckFailure(
                     f"already-cut-release-commit: the standing checks flagged a release commit no branch "
-                    f"contains: {standing_problems(cwd=second)}"
+                    f"contains: {flagged}"
                 )
             if check_release_commit_in_sync(second):
                 raise CheckFailure(
@@ -569,7 +570,7 @@ def standing_problems(*, cwd: Path | None = None) -> list[str]:
 
 
 def check(*, no_network: bool) -> dict[str, Any]:
-    ci_problems = standing_problems()
+    head_problems = standing_problems()
     with tempfile.TemporaryDirectory(prefix="agentce-release-shape-") as raw:
         tmp = Path(raw)
         try:
@@ -584,7 +585,7 @@ def check(*, no_network: bool) -> dict[str, Any]:
         finally:
             _remove_worktree(tmp / "release-worktree")
     problems = (
-        ci_problems
+        head_problems
         + sync_problems
         + [
             f"{r['skill']}: self-test failed (exit {r['returncode']})"
