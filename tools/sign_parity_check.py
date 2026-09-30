@@ -406,6 +406,33 @@ def _raw_file_text(path: Path, failures: list[str], label: str) -> str | None:
     return path.read_text(encoding="utf-8")
 
 
+def _error_key(out: str) -> str | None:
+    """The `--json` error's key, under either engine family's field names (Python's `key`,
+    TypeScript and Java's `message_key`)."""
+    error = json.loads(out).get("error", {})
+    return error.get("key", error.get("message_key"))
+
+
+def _assert_claim_untouched(
+    report: Path,
+    before: bytes,
+    engine: str,
+    scenario: str,
+    reason: str,
+    failures: list[str],
+) -> None:
+    """`claim.json` is byte-for-byte unchanged and no `signatures/` directory exists -- the shared
+    side-effect-free assertion scenarios 4 (--dry-run) and 11 (an array-shaped claim.json refusal)
+    both make after a run that must not have written anything."""
+    after = (report / "claim.json").read_bytes()
+    if before != after:
+        failures.append(f"{scenario}:{engine}: claim.json changed despite {reason}")
+    if (report / "signatures").exists():
+        failures.append(
+            f"{scenario}:{engine}: a signatures/ directory was created despite {reason}"
+        )
+
+
 def run_real_check() -> int:
     failures: list[str] = []
     keyid, pub_b64 = known_test_key()
@@ -585,8 +612,7 @@ def run_real_check() -> int:
             failures,
         )
         for engine in ("python", "typescript", "java"):
-            key = json.loads(outs[engine]).get("error", {})
-            got = key.get("key", key.get("message_key"))
+            got = _error_key(outs[engine])
             if got != "sign.not_ready":
                 failures.append(
                     f"s3-not-ready:{engine}: error key={got!r}, expected 'sign.not_ready'"
@@ -615,15 +641,9 @@ def run_real_check() -> int:
                 failures.append(
                     f"s4-dry-run:{engine}: exit {code}, expected 0 ({out.strip()[:200]!r})"
                 )
-            after = (report / "claim.json").read_bytes()
-            if before != after:
-                failures.append(
-                    f"s4-dry-run:{engine}: claim.json changed despite --dry-run"
-                )
-            if (report / "signatures").exists():
-                failures.append(
-                    f"s4-dry-run:{engine}: a signatures/ directory was created despite --dry-run"
-                )
+            _assert_claim_untouched(
+                report, before, engine, "s4-dry-run", "--dry-run", failures
+            )
             env = json.loads(out)
             if env.get("dry_run") is not True or env.get("readiness") != "READY":
                 failures.append(
@@ -644,8 +664,7 @@ def run_real_check() -> int:
                 failures,
             )
             for engine, (out, _) in runs:
-                got = json.loads(out).get("error", {})
-                key = got.get("key", got.get("message_key"))
+                key = _error_key(out)
                 if key != expect_key:
                     failures.append(
                         f"{name}:{engine}: error key={key!r}, expected {expect_key!r}"
@@ -677,21 +696,14 @@ def run_real_check() -> int:
                 failures.append(
                     f"s11-array-claim:{engine}: exit {code}, expected 3 ({out.strip()[:200]!r})"
                 )
-            got = json.loads(out).get("error", {})
-            key = got.get("key", got.get("message_key"))
+            key = _error_key(out)
             if key != "internal.unexpected":
                 failures.append(
                     f"s11-array-claim:{engine}: error key={key!r}, expected 'internal.unexpected'"
                 )
-            after = claim_path.read_bytes()
-            if before != after:
-                failures.append(
-                    f"s11-array-claim:{engine}: claim.json changed despite refusing to sign"
-                )
-            if (report / "signatures").exists():
-                failures.append(
-                    f"s11-array-claim:{engine}: a signatures/ directory was created despite refusing"
-                )
+            _assert_claim_untouched(
+                report, before, engine, "s11-array-claim", "refusing to sign", failures
+            )
 
     for failure in failures:
         print(f"MISMATCH: {failure}", file=sys.stderr)

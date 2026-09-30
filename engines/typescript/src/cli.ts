@@ -959,15 +959,18 @@ function parseSignArgv(argv: string[]): SignArgs {
   return parsed;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 /** Python's `dict.get(key, default)` restricted to the one shape this call site needs: `obj` may be
  * any JSON value (a hostile `claim.json` need not carry a mapping at every level), and `default` is
  * substituted only when `obj` is itself a plain mapping missing `key`, never when `obj` is some other
  * type -- matching `claim.get("claimant", {}).get("org", "unset")`'s own attribute-style access only
  * making sense on an actual mapping. */
 function pyGetField(obj: unknown, key: string, defaultValue: unknown): unknown {
-  if (obj !== null && typeof obj === "object" && !Array.isArray(obj)) {
-    const record = obj as Record<string, unknown>;
-    return key in record ? record[key] : defaultValue;
+  if (isRecord(obj)) {
+    return key in obj ? obj[key] : defaultValue;
   }
   return defaultValue;
 }
@@ -1063,7 +1066,7 @@ function cmdSign(argv: string[]): CommandResult {
     );
   }
   const parsedClaim: unknown = JSON.parse(readFileSync(claimPath, "utf-8"));
-  if (parsedClaim === null || typeof parsedClaim !== "object" || Array.isArray(parsedClaim)) {
+  if (!isRecord(parsedClaim)) {
     // Matches Python's `claim.setdefault("signatures", [])` (AttributeError on a non-dict claim)
     // and Java's `(ObjectNode) Json.parseFile(claimPath)` cast (ClassCastException) -- both crash
     // into `internal.unexpected` rather than silently appending a "signatures" property that
@@ -1072,7 +1075,7 @@ function cmdSign(argv: string[]): CommandResult {
       `claim.json does not hold an object (got ${Array.isArray(parsedClaim) ? "array" : parsedClaim === null ? "null" : typeof parsedClaim})`,
     );
   }
-  const claim = parsedClaim as Record<string, unknown>;
+  const claim = parsedClaim;
 
   const signer = signSigner(args.key, profile);
   const subjects = signSubjects(reportDir, claim);
