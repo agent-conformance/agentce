@@ -11,7 +11,8 @@ requires-python = ">=3.12"
 license = "Apache-2.0"
 authors = [{ name = "Agent Conformance Engine maintainers" }]
 dependencies = [
-  "cryptography>=50,<51,!=50.0.2",
+  "cryptography>=50,<51; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+  "cryptography>=48,<49; sys_platform == 'darwin' and platform_machine == 'x86_64'",
   "jsonschema>=4.21,<5",
   "pyyaml>=6,<7",
   "rdflib>=7,<8",
