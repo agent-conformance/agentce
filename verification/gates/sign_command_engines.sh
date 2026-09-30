@@ -65,43 +65,32 @@ run_sign() {
   esac
 }
 
-error_key() {
-  # Python's `--json` envelope keys an error as `error.key`; TypeScript/Java as `error.message_key`.
-  jq -r '.error.key // .error.message_key // empty'
-}
-
-verify_script="$work/verify_offline.py"
-cat >"$verify_script" <<'PY'
+verify_offline() {
+  # Independently verifies a DSSE envelope against the known test key's public half by calling
+  # tools/sign_parity_check.py's own `verify_offline` (which itself shells into engines/python's
+  # reference `signing.verify_envelope`) rather than re-embedding that DSSE bootstrap a second time.
+  # Run from tools/ (not $work) so `import sign_parity_check` resolves via the script's own directory.
+  local detached_file="$1"
+  (cd "$root/tools" && env -u VIRTUAL_ENV uv run --frozen python - "$detached_file" "$pub_b64" "$keyid" <<'PY'
 import json
 import sys
 
-from agentce import signing
+import sign_parity_check as spc
 
-keyid, pub_b64 = sys.argv[1], sys.argv[2]
-envelope = json.load(sys.stdin)
-trust = signing.TrustRoot.document(keyid, pub_b64, "checker")
-try:
-    signing.verify_envelope(envelope, signing.TrustRoot.from_dict(trust))
-    print("VERIFIED")
-except signing.VerificationError as exc:
-    print(f"FAILED: {exc}")
+detached = json.load(open(sys.argv[1]))
+ok, out = spc.verify_offline(detached, sys.argv[2], sys.argv[3])
+print("VERIFIED" if ok else out)
 PY
-
-verify_offline() {
-  # Independently verifies a DSSE envelope against the known test key's public half, using Python's
-  # own reference `signing.verify_envelope` -- the same boundary tools/sign_parity_check.py crosses.
-  local detached_json="$1"
-  (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen python "$verify_script" "$keyid" "$pub_b64" <<<"$detached_json")
+)
 }
 
 status=0
 
 for engine in python typescript java; do
-  set +e
-  out="$(run_sign "$engine" "$not_ready" --as claimant --profile kms --key "$key")"
-  code=$?
-  set -e
-  key_got="$(printf '%s' "$out" | error_key)"
+  out="$(run_sign "$engine" "$not_ready" --as claimant --profile kms --key "$key")" && code=0 || code=$?
+  # Python's `--json` envelope keys an error as `error.key`; TypeScript/Java as `error.message_key`
+  # (the same key/message_key split tools/readiness_parity_check.py's _error_fields normalizes).
+  key_got="$(printf '%s' "$out" | jq -r '.error.key // .error.message_key // empty')"
   if [ "$code" -ne 3 ] || [ "$key_got" != "sign.not_ready" ]; then
     echo "sign: $engine did not refuse the NOT_READY report (exit $code, key ${key_got:-none}, expected exit 3 and sign.not_ready)" >&2
     status=1
@@ -109,10 +98,7 @@ for engine in python typescript java; do
 done
 
 for engine in python typescript java; do
-  set +e
-  out="$(run_sign "$engine" "$ready" --as claimant --profile kms --key "$key")"
-  code=$?
-  set -e
+  out="$(run_sign "$engine" "$ready" --as claimant --profile kms --key "$key")" && code=0 || code=$?
   if [ "$code" -ne 0 ]; then
     echo "sign: $engine refused the READY report (exit $code: $out)" >&2
     status=1
@@ -124,7 +110,7 @@ for engine in python typescript java; do
     status=1
     continue
   fi
-  verified="$(verify_offline "$(cat "$sig_path")")"
+  verified="$(verify_offline "$sig_path")"
   if [ "$verified" != "VERIFIED" ]; then
     echo "sign: $engine's READY signature did not verify offline against the known test key ($verified)" >&2
     status=1
@@ -132,10 +118,7 @@ for engine in python typescript java; do
 done
 
 for engine in python typescript java; do
-  set +e
-  out="$(run_sign "$engine" "$ready_wtr" --as assessor --profile kms --key "$key" --write-trust-root)"
-  code=$?
-  set -e
+  out="$(run_sign "$engine" "$ready_wtr" --as assessor --profile kms --key "$key" --write-trust-root)" && code=0 || code=$?
   if [ "$code" -ne 0 ]; then
     echo "sign: $engine refused --write-trust-root on the READY report (exit $code: $out)" >&2
     status=1
