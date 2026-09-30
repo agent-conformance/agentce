@@ -1579,21 +1579,16 @@ def _sign_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
     18.26's C4), run against the installed artifact the way a user reaches it, network disabled."""
     fixture_dir = cwd / "sign-fixture"
     fixture_dir.mkdir(exist_ok=True)
-    scenarios = {s.name: s for s in readiness_parity_check.SCENARIOS}
     keyid, _ = sign_parity_check.known_test_key()
     key_path = sign_parity_check.TEST_KEY
 
     problems: list[str] = []
-    report1, extra1 = scenarios["1-clean"].build(fixture_dir)
-    (report1 / "claim.json").write_text(
-        json.dumps({"claimant": {"org": "acme"}}), encoding="utf-8"
-    )
+    report1 = sign_parity_check.ready_fixture(fixture_dir / "ready")
     proc = runner.run(
         [
             *exe,
             "sign",
             str(report1),
-            *extra1,
             "--as",
             "claimant",
             "--profile",
@@ -1610,14 +1605,12 @@ def _sign_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
         for p in _sign_ready_json_problems(proc.stdout, proc.returncode, keyid)
     ]
 
-    report3, extra3 = scenarios["3-insufficient-evidence-no-gaps"].build(fixture_dir)
-    (report3 / "claim.json").write_text(json.dumps({}), encoding="utf-8")
+    report3 = sign_parity_check.not_ready_fixture(fixture_dir / "not-ready")
     proc = runner.run(
         [
             *exe,
             "sign",
             str(report3),
-            *extra3,
             "--as",
             "claimant",
             "--profile",

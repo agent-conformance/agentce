@@ -333,7 +333,7 @@ def compare(
     """Append a failure iff `a != b` -- the one comparator both the self-test and the real invocation
     below use, so the self-test proves the actual logic the real check relies on, not a stand-in."""
     if a != b:
-        failures.append(f"{label}: {engine_a} and {engine_b} disagree")
+        failures.append(f"{label}: {engine_a} and {engine_b} disagree ({a!r} vs {b!r})")
 
 
 def compare_ports(label: str, outputs: list[str], failures: list[str]) -> None:
@@ -394,7 +394,8 @@ def typescript_readiness(args: list[str]) -> tuple[str, int]:
 
 
 @functools.cache
-def _java_jar() -> Path:
+def java_jar() -> Path:
+    """The most recently built runnable jar -- public since `sign_parity_check.py` also needs it."""
     jars = sorted(
         (JAVA_ENGINE / "build" / "libs").glob("agentce-*-all.jar"),
         key=lambda p: p.stat().st_mtime,
@@ -407,7 +408,7 @@ def _java_jar() -> Path:
 
 
 def java_readiness(args: list[str]) -> tuple[str, int]:
-    return _run(["java", "-jar", str(_java_jar()), "readiness", *args], cwd=ROOT)
+    return _run(["java", "-jar", str(java_jar()), "readiness", *args], cwd=ROOT)
 
 
 def self_test() -> int:

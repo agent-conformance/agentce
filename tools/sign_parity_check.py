@@ -53,20 +53,6 @@ RSA_KEY = FIXTURES / "rsa-key.pem"
 EC_KEY = FIXTURES / "ec-key.pem"
 ENCRYPTED_KEY = FIXTURES / "encrypted-key.pem"
 
-#: `SIGN_PROFILES`'s own declared order (`commands/__init__.py:170`); the `input.sign_profile` fix
-#: text names them in this order, so a hardcoded literal would drift if the source ever reorders it,
-#: but reading the source at check-run time is itself proof enough (readiness_parity_check.py's own
-#: CATALOG_DIR precedent reads a real vendored directory rather than embedding its content).
-_PROFILE_TEXT = (PY_ENGINE / "agentce" / "commands" / "__init__.py").read_text(
-    encoding="utf-8"
-)
-_PROFILES_MARK = "SIGN_PROFILES = ("
-_start = _PROFILE_TEXT.index(_PROFILES_MARK) + len(_PROFILES_MARK)
-_end = _PROFILE_TEXT.index(")", _start)
-SIGN_PROFILES: tuple[str, ...] = tuple(
-    p.strip().strip('"') for p in _PROFILE_TEXT[_start:_end].split(",") if p.strip()
-)
-
 
 def _run(
     cmd: list[str], *, cwd: Path | None = None, input_text: str | None = None
@@ -85,6 +71,21 @@ def _py_engine_script(script: str, *, input_text: str | None = None) -> tuple[st
         cwd=ROOT,
         input_text=input_text,
     )
+
+
+@functools.cache
+def sign_profiles() -> tuple[str, ...]:
+    """`SIGN_PROFILES` read out of the engine's own environment (the `known_test_key()` pattern)
+    rather than sliced out of the source text, so a reordering or rename is picked up automatically."""
+    script = (
+        "import json\n"
+        "from agentce.commands import SIGN_PROFILES\n"
+        "print(json.dumps(list(SIGN_PROFILES)))\n"
+    )
+    out, code = _py_engine_script(script)
+    if code != 0:
+        raise SystemExit(f"could not read SIGN_PROFILES from the engine: {out}")
+    return tuple(json.loads(out))
 
 
 @functools.cache
@@ -154,21 +155,11 @@ def typescript_sign(args: list[str]) -> tuple[str, int]:
     return _run(["node", str(entry), "sign", *args], cwd=ROOT)
 
 
-@functools.cache
-def _java_jar() -> Path:
-    jars = sorted(
-        (JAVA_ENGINE / "build" / "libs").glob("agentce-*-all.jar"),
-        key=lambda p: p.stat().st_mtime,
-    )
-    if not jars:
-        raise SystemExit(
-            "java runnable jar is not built (run `./gradlew :assemble -q` in engines/java first)"
-        )
-    return jars[-1]
-
-
 def java_sign(args: list[str]) -> tuple[str, int]:
-    return _run(["java", "-jar", str(_java_jar()), "sign", *args], cwd=ROOT)
+    return _run(
+        ["java", "-jar", str(readiness_parity_check.java_jar()), "sign", *args],
+        cwd=ROOT,
+    )
 
 
 def _run_engines(argv: list[str]) -> list[tuple[str, tuple[str, int]]]:
@@ -179,40 +170,11 @@ def _run_engines(argv: list[str]) -> list[tuple[str, tuple[str, int]]]:
     ]
 
 
-def compare(
-    label: str, a: str, b: str, engine_a: str, engine_b: str, failures: list[str]
-) -> None:
-    if a != b:
-        failures.append(f"{label}: {engine_a} and {engine_b} disagree ({a!r} vs {b!r})")
-
-
-def compare_ports(label: str, outputs: list[str], failures: list[str]) -> None:
-    py, ts, java = outputs
-    compare(label, py, ts, "python", "typescript", failures)
-    compare(label, py, java, "python", "java", failures)
-
-
-def _error_fields(out: str) -> str:
-    """The `--json` error's key, cause and fix, under either engine family's field names (Python's
-    `key`/`cause`, TypeScript and Java's `message_key`/`detail`)."""
-    try:
-        error = json.loads(out).get("error", {})
-    except json.JSONDecodeError:
-        return "no --json envelope"
-    return json.dumps(
-        [
-            error.get("key", error.get("message_key")),
-            error.get("cause", error.get("detail")),
-            error.get("fix"),
-        ]
-    )
-
-
 def _named_readiness_scenario(name: str) -> Any:
     return next(s for s in readiness_parity_check.SCENARIOS if s.name == name)
 
 
-def _ready_fixture(directory: Path, claim: dict[str, Any] | None = None) -> Path:
+def ready_fixture(directory: Path, claim: dict[str, Any] | None = None) -> Path:
     """The READY report-directory shape (18.25's scenario 1, reused directly) plus a `claim.json` to
     sign -- one independent copy per engine, so each engine's own `signatures[]` append is compared
     without chaining through a shared mutable file."""
@@ -225,7 +187,7 @@ def _ready_fixture(directory: Path, claim: dict[str, Any] | None = None) -> Path
     return report
 
 
-def _not_ready_fixture(directory: Path) -> Path:
+def not_ready_fixture(directory: Path) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     report, _ = _named_readiness_scenario("3-insufficient-evidence-no-gaps").build(
         directory
@@ -241,11 +203,24 @@ def _per_engine_dirs(tmp: Path, name: str) -> tuple[Path, Path, Path]:
     return dirs[0], dirs[1], dirs[2]
 
 
+def _build_reports(
+    dirs: tuple[Path, Path, Path], fixture_fn: Any, *args: Any
+) -> dict[str, Path]:
+    """One independent `fixture_fn(dir, *args)` call per engine's own directory -- the
+    per-scenario `{"python": ..., "typescript": ..., "java": ...}` shape every scenario below needs."""
+    py_dir, ts_dir, java_dir = dirs
+    return {
+        "python": fixture_fn(py_dir, *args),
+        "typescript": fixture_fn(ts_dir, *args),
+        "java": fixture_fn(java_dir, *args),
+    }
+
+
 #: (name, key, argv extra, expect_key) for every refusal scenario (contract C3's numbered list).
 #: `argv extra` is appended after the READY report-dir positional; every engine must refuse with
 #: `expect_key` and the identical cause/fix text.
 def _error_scenarios(directory: Path) -> list[tuple[str, list[str], str]]:
-    ready = _ready_fixture(directory / "errors")
+    ready = ready_fixture(directory / "errors")
     return [
         (
             "5-rsa-key-algorithm",
@@ -288,13 +263,17 @@ def self_test() -> int:
     failures: list[str] = []
 
     unmoved: list[str] = []
-    compare("comparator-self-test", "identical\n", "identical\n", "a", "b", unmoved)
+    readiness_parity_check.compare(
+        "comparator-self-test", "identical\n", "identical\n", "a", "b", unmoved
+    )
     if unmoved:
         failures.append(
             "comparator wrongly flagged two identical strings as a mismatch"
         )
     caught: list[str] = []
-    compare("comparator-self-test", "identical\n", "identicalX\n", "a", "b", caught)
+    readiness_parity_check.compare(
+        "comparator-self-test", "identical\n", "identicalX\n", "a", "b", caught
+    )
     if not caught:
         failures.append(
             "comparator failed to catch a one-byte tamper between two 'engine output' strings"
@@ -322,17 +301,18 @@ def self_test() -> int:
                 "ec-key.pem and test-key.pem are byte-identical (fixture generation bug)"
             )
 
-    if len(SIGN_PROFILES) != 3 or "kms" not in SIGN_PROFILES:
+    profiles = sign_profiles()
+    if len(profiles) != 3 or "kms" not in profiles:
         failures.append(
-            f"SIGN_PROFILES parsed from the source as {SIGN_PROFILES!r}, expected 3 names incl. 'kms'"
+            f"sign_profiles() returned {profiles!r}, expected 3 names incl. 'kms'"
         )
 
     with tempfile.TemporaryDirectory(prefix="sign-parity-selftest-") as raw:
         tmp = Path(raw)
-        ready = _ready_fixture(tmp / "ready")
+        ready = ready_fixture(tmp / "ready")
         if not (ready / "claim.json").is_file():
-            failures.append("_ready_fixture did not write claim.json")
-        not_ready = _not_ready_fixture(tmp / "not-ready")
+            failures.append("ready_fixture did not write claim.json")
+        not_ready = not_ready_fixture(tmp / "not-ready")
         integrity = [
             json.loads(line)
             for line in (not_ready / "integrity.jsonl")
@@ -344,7 +324,7 @@ def self_test() -> int:
             (not_ready / "assertions.json").read_text(encoding="utf-8")
         ):
             failures.append(
-                "_not_ready_fixture's reused readiness scenario carries no blocking finding"
+                "not_ready_fixture's reused readiness scenario carries no blocking finding"
             )
 
     for failure in failures:
@@ -376,12 +356,8 @@ def run_real_check() -> int:
 
         # Scenario 1: READY + kms happy path -- byte-identical claim.json signatures[-1] entry and
         # detached signature file, each independently verifying against the known test key.
-        py_dir, ts_dir, java_dir = _per_engine_dirs(tmp, "s1")
-        reports = {
-            "python": _ready_fixture(py_dir),
-            "typescript": _ready_fixture(ts_dir),
-            "java": _ready_fixture(java_dir),
-        }
+        dirs = _per_engine_dirs(tmp, "s1")
+        reports = _build_reports(dirs, ready_fixture)
         runners = {
             "python": python_sign,
             "typescript": typescript_sign,
@@ -425,7 +401,7 @@ def run_real_check() -> int:
                     )
 
         if len(detached) == 3:
-            compare_ports(
+            readiness_parity_check.compare_ports(
                 "s1-ready:detached-signature",
                 [
                     json.dumps(detached[e], sort_keys=True)
@@ -434,20 +410,21 @@ def run_real_check() -> int:
                 failures,
             )
         if len(envelopes) == 3:
-            compare_ports(
+            readiness_parity_check.compare_ports(
                 "s1-ready:keyid",
-                [str(envelopes[e].get("keyid")) for e in ("python", "typescript", "java")],
+                [
+                    str(envelopes[e].get("keyid"))
+                    for e in ("python", "typescript", "java")
+                ],
                 failures,
             )
 
         # Scenario 2: --write-trust-root -- byte-identical trust-root.json, keys[keyid].public_key
         # matches the known test key exactly.
-        py_dir, ts_dir, java_dir = _per_engine_dirs(tmp, "s2")
-        reports = {
-            "python": _ready_fixture(py_dir, {"claimant": {"org": "acme corp"}}),
-            "typescript": _ready_fixture(ts_dir, {"claimant": {"org": "acme corp"}}),
-            "java": _ready_fixture(java_dir, {"claimant": {"org": "acme corp"}}),
-        }
+        dirs = _per_engine_dirs(tmp, "s2")
+        reports = _build_reports(
+            dirs, ready_fixture, {"claimant": {"org": "acme corp"}}
+        )
         trust_roots: dict[str, dict[str, Any]] = {}
         for engine, report in reports.items():
             out, code = runners[engine](
@@ -486,7 +463,7 @@ def run_real_check() -> int:
                     f"s2-trust-root:{engine}: keys[keyid].identity={entry.get('identity')!r}, expected 'acme corp'"
                 )
         if len(trust_roots) == 3:
-            compare_ports(
+            readiness_parity_check.compare_ports(
                 "s2-trust-root:document",
                 [
                     json.dumps(trust_roots[e], sort_keys=True)
@@ -496,12 +473,8 @@ def run_real_check() -> int:
             )
 
         # Scenario 3: NOT_READY -- refuses with sign.not_ready, identical verdict/reasons text.
-        py_dir, ts_dir, java_dir = _per_engine_dirs(tmp, "s3")
-        reports = {
-            "python": _not_ready_fixture(py_dir),
-            "typescript": _not_ready_fixture(ts_dir),
-            "java": _not_ready_fixture(java_dir),
-        }
+        dirs = _per_engine_dirs(tmp, "s3")
+        reports = _build_reports(dirs, not_ready_fixture)
         outs: dict[str, str] = {}
         for engine, report in reports.items():
             out, code = runners[engine](
@@ -526,9 +499,12 @@ def run_real_check() -> int:
                 failures.append(
                     f"s3-not-ready:{engine}: claim.json was touched despite the NOT_READY refusal"
                 )
-        compare_ports(
+        readiness_parity_check.compare_ports(
             "s3-not-ready:error",
-            [_error_fields(outs[e]) for e in ("python", "typescript", "java")],
+            [
+                readiness_parity_check._error_fields(outs[e])
+                for e in ("python", "typescript", "java")
+            ],
             failures,
         )
         for engine in ("python", "typescript", "java"):
@@ -541,12 +517,8 @@ def run_real_check() -> int:
 
         # Scenario 4: --dry-run on the READY fixture -- claim.json byte-for-byte unchanged, no
         # signatures/ directory, even with a bad --key value (no key ever touched).
-        py_dir, ts_dir, java_dir = _per_engine_dirs(tmp, "s4")
-        reports = {
-            "python": _ready_fixture(py_dir),
-            "typescript": _ready_fixture(ts_dir),
-            "java": _ready_fixture(java_dir),
-        }
+        dirs = _per_engine_dirs(tmp, "s4")
+        reports = _build_reports(dirs, ready_fixture)
         for engine, report in reports.items():
             before = (report / "claim.json").read_bytes()
             out, code = runners[engine](
@@ -589,8 +561,10 @@ def run_real_check() -> int:
                 failures.append(
                     f"{name}: expected exit 3 in all three engines, got {codes}"
                 )
-            compare_ports(
-                f"{name}:error", [_error_fields(out) for _, (out, _) in runs], failures
+            readiness_parity_check.compare_ports(
+                f"{name}:error",
+                [readiness_parity_check._error_fields(out) for _, (out, _) in runs],
+                failures,
             )
             for engine, (out, _) in runs:
                 got = json.loads(out).get("error", {})
