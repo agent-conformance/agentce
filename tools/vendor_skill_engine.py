@@ -144,8 +144,8 @@ def cmd_write() -> int:
             # resolved versions). Lock twice so the second, warm call always produces the order every
             # later re-lock will converge back to, whether or not a uv.lock already existed here; this
             # is what makes `--release` idempotent on a commit it already cut (VG-SKILL-RELEASE-SHAPE).
-            _lock(skill)
-            _lock(skill)
+            _lock(skill)  # pass 1: may be cold or warm, order not yet the stable one
+            _lock(skill)  # pass 2: always warm -- this is the order that gets committed
             print(f"vendored {wheel.name} into skills/{skill}/vendor/ and re-locked")
     return 0
 
