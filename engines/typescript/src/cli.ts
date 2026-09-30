@@ -729,49 +729,90 @@ function readinessSeverities(catalogDirs: string[]): Map<string, string> {
   return severities;
 }
 
-/** `report_dir`'s value: the one positional token in `agentce readiness`'s argv, skipping `--json`/
- * `--debug`/`--quiet` (boolean) and `--gaps`/`--deviations`/`--catalog-dir` (each with a value) --
- * `readiness` has no `--format` flag in Python (confirmed by reading `cli.py`'s `readiness`
- * subparser: no `--format` argument at all), so none is recognized here either. Throws
- * `input.readiness_unrecognized_flag` on any other `--`-prefixed token, mirroring `positionalArgs`'s
- * own `diff`-specific guard (item 18.24): without this, a typo'd flag (e.g. `--gasp` for `--gaps`)
- * is silently skipped and the *next* token -- typically the flag's own value -- is misread as
- * `report_dir` instead. */
-function readinessReportDirToken(argv: string[]): string | undefined {
-  const valueFlags = new Set(["gaps", "deviations", "catalog-dir"]);
-  let reportDir: string | undefined;
-  // Scans every token, never returning at the first positional: a flag or a second positional
-  // written *after* `report_dir` must still be checked, not silently ignored. An earlier version
-  // returned as soon as it found `report_dir`, so a typo'd flag or a stray extra argument placed
-  // after it (`readiness rep --deviation dev.yaml`, prefix-typo'd for `--deviations`) was never
-  // seen by this function, fell through as an unconsumed token, and was simply not looked at --
-  // giving a false READY instead of the refusal Python's argparse gives for the same input.
+interface ReadinessArgs {
+  reportDir: string | undefined;
+  gaps: string | undefined;
+  deviations: string | undefined;
+  catalogDirs: string[];
+}
+
+/** A token argparse classifies as an option rather than a value: it starts with `-`, is not a bare
+ * `-`, does not look like a negative number and holds no space (`argparse._parse_optional`). */
+function looksLikeOption(token: string): boolean {
+  return (
+    token.startsWith("-") &&
+    token !== "-" &&
+    !/^-\d+$|^-\d*\.\d+$/.test(token) &&
+    !token.includes(" ")
+  );
+}
+
+function readinessUnrecognized(detail: string, fix: string): InputError {
+  return new InputError("input.readiness_unrecognized_flag", detail, fix);
+}
+
+/** `agentce readiness`'s argv, read the way Python's `readiness` subparser (argparse,
+ * `allow_abbrev=False`) reads it: `--gaps`/`--deviations` take one value (separate or `=`-joined, the
+ * last one wins), `--catalog-dir` appends, `--json`/`--debug`/`--quiet` take none, `--` ends the
+ * options, and there is at most one positional. Anything argparse would refuse (an unknown or
+ * abbreviated flag, a value flag with no value, a second positional) throws
+ * `input.readiness_unrecognized_flag` rather than being skipped, so a mistyped flag can never give a
+ * verdict computed without it. An empty `--gaps`/`--deviations` value is ignored, as Python's
+ * `if gaps_path:` does. */
+function parseReadinessArgv(argv: string[]): ReadinessArgs {
+  const flagFix = "pass --gaps, --deviations, or --catalog-dir, or drop the flag.";
+  const parsed: ReadinessArgs = {
+    reportDir: undefined,
+    gaps: undefined,
+    deviations: undefined,
+    catalogDirs: [],
+  };
+  let optionsEnded = false;
   for (let i = 1; i < argv.length; i++) {
     const token = argv[i] as string;
-    if (token === "--json" || token === "--debug" || token === "--quiet") {
+    if (!optionsEnded && token === "--") {
+      optionsEnded = true;
       continue;
     }
-    if (token.startsWith("--")) {
-      if (!valueFlags.has(token.slice(2))) {
-        throw new InputError(
-          "input.readiness_unrecognized_flag",
-          `unrecognized flag '${token}'.`,
-          "pass --gaps, --deviations, or --catalog-dir, or drop the flag.",
-        );
+    if (!optionsEnded && looksLikeOption(token)) {
+      const eq = token.indexOf("=");
+      const name = eq >= 0 ? token.slice(0, eq) : token;
+      if (name === "--json" || name === "--debug" || name === "--quiet") {
+        if (eq >= 0) {
+          throw readinessUnrecognized(`flag '${name}' takes no value.`, `drop the value: ${name}.`);
+        }
+        continue;
       }
-      i++; // also skip the value token
+      if (name !== "--gaps" && name !== "--deviations" && name !== "--catalog-dir") {
+        throw readinessUnrecognized(`unrecognized flag '${token}'.`, flagFix);
+      }
+      let value: string;
+      if (eq >= 0) {
+        value = token.slice(eq + 1);
+      } else {
+        const next = argv[i + 1];
+        if (next === undefined || looksLikeOption(next)) {
+          throw readinessUnrecognized(`flag '${name}' needs a value.`, `pass ${name} <path>.`);
+        }
+        value = next;
+        i++;
+      }
+      if (name === "--catalog-dir") {
+        parsed.catalogDirs.push(value);
+      } else {
+        parsed[name === "--gaps" ? "gaps" : "deviations"] = value === "" ? undefined : value;
+      }
       continue;
     }
-    if (reportDir !== undefined) {
-      throw new InputError(
-        "input.readiness_unrecognized_flag",
+    if (parsed.reportDir !== undefined) {
+      throw readinessUnrecognized(
         `unrecognized argument '${token}'.`,
         "pass exactly one report directory: `agentce readiness <report-dir>`.",
       );
     }
-    reportDir = token;
+    parsed.reportDir = token;
   }
-  return reportDir;
+  return parsed;
 }
 
 /** `agentce readiness` (SPEC §13.3.4 stage 4, item 18.25): the report-readiness verdict, matching the
@@ -779,26 +820,27 @@ function readinessReportDirToken(argv: string[]): string | undefined {
  * WITH LIMITATIONS, 1 for NOT READY -- the verdict logic lives in the engine, never in a skill. */
 function cmdReadiness(argv: string[]): CommandResult {
   const result = new CommandResult("readiness");
+  const args = parseReadinessArgv(argv);
   const reportDir = requireDir(
-    readinessReportDirToken(argv),
+    args.reportDir,
     "report_dir",
     "the report directory",
     "pass the report directory: `agentce readiness <report-dir>`.",
   );
   let gaps = new Set<string>();
-  const gapsPath = flagValue(argv, "gaps");
+  const gapsPath = args.gaps;
   if (gapsPath !== undefined) {
     const text = readFileSync(requireFile(gapsPath, "gaps", "the gaps file"), "utf-8");
     gaps = parseGapsFile(text);
   }
   let deviations: Record<string, unknown>[] = [];
-  const deviationsPath = flagValue(argv, "deviations");
+  const deviationsPath = args.deviations;
   if (deviationsPath !== undefined) {
     deviations = loadDeviationRegister(
       requireFile(deviationsPath, "deviations", "the deviation register"),
     );
   }
-  const severities = readinessSeverities(flagValues(argv, "catalog-dir"));
+  const severities = readinessSeverities(args.catalogDirs);
   const verdict = computeReadiness(reportDir, { severities, deviations, gaps });
   result.data.verdict = verdict.verdict;
   result.data.reasons = verdict.reasons;

@@ -584,3 +584,22 @@ def test_readiness_cli_with_gaps_and_deviations(
     payload = json.loads(capsys.readouterr().out)
     assert code == 0
     assert payload["verdict"] == READY_WITH_LIMITATIONS
+
+
+@pytest.mark.parametrize("flag", ["--deviation", "--gap", "--catalog", "--js"])
+def test_readiness_cli_refuses_an_abbreviated_flag(tmp_path: Path, flag: str) -> None:
+    """No prefix matching: TS and Java refuse an abbreviated flag, so Python does too, rather than
+    silently reading `--deviation` as `--deviations` (18.25 round 3)."""
+    report = _report(tmp_path, integrity=[{"status": "verified", "stream": "a"}])
+    register = tmp_path / "deviations.yaml"
+    register.write_text("deviations: []\n", encoding="utf-8")
+    gaps = tmp_path / "gaps.md"
+    gaps.write_text("", encoding="utf-8")
+    catalog = _REPO_ROOT / "spec" / "catalogs" / "base" / "eu-ai-act"
+    # Each value is valid for the flag the abbreviation expands to, so only the refusal gives 3.
+    extra = {
+        "--deviation": [str(register)],
+        "--gap": [str(gaps)],
+        "--catalog": [str(catalog)],
+    }
+    assert cli.main(["readiness", str(report), flag, *extra.get(flag, [])]) == 3

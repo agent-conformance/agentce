@@ -860,48 +860,85 @@ public final class Cli {
      * and the TypeScript port's {@code cmdVersion}). Distinct from the bare {@code --version}/
      * {@code -V} flag, which stays a plain one-line shortcut (handled before this is ever reached,
      * {@link #run}). */
-    /** {@code readiness} has no {@code --format} flag in Python (confirmed by reading {@code cli.py}'s
-     * {@code readiness} subparser: no {@code --format} argument at all), so none is recognized here
-     * either -- only these three value flags are skipped alongside the boolean {@code --json}/{@code
-     * --debug}/{@code --quiet}. */
-    private static final Set<String> READINESS_VALUE_FLAGS = Set.of("gaps", "deviations", "catalog-dir");
+    /** {@code agentce readiness}'s parsed args (see {@link #parseReadinessArgs}). */
+    private record ReadinessArgs(String reportDir, String gaps, String deviations, List<String> catalogDirs) {}
 
-    /** {@code report_dir}'s value: the one positional token in {@code agentce readiness}'s args.
-     * Throws {@code input.readiness_unrecognized_flag} on any other {@code --}-prefixed token,
-     * mirroring {@link #positionalArgs}'s own {@code diff}-specific guard (item 18.24): without this,
-     * a typo'd flag (e.g. {@code --gasp} for {@code --gaps}) is silently skipped and the *next*
-     * token -- typically the flag's own value -- is misread as {@code report_dir} instead. */
-    private static String readinessReportDirToken(String[] args) {
+    private static final java.util.regex.Pattern NEGATIVE_NUMBER =
+            java.util.regex.Pattern.compile("-\\d+|-\\d*\\.\\d+");
+
+    /** A token argparse classifies as an option rather than a value: it starts with {@code -}, is not
+     * a bare {@code -}, does not look like a negative number and holds no space
+     * ({@code argparse._parse_optional}). */
+    private static boolean looksLikeOption(String token) {
+        return token.startsWith("-")
+                && !"-".equals(token)
+                && !NEGATIVE_NUMBER.matcher(token).matches()
+                && !token.contains(" ");
+    }
+
+    private static InputError readinessUnrecognized(String detail, String fix) {
+        return new InputError("input.readiness_unrecognized_flag", detail, fix);
+    }
+
+    /** {@code agentce readiness}'s args, read the way Python's {@code readiness} subparser (argparse,
+     * {@code allow_abbrev=False}) reads them: {@code --gaps}/{@code --deviations} take one value
+     * (separate or {@code =}-joined, the last one wins), {@code --catalog-dir} appends, {@code --json}/
+     * {@code --debug}/{@code --quiet} take none, {@code --} ends the options, and there is at most one
+     * positional. Anything argparse would refuse (an unknown or abbreviated flag, a value flag with no
+     * value, a second positional) throws {@code input.readiness_unrecognized_flag} rather than being
+     * skipped, so a mistyped flag can never give a verdict computed without it. An empty
+     * {@code --gaps}/{@code --deviations} value is ignored, as Python's {@code if gaps_path:} does. */
+    private static ReadinessArgs parseReadinessArgs(String[] args) {
+        String flagFix = "pass --gaps, --deviations, or --catalog-dir, or drop the flag.";
         String reportDir = null;
-        // Scans every token, never returning at the first positional: a flag or a second positional
-        // written *after* report_dir must still be checked, not silently ignored -- an earlier
-        // version returned as soon as it found report_dir, so a typo'd flag or a stray extra
-        // argument placed after it fell through unchecked, giving a false READY instead of the
-        // refusal Python's argparse gives for the same input.
+        String gaps = null;
+        String deviations = null;
+        List<String> catalogDirs = new ArrayList<>();
+        boolean optionsEnded = false;
         for (int i = 1; i < args.length; i++) {
             String token = args[i];
-            if ("--json".equals(token) || "--debug".equals(token) || "--quiet".equals(token)) {
+            if (!optionsEnded && "--".equals(token)) {
+                optionsEnded = true;
                 continue;
             }
-            if (token.startsWith("--")) {
-                if (!READINESS_VALUE_FLAGS.contains(token.substring(2))) {
-                    throw new InputError(
-                            "input.readiness_unrecognized_flag",
-                            "unrecognized flag '" + token + "'.",
-                            "pass --gaps, --deviations, or --catalog-dir, or drop the flag.");
+            if (!optionsEnded && looksLikeOption(token)) {
+                int eq = token.indexOf('=');
+                String name = eq >= 0 ? token.substring(0, eq) : token;
+                if ("--json".equals(name) || "--debug".equals(name) || "--quiet".equals(name)) {
+                    if (eq >= 0) {
+                        throw readinessUnrecognized("flag '" + name + "' takes no value.", "drop the value: " + name + ".");
+                    }
+                    continue;
                 }
-                i++; // also skip the value token
+                if (!"--gaps".equals(name) && !"--deviations".equals(name) && !"--catalog-dir".equals(name)) {
+                    throw readinessUnrecognized("unrecognized flag '" + token + "'.", flagFix);
+                }
+                String value;
+                if (eq >= 0) {
+                    value = token.substring(eq + 1);
+                } else {
+                    if (i + 1 >= args.length || looksLikeOption(args[i + 1])) {
+                        throw readinessUnrecognized("flag '" + name + "' needs a value.", "pass " + name + " <path>.");
+                    }
+                    value = args[++i];
+                }
+                if ("--catalog-dir".equals(name)) {
+                    catalogDirs.add(value);
+                } else if ("--gaps".equals(name)) {
+                    gaps = value.isEmpty() ? null : value;
+                } else {
+                    deviations = value.isEmpty() ? null : value;
+                }
                 continue;
             }
             if (reportDir != null) {
-                throw new InputError(
-                        "input.readiness_unrecognized_flag",
+                throw readinessUnrecognized(
                         "unrecognized argument '" + token + "'.",
                         "pass exactly one report directory: `agentce readiness <report-dir>`.");
             }
             reportDir = token;
         }
-        return reportDir;
+        return new ReadinessArgs(reportDir, gaps, deviations, catalogDirs);
     }
 
     /** Every control's severity, from the given {@code --catalog-dir}s, else every vendored base
@@ -948,13 +985,14 @@ public final class Cli {
      * engine, never in a skill. */
     private static CommandResult cmdReadiness(String[] args) {
         CommandResult result = new CommandResult("readiness");
+        ReadinessArgs parsed = parseReadinessArgs(args);
         Path reportDir = Paths.get(requireDir(
-                readinessReportDirToken(args),
+                parsed.reportDir(),
                 "report_dir",
                 "the report directory",
                 "pass the report directory: `agentce readiness <report-dir>`."));
         Set<String> gaps = new LinkedHashSet<>();
-        String gapsPath = flagValue(args, "gaps");
+        String gapsPath = parsed.gaps();
         if (gapsPath != null) {
             String text;
             try {
@@ -965,12 +1003,12 @@ public final class Cli {
             gaps = Readiness.parseGapsFile(text);
         }
         List<JsonNode> deviations = List.of();
-        String deviationsPath = flagValue(args, "deviations");
+        String deviationsPath = parsed.deviations();
         if (deviationsPath != null) {
             deviations = Readiness.loadDeviationRegister(
                     Paths.get(requireFile(deviationsPath, "deviations", "the deviation register")));
         }
-        Map<String, String> severities = readinessSeverities(flagValues(args, "catalog-dir"));
+        Map<String, String> severities = readinessSeverities(parsed.catalogDirs());
         Readiness.Verdict verdict = Readiness.computeReadiness(reportDir, severities, deviations, gaps);
         result.data.put("verdict", verdict.verdict());
         ArrayNode reasonsArr = result.data.putArray("reasons");

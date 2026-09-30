@@ -429,6 +429,9 @@ def build_parser() -> argparse.ArgumentParser:
         "readiness",
         parents=[common],
         help="compute the report-readiness verdict (SPEC 13.3.4)",
+        # No prefix matching (`--deviation` for `--deviations`): TS and Java refuse an abbreviated
+        # flag as unrecognized, so Python does too.
+        allow_abbrev=False,
     )
     p.add_argument("report_dir", nargs="?", help="the report directory")
     p.add_argument(

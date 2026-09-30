@@ -147,7 +147,9 @@ def _scenario_3_no_gaps(directory: Path) -> tuple[Path, list[str]]:
     report = _report_dir(
         directory,
         "s3",
-        assertions=[{"control": "OVS-03", "outcome": "insufficient_evidence", "subject": "s"}],
+        assertions=[
+            {"control": "OVS-03", "outcome": "insufficient_evidence", "subject": "s"}
+        ],
     )
     return report, []
 
@@ -157,7 +159,9 @@ def _scenario_4_gaps(directory: Path) -> tuple[Path, list[str]]:
     report = _report_dir(
         directory,
         "s4",
-        assertions=[{"control": "OVS-03", "outcome": "insufficient_evidence", "subject": "s"}],
+        assertions=[
+            {"control": "OVS-03", "outcome": "insufficient_evidence", "subject": "s"}
+        ],
     )
     gaps = directory / "s4-gaps.md"
     gaps.write_text("OVS-03 owned by alice on 2026-02-01\n", encoding="utf-8")
@@ -218,12 +222,55 @@ SCENARIOS: list[Scenario] = [
     Scenario("1-clean", _scenario_1_clean, READY, 0),
     Scenario("2-regression", _scenario_2_regression, NOT_READY, 1),
     Scenario("3-insufficient-evidence-no-gaps", _scenario_3_no_gaps, NOT_READY, 1),
-    Scenario("4-insufficient-evidence-with-gaps", _scenario_4_gaps, READY_WITH_LIMITATIONS, 0),
+    Scenario(
+        "4-insufficient-evidence-with-gaps", _scenario_4_gaps, READY_WITH_LIMITATIONS, 0
+    ),
     Scenario("5-deviations", _scenario_5_deviations, NOT_READY, 1),
 ]
 
 
-def compare(label: str, a: str, b: str, engine_a: str, engine_b: str, failures: list[str]) -> None:
+def _argv_vectors(directory: Path) -> list[tuple[str, list[str], int]]:
+    """Argv shapes argparse reads in a particular way (18.25 round 3): each is (name, argv, the exit
+    code Python's `readiness` subparser gives). Over scenario 3's report (a high-severity control with
+    insufficient evidence), a gaps file naming it gives READY WITH LIMITATIONS (0) and an empty one
+    NOT READY (1), so a repeated flag shows which value an engine kept. Exit 3 is a refusal: Python's
+    is argparse's own usage error, TS/Java's the keyed `input.readiness_unrecognized_flag`, so only
+    the exit code is compared there."""
+    directory = directory / "argv"
+    directory.mkdir()
+    report, _ = _scenario_3_no_gaps(directory)
+    named = directory / "v-gaps.md"
+    named.write_text("OVS-03 owned by alice on 2026-02-01\n", encoding="utf-8")
+    empty = directory / "v-empty-gaps.md"
+    empty.write_text("", encoding="utf-8")
+    r, g, e, c = str(report), str(named), str(empty), str(CATALOG_DIR)
+    return [
+        (
+            "repeated-flag-last-wins-limitations",
+            [r, "--gaps", e, "--gaps", g, "--catalog-dir", c],
+            0,
+        ),
+        (
+            "repeated-flag-last-wins-not-ready",
+            [r, "--gaps", g, "--gaps", e, "--catalog-dir", c],
+            1,
+        ),
+        ("equals-joined-value", [r, f"--gaps={g}", f"--catalog-dir={c}"], 0),
+        ("empty-value-ignored", [r, "--gaps", "", "--catalog-dir", c], 1),
+        ("options-end-marker", ["--gaps", g, "--catalog-dir", c, "--", r], 0),
+        ("abbreviated-flag", [r, "--gap", g, "--catalog-dir", c], 3),
+        ("abbreviated-global-flag", [r, "--gaps", g, "--catalog-dir", c, "--js"], 3),
+        ("flag-without-value-at-end", [r, "--catalog-dir", c, "--gaps"], 3),
+        ("flag-followed-by-a-flag", [r, "--gaps", "--quiet", "--catalog-dir", c], 3),
+        ("boolean-flag-with-value", [r, "--catalog-dir", c, "--quiet=1"], 3),
+        ("second-positional", [r, r, "--catalog-dir", c], 3),
+        ("single-dash-unknown", [r, "-x", "--catalog-dir", c], 3),
+    ]
+
+
+def compare(
+    label: str, a: str, b: str, engine_a: str, engine_b: str, failures: list[str]
+) -> None:
     """Append a failure iff `a != b` -- the one comparator both the self-test and the real invocation
     below use, so the self-test proves the actual logic the real check relies on, not a stand-in."""
     if a != b:
@@ -239,7 +286,16 @@ def python_readiness(args: list[str]) -> tuple[str, int]:
     """The real Python engine's own `readiness`, run in its own project environment as the console
     script (`python -m agentce` fails with "No module named agentce.__main__", confirmed 18.24)."""
     return _run(
-        ["uv", "run", "--frozen", "--project", str(PY_ENGINE), "agentce", "readiness", *args],
+        [
+            "uv",
+            "run",
+            "--frozen",
+            "--project",
+            str(PY_ENGINE),
+            "agentce",
+            "readiness",
+            *args,
+        ],
         cwd=ROOT,
     )
 
@@ -273,11 +329,15 @@ def self_test() -> int:
     unmoved: list[str] = []
     compare("comparator-self-test", "identical\n", "identical\n", "a", "b", unmoved)
     if unmoved:
-        failures.append("comparator wrongly flagged two identical strings as a mismatch")
+        failures.append(
+            "comparator wrongly flagged two identical strings as a mismatch"
+        )
     caught: list[str] = []
     compare("comparator-self-test", "identical\n", "identicalX\n", "a", "b", caught)
     if not caught:
-        failures.append("comparator failed to catch a one-byte tamper between two 'engine output' strings")
+        failures.append(
+            "comparator failed to catch a one-byte tamper between two 'engine output' strings"
+        )
 
     # 1b. the report-read-order discipline (a verifier round found this vacuous once): all three
     # engines write the same `report-readiness-<date>.md` path inside one shared report dir, each
@@ -310,15 +370,20 @@ def self_test() -> int:
         tmp = Path(raw)
         for scenario in SCENARIOS:
             report, extra = scenario.build(tmp)
-            assertions = json.loads((report / "assertions.json").read_text(encoding="utf-8"))
+            assertions = json.loads(
+                (report / "assertions.json").read_text(encoding="utf-8")
+            )
             integrity = [
                 json.loads(line)
-                for line in (report / "integrity.jsonl").read_text(encoding="utf-8").splitlines()
+                for line in (report / "integrity.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()
                 if line.strip()
             ]
             if scenario.name == "2-regression":
                 reasons = [
-                    f"integrity {r.get('status')} on stream {r.get('stream')}" for r in integrity
+                    f"integrity {r.get('status')} on stream {r.get('stream')}"
+                    for r in integrity
                 ]
                 dupes = [r for r in reasons if r == "integrity failed on stream gw"]
                 if len(dupes) != 2:
@@ -339,13 +404,17 @@ def self_test() -> int:
             ):
                 failures.append(f"{scenario.name}: fixture has no applied deviation")
             if not (report / "assertions.json").is_file():
-                failures.append(f"{scenario.name}: fixture did not write assertions.json")
+                failures.append(
+                    f"{scenario.name}: fixture did not write assertions.json"
+                )
             _ = extra  # only used by the real invocation below
 
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if not failures:
-        print("readiness_parity_check self-test: comparator + fixture-shape cases discriminate")
+        print(
+            "readiness_parity_check self-test: comparator + fixture-shape cases discriminate"
+        )
     return 1 if failures else 0
 
 
@@ -373,7 +442,9 @@ def run_real_check() -> int:
 
             java_out, java_code = java_readiness([*args, "--json"])
             java_env = json.loads(java_out)
-            java_report = _strip_dates(Path(java_env["report"]).read_text(encoding="utf-8"))
+            java_report = _strip_dates(
+                Path(java_env["report"]).read_text(encoding="utf-8")
+            )
 
             if not (py_code == scenario.expect_exit == ts_code == java_code):
                 failures.append(
@@ -385,22 +456,86 @@ def run_real_check() -> int:
                 # `json.dumps` on a plain string round-trips to the same bytes a direct compare would
                 # use, so this one form covers both the scalar `verdict` and the list fields.
                 py_val = json.dumps(py_env.get(key))
-                compare(f"{scenario.name}:{key}", py_val, json.dumps(ts_env.get(key)), "python", "typescript", failures)
-                compare(f"{scenario.name}:{key}", py_val, json.dumps(java_env.get(key)), "python", "java", failures)
+                compare(
+                    f"{scenario.name}:{key}",
+                    py_val,
+                    json.dumps(ts_env.get(key)),
+                    "python",
+                    "typescript",
+                    failures,
+                )
+                compare(
+                    f"{scenario.name}:{key}",
+                    py_val,
+                    json.dumps(java_env.get(key)),
+                    "python",
+                    "java",
+                    failures,
+                )
             if py_env.get("verdict") != scenario.expect_verdict:
                 failures.append(
                     f"{scenario.name}: python's own verdict is {py_env.get('verdict')!r}, expected "
                     f"{scenario.expect_verdict!r} -- the fixture assumption above is wrong"
                 )
 
-            compare(f"{scenario.name}:report.md", py_report, ts_report, "python", "typescript", failures)
-            compare(f"{scenario.name}:report.md", py_report, java_report, "python", "java", failures)
+            compare(
+                f"{scenario.name}:report.md",
+                py_report,
+                ts_report,
+                "python",
+                "typescript",
+                failures,
+            )
+            compare(
+                f"{scenario.name}:report.md",
+                py_report,
+                java_report,
+                "python",
+                "java",
+                failures,
+            )
+
+        vectors = _argv_vectors(tmp)
+        for name, argv, expect in vectors:
+            runs = [
+                ("python", python_readiness(["--json", *argv])),
+                ("typescript", typescript_readiness(["--json", *argv])),
+                ("java", java_readiness(["--json", *argv])),
+            ]
+            codes = {engine: code for engine, (_, code) in runs}
+            if set(codes.values()) != {expect}:
+                failures.append(
+                    f"argv:{name}: expected exit {expect} in all three engines, got {codes}"
+                )
+            elif expect != 3:
+                verdicts = [
+                    json.dumps(json.loads(out).get("verdict")) for _, (out, _) in runs
+                ]
+                compare(
+                    f"argv:{name}:verdict",
+                    verdicts[0],
+                    verdicts[1],
+                    "python",
+                    "typescript",
+                    failures,
+                )
+                compare(
+                    f"argv:{name}:verdict",
+                    verdicts[0],
+                    verdicts[2],
+                    "python",
+                    "java",
+                    failures,
+                )
 
     for failure in failures:
         print(f"MISMATCH: {failure}", file=sys.stderr)
     if failures:
         return 1
-    print(f"MATCH: {len(SCENARIOS)} scenarios byte-identical across python, typescript, java")
+    print(
+        f"MATCH: {len(SCENARIOS)} scenarios byte-identical and {len(vectors)} argv shapes read alike "
+        "across python, typescript, java"
+    )
     return 0
 
 
