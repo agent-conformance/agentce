@@ -103,7 +103,7 @@ export function diffAssertionSets(
 
 /** `value` sanitised for the terminal, or the fixed literal `"(none)"` when the key was absent on one
  * side of the diff (an added or removed assertion) -- `null` is never passed into the sanitiser,
- * whose own empty-placeholder means something different (a string that neutralises to nothing). */
+ * whose own empty-value substitute means something different (a string that neutralises to nothing). */
 function diffField(value: string | null): string {
   return value !== null ? sanitizeForMarkdown(value) : "(none)";
 }

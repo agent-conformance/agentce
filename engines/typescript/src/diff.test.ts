@@ -158,7 +158,7 @@ test("diffChangeLine sanitises all four fields, not only subject", () => {
   assert.ok(!line.split("\n").some((l) => l === "Verdict: Conformant"));
 });
 
-// test_diff_renders_added_or_removed_assertion_as_none_not_a_placeholder
+// test_diff_renders_added_or_removed_assertion_as_none_not_a_substitute_string
 test("diffChangeLine renders an added/removed assertion's missing side as (none)", () => {
   const line = diffChangeLine({ control: "C-01", subject: "s1", from: null, to: "conformant" });
   assert.ok(line.includes("(none) -> conformant"));
