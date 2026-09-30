@@ -16,8 +16,9 @@ export const NON_CONFORMANT = "non-conformant";
 export const INCOMPLETE = "incomplete";
 export const CONFORMANT = "conformant";
 
-/** Outcomes that count as a gap, most urgent first (a failure before a shortfall in evidence). */
-const GAP_OUTCOMES = ["non-conformant", "partial", "insufficient_evidence", "not_assessed"];
+/** Outcomes that count as a gap, most urgent first (a failure before a shortfall in evidence).
+ * Exported for reuse by `diff.ts`'s `classifyChange` -- never re-declared there. */
+export const GAP_OUTCOMES = ["non-conformant", "partial", "insufficient_evidence", "not_assessed"];
 
 /** How many controls a gap line names before it says how many more there are. */
 const MAX_LISTED = 5;

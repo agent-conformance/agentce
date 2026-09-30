@@ -5,7 +5,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -25,6 +25,27 @@ function runJson(argv: string[]): { exitCode: number; envelope: Record<string, u
     console.log = original;
   }
   return { exitCode, envelope: JSON.parse(lines.join("\n")) };
+}
+
+function runText(argv: string[]): { exitCode: number; lines: string[] } {
+  const lines: string[] = [];
+  const original = console.log;
+  console.log = (line: string) => {
+    lines.push(line);
+  };
+  let exitCode: number;
+  try {
+    exitCode = main(argv);
+  } finally {
+    console.log = original;
+  }
+  return { exitCode, lines };
+}
+
+function diffFixture(dir: string, name: string, records: unknown[]): string {
+  const path = join(dir, name);
+  writeFileSync(path, JSON.stringify(records));
+  return path;
 }
 
 test("quickstart assesses the vendored project end to end and writes a real report", () => {
@@ -303,4 +324,204 @@ test("security-view CLI verb runs the fixture and prints a standards_citations a
     new Set(citations.map((c) => c.framework)),
     new Set(["owasp-asi-2026", "mitre-atlas", "owasp-acs"]),
   );
+});
+
+test("diff --json: envelope carries report_a/report_b/changed/diff/what_changed; exit 1 on a real change", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-diff-"));
+  try {
+    const a = diffFixture(dir, "a.json", [
+      { control: "C-01", subject: "s1", outcome: "non-conformant" },
+    ]);
+    const b = diffFixture(dir, "b.json", [
+      { control: "C-01", subject: "s1", outcome: "conformant" },
+    ]);
+    const { exitCode, envelope } = runJson(["diff", a, b]);
+    assert.equal(exitCode, 1);
+    assert.equal(envelope.report_a, a);
+    assert.equal(envelope.report_b, b);
+    assert.equal(envelope.changed, 1);
+    assert.deepEqual(envelope.diff, [
+      { control: "C-01", subject: "s1", from: "non-conformant", to: "conformant" },
+    ]);
+    assert.deepEqual(envelope.what_changed, {
+      closed: [{ control: "C-01", subject: "s1", from: "non-conformant", to: "conformant" }],
+      opened: [],
+      other: [],
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("diff identical inputs: exit 0, text 'no differences' (no trailing period)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-diff-"));
+  try {
+    const a = diffFixture(dir, "a.json", [
+      { control: "C-01", subject: "s1", outcome: "conformant" },
+    ]);
+    const { exitCode, lines } = runText(["diff", a, a]);
+    assert.equal(exitCode, 0);
+    assert.deepEqual(lines, ["no differences"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("diff --format md, identical inputs: the fixed three-line section, 'no differences.' with a period", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-diff-"));
+  try {
+    const a = diffFixture(dir, "a.json", [
+      { control: "C-01", subject: "s1", outcome: "conformant" },
+    ]);
+    const { exitCode, lines } = runText(["diff", a, a, "--format", "md"]);
+    assert.equal(exitCode, 0);
+    assert.deepEqual(lines, ["## What changed", "", "no differences."]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("diff --format json (without --json): one note line, byte-equal to the sorted-keys envelope data", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-diff-"));
+  try {
+    const a = diffFixture(dir, "a.json", []);
+    const b = diffFixture(dir, "b.json", [
+      { control: "C-01", subject: "s1", outcome: "conformant" },
+    ]);
+    const { exitCode, lines } = runText(["diff", a, b, "--format", "json"]);
+    assert.equal(exitCode, 1);
+    assert.equal(lines.length, 1);
+    const parsed = JSON.parse(lines[0] as string);
+    assert.equal(parsed.changed, 1);
+    assert.equal(parsed.report_a, a);
+    assert.ok(
+      !("command" in parsed),
+      "note-rendered JSON is result.data only, never the full envelope",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("diff: missing report_b gives input.report_b_missing with the diff-specific fix text, exit 3", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-diff-"));
+  try {
+    const a = diffFixture(dir, "a.json", []);
+    const { exitCode, envelope } = runJson(["diff", a]);
+    assert.equal(exitCode, 3);
+    const error = envelope.error as { message_key: string; fix: string };
+    assert.equal(error.message_key, "input.report_b_missing");
+    assert.equal(error.fix, "pass two assertion files: `agentce diff <report-a> <report-b>`.");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("diff: a malformed (not-JSON) input file gives a keyed internal.unexpected result, never a crash", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-diff-"));
+  try {
+    const a = join(dir, "a.json");
+    writeFileSync(a, "not json");
+    const b = diffFixture(dir, "b.json", []);
+    const { exitCode, envelope } = runJson(["diff", a, b]);
+    assert.equal(exitCode, 3);
+    assert.equal((envelope.error as { message_key: string }).message_key, "internal.unexpected");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("diff: an extra positional argument gives input.diff_extra_argument", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-diff-"));
+  try {
+    const a = diffFixture(dir, "a.json", []);
+    const b = diffFixture(dir, "b.json", []);
+    const c = diffFixture(dir, "c.json", []);
+    const { exitCode, envelope } = runJson(["diff", a, b, c]);
+    assert.equal(exitCode, 3);
+    assert.equal(
+      (envelope.error as { message_key: string }).message_key,
+      "input.diff_extra_argument",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("diff: an unrecognized flag gives input.diff_unrecognized_flag, never a silent positional read", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-diff-"));
+  try {
+    const a = diffFixture(dir, "a.json", []);
+    const b = diffFixture(dir, "b.json", []);
+    const { exitCode, envelope } = runJson(["diff", a, b, "--forma", "text"]);
+    assert.equal(exitCode, 3);
+    assert.equal(
+      (envelope.error as { message_key: string }).message_key,
+      "input.diff_unrecognized_flag",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("diff: --debug and --quiet are accepted and silently ignored, matching every other command", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-diff-"));
+  try {
+    const a = diffFixture(dir, "a.json", []);
+    const { exitCode, lines } = runText(["diff", a, a, "--debug", "--quiet"]);
+    assert.equal(exitCode, 0);
+    assert.deepEqual(lines, ["no differences"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("diff: --format outside {text, json, md} gives input.diff_format with the exact Python fix text", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-diff-"));
+  try {
+    const a = diffFixture(dir, "a.json", []);
+    const b = diffFixture(dir, "b.json", []);
+    const { exitCode, envelope } = runJson(["diff", a, b, "--format", "yaml"]);
+    assert.equal(exitCode, 3);
+    const error = envelope.error as { message_key: string; fix: string };
+    assert.equal(error.message_key, "input.diff_format");
+    assert.equal(error.fix, "pass --format text|json|md.");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("diff: the echoed report_a/report_b path keeps '..' unchanged (normalizePosixPath, not path.normalize)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-diff-"));
+  try {
+    diffFixture(dir, "a.json", []);
+    mkdirSync(join(dir, "sub"));
+    const raw = `${dir}/sub/../a.json`; // a real, existing file via '..'; the literal segment must survive the echo
+    const b = diffFixture(dir, "b.json", []);
+    const { envelope } = runJson(["diff", raw, b]);
+    assert.ok((envelope.report_a as string).includes("sub/../a.json"), envelope.report_a as string);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("diff --json escapes non-ASCII content exactly like Python's ensure_ascii=True", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-diff-"));
+  try {
+    const a = diffFixture(dir, "a.json", []);
+    const b = diffFixture(dir, "b.json", [{ control: "cé", subject: "😀", outcome: "conformant" }]);
+    const lines: string[] = [];
+    const original = console.log;
+    console.log = (line: string) => lines.push(line);
+    try {
+      main(["diff", a, b, "--json"]);
+    } finally {
+      console.log = original;
+    }
+    const raw = lines.join("\n");
+    assert.ok(raw.includes("c\\u00e9"), raw);
+    assert.ok(raw.includes("\\ud83d\\ude00"), raw);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

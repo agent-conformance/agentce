@@ -19,6 +19,14 @@ import { catalogsDir as bundledCatalogsDir, quickstartDir } from "./bundled";
 import { type Catalog, loadCatalog } from "./catalog";
 import { runEcs } from "./conformance";
 import { computeCoverage } from "./coverage";
+import {
+  DIFF_FORMATS,
+  diffAssertionSets,
+  diffChangeLine,
+  diffMdLines,
+  normalizePosixPath,
+  whatChanged,
+} from "./diff";
 import { DomainBinding } from "./domain";
 import { AgentceError, InputError } from "./errors";
 import { ExitCode } from "./exitCodes";
@@ -45,7 +53,7 @@ import { CommandResult } from "./result";
 import { computeSecurityView } from "./securityView";
 import { StateDir, windowEnd } from "./state";
 import { GraphStore } from "./store";
-import { byteCompare, sortKeysDeep, writeJsonl } from "./util";
+import { byteCompare, jsonStringifyAscii, sortKeysDeep, writeJsonl } from "./util";
 import { summarize } from "./verdict";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
@@ -56,8 +64,8 @@ const REPORT_FORMATS = ["md", "html", "oscal", "sarif", "pack"] as const;
 
 function emit(result: CommandResult, json: boolean): void {
   if (json) {
-    // json.dumps(envelope, sort_keys=True, indent=2), matching the Python reference
-    console.log(JSON.stringify(sortKeysDeep(result.envelope()), null, 2));
+    // json.dumps(envelope, sort_keys=True, indent=2, ensure_ascii=True), matching the Python reference
+    console.log(jsonStringifyAscii(sortKeysDeep(result.envelope()), 2));
   } else {
     for (const line of result.humanLines) {
       console.log(line);
@@ -103,8 +111,13 @@ function requireDir(raw: string | undefined, key: string, what: string): string 
   return raw;
 }
 
-function requireFile(raw: string | undefined, key: string, what: string): string {
-  const fix = `pass --${key} <file>.`;
+function requireFile(
+  raw: string | undefined,
+  key: string,
+  what: string,
+  fixOverride?: string,
+): string {
+  const fix = fixOverride ?? `pass --${key} <file>.`;
   if (raw === undefined) {
     throw new InputError(`input.${key}_missing`, `${what} is required.`, fix);
   }
@@ -122,6 +135,38 @@ function requireFile(raw: string | undefined, key: string, what: string): string
     );
   }
   return raw;
+}
+
+/** A hardened positional-argument scanner for `diff` (the first CLI verb in this engine with
+ * positional, not `--flag`, arguments). `argv[0]` is the command name and is not itself scanned.
+ * Skips exactly `--json`, `--format <value>`, `--debug`, and `--quiet` (the same four flags Python's
+ * own top-level parser accepts for every command; `--debug`/`--quiet` are silently ignored here too,
+ * exactly as they are everywhere else in both engines today) and collects every other token in order,
+ * but throws `input.diff_unrecognized_flag` on any other `--`-prefixed token instead of silently
+ * reading it as a positional (catches a genuine typo without inventing new behaviour for a flag
+ * Python's diff actually accepts). `--format=<value>` (single-token, `=`-joined) is out of scope,
+ * matching every other flag in both engines today. */
+function positionalArgs(argv: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 1; i < argv.length; i++) {
+    const token = argv[i] as string;
+    if (token === "--json" || token === "--debug" || token === "--quiet") {
+      continue;
+    }
+    if (token === "--format") {
+      i++; // also skip the value token, if any
+      continue;
+    }
+    if (token.startsWith("--")) {
+      throw new InputError(
+        "input.diff_unrecognized_flag",
+        `unrecognized flag '${token}'.`,
+        "pass --format text|json|md, or drop the flag.",
+      );
+    }
+    out.push(token);
+  }
+  return out;
 }
 
 /**
@@ -581,6 +626,63 @@ function cmdReport(argv: string[]): CommandResult {
   return result;
 }
 
+/** `agentce diff` (SPEC §9.3, item 18.6): a real, deterministic assertion-set diff, matching the
+ * Python reference's `cmd_diff` byte for byte (see `diff.ts`). */
+function cmdDiff(argv: string[]): CommandResult {
+  const result = new CommandResult("diff");
+  const positional = positionalArgs(argv);
+  if (positional.length > 2) {
+    throw new InputError(
+      "input.diff_extra_argument",
+      `diff takes exactly two positional arguments, got ${positional.length}.`,
+      "pass exactly two files: `agentce diff <report-a> <report-b>`.",
+    );
+  }
+  const fix = "pass two assertion files: `agentce diff <report-a> <report-b>`.";
+  const reportA = requireFile(positional[0], "report_a", "the first assertion set", fix);
+  const reportB = requireFile(positional[1], "report_b", "the second assertion set", fix);
+  const format = flagValue(argv, "format") ?? "text";
+  if (!(DIFF_FORMATS as readonly string[]).includes(format)) {
+    throw new InputError(
+      "input.diff_format",
+      `--format must be one of ${DIFF_FORMATS.join(", ")}, not '${format}'.`,
+      "pass --format text|json|md.",
+    );
+  }
+  result.data.report_a = normalizePosixPath(reportA);
+  result.data.report_b = normalizePosixPath(reportB);
+  const a = JSON.parse(readFileSync(reportA, "utf-8")) as Record<string, unknown>[];
+  const b = JSON.parse(readFileSync(reportB, "utf-8")) as Record<string, unknown>[];
+  const changes = diffAssertionSets(a, b);
+  const grouped = whatChanged(changes);
+  result.data.changed = changes.length;
+  result.data.diff = changes;
+  result.data.what_changed = grouped;
+  if (changes.length > 0) {
+    result.addCode(ExitCode.FINDINGS);
+  }
+  if (argv.includes("--json")) {
+    // Never render a format only --json will discard (the same rule 18.22's C1(h) established for
+    // `version`) -- mirrors Python's early return before any `result.note` call.
+    return result;
+  }
+  if (format === "md") {
+    for (const line of diffMdLines(grouped)) {
+      result.note(line);
+    }
+  } else if (format === "json") {
+    result.note(jsonStringifyAscii(sortKeysDeep(result.data), 2));
+  } else if (changes.length > 0) {
+    result.note(`${changes.length} assertion(s) differ:`);
+    for (const c of changes) {
+      result.note(`  ${diffChangeLine(c)}`);
+    }
+  } else {
+    result.note("no differences");
+  }
+  return result;
+}
+
 function notImplemented(command: string): CommandResult {
   const result = new CommandResult(command);
   result.addCode(ExitCode.INPUT_ERROR);
@@ -689,6 +791,8 @@ export function main(argv: string[]): number {
       result = cmdAssess(argv);
     } else if (command === "report") {
       result = cmdReport(argv);
+    } else if (command === "diff") {
+      result = cmdDiff(argv);
     } else if (command === "quickstart") {
       result = cmdQuickstart(argv);
     } else if (command === "version") {
@@ -700,7 +804,19 @@ export function main(argv: string[]): number {
     if (exc instanceof AgentceError) {
       result = errorResult(command ?? "", exc);
     } else {
-      throw exc;
+      // A non-AgentceError exception here would otherwise crash the process at exit 1 -- colliding
+      // with ExitCode.FINDINGS, so a malformed-input crash would be indistinguishable from a real
+      // finding to a CI script gating on exit code. Matches Python's key and exit code only, not its
+      // full error envelope shape (a real, pre-existing, engine-wide difference this does not close).
+      const message = exc instanceof Error ? exc.message : String(exc);
+      result = errorResult(
+        command ?? "",
+        new AgentceError(
+          "internal.unexpected",
+          message,
+          "file an issue with the input file that caused this.",
+        ),
+      );
     }
   }
   emit(result, json);
