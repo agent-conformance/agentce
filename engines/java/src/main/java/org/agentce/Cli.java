@@ -105,6 +105,8 @@ public final class Cli {
                 result = cmdReport(args);
             } else if ("diff".equals(command)) {
                 result = cmdDiff(args);
+            } else if ("readiness".equals(command)) {
+                result = cmdReadiness(args);
             } else if ("quickstart".equals(command)) {
                 result = cmdQuickstart(args);
             } else if ("version".equals(command)) {
@@ -167,7 +169,13 @@ public final class Cli {
     }
 
     private static String requireDir(String raw, String key, String what) {
-        String fix = "pass --" + key + " <dir>.";
+        return requireDir(raw, key, what, "pass --" + key + " <dir>.");
+    }
+
+    /** {@link #requireDir}, with an explicit {@code fix} rather than the computed {@code --key}-style
+     * default -- {@code readiness}'s positional {@code report_dir} (item 18.25) needs its own fix text,
+     * mirroring {@link #requireFile}'s existing 4-arg overload. */
+    private static String requireDir(String raw, String key, String what, String fix) {
         if (raw == null) {
             throw new InputError("input." + key + "_missing", what + " is required.", fix);
         }
@@ -852,6 +860,135 @@ public final class Cli {
      * and the TypeScript port's {@code cmdVersion}). Distinct from the bare {@code --version}/
      * {@code -V} flag, which stays a plain one-line shortcut (handled before this is ever reached,
      * {@link #run}). */
+    /** {@code readiness} has no {@code --format} flag in Python (confirmed by reading {@code cli.py}'s
+     * {@code readiness} subparser: no {@code --format} argument at all), so none is recognized here
+     * either -- only these three value flags are skipped alongside the boolean {@code --json}/{@code
+     * --debug}/{@code --quiet}. */
+    private static final Set<String> READINESS_VALUE_FLAGS = Set.of("gaps", "deviations", "catalog-dir");
+
+    /** {@code report_dir}'s value: the one positional token in {@code agentce readiness}'s args. */
+    private static String readinessReportDirToken(String[] args) {
+        for (int i = 1; i < args.length; i++) {
+            String token = args[i];
+            if ("--json".equals(token) || "--debug".equals(token) || "--quiet".equals(token)) {
+                continue;
+            }
+            if (token.startsWith("--")) {
+                if (READINESS_VALUE_FLAGS.contains(token.substring(2))) {
+                    i++; // also skip the value token
+                }
+                continue;
+            }
+            return token;
+        }
+        return null;
+    }
+
+    /** Every control's severity, from the given {@code --catalog-dir}s, else every vendored base
+     * catalog (SPEC §13.3.4). Deliberately <b>not</b> a factoring of {@link #vendoredCatalogs}: that
+     * method silently skips a subdirectory whose {@code catalog.yaml} fails to parse and also scans
+     * {@code overlays/}, neither of which matches this method's own throw-on-malformed, {@code
+     * base}-only behaviour (mirrors Python's {@code _readiness_severities}, which has no try/catch
+     * around {@code load_catalog}). A later catalog's control silently overwrites an earlier one
+     * sharing an id (plain last-write-wins, matching Python's dict-comprehension). */
+    private static Map<String, String> readinessSeverities(List<String> catalogDirs) {
+        List<String> dirs = catalogDirs;
+        if (dirs.isEmpty()) {
+            Path base = Bundled.catalogsDir().resolve("base");
+            List<String> names = new ArrayList<>();
+            if (Files.isDirectory(base)) {
+                try (Stream<Path> stream = Files.list(base)) {
+                    stream.map(p -> p.getFileName().toString()).forEach(names::add);
+                } catch (IOException ignored) {
+                    // no vendored base catalogs
+                }
+            }
+            names.sort(Json::byteCompare);
+            dirs = new ArrayList<>();
+            for (String name : names) {
+                Path dir = base.resolve(name);
+                if (Files.isRegularFile(dir.resolve("catalog.yaml"))) {
+                    dirs.add(dir.toString());
+                }
+            }
+        }
+        Map<String, String> severities = new LinkedHashMap<>();
+        for (String dir : dirs) {
+            Catalog catalog = Catalog.load(Paths.get(requireDir(dir, "catalog-dir", "a catalog directory")));
+            for (Catalog.ControlSpec control : catalog.controls) {
+                severities.put(control.id, control.severity);
+            }
+        }
+        return severities;
+    }
+
+    /** {@code agentce readiness} (SPEC §13.3.4 stage 4, item 18.25): the report-readiness verdict,
+     * matching the Python reference's {@code cmd_readiness} byte for byte (see {@code Readiness.java}).
+     * Exit 0 for READY and READY WITH LIMITATIONS, 1 for NOT READY -- the verdict logic lives in the
+     * engine, never in a skill. */
+    private static CommandResult cmdReadiness(String[] args) {
+        CommandResult result = new CommandResult("readiness");
+        Path reportDir = Paths.get(requireDir(
+                readinessReportDirToken(args),
+                "report_dir",
+                "the report directory",
+                "pass the report directory: `agentce readiness <report-dir>`."));
+        Set<String> gaps = new LinkedHashSet<>();
+        String gapsPath = flagValue(args, "gaps");
+        if (gapsPath != null) {
+            String text;
+            try {
+                text = Files.readString(Paths.get(requireFile(gapsPath, "gaps", "the gaps file")), StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                throw new IllegalStateException("cannot read " + gapsPath + ": " + e.getMessage(), e);
+            }
+            gaps = Readiness.parseGapsFile(text);
+        }
+        List<JsonNode> deviations = List.of();
+        String deviationsPath = flagValue(args, "deviations");
+        if (deviationsPath != null) {
+            deviations = Readiness.loadDeviationRegister(
+                    Paths.get(requireFile(deviationsPath, "deviations", "the deviation register")));
+        }
+        Map<String, String> severities = readinessSeverities(flagValues(args, "catalog-dir"));
+        Readiness.Verdict verdict = Readiness.computeReadiness(reportDir, severities, deviations, gaps);
+        result.data.put("verdict", verdict.verdict());
+        ArrayNode reasonsArr = result.data.putArray("reasons");
+        verdict.reasons().forEach(reasonsArr::add);
+        ArrayNode limitationsArr = result.data.putArray("limitations");
+        verdict.limitations().forEach(limitationsArr::add);
+        Path out = reportDir.resolve("report-readiness-" + java.time.LocalDate.now() + ".md").normalize();
+        List<String> lines = new ArrayList<>();
+        lines.add("# Report readiness — " + verdict.verdict());
+        lines.add("");
+        if (!verdict.reasons().isEmpty()) {
+            lines.add("## Blocking reasons");
+            for (String r : verdict.reasons()) {
+                lines.add("- " + r);
+            }
+            lines.add("");
+        }
+        if (!verdict.limitations().isEmpty()) {
+            lines.add("## Limitations");
+            for (String l : verdict.limitations()) {
+                lines.add("- " + l);
+            }
+            lines.add("");
+        }
+        try {
+            Files.writeString(out, String.join("\n", lines) + "\n");
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot write " + out + ": " + e.getMessage(), e);
+        }
+        result.data.put("report", out.toString());
+        if (Readiness.NOT_READY.equals(verdict.verdict())) {
+            result.addCode(ExitCode.FINDINGS.code);
+        }
+        result.note(verdict.verdict() + ": " + verdict.reasons().size() + " reason(s), "
+                + verdict.limitations().size() + " limitation(s)");
+        return result;
+    }
+
     private static CommandResult cmdVersion() {
         CommandResult result = new CommandResult("version");
         NoMl.InstalledResult scan = NoMl.evaluateInstalled(NoMl.loadVendoredDenylist(), NoMl.loadRuntimeDeps());
