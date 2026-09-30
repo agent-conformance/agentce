@@ -105,7 +105,7 @@ def main(argv: list[str]) -> int:
     files: dict[str, bytes] = {}
     for rel in tracked_files():
         if is_binary_path(rel):
-            continue
+            continue  # avoid reading a large binary into memory only for check() to discard it
         path = ROOT / rel
         try:
             files[rel] = path.read_bytes()
