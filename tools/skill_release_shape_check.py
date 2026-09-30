@@ -288,6 +288,20 @@ def copy_skill_out(
 def run_standalone_self_test(
     skill_dir: Path, skill: str, *, no_network: bool
 ) -> dict[str, Any]:
+    """Sync the skill's `.venv` online (a cold `uv` cache may need to fetch wheels), then run its
+    self-test command under `no_network`. A single combined `uv run --frozen ...` conflates the two --
+    fine on a warm cache, but blocks a real first-time install on a cold one, which is exactly the
+    scenario S-10 promises works. `installed_artifacts_check.py` and `offline_bundle.py` use the same
+    split: install may reach the network, every run step is offline."""
+    sync = _run(["uv", "sync", "--frozen"], cwd=skill_dir, no_network=False)
+    if sync.returncode != 0:
+        return {
+            "skill": skill,
+            "ok": False,
+            "returncode": sync.returncode,
+            "stdout_tail": f"[uv sync --frozen]\n{sync.stdout[-2000:]}",
+            "stderr_tail": f"[uv sync --frozen]\n{sync.stderr[-2000:]}",
+        }
     proc = _run(SELF_TEST_CMDS[skill], cwd=skill_dir, no_network=no_network)
     ok = proc.returncode == 0
     if ok and skill == "agentce-get-evidence":
@@ -417,8 +431,13 @@ def self_test() -> int:
 
     good = check(no_network=True)
     if good["problems"]:
+        tails = "\n".join(
+            f"--- {r['skill']} (exit {r['returncode']}) ---\nstdout: {r['stdout_tail']}\nstderr: {r['stderr_tail']}"
+            for r in good["results"]
+            if not r["ok"]
+        )
         failures.append(
-            f"a correctly release-shaped commit unexpectedly failed: {good['problems']}"
+            f"a correctly release-shaped commit unexpectedly failed: {good['problems']}\n{tails}"
         )
 
     for label, build, check_sync in (
