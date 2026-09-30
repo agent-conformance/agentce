@@ -655,8 +655,8 @@
       "timeout_s": 900,
       "invariant": "An attestation is reported as verified only after its signature verifies against a trusted key.",
       "rubric": {
-        "pass": "each engine refuses to sign the NOT_READY report (exit 3, error key sign.not_ready); each engine signs the READY report (exit 0), writes a detached DSSE/in-toto signature file, and that signature independently verifies offline against the known test key's public half via Python's own signing.verify_envelope; each engine's --write-trust-root run writes a trust-root.json whose keys[keyid].public_key matches the known test key exactly",
-        "fail": "any engine signs the NOT_READY report, refuses the READY report, writes a signature that does not verify offline against the known test key, or writes a trust-root.json whose public key does not match"
+        "pass": "each engine refuses to sign the NOT_READY report (exit 3, error key sign.not_ready); each engine signs the READY report (exit 0), writes a detached DSSE/in-toto signature file, that signature independently verifies offline against the known test key's public half via Python's own signing.verify_envelope, and a tampered copy of that same signature is rejected; each engine's --write-trust-root run writes a trust-root.json whose keys[keyid].public_key matches the known test key exactly",
+        "fail": "any engine signs the NOT_READY report, refuses the READY report, writes a signature that does not verify offline against the known test key, verifies a tampered signature, or writes a trust-root.json whose public key does not match"
       },
       "faults": [
         {
@@ -664,6 +664,12 @@
           "file": "engines/python/agentce/commands/__init__.py",
           "search": "    if verdict[\"verdict\"] == readiness.NOT_READY:\n        raise InputError(\n            \"sign.not_ready\",",
           "replace": "    if False:\n        raise InputError(\n            \"sign.not_ready\","
+        },
+        {
+          "description": "the signature check in verify_envelope always succeeds, so a tampered DSSE signature would be accepted",
+          "file": "engines/python/agentce/signing.py",
+          "search": "            public_key, identity = trust.resolve(signature)\n            public_key.verify(_b64d(signature[\"sig\"]), pae)\n            return Verified(",
+          "replace": "            public_key, identity = trust.resolve(signature)\n            return Verified("
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/commands/__init__.py's cmd_sign, ported field-for-field in engines/typescript/src/sign.ts and engines/java/src/main/java/org/agentce/Sign.java."

@@ -115,6 +115,17 @@ for engine in python typescript java; do
     echo "sign: $engine's READY signature did not verify offline against the known test key ($verified)" >&2
     status=1
   fi
+  # A tampered copy of the same signature must be rejected -- this is what actually exercises
+  # signing.py's verify_envelope/public_key.verify call rather than only its happy path, so a fault
+  # that made the check always succeed would turn this gate red.
+  tampered_file="$work/$engine-tampered.json"
+  jq '.signatures[0].sig |= (if (.[-1:] == "A") then (.[0:-1] + "B") else (.[0:-1] + "A") end)' \
+    "$sig_path" > "$tampered_file"
+  tampered="$(verify_offline "$tampered_file")"
+  if [ "$tampered" = "VERIFIED" ]; then
+    echo "sign: $engine's tampered READY signature verified offline (expected the check to reject it)" >&2
+    status=1
+  fi
 done
 
 for engine in python typescript java; do
