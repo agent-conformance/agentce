@@ -562,11 +562,7 @@ def run_real_check() -> int:
 
         vectors = _argv_vectors(tmp)
         for name, argv, expect in vectors:
-            runs = [
-                ("python", python_readiness(["--json", *argv])),
-                ("typescript", typescript_readiness(["--json", *argv])),
-                ("java", java_readiness(["--json", *argv])),
-            ]
+            runs = _run_engines(argv)
             codes = {engine: code for engine, (_, code) in runs}
             if set(codes.values()) != {expect}:
                 failures.append(
@@ -586,11 +582,7 @@ def run_real_check() -> int:
 
         floats = _float_vectors(tmp)
         for name, argv in floats:
-            runs = [
-                ("python", python_readiness(["--json", *argv])),
-                ("typescript", typescript_readiness(["--json", *argv])),
-                ("java", java_readiness(["--json", *argv])),
-            ]
+            runs = _run_engines(argv)
             for engine, (out, code) in runs:
                 verdict = json.loads(out).get("verdict") if code == 1 else None
                 if code != 1 or verdict != NOT_READY:
@@ -609,6 +601,15 @@ def run_real_check() -> int:
         "across python, typescript, java"
     )
     return 0
+
+
+def _run_engines(argv: list[str]) -> list[tuple[str, tuple[str, int]]]:
+    """`readiness --json <argv>` in each engine, Python (the reference) first."""
+    return [
+        ("python", python_readiness(["--json", *argv])),
+        ("typescript", typescript_readiness(["--json", *argv])),
+        ("java", java_readiness(["--json", *argv])),
+    ]
 
 
 def main(argv: list[str] | None = None) -> int:

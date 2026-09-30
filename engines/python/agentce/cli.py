@@ -13,11 +13,11 @@ import argparse
 import json
 import re
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, NoReturn
 
 from . import __version__, commands, exit_codes, logsetup
-from .errors import AgentceError
+from .errors import AgentceError, InputError
 from .exit_codes import ExitCode
 from .result import CommandResult
 
@@ -27,17 +27,22 @@ _log = logsetup.get_logger()
 class _Parser(argparse.ArgumentParser):
     """An ``ArgumentParser`` whose usage errors exit ``3`` (input error), per the CLI scheme.
 
-    With ``keyed_errors=True`` a usage error is instead raised as the keyed
-    ``input.readiness_unrecognized_flag`` error, worded as the TypeScript and Java engines word it.
+    A parser given ``on_error`` raises the keyed error it maps argparse's message to instead (the
+    English text: argparse is not localised here).
     """
 
-    def __init__(self, *args: Any, keyed_errors: bool = False, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *args: Any,
+        on_error: Callable[[str], AgentceError] | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(*args, **kwargs)
-        self._keyed_errors = keyed_errors
+        self._on_error = on_error
 
     def error(self, message: str) -> NoReturn:
-        if self._keyed_errors:
-            raise _readiness_usage_error(message)
+        if self._on_error is not None:
+            raise self._on_error(message)
         self.print_usage(sys.stderr)
         self.exit(int(ExitCode.INPUT_ERROR), f"{self.prog}: error: {message}\n")
         raise AssertionError("unreachable")  # pragma: no cover
@@ -46,11 +51,11 @@ class _Parser(argparse.ArgumentParser):
 _READINESS_FLAG_FIX = "pass --gaps, --deviations, or --catalog-dir, or drop the flag."
 
 
-def _readiness_argv_error(cause: str, fix: str) -> AgentceError:
-    return AgentceError(key="input.readiness_unrecognized_flag", cause=cause, fix=fix)
+def _readiness_argv_error(cause: str, fix: str) -> InputError:
+    return InputError("input.readiness_unrecognized_flag", cause, fix)
 
 
-def _readiness_usage_error(message: str) -> AgentceError:
+def _readiness_usage_error(message: str) -> InputError:
     """argparse's usage error inside ``readiness`` as the keyed error TypeScript and Java raise."""
     if m := re.fullmatch(r"argument (--[\w-]+): expected one argument", message):
         flag = m.group(1)
@@ -65,7 +70,7 @@ def _readiness_usage_error(message: str) -> AgentceError:
     return _readiness_argv_error(f"{message}.", _READINESS_FLAG_FIX)
 
 
-def _readiness_unknown_error(token: str) -> AgentceError:
+def _readiness_unknown_error(token: str) -> InputError:
     """The first token the ``readiness`` subparser left unconsumed, as TypeScript and Java word it."""
     if token.startswith("-") and token != "-":
         return _readiness_argv_error(
@@ -477,7 +482,7 @@ def build_parser() -> argparse.ArgumentParser:
         # No prefix matching (`--deviation` for `--deviations`): TS and Java refuse an abbreviated
         # flag as unrecognized, so Python does too, with the same keyed error.
         allow_abbrev=False,
-        keyed_errors=True,
+        on_error=_readiness_usage_error,
     )
     p.add_argument("report_dir", nargs="?", help="the report directory")
     p.add_argument(
@@ -595,9 +600,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     try:
         ns, unknown = parser.parse_known_args(args)
-        if unknown and getattr(ns, "command", None) != "readiness":
-            parser.error(f"unrecognized arguments: {' '.join(unknown)}")
         if unknown:
+            if getattr(ns, "command", None) != "readiness":
+                parser.error(f"unrecognized arguments: {' '.join(unknown)}")
             raise _readiness_unknown_error(unknown[0])
     except SystemExit as exc:  # argparse: -h/--version exit 0; usage errors exit 3
         return exc.code if isinstance(exc.code, int) else int(ExitCode.INPUT_ERROR)
