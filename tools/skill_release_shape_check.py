@@ -11,18 +11,23 @@ monorepo, with no sibling `engines/` checkout and no network beyond the one-time
 This check builds that commit and runs the install it describes, rather than only asserting its text:
 
     1. `git worktree add --detach` a throwaway checkout of HEAD, standing in for the commit a release tag
-       will point at.
-    2. Run that worktree's own `tools/vendor_skill_engine.py --write` inside it (the release-time build
-       step), asserting no tracked file other than the gitignored wheel and lock came out dirty. A version
-       bump landed in an earlier phase commit with no matching `--write` would otherwise leave a skill's
-       `pyproject.toml` stale and uncommitted -- a mismatch against the wheel this step is about to
-       commit, one only a non-frozen install downstream would ever notice. Then force-add the gitignored
-       wheel and lock for both skills and commit them. `git ls-tree` on the resulting commit confirms
-       every expected path actually landed in it -- `.gitignore` makes a plain `git add -A` silently skip
-       these paths, so a commit built that way would carry none of them while still reporting success;
-       this check fails loudly if that ever regresses. A second clean-tree assertion right after the
-       commit confirms the worktree's files are now byte-identical to what the commit carries, which is
-       what lets step 4 below trust the worktree as a stand-in for the commit.
+       will point at. If HEAD already carries a tracked wheel and lock for both skills (this ref already
+       *is* a release commit -- the ordinary case right after a real release cut), skip straight to step 3
+       and validate it directly, rather than trying to cut a second release commit on top of the first
+       (nothing would be left to stage, since `vendor_skill_engine.py --release`'s force-add is a no-op
+       when the tree already matches).
+    2. Otherwise, run `tools/vendor_skill_engine.py --release` *inside the worktree* -- the exact same
+       command, not a reimplementation of it, that `skills/README.md` "Install and pin (S-10)" tells a
+       releaser to run. It runs `--write` (the release-time build step), refuses if that leaves any
+       tracked file other than the gitignored wheel and lock dirty (a version bump landed in an earlier
+       phase commit with no matching `--write` would otherwise leave a skill's `pyproject.toml` stale and
+       uncommitted -- a mismatch against the wheel this step is about to commit, one only a non-frozen
+       install downstream would ever notice), then force-adds the wheel and lock for both skills by name
+       and commits them. `.gitignore` makes a plain `git add -A` silently skip these paths, so a commit
+       built that way would carry none of them while still reporting success; `--release` fails loudly
+       instead. Running the releaser's own command, rather than a second copy of its logic living only in
+       this check, is what keeps the two from drifting apart the way contract-critic rounds 1 and 2 each
+       found they had.
     3. Extract each skill folder from that commit with `git archive` (the committed tree, never the
        worktree's working directory, which could carry stray uncommitted files) into its own empty
        directory with no monorepo beside it, and run the two S-10 self-test commands from
@@ -148,68 +153,30 @@ def _remove_worktree(worktree: Path) -> None:
     _git("worktree", "prune")
 
 
-def _assert_worktree_clean(worktree: Path, *, context: str) -> None:
-    """Refuse to proceed if any tracked file in the whole worktree differs from HEAD (the gitignored
-    vendor wheel and lock never show here). Catches the shape contract-critic round 2 found: `--write`
-    silently rewrites a skill's `pyproject.toml` source line to match a wheel filename that was never
-    committed, when an engine version bump landed in an earlier phase commit with no matching `--write`
-    + commit. Checking the whole worktree, not only `skills/`, closes the general class -- any tracked
-    file `--write` or the release commit leaves modified and uncommitted, not only `pyproject.toml`.
-    Without this check, the release step would commit an in-sync wheel and lock next to a stale,
-    uncommitted file -- a mismatch only a non-frozen install, never exercised here, would surface."""
-    dirty = _git("status", "--porcelain", cwd=worktree)
-    if dirty:
-        raise CheckFailure(
-            f"{context}: tracked files changed beyond the gitignored vendor/lock artifacts -- commit "
-            f"these as a normal phase commit first, then cut the release:\n{dirty}"
-        )
-
-
-def _release_paths(worktree: Path) -> list[str]:
-    """The exact paths the release step must land in the commit: each skill's lock and wheel."""
-    paths: list[str] = []
-    for skill in SKILLS:
-        paths.append(f"skills/{skill}/uv.lock")
-        wheels = sorted((worktree / "skills" / skill / "vendor").glob("*.whl"))
-        if not wheels:
-            raise CheckFailure(f"no vendored wheel to commit for {skill}")
-        paths.append(f"skills/{skill}/vendor/{wheels[0].name}")
-    return paths
-
-
-def _commit_release_artifacts(worktree: Path, *, message: str) -> None:
-    """Force-add the gitignored vendor wheel and lock for both skills and commit them onto HEAD.
-
-    `.gitignore` excludes `skills/*/vendor/*.whl` and `skills/*/uv.lock` on everyday phase commits
-    (18.54); the release procedure documented in `skills/README.md` "Install and pin (S-10)" force-adds
-    exactly these paths as its last step before tagging. Force-add them by name rather than `git add -A`,
-    which silently skips gitignored files and would leave the release commit carrying none of them while
-    the `git add` and `git commit` calls both still exit 0.
-    """
-    _assert_worktree_clean(worktree, context="before the release commit")
-    paths = _release_paths(worktree)
-    _git("add", "-f", "--", *paths, cwd=worktree)
-    status = _git("status", "--porcelain", "--", *paths, cwd=worktree)
-    if not status:
-        raise CheckFailure(
-            "nothing staged for the release commit -- git add -f found no changes"
-        )
-    _commit_as_bot(worktree, "-m", message)
+def _release_commit_already_present(worktree: Path) -> bool:
+    """`ref` already carries a tracked wheel and lock for both skills -- it already *is* a release
+    commit (the ordinary case right after a real release cut). `vendor_skill_engine.py --release` force-
+    adds by name and would find nothing new to stage on a second run, so this check validates the
+    existing commit directly instead of trying to cut a second one on top of it."""
     tracked = set(
         _git("ls-tree", "-r", "--name-only", "HEAD", cwd=worktree).splitlines()
     )
-    missing = [p for p in paths if p not in tracked]
-    if missing:
-        raise CheckFailure(
-            f"release commit is missing {missing} from its tree even after git add -f"
+    return all(
+        f"skills/{skill}/uv.lock" in tracked
+        and any(
+            p.startswith(f"skills/{skill}/vendor/") and p.endswith(".whl")
+            for p in tracked
         )
-    _assert_worktree_clean(worktree, context="after the release commit")
+        for skill in SKILLS
+    )
 
 
 def build_release_worktree(
     tmp: Path, *, vendor: bool = True, ref: str = "HEAD"
 ) -> Path:
-    """Check out `ref` into a throwaway worktree and, unless `vendor` is False, vendor+commit it.
+    """Check out `ref` into a throwaway worktree and, unless `vendor` is False, make sure it's a release
+    commit -- either it already is one (validated in place), or `vendor_skill_engine.py --release` cuts
+    one on top.
 
     `vendor=False` seeds the "release tooling forgot to build the wheel" fault for --self-test: the
     worktree is committed exactly as `ref` already is, with no wheel at all. `ref` defaults to `HEAD`;
@@ -217,24 +184,29 @@ def build_release_worktree(
     """
     worktree = tmp / "release-worktree"
     _git("worktree", "add", "--detach", str(worktree), ref)
-    if vendor:
+    if vendor and not _release_commit_already_present(worktree):
+        env = dict(os.environ)
+        env.update(
+            GIT_AUTHOR_NAME="skill-release-shape-check",
+            GIT_AUTHOR_EMAIL="skill-release-shape-check@localhost",
+            GIT_COMMITTER_NAME="skill-release-shape-check",
+            GIT_COMMITTER_EMAIL="skill-release-shape-check@localhost",
+        )
         proc = subprocess.run(
             [
                 sys.executable,
                 str(worktree / "tools" / "vendor_skill_engine.py"),
-                "--write",
+                "--release",
             ],
             cwd=worktree,
+            env=env,
             capture_output=True,
             text=True,
         )
         if proc.returncode != 0:
             raise CheckFailure(
-                f"vendor_skill_engine.py --write failed in the worktree:\n{proc.stdout}\n{proc.stderr}"
+                f"vendor_skill_engine.py --release failed in the worktree:\n{proc.stdout}\n{proc.stderr}"
             )
-        _commit_release_artifacts(
-            worktree, message="release: vendor the engine wheel for this release commit"
-        )
     return worktree
 
 
@@ -315,14 +287,56 @@ def _assert_drifted_pyproject_is_refused(tmp: Path) -> None:
     )
 
 
+def _assert_already_cut_release_commit_validates() -> None:
+    """Reproduce the exact scenario verifier round 1 found broken: running this check against a HEAD
+    that already *is* a release commit (the ordinary case right after a real release cut, or any CI run
+    on that commit's own push) used to crash with `CheckFailure: nothing staged for the release commit`,
+    because the old code always tried to cut a second release commit on top of the first. Cut one real
+    release commit, then point `build_release_worktree` straight at its own sha: it must validate that
+    commit in place (`_release_commit_already_present` short-circuits the `--release` call) rather than
+    raise."""
+    with tempfile.TemporaryDirectory(
+        prefix="agentce-release-shape-selftest-already-cut-"
+    ) as raw:
+        tmp = Path(raw)
+        try:
+            first = build_release_worktree(tmp, vendor=True)
+            release_sha = _git("rev-parse", "HEAD", cwd=first)
+        finally:
+            _remove_worktree(tmp / "release-worktree")
+        try:
+            second = build_release_worktree(tmp, vendor=True, ref=release_sha)
+        except CheckFailure as exc:
+            raise CheckFailure(
+                f"already-cut-release-commit: validating a real release commit in place raised instead "
+                f"of succeeding: {exc}"
+            ) from exc
+        try:
+            if check_release_commit_in_sync(second):
+                raise CheckFailure(
+                    "already-cut-release-commit: the sync check found drift on a release commit that "
+                    "should be in sync"
+                )
+            for skill in SKILLS:
+                skill_dir = copy_skill_out(second, skill, tmp / "installed-already-cut")
+                result = run_standalone_self_test(skill_dir, skill, no_network=True)
+                if not result["ok"]:
+                    raise CheckFailure(
+                        f"already-cut-release-commit: {skill}'s standalone self-test failed on a valid "
+                        f"release commit: {result}"
+                    )
+        finally:
+            _remove_worktree(tmp / "release-worktree")
+
+
 def copy_skill_out(
     worktree: Path, skill: str, dest_root: Path, *, ref: str = "HEAD"
 ) -> Path:
     """Extract one skill folder from `ref`'s committed tree in `worktree`, severed from the monorepo.
 
     `git archive` reads only what is actually committed at `ref` -- unlike copying the worktree's working
-    directory, a file that `_commit_release_artifacts` failed to commit (or that sits there stale from a
-    prior step) cannot leak into the standalone install this proves.
+    directory, a file that `vendor_skill_engine.py --release` failed to commit (or that sits there stale
+    from a prior step) cannot leak into the standalone install this proves.
     """
     dest = dest_root / skill
     dest.mkdir(parents=True, exist_ok=True)
@@ -381,9 +395,10 @@ def check_release_commit_in_sync(worktree: Path) -> list[str]:
     """Rebuild each skill's wheel fresh from the release commit's own `engines/python` and diff it
     against the committed vendored wheel (`vendor_skill_engine.py`'s own check mode). Runs against the
     worktree's checked-out files rather than a `git archive` extraction, which is only a faithful stand-in
-    for the commit because `_commit_release_artifacts` already asserted the worktree carries no
-    uncommitted changes (tracked or gitignored) right after making the commit -- so the files on disk here
-    are byte-identical to what `HEAD` actually carries, not merely what happened to be built nearby."""
+    for the commit because `vendor_skill_engine.py --release` (or `_release_commit_already_present`, when
+    `ref` already was one) already confirmed the worktree carries no uncommitted changes (tracked or
+    gitignored) -- so the files on disk here are byte-identical to what `HEAD` actually carries, not
+    merely what happened to be built nearby."""
     proc = subprocess.run(
         [sys.executable, str(worktree / "tools" / "vendor_skill_engine.py")],
         cwd=worktree,
@@ -520,6 +535,11 @@ def self_test() -> int:
         except CheckFailure as exc:
             failures.append(str(exc))
 
+    try:
+        _assert_already_cut_release_commit_validates()
+    except CheckFailure as exc:
+        failures.append(str(exc))
+
     if failures:
         for f in failures:
             print(f"SELF-TEST FAIL: {f}", file=sys.stderr)
@@ -527,7 +547,8 @@ def self_test() -> int:
     print(
         "self-test ok: a release-shaped commit installs standalone; a missing, corrupted or stale "
         "vendored wheel turns the standalone self-test or the sync check red; a release cut on top of a "
-        "drifted, uncommitted pyproject.toml is refused outright"
+        "drifted, uncommitted pyproject.toml is refused outright; a HEAD that already is a release "
+        "commit validates in place instead of crashing"
     )
     return 0
 

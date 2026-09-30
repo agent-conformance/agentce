@@ -53,26 +53,38 @@ both paths; CI runs `tools/vendor_skill_engine.py --write` itself before testing
 standalone self-tests above still exercise a real, freshly built wheel on every run. The sync test still
 proves each skill bundles the engine it was tested with, just without a commit recording it.
 
-**A release commit is different.** As the last step of cutting a release, after `--write` rebuilds the
-wheel, force-add and commit the two now-gitignored paths for both skills before tagging:
+**A release commit is different, and it is cut off-branch.** As the last step of cutting a release, in a
+throwaway `git worktree` detached from `HEAD` -- never on `main` or a phase branch, so the wheel and lock
+never re-enter that branch's tracked history and every later phase commit on the branch stays clean under
+"`vendor/*.whl` and `uv.lock` are not committed" above -- run `vendor_skill_engine.py --release`, tag the
+worktree's commit, push the tag, then remove the worktree:
 
 ```sh
-tools/vendor_skill_engine.py --write
-git add -f skills/agentce-get-evidence/uv.lock skills/agentce-get-evidence/vendor/*.whl \
-           skills/agentce-prepare-to-share/uv.lock skills/agentce-prepare-to-share/vendor/*.whl
-git commit -s -m "release: vendor the engine wheel for this release commit"
+git worktree add --detach /tmp/agentce-release HEAD
+cd /tmp/agentce-release
+tools/vendor_skill_engine.py --release
+git tag vX.Y.Z
+git push origin vX.Y.Z
+cd -
+git worktree remove --force /tmp/agentce-release
 ```
 
-`--write` must find each skill's `pyproject.toml` already in sync with the engine version being
-released (it is, if every engine change was committed through the normal phase-commit process); if it
-isn't, `--write` leaves `pyproject.toml` modified on disk and the release step refuses to commit, so a
-stale, uncommitted source line can never ship inside the release commit next to an in-sync wheel. Commit
-that `pyproject.toml` fix as its own normal phase commit first, then cut the release again.
+`--release` is the one piece of code that cuts a release commit: it runs `--write`, refuses to commit if
+that leaves any tracked file other than the gitignored wheel and lock dirty (`--write` must find each
+skill's `pyproject.toml` already in sync with the engine version being released -- it is, if every engine
+change was committed through the normal phase-commit process; if it isn't, `--write` leaves
+`pyproject.toml` modified on disk and `--release` refuses, so a stale, uncommitted source line can never
+ship inside the release commit next to an in-sync wheel -- commit that `pyproject.toml` fix as its own
+normal phase commit first, then cut the release again), then force-adds and commits `uv.lock` and
+`vendor/*.whl` for both skills by name (`.gitignore` makes a plain `git add -A` silently skip them).
 
 That release commit carries `vendor/*.whl` and `uv.lock` for both skills, so a commit-pinned checkout of
 the tag it carries keeps working exactly as documented above: one command, standalone, offline.
-`tools/skill_release_shape_check.py` proves it. It builds a release-shaped commit the same way, extracts
-each skill folder from the committed tree alone, and runs both self-test commands above from it with
+`tools/skill_release_shape_check.py` proves it, running this exact `--release` command rather than a
+second copy of its logic: on an ordinary phase commit it cuts one in a throwaway worktree and validates
+the result; on a commit that already is a release commit (the ordinary case once a release has been cut)
+it validates that commit directly instead of trying to cut a second one on top. Either way it extracts
+each skill folder from the committed tree alone and runs both self-test commands above from it with
 networking disabled; it also rebuilds each wheel fresh from that commit's own `engines/python` and
 confirms it matches the committed one, byte for byte, so a release commit vendored before a later,
 uncommitted engine change would be caught even though its wheel still installs and runs. Its `--self-test`

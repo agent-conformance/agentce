@@ -19,6 +19,15 @@ file, never a relative path back into the monorepo.
                                           filename is unchanged, so it would leave the old hash pinned)
     vendor_skill_engine.py --self-test   prove --check discriminates: a corrupted vendored wheel and a
                                           version-stale filename both fail, an in-sync one passes
+    vendor_skill_engine.py --release     cut the release commit: --write, refuse if any other tracked
+                                          file is left dirty by it, force-add the gitignored wheel and
+                                          lock for both skills by name, commit. This is the one piece of
+                                          code that actually cuts a release commit -- `skills/README.md`
+                                          "Install and pin (S-10)" tells a releaser to run this exact
+                                          command in a throwaway, detached worktree (never on a shared
+                                          branch), and `tools/skill_release_shape_check.py` runs this
+                                          same command, not a reimplementation of it, to prove the result
+                                          installs standalone and offline.
 
 Standard library plus a `uv build`/`uv lock` subprocess; no network beyond what `uv build` itself
 needs (none once the local package cache holds engines/python's dependencies); no learned component.
@@ -133,6 +142,84 @@ def cmd_write() -> int:
     return 0
 
 
+def _git(*args: str, cwd: Path | None = None) -> str:
+    proc = subprocess.run(
+        ["git", *args], cwd=cwd or ROOT, capture_output=True, text=True
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"git {' '.join(args)} failed:\n{proc.stdout}\n{proc.stderr}"
+        )
+    return proc.stdout.strip()
+
+
+def assert_tree_clean(*, context: str) -> None:
+    """Refuse to proceed if any tracked file differs from HEAD (the gitignored vendor wheel and lock
+    never show here). Catches a version bump that landed in an earlier commit with no matching
+    `--write` + commit: `--write` would silently rewrite a skill's `pyproject.toml` source line to name
+    a wheel that was never committed, and the release commit would carry an in-sync wheel next to a
+    stale, uncommitted `pyproject.toml` -- a mismatch only a non-frozen install would ever surface."""
+    dirty = _git("status", "--porcelain")
+    if dirty:
+        raise RuntimeError(
+            f"{context}: tracked files changed beyond the gitignored vendor/lock artifacts -- commit "
+            f"these as a normal phase commit first, then cut the release:\n{dirty}"
+        )
+
+
+def release_paths() -> list[str]:
+    """The exact paths the release step must land in the commit: each skill's lock and wheel."""
+    paths: list[str] = []
+    for skill in SKILLS:
+        paths.append(f"skills/{skill}/uv.lock")
+        wheel = _vendored_wheel(skill)
+        if wheel is None:
+            raise RuntimeError(f"no vendored wheel to commit for {skill}")
+        paths.append(f"skills/{skill}/vendor/{wheel.name}")
+    return paths
+
+
+def cmd_release() -> int:
+    """Cut the release commit for real: `--write`, then force-add and commit the two now-gitignored
+    paths per skill by name (`.gitignore` makes a plain `git add -A` silently skip them). Must run in a
+    throwaway, detached worktree -- never on a shared branch -- so the wheel and lock never re-enter
+    that branch's tracked history; `skills/README.md` "Install and pin (S-10)" says so."""
+    cmd_write()
+    assert_tree_clean(context="before the release commit")
+    paths = release_paths()
+    _git("add", "-f", "--", *paths)
+    if not _git("status", "--porcelain", "--", *paths):
+        raise RuntimeError(
+            "nothing staged for the release commit -- git add -f found no changes"
+        )
+    proc = subprocess.run(
+        [
+            "git",
+            "commit",
+            "-s",
+            "--no-verify",
+            "-m",
+            "release: vendor the engine wheel for this release commit",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"git commit failed:\n{proc.stdout}\n{proc.stderr}")
+    tracked = set(_git("ls-tree", "-r", "--name-only", "HEAD").splitlines())
+    missing = [p for p in paths if p not in tracked]
+    if missing:
+        raise RuntimeError(
+            f"release commit is missing {missing} from its tree even after git add -f"
+        )
+    assert_tree_clean(context="after the release commit")
+    print(
+        f"ok: release commit {_git('rev-parse', 'HEAD')} carries the vendored wheel and lock for both skills"
+    )
+    return 0
+
+
 def cmd_check() -> list[str]:
     problems: list[str] = []
     with tempfile.TemporaryDirectory(prefix="agentce-vendor-check-") as raw:
@@ -217,12 +304,23 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument(
         "--self-test", action="store_true", help="prove --check discriminates"
     )
+    group.add_argument(
+        "--release",
+        action="store_true",
+        help="cut the release commit (run in a throwaway, detached worktree only)",
+    )
     args = parser.parse_args(argv)
 
     if args.self_test:
         return self_test()
     if args.write:
         return cmd_write()
+    if args.release:
+        try:
+            return cmd_release()
+        except RuntimeError as exc:
+            print(f"FAIL: {exc}", file=sys.stderr)
+            return 1
 
     problems = cmd_check()
     if problems:
