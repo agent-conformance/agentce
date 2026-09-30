@@ -73,9 +73,11 @@ FORMAT_INVOCATIONS: list[tuple[str, list[str]]] = [
 
 def classify(before: str | None, after: str | None) -> str:
     """A from-scratch reimplementation of `_classify_change`
-    (`engines/python/agentce/commands/__init__.py:2341`), used only by the fixture-shape self-test
-    below to prove the shared fixture exercises all three `what_changed` groups -- never used by the
-    real cross-engine invocation, which compares the engines' own real output to each other, not to
+    (`engines/python/agentce/commands/__init__.py:2341`), used by the fixture-shape self-test below to
+    prove the shared fixture exercises all three `what_changed` groups, and by
+    `tools/installed_artifacts_check.py`'s C4 check (via `what_changed_groups`) to compute this same
+    fixture's expected `diff` entries against an installed artifact -- never used by the real
+    cross-engine invocation below, which compares the engines' own real output to each other, not to
     this reference."""
     if before is not None and before in GAP_OUTCOMES and after == "conformant":
         return "closed"
@@ -124,7 +126,8 @@ def _by_key(entries: list[dict[str, Any]]) -> dict[tuple[str, str], str]:
 def what_changed_groups(
     a: list[dict[str, Any]], b: list[dict[str, Any]]
 ) -> dict[str, list[Any]]:
-    """The reference grouping used only by the fixture-shape self-test (see `classify`)."""
+    """The reference grouping used by the fixture-shape self-test and by
+    `tools/installed_artifacts_check.py`'s C4 check (see `classify`)."""
     left, right = _by_key(a), _by_key(b)
     groups: dict[str, list[Any]] = {"closed": [], "opened": [], "other": []}
     for key in sorted(set(left) | set(right)):

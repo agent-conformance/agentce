@@ -771,19 +771,12 @@ public final class Cli {
     }
 
     private static ObjectNode changeToJson(Diff.Change change) {
+        // ObjectNode.put(String, String) already writes a NullNode when the value is null.
         ObjectNode node = Json.nodes().objectNode();
         node.put("control", change.control());
         node.put("subject", change.subject());
-        if (change.from() != null) {
-            node.put("from", change.from());
-        } else {
-            node.putNull("from");
-        }
-        if (change.to() != null) {
-            node.put("to", change.to());
-        } else {
-            node.putNull("to");
-        }
+        node.put("from", change.from());
+        node.put("to", change.to());
         return node;
     }
 

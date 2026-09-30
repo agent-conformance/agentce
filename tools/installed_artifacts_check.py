@@ -1304,7 +1304,6 @@ def _version_problems(
 def _diff_json_problems(
     stdout: str,
     returncode: int,
-    expected_len: int,
     expected_keys: set[tuple[str, str]],
 ) -> list[str]:
     """A `diff --json` envelope must carry the real content-keyed delta, not merely exit
@@ -1319,9 +1318,9 @@ def _diff_json_problems(
     if not isinstance(diff, list):
         return ["diff --json: envelope has no 'diff' array"]
     problems: list[str] = []
-    if len(diff) != expected_len:
+    if len(diff) != len(expected_keys):
         problems.append(
-            f"diff --json: diff array has {len(diff)} entries, expected {expected_len}"
+            f"diff --json: diff array has {len(diff)} entries, expected {len(expected_keys)}"
         )
     got_keys = {
         (e.get("control"), e.get("subject")) for e in diff if isinstance(e, dict)
@@ -1380,15 +1379,12 @@ def _diff_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
     b_entries = json.loads(b_path.read_text(encoding="utf-8"))
     groups = diff_parity_check.what_changed_groups(a_entries, b_entries)
     expected_keys = {entry[0] for group in groups.values() for entry in group}
-    expected_len = len(expected_keys)
 
     problems: list[str] = []
     proc = runner.run(
         [*exe, "diff", str(a_path), str(b_path), "--json"], cwd, offline=True
     )
-    problems += _diff_json_problems(
-        proc.stdout, proc.returncode, expected_len, expected_keys
-    )
+    problems += _diff_json_problems(proc.stdout, proc.returncode, expected_keys)
 
     proc = runner.run(
         [*exe, "diff", str(a_path), str(b_path), "--format", "md"], cwd, offline=True
@@ -2314,11 +2310,8 @@ def self_test() -> int:
         diff_expected_keys = {
             entry[0] for group in diff_groups.values() for entry in group
         }
-        diff_expected_len = len(diff_expected_keys)
         zero_changes_envelope = json.dumps({"diff": [], "changed": 0})
-        if not _diff_json_problems(
-            zero_changes_envelope, 1, diff_expected_len, diff_expected_keys
-        ):
+        if not _diff_json_problems(zero_changes_envelope, 1, diff_expected_keys):
             failures.append(
                 "a diff implementation that always reports zero changes was accepted"
             )
@@ -2328,12 +2321,10 @@ def self_test() -> int:
                     {"control": control, "subject": subject}
                     for control, subject in sorted(diff_expected_keys)
                 ],
-                "changed": diff_expected_len,
+                "changed": len(diff_expected_keys),
             }
         )
-        if _diff_json_problems(
-            good_diff_envelope, 1, diff_expected_len, diff_expected_keys
-        ):
+        if _diff_json_problems(good_diff_envelope, 1, diff_expected_keys):
             failures.append("a correct diff --json envelope was rejected")
         if not _diff_md_problems("no differences.\n"):
             failures.append(

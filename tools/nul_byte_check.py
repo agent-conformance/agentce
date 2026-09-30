@@ -22,9 +22,10 @@ Uses only the standard library and git; no network, no learned component.
 
 from __future__ import annotations
 
-import subprocess
 import sys
 from pathlib import Path
+
+from spdx_check import tracked_files
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -33,17 +34,39 @@ ROOT = HERE.parent
 #: rather than allowlisting every source extension, so a new source language needs no update here.
 BINARY_EXTENSIONS = frozenset(
     {
-        "jar", "whl", "bin", "class", "pyc", "so", "dylib", "dll", "wasm",
-        "png", "jpg", "jpeg", "gif", "ico", "webp", "bmp",
-        "pdf", "zip", "gz", "tar", "tgz", "7z",
-        "woff", "woff2", "ttf", "otf", "eot",
+        "jar",
+        "whl",
+        "bin",
+        "class",
+        "pyc",
+        "so",
+        "dylib",
+        "dll",
+        "wasm",
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "ico",
+        "webp",
+        "bmp",
+        "pdf",
+        "zip",
+        "gz",
+        "tar",
+        "tgz",
+        "7z",
+        "woff",
+        "woff2",
+        "ttf",
+        "otf",
+        "eot",
     }
 )
 
 
 def is_binary_path(path: str) -> bool:
-    suffix = path.rsplit(".", 1)[-1].lower() if "." in path.rsplit("/", 1)[-1] else ""
-    return suffix in BINARY_EXTENSIONS
+    return Path(path).suffix.lstrip(".").lower() in BINARY_EXTENSIONS
 
 
 def check(files: dict[str, bytes]) -> list[str]:
@@ -57,13 +80,6 @@ def check(files: dict[str, bytes]) -> list[str]:
         if count:
             problems.append(f"{path}: {count} raw NUL byte(s)")
     return problems
-
-
-def tracked_files() -> list[str]:
-    out = subprocess.run(
-        ["git", "-C", str(ROOT), "ls-files"], capture_output=True, text=True, check=True
-    ).stdout
-    return [line for line in out.splitlines() if line]
 
 
 def self_test() -> int:
@@ -88,6 +104,8 @@ def main(argv: list[str]) -> int:
         return self_test()
     files: dict[str, bytes] = {}
     for rel in tracked_files():
+        if is_binary_path(rel):
+            continue
         path = ROOT / rel
         try:
             files[rel] = path.read_bytes()
