@@ -13,10 +13,16 @@ This check builds that commit and runs the install it describes, rather than onl
     1. `git worktree add --detach` a throwaway checkout of HEAD, standing in for the commit a release tag
        will point at.
     2. Run that worktree's own `tools/vendor_skill_engine.py --write` inside it (the release-time build
-       step), then force-add the gitignored wheel and lock for both skills and commit them. `git ls-tree`
-       on the resulting commit confirms every expected path actually landed in it -- `.gitignore` makes a
-       plain `git add -A` silently skip these paths, so a commit built that way would carry none of them
-       while still reporting success; this check fails loudly if that ever regresses.
+       step), asserting no tracked file other than the gitignored wheel and lock came out dirty. A version
+       bump landed in an earlier phase commit with no matching `--write` would otherwise leave a skill's
+       `pyproject.toml` stale and uncommitted -- a mismatch against the wheel this step is about to
+       commit, one only a non-frozen install downstream would ever notice. Then force-add the gitignored
+       wheel and lock for both skills and commit them. `git ls-tree` on the resulting commit confirms
+       every expected path actually landed in it -- `.gitignore` makes a plain `git add -A` silently skip
+       these paths, so a commit built that way would carry none of them while still reporting success;
+       this check fails loudly if that ever regresses. A second clean-tree assertion right after the
+       commit confirms the worktree's files are now byte-identical to what the commit carries, which is
+       what lets step 4 below trust the worktree as a stand-in for the commit.
     3. Extract each skill folder from that commit with `git archive` (the committed tree, never the
        worktree's working directory, which could carry stray uncommitted files) into its own empty
        directory with no monorepo beside it, and run the two S-10 self-test commands from
@@ -33,17 +39,20 @@ This check builds that commit and runs the install it describes, rather than onl
 install steps may reach the network on a cold `uv` cache, every run step is offline. An accidental network
 call in the standalone self-test then fails loudly instead of silently succeeding over a live connection.
 
-`--self-test` proves the check discriminates. The good release-shaped commit passes. Three seeded faults
+`--self-test` proves the check discriminates. The good release-shaped commit passes. Four seeded faults
 each turn it red: a release commit with no vendored wheel at all, one with a corrupted wheel (bytes that
-no longer form a valid zip), and one whose wheel was vendored before a later engine-source change was
-folded into the same commit without re-vendoring (a real, valid wheel -- stale, not broken).
+no longer form a valid zip), one whose wheel was vendored before a later engine-source change was folded
+into the same commit without re-vendoring (a real, valid wheel -- stale, not broken), and an attempt to
+cut a release on top of a phase commit that bumped the engine version without ever running `--write`
+(the release step refuses outright rather than committing a wheel and lock next to a stale pyproject.toml).
 
 Usage:
     skill_release_shape_check.py                 build a release-shaped commit and prove both skills
                                                    install and self-test standalone from it
     skill_release_shape_check.py --no-network     the same, with the standalone self-test run offline
-    skill_release_shape_check.py --self-test      prove a missing, corrupted or stale wheel on the
-                                                   release commit turns the check red
+    skill_release_shape_check.py --self-test      prove a missing, corrupted or stale wheel, or a
+                                                   drifted pyproject.toml, on the release commit turns
+                                                   the check red
 """
 
 from __future__ import annotations
@@ -118,6 +127,21 @@ def _git(*args: str, cwd: Path | None = None) -> str:
     return proc.stdout.strip()
 
 
+def _assert_worktree_clean(worktree: Path, *, context: str) -> None:
+    """Refuse to proceed if any tracked file differs from HEAD (the gitignored vendor wheel and lock
+    never show here). Catches the shape contract-critic round 2 found: `--write` silently rewrites a
+    skill's `pyproject.toml` source line to match a wheel filename that was never committed, when an
+    engine version bump landed in an earlier phase commit with no matching `--write` + commit. Without
+    this check, the release step would commit an in-sync wheel and lock next to a stale, uncommitted
+    pyproject.toml -- a mismatch only a non-frozen install, never exercised here, would surface."""
+    dirty = _git("status", "--porcelain", "--", "skills", cwd=worktree)
+    if dirty:
+        raise CheckFailure(
+            f"{context}: tracked files changed beyond the gitignored vendor/lock artifacts -- commit "
+            f"these as a normal phase commit first, then cut the release:\n{dirty}"
+        )
+
+
 def _release_paths(worktree: Path) -> list[str]:
     """The exact paths the release step must land in the commit: each skill's lock and wheel."""
     paths: list[str] = []
@@ -139,6 +163,7 @@ def _commit_release_artifacts(worktree: Path, *, message: str) -> None:
     which silently skips gitignored files and would leave the release commit carrying none of them while
     the `git add` and `git commit` calls both still exit 0.
     """
+    _assert_worktree_clean(worktree, context="before the release commit")
     paths = _release_paths(worktree)
     _git("add", "-f", "--", *paths, cwd=worktree)
     status = _git("status", "--porcelain", "--", *paths, cwd=worktree)
@@ -165,16 +190,20 @@ def _commit_release_artifacts(worktree: Path, *, message: str) -> None:
         raise CheckFailure(
             f"release commit is missing {missing} from its tree even after git add -f"
         )
+    _assert_worktree_clean(worktree, context="after the release commit")
 
 
-def build_release_worktree(tmp: Path, *, vendor: bool = True) -> Path:
-    """Check out HEAD into a throwaway worktree and, unless `vendor` is False, vendor+commit it.
+def build_release_worktree(
+    tmp: Path, *, vendor: bool = True, ref: str = "HEAD"
+) -> Path:
+    """Check out `ref` into a throwaway worktree and, unless `vendor` is False, vendor+commit it.
 
     `vendor=False` seeds the "release tooling forgot to build the wheel" fault for --self-test: the
-    worktree is committed exactly as HEAD already is, with no wheel at all.
+    worktree is committed exactly as `ref` already is, with no wheel at all. `ref` defaults to `HEAD`;
+    `--self-test`'s drifted-pyproject fault points it at a throwaway commit instead.
     """
     worktree = tmp / "release-worktree"
-    _git("worktree", "add", "--detach", str(worktree), "HEAD")
+    _git("worktree", "add", "--detach", str(worktree), ref)
     if vendor:
         proc = subprocess.run(
             [
@@ -253,6 +282,54 @@ def stale_wheel_worktree(tmp: Path) -> Path:
     return worktree
 
 
+def _assert_drifted_pyproject_is_refused(tmp: Path) -> None:
+    """Seed the exact fault contract-critic round 2 found: a phase commit bumps `engines/python`'s
+    version without ever running `--write`, so a skill's already-committed `pyproject.toml` still names
+    the old wheel filename. The standalone self-test and the sync check can't see this -- `--frozen`
+    installs trust `uv.lock`, not `pyproject.toml`'s source line -- so assert the release step refuses to
+    build on top of the drift instead, rather than silently committing a release commit whose
+    `pyproject.toml` and vendored wheel disagree."""
+    drift_source = tmp / "drift-source"
+    _git("worktree", "add", "--detach", str(drift_source), "HEAD")
+    try:
+        pyproject = drift_source / "engines" / "python" / "pyproject.toml"
+        text = pyproject.read_text(encoding="utf-8")
+        bumped = text.replace('version = "0.1.0"', 'version = "0.1.0+selftest"', 1)
+        if bumped == text:
+            raise CheckFailure(
+                "self-test setup: could not find engines/python/pyproject.toml's version line to bump"
+            )
+        pyproject.write_text(bumped, encoding="utf-8")
+        _git("add", "--", "engines/python/pyproject.toml", cwd=drift_source)
+        _git(
+            "-c",
+            "user.name=skill-release-shape-check",
+            "-c",
+            "user.email=skill-release-shape-check@localhost",
+            "commit",
+            "-m",
+            "self-test: bump the engine version with no matching --write",
+            "--no-verify",
+            cwd=drift_source,
+        )
+        drift_sha = _git("rev-parse", "HEAD", cwd=drift_source)
+    finally:
+        _git("worktree", "remove", "--force", str(drift_source))
+        _git("worktree", "prune")
+
+    try:
+        build_release_worktree(tmp, vendor=True, ref=drift_sha)
+    except CheckFailure:
+        return
+    finally:
+        _git("worktree", "remove", "--force", str(tmp / "release-worktree"))
+        _git("worktree", "prune")
+    raise CheckFailure(
+        "drifted-pyproject: the release step committed a wheel/lock next to a pyproject.toml it never "
+        "updated, instead of refusing"
+    )
+
+
 def copy_skill_out(
     worktree: Path, skill: str, dest_root: Path, *, ref: str = "HEAD"
 ) -> Path:
@@ -317,8 +394,11 @@ def run_standalone_self_test(
 
 def check_release_commit_in_sync(worktree: Path) -> list[str]:
     """Rebuild each skill's wheel fresh from the release commit's own `engines/python` and diff it
-    against the committed vendored wheel (`vendor_skill_engine.py`'s own check mode, run against the
-    worktree's checked-out state, which after `build_release_worktree` equals the release commit)."""
+    against the committed vendored wheel (`vendor_skill_engine.py`'s own check mode). Runs against the
+    worktree's checked-out files rather than a `git archive` extraction, which is only a faithful stand-in
+    for the commit because `_commit_release_artifacts` already asserted the worktree carries no
+    uncommitted changes (tracked or gitignored) right after making the commit -- so the files on disk here
+    are byte-identical to what `HEAD` actually carries, not merely what happened to be built nearby."""
     proc = subprocess.run(
         [sys.executable, str(worktree / "tools" / "vendor_skill_engine.py")],
         cwd=worktree,
@@ -449,13 +529,22 @@ def self_test() -> int:
         if failure:
             failures.append(failure)
 
+    with tempfile.TemporaryDirectory(
+        prefix="agentce-release-shape-selftest-drifted-pyproject-"
+    ) as raw:
+        try:
+            _assert_drifted_pyproject_is_refused(Path(raw))
+        except CheckFailure as exc:
+            failures.append(str(exc))
+
     if failures:
         for f in failures:
             print(f"SELF-TEST FAIL: {f}", file=sys.stderr)
         return 1
     print(
         "self-test ok: a release-shaped commit installs standalone; a missing, corrupted or stale "
-        "vendored wheel turns the standalone self-test or the sync check red"
+        "vendored wheel turns the standalone self-test or the sync check red; a release cut on top of a "
+        "drifted, uncommitted pyproject.toml is refused outright"
     )
     return 0
 

@@ -63,6 +63,12 @@ git add -f skills/agentce-get-evidence/uv.lock skills/agentce-get-evidence/vendo
 git commit -s -m "release: vendor the engine wheel for this release commit"
 ```
 
+`--write` must find each skill's `pyproject.toml` already in sync with the engine version being
+released (it is, if every engine change was committed through the normal phase-commit process); if it
+isn't, `--write` leaves `pyproject.toml` modified on disk and the release step refuses to commit, so a
+stale, uncommitted source line can never ship inside the release commit next to an in-sync wheel. Commit
+that `pyproject.toml` fix as its own normal phase commit first, then cut the release again.
+
 That release commit carries `vendor/*.whl` and `uv.lock` for both skills, so a commit-pinned checkout of
 the tag it carries keeps working exactly as documented above: one command, standalone, offline.
 `tools/skill_release_shape_check.py` proves it. It builds a release-shaped commit the same way, extracts
