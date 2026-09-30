@@ -781,6 +781,7 @@ export function main(argv: string[]): number {
   }
 
   const json = argv.includes("--json");
+  const debug = argv.includes("--debug");
   let result: CommandResult;
   try {
     if (command === "conformance") {
@@ -803,18 +804,24 @@ export function main(argv: string[]): number {
   } catch (exc) {
     if (exc instanceof AgentceError) {
       result = errorResult(command ?? "", exc);
+    } else if (debug) {
+      // Matches Python's own `--debug` behaviour (`cli.py:562-564`, `if debug: raise`): let the
+      // exception propagate to the runtime's default handler (a full stack trace on stderr), rather
+      // than swallowing it into the keyed envelope below.
+      throw exc;
     } else {
       // A non-AgentceError exception here would otherwise crash the process at exit 1 -- colliding
       // with ExitCode.FINDINGS, so a malformed-input crash would be indistinguishable from a real
-      // finding to a CI script gating on exit code. Matches Python's key and exit code only, not its
-      // full error envelope shape (a real, pre-existing, engine-wide difference this does not close).
+      // finding to a CI script gating on exit code. Matches Python's key, exit code, and (now that
+      // `--debug` is real in this engine too) fix text -- not its full error envelope shape (a real,
+      // pre-existing, engine-wide difference this does not close).
       const message = exc instanceof Error ? exc.message : String(exc);
       result = errorResult(
         command ?? "",
         new AgentceError(
           "internal.unexpected",
           message,
-          "file an issue with the input file that caused this.",
+          "re-run with --debug to see the stack trace, then file an issue.",
         ),
       );
     }

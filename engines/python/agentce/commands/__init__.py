@@ -2281,6 +2281,22 @@ def cmd_conformance(ns: argparse.Namespace) -> CommandResult:
     return result
 
 
+def _diff_string_field(entry: dict[str, Any], field: str) -> str:
+    """``entry[field]``, required to already be a JSON string. A structurally-absent key is an
+    uncaught ``KeyError`` (mirrors every other command's malformed-input path in this engine, not
+    newly introduced here); a present-but-non-string value (a number, boolean, ``null``, object, or
+    array) raises a keyed ``input.diff_field_not_string`` instead of silently coercing it with
+    ``str()`` -- all three engines refuse this input the same way (TRADEOFFS.md, 2026-09-30)."""
+    value = entry[field]
+    if not isinstance(value, str):
+        raise InputError(
+            "input.diff_field_not_string",
+            f"assertion field {field!r} must be a string, not {value!r}.",
+            "emit control/subject/outcome as JSON strings.",
+        )
+    return value
+
+
 def _diff_assertion_sets(
     a: list[dict[str, Any]], b: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
@@ -2290,7 +2306,11 @@ def _diff_assertion_sets(
 
     def by_key(entries: list[dict[str, Any]]) -> dict[tuple[str, str], str]:
         return {
-            (str(e["control"]), str(e["subject"])): str(e["outcome"]) for e in entries
+            (
+                _diff_string_field(e, "control"),
+                _diff_string_field(e, "subject"),
+            ): _diff_string_field(e, "outcome")
+            for e in entries
         }
 
     left, right = by_key(a), by_key(b)
@@ -2376,6 +2396,13 @@ def _diff_md_lines(what_changed: dict[str, list[dict[str, Any]]]) -> list[str]:
 
 def cmd_diff(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="diff")
+    extra = list(getattr(ns, "extra", None) or [])
+    if extra:
+        raise InputError(
+            "input.diff_extra_argument",
+            f"diff takes exactly two positional arguments, got {2 + len(extra)}.",
+            "pass exactly two files: `agentce diff <report-a> <report-b>`.",
+        )
     fix = "pass two assertion files: `agentce diff <report-a> <report-b>`."
     left = _require_file(
         _opt_str(ns, "report_a"),

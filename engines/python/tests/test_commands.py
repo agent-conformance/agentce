@@ -315,6 +315,21 @@ def test_diff_renders_added_or_removed_assertion_as_none_not_a_placeholder(
     assert "(none) -> conformant" in out
 
 
+@pytest.mark.parametrize("value", [1, True, None, {}, []])
+def test_diff_assertion_sets_rejects_non_string_field(value: object) -> None:
+    """A `control`/`subject`/`outcome` present but not a JSON string raises the keyed
+    `input.diff_field_not_string`, never Python's own former silent `str()` coercion -- all three
+    engines refuse this the same way (TRADEOFFS.md, 2026-09-30)."""
+    from agentce.commands import _diff_assertion_sets
+    from agentce.errors import InputError
+
+    with pytest.raises(InputError) as exc_info:
+        _diff_assertion_sets(
+            [{"control": value, "subject": "s1", "outcome": "conformant"}], []
+        )
+    assert exc_info.value.key == "input.diff_field_not_string"
+
+
 #: All 42 off-diagonal `(before, after)` pairs over `{None} + assertions.OUTCOMES` (item 18.6, C1(a)):
 #: written by hand from `verdict.GAP_OUTCOMES = ("non-conformant", "partial", "insufficient_evidence",
 #: "not_assessed")`, never re-derived by calling `_classify_change`'s own two conditions again, so this

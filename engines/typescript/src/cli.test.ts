@@ -425,7 +425,21 @@ test("diff: a malformed (not-JSON) input file gives a keyed internal.unexpected 
     const b = diffFixture(dir, "b.json", []);
     const { exitCode, envelope } = runJson(["diff", a, b]);
     assert.equal(exitCode, 3);
-    assert.equal((envelope.error as { message_key: string }).message_key, "internal.unexpected");
+    const error = envelope.error as { message_key: string; fix: string };
+    assert.equal(error.message_key, "internal.unexpected");
+    assert.equal(error.fix, "re-run with --debug to see the stack trace, then file an issue.");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("diff: --debug on a malformed input file re-throws instead of returning a keyed envelope", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-diff-"));
+  try {
+    const a = join(dir, "a.json");
+    writeFileSync(a, "not json");
+    const b = diffFixture(dir, "b.json", []);
+    assert.throws(() => main(["diff", a, b, "--debug"]));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

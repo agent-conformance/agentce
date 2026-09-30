@@ -92,6 +92,7 @@ public final class Cli {
         }
 
         boolean json = Arrays.asList(args).contains("--json");
+        boolean debug = Arrays.asList(args).contains("--debug");
         CommandResult result;
         try {
             if ("conformance".equals(command)) {
@@ -114,16 +115,25 @@ public final class Cli {
         } catch (AgentceError exc) {
             result = errorResult(command == null ? "" : command, exc);
         } catch (RuntimeException exc) {
+            if (debug) {
+                // Matches Python's own `--debug` behaviour (`cli.py:562-564`, `if debug: raise`): let
+                // the exception propagate to the JVM's default handler (a full stack trace on
+                // stderr), rather than swallowing it into the keyed envelope below.
+                throw exc;
+            }
             // A non-AgentceError exception here would otherwise propagate to the JVM's default
             // handler, which prints a stack trace and exits with code 1 -- colliding with
             // ExitCode.FINDINGS, so a malformed-input crash would be indistinguishable from a real
-            // finding to a CI script gating on exit code. Matches Python's key and exit code only,
-            // not its full error envelope shape (a real, pre-existing, engine-wide difference this
-            // does not close).
+            // finding to a CI script gating on exit code. Matches Python's key, exit code, and (now
+            // that `--debug` is real in this engine too) fix text -- not its full error envelope
+            // shape (a real, pre-existing, engine-wide difference this does not close).
             String message = exc.getMessage() != null ? exc.getMessage() : exc.getClass().getName();
             result = errorResult(
                     command == null ? "" : command,
-                    new AgentceError("internal.unexpected", message, "file an issue with the input file that caused this."));
+                    new AgentceError(
+                            "internal.unexpected",
+                            message,
+                            "re-run with --debug to see the stack trace, then file an issue."));
         }
         emit(result, json);
         return result.exitCode();

@@ -715,11 +715,45 @@ def _diff_pair(
 def test_diff_format_invalid_exits_3(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """An unrecognised `--format` value is an input error (argparse's own `choices=`), not a silent
-    fallback to `text` and not a crash (round 2 finding 5c)."""
+    """An unrecognised `--format` value is a keyed `input.diff_format` envelope error raised by
+    `cmd_diff` itself, not argparse's own pre-envelope `choices=` usage error and not a silent
+    fallback to `text` -- all three engines agree on this (TRADEOFFS.md, 2026-09-30; `report --format`
+    is unchanged and still uses argparse's `choices=`, a disclosed, `diff`-only divergence)."""
     left, right = _diff_pair(tmp_path, [], [])
-    code = cli.main(["diff", str(left), str(right), "--format", "xml"])
+    code, env = run(
+        ["diff", str(left), str(right), "--format", "xml", "--json"], capsys
+    )
     assert code == 3
+    assert env["error"]["key"] == "input.diff_format"
+
+
+def test_diff_extra_argument_is_keyed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A third positional argument is a keyed `input.diff_extra_argument` envelope error, not
+    argparse's own "unrecognized arguments" usage error (TRADEOFFS.md, 2026-09-30)."""
+    left, right = _diff_pair(tmp_path, [], [])
+    code, env = run(["diff", str(left), str(right), str(left), "--json"], capsys)
+    assert code == 3
+    assert env["error"]["key"] == "input.diff_extra_argument"
+
+
+def test_diff_field_not_string_is_keyed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A record whose `control`/`subject`/`outcome` is present but not a string is a keyed
+    `input.diff_field_not_string` error, never a silent `str()` coercion (TRADEOFFS.md, 2026-09-30
+    -- this row is now decided the opposite way for all three engines: refuse, don't coerce)."""
+    left = tmp_path / "a.json"
+    right = tmp_path / "b.json"
+    left.write_text(
+        json.dumps([{"control": 1, "subject": "s1", "outcome": "conformant"}]),
+        encoding="utf-8",
+    )
+    right.write_text("[]", encoding="utf-8")
+    code, env = run(["diff", str(left), str(right), "--json"], capsys)
+    assert code == 3
+    assert env["error"]["key"] == "input.diff_field_not_string"
 
 
 def test_diff_format_text_unchanged(

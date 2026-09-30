@@ -411,6 +411,17 @@ class CliTest {
         JsonNode env = runJson("diff", a.toString(), b.toString());
         assertEquals(3, env.get("exit_code").asInt());
         assertEquals("internal.unexpected", env.get("error").get("message_key").asText());
+        assertEquals(
+                "re-run with --debug to see the stack trace, then file an issue.",
+                env.get("error").get("fix").asText());
+    }
+
+    @Test
+    void diffDebugOnAMalformedInputFileRethrowsInsteadOfReturningAKeyedEnvelope(@TempDir Path dir) {
+        Path a = diffFixture(dir, "a.json", "not json");
+        Path b = diffFixture(dir, "b.json", "[]");
+        org.junit.jupiter.api.Assertions.assertThrows(
+                RuntimeException.class, () -> Cli.run(new String[] {"diff", a.toString(), b.toString(), "--debug"}));
     }
 
     @Test

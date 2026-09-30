@@ -387,9 +387,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("report_a", nargs="?", help="the first assertions.json")
     p.add_argument("report_b", nargs="?", help="the second assertions.json")
+    # An extra positional is a keyed `input.diff_extra_argument` error (`cmd_diff`), not argparse's
+    # own "unrecognized arguments" usage error -- so it is captured here, not left unconsumed.
+    p.add_argument("extra", nargs="*", help=argparse.SUPPRESS)
     p.add_argument(
+        # No `choices=`: an invalid value is a keyed `input.diff_format` error raised by `cmd_diff`
+        # itself, not argparse's own pre-envelope usage error -- unlike `report --format` (unchanged,
+        # still `choices=`), a disclosed divergence recorded in TRADEOFFS.md (2026-09-30).
         "--format",
-        choices=commands.DIFF_FORMATS,
         help="how to render the diff (default: text)",
     )
     p.set_defaults(func=commands.cmd_diff)
