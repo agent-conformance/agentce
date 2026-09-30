@@ -24,6 +24,7 @@ import {
   parseGapsFile,
   pythonizeTimestamp,
 } from "./readiness";
+import { byteCompare } from "./util";
 
 const SEVERITIES = new Map([
   ["OVS-03", "high"],
@@ -162,10 +163,7 @@ test("duplicate reasons are never deduplicated, and sort by byteCompare, not UTF
   assert.equal(dupe.length, 2);
   assert.ok(verdict.reasons.includes("integrity gap on stream None"));
   const sorted = verdict.reasons.slice().sort();
-  assert.deepEqual(
-    verdict.reasons,
-    sorted.sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b))),
-  );
+  assert.deepEqual(verdict.reasons, sorted.sort(byteCompare));
 });
 
 // --- deviation_lint (test_readiness.py) ---------------------------------------------------------

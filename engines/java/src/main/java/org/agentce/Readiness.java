@@ -573,16 +573,16 @@ public final class Readiness {
         return date.day() + (153L * mo + 2) / 5 + 365L * y + y / 4 - y / 100 + y / 400 - 32045;
     }
 
-    /** {@code (expiry.date() - granted.date()).days}, calendar-day arithmetic, matching Python's own
-     * {@code timedelta.days} for two {@code date} objects exactly. */
-    private static long daysBetween(CalendarDate from, CalendarDate to) {
-        return julianDayNumber(to) - julianDayNumber(from);
-    }
-
     /** Negative when {@code a}'s calendar date is before {@code b}'s, matching Python's {@code
      * date.__lt__}. */
     private static long compareDate(CalendarDate a, CalendarDate b) {
         return julianDayNumber(a) - julianDayNumber(b);
+    }
+
+    /** {@code (expiry.date() - granted.date()).days}, calendar-day arithmetic, matching Python's own
+     * {@code timedelta.days} for two {@code date} objects exactly. */
+    private static long daysBetween(CalendarDate from, CalendarDate to) {
+        return compareDate(to, from);
     }
 
     // --- deviationLint -------------------------------------------------------------------------------
