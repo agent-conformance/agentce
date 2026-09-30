@@ -17,6 +17,7 @@ Nothing here is a constant standing in for a measurement: the interpreter versio
 from __future__ import annotations
 
 import platform
+import re
 import sys
 from importlib import metadata
 from typing import Any
@@ -24,17 +25,19 @@ from typing import Any
 #: The oldest interpreter the engine supports (``requires-python`` in ``pyproject.toml``).
 MINIMUM_PYTHON = (3, 12)
 
-#: Platform-tag prefixes for which ``cryptography`` publishes a prebuilt wheel. A wheel installed with
-#: any other platform tag was built locally, from source. ``macosx_10_9_universal2`` is the 48.x-line
-#: fat binary that gives Intel macOS a real prebuilt wheel (ADR-0024); it predates arm64-only wheels,
-#: so it also covers Apple-silicon macOS on that line.
+#: Platform-tag prefixes for which ``cryptography`` publishes a prebuilt wheel: Linux and Windows.
 PREBUILT_PLATFORM_PREFIXES = (
     "manylinux",
     "musllinux",
-    "macosx_11_0_arm64",
-    "macosx_10_9_universal2",
     "win_amd64",
 )
+
+#: macOS platform tags ``cryptography`` publishes a prebuilt wheel for, matched by architecture rather
+#: than by a fixed deployment-target version (that version has moved once already, arm64's 10.9 base
+#: through 11.0, and will again): ``arm64`` on the 49.x line onward, and the ``universal2`` fat binary
+#: that also covers Intel macOS through the 48.x line (ADR-0024). A future release bumping either
+#: version number keeps matching; only a new architecture tag needs a code change.
+PREBUILT_MACOS_TAG = re.compile(r"^macosx_\d+_\d+_(arm64|universal2)$")
 
 SOURCE_BUILD_FIX = (
     "install Rust (https://rustup.rs) and OpenSSL 3 before syncing: on macOS `brew install openssl@3` "
@@ -50,7 +53,9 @@ def wheel_source(tags: list[str]) -> str:
         return "source-build"
     for tag in tags:
         platform_tag = tag.rsplit("-", 1)[-1]
-        if not platform_tag.startswith(PREBUILT_PLATFORM_PREFIXES):
+        if not platform_tag.startswith(
+            PREBUILT_PLATFORM_PREFIXES
+        ) and not PREBUILT_MACOS_TAG.match(platform_tag):
             return "source-build"
     return "prebuilt"
 

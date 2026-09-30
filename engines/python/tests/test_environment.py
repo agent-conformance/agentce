@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+import tomllib
 from importlib import metadata
 from pathlib import Path
 
@@ -12,7 +13,25 @@ import pytest
 from agentce import cli, environment
 from agentce.environment import inspect_environment, wheel_source
 
-_QUICKSTART = Path(__file__).resolve().parents[3] / "corpus" / "quickstart"
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_QUICKSTART = _REPO_ROOT / "corpus" / "quickstart"
+
+
+def _cryptography_requirements(pyproject: Path) -> set[str]:
+    deps = tomllib.loads(pyproject.read_text())["project"]["dependencies"]
+    return {dep for dep in deps if dep.startswith("cryptography")}
+
+
+def test_cryptography_platform_pin_matches_across_packages() -> None:
+    """The Intel-macOS platform split (ADR-0024) is hand-duplicated in two pyproject.toml files with
+    no shared source; this is the drift check that stands in for one (simplify, item 18.55)."""
+    engine = _cryptography_requirements(
+        _REPO_ROOT / "engines" / "python" / "pyproject.toml"
+    )
+    adapter = _cryptography_requirements(
+        _REPO_ROOT / "adapters" / "supply-chain" / "pyproject.toml"
+    )
+    assert engine == adapter
 
 
 @pytest.mark.parametrize(
@@ -27,6 +46,10 @@ _QUICKSTART = Path(__file__).resolve().parents[3] / "corpus" / "quickstart"
         (["cp311-abi3-macosx_11_0_arm64"], "prebuilt"),
         # The 48.x-line universal2 fat binary (ADR-0024): a real prebuilt wheel for Intel macOS.
         (["cp311-abi3-macosx_10_9_universal2"], "prebuilt"),
+        # A future release bumping either tag's deployment-target version still matches (matched by
+        # architecture, not by the exact version numbers above).
+        (["cp311-abi3-macosx_12_0_arm64"], "prebuilt"),
+        (["cp311-abi3-macosx_11_0_universal2"], "prebuilt"),
         (["cp311-abi3-win_amd64"], "prebuilt"),
         # No release publishes an architecture-specific macOS x86_64 wheel, so this tag can only be a
         # local build (unlike the universal2 fat binary above).
