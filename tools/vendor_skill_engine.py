@@ -121,18 +121,31 @@ def write_vendor(skill: str, wheel: Path) -> None:
     _pyproject_source_line(skill, wheel.name)
 
 
+def _lock(skill: str) -> None:
+    # The wheel keeps its version and filename, so a plain `uv lock` would keep the old hash.
+    proc = _run(
+        ["uv", "lock", "--refresh-package", "agent-conformance"],
+        ROOT / "skills" / skill,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"uv lock failed in skills/{skill}:\n{proc.stderr}")
+
+
 def cmd_write() -> int:
     with tempfile.TemporaryDirectory(prefix="agentce-vendor-") as raw:
         wheel = build_wheel(Path(raw) / "dist")
         for skill in SKILLS:
             write_vendor(skill, wheel)
-            # The wheel keeps its version and filename, so a plain `uv lock` would keep the old hash.
-            proc = _run(
-                ["uv", "lock", "--refresh-package", "agent-conformance"],
-                ROOT / "skills" / skill,
-            )
-            if proc.returncode != 0:
-                raise RuntimeError(f"uv lock failed in skills/{skill}:\n{proc.stderr}")
+            # A lock resolved cold (no uv.lock on disk yet) orders a multi-marker
+            # `resolution-markers` list differently from one resolved warm (an existing lock already
+            # on disk): confirmed by hand, repeatedly, on this pyproject's four-way python-version x
+            # platform split -- cold runs agree with each other, warm re-locks agree with each other,
+            # but a cold run disagrees with a warm one, purely in marker order (same markers, same
+            # resolved versions). Lock twice so the second, warm call always produces the order every
+            # later re-lock will converge back to, whether or not a uv.lock already existed here; this
+            # is what makes `--release` idempotent on a commit it already cut (VG-SKILL-RELEASE-SHAPE).
+            _lock(skill)
+            _lock(skill)
             print(f"vendored {wheel.name} into skills/{skill}/vendor/ and re-locked")
     return 0
 
