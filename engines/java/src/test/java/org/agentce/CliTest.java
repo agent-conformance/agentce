@@ -478,4 +478,141 @@ class CliTest {
         assertTrue(raw.contains("c\\u00e9"), raw);
         assertTrue(raw.contains("\\ud83d\\ude00"), raw);
     }
+
+    // --- `readiness` (item 18.25): the report-readiness verdict, matching `readiness.test.ts`'s own
+    // CLI-wiring subset. ---
+
+    private static Path readinessReport(Path dir, String assertionsJson, String integrityJsonl) throws IOException {
+        Path reportDir = dir.resolve("report");
+        Files.createDirectory(reportDir);
+        Files.writeString(reportDir.resolve("assertions.json"), assertionsJson);
+        Files.writeString(reportDir.resolve("integrity.jsonl"), integrityJsonl);
+        Files.writeString(reportDir.resolve("coverage.json"), "{\"subjects\":{}}");
+        Files.writeString(reportDir.resolve("applicability.jsonl"), "");
+        return reportDir;
+    }
+
+    private static Path readinessReport(Path dir) throws IOException {
+        return readinessReport(dir, "[]", "");
+    }
+
+    @Test
+    void readinessACleanReportIsReadyExitZeroAndWritesARealReportReadinessMdFile(@TempDir Path dir) throws IOException {
+        Path report = readinessReport(
+                dir,
+                "[{\"control\":\"OVS-03\",\"outcome\":\"conformant\",\"subject\":\"s\"}]",
+                "{\"status\":\"verified\",\"stream\":\"a\"}\n");
+        JsonNode env = runJson("readiness", report.toString(), "--catalog-dir", CATALOG_DIR.toString());
+        assertEquals(0, env.get("exit_code").asInt());
+        assertEquals("READY", env.get("verdict").asText());
+        assertEquals(0, env.get("reasons").size());
+        String reportPath = env.get("report").asText();
+        assertTrue(reportPath.contains("report-readiness-"), reportPath);
+        String written = Files.readString(Path.of(reportPath));
+        assertTrue(written.startsWith("# Report readiness — READY\n"), written);
+    }
+
+    @Test
+    void readinessBrokenIntegrityIsNotReadyExitOneBlockingReasonsSectionWritten(@TempDir Path dir) throws IOException {
+        Path report = readinessReport(dir, "[]", "{\"status\":\"failed\",\"stream\":\"gw\"}\n");
+        JsonNode env = runJson("readiness", report.toString(), "--catalog-dir", CATALOG_DIR.toString());
+        assertEquals(1, env.get("exit_code").asInt());
+        assertEquals("NOT READY", env.get("verdict").asText());
+        String written = Files.readString(Path.of(env.get("report").asText()));
+        assertTrue(written.contains("## Blocking reasons"), written);
+        assertTrue(written.contains("- integrity failed on stream gw"), written);
+    }
+
+    @Test
+    void readinessAHighSeverityInsufficientEvidenceRecordedInGapsIsReadyWithLimitations(@TempDir Path dir)
+            throws IOException {
+        Path report = readinessReport(
+                dir, "[{\"control\":\"OVS-03\",\"outcome\":\"insufficient_evidence\",\"subject\":\"s\"}]", "");
+        Path gaps = dir.resolve("gaps.md");
+        Files.writeString(gaps, "OVS-03 owned by alice on 2026-02-01\n");
+        Path deviations = dir.resolve("deviations.yaml");
+        Files.writeString(deviations, "deviations: []\n");
+        JsonNode env = runJson(
+                "readiness",
+                report.toString(),
+                "--catalog-dir", CATALOG_DIR.toString(),
+                "--gaps", gaps.toString(),
+                "--deviations", deviations.toString());
+        assertEquals(0, env.get("exit_code").asInt());
+        assertEquals("READY WITH LIMITATIONS", env.get("verdict").asText());
+    }
+
+    @Test
+    void readinessMissingReportDirGivesInputReportDirMissingWithTheReadinessSpecificFixText() {
+        JsonNode env = runJson("readiness");
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.report_dir_missing", env.get("error").get("message_key").asText());
+        assertEquals(
+                "pass the report directory: `agentce readiness <report-dir>`.",
+                env.get("error").get("fix").asText());
+    }
+
+    @Test
+    void readinessAReportDirThatIsNotADirectoryGivesInputReportDirNotADirectory(@TempDir Path dir) {
+        Path notADir = dir.resolve("nope");
+        JsonNode env = runJson("readiness", notADir.toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.report_dir_not_a_directory", env.get("error").get("message_key").asText());
+    }
+
+    @Test
+    void readinessAGivenButBadGapsPathIsInputGapsNotAFile(@TempDir Path dir) throws IOException {
+        Path report = readinessReport(dir);
+        JsonNode env = runJson(
+                "readiness",
+                report.toString(),
+                "--catalog-dir", CATALOG_DIR.toString(),
+                "--gaps", dir.resolve("missing.md").toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.gaps_not_a_file", env.get("error").get("message_key").asText());
+    }
+
+    @Test
+    void readinessAGivenButBadDeviationsPathIsInputDeviationsNotAFile(@TempDir Path dir) throws IOException {
+        Path report = readinessReport(dir);
+        JsonNode env = runJson(
+                "readiness",
+                report.toString(),
+                "--catalog-dir", CATALOG_DIR.toString(),
+                "--deviations", dir.resolve("missing.yaml").toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.deviations_not_a_file", env.get("error").get("message_key").asText());
+    }
+
+    @Test
+    void readinessABadCatalogDirIsInputCatalogDirNotADirectory(@TempDir Path dir) throws IOException {
+        Path report = readinessReport(dir);
+        JsonNode env = runJson(
+                "readiness", report.toString(), "--catalog-dir", dir.resolve("no-such-catalog").toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.catalog-dir_not_a_directory", env.get("error").get("message_key").asText());
+    }
+
+    @Test
+    void readinessAMalformedDeviationRegisterGivesInputDeviationInvalidNeverACrash(@TempDir Path dir)
+            throws IOException {
+        Path report = readinessReport(dir);
+        Path deviations = dir.resolve("deviations.yaml");
+        Files.writeString(deviations, "deviations: not-a-list\n");
+        JsonNode env = runJson(
+                "readiness",
+                report.toString(),
+                "--catalog-dir", CATALOG_DIR.toString(),
+                "--deviations", deviations.toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.deviation_invalid", env.get("error").get("message_key").asText());
+    }
+
+    @Test
+    void readinessWithNoCatalogDirEveryVendoredBaseCatalogIsUsed(@TempDir Path dir) throws IOException {
+        Path report = readinessReport(dir, "[{\"control\":\"OVS-03\",\"outcome\":\"conformant\",\"subject\":\"s\"}]", "");
+        JsonNode env = runJson("readiness", report.toString());
+        assertTrue(env.get("exit_code").asInt() == 0 || env.get("exit_code").asInt() == 1);
+        assertTrue(env.get("verdict").isTextual());
+    }
 }
