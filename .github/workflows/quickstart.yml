@@ -183,6 +183,10 @@ jobs:
           (cd engines/typescript && pnpm build)
           (cd engines/java && ./gradlew :assemble -q)
           uv run --project tools --frozen python tools/catalog_digest_check.py spec/catalogs/base/baseline
+      - name: Cross-engine agentce diff must agree (self-test, then the real invocations)
+        run: |
+          uv run --project tools --frozen python tools/diff_parity_check.py --self-test
+          uv run --project tools --frozen python tools/diff_parity_check.py
       - name: The check itself must be able to fail
         run: python3 tools/installed_artifacts_check.py --self-test
       - name: Build each artifact, install it outside the checkout, run it with no network
