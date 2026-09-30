@@ -410,12 +410,11 @@ export interface CalendarDate {
   readonly offsetMinutes?: number | null;
 }
 
-/** Deliberately **narrower** than Python 3.12 `datetime.fromisoformat` (a disclosed divergence,
- * `TRADEOFFS.md`): only the extended ISO-8601/RFC-3339 forms the deviation-register schema's own
- * `format: date-time` allows -- never Python's additionally-accepted basic format (`20211231`),
- * week-dates (`2021-W52-5`), or hour-only/space-separated naive forms. The divergence fails safely
- * (a spurious, disclosed `NOT_READY` on a Python-only-accepted string, never a wrongly-accepted or
- * silently-misread date). */
+/** RFC 3339 only, the one grammar all three engines accept (2026-09-30 maintainer decision,
+ * `TRADEOFFS.md`/inbox row 19): only the forms the deviation-register schema's own
+ * `format: date-time` allows -- never `datetime.fromisoformat`'s additionally-accepted basic format
+ * (`20211231`), week-dates (`2021-W52-5`), or hour-only/minute-only reduced-precision forms; Python's
+ * own `parse_date` now rejects these same forms too, so this is no longer a cross-engine divergence. */
 const PARSE_DATE_RE =
   /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?:[T ](?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})(?:\.(?<fraction>\d+))?(?<offset>Z|[+-]\d{2}:?\d{2})?)?$/;
 const OFFSET_RE = /^([+-])(\d{2}):?(\d{2})$/;
@@ -593,7 +592,7 @@ export function deviationLint(
       ["expiry", expiryRaw, expiry] as const,
     ]) {
       if (pyTruthy(raw) && parsed === null) {
-        problems.push(`${control}: ${dateField} is not a valid ISO-8601 date (${pyRepr(raw)})`);
+        problems.push(`${control}: ${dateField} is not a valid RFC 3339 date (${pyRepr(raw)})`);
       }
     }
     if (granted !== null && expiry !== null && daysBetween(granted, expiry) > maxDays) {

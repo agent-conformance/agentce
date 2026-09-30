@@ -578,11 +578,12 @@ public final class Readiness {
      * never an instant on a shared timeline. */
     private record CalendarDate(int year, int month, int day) {}
 
-    /** Deliberately <b>narrower</b> than Python 3.12 {@code datetime.fromisoformat} (a disclosed
-     * divergence, {@code TRADEOFFS.md}): only the extended ISO-8601/RFC-3339 forms the deviation-
-     * register schema's own {@code format: date-time} allows -- never Python's additionally-accepted
-     * basic format ({@code 20211231}), week-dates ({@code 2021-W52-5}), or hour-only/space-separated
-     * naive forms. */
+    /** RFC 3339 only, the one grammar all three engines accept (2026-09-30 maintainer decision,
+     * {@code TRADEOFFS.md}/inbox row 19): only the forms the deviation-register schema's own
+     * {@code format: date-time} allows -- never {@code datetime.fromisoformat}'s additionally-accepted
+     * basic format ({@code 20211231}), week-dates ({@code 2021-W52-5}), or hour-only/minute-only
+     * reduced-precision forms; Python's own {@code parse_date} now rejects these same forms too, so
+     * this is no longer a cross-engine divergence. */
     private static final java.util.regex.Pattern PARSE_DATE_RE = java.util.regex.Pattern.compile(
             "(?<year>\\d{4})-(?<month>\\d{2})-(?<day>\\d{2})"
                     + "(?:[T ](?<hour>\\d{2}):(?<minute>\\d{2}):(?<second>\\d{2})"
@@ -727,10 +728,10 @@ public final class Readiness {
             CalendarDate granted = grantedRaw.isTextual() ? parseDate(grantedRaw.textValue()) : null;
             CalendarDate expiry = expiryRaw.isTextual() ? parseDate(expiryRaw.textValue()) : null;
             if (pyTruthy(grantedRaw) && granted == null) {
-                problems.add(control + ": granted is not a valid ISO-8601 date (" + pyRepr(grantedRaw) + ")");
+                problems.add(control + ": granted is not a valid RFC 3339 date (" + pyRepr(grantedRaw) + ")");
             }
             if (pyTruthy(expiryRaw) && expiry == null) {
-                problems.add(control + ": expiry is not a valid ISO-8601 date (" + pyRepr(expiryRaw) + ")");
+                problems.add(control + ": expiry is not a valid RFC 3339 date (" + pyRepr(expiryRaw) + ")");
             }
             if (granted != null && expiry != null && daysBetween(granted, expiry) > maxDays) {
                 problems.add(control + ": deviation lifetime exceeds " + maxDays + " days");

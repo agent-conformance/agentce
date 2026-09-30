@@ -320,14 +320,14 @@ test("an unparseable expiry or granted is rejected, not silently skipped", () =>
     appliedControls: new Set(),
     asOf: null,
   });
-  assert.ok(badExpiry.some((p) => p.includes("expiry is not a valid ISO-8601 date")));
+  assert.ok(badExpiry.some((p) => p.includes("expiry is not a valid RFC 3339 date")));
   const badGranted = deviationLint([deviation({ granted: "not-a-date" })], {
     controlIds: new Set(["OVS-03"]),
     outcomesByControl: new Map([["OVS-03", new Set(["non-conformant"])]]),
     appliedControls: new Set(),
     asOf: null,
   });
-  assert.ok(badGranted.some((p) => p.includes("granted is not a valid ISO-8601 date")));
+  assert.ok(badGranted.some((p) => p.includes("granted is not a valid RFC 3339 date")));
 });
 
 test("control: null renders as 'None', an absent control as '' -- the pyGet-vs-|| distinction", () => {
@@ -435,6 +435,17 @@ test("parseDate rejects an out-of-range hour/minute/second/offset, not only an i
   assert.equal(parseDate("2021-01-01T10:61:00Z"), null);
   assert.equal(parseDate("2021-01-01T23:59:60Z"), null);
   assert.equal(parseDate("2021-01-01T10:00:00+24:00"), null);
+});
+
+test("parseDate rejects fromisoformat's extra forms -- RFC 3339 only (2026-09-30 maintainer decision)", () => {
+  // TRADEOFFS.md/inbox row 19: one grammar in all three engines. Python's own `parse_date` now
+  // rejects these same four forms (cross-engine vector) even though real `datetime.fromisoformat`
+  // still accepts each of them.
+  assert.equal(parseDate("20211231"), null); // basic format (no separators)
+  assert.equal(parseDate("2021-W52-5"), null); // ISO week date
+  assert.equal(parseDate("2021-12-31T10"), null); // hour-only precision, no minutes/seconds
+  assert.equal(parseDate("2021-12-31T10:30"), null); // minute precision, no seconds
+  assert.notEqual(parseDate("2021-12-31T10:30:00"), null); // RFC 3339 still accepted
 });
 
 // --- loadDeviationRegister: PyYAML-matching implicit resolution --------------------------------

@@ -11,6 +11,7 @@ manual-protocol linters the ``agentce-prepare-to-share`` skill wraps; each retur
 from __future__ import annotations
 
 import json
+import re
 from datetime import date, datetime
 from importlib import resources
 from pathlib import Path
@@ -82,23 +83,57 @@ def normalize_deviation_dates(
     ]
 
 
+#: RFC 3339 only (2026-09-30 maintainer decision, `TRADEOFFS.md`/inbox row 19): the same grammar
+#: TypeScript's and Java's own ``parseDate`` accept -- full calendar date, optional ``T``/space-
+#: separated time with mandatory seconds, optional fractional seconds, optional ``Z``/numeric offset --
+#: never ``datetime.fromisoformat``'s additional basic-format (``20211231``), week-date
+#: (``2021-W52-5``), or reduced-precision (hour-only/minute-only) forms, which no producer this engine
+#: reads ever emits.
+_PARSE_DATE_RE = re.compile(
+    r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})"
+    r"(?:[T ](?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})"
+    r"(?:\.\d+)?(?P<offset>Z|[+-]\d{2}:?\d{2})?)?$"
+)
+_OFFSET_RE = re.compile(r"^([+-])(\d{2}):?(\d{2})$")
+
+
 def parse_date(value: Any) -> date | None:
-    """Parse an ISO 8601 date or datetime string, or an already-parsed ``date``/``datetime`` (what a
-    YAML loader turns an *unquoted* date into), to a ``date``; anything else (not parseable) is
-    ``None`` -- never an exception, so a hostile or malformed field is simply absent for comparison,
-    not a crash. Accepting ``date``/``datetime`` directly, not just ``str``, means a caller that reads
-    a register straight off disk and forgets :func:`normalize_deviation_dates` still gets a correct
-    parse here rather than a silently-absent or falsely-invalid field."""
+    """Parse an RFC 3339 date or date-time string, or an already-parsed ``date``/``datetime`` (what a
+    YAML loader turns an *unquoted* date into), to a ``date``; anything else (not parseable, or a
+    string outside RFC 3339's grammar) is ``None`` -- never an exception, so a hostile or malformed
+    field is simply absent for comparison, not a crash. Accepting ``date``/``datetime`` directly, not
+    just ``str``, means a caller that reads a register straight off disk and forgets
+    :func:`normalize_deviation_dates` still gets a correct parse here rather than a silently-absent or
+    falsely-invalid field."""
     if isinstance(value, datetime):
         return value.date()
     if isinstance(value, date):
         return value
     if not isinstance(value, str):
         return None
+    m = _PARSE_DATE_RE.match(value)
+    if m is None:
+        return None
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+        result = date(int(m.group("year")), int(m.group("month")), int(m.group("day")))
     except ValueError:
         return None
+    if m.group("hour") is not None:
+        hour, minute, second = (
+            int(m.group("hour")),
+            int(m.group("minute")),
+            int(m.group("second")),
+        )
+        if hour > 23 or minute > 59 or second > 59:
+            return None
+        offset = m.group("offset")
+        if offset is not None and offset != "Z":
+            offset_match = _OFFSET_RE.match(offset)
+            if offset_match is None:
+                return None
+            if int(offset_match.group(2)) > 23 or int(offset_match.group(3)) > 59:
+                return None
+    return result
 
 
 def compute_readiness(
@@ -260,7 +295,7 @@ def deviation_lint(
         ):
             if raw and parsed is None:
                 problems.append(
-                    f"{control}: {date_field} is not a valid ISO-8601 date ({raw!r})"
+                    f"{control}: {date_field} is not a valid RFC 3339 date ({raw!r})"
                 )
         if granted and expiry and (expiry - granted).days > max_days:
             problems.append(f"{control}: deviation lifetime exceeds {max_days} days")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -283,19 +284,32 @@ def test_deviation_lint_rejects_an_unparseable_granted_or_expiry_rather_than_sil
         control_ids={"OVS-03"},
         outcomes_by_control={"OVS-03": frozenset({"non-conformant"})},
     )
-    assert any("expiry is not a valid ISO-8601 date" in p for p in problems)
+    assert any("expiry is not a valid RFC 3339 date" in p for p in problems)
     non_string = deviation_lint(
         [_deviation(expiry=20210101)],
         control_ids={"OVS-03"},
         outcomes_by_control={"OVS-03": frozenset({"non-conformant"})},
     )
-    assert any("expiry is not a valid ISO-8601 date" in p for p in non_string)
+    assert any("expiry is not a valid RFC 3339 date" in p for p in non_string)
     granted = deviation_lint(
         [_deviation(granted="not-a-date")],
         control_ids={"OVS-03"},
         outcomes_by_control={"OVS-03": frozenset({"non-conformant"})},
     )
-    assert any("granted is not a valid ISO-8601 date" in p for p in granted)
+    assert any("granted is not a valid RFC 3339 date" in p for p in granted)
+
+
+def test_parse_date_rejects_fromisoformats_extra_forms_rfc_3339_only() -> None:
+    """2026-09-30 maintainer decision (`TRADEOFFS.md`/inbox row 19): one grammar in all three
+    engines, RFC 3339 only -- ``parse_date`` must no longer accept the forms real
+    ``datetime.fromisoformat`` does beyond RFC 3339 (confirmed against Python 3.12: each of these
+    parses successfully today, before this narrowing). TypeScript's and Java's own ``parseDate``
+    already reject all four; this is the cross-engine vector proving Python now agrees."""
+    assert parse_date("20211231") is None  # basic format (no separators)
+    assert parse_date("2021-W52-5") is None  # ISO week date
+    assert parse_date("2021-12-31T10") is None  # hour-only precision, no minutes/seconds
+    assert parse_date("2021-12-31T10:30") is None  # minute precision, no seconds
+    assert parse_date("2021-12-31T10:30:00") == date(2021, 12, 31)  # RFC 3339 still accepted
 
 
 def test_parse_date_accepts_an_already_parsed_date_or_datetime() -> None:

@@ -441,7 +441,7 @@ class ReadinessTest {
                 Set.of(),
                 null,
                 Readiness.DEFAULT_MAX_DEVIATION_DAYS);
-        assertTrue(badExpiry.stream().anyMatch(p -> p.contains("expiry is not a valid ISO-8601 date")));
+        assertTrue(badExpiry.stream().anyMatch(p -> p.contains("expiry is not a valid RFC 3339 date")));
 
         ObjectNode badGrantedDev = deviation();
         badGrantedDev.put("granted", "not-a-date");
@@ -452,7 +452,7 @@ class ReadinessTest {
                 Set.of(),
                 null,
                 Readiness.DEFAULT_MAX_DEVIATION_DAYS);
-        assertTrue(badGranted.stream().anyMatch(p -> p.contains("granted is not a valid ISO-8601 date")));
+        assertTrue(badGranted.stream().anyMatch(p -> p.contains("granted is not a valid RFC 3339 date")));
     }
 
     @Test
@@ -555,6 +555,18 @@ class ReadinessTest {
         assertNull(Readiness.parseDate("2021-01-01T10:61:00Z"));
         assertNull(Readiness.parseDate("2021-01-01T23:59:60Z"));
         assertNull(Readiness.parseDate("2021-01-01T10:00:00+24:00"));
+    }
+
+    @Test
+    void parseDateRejectsFromisoformatsExtraFormsRfc3339Only() {
+        // TRADEOFFS.md/inbox row 19 (2026-09-30 maintainer decision): one grammar in all three
+        // engines. Python's own parse_date now rejects these same four forms (cross-engine vector)
+        // even though real datetime.fromisoformat still accepts each of them.
+        assertNull(Readiness.parseDate("20211231")); // basic format (no separators)
+        assertNull(Readiness.parseDate("2021-W52-5")); // ISO week date
+        assertNull(Readiness.parseDate("2021-12-31T10")); // hour-only precision, no minutes/seconds
+        assertNull(Readiness.parseDate("2021-12-31T10:30")); // minute precision, no seconds
+        assertNotNull(Readiness.parseDate("2021-12-31T10:30:00")); // RFC 3339 still accepted
     }
 
     // --- loadDeviationRegister: PyYAML-matching implicit resolution --------------------------------
