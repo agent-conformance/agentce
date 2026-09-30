@@ -157,10 +157,7 @@ public final class Readiness {
             return value.bigIntegerValue().signum() != 0;
         }
         if (value.isNumber()) {
-            // A non-integral node can hold NaN/Infinity (from a YAML `.nan`/`.inf` scalar, e.g.),
-            // which BigDecimal cannot represent -- decimalValue() throws for those. doubleValue() is
-            // exact for every non-integral JSON number this engine produces and matches Python's own
-            // float truthiness: only 0.0/-0.0 is falsy; NaN and +/-Infinity are both truthy.
+            // doubleValue(), not decimalValue() (see pyStr): Python float truthiness, NaN is truthy.
             return value.doubleValue() != 0.0;
         }
         if (value.isArray() || value.isObject()) {
@@ -210,9 +207,7 @@ public final class Readiness {
             if (a.isIntegralNumber() && b.isIntegralNumber()) {
                 return a.bigIntegerValue().equals(b.bigIntegerValue());
             }
-            // At least one side is non-integral and may hold NaN/Infinity (BigDecimal can't
-            // represent those, so decimalValue() would throw). Primitive double `==` already
-            // matches Python's float equality here, including NaN != NaN.
+            // doubleValue() (see pyStr): primitive `==` is Python's float equality, NaN != NaN.
             return a.doubleValue() == b.doubleValue();
         }
         return false;

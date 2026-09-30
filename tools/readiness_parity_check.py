@@ -32,6 +32,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import re
 import subprocess
@@ -277,6 +278,13 @@ def compare(
         failures.append(f"{label}: {engine_a} and {engine_b} disagree")
 
 
+def compare_ports(label: str, outputs: list[str], failures: list[str]) -> None:
+    """`compare` of the Python reference (`outputs[0]`) against each port (TypeScript, Java)."""
+    py, ts, java = outputs
+    compare(label, py, ts, "python", "typescript", failures)
+    compare(label, py, java, "python", "java", failures)
+
+
 def _run(cmd: list[str], *, cwd: Path | None = None) -> tuple[str, int]:
     proc = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
     return proc.stdout, proc.returncode
@@ -310,7 +318,8 @@ def typescript_readiness(args: list[str]) -> tuple[str, int]:
     return _run(["node", str(entry), "readiness", *args], cwd=ROOT)
 
 
-def java_readiness(args: list[str]) -> tuple[str, int]:
+@functools.cache
+def _java_jar() -> Path:
     jars = sorted(
         (JAVA_ENGINE / "build" / "libs").glob("agentce-*-all.jar"),
         key=lambda p: p.stat().st_mtime,
@@ -319,7 +328,11 @@ def java_readiness(args: list[str]) -> tuple[str, int]:
         raise SystemExit(
             "java runnable jar is not built (run `./gradlew :assemble -q` in engines/java first)"
         )
-    return _run(["java", "-jar", str(jars[-1]), "readiness", *args], cwd=ROOT)
+    return jars[-1]
+
+
+def java_readiness(args: list[str]) -> tuple[str, int]:
+    return _run(["java", "-jar", str(_java_jar()), "readiness", *args], cwd=ROOT)
 
 
 def self_test() -> int:
@@ -455,21 +468,9 @@ def run_real_check() -> int:
             for key in ("verdict", "reasons", "limitations"):
                 # `json.dumps` on a plain string round-trips to the same bytes a direct compare would
                 # use, so this one form covers both the scalar `verdict` and the list fields.
-                py_val = json.dumps(py_env.get(key))
-                compare(
+                compare_ports(
                     f"{scenario.name}:{key}",
-                    py_val,
-                    json.dumps(ts_env.get(key)),
-                    "python",
-                    "typescript",
-                    failures,
-                )
-                compare(
-                    f"{scenario.name}:{key}",
-                    py_val,
-                    json.dumps(java_env.get(key)),
-                    "python",
-                    "java",
+                    [json.dumps(env.get(key)) for env in (py_env, ts_env, java_env)],
                     failures,
                 )
             if py_env.get("verdict") != scenario.expect_verdict:
@@ -478,20 +479,9 @@ def run_real_check() -> int:
                     f"{scenario.expect_verdict!r} -- the fixture assumption above is wrong"
                 )
 
-            compare(
+            compare_ports(
                 f"{scenario.name}:report.md",
-                py_report,
-                ts_report,
-                "python",
-                "typescript",
-                failures,
-            )
-            compare(
-                f"{scenario.name}:report.md",
-                py_report,
-                java_report,
-                "python",
-                "java",
+                [py_report, ts_report, java_report],
                 failures,
             )
 
@@ -511,22 +501,7 @@ def run_real_check() -> int:
                 verdicts = [
                     json.dumps(json.loads(out).get("verdict")) for _, (out, _) in runs
                 ]
-                compare(
-                    f"argv:{name}:verdict",
-                    verdicts[0],
-                    verdicts[1],
-                    "python",
-                    "typescript",
-                    failures,
-                )
-                compare(
-                    f"argv:{name}:verdict",
-                    verdicts[0],
-                    verdicts[2],
-                    "python",
-                    "java",
-                    failures,
-                )
+                compare_ports(f"argv:{name}:verdict", verdicts, failures)
 
     for failure in failures:
         print(f"MISMATCH: {failure}", file=sys.stderr)

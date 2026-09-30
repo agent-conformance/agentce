@@ -15,6 +15,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.TreeSet;
 import java.util.stream.Stream;
 
@@ -35,7 +36,7 @@ public final class Cli {
     /** The same four flags Python's own top-level parser accepts for every command ({@code
      * --debug}/{@code --quiet} are silently ignored here too, exactly as they are everywhere else in
      * both engines today) -- skipped by {@link #positionalArgs}, never read as a positional. */
-    private static final Set<String> DIFF_SKIP_FLAGS = Set.of("--json", "--debug", "--quiet");
+    private static final Set<String> GLOBAL_BOOLEAN_FLAGS = Set.of("--json", "--debug", "--quiet");
 
     public static void main(String[] args) {
         System.exit(run(args));
@@ -207,7 +208,7 @@ public final class Cli {
 
     /** A hardened positional-argument scanner for {@code diff} (the first CLI verb in this engine with
      * positional, not {@code --flag}, arguments). {@code args[0]} is the command name and is not itself
-     * scanned. Skips exactly {@link #DIFF_SKIP_FLAGS} and {@code --format <value>}, collecting every
+     * scanned. Skips exactly {@link #GLOBAL_BOOLEAN_FLAGS} and {@code --format <value>}, collecting every
      * other token in order, but throws {@code input.diff_unrecognized_flag} on any other {@code
      * --}-prefixed token instead of silently reading it as a positional. {@code --format=<value>}
      * (single-token, {@code =}-joined) is out of scope, matching every other flag in both engines
@@ -216,7 +217,7 @@ public final class Cli {
         List<String> out = new ArrayList<>();
         for (int i = 1; i < args.length; i++) {
             String token = args[i];
-            if (DIFF_SKIP_FLAGS.contains(token)) {
+            if (GLOBAL_BOOLEAN_FLAGS.contains(token)) {
                 continue;
             }
             if ("--format".equals(token)) {
@@ -855,16 +856,10 @@ public final class Cli {
         return result;
     }
 
-    /** {@code agentce version} (SPEC §8.5): the same structured envelope every other command returns,
-     * with a real installed-artifact {@code no_ml} self-report (mirrors Python's {@code cmd_version}
-     * and the TypeScript port's {@code cmdVersion}). Distinct from the bare {@code --version}/
-     * {@code -V} flag, which stays a plain one-line shortcut (handled before this is ever reached,
-     * {@link #run}). */
     /** {@code agentce readiness}'s parsed args (see {@link #parseReadinessArgs}). */
     private record ReadinessArgs(String reportDir, String gaps, String deviations, List<String> catalogDirs) {}
 
-    private static final java.util.regex.Pattern NEGATIVE_NUMBER =
-            java.util.regex.Pattern.compile("-\\d+|-\\d*\\.\\d+");
+    private static final Pattern NEGATIVE_NUMBER = Pattern.compile("-\\d+|-\\d*\\.\\d+");
 
     /** A token argparse classifies as an option rather than a value: it starts with {@code -}, is not
      * a bare {@code -}, does not look like a negative number and holds no space
@@ -904,7 +899,7 @@ public final class Cli {
             if (!optionsEnded && looksLikeOption(token)) {
                 int eq = token.indexOf('=');
                 String name = eq >= 0 ? token.substring(0, eq) : token;
-                if ("--json".equals(name) || "--debug".equals(name) || "--quiet".equals(name)) {
+                if (GLOBAL_BOOLEAN_FLAGS.contains(name)) {
                     if (eq >= 0) {
                         throw readinessUnrecognized("flag '" + name + "' takes no value.", "drop the value: " + name + ".");
                     }
@@ -1047,6 +1042,11 @@ public final class Cli {
         return result;
     }
 
+    /** {@code agentce version} (SPEC §8.5): the same structured envelope every other command returns,
+     * with a real installed-artifact {@code no_ml} self-report (mirrors Python's {@code cmd_version}
+     * and the TypeScript port's {@code cmdVersion}). Distinct from the bare {@code --version}/
+     * {@code -V} flag, which stays a plain one-line shortcut (handled before this is ever reached,
+     * {@link #run}). */
     private static CommandResult cmdVersion() {
         CommandResult result = new CommandResult("version");
         NoMl.InstalledResult scan = NoMl.evaluateInstalled(NoMl.loadVendoredDenylist(), NoMl.loadRuntimeDeps());

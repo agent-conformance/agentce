@@ -143,6 +143,9 @@ function requireFile(
   return raw;
 }
 
+/** The global flags every command accepts, none of which takes a value. */
+const GLOBAL_BOOLEAN_FLAGS = new Set(["--json", "--debug", "--quiet"]);
+
 /** A hardened positional-argument scanner for `diff` (the first CLI verb in this engine with
  * positional, not `--flag`, arguments). `argv[0]` is the command name and is not itself scanned.
  * Skips exactly `--json`, `--format <value>`, `--debug`, and `--quiet` (the same four flags Python's
@@ -156,7 +159,7 @@ function positionalArgs(argv: string[]): string[] {
   const out: string[] = [];
   for (let i = 1; i < argv.length; i++) {
     const token = argv[i] as string;
-    if (token === "--json" || token === "--debug" || token === "--quiet") {
+    if (GLOBAL_BOOLEAN_FLAGS.has(token)) {
       continue;
     }
     if (token === "--format") {
@@ -777,7 +780,7 @@ function parseReadinessArgv(argv: string[]): ReadinessArgs {
     if (!optionsEnded && looksLikeOption(token)) {
       const eq = token.indexOf("=");
       const name = eq >= 0 ? token.slice(0, eq) : token;
-      if (name === "--json" || name === "--debug" || name === "--quiet") {
+      if (GLOBAL_BOOLEAN_FLAGS.has(name)) {
         if (eq >= 0) {
           throw readinessUnrecognized(`flag '${name}' takes no value.`, `drop the value: ${name}.`);
         }
@@ -828,16 +831,14 @@ function cmdReadiness(argv: string[]): CommandResult {
     "pass the report directory: `agentce readiness <report-dir>`.",
   );
   let gaps = new Set<string>();
-  const gapsPath = args.gaps;
-  if (gapsPath !== undefined) {
-    const text = readFileSync(requireFile(gapsPath, "gaps", "the gaps file"), "utf-8");
+  if (args.gaps !== undefined) {
+    const text = readFileSync(requireFile(args.gaps, "gaps", "the gaps file"), "utf-8");
     gaps = parseGapsFile(text);
   }
   let deviations: Record<string, unknown>[] = [];
-  const deviationsPath = args.deviations;
-  if (deviationsPath !== undefined) {
+  if (args.deviations !== undefined) {
     deviations = loadDeviationRegister(
-      requireFile(deviationsPath, "deviations", "the deviation register"),
+      requireFile(args.deviations, "deviations", "the deviation register"),
     );
   }
   const severities = readinessSeverities(args.catalogDirs);
