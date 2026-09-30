@@ -38,6 +38,7 @@ import { evaluateInstalledNoMl, loadVendoredDenylist } from "./noMl";
 import { computeVectorFile } from "./numerics";
 import { type Profile, loadProfile } from "./profile";
 import { writeQuarantine } from "./quarantine";
+import { NOT_READY, computeReadiness, loadDeviationRegister, parseGapsFile } from "./readiness";
 import {
   activityCliLines,
   blindSpotsCliLines,
@@ -90,8 +91,13 @@ function flagValues(argv: string[], name: string): string[] {
   return out;
 }
 
-function requireDir(raw: string | undefined, key: string, what: string): string {
-  const fix = `pass --${key} <dir>.`;
+function requireDir(
+  raw: string | undefined,
+  key: string,
+  what: string,
+  fixOverride?: string,
+): string {
+  const fix = fixOverride ?? `pass --${key} <dir>.`;
   if (raw === undefined) {
     throw new InputError(`input.${key}_missing`, `${what} is required.`, fix);
   }
@@ -683,6 +689,116 @@ function cmdDiff(argv: string[]): CommandResult {
   return result;
 }
 
+/** Today's date in the **local** calendar, `YYYY-MM-DD` -- never `toISOString()`, which is UTC-based
+ * and would name tomorrow's report file every evening west of UTC. Matches Python's
+ * `date.today().isoformat()` (local-clock-based) and Java's `LocalDate.now()` (likewise local). */
+function localIsoDate(): string {
+  const d = new Date();
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** Every control's severity, from the given `--catalog-dir`s, else every vendored base catalog (SPEC
+ * §13.3.4). Deliberately **not** a factoring of {@link vendoredCatalogs}: that function silently
+ * skips a subdirectory whose `catalog.yaml` fails to parse and also scans `overlays/`, neither of
+ * which matches this function's own throw-on-malformed, `base`-only behaviour (mirrors Python's
+ * `_readiness_severities`, `commands/__init__.py:2815-2827`, which has no try/catch around
+ * `load_catalog`). A later catalog's control silently overwrites an earlier one sharing an id
+ * (plain last-write-wins, matching Python's dict-comprehension). */
+function readinessSeverities(catalogDirs: string[]): Map<string, string> {
+  let dirs = catalogDirs;
+  if (dirs.length === 0) {
+    const base = join(bundledCatalogsDir(), "base");
+    let names: string[] = [];
+    try {
+      names = readdirSync(base).sort(byteCompare);
+    } catch {
+      names = [];
+    }
+    dirs = names
+      .map((name) => join(base, name))
+      .filter((dir) => existsSync(join(dir, "catalog.yaml")));
+  }
+  const severities = new Map<string, string>();
+  for (const dir of dirs) {
+    const catalog = loadCatalog(requireDir(dir, "catalog-dir", "a catalog directory"));
+    for (const control of catalog.controls) {
+      severities.set(control.id, control.severity);
+    }
+  }
+  return severities;
+}
+
+/** `report_dir`'s value: the one positional token in `agentce readiness`'s argv, skipping `--json`/
+ * `--debug`/`--quiet` (boolean) and `--gaps`/`--deviations`/`--catalog-dir` (each with a value) --
+ * `readiness` has no `--format` flag in Python (confirmed by reading `cli.py`'s `readiness`
+ * subparser: no `--format` argument at all), so none is recognized here either. */
+function readinessReportDirToken(argv: string[]): string | undefined {
+  const valueFlags = new Set(["gaps", "deviations", "catalog-dir"]);
+  for (let i = 1; i < argv.length; i++) {
+    const token = argv[i] as string;
+    if (token === "--json" || token === "--debug" || token === "--quiet") {
+      continue;
+    }
+    if (token.startsWith("--")) {
+      if (valueFlags.has(token.slice(2))) {
+        i++; // also skip the value token
+      }
+      continue;
+    }
+    return token;
+  }
+  return undefined;
+}
+
+/** `agentce readiness` (SPEC §13.3.4 stage 4, item 18.25): the report-readiness verdict, matching the
+ * Python reference's `cmd_readiness` byte for byte (see `readiness.ts`). Exit 0 for READY and READY
+ * WITH LIMITATIONS, 1 for NOT READY -- the verdict logic lives in the engine, never in a skill. */
+function cmdReadiness(argv: string[]): CommandResult {
+  const result = new CommandResult("readiness");
+  const reportDir = requireDir(
+    readinessReportDirToken(argv),
+    "report_dir",
+    "the report directory",
+    "pass the report directory: `agentce readiness <report-dir>`.",
+  );
+  let gaps = new Set<string>();
+  const gapsPath = flagValue(argv, "gaps");
+  if (gapsPath !== undefined) {
+    const text = readFileSync(requireFile(gapsPath, "gaps", "the gaps file"), "utf-8");
+    gaps = parseGapsFile(text);
+  }
+  let deviations: Record<string, unknown>[] = [];
+  const deviationsPath = flagValue(argv, "deviations");
+  if (deviationsPath !== undefined) {
+    deviations = loadDeviationRegister(
+      requireFile(deviationsPath, "deviations", "the deviation register"),
+    );
+  }
+  const severities = readinessSeverities(flagValues(argv, "catalog-dir"));
+  const verdict = computeReadiness(reportDir, { severities, deviations, gaps });
+  result.data.verdict = verdict.verdict;
+  result.data.reasons = verdict.reasons;
+  result.data.limitations = verdict.limitations;
+  const out = join(reportDir, `report-readiness-${localIsoDate()}.md`);
+  const lines = [`# Report readiness — ${verdict.verdict}`, ""];
+  if (verdict.reasons.length > 0) {
+    lines.push("## Blocking reasons", ...verdict.reasons.map((r) => `- ${r}`), "");
+  }
+  if (verdict.limitations.length > 0) {
+    lines.push("## Limitations", ...verdict.limitations.map((l) => `- ${l}`), "");
+  }
+  writeFileSync(out, `${lines.join("\n")}\n`);
+  result.data.report = out;
+  if (verdict.verdict === NOT_READY) {
+    result.addCode(ExitCode.FINDINGS);
+  }
+  result.note(
+    `${verdict.verdict}: ${verdict.reasons.length} reason(s), ${verdict.limitations.length} limitation(s)`,
+  );
+  return result;
+}
+
 function notImplemented(command: string): CommandResult {
   const result = new CommandResult(command);
   result.addCode(ExitCode.INPUT_ERROR);
@@ -794,6 +910,8 @@ export function main(argv: string[]): number {
       result = cmdReport(argv);
     } else if (command === "diff") {
       result = cmdDiff(argv);
+    } else if (command === "readiness") {
+      result = cmdReadiness(argv);
     } else if (command === "quickstart") {
       result = cmdQuickstart(argv);
     } else if (command === "version") {

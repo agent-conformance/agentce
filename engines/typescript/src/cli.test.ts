@@ -48,6 +48,29 @@ function diffFixture(dir: string, name: string, records: unknown[]): string {
   return path;
 }
 
+const REPO = join(__dirname, "..", "..", "..");
+/** A real, vendored catalog (`OVS-03` is `severity: high`) -- the same catalog `catalog.test.ts` uses. */
+const CATALOG_DIR = join(REPO, "spec", "catalogs", "base", "eu-ai-act");
+
+function readinessReport(
+  dir: string,
+  overrides: {
+    assertions?: Record<string, unknown>[];
+    integrity?: Record<string, unknown>[];
+  } = {},
+): string {
+  const reportDir = join(dir, "report");
+  mkdirSync(reportDir);
+  writeFileSync(join(reportDir, "assertions.json"), JSON.stringify(overrides.assertions ?? []));
+  writeFileSync(
+    join(reportDir, "integrity.jsonl"),
+    (overrides.integrity ?? []).map((r) => `${JSON.stringify(r)}\n`).join(""),
+  );
+  writeFileSync(join(reportDir, "coverage.json"), JSON.stringify({ subjects: {} }));
+  writeFileSync(join(reportDir, "applicability.jsonl"), "");
+  return reportDir;
+}
+
 test("quickstart assesses the vendored project end to end and writes a real report", () => {
   const out = mkdtempSync(join(tmpdir(), "agentce-cli-quickstart-"));
   try {
@@ -535,6 +558,193 @@ test("diff --json escapes non-ASCII content exactly like Python's ensure_ascii=T
     const raw = lines.join("\n");
     assert.ok(raw.includes("c\\u00e9"), raw);
     assert.ok(raw.includes("\\ud83d\\ude00"), raw);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- readiness (item 18.25) ---------------------------------------------------------------------
+
+test("readiness: a clean report is READY, exit 0, and writes a real report-readiness-*.md file", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-readiness-"));
+  try {
+    const report = readinessReport(dir, {
+      assertions: [{ control: "OVS-03", outcome: "conformant", subject: "s" }],
+      integrity: [{ status: "verified", stream: "a" }],
+    });
+    const { exitCode, envelope } = runJson(["readiness", report, "--catalog-dir", CATALOG_DIR]);
+    assert.equal(exitCode, 0);
+    assert.equal(envelope.verdict, "READY");
+    assert.deepEqual(envelope.reasons, []);
+    const reportPath = envelope.report as string;
+    assert.ok(reportPath.includes("report-readiness-"), reportPath);
+    const written = readFileSync(reportPath, "utf-8");
+    assert.ok(written.startsWith("# Report readiness — READY\n"), written);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("readiness: broken integrity is NOT READY, exit 1, blocking reasons section written", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-readiness-"));
+  try {
+    const report = readinessReport(dir, { integrity: [{ status: "failed", stream: "gw" }] });
+    const { exitCode, envelope } = runJson(["readiness", report, "--catalog-dir", CATALOG_DIR]);
+    assert.equal(exitCode, 1);
+    assert.equal(envelope.verdict, "NOT READY");
+    const reportPath = envelope.report as string;
+    const written = readFileSync(reportPath, "utf-8");
+    assert.ok(written.includes("## Blocking reasons"), written);
+    assert.ok(written.includes("- integrity failed on stream gw"), written);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("readiness: a high-severity insufficient_evidence recorded in --gaps is READY WITH LIMITATIONS", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-readiness-"));
+  try {
+    const report = readinessReport(dir, {
+      assertions: [{ control: "OVS-03", outcome: "insufficient_evidence", subject: "s" }],
+    });
+    const gaps = join(dir, "gaps.md");
+    writeFileSync(gaps, "OVS-03 owned by alice on 2026-02-01\n");
+    const deviations = join(dir, "deviations.yaml");
+    writeFileSync(deviations, "deviations: []\n");
+    const { exitCode, envelope } = runJson([
+      "readiness",
+      report,
+      "--catalog-dir",
+      CATALOG_DIR,
+      "--gaps",
+      gaps,
+      "--deviations",
+      deviations,
+    ]);
+    assert.equal(exitCode, 0);
+    assert.equal(envelope.verdict, "READY WITH LIMITATIONS");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("readiness: missing report_dir gives input.report_dir_missing with the readiness-specific fix text", () => {
+  const { exitCode, envelope } = runJson(["readiness"]);
+  assert.equal(exitCode, 3);
+  const error = envelope.error as { message_key: string; fix: string };
+  assert.equal(error.message_key, "input.report_dir_missing");
+  assert.equal(error.fix, "pass the report directory: `agentce readiness <report-dir>`.");
+});
+
+test("readiness: a report_dir that is not a directory gives input.report_dir_not_a_directory", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-readiness-"));
+  try {
+    const notADir = join(dir, "nope");
+    const { exitCode, envelope } = runJson(["readiness", notADir]);
+    assert.equal(exitCode, 3);
+    assert.equal(
+      (envelope.error as { message_key: string }).message_key,
+      "input.report_dir_not_a_directory",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("readiness: a given-but-bad --gaps path is input.gaps_not_a_file", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-readiness-"));
+  try {
+    const report = readinessReport(dir);
+    const { exitCode, envelope } = runJson([
+      "readiness",
+      report,
+      "--catalog-dir",
+      CATALOG_DIR,
+      "--gaps",
+      join(dir, "missing.md"),
+    ]);
+    assert.equal(exitCode, 3);
+    assert.equal((envelope.error as { message_key: string }).message_key, "input.gaps_not_a_file");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("readiness: a given-but-bad --deviations path is input.deviations_not_a_file", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-readiness-"));
+  try {
+    const report = readinessReport(dir);
+    const { exitCode, envelope } = runJson([
+      "readiness",
+      report,
+      "--catalog-dir",
+      CATALOG_DIR,
+      "--deviations",
+      join(dir, "missing.yaml"),
+    ]);
+    assert.equal(exitCode, 3);
+    assert.equal(
+      (envelope.error as { message_key: string }).message_key,
+      "input.deviations_not_a_file",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("readiness: a bad --catalog-dir is input.catalog-dir_not_a_directory", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-readiness-"));
+  try {
+    const report = readinessReport(dir);
+    const { exitCode, envelope } = runJson([
+      "readiness",
+      report,
+      "--catalog-dir",
+      join(dir, "no-such-catalog"),
+    ]);
+    assert.equal(exitCode, 3);
+    assert.equal(
+      (envelope.error as { message_key: string }).message_key,
+      "input.catalog-dir_not_a_directory",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("readiness: a malformed deviation register gives input.deviation_invalid, never a crash", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-readiness-"));
+  try {
+    const report = readinessReport(dir);
+    const deviations = join(dir, "deviations.yaml");
+    writeFileSync(deviations, "deviations: not-a-list\n");
+    const { exitCode, envelope } = runJson([
+      "readiness",
+      report,
+      "--catalog-dir",
+      CATALOG_DIR,
+      "--deviations",
+      deviations,
+    ]);
+    assert.equal(exitCode, 3);
+    assert.equal(
+      (envelope.error as { message_key: string }).message_key,
+      "input.deviation_invalid",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("readiness: with no --catalog-dir, every vendored base catalog is used", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-readiness-"));
+  try {
+    const report = readinessReport(dir, {
+      assertions: [{ control: "OVS-03", outcome: "conformant", subject: "s" }],
+    });
+    const { exitCode, envelope } = runJson(["readiness", report]);
+    assert.ok([0, 1].includes(exitCode));
+    assert.ok(typeof envelope.verdict === "string");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
