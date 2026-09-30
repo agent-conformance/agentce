@@ -1068,9 +1068,7 @@ function cmdSign(argv: string[]): CommandResult {
   // A fatal decode, not `readFileSync(claimPath, "utf-8")`: Node's utf-8 string coercion silently
   // replaces invalid byte sequences with U+FFFD, while Python's and Java's decoders refuse
   // (18.26 round-3 verifier finding). `TextDecoder`'s `fatal: true` throws instead.
-  const claimText = new TextDecoder("utf-8", { fatal: true }).decode(
-    readFileSync(claimPath),
-  );
+  const claimText = new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(claimPath));
   const parsedClaim: unknown = JSON.parse(claimText);
   if (!isRecord(parsedClaim)) {
     // Matches Python's `claim.setdefault("signatures", [])` (AttributeError on a non-dict claim)
@@ -1103,11 +1101,9 @@ function cmdSign(argv: string[]): CommandResult {
   // `claim["signatures"].append(record)` crashing with AttributeError, not a silent replacement
   // with a fresh array (18.26 round-3 verifier finding).
   if (claim.signatures !== undefined && !Array.isArray(claim.signatures)) {
-    throw new Error(
-      `claim.json's "signatures" is not an array (got ${typeof claim.signatures})`,
-    );
+    throw new Error(`claim.json's "signatures" is not an array (got ${typeof claim.signatures})`);
   }
-  const signatures = Array.isArray(claim.signatures) ? (claim.signatures as unknown[]) : [];
+  const signatures = (claim.signatures as unknown[] | undefined) ?? [];
   signatures.push(record);
   claim.signatures = signatures;
   writeFileSync(claimPath, `${jsonStringifyAscii(sortKeysDeep(claim), 2)}\n`);
