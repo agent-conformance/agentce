@@ -691,8 +691,8 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "a throwaway release-shaped commit built by force-adding the gitignored vendored wheel and lock for both skills actually carries them in its git tree; extracting each skill folder from that commit alone and running its S-10 self-test passes standalone, offline, with no sibling engines/ checkout; the committed wheel matches a fresh build of that commit's own engines/python byte for byte; a release commit with a missing, corrupted or stale wheel turns the check red",
-        "fail": "the release-shaped commit never advances past HEAD or is missing the wheel/lock from its tree, a skill's standalone self-test fails or needs the network, the committed wheel does not match a fresh build of its own engines/python, or the self-test's three seeded faults (missing, corrupted, stale) fail to turn the check red"
+        "pass": "a throwaway release-shaped commit built by force-adding the gitignored vendored wheel and lock for both skills actually carries them in its git tree, with no tracked file (such as pyproject.toml) left drifted and uncommitted; extracting each skill folder from that commit alone and running its S-10 self-test passes standalone, offline, with no sibling engines/ checkout; the committed wheel matches a fresh build of that commit's own engines/python byte for byte; a release commit with a missing, corrupted or stale wheel turns the check red",
+        "fail": "the release-shaped commit never advances past HEAD or is missing the wheel/lock from its tree, a skill's standalone self-test fails or needs the network, the committed wheel does not match a fresh build of its own engines/python, or the self-test's four seeded faults (missing, corrupted, stale, drifted pyproject.toml) fail to turn the check red"
       },
       "faults": [
         {

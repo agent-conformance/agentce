@@ -112,6 +112,7 @@ def _run(
             http_proxy=_DEAD_PROXY,
             https_proxy=_DEAD_PROXY,
             NO_PROXY="",
+            UV_OFFLINE="1",
         )
     return subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True)
 
@@ -127,14 +128,36 @@ def _git(*args: str, cwd: Path | None = None) -> str:
     return proc.stdout.strip()
 
 
+def _commit_as_bot(worktree: Path, *args: str) -> None:
+    """Run `git commit` in `worktree` under a fixed throwaway identity (these commits never leave the
+    temporary worktree, so no real author applies)."""
+    _git(
+        "-c",
+        "user.name=skill-release-shape-check",
+        "-c",
+        "user.email=skill-release-shape-check@localhost",
+        "commit",
+        *args,
+        "--no-verify",
+        cwd=worktree,
+    )
+
+
+def _remove_worktree(worktree: Path) -> None:
+    _git("worktree", "remove", "--force", str(worktree))
+    _git("worktree", "prune")
+
+
 def _assert_worktree_clean(worktree: Path, *, context: str) -> None:
-    """Refuse to proceed if any tracked file differs from HEAD (the gitignored vendor wheel and lock
-    never show here). Catches the shape contract-critic round 2 found: `--write` silently rewrites a
-    skill's `pyproject.toml` source line to match a wheel filename that was never committed, when an
-    engine version bump landed in an earlier phase commit with no matching `--write` + commit. Without
-    this check, the release step would commit an in-sync wheel and lock next to a stale, uncommitted
-    pyproject.toml -- a mismatch only a non-frozen install, never exercised here, would surface."""
-    dirty = _git("status", "--porcelain", "--", "skills", cwd=worktree)
+    """Refuse to proceed if any tracked file in the whole worktree differs from HEAD (the gitignored
+    vendor wheel and lock never show here). Catches the shape contract-critic round 2 found: `--write`
+    silently rewrites a skill's `pyproject.toml` source line to match a wheel filename that was never
+    committed, when an engine version bump landed in an earlier phase commit with no matching `--write`
+    + commit. Checking the whole worktree, not only `skills/`, closes the general class -- any tracked
+    file `--write` or the release commit leaves modified and uncommitted, not only `pyproject.toml`.
+    Without this check, the release step would commit an in-sync wheel and lock next to a stale,
+    uncommitted file -- a mismatch only a non-frozen install, never exercised here, would surface."""
+    dirty = _git("status", "--porcelain", cwd=worktree)
     if dirty:
         raise CheckFailure(
             f"{context}: tracked files changed beyond the gitignored vendor/lock artifacts -- commit "
@@ -171,17 +194,7 @@ def _commit_release_artifacts(worktree: Path, *, message: str) -> None:
         raise CheckFailure(
             "nothing staged for the release commit -- git add -f found no changes"
         )
-    _git(
-        "-c",
-        "user.name=skill-release-shape-check",
-        "-c",
-        "user.email=skill-release-shape-check@localhost",
-        "commit",
-        "-m",
-        message,
-        "--no-verify",
-        cwd=worktree,
-    )
+    _commit_as_bot(worktree, "-m", message)
     tracked = set(
         _git("ls-tree", "-r", "--name-only", "HEAD", cwd=worktree).splitlines()
     )
@@ -240,17 +253,7 @@ def corrupted_wheel_worktree(tmp: Path) -> Path:
         wheels[0].write_bytes(b"not a real wheel")
         corrupted.append(f"skills/{skill}/vendor/{wheels[0].name}")
     _git("add", "--", *corrupted, cwd=worktree)
-    _git(
-        "-c",
-        "user.name=skill-release-shape-check",
-        "-c",
-        "user.email=skill-release-shape-check@localhost",
-        "commit",
-        "--amend",
-        "--no-edit",
-        "--no-verify",
-        cwd=worktree,
-    )
+    _commit_as_bot(worktree, "--amend", "--no-edit")
     return worktree
 
 
@@ -268,17 +271,7 @@ def stale_wheel_worktree(tmp: Path) -> Path:
         encoding="utf-8",
     )
     _git("add", "--", "engines/python/agentce/__init__.py", cwd=worktree)
-    _git(
-        "-c",
-        "user.name=skill-release-shape-check",
-        "-c",
-        "user.email=skill-release-shape-check@localhost",
-        "commit",
-        "--amend",
-        "--no-edit",
-        "--no-verify",
-        cwd=worktree,
-    )
+    _commit_as_bot(worktree, "--amend", "--no-edit")
     return worktree
 
 
@@ -301,29 +294,21 @@ def _assert_drifted_pyproject_is_refused(tmp: Path) -> None:
             )
         pyproject.write_text(bumped, encoding="utf-8")
         _git("add", "--", "engines/python/pyproject.toml", cwd=drift_source)
-        _git(
-            "-c",
-            "user.name=skill-release-shape-check",
-            "-c",
-            "user.email=skill-release-shape-check@localhost",
-            "commit",
+        _commit_as_bot(
+            drift_source,
             "-m",
             "self-test: bump the engine version with no matching --write",
-            "--no-verify",
-            cwd=drift_source,
         )
         drift_sha = _git("rev-parse", "HEAD", cwd=drift_source)
     finally:
-        _git("worktree", "remove", "--force", str(drift_source))
-        _git("worktree", "prune")
+        _remove_worktree(drift_source)
 
     try:
         build_release_worktree(tmp, vendor=True, ref=drift_sha)
     except CheckFailure:
         return
     finally:
-        _git("worktree", "remove", "--force", str(tmp / "release-worktree"))
-        _git("worktree", "prune")
+        _remove_worktree(tmp / "release-worktree")
     raise CheckFailure(
         "drifted-pyproject: the release step committed a wheel/lock next to a pyproject.toml it never "
         "updated, instead of refusing"
@@ -456,8 +441,7 @@ def check(*, no_network: bool) -> dict[str, Any]:
                     run_standalone_self_test(skill_dir, skill, no_network=no_network)
                 )
         finally:
-            _git("worktree", "remove", "--force", str(tmp / "release-worktree"))
-            _git("worktree", "prune")
+            _remove_worktree(tmp / "release-worktree")
     problems = (
         ci_problems
         + sync_problems
@@ -501,8 +485,7 @@ def _run_fault(build: Any, *, label: str, check_sync: bool = False) -> str | Non
             except CheckFailure as exc:
                 return str(exc)
         finally:
-            _git("worktree", "remove", "--force", str(tmp / "release-worktree"))
-            _git("worktree", "prune")
+            _remove_worktree(tmp / "release-worktree")
     return None
 
 

@@ -7,4 +7,3 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$root"
 uv run --project tools --frozen python tools/skill_release_shape_check.py --self-test
-uv run --project tools --frozen python tools/skill_release_shape_check.py --no-network
