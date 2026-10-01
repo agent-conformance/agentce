@@ -992,6 +992,34 @@ def test_sign_cli_usage_error_is_the_keyed_envelope(
     )
 
 
+@pytest.mark.parametrize(
+    ("argv", "cause"),
+    [
+        (["--bogus", "x"], "unrecognized flag '--bogus'."),
+        (["--cat", "x"], "unrecognized flag '--cat'."),
+        (["--catalog"], "flag '--catalog' needs a value."),
+        (["--catalog", "x", "extra"], "unrecognized argument 'extra'."),
+        (["--", "--catalog", "x"], "unrecognized flag '--'."),
+        (
+            ["--catalog", "x", "--signer-trust-root"],
+            "flag '--signer-trust-root' needs a value.",
+        ),
+        (["--json=1", "--catalog", "x"], "flag '--json' takes no value."),
+    ],
+)
+def test_verify_cli_usage_error_is_the_keyed_envelope(
+    capsys: pytest.CaptureFixture[str], argv: list[str], cause: str
+) -> None:
+    """A `verify` usage error is the keyed envelope TypeScript and Java give, worded alike, and an
+    abbreviated flag is refused rather than taken as its full form (18.65 round 3)."""
+    code, env = run(["--json", "verify", *argv], capsys)
+    assert code == 3
+    assert (env["error"]["key"], env["error"]["cause"]) == (
+        "input.verify_unrecognized_flag",
+        cause,
+    )
+
+
 def test_human_output_without_json(
     make_bundle: Callable[..., Path],
     example_events: list[dict[str, Any]],

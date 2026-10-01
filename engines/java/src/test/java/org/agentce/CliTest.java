@@ -1034,6 +1034,30 @@ class CliTest {
         assertEquals("input.sign_unrecognized_flag", env.get("error").get("message_key").asText());
     }
 
+    @Test
+    void verifyAUsageErrorIsTheKeyedEnvelopePythonAndTypeScriptGiveAndAnAbbreviatedFlagIsRefused()
+            throws Exception {
+        String[][] cases = {
+            {"unrecognized flag '--bogus'.", "--bogus", "x"},
+            {"unrecognized flag '--cat'.", "--cat", "x"},
+            {"flag '--catalog' needs a value.", "--catalog"},
+            {"unrecognized argument 'extra'.", "--catalog", "x", "extra"},
+            {"unrecognized flag '--'.", "--", "--catalog", "x"},
+            {"flag '--signer-trust-root' needs a value.", "--catalog", "x", "--signer-trust-root"},
+            {"flag '--json' takes no value.", "--json=1", "--catalog", "x"},
+        };
+        for (String[] c : cases) {
+            String[] argv = new String[c.length];
+            argv[0] = "verify";
+            System.arraycopy(c, 1, argv, 1, c.length - 1);
+            JsonNode env = runJson(argv);
+            String label = String.join(" ", argv);
+            assertEquals(3, env.get("exit_code").asInt(), label);
+            assertEquals("input.verify_unrecognized_flag", env.get("error").get("message_key").asText(), label);
+            assertEquals(c[0], env.get("error").get("detail").asText(), label);
+        }
+    }
+
     // --- `verify` (item 18.28): offline DSSE/certificate verification, dispatched end to end through
     // the real CLI. `VerifyTest` covers the compute seam's own primitives in full (real signed round
     // trips, every malformed-shape vector); these cases prove the CLI wiring, input validation, and

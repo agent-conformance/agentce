@@ -1438,3 +1438,21 @@ test("sign: an unrecognized flag gives input.sign_unrecognized_flag, never a sil
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("verify: a usage error is the keyed envelope Python and Java give, and an abbreviated flag is refused", () => {
+  const cases: [string[], string][] = [
+    [["--bogus", "x"], "unrecognized flag '--bogus'."],
+    [["--cat", "x"], "unrecognized flag '--cat'."],
+    [["--catalog"], "flag '--catalog' needs a value."],
+    [["--catalog", "x", "extra"], "unrecognized argument 'extra'."],
+    [["--", "--catalog", "x"], "unrecognized flag '--'."],
+    [["--catalog", "x", "--signer-trust-root"], "flag '--signer-trust-root' needs a value."],
+    [["--json=1", "--catalog", "x"], "flag '--json' takes no value."],
+  ];
+  for (const [argv, detail] of cases) {
+    const { exitCode, envelope } = runJson(["verify", ...argv]);
+    const error = envelope.error as { message_key: string; detail: string };
+    assert.equal(exitCode, 3, argv.join(" "));
+    assert.deepEqual([error.message_key, error.detail], ["input.verify_unrecognized_flag", detail]);
+  }
+});
