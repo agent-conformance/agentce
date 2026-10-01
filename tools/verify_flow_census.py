@@ -728,7 +728,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
     # `str(["x"])` ("['x']"), TypeScript's `String(["x"])` ("x", JS array-to-string joins a
     # single-element array to its bare element) and Java's Jackson `asText()` ("") each render this
     # differently, and only TypeScript's happens to still equal the real id -- so unlike every other
-    # node_mutations case above, a generic placeholder value can't expose this; the mutation has to
+    # node_mutations case above, an arbitrary stand-in value can't expose this; the mutation has to
     # wrap the id this manifest actually declares (verifier round 1, 18.65).
     wrapped_sources = [
         {**source, "id": [source["id"]]}
