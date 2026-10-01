@@ -67,6 +67,7 @@ import catalog_digest_check
 import diff_parity_check
 import readiness_parity_check
 import sign_parity_check
+import verify_parity_check
 
 ROOT = Path(__file__).resolve().parent.parent
 PY_ENGINE = ROOT / "engines" / "python"
@@ -301,7 +302,10 @@ def check_python_artifact(
     if proc.returncode != 0:
         return [_fail(f"{label}: agentce quickstart from an empty directory", proc)]
     problems = [f"{label}: {p}" for p in compare_outputs(reference, out)]
-    return problems + _lens_problems(runner, venv, empty, label)
+    problems += _lens_problems(runner, venv, empty, label)
+    exe = [str(venv / "bin" / "agentce")]
+    problems += [f"{label}: {p}" for p in _verify_problems(exe, runner, empty)]
+    return problems
 
 
 def _install(
@@ -1629,8 +1633,109 @@ def _sign_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
     return problems
 
 
+def _verify_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
+    """`agentce verify --catalog/--release` against four of `tools/verify_parity_check.py`'s own
+    scenarios (item 18.28's C4), run against the installed artifact the way a user reaches it,
+    network disabled: the kms-signed release with its signature byte-flipped (scenario 5 -- the
+    item's own named defect, proving the shipped build gives a stable refusal, never
+    `internal.unexpected`), the real vendored eu-ai-act catalog with its signature file deleted
+    (scenario 3, the exact unsigned sentence), the valid kms-signed release (scenario 4), and the
+    valid certificate/keyless-signed release (scenario 6)."""
+    canonical = cwd / "verify-fixture"
+    verify_parity_check.build_canonical_fixtures(canonical)
+    problems: list[str] = []
+
+    tampered = json.loads((canonical / "release-kms.json").read_text(encoding="utf-8"))
+    tampered["signatures"][0]["sig"] = verify_parity_check._flip_b64_byte(
+        tampered["signatures"][0]["sig"]
+    )
+    tampered_path = cwd / "release-tampered.json"
+    tampered_path.write_text(json.dumps(tampered), encoding="utf-8")
+    proc = runner.run(
+        [*exe, "verify", "--release", str(tampered_path), "--json"], cwd, offline=True
+    )
+    try:
+        envelope = json.loads(proc.stdout)
+    except ValueError:
+        envelope = {}
+    if proc.returncode != 3:
+        problems.append(
+            f"verify --release tampered: exit {proc.returncode}, expected 3"
+        )
+    if envelope.get("verified") is not False:
+        problems.append(
+            f"verify --release tampered: verified={envelope.get('verified')!r}, expected false"
+        )
+    if not envelope.get("reason"):
+        problems.append("verify --release tampered: no 'reason' in the output")
+    if "error" in envelope:
+        problems.append(
+            f"verify --release tampered: output carries an 'error' field "
+            f"{envelope.get('error')!r} (a crash, not a clean refusal -- the item's own "
+            "named defect)"
+        )
+
+    unsigned_catalog = cwd / "catalog-unsigned"
+    if unsigned_catalog.exists():
+        shutil.rmtree(unsigned_catalog)
+    shutil.copytree(EU_AI_ACT_DIR, unsigned_catalog)
+    (unsigned_catalog / verify_parity_check.CATALOG_SIGNATURE_NAME).unlink()
+    proc = runner.run(
+        [*exe, "verify", "--catalog", str(unsigned_catalog), "--json"],
+        cwd,
+        offline=True,
+    )
+    try:
+        envelope = json.loads(proc.stdout)
+    except ValueError:
+        envelope = {}
+    if proc.returncode != 3 or envelope.get("verified") is not False:
+        problems.append(
+            f"verify --catalog unsigned: exit {proc.returncode}, "
+            f"verified={envelope.get('verified')!r}, expected exit 3, verified=false"
+        )
+    if envelope.get("reason") != verify_parity_check.UNSIGNED_SENTENCE:
+        problems.append(
+            f"verify --catalog unsigned: reason={envelope.get('reason')!r}, expected "
+            f"{verify_parity_check.UNSIGNED_SENTENCE!r}"
+        )
+
+    for label, fixture_name, expect_keyless in (
+        ("kms", "release-kms.json", False),
+        ("cert", "release-cert.json", True),
+    ):
+        release_path = cwd / f"release-{label}.json"
+        shutil.copyfile(canonical / fixture_name, release_path)
+        proc = runner.run(
+            [*exe, "verify", "--release", str(release_path), "--json"],
+            cwd,
+            offline=True,
+        )
+        try:
+            envelope = json.loads(proc.stdout)
+        except ValueError:
+            envelope = {}
+        if proc.returncode != 0 or envelope.get("verified") is not True:
+            problems.append(
+                f"verify --release {label}: exit {proc.returncode}, "
+                f"verified={envelope.get('verified')!r}, expected exit 0, verified=true"
+            )
+        if envelope.get("keyless") is not expect_keyless:
+            problems.append(
+                f"verify --release {label}: keyless={envelope.get('keyless')!r}, "
+                f"expected {expect_keyless!r}"
+            )
+
+    return problems
+
+
 def _report_validate_problems(
-    exe: list[str], runner: Runner, cwd: Path, qs_out: Path, *, error_key: str = "message_key"
+    exe: list[str],
+    runner: Runner,
+    cwd: Path,
+    qs_out: Path,
+    *,
+    error_key: str = "message_key",
 ) -> list[str]:
     """`agentce report --validate <dir>` against this installed artifact's own freshly-written
     quickstart output (item 18.27), run the way a user reaches it (C4), network disabled: a clean
@@ -2073,6 +2178,7 @@ def _npm_run_problems(
     problems += [f"npm: {p}" for p in _diff_problems(exe, runner, empty)]
     problems += [f"npm: {p}" for p in _readiness_problems(exe, runner, empty)]
     problems += [f"npm: {p}" for p in _sign_problems(exe, runner, empty)]
+    problems += [f"npm: {p}" for p in _verify_problems(exe, runner, empty)]
     package = empty / "node_modules" / "@agent-conformance" / "cli"
     for rel in (
         "schema/agentce-evidence.schema.json",
@@ -2183,6 +2289,7 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
         problems += [f"jar: {p}" for p in _diff_problems(exe, runner, empty)]
         problems += [f"jar: {p}" for p in _readiness_problems(exe, runner, empty)]
         problems += [f"jar: {p}" for p in _sign_problems(exe, runner, empty)]
+        problems += [f"jar: {p}" for p in _verify_problems(exe, runner, empty)]
         with zipfile.ZipFile(jar) as zf:
             names = set(zf.namelist())
         for entry in (
@@ -2779,10 +2886,41 @@ def self_test() -> int:
                 failures.append(
                     "a sign envelope naming a signature file that does not exist was accepted"
                 )
+
+        # 9. item 18.28's C4: a `verify` implementation that re-raises instead of soft-failing on a
+        #    signature that fails to verify (the item's own named defect) must be rejected, even
+        #    though it still exits non-zero; the real checkout's own Python engine (which carries
+        #    the real fix) must be accepted.
+        crashy = tmp / "crashy-cwd"
+        crashy.mkdir()
+        crashy_exe = crashy / "agentce"
+        crashy_exe.write_text(
+            "#!/bin/sh\n"
+            'echo \'{"error": {"key": "internal.unexpected", "message": "boom"}}\'\n'
+            "exit 1\n",
+            encoding="utf-8",
+        )
+        crashy_exe.chmod(0o755)
+        if not _verify_problems([str(crashy_exe)], runner, crashy):
+            failures.append(
+                "a verify implementation that re-raises instead of soft-failing was accepted"
+            )
+        real_verify_cwd = tmp / "real-verify-cwd"
+        real_verify_cwd.mkdir()
+        real_verify_problems = _verify_problems(
+            ["uv", "run", "--frozen", "--project", str(PY_ENGINE), "agentce"],
+            runner,
+            real_verify_cwd,
+        )
+        if real_verify_problems:
+            failures.append(
+                "the real python engine's own verify command was rejected: "
+                + "; ".join(real_verify_problems)
+            )
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if not failures:
-        print("installed_artifacts_check self-test: 19 cases discriminate")
+        print("installed_artifacts_check self-test: 20 cases discriminate")
     return 1 if failures else 0
 
 
