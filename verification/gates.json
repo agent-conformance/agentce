@@ -668,8 +668,8 @@
         {
           "description": "the signature check in verify_envelope always succeeds, so a tampered DSSE signature would be accepted",
           "file": "engines/python/agentce/signing.py",
-          "search": "            public_key, identity = trust.resolve(signature)\n            public_key.verify(_b64d(signature[\"sig\"]), pae)\n            return Verified(",
-          "replace": "            public_key, identity = trust.resolve(signature)\n            return Verified("
+          "search": "            public_key.verify(_b64d(sig), pae)\n            return Verified(",
+          "replace": "            return Verified("
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/commands/__init__.py's cmd_sign, ported field-for-field in engines/typescript/src/sign.ts and engines/java/src/main/java/org/agentce/Sign.java."
