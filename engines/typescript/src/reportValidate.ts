@@ -11,7 +11,10 @@
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import type { CodeKeywordDefinition, KeywordCxt } from "ajv";
 import Ajv2020 from "ajv/dist/2020";
+import anyOfDef from "ajv/dist/vocabularies/applicator/anyOf";
+import oneOfDef from "ajv/dist/vocabularies/applicator/oneOf";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 
 /** Always written, regardless of `--emit`: the run's structural core. */
@@ -58,8 +61,45 @@ function loadSchemaJson(name: string): Record<string, unknown> {
   return JSON.parse(text) as Record<string, unknown>;
 }
 
-// `strict: false`/`logger: false` mirror schema.ts: unknown formats (date-time, uri, ...) are
-// annotations, not assertions, and must never print a warning that would corrupt `--json` stdout.
+/** An `anyOf`/`oneOf` keyword that, when it fails, drops every error its branches recorded and
+ * reports itself once -- the `iter_errors` rule the Python reference follows: one problem per failing
+ * combinator at its own instance location, never one per failing branch. Ajv's own definition (with
+ * `allErrors: true`) keeps every branch error alongside the combinator's, and its schema paths name
+ * the `$ref` target rather than the branch, so filtering afterwards cannot find a branch error that
+ * came through a `$ref` (P18-18.27 verifier round 2, D1). Resetting the error count the keyword
+ * started with, just before it reports, needs no path matching at all. */
+function collapsingCombinator(def: CodeKeywordDefinition): CodeKeywordDefinition {
+  return {
+    ...def,
+    code(cxt: KeywordCxt, ruleType?: string) {
+      const report = cxt.error.bind(cxt);
+      cxt.error = (...args: Parameters<KeywordCxt["error"]>) => {
+        cxt.reset();
+        report(...args);
+      };
+      def.code(cxt, ruleType);
+    },
+  };
+}
+
+// `strict: false`/`logger: false` mirror schema.ts. `validateFormats: false`: `format` is an
+// annotation in all three engines, never an assertion (Python's validators run without a
+// FormatChecker; Java turns format assertions off).
+function newAjv(options: { validateSchema?: boolean } = {}): InstanceType<typeof Ajv2020> {
+  const ajv = new Ajv2020({
+    allErrors: true,
+    strict: false,
+    logger: false,
+    validateFormats: false,
+    ...options,
+  });
+  for (const def of [anyOfDef, oneOfDef]) {
+    ajv.removeKeyword(def.keyword as string);
+    ajv.addKeyword(collapsingCombinator(def));
+  }
+  return ajv;
+}
+
 let localAjv: InstanceType<typeof Ajv2020> | null = null;
 const localValidators = new Map<string, ReturnType<InstanceType<typeof Ajv2020>["compile"]>>();
 
@@ -67,7 +107,7 @@ function localValidatorFor(schemaName: string) {
   let validate = localValidators.get(schemaName);
   if (validate === undefined) {
     if (localAjv === null) {
-      localAjv = new Ajv2020({ allErrors: true, strict: false, logger: false });
+      localAjv = newAjv();
     }
     validate = localAjv.compile(loadSchemaJson(schemaName));
     localValidators.set(schemaName, validate);
@@ -75,65 +115,123 @@ function localValidatorFor(schemaName: string) {
   return validate;
 }
 
-function messageLocation(instancePath: string): string {
-  const path = instancePath.startsWith("/") ? instancePath.slice(1) : instancePath;
-  return path === "" ? "<root>" : path;
+/** One step of a problem's location: an object key, or an array index. */
+type Segment = string | number;
+
+/** Ajv's `instancePath` (a JSON pointer) as typed segments: each token decoded (`~1` to `/`, then `~0`
+ * to `~`, RFC 6901), and a token that indexes an array -- found by walking `instance` along the path,
+ * never guessed from the token's digits -- as a number, like Python's `absolute_path`. */
+function pathSegments(instance: unknown, instancePath: string): Segment[] {
+  if (instancePath === "") {
+    return [];
+  }
+  const segments: Segment[] = [];
+  let node = instance;
+  for (const token of instancePath.slice(1).split("/")) {
+    const key = token.replace(/~1/g, "/").replace(/~0/g, "~");
+    if (Array.isArray(node)) {
+      segments.push(Number(key));
+      node = node[Number(key)];
+    } else {
+      segments.push(key);
+      node = isRecord(node) ? node[key] : undefined;
+    }
+  }
+  return segments;
 }
 
-/** Compares two `/`-joined locations segment by segment, comparing a pair of all-digit segments
- * (an array index) as numbers rather than strings, so `results/2` sorts before `results/10` --
- * matching Python's `absolute_path`, whose array-index elements are already native ints
- * (P18-18.27 verifier round 1). */
-function compareLocations(a: string, b: string): number {
-  const segmentsA = a.split("/");
-  const segmentsB = b.split("/");
-  const len = Math.min(segmentsA.length, segmentsB.length);
+/** Compares strings by Unicode code point, as Python does (`<` on JS strings compares UTF-16 code
+ * units, which orders astral characters differently). */
+function compareCodePoints(a: string, b: string): number {
+  const pointsA = Array.from(a, (c) => c.codePointAt(0) as number);
+  const pointsB = Array.from(b, (c) => c.codePointAt(0) as number);
+  const len = Math.min(pointsA.length, pointsB.length);
   for (let i = 0; i < len; i++) {
-    const segA = segmentsA[i] as string;
-    const segB = segmentsB[i] as string;
-    if (/^\d+$/.test(segA) && /^\d+$/.test(segB)) {
-      const diff = Number(segA) - Number(segB);
-      if (diff !== 0) {
-        return diff;
+    const diff = (pointsA[i] as number) - (pointsB[i] as number);
+    if (diff !== 0) {
+      return diff;
+    }
+  }
+  return pointsA.length - pointsB.length;
+}
+
+/** Python's list ordering over `absolute_path`: array indices compare as numbers, object keys as
+ * strings by code point, and a path sorts before any longer path it is a prefix of. */
+function compareSegments(a: Segment[], b: Segment[]): number {
+  const len = Math.min(a.length, b.length);
+  for (let i = 0; i < len; i++) {
+    const segA = a[i] as Segment;
+    const segB = b[i] as Segment;
+    const diff =
+      typeof segA === "number" && typeof segB === "number"
+        ? segA - segB
+        : compareCodePoints(String(segA), String(segB));
+    if (diff !== 0) {
+      return diff;
+    }
+  }
+  return a.length - b.length;
+}
+
+interface AjvError {
+  instancePath: string;
+  schemaPath: string;
+  keyword: string;
+  params: Record<string, unknown>;
+  message?: string;
+}
+
+interface SchemaProblem {
+  segments: Segment[];
+  keyword: string;
+  message: string;
+  /** For an `additionalProperties` problem: every unexpected key on that object. */
+  extraKeys?: string[];
+}
+
+/** Every schema error as `"<prefix><location>: <message>"`, following the Python reference's model
+ * (P18-18.27; `python-reference.md`'s Design notes): one problem per failing combinator (done at
+ * compile time, `collapsingCombinator`); one `additionalProperties` problem per object naming its
+ * unexpected keys in code-point order, where Ajv reports one per key; sorted by location, then
+ * keyword, keeping validator order for ties. */
+function ajvProblems(prefix: string, instance: unknown, errors: AjvError[] | null | undefined) {
+  const problems: SchemaProblem[] = [];
+  const byObject = new Map<string, SchemaProblem>();
+  for (const e of errors ?? []) {
+    if (e.keyword === "additionalProperties") {
+      const group = `${e.instancePath}\u0000${e.schemaPath}`;
+      const existing = byObject.get(group);
+      if (existing !== undefined) {
+        existing.extraKeys?.push(String(e.params.additionalProperty));
+        continue;
       }
+      const problem: SchemaProblem = {
+        segments: pathSegments(instance, e.instancePath),
+        keyword: e.keyword,
+        message: "",
+        extraKeys: [String(e.params.additionalProperty)],
+      };
+      byObject.set(group, problem);
+      problems.push(problem);
       continue;
     }
-    if (segA !== segB) {
-      return segA < segB ? -1 : 1;
-    }
+    problems.push({
+      segments: pathSegments(instance, e.instancePath),
+      keyword: e.keyword,
+      message: e.message ?? "invalid",
+    });
   }
-  return segmentsA.length - segmentsB.length;
-}
-
-/** An `anyOf`/`oneOf` failure's per-branch errors are discarded, keeping only the combinator error
- * itself: Ajv's `allErrors: true` reports every failing branch alongside it, but Python's
- * `iter_errors` never expands a combinator failure that way, and that is the one rule all three
- * engines' validators follow at parity (P18-18.27 verifier round 1). */
-function collapseCombinatorErrors<T extends { keyword?: string; schemaPath: string }>(
-  errors: T[],
-): T[] {
-  const combinatorPaths = errors
-    .filter((e) => e.keyword === "anyOf" || e.keyword === "oneOf")
-    .map((e) => e.schemaPath);
-  if (combinatorPaths.length === 0) {
-    return errors;
+  for (const problem of byObject.values()) {
+    const named = (problem.extraKeys ?? []).sort(compareCodePoints).map((k) => `'${k}'`);
+    problem.message = `must NOT have additional properties (${named.join(", ")})`;
   }
-  return errors.filter(
-    (e) => !combinatorPaths.some((p) => e.schemaPath !== p && e.schemaPath.startsWith(`${p}/`)),
+  problems.sort(
+    (a, b) => compareSegments(a.segments, b.segments) || compareCodePoints(a.keyword, b.keyword),
   );
-}
-
-function ajvProblems(
-  prefix: string,
-  rawErrors:
-    | { instancePath: string; message?: string; keyword?: string; schemaPath: string }[]
-    | null
-    | undefined,
-): string[] {
-  const errors = collapseCombinatorErrors(rawErrors ?? []);
-  const withPath = errors.map((e) => ({ location: messageLocation(e.instancePath), e }));
-  withPath.sort((a, b) => compareLocations(a.location, b.location));
-  return withPath.map(({ location, e }) => `${prefix}${location}: ${e.message ?? "invalid"}`);
+  return problems.map((p) => {
+    const location = p.segments.length === 0 ? "<root>" : p.segments.join("/");
+    return `${prefix}${location}: ${p.message}`;
+  });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -367,7 +465,7 @@ export function validateReport(outDir: string): string[] {
     }
     const localValidate = localValidatorFor(schemaName);
     if (!localValidate(instance)) {
-      problems.push(...ajvProblems(`${filename}: `, localValidate.errors));
+      problems.push(...ajvProblems(`${filename}: `, instance, localValidate.errors));
       continue;
     }
     if (filename === "oscal-ar.json") {
@@ -411,7 +509,7 @@ function compiledOscalNistValidator() {
     // 2020-12 `Ajv2020` instance has no meta-schema for -- Ajv would otherwise refuse to compile it
     // trying to check the schema against a meta-schema it does not have, before ever reaching the
     // instance documents this validates (spec/report/vendor/README.md: draft-07).
-    nistAjv = new Ajv2020({ allErrors: true, strict: false, logger: false, validateSchema: false });
+    nistAjv = newAjv({ validateSchema: false });
     // Override the built-in `pattern` keyword so it compiles with the `u` flag: the only difference
     // this schema needs from Ajv's default (see the module docstring's Unicode-property note).
     nistAjv.removeKeyword("pattern");
@@ -437,7 +535,7 @@ function validateOscalArNist(document: unknown): string[] {
   if (validate(document)) {
     return [];
   }
-  return ajvProblems("oscal-ar.json (NIST OSCAL 1.1.2): ", validate.errors);
+  return ajvProblems("oscal-ar.json (NIST OSCAL 1.1.2): ", document, validate.errors);
 }
 
 let sarifAjv: InstanceType<typeof Ajv2020> | null = null;
@@ -454,12 +552,7 @@ function compiledSarifValidator() {
     const raw = loadSchemaJson("sarif-2.1.0");
     const { id, ...rest } = raw as { id?: string };
     const fixed = { $id: id, ...rest };
-    sarifAjv = new Ajv2020({
-      allErrors: true,
-      strict: false,
-      logger: false,
-      validateSchema: false,
-    });
+    sarifAjv = newAjv({ validateSchema: false });
     sarifValidateCache = sarifAjv.compile(fixed);
   }
   return sarifValidateCache;
@@ -470,5 +563,5 @@ function validateSarif210(document: unknown): string[] {
   if (validate(document)) {
     return [];
   }
-  return ajvProblems("results.sarif (OASIS SARIF 2.1.0): ", validate.errors);
+  return ajvProblems("results.sarif (OASIS SARIF 2.1.0): ", document, validate.errors);
 }
