@@ -41,7 +41,6 @@ const NAMESPACE_URL = "6ba7b811-9dad-11d1-80b4-00c04fd430c8";
  * non-circular (mirrors the Python reference's `catalog._PROVENANCE_EXCLUDE`). */
 const PROVENANCE_EXCLUDE = new Set(["catalog.sig.json", "catalog.yaml"]);
 
-/** Every file's POSIX relpath under `dir`, unsorted. */
 /** Python's `Path.is_file()`: follows a symlink, and an unresolvable one is not a file. */
 function isFileFollowingLinks(path: string): boolean {
   try {
@@ -51,6 +50,7 @@ function isFileFollowingLinks(path: string): boolean {
   }
 }
 
+/** Every file's POSIX relpath under `dir`, unsorted. */
 function walkFiles(dir: string, base: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir).sort(byteCompare)) {
@@ -58,9 +58,10 @@ function walkFiles(dir: string, base: string): string[] {
     const rel = base === "" ? name : `${base}/${name}`;
     // As Python's `rglob`: never descend a symlinked directory, follow a symlinked file, skip a
     // broken link.
-    if (lstatSync(full).isDirectory()) {
+    const entry = lstatSync(full);
+    if (entry.isDirectory()) {
       out.push(...walkFiles(full, rel));
-    } else if (isFileFollowingLinks(full)) {
+    } else if (entry.isFile() || (entry.isSymbolicLink() && isFileFollowingLinks(full))) {
       out.push(rel);
     }
   }

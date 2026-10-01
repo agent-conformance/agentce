@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import copy
 import json
 import os
 import shutil
@@ -177,8 +178,11 @@ ARTIFACT_NAMES = (
 )
 
 DEEP_NESTING = 100_000
-#: The deepest container nesting the engines accept (Jackson's default, enforced alike in all three).
+#: The deepest container nesting the engines accept (Jackson's default, enforced alike in all three);
+#: keep equal to `signing.MAX_JSON_DEPTH` (tools do not import the engine at module level).
 MAX_DEPTH = 1000
+#: The release statement's predicate type, as `agentce sign` writes it.
+RELEASE_PREDICATE_TYPE = "https://agent-conformance.org/attestation/release/v1"
 
 
 def json_type(value: Any) -> str:
@@ -215,22 +219,25 @@ def pointer(path: tuple[Any, ...]) -> str:
     return "/" + "/".join(str(part) for part in path) if path else ""
 
 
-def replaced(document: Any, path: tuple[Any, ...], value: Any) -> Any:
-    copy = json.loads(json.dumps(document))
-    parent = copy
+def _copy_and_parent(document: Any, path: tuple[Any, ...]) -> tuple[Any, Any]:
+    """A deep copy of `document`, and the container in it that holds the node at `path`."""
+    result = copy.deepcopy(document)
+    parent = result
     for part in path[:-1]:
         parent = parent[part]
+    return result, parent
+
+
+def replaced(document: Any, path: tuple[Any, ...], value: Any) -> Any:
+    result, parent = _copy_and_parent(document, path)
     parent[path[-1]] = value
-    return copy
+    return result
 
 
 def deleted(document: Any, path: tuple[Any, ...]) -> Any:
-    copy = json.loads(json.dumps(document))
-    parent = copy
-    for part in path[:-1]:
-        parent = parent[part]
+    result, parent = _copy_and_parent(document, path)
     del parent[path[-1]]
-    return copy
+    return result
 
 
 def node_mutations(
@@ -353,9 +360,9 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
         name: str,
         flow: str,
         problem_class: str,
-        target: str,
         build: Callable[[Path], Path],
     ) -> None:
+        target = "catalog" if flow.startswith("catalog-") else "release"
         mutations.append(Mutation(f"{flow}:{name}", flow, problem_class, target, build))
 
     def catalog_with(edit: Callable[[Path], object]) -> Callable[[Path], Path]:
@@ -408,21 +415,18 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
             name,
             "catalog-sig-file",
             cls,
-            "catalog",
             catalog_with(set_file(CATALOG_SIGNATURE_NAME, data)),
         )
     add(
         "directory",
         "catalog-sig-file",
         "not-a-file",
-        "catalog",
         catalog_with(replace_with_directory(CATALOG_SIGNATURE_NAME)),
     )
     add(
         "unreadable",
         "catalog-sig-file",
         "not-a-file",
-        "catalog",
         catalog_with(make_unreadable(CATALOG_SIGNATURE_NAME)),
     )
     for name, cls, doc in node_mutations(json.loads(sig_bytes)):
@@ -430,7 +434,6 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
             name,
             "catalog-envelope",
             cls,
-            "catalog",
             catalog_with(set_file(CATALOG_SIGNATURE_NAME, doc)),
         )
 
@@ -442,7 +445,6 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
         "content-changed",
         "catalog-tree",
         "content",
-        "catalog",
         catalog_with(lambda dest: (dest / content_file).write_bytes(b"changed\n")),
     )
     for name, file_name in (
@@ -454,28 +456,24 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
             f"extra-file-{name}",
             "catalog-tree",
             "file-name-order",
-            "catalog",
             catalog_with(set_file(file_name, b"x\n")),
         )
     add(
         "empty-subdirectory",
         "catalog-tree",
         "empty-directory",
-        "catalog",
         catalog_with(lambda dest: (dest / "empty").mkdir()),
     )
     add(
         "link-out",
         "catalog-tree",
         "link",
-        "catalog",
         catalog_with(lambda dest: os.symlink(dest.parent, dest / "link-out")),
     )
     add(
         "link-to-file",
         "catalog-tree",
         "link",
-        "catalog",
         catalog_with(lambda dest: os.symlink(content_file, dest / "link-in")),
     )
 
@@ -493,7 +491,6 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
                 name,
                 flow,
                 cls,
-                "catalog",
                 catalog_with(set_file(CATALOG_SIGNATURE_NAME, envelope)),
             )
         elif flow == "release-statement":
@@ -505,25 +502,25 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
                 entries[0]["envelope"] = envelope
                 _write(dest / "signatures.json", entries)
 
-            add(name, flow, cls, "release", bundle_with(edit))
+            add(name, flow, cls, bundle_with(edit))
         else:
-            add(name, flow, cls, "release", single_file(envelope))
+            add(name, flow, cls, single_file(envelope))
 
     # release-file / release-envelope (kms and certificate envelopes).
     for source in ("release-kms.json", "release-cert.json"):
         raw = (canonical / source).read_bytes()
         stem = source.removesuffix(".json")
         for name, cls, data in byte_mutations(raw):
-            add(f"{stem}:{name}", "release-file", cls, "release", single_file(data))
+            add(f"{stem}:{name}", "release-file", cls, single_file(data))
 
         def unreadable(d: Path, raw: bytes = raw) -> Path:
             dest = single_file(raw)(d)
             dest.chmod(0)
             return dest
 
-        add(f"{stem}:unreadable", "release-file", "not-a-file", "release", unreadable)
+        add(f"{stem}:unreadable", "release-file", "not-a-file", unreadable)
         for name, cls, doc in node_mutations(json.loads(raw)):
-            add(f"{stem}:{name}", "release-envelope", cls, "release", single_file(doc))
+            add(f"{stem}:{name}", "release-envelope", cls, single_file(doc))
 
     # manifest-file / manifest-fields / artifact-path.
     manifest_bytes = (canonical / "bundle" / "release-manifest.json").read_bytes()
@@ -532,21 +529,18 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
             name,
             "manifest-file",
             cls,
-            "release",
             bundle_with(set_file("release-manifest.json", data)),
         )
     add(
         "directory",
         "manifest-file",
         "not-a-file",
-        "release",
         bundle_with(replace_with_directory("release-manifest.json")),
     )
     add(
         "unreadable",
         "manifest-file",
         "not-a-file",
-        "release",
         bundle_with(make_unreadable("release-manifest.json")),
     )
     manifest = json.loads(manifest_bytes)
@@ -555,7 +549,6 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
             name,
             "manifest-fields",
             cls,
-            "release",
             bundle_with(set_file("release-manifest.json", doc)),
         )
     for name, artifact_name in ARTIFACT_NAMES:
@@ -564,21 +557,18 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
             name,
             "artifact-path",
             "path",
-            "release",
             bundle_with(set_file("release-manifest.json", doc)),
         )
     add(
         "content-changed",
         "artifact-path",
         "content",
-        "release",
         bundle_with(set_file("artifact-a.txt", b"changed\n")),
     )
     add(
         "artifact-is-directory",
         "artifact-path",
         "content",
-        "release",
         bundle_with(replace_with_directory("artifact-a.txt")),
     )
     if os.geteuid() != 0:  # root reads a mode-000 file anyway
@@ -586,21 +576,18 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
             "artifact-unreadable",
             "artifact-path",
             "content",
-            "release",
             bundle_with(lambda dest: (dest / "artifact-a.txt").chmod(0)),
         )
         add(
             "unreadable-file",
             "catalog-tree",
             "content",
-            "catalog",
             catalog_with(lambda dest: (dest / content_file).chmod(0)),
         )
     add(
         "broken-link",
         "catalog-tree",
         "link",
-        "catalog",
         catalog_with(lambda dest: os.symlink("no-such-file", dest / "broken")),
     )
 
@@ -611,21 +598,18 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
             name,
             "signatures-file",
             cls,
-            "release",
             bundle_with(set_file("signatures.json", data)),
         )
     add(
         "directory",
         "signatures-file",
         "not-a-file",
-        "release",
         bundle_with(replace_with_directory("signatures.json")),
     )
     add(
         "unreadable",
         "signatures-file",
         "not-a-file",
-        "release",
         bundle_with(make_unreadable("signatures.json")),
     )
     for name, cls, doc in node_mutations(json.loads(signatures_bytes)):
@@ -633,7 +617,6 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
             name,
             "signature-entries",
             cls,
-            "release",
             bundle_with(set_file("signatures.json", doc)),
         )
 
@@ -645,7 +628,6 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
             f"/0/profile={type_name}-with-no-envelope",
             "signature-entries",
             "json-type",
-            "release",
             bundle_with(set_file("signatures.json", broken)),
         )
 
@@ -729,7 +711,7 @@ def build_signed_variants(
     release_statement = signing.intoto_statement(
         subject_name="release-manifest.json",
         digest=manifest_digest,
-        predicate_type="https://agent-conformance.org/attestation/release/v1",
+        predicate_type=RELEASE_PREDICATE_TYPE,
         predicate={"profile": "kms", "release": "agentce@parity-fixture"},
     )
     kms = dev_trust.KmsSigner(private_key=dev_trust.kms_key())
@@ -743,7 +725,7 @@ def build_signed_variants(
     single_statement = signing.intoto_statement(
         subject_name="release",
         digest="sha256:" + "0" * 64,
-        predicate_type="https://agent-conformance.org/attestation/release/v1",
+        predicate_type=RELEASE_PREDICATE_TYPE,
         predicate={},
     )
     for name, cls, body in certificate_variants(keyless.cert):

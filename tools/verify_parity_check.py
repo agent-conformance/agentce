@@ -53,7 +53,7 @@ TS_ENGINE = ROOT / "engines" / "typescript"
 EU_AI_ACT = ROOT / "spec" / "catalogs" / "base" / "eu-ai-act"
 EVIDENCE_BUNDLE = ROOT / "corpus" / "quickstart" / "evidence"
 
-CATALOG_SIGNATURE_NAME = "catalog.sig.json"
+CATALOG_SIGNATURE_NAME = verify_flow_census.CATALOG_SIGNATURE_NAME
 
 #: The exact literal Python gives for an absent catalog signature (`signing.UnsignedError`'s own
 #: message, `signing.py:437-442`) -- asserted byte-identical across all three engines (scenario 3).
@@ -466,15 +466,15 @@ def _run_bundle_scenario(
 def _run_mutation(
     mutation: verify_flow_census.Mutation, root: Path
 ) -> dict[str, tuple[str, int]]:
-    """Each engine's output for one mutation, with its own fixture directory written as `<dir>` so
-    a refusal that names the path compares alike."""
+    """Each engine's output for one mutation, built once (`verify` only reads it), with the fixture
+    directory written as `<dir>` so a refusal that names the path compares alike."""
     flag = "--catalog" if mutation.target == "catalog" else "--release"
+    root.mkdir(parents=True)
+    target = str(mutation.build(root))
     runs = {}
     for engine, run in ENGINE_VERIFY.items():
-        d = root / engine
-        d.mkdir(parents=True)
-        out, code = run([flag, str(mutation.build(d)), "--json"])
-        runs[engine] = (out.replace(str(d), "<dir>"), code)
+        out, code = run([flag, target, "--json"])
+        runs[engine] = (out.replace(str(root), "<dir>"), code)
     return runs
 
 
@@ -514,7 +514,7 @@ def run_census(canonical: Path, tmp: Path, failures: list[str]) -> None:
                 failures,
                 f"{label}:{engine}: crashed ({out.strip()[:300]!r})",
             )
-        outputs = [_census_view(*runs[e]) for e in ("python", "typescript", "java")]
+        outputs = [_census_view(*runs[e]) for e in ENGINE_VERIFY]
         readiness_parity_check.compare_ports(label, outputs, failures)
         if runs["python"][1] == 0:
             verified.append(mutation.name)

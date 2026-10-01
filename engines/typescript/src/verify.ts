@@ -18,7 +18,7 @@ import { InputError } from "./errors";
 import { NonCanonicalNumber, parseJson } from "./json";
 import { digestTree } from "./report";
 import { dssePae, keyidFor } from "./sign";
-import { b64dStrict, pyRepr } from "./util";
+import { b64dStrict, decodeUtf8Strict, pyRepr } from "./util";
 
 /** The detached signature a signed catalog (or corpus) directory carries (SPEC §8.7). */
 export const CATALOG_SIGNATURE_NAME = "catalog.sig.json";
@@ -55,7 +55,7 @@ const PLAIN_ASCII = /^[ !#-&(-\[\]-~]*$/;
  * canonical form can still refuse it (the release manifest). Callers turn the error into their own
  * fixed reason text; its message is never shown. */
 export function parseUntrustedJson(raw: Buffer, keepNumberTokens = false): unknown {
-  const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(raw);
+  const text = decodeUtf8Strict(raw);
   const value = keepNumberTokens ? parseJson(text) : JSON.parse(text);
   const stack: Array<[unknown, number]> = [[value, 1]];
   while (stack.length > 0) {
@@ -75,6 +75,11 @@ export function parseUntrustedJson(raw: Buffer, keepNumberTokens = false): unkno
     }
   }
   return value;
+}
+
+/** {@link parseUntrustedJson} over a file's bytes (mirrors Java's `readUntrustedJsonFile`). */
+function readUntrustedJsonFile(path: string, keepNumberTokens = false): unknown {
+  return parseUntrustedJson(readFileSync(path), keepNumberTokens);
 }
 
 /** Mirrors `signing.describe_untrusted`: how a refusal names a value read from an untrusted document
@@ -349,7 +354,7 @@ export function verifyCatalog(dir: string, trust: TrustRoot): CatalogVerifyResul
   }
   let envelope: unknown;
   try {
-    envelope = parseUntrustedJson(readFileSync(sigPath));
+    envelope = readUntrustedJsonFile(sigPath);
   } catch {
     return fail(`${CATALOG_SIGNATURE_NAME} is not readable JSON`);
   }
@@ -416,7 +421,7 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
   if (stat.isFile()) {
     let envelope: unknown;
     try {
-      envelope = parseUntrustedJson(readFileSync(releasePath));
+      envelope = readUntrustedJsonFile(releasePath);
     } catch {
       return {
         release: releasePath,
@@ -461,7 +466,7 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
     // Number tokens kept: `manifestDigest` below canonicalizes `manifest`, which must refuse a
     // non-canonical number token (`1.0`, `1e2`, `-0.0`) the way Python's and Java's decoders do,
     // rather than have `JSON.parse` fold it to an ordinary number first.
-    manifest = parseUntrustedJson(readFileSync(manifestPath), true);
+    manifest = readUntrustedJsonFile(manifestPath, true);
   } catch {
     return {
       release: releasePath,
@@ -522,7 +527,7 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
 
   let signatureEntries: unknown;
   try {
-    signatureEntries = parseUntrustedJson(readFileSync(signaturesPath));
+    signatureEntries = readUntrustedJsonFile(signaturesPath);
   } catch {
     // The bare 3-field soft-fail shape (`_verify_release_soft_fail`'s own shape) -- Python computes
     // `manifest_digest` as a local before this point too, but never adds it to `result.data` on this

@@ -154,7 +154,12 @@ export function b64dStrict(value: string): Buffer {
  * silently parsing where they refuse.
  */
 export function readTextFileStrict(path: string): string {
-  return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(readFileSync(path));
+  return decodeUtf8Strict(readFileSync(path));
+}
+
+/** The fatal, BOM-keeping UTF-8 decode {@link readTextFileStrict} applies, for bytes already read. */
+export function decodeUtf8Strict(raw: Uint8Array): string {
+  return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(raw);
 }
 
 /**
