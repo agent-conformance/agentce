@@ -448,7 +448,10 @@ def _verify_report(
             "verify.report_claim_malformed", "claim.json is not valid JSON.", claim_fix
         ) from exc
     claim = _parse_untrusted_object(
-        claim_bytes, key="verify.report_claim_malformed", noun="claim.json", fix=claim_fix
+        claim_bytes,
+        key="verify.report_claim_malformed",
+        noun="claim.json",
+        fix=claim_fix,
     )
     signatures = claim.get("signatures") or []
     if not signatures:

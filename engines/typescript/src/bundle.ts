@@ -215,7 +215,10 @@ export function loadBundle(bundleDir: string): Bundle {
     sources,
     sourceClasses: sourceClasses.size > 0 ? sourceClasses : null,
     get digest(): string {
-      return (digestCache ??= `sha256:${sha256Hex(manifest)}`);
+      if (digestCache === undefined) {
+        digestCache = `sha256:${sha256Hex(manifest)}`;
+      }
+      return digestCache;
     },
   };
 }
