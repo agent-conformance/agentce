@@ -340,15 +340,18 @@ def _reason(out: str) -> str | None:
 
 
 def _normalized(out: str) -> str:
-    """`out` with the `catalog`/`release` path field blanked -- each engine runs against its own
-    per-engine copy of the fixture (never a shared mutable file, so cross-engine runs cannot
+    """`out` with the `catalog`/`release`/`bundle` path field blanked -- each engine runs against
+    its own per-engine copy of the fixture (never a shared mutable file, so cross-engine runs cannot
     interfere with each other), so that field is expected to differ by construction and must not
-    fail the byte-identical comparison the way every other field does."""
+    fail the byte-identical comparison the way every other field does. It also carries whatever
+    argv spelling the caller passed (a trailing slash, a trailing `/.`): Python's `Path` collapses
+    those while TS/Java echo the raw string, a display-only difference the `target-argument` census
+    rows exist to exercise, not a `verified`/exit-code divergence this check needs to catch."""
     try:
         env = json.loads(out)
     except json.JSONDecodeError:
         return out
-    for key in ("catalog", "release"):
+    for key in ("catalog", "release", "bundle"):
         if key in env:
             env[key] = "<path>"
     return json.dumps(env, indent=2, sort_keys=True) + "\n"
@@ -463,14 +466,23 @@ def _run_bundle_scenario(
     return runs
 
 
+_TARGET_FLAGS = {
+    "catalog": "--catalog",
+    "release": "--release",
+    "bundle": "--bundle",
+    "report": "--report",
+}
+
+
 def _run_mutation(
     mutation: verify_flow_census.Mutation, root: Path
 ) -> dict[str, tuple[str, int]]:
     """Each engine's output for one mutation, built once (`verify` only reads it), with the fixture
     directory written as `<dir>` so a refusal that names the path compares alike."""
-    flag = "--catalog" if mutation.target == "catalog" else "--release"
+    flag = _TARGET_FLAGS[mutation.target]
     root.mkdir(parents=True)
-    target = str(mutation.build(root))
+    path = mutation.build(root)
+    target = mutation.arg(path) if mutation.arg is not None else str(path)
     runs = {}
     for engine, run in ENGINE_VERIFY.items():
         out, code = run([flag, target, "--json"])
@@ -496,7 +508,7 @@ def _census_view(out: str, code: int) -> str:
 def run_census(canonical: Path, tmp: Path, failures: list[str]) -> None:
     """Every mutation `verify_flow_census.generate` derives from the census, through all three
     engines: byte-identical output and exit code, a JSON envelope, never `internal.unexpected`."""
-    mutations = verify_flow_census.generate(canonical, EU_AI_ACT)
+    mutations = verify_flow_census.generate(canonical, EU_AI_ACT, EVIDENCE_BUNDLE)
     failures.extend(verify_flow_census.coverage_problems(mutations))
     with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:
         results = list(

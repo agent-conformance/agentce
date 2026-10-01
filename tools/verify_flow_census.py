@@ -116,6 +116,30 @@ FLOW_POINTS = (
         "a bundle signature's signed statement: payload bytes -> JSON -> subject[0].digest.sha256",
         ("json-type", "missing-field", "payload-bytes"),
     ),
+    FlowPoint(
+        "bundle-manifest",
+        "a --bundle directory's own manifest.json bytes -> JSON (load_bundle)",
+        (
+            "bytes",
+            "number-token",
+            "nesting",
+            "duplicate-key",
+            "not-a-file",
+            "json-type",
+            "missing-field",
+        ),
+    ),
+    FlowPoint(
+        "bundle-files",
+        "manifest.json's files[] entries: each entry's path resolved inside the bundle "
+        "(confine_to_root) and its content hashed",
+        ("path", "content"),
+    ),
+    FlowPoint(
+        "target-argument",
+        "verify's own --catalog/--release/--bundle/--report value: empty, trailing-slash, '.'",
+        ("empty", "trailing-slash", "dot"),
+    ),
 )
 FLOW_IDS = frozenset(point.id for point in FLOW_POINTS)
 
@@ -160,22 +184,30 @@ STRING_TOKENS = (
     ("astral", '"\\ud83d\\ude00"'),
 )
 
+def path_names_for(base_name: str) -> tuple[tuple[str, str], ...]:
+    """Path values for a manifest entry that names a real file `base_name` inside the fixture
+    directory built by `bundle_with`/`bundle_evidence_with` (which also provides `outside.txt` one
+    level up, a `subdir`, and `link-out`/`link-in`): escapes, links, odd spellings of the real name,
+    and a directory."""
+    return (
+        ("absolute", "/etc/hosts"),
+        ("dotdot", "../outside.txt"),
+        ("dotdot-back-in", f"sub/../{base_name}"),
+        ("dot-prefix", f"./{base_name}"),
+        ("trailing-slash", f"{base_name}/"),
+        ("nul", f"{base_name}\u0000x"),
+        ("empty", ""),
+        ("dot", "."),
+        ("directory", "subdir"),
+        ("backslash", "..\\outside.txt"),
+        ("link-out", "link-out"),
+        ("link-in", "link-in"),
+        ("non-ascii", "artifact-é.txt"),
+    )
+
+
 #: Artifact names: escapes, links, odd spellings of the real name, and a directory.
-ARTIFACT_NAMES = (
-    ("absolute", "/etc/hosts"),
-    ("dotdot", "../outside.txt"),
-    ("dotdot-back-in", "sub/../artifact-a.txt"),
-    ("dot-prefix", "./artifact-a.txt"),
-    ("trailing-slash", "artifact-a.txt/"),
-    ("nul", "artifact-a.txt\u0000x"),
-    ("empty", ""),
-    ("dot", "."),
-    ("directory", "subdir"),
-    ("backslash", "..\\outside.txt"),
-    ("link-out", "link-out"),
-    ("link-in", "link-in"),
-    ("non-ascii", "artifact-é.txt"),
-)
+ARTIFACT_NAMES = path_names_for("artifact-a.txt")
 
 DEEP_NESTING = 100_000
 #: The deepest container nesting the engines accept (Jackson's default, enforced alike in all three);
@@ -338,10 +370,13 @@ class Mutation:
     name: str
     flow: str
     problem_class: str
-    target: str  # "catalog" or "release"
+    target: str  # "catalog", "release", "bundle", or "report" -- which verify flag to pass
     #: Writes this mutation's fixture into an empty per-engine directory and returns the path to pass
-    #: to `verify --catalog` or `verify --release`. Reads only the canonical fixtures.
+    #: to `verify --catalog`/`--release`/`--bundle`/`--report`. Reads only the canonical fixtures.
     build: Callable[[Path], Path]
+    #: Overrides the argv value computed from `build`'s returned path (default: `str(path)`) --
+    #: `target-argument` mutations build a valid fixture but pass a different spelling of its path.
+    arg: Callable[[Path], str] | None = None
 
 
 def _write(path: Path, data: bytes | Any) -> None:
@@ -351,9 +386,10 @@ def _write(path: Path, data: bytes | Any) -> None:
         path.write_text(json.dumps(data), encoding="utf-8")
 
 
-def generate(canonical: Path, catalog: Path) -> list[Mutation]:
+def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Mutation]:
     """Every mutation the census generates, from the canonical fixtures in `canonical` (built by
-    `verify_parity_check.build_canonical_fixtures`) and the real signed catalog at `catalog`."""
+    `verify_parity_check.build_canonical_fixtures`), the real signed catalog at `catalog`, and the
+    real signed evidence bundle at `evidence_bundle` (`corpus/quickstart/evidence`)."""
     mutations: list[Mutation] = []
 
     def add(
@@ -361,9 +397,15 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
         flow: str,
         problem_class: str,
         build: Callable[[Path], Path],
+        *,
+        target: str | None = None,
+        arg: Callable[[Path], str] | None = None,
     ) -> None:
-        target = "catalog" if flow.startswith("catalog-") else "release"
-        mutations.append(Mutation(f"{flow}:{name}", flow, problem_class, target, build))
+        if target is None:
+            target = "catalog" if flow.startswith("catalog-") else "release"
+        mutations.append(
+            Mutation(f"{flow}:{name}", flow, problem_class, target, build, arg)
+        )
 
     def catalog_with(edit: Callable[[Path], object]) -> Callable[[Path], Path]:
         def build(d: Path) -> Path:
@@ -390,6 +432,20 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
             (dest / "subdir").mkdir()
             os.symlink(d / "outside.txt", dest / "link-out")
             os.symlink("artifact-a.txt", dest / "link-in")
+            edit(dest)
+            return dest
+
+        return build
+
+    def bundle_evidence_with(edit: Callable[[Path], object]) -> Callable[[Path], Path]:
+        def build(d: Path) -> Path:
+            dest = d / "evidence"
+            shutil.copytree(evidence_bundle, dest, symlinks=True)
+            real_file = dest / "events" / "_benign-quarantine.jsonl"
+            (d / "outside.txt").write_bytes(real_file.read_bytes())
+            (dest / "subdir").mkdir()
+            os.symlink(d / "outside.txt", dest / "link-out")
+            os.symlink("events/_benign-quarantine.jsonl", dest / "link-in")
             edit(dest)
             return dest
 
@@ -630,6 +686,119 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
             "json-type",
             bundle_with(set_file("signatures.json", broken)),
         )
+
+    # bundle-manifest / bundle-files (--bundle's own manifest.json and the files it names).
+    bundle_manifest_bytes = (evidence_bundle / "manifest.json").read_bytes()
+    for name, cls, data in byte_mutations(bundle_manifest_bytes):
+        add(
+            name,
+            "bundle-manifest",
+            cls,
+            bundle_evidence_with(set_file("manifest.json", data)),
+            target="bundle",
+        )
+    add(
+        "directory",
+        "bundle-manifest",
+        "not-a-file",
+        bundle_evidence_with(replace_with_directory("manifest.json")),
+        target="bundle",
+    )
+    add(
+        "unreadable",
+        "bundle-manifest",
+        "not-a-file",
+        bundle_evidence_with(make_unreadable("manifest.json")),
+        target="bundle",
+    )
+    bundle_manifest = json.loads(bundle_manifest_bytes)
+    for name, cls, doc in node_mutations(bundle_manifest):
+        add(
+            name,
+            "bundle-manifest",
+            cls,
+            bundle_evidence_with(set_file("manifest.json", doc)),
+            target="bundle",
+        )
+    bundle_file_name = "events/_benign-quarantine.jsonl"
+    for name, path_value in path_names_for(bundle_file_name):
+        doc = replaced(bundle_manifest, ("files", 0, "path"), path_value)
+        add(
+            name,
+            "bundle-files",
+            "path",
+            bundle_evidence_with(set_file("manifest.json", doc)),
+            target="bundle",
+        )
+    add(
+        "content-changed",
+        "bundle-files",
+        "content",
+        bundle_evidence_with(
+            lambda dest: (dest / bundle_file_name).write_bytes(b"changed\n")
+        ),
+        target="bundle",
+    )
+    add(
+        "missing-file",
+        "bundle-files",
+        "content",
+        bundle_evidence_with(lambda dest: (dest / bundle_file_name).unlink()),
+        target="bundle",
+    )
+
+    # target-argument (verify's own --catalog/--release/--bundle/--report value).
+    def report_placeholder(d: Path) -> Path:
+        dest = d / "report-unused"
+        dest.mkdir()
+        return dest
+
+    def arg_empty(_path: Path) -> str:
+        return ""
+
+    def arg_trailing_slash(path: Path) -> str:
+        return str(path) + "/"
+
+    def arg_dot_suffix(path: Path) -> str:
+        return str(path) + "/."
+
+    for flag_target, builder in (
+        ("catalog", catalog_with(lambda _dest: None)),
+        ("release", bundle_with(lambda _dest: None)),
+        ("bundle", bundle_evidence_with(lambda _dest: None)),
+    ):
+        add(
+            f"{flag_target}-empty",
+            "target-argument",
+            "empty",
+            builder,
+            target=flag_target,
+            arg=arg_empty,
+        )
+        add(
+            f"{flag_target}-trailing-slash",
+            "target-argument",
+            "trailing-slash",
+            builder,
+            target=flag_target,
+            arg=arg_trailing_slash,
+        )
+        add(
+            f"{flag_target}-dot",
+            "target-argument",
+            "dot",
+            builder,
+            target=flag_target,
+            arg=arg_dot_suffix,
+        )
+    add(
+        "report-empty",
+        "target-argument",
+        "empty",
+        report_placeholder,
+        target="report",
+        arg=arg_empty,
+    )
 
     return mutations
 
