@@ -53,7 +53,7 @@ from ..assess import (
 )
 from ..blind_spots import catalog_support_view, compute_blind_spots
 from ..bundle import copy_bundle, load_bundle
-from ..canonical import canonical_string, canonicalize
+from ..canonical import CanonicalizationError, canonical_string, canonicalize
 from ..catalog import Catalog, lint_catalog, load_catalog
 from ..collect import EnvSecretManager, SourceSpec, load_config, run_collect
 from ..config import resolve as resolve_config
@@ -819,9 +819,17 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
     )
     if err:
         return _verify_release_soft_fail(result, release_path, err)
-    manifest_digest = signing.sha256_prefixed(canonicalize(manifest))
+    try:
+        manifest_digest = signing.sha256_prefixed(canonicalize(manifest))
+    except CanonicalizationError:
+        return _verify_release_soft_fail(
+            result, release_path, "release manifest cannot be canonicalized"
+        )
     problems: list[str] = []
-    for artifact in manifest.get("artifacts", []):
+    artifacts = manifest.get("artifacts", [])
+    if not isinstance(artifacts, list):
+        artifacts = []
+    for artifact in artifacts:
         name = artifact.get("name") if isinstance(artifact, dict) else None
         if not isinstance(name, str):
             problems.append("release manifest has an artifact entry with no name")
@@ -863,6 +871,8 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
             TypeError,
         ) as exc:
             problems.append(f"signature ({profile}): {exc}")
+    if not problems and not signers:
+        problems.append("release bundle carries no signatures")
     ok = not problems
     result.data.update(
         {

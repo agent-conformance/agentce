@@ -475,6 +475,19 @@ test("verifyRelease verifies a real single-file kms-signed release", () => {
   }
 });
 
+test("verifyRelease refuses a byte-order-marked envelope instead of silently stripping it (verifier round-1 Finding 4)", () => {
+  const fixture = kmsFixture();
+  const envelope = { payloadType: "x", payload: "", signatures: [] as unknown[] };
+  const { dir, path } = tmpFile("release.dsse.json", `﻿${JSON.stringify(envelope)}`);
+  try {
+    const result = verifyRelease(path, fixture.trust) as { verified: boolean; reason?: string };
+    assert.equal(result.verified, false);
+    assert.equal(result.reason, "release envelope is not readable JSON");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // --- verifyRelease: directory-bundle form. ---
 
 function bundleDir(files: Record<string, string>): string {
@@ -647,6 +660,58 @@ test("verifyRelease verifies a real directory-bundle release signed by one kms e
     assert.equal(result.manifest_digest, manifestDigest);
     assert.equal(result.signers.length, 1);
     assert.equal(result.signers[0]?.identity, "bundle-signer");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("verifyRelease refuses an unsigned bundle (zero signature entries), not verified:true (verifier round-1 Finding 1)", () => {
+  const fixture = kmsFixture();
+  const dir = bundleDir({
+    "release-manifest.json": JSON.stringify({ artifacts: [] }),
+    "signatures.json": "[]",
+  });
+  try {
+    const result = verifyRelease(dir, fixture.trust) as { verified: boolean; reason?: string };
+    assert.equal(result.verified, false);
+    assert.equal(result.reason, "release bundle carries no signatures");
+    assert.deepEqual((result as unknown as { signers: unknown[] }).signers, []);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+for (const [label, artifacts] of Object.entries({
+  "artifacts-null": null,
+  "artifacts-int": 5,
+  "artifacts-str": "ab",
+})) {
+  test(`verifyRelease treats a non-array artifacts field (${label}) as empty, not a crash (verifier round-1 Finding 2)`, () => {
+    const fixture = kmsFixture();
+    const dir = bundleDir({
+      "release-manifest.json": JSON.stringify({ artifacts }),
+      "signatures.json": "[]",
+    });
+    try {
+      const result = verifyRelease(dir, fixture.trust) as { verified: boolean; reason?: string };
+      assert.equal(result.verified, false);
+      assert.equal(result.reason, "release bundle carries no signatures");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+test("verifyRelease soft-fails when the manifest cannot be canonicalized, instead of crashing (verifier round-1 Finding 3)", () => {
+  const fixture = kmsFixture();
+  const dir = bundleDir({
+    "release-manifest.json": JSON.stringify({ artifacts: [], size: 1.5 }),
+    "signatures.json": "[]",
+  });
+  try {
+    const result = verifyRelease(dir, fixture.trust) as { verified: boolean; reason?: string };
+    assert.equal(result.verified, false);
+    assert.equal(result.reason, "release manifest cannot be canonicalized");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

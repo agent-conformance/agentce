@@ -224,6 +224,76 @@ def test_verify_release_bundle_artifact_missing_name_refused(
     assert "release manifest has an artifact entry with no name" in env["reason"]
 
 
+def test_verify_release_bundle_unsigned_is_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A bundle with no signature entries at all must not be `verified: true` -- the verifier's
+    round-1 Finding 1: no problems and no signers used to mean `verified: true`, an unsigned bundle
+    reported as verified."""
+    (tmp_path / "release-manifest.json").write_text(
+        json.dumps({"artifacts": []}), encoding="utf-8"
+    )
+    (tmp_path / "signatures.json").write_text("[]", encoding="utf-8")
+    code, env = run(["verify", "--release", str(tmp_path), "--json"], capsys)
+    assert code == 3
+    assert env["verified"] is False
+    assert env["reason"] == "release bundle carries no signatures"
+    assert env["signers"] == []
+
+
+@pytest.mark.parametrize(
+    "artifacts",
+    [None, 5, "ab"],
+    ids=["artifacts-null", "artifacts-int", "artifacts-str"],
+)
+def test_verify_release_bundle_artifacts_not_a_list_is_empty(
+    artifacts: Any, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A non-list `artifacts` field is treated as `[]`, not a crash (`TypeError` on `None`/`int`)
+    and not an iterable of characters (`str`) -- verifier round-1 Finding 2."""
+    (tmp_path / "release-manifest.json").write_text(
+        json.dumps({"artifacts": artifacts}), encoding="utf-8"
+    )
+    (tmp_path / "signatures.json").write_text("[]", encoding="utf-8")
+    code, env = run(["verify", "--release", str(tmp_path), "--json"], capsys)
+    assert code == 3
+    assert env["verified"] is False
+    assert "error" not in env
+    assert env["reason"] == "release bundle carries no signatures"
+
+
+def test_verify_release_bundle_manifest_not_canonicalizable_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A manifest holding a float crashes `canonicalize()` with `CanonicalizationError` today --
+    verifier round-1 Finding 3: wrap it in the same soft-fail shape, never `internal.unexpected`."""
+    (tmp_path / "release-manifest.json").write_text(
+        json.dumps({"artifacts": [], "size": 1.5}), encoding="utf-8"
+    )
+    (tmp_path / "signatures.json").write_text("[]", encoding="utf-8")
+    code, env = run(["verify", "--release", str(tmp_path), "--json"], capsys)
+    assert code == 3
+    assert env["verified"] is False
+    assert "error" not in env
+    assert env["reason"] == "release manifest cannot be canonicalized"
+
+
+def test_verify_release_envelope_with_bom_is_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A byte-order mark makes the file unreadable JSON in every engine -- verifier round-1 Finding 4
+    (TypeScript's decoder silently stripped it; this pins the cross-engine refusal)."""
+    artifact = tmp_path / "release.dsse.json"
+    artifact.write_text(
+        "﻿" + json.dumps({"payloadType": "x", "payload": "", "signatures": []}),
+        encoding="utf-8",
+    )
+    code, env = run(["verify", "--release", str(artifact), "--json"], capsys)
+    assert code == 3
+    assert env["verified"] is False
+    assert env["reason"] == "release envelope is not readable JSON"
+
+
 def test_verify_two_targets_is_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

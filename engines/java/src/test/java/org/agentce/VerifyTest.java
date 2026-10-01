@@ -518,6 +518,23 @@ class VerifyTest {
         assertEquals("release-signer", result.get("signer").asText());
     }
 
+    @Test
+    void verifyReleaseRefusesAByteOrderMarkedEnvelopeInsteadOfSilentlyStrippingIt(@TempDir Path dir)
+            throws Exception {
+        // Verifier round-1 Finding 4: a leading U+FEFF must make the file unreadable JSON here too,
+        // matching Python's `read_text("utf-8")` and this engine's own decoder.
+        KmsFixture fixture = kmsFixture("test-identity");
+        ObjectNode envelope = Json.nodes().objectNode();
+        envelope.put("payloadType", "x");
+        envelope.put("payload", "");
+        envelope.putArray("signatures");
+        Path path = dir.resolve("release.dsse.json");
+        Files.writeString(path, "﻿" + Json.pretty(envelope));
+        ObjectNode result = Verify.verifyRelease(path, fixture.trust());
+        assertFalse(result.get("verified").asBoolean());
+        assertEquals("release envelope is not readable JSON", result.get("reason").asText());
+    }
+
     // --- verifyRelease: directory-bundle form. --------------------------------------------------------
 
     @Test
@@ -650,6 +667,52 @@ class VerifyTest {
         assertEquals(manifestDigest, result.get("manifest_digest").asText());
         assertEquals(1, result.get("signers").size());
         assertEquals("bundle-signer", result.get("signers").get(0).get("identity").asText());
+    }
+
+    @Test
+    void verifyReleaseRefusesAnUnsignedBundleWithZeroSignatureEntries(@TempDir Path dir) throws Exception {
+        // Verifier round-1 Finding 1 (HIGH, security): no problems and no signers used to mean
+        // verified:true -- an unsigned bundle reported as verified.
+        KmsFixture fixture = kmsFixture("test-identity");
+        ObjectNode manifest = Json.nodes().objectNode();
+        manifest.putArray("artifacts");
+        Files.writeString(dir.resolve("release-manifest.json"), Json.pretty(manifest));
+        Files.writeString(dir.resolve("signatures.json"), "[]");
+        ObjectNode result = Verify.verifyRelease(dir, fixture.trust());
+        assertFalse(result.get("verified").asBoolean());
+        assertEquals("release bundle carries no signatures", result.get("reason").asText());
+        assertEquals(0, result.get("signers").size());
+    }
+
+    @Test
+    void verifyReleaseTreatsANonArrayArtifactsFieldAsEmptyNotACrash(@TempDir Path dir) throws Exception {
+        // Verifier round-1 Finding 2.
+        KmsFixture fixture = kmsFixture("test-identity");
+        for (JsonNode badArtifacts : new JsonNode[] {
+            Json.nodes().nullNode(), Json.nodes().numberNode(5), Json.nodes().textNode("ab")
+        }) {
+            ObjectNode manifest = Json.nodes().objectNode();
+            manifest.set("artifacts", badArtifacts);
+            Files.writeString(dir.resolve("release-manifest.json"), Json.pretty(manifest));
+            Files.writeString(dir.resolve("signatures.json"), "[]");
+            ObjectNode result = Verify.verifyRelease(dir, fixture.trust());
+            assertFalse(result.get("verified").asBoolean());
+            assertEquals("release bundle carries no signatures", result.get("reason").asText());
+        }
+    }
+
+    @Test
+    void verifyReleaseSoftFailsWhenTheManifestCannotBeCanonicalized(@TempDir Path dir) throws Exception {
+        // Verifier round-1 Finding 3.
+        KmsFixture fixture = kmsFixture("test-identity");
+        ObjectNode manifest = Json.nodes().objectNode();
+        manifest.putArray("artifacts");
+        manifest.put("size", 1.5);
+        Files.writeString(dir.resolve("release-manifest.json"), Json.pretty(manifest));
+        Files.writeString(dir.resolve("signatures.json"), "[]");
+        ObjectNode result = Verify.verifyRelease(dir, fixture.trust());
+        assertFalse(result.get("verified").asBoolean());
+        assertEquals("release manifest cannot be canonicalized", result.get("reason").asText());
     }
 
     @Test

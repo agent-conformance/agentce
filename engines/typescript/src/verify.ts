@@ -12,7 +12,7 @@
 import { type KeyObject, createHash, createPublicKey, verify as cryptoVerify } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { canonicalize, sha256Hex } from "./canonical";
+import { CanonicalizationError, canonicalize, sha256Hex } from "./canonical";
 import { InputError } from "./errors";
 import { digestTree } from "./report";
 import { dssePae, keyidFor } from "./sign";
@@ -402,7 +402,19 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
     };
   }
 
-  const manifestDigest = `sha256:${sha256Hex(manifest)}`;
+  let manifestDigest: string;
+  try {
+    manifestDigest = `sha256:${sha256Hex(manifest)}`;
+  } catch (exc) {
+    if (!(exc instanceof CanonicalizationError)) {
+      throw exc;
+    }
+    return {
+      release: releasePath,
+      verified: false,
+      reason: "release manifest cannot be canonicalized",
+    };
+  }
   const problems: string[] = [];
   const artifacts = Array.isArray(manifest.artifacts) ? manifest.artifacts : [];
   for (const raw of artifacts) {
@@ -472,6 +484,9 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
       const message = exc instanceof Error ? exc.message : String(exc);
       problems.push(`signature (${pyStr(profile)}): ${message}`);
     }
+  }
+  if (problems.length === 0 && signers.length === 0) {
+    problems.push("release bundle carries no signatures");
   }
 
   if (problems.length === 0) {

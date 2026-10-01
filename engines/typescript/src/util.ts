@@ -149,10 +149,15 @@ export function b64dStrict(value: string): Buffer {
  * Reads a JSON file with a fatal UTF-8 decode (Node's lenient `utf-8` string coercion would
  * otherwise silently replace invalid byte sequences with U+FFFD rather than refuse, unlike Python's
  * `read_text("utf-8")` and Java's decoder); throws on a decode or parse failure, never on a
- * valid-JSON-but-wrong-shape value (the caller decides what "wrong shape" means).
+ * valid-JSON-but-wrong-shape value (the caller decides what "wrong shape" means). `ignoreBOM: true`
+ * keeps a leading U+FEFF in the decoded text instead of stripping it, so a byte-order-marked file
+ * fails `JSON.parse` here exactly as it does against Python's and Java's decoders, rather than
+ * silently parsing where they refuse.
  */
 export function readJsonFileStrict(path: string): unknown {
-  const text = new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(path));
+  const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
+    readFileSync(path),
+  );
   return JSON.parse(text);
 }
 

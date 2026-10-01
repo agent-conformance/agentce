@@ -473,7 +473,12 @@ public final class Verify {
             return releaseSoftFail(releasePath, "release manifest is not readable JSON");
         }
 
-        String manifestDigest = "sha256:" + Canonical.sha256Hex(manifest);
+        String manifestDigest;
+        try {
+            manifestDigest = "sha256:" + Canonical.sha256Hex(manifest);
+        } catch (Canonical.CanonicalizationError e) {
+            return releaseSoftFail(releasePath, "release manifest cannot be canonicalized");
+        }
         List<String> problems = new ArrayList<>();
         JsonNode artifacts =
                 manifest.has("artifacts") && manifest.get("artifacts").isArray()
@@ -537,6 +542,9 @@ public final class Verify {
                 String message = e.getMessage() != null ? e.getMessage() : "";
                 problems.add("signature (" + Readiness.pyStr(profile) + "): " + message);
             }
+        }
+        if (problems.isEmpty() && signers.isEmpty()) {
+            problems.add("release bundle carries no signatures");
         }
 
         ObjectNode out = Json.nodes().objectNode();

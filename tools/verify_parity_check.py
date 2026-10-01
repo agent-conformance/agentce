@@ -56,6 +56,22 @@ CATALOG_SIGNATURE_NAME = "catalog.sig.json"
 #: message, `signing.py:437-442`) -- asserted byte-identical across all three engines (scenario 3).
 UNSIGNED_SENTENCE = f"unsigned: {CATALOG_SIGNATURE_NAME} is absent, so there is no signature to verify (SPEC §8.7)."
 
+#: The fixed literal every engine gives for a directory-bundle release with zero signature
+#: entries (verifier round-1 Finding 1: "no problems, no signers" used to mean `verified: true`,
+#: an unsigned bundle reported as verified) -- asserted byte-identical across all three engines
+#: (scenario 23) and reused by VG-VERIFY's own unsigned-bundle leg.
+UNSIGNED_BUNDLE_SENTENCE = "release bundle carries no signatures"
+
+
+def write_bundle_with_manifest(dest: Path, manifest: Any) -> None:
+    """Writes an unsigned directory-bundle release (`release-manifest.json` + an empty
+    `signatures.json`) at `dest`, which must not already exist -- the one fixture shape scenarios
+    23-25 and VG-VERIFY's own unsigned-bundle leg all share, so the manifest shape (or the empty-
+    signatures convention) only has one place to keep in sync."""
+    dest.mkdir()
+    (dest / "release-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (dest / "signatures.json").write_text("[]", encoding="utf-8")
+
 
 def _run(cmd: list[str], *, cwd: Path | None = None) -> tuple[str, int]:
     proc = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
@@ -1025,6 +1041,73 @@ def run_real_check() -> int:
                 == "the signature covers a different catalog digest than the directory content",
                 failures,
                 f"s22-catalog-digest-mismatch:{engine}: reason={_reason(out)!r}",
+            )
+
+        # Scenario 23 (verifier round-1 Finding 1, HIGH/security): a bundle with no signature
+        # entries at all must refuse, not report verified: true (an empty "no problems, no
+        # signers" bundle used to pass in all three engines).
+        def _unsigned_bundle(d: Path) -> Path:
+            dest = d / "bundle"
+            write_bundle_with_manifest(dest, {"artifacts": []})
+            return dest
+
+        runs = _run_release_scenario(
+            "s23-release-bundle-unsigned",
+            _unsigned_bundle,
+            tmp,
+            failures,
+            expect_exit=3,
+            expect_verified=False,
+        )
+        for engine, (out, _) in runs.items():
+            _assert(
+                _reason(out) == UNSIGNED_BUNDLE_SENTENCE,
+                failures,
+                f"s23-release-bundle-unsigned:{engine}: reason={_reason(out)!r}",
+            )
+
+        # Scenario 24 (verifier round-1 Finding 2): a manifest whose `artifacts` field is present
+        # but not an array is treated as empty, not a crash.
+        def _artifacts_not_a_list(d: Path) -> Path:
+            dest = d / "bundle"
+            write_bundle_with_manifest(dest, {"artifacts": None})
+            return dest
+
+        runs = _run_release_scenario(
+            "s24-release-bundle-artifacts-not-a-list",
+            _artifacts_not_a_list,
+            tmp,
+            failures,
+            expect_exit=3,
+            expect_verified=False,
+        )
+        for engine, (out, _) in runs.items():
+            _assert(
+                _reason(out) == UNSIGNED_BUNDLE_SENTENCE,
+                failures,
+                f"s24-release-bundle-artifacts-not-a-list:{engine}: reason={_reason(out)!r}",
+            )
+
+        # Scenario 25 (verifier round-1 Finding 3): a manifest holding a float crashes
+        # `canonicalize()` in all three engines today; it must soft-fail instead.
+        def _manifest_not_canonicalizable(d: Path) -> Path:
+            dest = d / "bundle"
+            write_bundle_with_manifest(dest, {"artifacts": [], "size": 1.5})
+            return dest
+
+        runs = _run_release_scenario(
+            "s25-release-bundle-manifest-not-canonicalizable",
+            _manifest_not_canonicalizable,
+            tmp,
+            failures,
+            expect_exit=3,
+            expect_verified=False,
+        )
+        for engine, (out, _) in runs.items():
+            _assert(
+                _reason(out) == "release manifest cannot be canonicalized",
+                failures,
+                f"s25-release-bundle-manifest-not-canonicalizable:{engine}: reason={_reason(out)!r}",
             )
 
         # Scenario B1 (point 4, critic round-2 finding #13): `verify --bundle` on a real,

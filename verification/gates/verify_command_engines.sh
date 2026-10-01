@@ -39,6 +39,9 @@ unsigned_catalog = work / "catalog-unsigned"
 shutil.copytree(vpc.EU_AI_ACT, unsigned_catalog)
 (unsigned_catalog / vpc.CATALOG_SIGNATURE_NAME).unlink()
 
+unsigned_bundle = work / "bundle-unsigned"
+vpc.write_bundle_with_manifest(unsigned_bundle, {"artifacts": []})
+
 print(
     json.dumps(
         {
@@ -46,6 +49,8 @@ print(
             "tampered_release": str(tampered_release),
             "unsigned_catalog": str(unsigned_catalog),
             "unsigned_sentence": vpc.UNSIGNED_SENTENCE,
+            "unsigned_bundle": str(unsigned_bundle),
+            "unsigned_bundle_sentence": vpc.UNSIGNED_BUNDLE_SENTENCE,
         }
     )
 )
@@ -55,6 +60,8 @@ kms_release="$(jq -r .kms_release "$fixture_json")"
 tampered_release="$(jq -r .tampered_release "$fixture_json")"
 unsigned_catalog="$(jq -r .unsigned_catalog "$fixture_json")"
 unsigned_sentence="$(jq -r .unsigned_sentence "$fixture_json")"
+unsigned_bundle="$(jq -r .unsigned_bundle "$fixture_json")"
+unsigned_bundle_sentence="$(jq -r .unsigned_bundle_sentence "$fixture_json")"
 
 (cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist)
 
@@ -114,5 +121,19 @@ for engine in python typescript java; do
   fi
 done
 
-[ "$status" -eq 0 ] && echo "verify: all three engines refuse the tampered release and the unsigned catalog without crashing, and verify the validly kms-signed release"
+# Leg 4 (verifier round-1 Finding 1, HIGH/security): a directory-bundle release with zero
+# signature entries must refuse with the fixed sentence, not report verified:true -- a gate cannot
+# claim an unsigned release artifact is refused (this script's own header) without a leg that
+# proves it for the bundle form, not only the single-file form leg 1 already covers.
+for engine in python typescript java; do
+  out="$(run_verify "$engine" --release "$unsigned_bundle")" && code=0 || code=$?
+  verified="$(printf '%s' "$out" | jq -r '.verified | tostring')"
+  reason="$(printf '%s' "$out" | jq -r '.reason // empty')"
+  if [ "$code" -ne 3 ] || [ "$verified" != "false" ] || [ "$reason" != "$unsigned_bundle_sentence" ]; then
+    echo "verify: $engine did not refuse the unsigned bundle with the exact sentence (exit $code, verified=${verified:-none}, reason=${reason:-none}; expected exit 3, verified=false, reason=$unsigned_bundle_sentence)" >&2
+    status=1
+  fi
+done
+
+[ "$status" -eq 0 ] && echo "verify: all three engines refuse the tampered release, the unsigned catalog and the unsigned bundle without crashing, and verify the validly kms-signed release"
 exit "$status"
