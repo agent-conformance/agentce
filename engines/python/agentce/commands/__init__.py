@@ -741,18 +741,51 @@ def _verify_report(
     return result
 
 
+def _verify_release_soft_fail(
+    result: CommandResult, release_path: Path, reason: str
+) -> CommandResult:
+    """The shared soft-fail shape for a release that cannot be verified: `{release, verified: False,
+    reason}`, no `error`/`key` field -- matching `--catalog`'s and the directory-bundle branch's own
+    shape (SPEC's three-engine parity standard; see Dispositions)."""
+    result.data.update(
+        {"release": str(release_path), "verified": False, "reason": reason}
+    )
+    result.note(f"release {release_path.name}: verification failed")
+    result.add_code(int(ExitCode.INPUT_ERROR))
+    return result
+
+
 def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
-    """Verify a release bundle (or a single DSSE envelope) offline against the vendored trust root."""
+    """Verify a release bundle (or a single DSSE envelope) offline against the vendored trust root.
+
+    Every branch uses the soft-fail shape above, and every new JSON-parse-failure path this function
+    adds uses a fixed, engine-neutral reason text, not an embedded native-parser message (brand-new
+    code for all three engines; `--catalog`'s pre-existing unreadable-JSON path is unchanged)."""
     trust = signing.vendored_trust()
     if release_path.is_file():
-        envelope = json.loads(release_path.read_text("utf-8"))
-        verified = signing.verify_envelope(envelope, trust)
+        try:
+            envelope = json.loads(release_path.read_text("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return _verify_release_soft_fail(
+                result, release_path, "release envelope is not readable JSON"
+            )
+        try:
+            verified = signing.verify_envelope(envelope, trust)
+        except (
+            signing.VerificationError,
+            ValueError,
+            KeyError,
+            AttributeError,
+            TypeError,
+        ) as exc:
+            return _verify_release_soft_fail(result, release_path, str(exc))
         result.data.update(
             {
                 "release": str(release_path),
                 "verified": True,
                 "signer": verified.identity,
                 "keyid": verified.keyid,
+                "keyless": verified.keyless,
             }
         )
         result.note(f"verified {release_path.name}: signer {verified.identity}")
@@ -765,19 +798,46 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
             f"{release_path} is not a release bundle (release-manifest.json/signatures.json).",
             "pass the --out directory produced by the release tooling.",
         )
-    manifest = json.loads(manifest_path.read_text("utf-8"))
+    try:
+        manifest = json.loads(manifest_path.read_text("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return _verify_release_soft_fail(
+            result, release_path, "release manifest is not readable JSON"
+        )
+    if not isinstance(manifest, dict):
+        return _verify_release_soft_fail(
+            result, release_path, "release manifest is not readable JSON"
+        )
     manifest_digest = signing.sha256_prefixed(canonicalize(manifest))
     problems: list[str] = []
     for artifact in manifest.get("artifacts", []):
-        artifact_file = release_path / artifact["name"]
+        name = artifact.get("name") if isinstance(artifact, dict) else None
+        if not isinstance(name, str):
+            problems.append("release manifest has an artifact entry with no name")
+            continue
+        artifact_file = release_path / name
         if not artifact_file.is_file():
-            problems.append(f"missing artifact {artifact['name']}")
+            problems.append(f"missing artifact {name}")
             continue
         actual = signing.sha256_prefixed(artifact_file.read_bytes())
         if actual != artifact.get("digest"):
-            problems.append(f"digest mismatch for {artifact['name']}")
+            problems.append(f"digest mismatch for {name}")
+    try:
+        signature_entries = json.loads(signatures_path.read_text("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return _verify_release_soft_fail(
+            result, release_path, "release signatures are not readable JSON"
+        )
+    if not isinstance(signature_entries, list):
+        return _verify_release_soft_fail(
+            result, release_path, "release signatures are not readable JSON"
+        )
     signers: list[dict[str, Any]] = []
-    for entry in json.loads(signatures_path.read_text("utf-8")):
+    for entry in signature_entries:
+        if not isinstance(entry, dict):
+            problems.append("signature (None): signature entry is not an object")
+            continue
+        profile = entry.get("profile")
         try:
             verified = signing.verify_envelope(entry["envelope"], trust)
             if (
@@ -787,11 +847,16 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
                 raise signing.VerificationError(
                     "signature does not cover the release manifest"
                 )
-            signers.append(
-                {"profile": entry.get("profile"), "identity": verified.identity}
-            )
-        except (signing.VerificationError, ValueError, KeyError) as exc:
-            problems.append(f"signature ({entry.get('profile')}): {exc}")
+            signers.append({"profile": profile, "identity": verified.identity})
+        except (
+            signing.VerificationError,
+            ValueError,
+            KeyError,
+            IndexError,
+            AttributeError,
+            TypeError,
+        ) as exc:
+            problems.append(f"signature ({profile}): {exc}")
     ok = not problems
     result.data.update(
         {

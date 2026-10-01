@@ -92,7 +92,7 @@ def _b64e(data: bytes) -> str:
 
 
 def _b64d(text: str) -> bytes:
-    return base64.b64decode(text.encode("ascii"))
+    return base64.b64decode(text.encode("ascii"), validate=True)
 
 
 def sha256_prefixed(data: bytes) -> str:
@@ -197,9 +197,16 @@ def issue_certificate(
 
 
 def verify_certificate(
-    cert: dict[str, Any], authorities: dict[str, Ed25519PublicKey]
+    cert: Any, authorities: dict[str, Ed25519PublicKey]
 ) -> tuple[Ed25519PublicKey, str]:
-    """Verify a keyless certificate against the pinned authorities; return ``(leaf_key, identity)``."""
+    """Verify a keyless certificate against the pinned authorities; return ``(leaf_key, identity)``.
+
+    Every way a certificate can be malformed -- not an object, a missing/non-base64 ``signature``, a
+    signature that does not verify, a missing ``public_key``/``identity`` -- collapses to the one
+    ``"certificate signature does not verify"`` message (SPEC's keyless model treats a malformed
+    certificate the same as one that fails to verify; TS/Java mirror this exact collapse)."""
+    if not isinstance(cert, dict):
+        raise VerificationError("certificate signature does not verify")
     issuer = cert.get("issuer")
     ca = authorities.get(issuer) if isinstance(issuer, str) else None
     if ca is None:
@@ -207,9 +214,11 @@ def verify_certificate(
     body = {k: v for k, v in cert.items() if k != "signature"}
     try:
         ca.verify(_b64d(cert["signature"]), canonicalize(body))
-    except (InvalidSignature, KeyError, ValueError) as exc:
+        leaf_key = load_public_ed25519(cert["public_key"])
+        identity = cert["identity"]
+    except (InvalidSignature, KeyError, ValueError, TypeError, AttributeError) as exc:
         raise VerificationError("certificate signature does not verify") from exc
-    return load_public_ed25519(cert["public_key"]), cert["identity"]
+    return leaf_key, identity
 
 
 # --- Signers. ---
@@ -353,29 +362,55 @@ def sign_statement(statement: dict[str, Any], signer: Signer) -> dict[str, Any]:
     }
 
 
-def verify_envelope(envelope: dict[str, Any], trust: TrustRoot) -> Verified:
-    """Verify a DSSE envelope against ``trust``; raise :class:`VerificationError` on any failure."""
+def verify_envelope(envelope: Any, trust: TrustRoot) -> Verified:
+    """Verify a DSSE envelope against ``trust``; raise :class:`VerificationError` on any failure.
+
+    Shape is validated explicitly, one ordered check at a time, rather than relying on which
+    exception a malformed field happens to raise: a wrong JSON type anywhere in the envelope (an int
+    where a string is expected, a string where an array is expected, and so on) must refuse cleanly
+    with the one message below, never surface as an unhandled crash (TS/Java port this exact sequence,
+    since neither language throws on an ordinary out-of-shape property read the way Python does)."""
+    if not isinstance(envelope, dict):
+        raise VerificationError("malformed DSSE envelope")
+    payload_type = envelope.get("payloadType")
+    if not isinstance(payload_type, str):
+        raise VerificationError("malformed DSSE envelope")
+    raw_payload = envelope.get("payload")
+    if not isinstance(raw_payload, str):
+        raise VerificationError("malformed DSSE envelope")
     try:
-        payload_type = envelope["payloadType"]
-        payload = _b64d(envelope["payload"])
-        signatures = envelope["signatures"]
-    except (KeyError, ValueError, TypeError) as exc:
+        payload = _b64d(raw_payload)
+    except ValueError as exc:
         raise VerificationError("malformed DSSE envelope") from exc
+    signatures = envelope.get("signatures")
+    if not isinstance(signatures, list):
+        raise VerificationError("malformed DSSE envelope")
     if not signatures:
         raise VerificationError("DSSE envelope carries no signatures")
     pae = _pae(payload_type, payload)
     last_error: Exception | None = None
     for signature in signatures:
         try:
+            if not isinstance(signature, dict):
+                # A non-object entry has no keyid to resolve; route it through the same
+                # missing-keyid message `TrustRoot.resolve` gives for an absent `keyid` field, so the
+                # text is one the per-entry loop already defines, not a second ad-hoc string.
+                raise VerificationError(f"no trusted key for keyid {None!r}")
             public_key, identity = trust.resolve(signature)
-            public_key.verify(_b64d(signature["sig"]), pae)
+            sig = signature.get("sig")
+            if not isinstance(sig, str):
+                # `signature["sig"]` would raise a bare ``KeyError`` today for a missing key; keep
+                # that same repr text as an explicit, pinned message (TS/Java have no native
+                # equivalent to mirror otherwise).
+                raise VerificationError("'sig'")
+            public_key.verify(_b64d(sig), pae)
             return Verified(
                 payload=payload,
                 identity=identity,
                 keyid=signature.get("keyid"),
                 keyless="cert" in signature,
             )
-        except (InvalidSignature, VerificationError, KeyError, ValueError) as exc:
+        except (InvalidSignature, VerificationError, ValueError) as exc:
             last_error = exc
     raise VerificationError(
         f"no signature verified against the trust root: {last_error}"

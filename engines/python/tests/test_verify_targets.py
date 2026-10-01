@@ -115,6 +115,102 @@ def test_verify_release_missing(
     assert env["error"]["key"] == "input.release_missing"
 
 
+def test_verify_release_tampered_is_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An envelope whose keyid is not in the trust root is refused, not a crash (the item's named
+    defect: this used to surface as `internal.unexpected`)."""
+    trusted_key = Ed25519PrivateKey.generate()
+    other_key = Ed25519PrivateKey.generate()
+    monkeypatch.setattr(signing, "vendored_trust", lambda: _trust_for(trusted_key))
+    statement = signing.intoto_statement(
+        "release",
+        "sha256:" + "0" * 64,
+        "https://agent-conformance.org/attestation/release/v1",
+        {},
+    )
+    envelope = signing.sign_statement(
+        statement, signing.KmsSigner(private_key=other_key)
+    )
+    artifact = tmp_path / "release.dsse.json"
+    artifact.write_text(json.dumps(envelope), encoding="utf-8")
+    code, env = run(["verify", "--release", str(artifact), "--json"], capsys)
+    assert code == 3
+    assert env["verified"] is False
+    assert "reason" in env
+    assert "error" not in env
+
+
+@pytest.mark.parametrize(
+    "envelope",
+    [
+        {
+            "payloadType": "application/vnd.in-toto+json",
+            "payload": "e30=",
+            "signatures": ["x"],
+        },
+        {"payloadType": "application/vnd.in-toto+json", "payload": 5, "signatures": []},
+        {"payloadType": 5, "payload": "e30=", "signatures": []},
+    ],
+    ids=["signatures-not-objects", "payload-wrong-type", "payloadType-wrong-type"],
+)
+def test_verify_release_malformed_types_refused(
+    envelope: dict[str, Any],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A release envelope with a wrong JSON type for a required field is refused cleanly -- these
+    crash with `internal.unexpected` today even under a narrower, single-exception-tuple fix."""
+    monkeypatch.setattr(
+        signing, "vendored_trust", lambda: _trust_for(Ed25519PrivateKey.generate())
+    )
+    artifact = tmp_path / "release.dsse.json"
+    artifact.write_text(json.dumps(envelope), encoding="utf-8")
+    code, env = run(["verify", "--release", str(artifact), "--json"], capsys)
+    assert code == 3
+    assert env["verified"] is False
+    assert "reason" in env
+    assert "error" not in env
+
+
+def test_verify_release_bundle_manifest_not_json_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "release-manifest.json").write_text("not json", encoding="utf-8")
+    (tmp_path / "signatures.json").write_text("[]", encoding="utf-8")
+    code, env = run(["verify", "--release", str(tmp_path), "--json"], capsys)
+    assert code == 3
+    assert env["verified"] is False
+    assert env["reason"] == "release manifest is not readable JSON"
+
+
+def test_verify_release_bundle_signatures_entry_not_object_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "release-manifest.json").write_text(
+        json.dumps({"artifacts": []}), encoding="utf-8"
+    )
+    (tmp_path / "signatures.json").write_text(json.dumps(["x"]), encoding="utf-8")
+    code, env = run(["verify", "--release", str(tmp_path), "--json"], capsys)
+    assert code == 3
+    assert env["verified"] is False
+    assert "signature (None): signature entry is not an object" in env["reason"]
+
+
+def test_verify_release_bundle_artifact_missing_name_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "release-manifest.json").write_text(
+        json.dumps({"artifacts": [{"digest": "sha256:" + "0" * 64}]}), encoding="utf-8"
+    )
+    (tmp_path / "signatures.json").write_text("[]", encoding="utf-8")
+    code, env = run(["verify", "--release", str(tmp_path), "--json"], capsys)
+    assert code == 3
+    assert env["verified"] is False
+    assert "release manifest has an artifact entry with no name" in env["reason"]
+
+
 def test_verify_two_targets_is_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
