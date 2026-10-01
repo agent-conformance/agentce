@@ -298,6 +298,49 @@ def _mutate_non_utf8_jsonl(report_dir: Path) -> None:
     )
 
 
+def _mutate_local_multi(report_dir: Path) -> None:
+    """Two local-stage violations in one file (P18-18.27 verifier round 1, `two_locals`): before the
+    fix, Python's `jsonschema.validate` raised only its single `best_match` error while TS/Java's
+    `allErrors: true` validators already reported both -- a real count divergence `case4-local-schema`
+    (one violation) could never catch."""
+    path = report_dir / "assertions.json"
+    assertions = _read_json(path)
+    del assertions[0]["control"]
+    del assertions[1]["control"]
+    _write_json(path, assertions)
+
+
+def _mutate_sarif_anyof(report_dir: Path) -> None:
+    """A real-schema `anyOf` failure (P18-18.27 verifier round 1, `anyof_region`): an empty `region`
+    object fails all three of SARIF's `anyOf` branches (`startLine`, `charOffset`, `byteOffset`).
+    Python's `iter_errors` reports exactly the one combinator error; Ajv's `allErrors: true` also
+    reported every failing branch, and networknt reported every failing branch but never the
+    combinator error itself -- three different counts (1, 4, 3) before the fix collapsed all three to
+    one message per combinator failure."""
+    path = report_dir / "results.sarif"
+    sarif = _read_json(path)
+    sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"] = {}
+    _write_json(path, sarif)
+
+
+def _mutate_sarif_idx_order(report_dir: Path) -> None:
+    """Violations at array indices 2 and 10 in the same file (P18-18.27 verifier round 1,
+    `idx_order`): before the fix, TS sorted the joined location string lexicographically (`results/10`
+    before `results/2`) and Java's `Json.byteCompare` did the same, while Python's `absolute_path`
+    elements are already native ints and sorted correctly -- needs at least 11 `results` entries in the
+    shared base report."""
+    path = report_dir / "results.sarif"
+    sarif = _read_json(path)
+    results = sarif["runs"][0]["results"]
+    if len(results) <= 10:
+        raise AssertionError(
+            f"fixture needs at least 11 SARIF results for the idx_order case, has {len(results)}"
+        )
+    del results[2]["message"]["text"]
+    del results[10]["message"]["text"]
+    _write_json(path, sarif)
+
+
 CASES: list[tuple[str, Callable[[Path], None], int]] = [
     ("case1-clean", _mutate_clean, 0),
     ("case2-missing-mandatory", _mutate_missing_mandatory, 3),
@@ -318,6 +361,9 @@ CASES: list[tuple[str, Callable[[Path], None], int]] = [
     ("case19-non-object-manifest", _mutate_non_object_manifest, 3),
     ("case20-non-utf8-mandatory", _mutate_non_utf8_mandatory, 3),
     ("case21-non-utf8-jsonl", _mutate_non_utf8_jsonl, 3),
+    ("case22-local-multi", _mutate_local_multi, 3),
+    ("case23-sarif-anyof", _mutate_sarif_anyof, 3),
+    ("case24-sarif-idx-order", _mutate_sarif_idx_order, 3),
 ]
 
 #: Cases that must additionally prove the real third-party schema ran, not only the local profile
@@ -325,6 +371,7 @@ CASES: list[tuple[str, Callable[[Path], None], int]] = [
 REAL_SCHEMA_MARKERS = {
     "case6-oscal-nist": "oscal-ar.json (NIST OSCAL 1.1.2)",
     "case8-sarif-real": "results.sarif (OASIS SARIF 2.1.0)",
+    "case23-sarif-anyof": "results.sarif (OASIS SARIF 2.1.0)",
 }
 
 
@@ -333,6 +380,30 @@ def problem_labels(problems: list[str]) -> list[str]:
     part before the first `": "` -- with the trailing validator message dropped. Message text is
     deliberately not compared (see the module docstring); the label is."""
     return [p.split(": ", 1)[0] for p in problems]
+
+
+def problem_prefixes(problems: list[str]) -> list[str]:
+    """Each problem's label plus, for a schema-validation problem, its location (`problem_labels`
+    only compares the file label, so three engines reporting a different count, order, or location of
+    problems *within* the same file were invisible to it -- the real gap the P18-18.27 verifier round
+    1 found). A schema-validation problem's shape is `"<label>: <location>: <message>"`, where
+    `<location>` (a `/`-joined path, or `<root>`) never contains a space; every other problem's
+    message does, so testing for a space after the first `": "` tells the two shapes apart without
+    tracking which mutator produced which."""
+    out = []
+    for p in problems:
+        first = p.find(": ")
+        if first == -1:
+            out.append(p)
+            continue
+        rest = p[first + 2 :]
+        second = rest.find(": ")
+        candidate_location = rest if second == -1 else rest[:second]
+        if candidate_location == "" or " " in candidate_location:
+            out.append(p[:first])
+        else:
+            out.append(p[: first + 2 + len(candidate_location)])
+    return out
 
 
 def compare_labels(
@@ -412,6 +483,59 @@ def self_test() -> int:
                 f"label extraction ({name}): got {got!r}, expected {expected!r}"
             )
 
+    prefix_cases = [
+        (
+            "schema-with-location",
+            "assertions.json: 0: 'control' is a required property",
+            "assertions.json: 0",
+        ),
+        (
+            "real-schema-with-location",
+            "oscal-ar.json (NIST OSCAL 1.1.2): assessment-results/uuid: 'not-a-uuid' does not match '...'",
+            "oscal-ar.json (NIST OSCAL 1.1.2): assessment-results/uuid",
+        ),
+        (
+            "no-location-colon-in-message",
+            "assertions.json: cannot read ('utf-8' codec can't decode byte 0xff in position 0: invalid start byte)",
+            "assertions.json",
+        ),
+        (
+            "plain-no-location",
+            "manifest.json: invalid JSON (Expecting value)",
+            "manifest.json",
+        ),
+    ]
+    for name, problem, expected in prefix_cases:
+        got = problem_prefixes([problem])[0]
+        if got != expected:
+            failures.append(
+                f"prefix extraction ({name}): got {got!r}, expected {expected!r}"
+            )
+
+    # The real pre-fix divergence `problem_labels` (file-label only) could never see (P18-18.27
+    # verifier round 1, `anyof_region`): all three engines name the same file and standard, so
+    # `problem_labels` alone called this a match, but they disagreed on count (1 vs 4 vs 3) at the
+    # same location -- `problem_prefixes` must still tell a single combined-location problem apart
+    # from the same location repeated.
+    location_count_divergence: list[str] = []
+    region = "runs/0/results/0/locations/0/physicalLocation/region"
+    compare_labels(
+        "self-test-location-count-divergence",
+        problem_prefixes([f"results.sarif (OASIS SARIF 2.1.0): {region}: combinator message"]),
+        problem_prefixes(
+            [
+                f"results.sarif (OASIS SARIF 2.1.0): {region}: branch 1",
+                f"results.sarif (OASIS SARIF 2.1.0): {region}: branch 2",
+            ]
+        ),
+        problem_prefixes([f"results.sarif (OASIS SARIF 2.1.0): {region}: combinator message"]),
+        location_count_divergence,
+    )
+    if not location_count_divergence:
+        failures.append(
+            "comparator failed to catch a same-location problem-count divergence between engines"
+        )
+
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if not failures:
@@ -461,7 +585,10 @@ def run_real_check() -> int:
             py_labels = problem_labels(py_env["problems"])
             ts_labels = problem_labels(ts_env["problems"])
             java_labels = problem_labels(java_env["problems"])
-            compare_labels(case, py_labels, ts_labels, java_labels, failures)
+            py_prefixes = problem_prefixes(py_env["problems"])
+            ts_prefixes = problem_prefixes(ts_env["problems"])
+            java_prefixes = problem_prefixes(java_env["problems"])
+            compare_labels(case, py_prefixes, ts_prefixes, java_prefixes, failures)
 
             marker = REAL_SCHEMA_MARKERS.get(case)
             if marker is not None:
