@@ -111,8 +111,11 @@ public final class Bundle {
         if (member == null) {
             throw new InputError(
                     "input.bundle_manifest_path",
-                    "manifest lists an unsafe path " + Json.quote(rel) + ".",
-                    "the manifest must list only paths inside the bundle.");
+                    "manifest lists an unsafe path " + rel + ": it is absolute, contains '..', "
+                            + "resolves outside the bundle root (a symlink or junction escapes it), "
+                            + "or cannot be safely resolved.",
+                    "the manifest must list only paths that stay inside the bundle after symlinks "
+                            + "resolve.");
         }
         return member;
     }
@@ -122,7 +125,7 @@ public final class Bundle {
         if (!Files.isRegularFile(manifestPath)) {
             throw new InputError(
                     "input.bundle_manifest_missing",
-                    "the bundle at " + Json.quote(bundleDir.toString()) + " has no manifest.json.",
+                    "the bundle at " + bundleDir + " has no manifest.json.",
                     "add a manifest.json listing every file with its SHA-256.");
         }
         JsonNode manifest;
@@ -154,7 +157,15 @@ public final class Bundle {
 
         List<Path> eventFiles = new ArrayList<>();
         for (JsonNode entry : files) {
-            if (!entry.isObject() || !entry.has("path") || !entry.has("sha256")) {
+            // A non-string path/sha256 folds into the same refusal as a missing one: Jackson's
+            // asText(), Python's str() and JS's String() disagree on how to render an array,
+            // object or null, which would make the following messages diverge across engines for
+            // no reason a reader could use.
+            if (!entry.isObject()
+                    || !entry.has("path")
+                    || !entry.has("sha256")
+                    || !entry.get("path").isTextual()
+                    || !entry.get("sha256").isTextual()) {
                 throw new InputError(
                         "input.bundle_manifest_entry",
                         "a 'files' entry is missing 'path' or 'sha256'.",
@@ -165,13 +176,13 @@ public final class Bundle {
             if (!safeIsFile(member)) {
                 throw new InputError(
                         "input.bundle_manifest_mismatch",
-                        "manifest lists " + Json.quote(rel) + ", which is missing from the bundle.",
+                        "manifest lists " + rel + ", which is missing from the bundle.",
                         "regenerate the bundle so its files match the manifest.");
             }
             if (!fileSha256Hex(member).equals(normaliseDigest(entry.get("sha256").asText()))) {
                 throw new InputError(
                         "input.bundle_manifest_mismatch",
-                        Json.quote(rel) + " does not match its manifest SHA-256.",
+                        rel + " does not match its manifest SHA-256.",
                         "regenerate the bundle so its files match the manifest.");
             }
             if (rel.startsWith("events/") && rel.endsWith(".jsonl")) {

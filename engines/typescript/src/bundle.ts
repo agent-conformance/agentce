@@ -12,6 +12,7 @@ import { isAbsolute, join, relative, sep } from "node:path";
 import { sha256Hex } from "./canonical";
 import { InputError } from "./errors";
 import { parseJson } from "./json";
+import { readTextFileStrict } from "./util";
 
 export interface Bundle {
   root: string;
@@ -88,8 +89,9 @@ function safeMember(root: string, rel: string): string {
   if (member === null) {
     throw new InputError(
       "input.bundle_manifest_path",
-      `manifest lists an unsafe path ${JSON.stringify(rel)}.`,
-      "the manifest must list only paths inside the bundle.",
+      `manifest lists an unsafe path ${rel}: it is absolute, contains '..', resolves outside ` +
+        "the bundle root (a symlink or junction escapes it), or cannot be safely resolved.",
+      "the manifest must list only paths that stay inside the bundle after symlinks resolve.",
     );
   }
   return member;
@@ -100,13 +102,13 @@ export function loadBundle(bundleDir: string): Bundle {
   if (!safeIsFile(manifestPath)) {
     throw new InputError(
       "input.bundle_manifest_missing",
-      `the bundle at ${JSON.stringify(bundleDir)} has no manifest.json.`,
+      `the bundle at ${bundleDir} has no manifest.json.`,
       "add a manifest.json listing every file with its SHA-256.",
     );
   }
   let parsed: unknown;
   try {
-    parsed = parseJson(readFileSync(manifestPath, "utf-8"));
+    parsed = parseJson(readTextFileStrict(manifestPath));
   } catch {
     // A fixed message, not the parser's own text: the three engines' JSON readers each produce
     // different exception text for the same malformed input, which would make this refusal's
@@ -137,26 +139,36 @@ export function loadBundle(bundleDir: string): Bundle {
 
   const eventFiles: string[] = [];
   for (const entry of files) {
-    if (!isRecord(entry) || !("path" in entry) || !("sha256" in entry)) {
+    if (
+      !isRecord(entry) ||
+      !("path" in entry) ||
+      !("sha256" in entry) ||
+      // A non-string path/sha256 folds into the same refusal as a missing one: `String()`,
+      // `JSON.stringify` and Jackson's `asText()` disagree on how to render an array, object or
+      // null, which would make the following messages diverge across engines for no reason a
+      // reader could use.
+      typeof entry.path !== "string" ||
+      typeof entry.sha256 !== "string"
+    ) {
       throw new InputError(
         "input.bundle_manifest_entry",
         "a 'files' entry is missing 'path' or 'sha256'.",
         'each entry needs {"path": ..., "sha256": ...}.',
       );
     }
-    const rel = String(entry.path);
+    const rel = entry.path;
     const member = safeMember(bundleDir, rel);
     if (!safeIsFile(member)) {
       throw new InputError(
         "input.bundle_manifest_mismatch",
-        `manifest lists ${JSON.stringify(rel)}, which is missing from the bundle.`,
+        `manifest lists ${rel}, which is missing from the bundle.`,
         "regenerate the bundle so its files match the manifest.",
       );
     }
-    if (fileSha256Hex(member) !== normaliseDigest(String(entry.sha256))) {
+    if (fileSha256Hex(member) !== normaliseDigest(entry.sha256)) {
       throw new InputError(
         "input.bundle_manifest_mismatch",
-        `${JSON.stringify(rel)} does not match its manifest SHA-256.`,
+        `${rel} does not match its manifest SHA-256.`,
         "regenerate the bundle so its files match the manifest.",
       );
     }

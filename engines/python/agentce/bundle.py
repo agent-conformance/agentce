@@ -92,7 +92,7 @@ def _safe_member(root: Path, rel: str) -> Path:
     if member is None:
         raise InputError(
             "input.bundle_manifest_path",
-            f"manifest lists an unsafe path {rel!r}: it is absolute, contains '..', resolves "
+            f"manifest lists an unsafe path {rel}: it is absolute, contains '..', resolves "
             "outside the bundle root (a symlink or junction escapes it), or cannot be safely "
             "resolved.",
             "the manifest must list only paths that stay inside the bundle after symlinks resolve.",
@@ -128,7 +128,7 @@ def load_bundle(bundle_dir: Path) -> Bundle:
     if not manifest_path.is_file():
         raise InputError(
             "input.bundle_manifest_missing",
-            f"the bundle at {str(bundle_dir)!r} has no manifest.json.",
+            f"the bundle at {str(bundle_dir)} has no manifest.json.",
             MESSAGE_KEYS["input.bundle_manifest_missing"].fix,
         )
     try:
@@ -157,18 +157,29 @@ def load_bundle(bundle_dir: Path) -> Bundle:
 
     event_files: list[Path] = []
     for entry in files:
-        if not isinstance(entry, dict) or "path" not in entry or "sha256" not in entry:
+        if (
+            not isinstance(entry, dict)
+            or "path" not in entry
+            or "sha256" not in entry
+            # A non-string path/sha256 folds into the same refusal as a missing one (not a type
+            # this caller could usefully stringify, and `str()`/`JSON.stringify`/Jackson `asText()`
+            # disagree on how to render an array, object or null, which would make the following
+            # "missing from the bundle"/"does not match" messages diverge across engines for no
+            # reason a reader could use).
+            or not isinstance(entry["path"], str)
+            or not isinstance(entry["sha256"], str)
+        ):
             raise InputError(
                 "input.bundle_manifest_entry",
                 "a 'files' entry is missing 'path' or 'sha256'.",
                 'each entry needs {"path": ..., "sha256": ...}.',
             )
-        rel = str(entry["path"])
+        rel: str = entry["path"]
         member = _safe_member(bundle_dir, rel)
         if not safe_is_file(member):
             raise InputError(
                 "input.bundle_manifest_mismatch",
-                f"manifest lists {rel!r}, which is missing from the bundle.",
+                f"manifest lists {rel}, which is missing from the bundle.",
                 "regenerate the bundle so its files match the manifest.",
             )
         try:
@@ -176,22 +187,22 @@ def load_bundle(bundle_dir: Path) -> Bundle:
         except (OSError, RuntimeError, ValueError) as exc:
             raise InputError(
                 "input.bundle_manifest_mismatch",
-                f"manifest lists {rel!r}, which could not be safely accessed: {exc}.",
+                f"manifest lists {rel}, which could not be safely accessed.",
                 "regenerate the bundle so its files match the manifest.",
             ) from exc
         if size > DEFAULT_MAX_MANIFEST_FILE_BYTES:
             raise InputError(
                 "input.bundle_manifest_file_too_large",
-                f"{rel!r} is {size} bytes, over the {DEFAULT_MAX_MANIFEST_FILE_BYTES}-byte "
+                f"{rel} is {size} bytes, over the {DEFAULT_MAX_MANIFEST_FILE_BYTES}-byte "
                 "per-file limit.",
                 "split large evidence into more, smaller files, or reference bulk content by an "
                 "opaque locator instead of inlining it (SPEC R12).",
             )
         actual = _sha256_hex(member)
-        if actual != _normalise_digest(str(entry["sha256"])):
+        if actual != _normalise_digest(entry["sha256"]):
             raise InputError(
                 "input.bundle_manifest_mismatch",
-                f"{rel!r} does not match its manifest SHA-256.",
+                f"{rel} does not match its manifest SHA-256.",
                 "regenerate the bundle so its files match the manifest.",
             )
         if rel.startswith("events/") and rel.endswith(".jsonl"):
