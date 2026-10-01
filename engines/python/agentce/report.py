@@ -3552,11 +3552,13 @@ def _schema_errors_to_problems(
     errors: Iterable[jsonschema.exceptions.ValidationError],
 ) -> list[str]:
     """Every schema-validation error as ``"<location>: <message>"``, one per error, sorted by
-    location (array indices compared as numbers, so ``2`` sorts before ``10``) -- the one rule all
-    three engines' validators follow at parity (P18-18.27 verifier round 1): ``iter_errors`` never
-    expands an ``anyOf``/``oneOf`` failure's per-branch errors into the result on its own, so a
-    combinator failure is already exactly one error here, with no extra collapsing needed."""
-    ordered = sorted(errors, key=lambda e: list(e.absolute_path))
+    location, then by the failing keyword -- the reference model all three engines follow (P18-18.27):
+    array indices compare as numbers and object keys as strings by code point (``absolute_path``
+    keeps them typed); ``iter_errors`` reports one error per failing ``anyOf``/``oneOf``, never its
+    branches, and one ``additionalProperties`` error per object; ``format`` is never asserted (no
+    FormatChecker). The keyword breaks ties so two keywords failing at one location come out in the
+    same order whatever order a validator evaluates them in."""
+    ordered = sorted(errors, key=lambda e: (list(e.absolute_path), str(e.validator)))
     problems = []
     for error in ordered:
         location = "/".join(str(p) for p in error.absolute_path) or "<root>"
