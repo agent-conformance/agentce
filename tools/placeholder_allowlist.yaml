@@ -640,3 +640,21 @@ allow:
     count: 3
     class: legitimate
     justification: "The test names the catalog status value 'placeholder' that the draft-standard crosswalk files carry, to prove the baseline never cites a placeholder row; it is not an unfinished part of the test."
+
+  - path: verification/CHANGELOG.md
+    pattern: stub
+    count: 2
+    class: legitimate
+    justification: "VG-VERIFY's changelog entry describes its own seeded faults: TypeScript's and Java's verifyRelease each become a stub that always answers verified:true, a named test double for the registry's fault, never an unfinished part of this check."
+
+  - path: verification/gates.json
+    pattern: stub
+    count: 9
+    class: legitimate
+    justification: "VG-VERIFY's own seeded-fault registry entry: its description and the TypeScript/Java fault patches' replace text name and construct the always-verified:true stub object (local variable names stub/stubAlwaysTrue and the field it builds), a named test double for the fault, never an unfinished part of this check."
+
+  - path: verification/gates/verify_command_engines.sh
+    pattern: stub
+    count: 1
+    class: legitimate
+    justification: "A code comment on the gate's third leg explains that a stub which never checks the signature must not pass the validly-signed leg either; describes the seeded-fault test double named above, not an unfinished part of this gate."
