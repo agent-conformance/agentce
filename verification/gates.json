@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.20.0",
+  "suite_version": "0.21.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -776,6 +776,49 @@
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; tools/cryptography_intel_wheel_check.py names each offending uv.lock, which needs `uv lock` run inside it once its editable agent-conformance dependency (engines/python/pyproject.toml, ADR-0024) carries the platform split again."
+    },
+    {
+      "id": "VG-VERIFY",
+      "title": "A tampered or unsigned catalog or release artifact is refused with a stable, non-crashing result in all three engines; a validly-signed one -- key-based or certificate-based -- verifies offline",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/verify_command_engines.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 900,
+      "invariant": "An attestation is reported as verified only after its signature verifies against a trusted key.",
+      "rubric": {
+        "pass": "each engine refuses the kms-signed release whose signature byte was flipped (exit 3, verified:false, a reason, never a crash) and the real vendored eu-ai-act catalog with its signature deleted (exit 3, verified:false, the exact unsigned sentence), and each engine verifies the validly kms-signed release (exit 0, verified:true)",
+        "fail": "any engine crashes (an error field) on the tampered release, fails to refuse the unsigned catalog with the exact sentence, or fails to verify the validly kms-signed release"
+      },
+      "faults": [
+        {
+          "description": "Python: remove _verify_release's try/except around verify_envelope, reintroducing the named defect (an unresolvable-keyid signature crashes instead of soft-failing)",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "        try:\n            verified = signing.verify_envelope(envelope, trust)\n        except (\n            signing.VerificationError,\n            ValueError,\n            KeyError,\n            AttributeError,\n            TypeError,\n        ) as exc:\n            return _verify_release_soft_fail(result, release_path, str(exc))\n",
+          "replace": "        verified = signing.verify_envelope(envelope, trust)\n"
+        },
+        {
+          "description": "TypeScript: verifyRelease always returns verified:true regardless of input, a stub that never actually checks the signature",
+          "file": "engines/typescript/src/verify.ts",
+          "search": "export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseResult {\n  const stat = statSync(releasePath);\n",
+          "replace": "export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseResult {\n  return { release: releasePath, verified: true, signer: \"stub\" } as unknown as ReleaseResult;\n  const stat = statSync(releasePath);\n"
+        },
+        {
+          "description": "Java: verifyRelease always returns verified:true regardless of input, the same always-true stub as the TypeScript fault",
+          "file": "engines/java/src/main/java/org/agentce/Verify.java",
+          "search": "    public static ObjectNode verifyRelease(Path releasePath, TrustRoot trust) {\n        if (Files.isRegularFile(releasePath)) {\n",
+          "replace": "    public static ObjectNode verifyRelease(Path releasePath, TrustRoot trust) {\n        if (true) {\n            ObjectNode stub = Json.nodes().objectNode();\n            stub.put(\"release\", releasePath.toString());\n            stub.put(\"verified\", true);\n            stub.put(\"signer\", \"stub\");\n            return stub;\n        }\n        if (Files.isRegularFile(releasePath)) {\n"
+        }
+      ],
+      "fix_hint": "Run the gate's command and read the FAIL lines, each naming the engine whose leg failed; the reference implementation is engines/python/agentce/commands/__init__.py's _verify_release, ported in engines/typescript/src/verify.ts's verifyRelease and engines/java/src/main/java/org/agentce/Verify.java's verifyRelease."
     }
   ]
 }

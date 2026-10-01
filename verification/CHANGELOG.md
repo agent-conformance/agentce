@@ -3,6 +3,17 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.21.0
+
+- Added `VG-VERIFY`: a tampered or unsigned catalog or release artifact is refused with a stable,
+  non-crashing result in all three engines, and a validly-signed one -- key-based or certificate-based --
+  verifies offline (item 18.28). Reuses `tools/verify_parity_check.py`'s own cryptographic fixture builder
+  (18.28's C3) rather than a second, independently-drifting fixture pair. Its three seeded faults each flip
+  only one engine's leg red: Python's `_verify_release` loses the try/except that is this item's own fix
+  (reintroducing the crash the item names), and TypeScript's and Java's `verifyRelease` each become a stub
+  that always answers `verified: true`, proving the gate's third leg (a validly-signed release must still
+  verify) cannot be passed by a stub that never checks a signature.
+
 ## 0.20.0
 
 - Added `VG-CRYPTO-INTEL-WHEEL`: every tracked `uv.lock` that resolves `cryptography` resolves a real
