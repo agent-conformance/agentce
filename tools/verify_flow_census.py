@@ -24,6 +24,7 @@ least one mutation.
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import shutil
@@ -56,7 +57,7 @@ FLOW_POINTS = (
     FlowPoint(
         "catalog-envelope",
         "catalog.sig.json envelope fields: payloadType, payload, signatures[], keyid, sig",
-        ("json-type", "missing-field"),
+        ("json-type", "missing-field", "base64"),
     ),
     FlowPoint(
         "catalog-statement",
@@ -71,18 +72,18 @@ FLOW_POINTS = (
     FlowPoint(
         "release-file",
         "a single-file --release envelope's bytes -> JSON",
-        ("bytes", "number-token", "nesting", "duplicate-key"),
+        ("bytes", "number-token", "nesting", "duplicate-key", "not-a-file"),
     ),
     FlowPoint(
         "release-envelope",
         "a single-file --release envelope's fields, kms and certificate entries",
-        ("json-type", "missing-field"),
+        ("json-type", "missing-field", "base64"),
     ),
     FlowPoint(
         "certificate",
         "a keyless certificate's fields after the authority's signature verifies "
         "(issuer, identity, public_key, algorithm, validity)",
-        ("json-type", "missing-field"),
+        ("json-type", "missing-field", "base64"),
     ),
     FlowPoint(
         "manifest-file",
@@ -107,7 +108,7 @@ FLOW_POINTS = (
     FlowPoint(
         "signature-entries",
         "signatures.json entries: profile, target, envelope and the envelope's own fields",
-        ("json-type", "missing-field"),
+        ("json-type", "missing-field", "base64"),
     ),
     FlowPoint(
         "release-statement",
@@ -132,6 +133,11 @@ TYPE_SAMPLES: tuple[tuple[str, Any], ...] = (
 #: A string every refusal that names an untrusted value must render without a language's own repr:
 #: a quote, a backslash, non-ASCII and a control character.
 SPECIAL_STRING = "it's \\ caf\u00e9\n"
+
+#: The fields the engines base64-decode. Each also gets a value with its padding stripped (Java's
+#: default decoder accepts that; Python's and Node's strict reading must not), one with a character
+#: outside the alphabet, and well-formed base64 of the wrong length for a key or signature.
+BASE64_FIELDS = frozenset({"payload", "sig", "signature", "public_key"})
 
 #: Number tokens JSON parsers disagree on: non-standard constants, integral floats, exponents,
 #: negative zero, a double overflow and an integer past 64 bits.
@@ -249,6 +255,23 @@ def node_mutations(
                 replaced(document, path, SPECIAL_STRING),
             )
         yield f"{pointer(path)}-deleted", "missing-field", deleted(document, path)
+        if path and path[-1] in BASE64_FIELDS and isinstance(value, str) and value:
+            unpadded = value.rstrip("=") if value.endswith("=") else value[:-1]
+            yield (
+                f"{pointer(path)}=base64-unpadded",
+                "base64",
+                replaced(document, path, unpadded),
+            )
+            yield (
+                f"{pointer(path)}=base64-bad-character",
+                "base64",
+                replaced(document, path, "!" + value[1:]),
+            )
+            yield (
+                f"{pointer(path)}=base64-wrong-length",
+                "base64",
+                replaced(document, path, base64.b64encode(bytes(31)).decode("ascii")),
+            )
 
 
 def _inject(original: bytes, token: str) -> bytes:
@@ -286,13 +309,20 @@ def byte_mutations(original: bytes) -> Iterator[tuple[str, str, bytes]]:
         yield f"number-{token}", "number-token", _inject(original, token)
     for name, token in STRING_TOKENS:
         yield f"string-{name}", "bytes", _inject(original, token)
+    # A duplicate of the first key of the root object, or of the first entry's when the root is an
+    # array of objects (signatures.json).
     text = original.decode("utf-8").lstrip()
-    if text.startswith("{"):
-        first_key = json.dumps(sorted(json.loads(text))[0])
+    document = json.loads(text)
+    prefix = "{"
+    if isinstance(document, list) and document and isinstance(document[0], dict):
+        document, prefix = document[0], "[{"
+        text = "[" + text[1:].lstrip()
+    if isinstance(document, dict) and document:
+        first_key = json.dumps(sorted(document)[0])
         yield (
             "duplicate-key",
             "duplicate-key",
-            ("{" + first_key + ": 1, " + text[1:]).encode(),
+            (prefix + first_key + ": 1, " + text[len(prefix) :]).encode(),
         )
 
 
@@ -361,6 +391,9 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
     def set_file(name: str, data: bytes | Any) -> Callable[[Path], None]:
         return lambda dest: _write(dest / name, data)
 
+    def make_unreadable(name: str) -> Callable[[Path], None]:
+        return lambda dest: (dest / name).chmod(0)
+
     def replace_with_directory(name: str) -> Callable[[Path], None]:
         def edit(dest: Path) -> None:
             (dest / name).unlink()
@@ -384,6 +417,13 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
         "not-a-file",
         "catalog",
         catalog_with(replace_with_directory(CATALOG_SIGNATURE_NAME)),
+    )
+    add(
+        "unreadable",
+        "catalog-sig-file",
+        "not-a-file",
+        "catalog",
+        catalog_with(make_unreadable(CATALOG_SIGNATURE_NAME)),
     )
     for name, cls, doc in node_mutations(json.loads(sig_bytes)):
         add(
@@ -475,6 +515,13 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
         stem = source.removesuffix(".json")
         for name, cls, data in byte_mutations(raw):
             add(f"{stem}:{name}", "release-file", cls, "release", single_file(data))
+
+        def unreadable(d: Path, raw: bytes = raw) -> Path:
+            dest = single_file(raw)(d)
+            dest.chmod(0)
+            return dest
+
+        add(f"{stem}:unreadable", "release-file", "not-a-file", "release", unreadable)
         for name, cls, doc in node_mutations(json.loads(raw)):
             add(f"{stem}:{name}", "release-envelope", cls, "release", single_file(doc))
 
@@ -494,6 +541,13 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
         "not-a-file",
         "release",
         bundle_with(replace_with_directory("release-manifest.json")),
+    )
+    add(
+        "unreadable",
+        "manifest-file",
+        "not-a-file",
+        "release",
+        bundle_with(make_unreadable("release-manifest.json")),
     )
     manifest = json.loads(manifest_bytes)
     for name, cls, doc in node_mutations(manifest):
@@ -566,6 +620,13 @@ def generate(canonical: Path, catalog: Path) -> list[Mutation]:
         "not-a-file",
         "release",
         bundle_with(replace_with_directory("signatures.json")),
+    )
+    add(
+        "unreadable",
+        "signatures-file",
+        "not-a-file",
+        "release",
+        bundle_with(make_unreadable("signatures.json")),
     )
     for name, cls, doc in node_mutations(json.loads(signatures_bytes)):
         add(

@@ -466,13 +466,31 @@ def _run_bundle_scenario(
 def _run_mutation(
     mutation: verify_flow_census.Mutation, root: Path
 ) -> dict[str, tuple[str, int]]:
+    """Each engine's output for one mutation, with its own fixture directory written as `<dir>` so
+    a refusal that names the path compares alike."""
     flag = "--catalog" if mutation.target == "catalog" else "--release"
     runs = {}
     for engine, run in ENGINE_VERIFY.items():
         d = root / engine
         d.mkdir(parents=True)
-        runs[engine] = run([flag, str(mutation.build(d)), "--json"])
+        out, code = run([flag, str(mutation.build(d)), "--json"])
+        runs[engine] = (out.replace(str(d), "<dir>"), code)
     return runs
+
+
+def _census_view(out: str, code: int) -> str:
+    """What the census compares: a refusal's key, text and fix (the engines name the fields
+    differently), else the normalized result; then the exit code."""
+    try:
+        is_error = "error" in json.loads(out)
+    except json.JSONDecodeError:
+        is_error = False
+    view = (
+        readiness_parity_check._error_fields(out) + "\n"
+        if is_error
+        else _normalized(out)
+    )
+    return f"{view}exit {code}\n"
 
 
 def run_census(canonical: Path, tmp: Path, failures: list[str]) -> None:
@@ -496,10 +514,7 @@ def run_census(canonical: Path, tmp: Path, failures: list[str]) -> None:
                 failures,
                 f"{label}:{engine}: crashed ({out.strip()[:300]!r})",
             )
-        outputs = [
-            _normalized(runs[e][0]) + f"exit {runs[e][1]}\n"
-            for e in ("python", "typescript", "java")
-        ]
+        outputs = [_census_view(*runs[e]) for e in ("python", "typescript", "java")]
         readiness_parity_check.compare_ports(label, outputs, failures)
         if runs["python"][1] == 0:
             verified.append(mutation.name)
@@ -972,7 +987,8 @@ def run_real_check() -> int:
         for engine, (out, _) in runs.items():
             reason = _reason(out)
             _assert(
-                reason is not None and "list index out of range" in reason,
+                reason is not None
+                and "the signed statement carries no subject digest" in reason,
                 failures,
                 f"s17-release-bundle-entry-subject-empty:{engine}: reason={reason!r}",
             )
