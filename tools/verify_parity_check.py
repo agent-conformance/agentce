@@ -1,6 +1,6 @@
 """verify_parity_check - prove Python, TypeScript, and Java compute an identical `agentce verify
---catalog`/`--release` (single-file and directory-bundle) across the twelve scenarios item 18.28's
-contract names (C3).
+--catalog`/`--release`/`--bundle` (single-file, directory-bundle, and evidence bundle) across the
+scenarios item 18.28's contract names (C3).
 
 `agentce verify`'s job (SPEC §8.7, §9.1) is offline signature verification against the vendored
 development trust root. Three independent per-engine unit-test suites (18.28's C1/C2) can pass with
@@ -23,7 +23,7 @@ key-based signatures, and its new, test-only `deterministic_keyless_signer` for 
   copies each into three independent per-engine directories and applies any scenario-specific,
   crypto-free tampering (a base64 byte flip, a deleted file, a mutated JSON field) separately per
   engine copy, then runs Python's own `agentce verify` (the reference), the built TypeScript
-  `dist/cli.js`, and the built Java runnable jar over all twelve scenarios.
+  `dist/cli.js`, and the built Java runnable jar over every scenario.
 
 Usage:
     verify_parity_check.py             # needs `pnpm build` (TS) and `:assemble` (Java) run first
@@ -48,6 +48,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PY_ENGINE = ROOT / "engines" / "python"
 TS_ENGINE = ROOT / "engines" / "typescript"
 EU_AI_ACT = ROOT / "spec" / "catalogs" / "base" / "eu-ai-act"
+EVIDENCE_BUNDLE = ROOT / "corpus" / "quickstart" / "evidence"
 
 CATALOG_SIGNATURE_NAME = "catalog.sig.json"
 
@@ -193,6 +194,23 @@ for profile, signer in (
     signatures.append({{"profile": profile, "target": "release-manifest.json", "envelope": envelope}})
 (bundle / "signatures.json").write_text(
     json.dumps(signatures, indent=2, sort_keys=True) + "\\n", encoding="utf-8"
+)
+
+# Scenario s17 (directory-bundle signature entry whose signed statement has an empty `subject`
+# list -- exercises `statement_subject_digest`'s `IndexError`, caught by the bundle's per-entry
+# tuple; needs a real signature, since the per-entry loop only reaches this check once the DSSE
+# signature itself has already verified).
+empty_subject_statement = {{
+    "_type": signing.INTOTO_STATEMENT_TYPE,
+    "subject": [],
+    "predicateType": RELEASE_PREDICATE_TYPE,
+    "predicate": {{}},
+}}
+empty_subject_env = signing.sign_statement(
+    empty_subject_statement, dev_trust.KmsSigner(private_key=dev_trust.kms_key())
+)
+(out / "release-subject-empty-entry.json").write_text(
+    json.dumps(empty_subject_env), encoding="utf-8"
 )
 
 print(json.dumps({{"manifest_digest": manifest_digest, "profiles": ["kms", "sigstore-public"]}}))
@@ -721,14 +739,303 @@ def run_real_check() -> int:
                     f"{name}:{engine}: reason={_reason(out)!r}, expected {expect_reason!r}",
                 )
 
+        # Scenario 13: bundle release-manifest.json replaced by a JSON array (valid JSON, wrong
+        # top-level type) -- folded into the same "not readable JSON" text as a file that does not
+        # parse at all (Dispositions), byte-identical, never a crash.
+        def _manifest_wrong_type(d: Path) -> Path:
+            dest = d / "bundle"
+            shutil.copytree(canonical / "bundle", dest)
+            (dest / "release-manifest.json").write_text(
+                json.dumps([]), encoding="utf-8"
+            )
+            return dest
+
+        runs = _run_release_scenario(
+            "s13-release-bundle-manifest-wrong-type",
+            _manifest_wrong_type,
+            tmp,
+            failures,
+            expect_exit=3,
+            expect_verified=False,
+        )
+        for engine, (out, _) in runs.items():
+            _assert(
+                _reason(out) == "release manifest is not readable JSON",
+                failures,
+                f"s13-release-bundle-manifest-wrong-type:{engine}: reason={_reason(out)!r}",
+            )
+
+        # Scenario 14: bundle signatures.json replaced by a bare integer (valid JSON, wrong
+        # top-level type, not an array) -- same deliberate fold, byte-identical, never a crash.
+        def _signatures_wrong_type(d: Path) -> Path:
+            dest = d / "bundle"
+            shutil.copytree(canonical / "bundle", dest)
+            (dest / "signatures.json").write_text(json.dumps(5), encoding="utf-8")
+            return dest
+
+        runs = _run_release_scenario(
+            "s14-release-bundle-signatures-wrong-type",
+            _signatures_wrong_type,
+            tmp,
+            failures,
+            expect_exit=3,
+            expect_verified=False,
+        )
+        for engine, (out, _) in runs.items():
+            _assert(
+                _reason(out) == "release signatures are not readable JSON",
+                failures,
+                f"s14-release-bundle-signatures-wrong-type:{engine}: reason={_reason(out)!r}",
+            )
+
+        # Scenario 15: a manifest.artifacts[] entry whose `name` is present but not a string --
+        # folded into the same "no name" text as a missing `name` (Dispositions: "has a name that
+        # is not a string" and "has no name" are the same defect from a caller's point of view).
+        def _artifact_name_not_string(d: Path) -> Path:
+            dest = d / "bundle"
+            shutil.copytree(canonical / "bundle", dest)
+            manifest_path = dest / "release-manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["artifacts"][0]["name"] = 5
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            return dest
+
+        runs = _run_release_scenario(
+            "s15-release-bundle-artifact-name-not-string",
+            _artifact_name_not_string,
+            tmp,
+            failures,
+            expect_exit=3,
+            expect_verified=False,
+        )
+        for engine, (out, _) in runs.items():
+            reason = _reason(out)
+            _assert(
+                reason is not None
+                and "release manifest has an artifact entry with no name" in reason,
+                failures,
+                f"s15-release-bundle-artifact-name-not-string:{engine}: reason={reason!r}",
+            )
+
+        # Scenario 16: one signatures.json entry's own envelope has a malformed field type
+        # (`payloadType` wrong type) -- the per-entry loop's exception tuple catches it and wraps
+        # it with the entry's profile, same as any other per-entry failure.
+        def _entry_envelope_malformed(d: Path) -> Path:
+            dest = d / "bundle"
+            shutil.copytree(canonical / "bundle", dest)
+            signatures_path = dest / "signatures.json"
+            entries = json.loads(signatures_path.read_text(encoding="utf-8"))
+            entries[0]["envelope"]["payloadType"] = 5
+            signatures_path.write_text(json.dumps(entries), encoding="utf-8")
+            return dest
+
+        runs = _run_release_scenario(
+            "s16-release-bundle-entry-malformed-envelope",
+            _entry_envelope_malformed,
+            tmp,
+            failures,
+            expect_exit=3,
+            expect_verified=False,
+        )
+        for engine, (out, _) in runs.items():
+            reason = _reason(out)
+            _assert(
+                reason is not None and "malformed DSSE envelope" in reason,
+                failures,
+                f"s16-release-bundle-entry-malformed-envelope:{engine}: reason={reason!r}",
+            )
+
+        # Scenario 17: one signatures.json entry's envelope verifies (a real signature), but the
+        # statement it signs has an empty `subject` list -- `statement_subject_digest`'s
+        # `IndexError`, caught by the per-entry tuple and wrapped the same as any other failure.
+        def _entry_subject_empty(d: Path) -> Path:
+            dest = d / "bundle"
+            shutil.copytree(canonical / "bundle", dest)
+            signatures_path = dest / "signatures.json"
+            entries = json.loads(signatures_path.read_text(encoding="utf-8"))
+            empty_subject_env = json.loads(
+                (canonical / "release-subject-empty-entry.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            entries[0]["envelope"] = empty_subject_env
+            signatures_path.write_text(json.dumps(entries), encoding="utf-8")
+            return dest
+
+        runs = _run_release_scenario(
+            "s17-release-bundle-entry-subject-empty",
+            _entry_subject_empty,
+            tmp,
+            failures,
+            expect_exit=3,
+            expect_verified=False,
+        )
+        for engine, (out, _) in runs.items():
+            reason = _reason(out)
+            _assert(
+                reason is not None and "list index out of range" in reason,
+                failures,
+                f"s17-release-bundle-entry-subject-empty:{engine}: reason={reason!r}",
+            )
+
+        # Scenario 18: a single-file release envelope that is not valid UTF-8 -- every engine's
+        # strict decoder (Python's `read_text("utf-8")`, TS's `TextDecoder(..., {fatal: true})`,
+        # Java's fatal-UTF-8 `readJsonFileStrict`) refuses it with the same fixed sentence a
+        # non-parsing file gets, never a crash.
+        def _non_utf8(d: Path) -> Path:
+            dest = d / "release.json"
+            dest.write_bytes(
+                b'{"payloadType": "x", "payload": "\xff\xfe", "signatures": []}'
+            )
+            return dest
+
+        runs = _run_release_scenario(
+            "s18-release-non-utf8",
+            _non_utf8,
+            tmp,
+            failures,
+            expect_exit=3,
+            expect_verified=False,
+        )
+        for engine, (out, _) in runs.items():
+            _assert(
+                _reason(out) == "release envelope is not readable JSON",
+                failures,
+                f"s18-release-non-utf8:{engine}: reason={_reason(out)!r}",
+            )
+
+        # Scenario 19: bundle with the manifest's one artifact file deleted -- a crypto-free
+        # mutation of the artifact file only (manifest/signatures stay validly signed), byte-
+        # identical fixed text.
+        def _missing_artifact(d: Path) -> Path:
+            dest = d / "bundle"
+            shutil.copytree(canonical / "bundle", dest)
+            (dest / "artifact-a.txt").unlink()
+            return dest
+
+        runs = _run_release_scenario(
+            "s19-release-bundle-missing-artifact",
+            _missing_artifact,
+            tmp,
+            failures,
+            expect_exit=3,
+            expect_verified=False,
+        )
+        for engine, (out, _) in runs.items():
+            reason = _reason(out)
+            _assert(
+                reason is not None and "missing artifact artifact-a.txt" in reason,
+                failures,
+                f"s19-release-bundle-missing-artifact:{engine}: reason={reason!r}",
+            )
+
+        # Scenario 20: bundle with the artifact file's content changed after signing (manifest and
+        # signatures untouched) -- the artifact's recomputed digest no longer matches the one the
+        # manifest names, byte-identical fixed text.
+        def _artifact_tampered(d: Path) -> Path:
+            dest = d / "bundle"
+            shutil.copytree(canonical / "bundle", dest)
+            (dest / "artifact-a.txt").write_bytes(b"tampered content\n")
+            return dest
+
+        runs = _run_release_scenario(
+            "s20-release-bundle-artifact-digest-mismatch",
+            _artifact_tampered,
+            tmp,
+            failures,
+            expect_exit=3,
+            expect_verified=False,
+        )
+        for engine, (out, _) in runs.items():
+            reason = _reason(out)
+            _assert(
+                reason is not None and "digest mismatch for artifact-a.txt" in reason,
+                failures,
+                f"s20-release-bundle-artifact-digest-mismatch:{engine}: reason={reason!r}",
+            )
+
+        # Scenario 21: bundle with an unrelated field added to release-manifest.json after
+        # signing -- the artifacts[] array and the artifact file are both untouched (so neither
+        # "missing artifact" nor "digest mismatch" fires), but the manifest's own recomputed digest
+        # no longer matches what either signature covers: both entries report the same fixed text.
+        def _manifest_digest_moved(d: Path) -> Path:
+            dest = d / "bundle"
+            shutil.copytree(canonical / "bundle", dest)
+            manifest_path = dest / "release-manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["note"] = "this field was added after signing"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            return dest
+
+        runs = _run_release_scenario(
+            "s21-release-bundle-manifest-digest-moved",
+            _manifest_digest_moved,
+            tmp,
+            failures,
+            expect_exit=3,
+            expect_verified=False,
+        )
+        for engine, (out, _) in runs.items():
+            reason = _reason(out)
+            _assert(
+                reason is not None
+                and reason.count("signature does not cover the release manifest") == 2,
+                failures,
+                f"s21-release-bundle-manifest-digest-moved:{engine}: reason={reason!r}",
+            )
+
+        # Scenario 22: the vendored catalog's content tampered (an extra file added) while
+        # catalog.sig.json itself is untouched -- the signature still verifies, but the recomputed
+        # directory digest no longer matches the one it was signed over.
+        def _catalog_content_tampered(catalog_dir: Path) -> None:
+            (catalog_dir / "parity-check-tamper.txt").write_text(
+                "added after signing\n", encoding="utf-8"
+            )
+
+        runs = _run_catalog_scenario(
+            "s22-catalog-digest-mismatch",
+            EU_AI_ACT,
+            tmp,
+            failures,
+            mutate=_catalog_content_tampered,
+            expect_exit=3,
+            expect_verified=False,
+        )
+        for engine, (out, _) in runs.items():
+            _assert(
+                _reason(out)
+                == "the signature covers a different catalog digest than the directory content",
+                failures,
+                f"s22-catalog-digest-mismatch:{engine}: reason={_reason(out)!r}",
+            )
+
+        # Scenario B1 (point 4, critic round-2 finding #13): `verify --bundle` on a real,
+        # already-signed evidence bundle (`corpus/quickstart/evidence`, never a stub) -- this is
+        # the item's full evidence-integrity path, not only the catalog/release DSSE primitives,
+        # so it is compared with its own runner rather than `_run_catalog_scenario`/
+        # `_run_release_scenario` (there is no per-engine fixture copy to make: the bundle is read
+        # only, identical for all three engines).
+        bundle_runs = _run_engines(["--bundle", str(EVIDENCE_BUNDLE), "--json"])
+        for engine, (out, code) in bundle_runs.items():
+            _assert(
+                code == 0,
+                failures,
+                f"sB1-verify-bundle-evidence:{engine}: exit {code}, expected 0 ({out.strip()[:200]!r})",
+            )
+        readiness_parity_check.compare_ports(
+            "sB1-verify-bundle-evidence:error",
+            [_normalized(bundle_runs[e][0]) for e in ("python", "typescript", "java")],
+            failures,
+        )
+
     for failure in failures:
         print(f"MISMATCH: {failure}", file=sys.stderr)
     if failures:
         return 1
     print(
-        "MATCH: verify --catalog/--release scenarios (happy path, signature/certificate tamper, "
-        "unsigned, directory-bundle, and malformed-type vectors) byte-identical across "
-        "python, typescript, java"
+        "MATCH: verify --catalog/--release/--bundle scenarios (happy path, signature/certificate "
+        "tamper, unsigned, directory-bundle, malformed-type, digest-mismatch, and evidence-bundle "
+        "vectors) byte-identical across python, typescript, java"
     )
     return 0
 
