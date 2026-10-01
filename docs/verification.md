@@ -179,6 +179,20 @@ claim's `signatures[]` and written to `signatures/<role>-<profile>.dsse.json`. T
 `sigstore-*` profiles obtain their certificate from a Fulcio instance and therefore need network;
 `kms` signs offline with an operator-held key.
 
+## Known differences between the engines
+
+`agentce verify` gives the same verdict, exit code and message key in the Python, TypeScript and
+Java engines for every input the verification suite tries. Two differences remain, and neither
+changes a verdict:
+
+- **The path in the output.** Python prints the target path in normalized form, so `--catalog
+  spec/catalogs/base/eu-ai-act/./` comes back as `"catalog": "spec/catalogs/base/eu-ai-act"`.
+  TypeScript and Java print the path as you typed it. Compare the `verified` field and the digest,
+  not the path string.
+- **`--help` and `-h`.** Python prints the usage text for `verify` and exits `0`. TypeScript and
+  Java refuse both with `input.verify_unrecognized_flag` (exit `3`), as they do for `sign` and
+  `readiness`. The `fix` line of that refusal names the flags `verify` accepts.
+
 ## Threat model
 
 The integrity and provenance threats these mechanisms address — catalog or corpus substitution,
