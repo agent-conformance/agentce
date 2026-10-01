@@ -4,7 +4,7 @@
 directory holds; whichever engine ran `--validate` must reach the same verdict over the same
 directory, since the directory itself carries no engine identity -- a report one engine wrote can be
 (and in this check, always is) validated by a different engine entirely. Three independent per-engine
-unit-test suites (the 16 cases each already has, mirroring
+unit-test suites (the 21 cases each already has, mirroring
 `harness/remediation/evidence/P18-18.27/python-reference.md`) can pass with three
 independently-wrong-but-matching-in-no-way validators, since none of them ever compares against
 another engine's real verdict over a shared directory. This check does.
@@ -15,8 +15,8 @@ another engine's real verdict over a shared directory. This check does.
 * The real invocation runs Python's own `agentce assess` (the console-script form, `uv run
   --frozen`) once, with every `--emit` token, to produce one shared, genuinely full report
   directory over the bundled quickstart project -- the same recipe
-  `harness/remediation/evidence/P18-18.27/python-reference.md` captured its 16 cases against. Each
-  of the 16 cases below copies that directory, applies its one named corruption (or none, for the
+  `harness/remediation/evidence/P18-18.27/python-reference.md` captured its 21 cases against. Each
+  of the 21 cases below copies that directory, applies its one named corruption (or none, for the
   clean case), then runs `report --validate <copy> --json` with Python's own console script, the
   built TypeScript `dist/cli.js`, and the built Java runnable jar, and asserts: the three exit codes
   agree, the three `valid` flags agree, and the three `problems` lists name the same files (and, for
@@ -118,7 +118,7 @@ def java_validate(report_dir: Path) -> tuple[str, int]:
 def build_base_report(directory: Path) -> Path:
     """Run Python's `assess` with every `--emit` token against the bundled quickstart project,
     producing one shared, genuinely full report directory -- the same recipe
-    `harness/remediation/evidence/P18-18.27/python-reference.md` captured its 16 cases against."""
+    `harness/remediation/evidence/P18-18.27/python-reference.md` captured its 21 cases against."""
     full = directory / "full"
     proc = subprocess.run(
         [
@@ -173,7 +173,7 @@ def _register_output(report_dir: Path, filename: str) -> None:
     _write_json(manifest_path, manifest)
 
 
-# --- The 16 cases, each a (name, mutate, expect_exit) triple -------------------------------------
+# --- The 21 cases, each a (name, mutate, expect_exit) triple -------------------------------------
 
 
 def _mutate_clean(report_dir: Path) -> None:
@@ -267,6 +267,31 @@ def _mutate_recorded_missing(report_dir: Path) -> None:
     (report_dir / "report.html").unlink()
 
 
+def _mutate_xml_multi_root(report_dir: Path) -> None:
+    (report_dir / "report.junit.xml").write_text(
+        '<?xml version="1.0"?>\n<a/><b/>\n', encoding="utf-8"
+    )
+
+
+def _mutate_xml_undefined_entity(report_dir: Path) -> None:
+    (report_dir / "oscal-ar.xml").write_text(
+        '<?xml version="1.0"?>\n<a>&undefined;</a>\n', encoding="utf-8"
+    )
+
+
+def _mutate_non_object_manifest(report_dir: Path) -> None:
+    (report_dir / "manifest.json").write_text("[1, 2, 3]", encoding="utf-8")
+
+
+def _mutate_non_utf8_mandatory(report_dir: Path) -> None:
+    (report_dir / "assertions.json").write_bytes(b"\xff\xfe\x00\x01not-utf8")
+
+
+def _mutate_non_utf8_jsonl(report_dir: Path) -> None:
+    _register_output(report_dir, "runtime_drift.jsonl")
+    (report_dir / "runtime_drift.jsonl").write_bytes(b'{"subject": "x"}\n\xff\xfenot-utf8')
+
+
 CASES: list[tuple[str, Callable[[Path], None], int]] = [
     ("case1-clean", _mutate_clean, 0),
     ("case2-missing-mandatory", _mutate_missing_mandatory, 3),
@@ -282,6 +307,11 @@ CASES: list[tuple[str, Callable[[Path], None], int]] = [
     ("case13-jsonl-corrupt", _mutate_jsonl_corrupt, 3),
     ("case14-empty-md", _mutate_empty_md, 3),
     ("case15-recorded-missing", _mutate_recorded_missing, 3),
+    ("case17-xml-multi-root", _mutate_xml_multi_root, 3),
+    ("case18-xml-undefined-entity", _mutate_xml_undefined_entity, 3),
+    ("case19-non-object-manifest", _mutate_non_object_manifest, 3),
+    ("case20-non-utf8-mandatory", _mutate_non_utf8_mandatory, 3),
+    ("case21-non-utf8-jsonl", _mutate_non_utf8_jsonl, 3),
 ]
 
 #: Cases that must additionally prove the real third-party schema ran, not only the local profile

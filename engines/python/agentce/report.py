@@ -3589,8 +3589,12 @@ def _validate_xml_wellformed(path: Path) -> list[str]:
 
 def _validate_jsonl(path: Path) -> list[str]:
     """Every non-blank line of ``path`` parses as its own JSON object."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        return [f"{path.name}: cannot read ({exc})"]
     problems = []
-    for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    for i, line in enumerate(text.splitlines(), start=1):
         if not line.strip():
             continue
         try:
@@ -3647,9 +3651,9 @@ def _recorded_outputs(out_dir: Path) -> dict[str, str]:
         return {}
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return {}
-    outputs = manifest.get("outputs")
+    outputs = manifest.get("outputs") if isinstance(manifest, dict) else None
     return outputs if isinstance(outputs, dict) else {}
 
 
@@ -3679,7 +3683,12 @@ def validate_report(out_dir: Path) -> list[str]:
         if not path.is_file():
             continue  # mandatory absence was already reported above; optional absence is not a problem
         try:
-            instance = json.loads(path.read_text(encoding="utf-8"))
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            problems.append(f"{filename}: cannot read ({exc})")
+            continue
+        try:
+            instance = json.loads(text)
             jsonschema.validate(instance, _load_schema(schema_name))
         except json.JSONDecodeError as exc:
             problems.append(f"{filename}: invalid JSON ({exc.msg})")
@@ -3699,7 +3708,14 @@ def validate_report(out_dir: Path) -> list[str]:
             ]
     for filename in ("report.md", "report.html"):
         path = out_dir / filename
-        if path.is_file() and not path.read_text(encoding="utf-8").strip():
+        if not path.is_file():
+            continue
+        try:
+            empty = not path.read_text(encoding="utf-8").strip()
+        except (OSError, UnicodeDecodeError) as exc:
+            problems.append(f"{filename}: cannot read ({exc})")
+            continue
+        if empty:
             problems.append(f"{filename}: empty")
     for filename in _OPTIONAL_ARTIFACTS:
         path = out_dir / filename

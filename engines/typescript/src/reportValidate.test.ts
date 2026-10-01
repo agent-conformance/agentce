@@ -245,6 +245,114 @@ test("case 10/11: malformed XML is reported as invalid XML for either optional X
   }
 });
 
+test("a self-closing root followed by a sibling element is multiple root elements, not valid XML", () => {
+  // fast-xml-parser's own `XMLValidator.validate` only flips `reachedRoot` from the paired
+  // open/close branch, so `<a/><b/>` -- a self-closing root followed by a sibling -- slips past it
+  // (confirmed empirically); Python's `ElementTree` and Java's `XMLStreamReader` both refuse it.
+  const out = freshFullReport();
+  try {
+    writeFileSync(join(out, "report.junit.xml"), '<?xml version="1.0"?>\n<a/><b/>\n');
+    const problems = validateReport(out);
+    assert.ok(
+      problems.some((p) => p.startsWith("report.junit.xml: invalid XML")),
+      JSON.stringify(problems),
+    );
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("a named entity reference that isn't one of XML's five predefined entities is not valid XML", () => {
+  // `XMLValidator.validate` checks an entity reference's syntax (`&word;`) but never whether `word`
+  // actually names something, so it accepts `&undefined;` outright (confirmed empirically); Python's
+  // `ElementTree` and Java's `XMLStreamReader` (DTD support off in both) both refuse it as undefined.
+  const out = freshFullReport();
+  try {
+    writeFileSync(join(out, "oscal-ar.xml"), '<?xml version="1.0"?>\n<a>&undefined;</a>\n');
+    const problems = validateReport(out);
+    assert.ok(
+      problems.some((p) => p.startsWith("oscal-ar.xml: invalid XML")),
+      JSON.stringify(problems),
+    );
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("the five predefined XML entities and numeric character references are still accepted", () => {
+  const out = freshFullReport();
+  try {
+    writeFileSync(
+      join(out, "report.junit.xml"),
+      '<?xml version="1.0"?>\n<a>&amp; &lt; &gt; &apos; &quot; &#65; &#x41;</a>\n',
+    );
+    const problems = validateReport(out);
+    assert.ok(!problems.some((p) => p.startsWith("report.junit.xml:")), JSON.stringify(problems));
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("a non-object manifest.json is a tidy problem, not a crash", () => {
+  // Python's own `_recorded_outputs` crashed with an uncaught `AttributeError` on this input before
+  // this item's follow-up fix (`manifest.get("outputs")` assumed a dict); `recordedOutputs`'s
+  // `isRecord` guard already made TypeScript safe here -- this test locks that in.
+  const out = freshFullReport();
+  try {
+    writeFileSync(join(out, "manifest.json"), "[1, 2, 3]");
+    const problems = validateReport(out);
+    assert.ok(
+      problems.some((p) => p.includes("manifest.json")),
+      JSON.stringify(problems),
+    );
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("non-UTF-8 bytes in a mandatory artifact are a tidy problem, not a crash", () => {
+  // Python's own `path.read_text(encoding="utf-8")` crashed with an uncaught `UnicodeDecodeError`
+  // on this input before this item's follow-up fix; `readFileSync(path, "utf-8")` never raises on
+  // invalid bytes (Node substitutes U+FFFD, so the subsequent `JSON.parse` fails as ordinary invalid
+  // JSON) -- this test locks that in.
+  const out = freshFullReport();
+  try {
+    writeFileSync(join(out, "assertions.json"), Buffer.from([0xff, 0xfe, 0x00, 0x01, 0x78]));
+    const problems = validateReport(out);
+    assert.ok(
+      problems.some((p) => p.startsWith("assertions.json:")),
+      JSON.stringify(problems),
+    );
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("a non-UTF-8 runtime_drift.jsonl line is a tidy problem, not a crash", () => {
+  const out = freshFullReport();
+  try {
+    const manifestPath = join(out, "manifest.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    manifest.outputs["runtime_drift.jsonl"] = `sha256:${"0".repeat(64)}`;
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+    writeFileSync(
+      join(out, "runtime_drift.jsonl"),
+      Buffer.concat([
+        Buffer.from('{"subject": "x"}\n'),
+        Buffer.from([0xff, 0xfe]),
+        Buffer.from("x"),
+      ]),
+    );
+    const problems = validateReport(out);
+    assert.ok(
+      problems.some((p) => p.startsWith("runtime_drift.jsonl:")),
+      JSON.stringify(problems),
+    );
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
 test("case 12/13: runtime_drift.jsonl is fine when every line parses, flagged on the first bad line", () => {
   const out = freshFullReport();
   try {

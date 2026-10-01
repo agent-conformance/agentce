@@ -12,7 +12,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import Ajv2020 from "ajv/dist/2020";
-import { XMLValidator } from "fast-xml-parser";
+import { XMLParser, XMLValidator } from "fast-xml-parser";
 
 /** Always written, regardless of `--emit`: the run's structural core. */
 const MANDATORY_ARTIFACT_SCHEMAS: Record<string, string> = {
@@ -107,13 +107,97 @@ function recordedOutputs(outDir: string): Record<string, string> {
   }
 }
 
+// The five entities XML itself predefines (SPEC/no DTD support, matching Java's `SUPPORT_DTD=false`
+// and Python's expat-backed `ElementTree`, neither of which resolves a custom DTD-declared entity for
+// these report artifacts): any other named reference is undefined.
+const PREDEFINED_XML_ENTITIES = new Set(["amp", "lt", "gt", "apos", "quot"]);
+
+/** `fast-xml-parser`'s own `XMLValidator` checks an entity reference's *syntax* (`&word;`) but never
+ * whether `word` names a real entity (confirmed empirically: it accepts `&undefined;` outright, unlike
+ * Python's `ElementTree`/Java's `XMLStreamReader`, both of which refuse it as "undefined entity"). Walk
+ * the raw text the same way `XMLValidator` does -- skipping comments, CDATA, and the DOCTYPE's own
+ * internal subset, where a literal `&` is just text -- and refuse any named (non-numeric) reference
+ * outside that set. */
+function validateXmlEntities(text: string, filename: string): string[] {
+  let i = 0;
+  while (i < text.length) {
+    if (text.startsWith("<!--", i)) {
+      const end = text.indexOf("-->", i + 4);
+      i = end === -1 ? text.length : end + 3;
+      continue;
+    }
+    if (text.startsWith("<![CDATA[", i)) {
+      const end = text.indexOf("]]>", i + 9);
+      i = end === -1 ? text.length : end + 3;
+      continue;
+    }
+    if (text.startsWith("<!DOCTYPE", i)) {
+      let depth = 1;
+      let j = i + "<!DOCTYPE".length;
+      while (j < text.length && depth > 0) {
+        if (text[j] === "<") depth++;
+        else if (text[j] === ">") depth--;
+        j++;
+      }
+      i = j;
+      continue;
+    }
+    if (text[i] === "&") {
+      const rest = text.slice(i);
+      const numeric = /^&#(x[0-9a-fA-F]+|[0-9]+);/.exec(rest);
+      if (numeric !== null) {
+        i += numeric[0].length;
+        continue;
+      }
+      const named = /^&([A-Za-z_][\w.-]*);/.exec(rest);
+      if (named !== null) {
+        if (!PREDEFINED_XML_ENTITIES.has(named[1] as string)) {
+          return [`${filename}: invalid XML (undefined entity "${named[1]}")`];
+        }
+        i += named[0].length;
+        continue;
+      }
+      i += 1; // a bare '&': XMLValidator.validate's own ampersand check already rejects this shape
+      continue;
+    }
+    i += 1;
+  }
+  return [];
+}
+
+/** `XMLValidator.validate` tracks whether the root tag closed, but never refuses a *self-closing*
+ * root followed by a sibling element (confirmed empirically: `<a/><b/>` passes it outright) --
+ * `reachedRoot` is only ever set from the paired open/close branch. Parse the document instead and
+ * check that exactly one top-level element exists: more than one key (ignoring the `?xml` declaration
+ * and comments), or a single key whose value is an array (two siblings sharing one tag name), means
+ * more than one root. */
+function validateXmlSingleRoot(text: string, filename: string): string[] {
+  let parsed: unknown;
+  try {
+    parsed = new XMLParser({ preserveOrder: false, ignoreAttributes: true }).parse(text);
+  } catch {
+    return []; // a parse failure here is XMLValidator.validate's job to report, not this check's
+  }
+  if (!isRecord(parsed)) {
+    return [];
+  }
+  const rootKeys = Object.keys(parsed).filter((k) => !k.startsWith("?") && !k.startsWith("#"));
+  const multiple =
+    rootKeys.length > 1 || (rootKeys.length === 1 && Array.isArray(parsed[rootKeys[0] as string]));
+  return multiple ? [`${filename}: invalid XML (multiple root elements)`] : [];
+}
+
 function validateXmlWellformed(path: string, filename: string): string[] {
   const text = readFileSync(path, "utf-8");
   const result = XMLValidator.validate(text);
-  if (result === true) {
-    return [];
+  if (result !== true) {
+    return [`${filename}: invalid XML (${result.err.msg})`];
   }
-  return [`${filename}: invalid XML (${result.err.msg})`];
+  const entityProblems = validateXmlEntities(text, filename);
+  if (entityProblems.length > 0) {
+    return entityProblems;
+  }
+  return validateXmlSingleRoot(text, filename);
 }
 
 function validateJsonl(path: string, filename: string): string[] {

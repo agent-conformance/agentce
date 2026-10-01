@@ -1387,6 +1387,92 @@ def test_validate_report_rejects_malformed_junit_xml(tmp_path: Path) -> None:
     assert any("report.junit.xml" in p for p in problems)
 
 
+def test_validate_report_rejects_multiple_root_elements(tmp_path: Path) -> None:
+    write_report(
+        tmp_path,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+        emit=frozenset({"md", "html", "oscal", "sarif", "pack", "junit"}),
+    )
+    (tmp_path / "report.junit.xml").write_text(
+        '<?xml version="1.0"?>\n<a/><b/>\n', encoding="utf-8"
+    )
+    problems = validate_report(tmp_path)
+    assert any("report.junit.xml" in p for p in problems), problems
+
+
+def test_validate_report_rejects_an_undefined_entity(tmp_path: Path) -> None:
+    write_report(
+        tmp_path,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+        emit=frozenset({"md", "html", "oscal", "sarif", "pack", "oscal_xml"}),
+    )
+    (tmp_path / "oscal-ar.xml").write_text(
+        '<?xml version="1.0"?>\n<a>&undefined;</a>\n', encoding="utf-8"
+    )
+    problems = validate_report(tmp_path)
+    assert any("oscal-ar.xml" in p for p in problems), problems
+
+
+def test_validate_report_handles_a_non_object_manifest_without_crashing(
+    tmp_path: Path,
+) -> None:
+    """`manifest.json`'s own `outputs` map read assumed a JSON object; a corrupted manifest that
+    parses as a JSON array must still produce a tidy problem list, never an uncaught `AttributeError`
+    (confirmed against TypeScript's/Java's own `isRecord`/`isObject` guards, which already handle it)."""
+    write_report(
+        tmp_path,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+    )
+    (tmp_path / "manifest.json").write_text("[1, 2, 3]", encoding="utf-8")
+    problems = validate_report(tmp_path)
+    assert any("manifest.json" in p for p in problems), problems
+
+
+def test_validate_report_handles_non_utf8_bytes_without_crashing(
+    tmp_path: Path,
+) -> None:
+    """A non-UTF-8 artifact must produce a tidy `cannot read` problem, never an uncaught
+    `UnicodeDecodeError` (confirmed against TypeScript's/Java's own graceful handling of the same
+    bytes)."""
+    write_report(
+        tmp_path,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+    )
+    (tmp_path / "assertions.json").write_bytes(b"\xff\xfe\x00\x01not-utf8")
+    problems = validate_report(tmp_path)
+    assert any(p.startswith("assertions.json: cannot read") for p in problems), problems
+
+
+def test_validate_report_handles_a_non_utf8_jsonl_line_without_crashing(
+    tmp_path: Path,
+) -> None:
+    write_report(
+        tmp_path,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+    )
+    manifest_path = tmp_path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["outputs"]["runtime_drift.jsonl"] = "sha256:" + "0" * 64
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    (tmp_path / "runtime_drift.jsonl").write_bytes(
+        b'{"subject": "x"}\n\xff\xfenot-utf8\n'
+    )
+    problems = validate_report(tmp_path)
+    assert any(p.startswith("runtime_drift.jsonl: cannot read") for p in problems), (
+        problems
+    )
+
+
 def test_validate_report_optional_artifacts_absent_is_fine(tmp_path: Path) -> None:
     write_report(
         tmp_path,

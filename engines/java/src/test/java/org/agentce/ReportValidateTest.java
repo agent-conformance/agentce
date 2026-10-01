@@ -205,6 +205,49 @@ class ReportValidateTest {
     }
 
     @Test
+    void aSelfClosingRootFollowedByASiblingElementIsMultipleRootElements(@TempDir Path out) throws IOException {
+        freshFullReport(out);
+        Files.writeString(out.resolve("report.junit.xml"), "<?xml version=\"1.0\"?>\n<a/><b/>\n");
+        List<String> problems = ReportValidate.validateReport(out);
+        assertTrue(problems.stream().anyMatch(p -> p.startsWith("report.junit.xml: invalid XML")), problems.toString());
+    }
+
+    @Test
+    void anUndefinedNamedEntityReferenceIsNotValidXml(@TempDir Path out) throws IOException {
+        freshFullReport(out);
+        Files.writeString(out.resolve("oscal-ar.xml"), "<?xml version=\"1.0\"?>\n<a>&undefined;</a>\n");
+        List<String> problems = ReportValidate.validateReport(out);
+        assertTrue(problems.stream().anyMatch(p -> p.startsWith("oscal-ar.xml: invalid XML")), problems.toString());
+    }
+
+    @Test
+    void theFivePredefinedXmlEntitiesAndNumericCharReferencesAreStillAccepted(@TempDir Path out) throws IOException {
+        freshFullReport(out);
+        Files.writeString(
+                out.resolve("report.junit.xml"),
+                "<?xml version=\"1.0\"?>\n<a>&amp; &lt; &gt; &apos; &quot; &#65; &#x41;</a>\n");
+        List<String> problems = ReportValidate.validateReport(out);
+        assertTrue(problems.stream().noneMatch(p -> p.startsWith("report.junit.xml:")), problems.toString());
+    }
+
+    @Test
+    void aNonObjectManifestIsATidyProblemNotACrash(@TempDir Path out) throws IOException {
+        freshFullReport(out);
+        Files.writeString(out.resolve("manifest.json"), "[1, 2, 3]");
+        List<String> problems = ReportValidate.validateReport(out);
+        assertTrue(problems.stream().anyMatch(p -> p.contains("manifest.json")), problems.toString());
+    }
+
+    @Test
+    void nonUtf8BytesAreATidyProblemNotACrash(@TempDir Path out) throws IOException {
+        freshFullReport(out);
+        Files.write(out.resolve("assertions.json"), new byte[] {(byte) 0xff, (byte) 0xfe, 0, 1, 'x'});
+        List<String> problems = ReportValidate.validateReport(out);
+        assertTrue(
+                problems.stream().anyMatch(p -> p.startsWith("assertions.json: cannot read")), problems.toString());
+    }
+
+    @Test
     void case12and13RuntimeDriftJsonlFineWhenValidFlaggedOnFirstBadLine(@TempDir Path out) throws IOException {
         freshFullReport(out);
         Path manifestPath = out.resolve("manifest.json");
@@ -220,6 +263,27 @@ class ReportValidateTest {
         List<String> problems = ReportValidate.validateReport(out);
         assertTrue(
                 problems.stream().anyMatch(p -> p.startsWith("runtime_drift.jsonl: line 2 is not valid JSON")),
+                problems.toString());
+    }
+
+    @Test
+    void aNonUtf8RuntimeDriftLineIsATidyProblemNotACrash(@TempDir Path out) throws IOException {
+        freshFullReport(out);
+        Path manifestPath = out.resolve("manifest.json");
+        ObjectNode manifest = readObject(manifestPath);
+        ((ObjectNode) manifest.get("outputs")).put("runtime_drift.jsonl", "sha256:" + "0".repeat(64));
+        Files.writeString(manifestPath, manifest.toString());
+
+        Files.write(
+                out.resolve("runtime_drift.jsonl"),
+                "{\"subject\": \"x\"}\n".getBytes(StandardCharsets.UTF_8));
+        Files.write(
+                out.resolve("runtime_drift.jsonl"),
+                new byte[] {(byte) 0xff, (byte) 0xfe, 'x'},
+                java.nio.file.StandardOpenOption.APPEND);
+        List<String> problems = ReportValidate.validateReport(out);
+        assertTrue(
+                problems.stream().anyMatch(p -> p.startsWith("runtime_drift.jsonl: cannot read")),
                 problems.toString());
     }
 
