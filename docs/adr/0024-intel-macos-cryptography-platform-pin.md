@@ -95,10 +95,10 @@ envelopes or build X.509 certificate chains.
   unreachable-but-unpatched advisories (above) until upstream ships an Intel wheel again. This is a
   known limitation, not a silent gap: it is recorded here, in Getting Started, and in
   `agentce doctor`'s `environment` section (the installed version and wheel tag are always reported).
-- Every tracked `uv.lock` resolving `cryptography` — not just the two packages that pin it directly, but
-  every other workspace that depends on `agent-conformance` (editable from `engines/python`) — now
-  carries two `cryptography` entries (48.0.1 and 50.0.1) distinguished by resolution marker, because
-  `uv lock` re-resolves the editable dependency's own split specifier (item 18.58). `tools/no_ml_check.py`'s
+- Every tracked `uv.lock` resolving `cryptography` now carries two `cryptography` entries (48.0.1 and
+  50.0.1) distinguished by resolution marker, not just the two packages that pin it directly. Every other
+  workspace that depends on `agent-conformance` (editable from `engines/python`) picks up the split too,
+  because `uv lock` re-resolves the editable dependency's own split specifier (item 18.58). `tools/no_ml_check.py`'s
   denylist scan is unaffected (`cryptography` is not on the no-ML denylist; the scan is not
   platform-aware and checks both entries the same way).
 - No effect on determinism: `cryptography` is a signing/verification dependency, not part of the
