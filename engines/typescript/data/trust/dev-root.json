@@ -1,0 +1,30 @@
+{
+  "certificate_authorities": {
+    "agentce-dev-fulcio-private": {
+      "algorithm": "ed25519",
+      "public_key": "LOJ8rQOmEDZaeUWDQOxGa3BIe8vj7hHSZEA8Rza1394=",
+      "purpose": "sigstore-private keyless certificate authority"
+    },
+    "agentce-dev-fulcio-public": {
+      "algorithm": "ed25519",
+      "public_key": "Ra77eQjyd+0OGoVr3L1UepfRQwLyalSTCwACC31C6Zk=",
+      "purpose": "sigstore-public keyless certificate authority (development)"
+    }
+  },
+  "description": "PUBLISHED development trust root. Verifies the repository's own bundled catalogs, corpora, and dry-run release artifacts, which are signed with keys derived from a published non-production seed (see conformance/dev_trust.py and docs/verification.md). It is NOT the public Sigstore TUF root; a production deployment configures its own root.",
+  "keys": {
+    "sha256:bc73971019bb7c65a61d9c1841a6abd1a9983ed7edf2f0df2a10f74f339c2d5f": {
+      "algorithm": "ed25519",
+      "identity": "kms://agent-conformance/dev/release",
+      "public_key": "mg/HCTh84ROHUN+Nn9cM9pZUFKkDjccK4nj7Xf4fLaY=",
+      "purpose": "kms-release-signing"
+    },
+    "sha256:d0f46a3992ebb4e34819dad2bfa533bfcef4f68ab9532cf1e451e2272332cf86": {
+      "algorithm": "ed25519",
+      "identity": "agentce-release (development catalog-signing key)",
+      "public_key": "Dt6PJyPdgJCHHgo4sXbKZy4uX6MO4+rkhyQPaR3yZ5U=",
+      "purpose": "catalog-and-corpus-signing"
+    }
+  },
+  "version": 1
+}

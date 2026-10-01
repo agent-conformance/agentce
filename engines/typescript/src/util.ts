@@ -131,6 +131,21 @@ export function pyRepr(value: unknown): string {
 }
 
 /**
+ * A validating base64 decoder (standard alphabet, `base64.b64decode(..., validate=True)`'s TS
+ * mirror): refuses any string containing a character outside `[A-Za-z0-9+/]=` or whose length is not
+ * a multiple of 4, rather than `Buffer.from(s, "base64")`'s own silent-drop-invalid-characters
+ * behaviour (which would let a junk-character payload decode as if it were valid, verdict and all).
+ * Used wherever a DSSE/certificate field is base64: `verify.ts`'s `payload`/`sig`/`public_key`/
+ * `signature` fields, never a bare `Buffer.from(s, "base64")`.
+ */
+export function b64dStrict(value: string): Buffer {
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value) || value.length % 4 !== 0) {
+    throw new Error(`invalid base64: ${pyRepr(value)}`);
+  }
+  return Buffer.from(value, "base64");
+}
+
+/**
  * Recursively sort object keys, matching Python's `json.dumps(sort_keys=True)`. With
  * `JSON.stringify(sortKeysDeep(x), null, 2)` the output is byte-for-byte identical to
  * `json.dumps(x, sort_keys=True, indent=2)` for ASCII content.

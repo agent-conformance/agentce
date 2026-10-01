@@ -58,6 +58,7 @@ import { StateDir, windowEnd } from "./state";
 import { GraphStore } from "./store";
 import { byteCompare, jsonStringifyAscii, pyRepr, sortKeysDeep, writeJsonl } from "./util";
 import { summarize } from "./verdict";
+import { vendoredTrust, verifyCatalog, verifyRelease } from "./verify";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
 const DEFAULT_OUT_DIR = "out";
@@ -1149,6 +1150,93 @@ function cmdSign(argv: string[]): CommandResult {
   return result;
 }
 
+/** `agentce verify --bundle/--catalog/--release/--report`: offline DSSE/certificate verification
+ * (SPEC §8.7, §9.1). Ports `cmd_verify`'s own input validation verbatim (`commands/__init__.py:254-
+ * 282`); `--report` (the 9-stage offline reproduction) is out of scope for this port (18.26's own
+ * disposition) and falls to {@link notImplemented} once validation passes. */
+function cmdVerify(argv: string[]): CommandResult {
+  const result = new CommandResult("verify");
+  const bundle = flagValue(argv, "bundle");
+  const catalog = flagValue(argv, "catalog");
+  const release = flagValue(argv, "release");
+  const report = flagValue(argv, "report");
+  const chosenCount = [bundle, catalog, release, report].filter((v) => v !== undefined).length;
+  if (chosenCount !== 1) {
+    throw new InputError(
+      "input.verify_target",
+      "verify needs exactly one of --bundle, --catalog, --release, or --report.",
+      "pass exactly one target, e.g. `agentce verify --bundle <dir>`.",
+    );
+  }
+  const signerTrustRoot = flagValue(argv, "signer-trust-root");
+  const expectKeyid = flagValue(argv, "expect-keyid");
+  if (report === undefined && (signerTrustRoot !== undefined || expectKeyid !== undefined)) {
+    throw new InputError(
+      "input.verify_target",
+      "--signer-trust-root/--expect-keyid apply only to --report.",
+      "pass --report <dir> together with --signer-trust-root/--expect-keyid, or drop them.",
+    );
+  }
+
+  if (bundle !== undefined) {
+    const bundleDir = requireDir(bundle, "bundle", "the evidence bundle");
+    const loaded = loadBundle(bundleDir);
+    const ingested = ingest(loaded);
+    const results = verifyBundle(ingested.accepted, loaded.manifest, loaded.root);
+    const clean = new Set(["verified", "verified_weak"]);
+    const broken = results.filter((r) => !clean.has(r.status));
+    result.data.bundle = bundleDir;
+    result.data.streams = results.map(integrityResultToJson);
+    result.data.stream_count = results.length;
+    result.data.broken_streams = broken.length;
+    result.note(`verified ${bundleDir}: ${results.length} streams, ${broken.length} broken`);
+    if (broken.length > 0) {
+      result.addCode(ExitCode.FINDINGS);
+    }
+    return result;
+  }
+
+  if (catalog !== undefined) {
+    const catalogDir = requireDir(catalog, "catalog", "the catalog directory");
+    const outcome = verifyCatalog(catalogDir, vendoredTrust());
+    result.data.catalog = catalogDir;
+    Object.assign(result.data, outcome);
+    if (outcome.verified) {
+      result.note(`verified catalog ${basename(catalogDir)}: signer ${outcome.signer}`);
+    } else {
+      result.note(`catalog ${basename(catalogDir)}: verification failed`);
+      result.addCode(ExitCode.INPUT_ERROR);
+    }
+    return result;
+  }
+
+  if (release !== undefined) {
+    if (!existsSync(release)) {
+      throw new InputError(
+        "input.release_missing",
+        `the release artifact ${pyRepr(release)} does not exist.`,
+        "pass --release <bundle-dir-or-envelope>.",
+      );
+    }
+    const outcome = verifyRelease(release, vendoredTrust());
+    Object.assign(result.data, outcome);
+    if (outcome.verified) {
+      if ("signer" in outcome) {
+        result.note(`verified ${basename(release)}: signer ${outcome.signer}`);
+      } else {
+        result.note(`verified release ${basename(release)}: ${outcome.signers.length} signatures`);
+      }
+    } else {
+      result.note(`release ${basename(release)}: verification failed`);
+      result.addCode(ExitCode.INPUT_ERROR);
+    }
+    return result;
+  }
+
+  // `report` is the only remaining target (exactly-one was already enforced above).
+  return notImplemented("verify");
+}
+
 function notImplemented(command: string): CommandResult {
   const result = new CommandResult(command);
   result.addCode(ExitCode.INPUT_ERROR);
@@ -1264,6 +1352,8 @@ export function main(argv: string[]): number {
       result = cmdReadiness(argv);
     } else if (command === "sign") {
       result = cmdSign(argv);
+    } else if (command === "verify") {
+      result = cmdVerify(argv);
     } else if (command === "quickstart") {
       result = cmdQuickstart(argv);
     } else if (command === "version") {
