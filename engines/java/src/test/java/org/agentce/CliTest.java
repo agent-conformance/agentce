@@ -1033,4 +1033,101 @@ class CliTest {
         assertEquals(3, env.get("exit_code").asInt());
         assertEquals("input.sign_unrecognized_flag", env.get("error").get("message_key").asText());
     }
+
+    // --- `verify` (item 18.28): offline DSSE/certificate verification, dispatched end to end through
+    // the real CLI. `VerifyTest` covers the compute seam's own primitives in full (real signed round
+    // trips, every malformed-shape vector); these cases prove the CLI wiring, input validation, and
+    // exit-code shape -- the vendored dev-root trust root has no CLI override, so a real
+    // verified:true --catalog/--release round trip is out of reach from here (covered by `VerifyTest`
+    // against test-local trust roots, and by C3's cross-engine parity check against dev-root fixtures).
+
+    @Test
+    void verifyWithNoTargetGivesInputVerifyTarget() {
+        JsonNode env = runJson("verify");
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.verify_target", env.get("error").get("message_key").asText());
+        assertEquals(
+                "verify needs exactly one of --bundle, --catalog, --release, or --report.",
+                env.get("error").get("detail").asText());
+    }
+
+    @Test
+    void verifyWithTwoTargetsGivesInputVerifyTarget(@TempDir Path dir) {
+        JsonNode env = runJson("verify", "--catalog", dir.toString(), "--release", dir.toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.verify_target", env.get("error").get("message_key").asText());
+    }
+
+    @Test
+    void verifySignerTrustRootWithoutReportGivesTheSecondInputVerifyTargetMessage(@TempDir Path dir) {
+        JsonNode env = runJson("verify", "--catalog", dir.toString(), "--signer-trust-root", "x.json");
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.verify_target", env.get("error").get("message_key").asText());
+        assertEquals(
+                "--signer-trust-root/--expect-keyid apply only to --report.",
+                env.get("error").get("detail").asText());
+    }
+
+    @Test
+    void verifyCatalogNotADirectoryGivesInputCatalogNotADirectory(@TempDir Path dir) throws Exception {
+        Path notADir = dir.resolve("not-a-dir.txt");
+        Files.writeString(notADir, "x");
+        JsonNode env = runJson("verify", "--catalog", notADir.toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.catalog_not_a_directory", env.get("error").get("message_key").asText());
+    }
+
+    @Test
+    void verifyCatalogUnsignedSoftFailsWithTheExactSentenceAndExitThree(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("rule.yaml"), "x: 1\n");
+        JsonNode env = runJson("verify", "--catalog", dir.toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertFalse(env.get("verified").asBoolean());
+        assertEquals(
+                "unsigned: catalog.sig.json is absent, so there is no signature to verify (SPEC §8.7).",
+                env.get("reason").asText());
+        assertEquals(dir.toString(), env.get("catalog").asText());
+    }
+
+    @Test
+    void verifyReleaseMissingPathGivesInputReleaseMissing(@TempDir Path dir) {
+        Path missing = dir.resolve("nope.dsse.json");
+        JsonNode env = runJson("verify", "--release", missing.toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.release_missing", env.get("error").get("message_key").asText());
+        assertTrue(env.get("error").get("detail").asText().contains(missing.toString()));
+    }
+
+    @Test
+    void verifyReleaseUnreadableEnvelopeSoftFailsWithTheFixedSentenceAndExitThree(@TempDir Path dir)
+            throws Exception {
+        Path path = dir.resolve("release.dsse.json");
+        Files.writeString(path, "not json");
+        JsonNode env = runJson("verify", "--release", path.toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertFalse(env.get("verified").asBoolean());
+        assertEquals("release envelope is not readable JSON", env.get("reason").asText());
+        assertFalse(env.has("error"));
+    }
+
+    @Test
+    void verifyBundleIsNowReachableFromTheCliWithTheSameShapeValidateEstablishes() {
+        JsonNode env = runJson("verify", "--bundle", QUICKSTART.resolve("evidence").toString());
+        assertTrue(env.get("stream_count").asInt() > 0);
+        assertTrue(env.get("streams").isArray());
+        assertEquals(
+                env.get("stream_count").asInt(),
+                env.get("streams").size());
+        assertEquals(QUICKSTART.resolve("evidence").toString(), env.get("bundle").asText());
+        // exit_code is FINDINGS (1) when any stream is broken, OK (0) otherwise -- either is a real,
+        // non-crashing outcome; the wiring itself (unreachable before this item) is what this proves.
+        assertTrue(env.get("exit_code").asInt() == 0 || env.get("exit_code").asInt() == 1);
+    }
+
+    @Test
+    void verifyReportFallsToCliNotImplemented(@TempDir Path dir) {
+        JsonNode env = runJson("verify", "--report", dir.toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("cli.not_implemented", env.get("error").get("message_key").asText());
+    }
 }

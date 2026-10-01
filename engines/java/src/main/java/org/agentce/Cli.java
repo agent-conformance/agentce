@@ -110,6 +110,8 @@ public final class Cli {
                 result = cmdReadiness(args);
             } else if ("sign".equals(command)) {
                 result = cmdSign(args);
+            } else if ("verify".equals(command)) {
+                result = cmdVerify(args);
             } else if ("quickstart".equals(command)) {
                 result = cmdQuickstart(args);
             } else if ("version".equals(command)) {
@@ -1310,6 +1312,102 @@ public final class Cli {
         }
         result.note("signed " + claimPath.getFileName() + " as " + role + " (" + profile + ")");
         return result;
+    }
+
+    /** {@code agentce verify --bundle/--catalog/--release/--report}: offline DSSE/certificate
+     * verification (SPEC §8.7, §9.1). Ports {@code cmd_verify}'s own input validation verbatim
+     * ({@code commands/__init__.py:254-282}); {@code --report} (the 9-stage offline reproduction) is
+     * out of scope for this port (18.26's own disposition) and falls to {@link #notImplemented} once
+     * validation passes. Mirrors {@code cli.ts}'s {@code cmdVerify} exactly. */
+    private static CommandResult cmdVerify(String[] args) {
+        CommandResult result = new CommandResult("verify");
+        String bundle = flagValue(args, "bundle");
+        String catalog = flagValue(args, "catalog");
+        String release = flagValue(args, "release");
+        String report = flagValue(args, "report");
+        int chosenCount = (bundle != null ? 1 : 0) + (catalog != null ? 1 : 0)
+                + (release != null ? 1 : 0) + (report != null ? 1 : 0);
+        if (chosenCount != 1) {
+            throw new InputError(
+                    "input.verify_target",
+                    "verify needs exactly one of --bundle, --catalog, --release, or --report.",
+                    "pass exactly one target, e.g. `agentce verify --bundle <dir>`.");
+        }
+        String signerTrustRoot = flagValue(args, "signer-trust-root");
+        String expectKeyid = flagValue(args, "expect-keyid");
+        if (report == null && (signerTrustRoot != null || expectKeyid != null)) {
+            throw new InputError(
+                    "input.verify_target",
+                    "--signer-trust-root/--expect-keyid apply only to --report.",
+                    "pass --report <dir> together with --signer-trust-root/--expect-keyid, or drop them.");
+        }
+
+        if (bundle != null) {
+            String bundleDir = requireDir(bundle, "bundle", "the evidence bundle");
+            Bundle loaded = Bundle.load(Paths.get(bundleDir));
+            Ingest.Result ingested = Ingest.ingest(loaded);
+            List<Integrity.Result> results = Integrity.verifyBundle(ingested.accepted, loaded.manifest, loaded.root);
+            Set<String> clean = Set.of("verified", "verified_weak");
+            int broken = 0;
+            ArrayNode streams = Json.nodes().arrayNode();
+            for (Integrity.Result r : results) {
+                streams.add(r.toJson());
+                if (!clean.contains(r.status)) {
+                    broken++;
+                }
+            }
+            result.data.put("bundle", bundleDir);
+            result.data.set("streams", streams);
+            result.data.put("stream_count", results.size());
+            result.data.put("broken_streams", broken);
+            result.note("verified " + bundleDir + ": " + results.size() + " streams, " + broken + " broken");
+            if (broken > 0) {
+                result.addCode(ExitCode.FINDINGS.code);
+            }
+            return result;
+        }
+
+        if (catalog != null) {
+            String catalogDir = requireDir(catalog, "catalog", "the catalog directory");
+            ObjectNode outcome = Verify.verifyCatalog(Paths.get(catalogDir), Verify.vendoredTrust());
+            result.data.put("catalog", catalogDir);
+            result.data.setAll(outcome);
+            if (outcome.path("verified").asBoolean(false)) {
+                result.note("verified catalog " + Paths.get(catalogDir).getFileName() + ": signer "
+                        + outcome.path("signer").asText());
+            } else {
+                result.note("catalog " + Paths.get(catalogDir).getFileName() + ": verification failed");
+                result.addCode(ExitCode.INPUT_ERROR.code);
+            }
+            return result;
+        }
+
+        if (release != null) {
+            if (!Files.exists(Paths.get(release))) {
+                throw new InputError(
+                        "input.release_missing",
+                        "the release artifact " + Readiness.pyRepr(Json.nodes().textNode(release)) + " does not exist.",
+                        "pass --release <bundle-dir-or-envelope>.");
+            }
+            ObjectNode outcome = Verify.verifyRelease(Paths.get(release), Verify.vendoredTrust());
+            result.data.setAll(outcome);
+            if (outcome.path("verified").asBoolean(false)) {
+                if (outcome.has("signer")) {
+                    result.note("verified " + Paths.get(release).getFileName() + ": signer "
+                            + outcome.path("signer").asText());
+                } else {
+                    result.note("verified release " + Paths.get(release).getFileName() + ": "
+                            + outcome.path("signers").size() + " signatures");
+                }
+            } else {
+                result.note("release " + Paths.get(release).getFileName() + ": verification failed");
+                result.addCode(ExitCode.INPUT_ERROR.code);
+            }
+            return result;
+        }
+
+        // `report` is the only remaining target (exactly-one was already enforced above).
+        return notImplemented("verify");
     }
 
     /** {@code agentce version} (SPEC §8.5): the same structured envelope every other command returns,
