@@ -726,3 +726,116 @@ test("verifyRelease throws input.release_bundle for a directory with no manifest
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// --- Verifier round 2: integral floats, path containment, recursion depth, cert edge cases. ---
+
+for (const label of ["1.0", "1e2", "-0.0"]) {
+  test(`verifyRelease soft-fails on an integral-valued float manifest field (${label}), not verified:true (verifier round-2)`, () => {
+    const fixture = kmsFixture();
+    const dir = bundleDir({
+      "release-manifest.json": `{"artifacts": [], "size": ${label}}`,
+      "signatures.json": "[]",
+    });
+    try {
+      const result = verifyRelease(dir, fixture.trust) as { verified: boolean; reason?: string };
+      assert.equal(result.verified, false);
+      assert.equal(result.reason, "release manifest cannot be canonicalized");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+for (const [label, name] of [
+  ["absolute", "/etc/hosts"],
+  ["dotdot-escape", "../../../../../../etc/hosts"],
+  ["embedded-nul", "a\0b"],
+] as const) {
+  test(`verifyRelease treats an unsafe artifact name (${label}) as missing, never escaping the release directory (verifier round-2)`, () => {
+    const fixture = kmsFixture();
+    const dir = bundleDir({
+      "release-manifest.json": JSON.stringify({
+        artifacts: [{ name, digest: "sha256:0" }],
+      }),
+      "signatures.json": "[]",
+    });
+    try {
+      const result = verifyRelease(dir, fixture.trust) as { verified: boolean; reason?: string };
+      assert.equal(result.verified, false);
+      assert.ok((result.reason ?? "").includes(`missing artifact ${name}`));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+test("verifyRelease soft-fails on a manifest nested far beyond the serialiser's safe call-stack depth, instead of crashing (verifier round-2)", () => {
+  const fixture = kmsFixture();
+  const nested = "[".repeat(5000) + "]".repeat(5000);
+  const dir = bundleDir({
+    "release-manifest.json": `{"artifacts": [], "nested": ${nested}}`,
+    "signatures.json": "[]",
+  });
+  try {
+    const result = verifyRelease(dir, fixture.trust) as { verified: boolean; reason?: string };
+    assert.equal(result.verified, false);
+    assert.equal(result.reason, "release manifest cannot be canonicalized");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("verifyCertificate collapses a non-string identity to 'certificate signature does not verify' (verifier round-2)", () => {
+  const ca = ed25519RawPair();
+  const leaf = ed25519RawPair();
+  const issuer = "test-ca";
+  const trust = TrustRoot.fromDict({
+    certificate_authorities: { [issuer]: { public_key: ca.rawPublicKey.toString("base64") } },
+  });
+  const body = {
+    issuer,
+    identity: 5,
+    algorithm: "ed25519",
+    public_key: leaf.rawPublicKey.toString("base64"),
+    not_before: "2026-01-01T00:00:00Z",
+    not_after: "2027-01-01T00:00:00Z",
+  };
+  const signature = cryptoSign(null, canonicalize(body), ca.privateKeyObject);
+  const cert = { ...body, signature: signature.toString("base64") };
+  const envelope = {
+    payloadType: "application/vnd.in-toto+json",
+    payload: "e30=",
+    signatures: [{ keyid: keyidFor(leaf.rawPublicKey), sig: "AAAA", cert }],
+  };
+  assert.throws(
+    () => verifyEnvelope(envelope, trust),
+    /no signature verified against the trust root: certificate signature does not verify/,
+  );
+});
+
+test("verifyCertificate collapses a wrong-length leaf key to 'certificate signature does not verify', not a native crypto message (verifier round-2)", () => {
+  const ca = ed25519RawPair();
+  const issuer = "test-ca";
+  const trust = TrustRoot.fromDict({
+    certificate_authorities: { [issuer]: { public_key: ca.rawPublicKey.toString("base64") } },
+  });
+  const body = {
+    issuer,
+    identity: "ci@agent-conformance.org",
+    algorithm: "ed25519",
+    public_key: Buffer.from("too-short").toString("base64"),
+    not_before: "2026-01-01T00:00:00Z",
+    not_after: "2027-01-01T00:00:00Z",
+  };
+  const signature = cryptoSign(null, canonicalize(body), ca.privateKeyObject);
+  const cert = { ...body, signature: signature.toString("base64") };
+  const envelope = {
+    payloadType: "application/vnd.in-toto+json",
+    payload: "e30=",
+    signatures: [{ sig: Buffer.alloc(64).toString("base64"), cert }],
+  };
+  assert.throws(
+    () => verifyEnvelope(envelope, trust),
+    /no signature verified against the trust root: certificate signature does not verify/,
+  );
+});

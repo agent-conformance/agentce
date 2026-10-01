@@ -294,6 +294,80 @@ def test_verify_release_envelope_with_bom_is_refused(
     assert env["reason"] == "release envelope is not readable JSON"
 
 
+@pytest.mark.parametrize("size", [1.0, 100.0, -0.0], ids=["1.0", "1e2", "-0.0"])
+def test_verify_release_bundle_manifest_integral_float_refused(
+    size: float, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An integral-valued float (`1.0`, `1e2`, `-0.0`) is still a non-integer JSON number token and
+    must refuse exactly like `1.5` -- verifier round-2: TypeScript's plain `JSON.parse` folded these
+    to ordinary integers before `canonicalize` ever saw them, so only Python/Java refused."""
+    (tmp_path / "release-manifest.json").write_text(
+        json.dumps({"artifacts": [], "size": size}), encoding="utf-8"
+    )
+    (tmp_path / "signatures.json").write_text("[]", encoding="utf-8")
+    code, env = run(["verify", "--release", str(tmp_path), "--json"], capsys)
+    assert code == 3
+    assert env["verified"] is False
+    assert "error" not in env
+    assert env["reason"] == "release manifest cannot be canonicalized"
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["/etc/hosts", "../../../../../../etc/hosts", "a\x00b"],
+    ids=["absolute", "dotdot-escape", "embedded-nul"],
+)
+def test_verify_release_bundle_artifact_name_unsafe_is_missing(
+    name: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An artifact name that is absolute, escapes the release directory via `..`, or carries an
+    embedded NUL byte must soft-fail as a missing artifact, never read outside the release directory
+    and never crash -- verifier round-2 (adjacent probes)."""
+    (tmp_path / "release-manifest.json").write_text(
+        json.dumps({"artifacts": [{"name": name, "digest": "sha256:0" * 8}]}),
+        encoding="utf-8",
+    )
+    (tmp_path / "signatures.json").write_text("[]", encoding="utf-8")
+    code, env = run(["verify", "--release", str(tmp_path), "--json"], capsys)
+    assert code == 3
+    assert env["verified"] is False
+    assert "error" not in env
+    assert f"missing artifact {name}" in env["reason"]
+
+
+def test_verify_release_bundle_manifest_deeply_nested_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A manifest nested far beyond the interpreter's recursion limit must soft-fail, not crash with
+    `internal.unexpected` (`RecursionError`) -- verifier round-2 (adjacent probes). Built as raw text
+    (not `json.dumps` on a Python object), since building the fixture that way would itself
+    recurse."""
+    nested_text = '{"artifacts": [], "nested": ' + "[" * 5000 + "]" * 5000 + "}"
+    (tmp_path / "release-manifest.json").write_text(nested_text, encoding="utf-8")
+    (tmp_path / "signatures.json").write_text("[]", encoding="utf-8")
+    code, env = run(["verify", "--release", str(tmp_path), "--json"], capsys)
+    assert code == 3
+    assert env["verified"] is False
+    assert "error" not in env
+    assert env["reason"] == "release manifest cannot be canonicalized"
+
+
+def test_verify_release_single_file_deeply_nested_envelope_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A single-file release envelope nested far beyond the interpreter's recursion limit must
+    soft-fail as unreadable JSON, not crash -- verifier round-2 (adjacent probes). Built as raw text,
+    since `json.dumps` on an equivalently deep Python object would itself recurse."""
+    nested_text = "[" * 100000 + "]" * 100000
+    artifact = tmp_path / "release.dsse.json"
+    artifact.write_text(nested_text, encoding="utf-8")
+    code, env = run(["verify", "--release", str(artifact), "--json"], capsys)
+    assert code == 3
+    assert env["verified"] is False
+    assert "error" not in env
+    assert env["reason"] == "release envelope is not readable JSON"
+
+
 def test_verify_two_targets_is_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

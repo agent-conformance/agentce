@@ -142,6 +142,8 @@ public final class Verify {
                 throw new IllegalArgumentException("certificate signature invalid");
             }
             byte[] leafRaw = b64dStrict(cert.get("public_key"));
+            publicKeyFromRaw(leafRaw); // validate eagerly, as Python's `load_public_ed25519` does, so
+            // a malformed leaf key collapses to this method's own message, not a later deferred one.
             String identity = textOrNull(cert.get("identity"));
             if (identity == null) {
                 throw new IllegalArgumentException("missing certificate identity");
@@ -491,8 +493,8 @@ public final class Verify {
                 continue;
             }
             String name = nameNode.textValue();
-            Path artifactFile = releasePath.resolve(name);
-            if (!Files.isRegularFile(artifactFile)) {
+            Path artifactFile = Bundle.confineToRoot(releasePath, name);
+            if (artifactFile == null || !Files.isRegularFile(artifactFile)) {
                 problems.add("missing artifact " + name);
                 continue;
             }

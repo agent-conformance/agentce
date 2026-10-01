@@ -353,6 +353,72 @@ class VerifyTest {
                         .getMessage());
     }
 
+    @Test
+    void verifyEnvelopeCollapsesANonStringCertificateIdentityToCertificateSignatureDoesNotVerify() throws Exception {
+        // Verifier round-2 (adjacent probes): TypeScript/Java already rejected this; Python did not.
+        EdPair ca = ed25519RawPair();
+        EdPair leaf = ed25519RawPair();
+        String issuer = "test-ca";
+        ObjectNode root = Json.nodes().objectNode();
+        root.putObject("certificate_authorities")
+                .putObject(issuer)
+                .put("public_key", Base64.getEncoder().encodeToString(ca.rawPublicKey()));
+        Verify.TrustRoot trust = Verify.TrustRoot.fromDict(root);
+        ObjectNode body = Json.nodes().objectNode();
+        body.put("issuer", issuer);
+        body.put("identity", 5);
+        body.put("algorithm", "ed25519");
+        body.put("public_key", Base64.getEncoder().encodeToString(leaf.rawPublicKey()));
+        body.put("not_before", "2026-01-01T00:00:00Z");
+        body.put("not_after", "2027-01-01T00:00:00Z");
+        byte[] signature = edSign(ca.privateKey(), Canonical.canonicalize(body));
+        ObjectNode cert = body.deepCopy();
+        cert.put("signature", Base64.getEncoder().encodeToString(signature));
+        ObjectNode envelope = Json.nodes().objectNode();
+        envelope.put("payloadType", "t");
+        envelope.put("payload", "e30=");
+        ObjectNode sig = envelope.putArray("signatures").addObject();
+        sig.put("sig", Base64.getEncoder().encodeToString(new byte[64]));
+        sig.set("cert", cert);
+        assertEquals(
+                "no signature verified against the trust root: certificate signature does not verify",
+                assertThrows(IllegalArgumentException.class, () -> Verify.verifyEnvelope(envelope, trust))
+                        .getMessage());
+    }
+
+    @Test
+    void verifyEnvelopeCollapsesAWrongLengthLeafKeyToCertificateSignatureDoesNotVerify() throws Exception {
+        // Verifier round-2 (adjacent probes): leaf-key loading was deferred past this collapsing
+        // handler and leaked a native "invalid Ed25519 public key" message instead.
+        EdPair ca = ed25519RawPair();
+        String issuer = "test-ca";
+        ObjectNode root = Json.nodes().objectNode();
+        root.putObject("certificate_authorities")
+                .putObject(issuer)
+                .put("public_key", Base64.getEncoder().encodeToString(ca.rawPublicKey()));
+        Verify.TrustRoot trust = Verify.TrustRoot.fromDict(root);
+        ObjectNode body = Json.nodes().objectNode();
+        body.put("issuer", issuer);
+        body.put("identity", "ci@agent-conformance.org");
+        body.put("algorithm", "ed25519");
+        body.put("public_key", Base64.getEncoder().encodeToString("too-short".getBytes(StandardCharsets.UTF_8)));
+        body.put("not_before", "2026-01-01T00:00:00Z");
+        body.put("not_after", "2027-01-01T00:00:00Z");
+        byte[] signature = edSign(ca.privateKey(), Canonical.canonicalize(body));
+        ObjectNode cert = body.deepCopy();
+        cert.put("signature", Base64.getEncoder().encodeToString(signature));
+        ObjectNode envelope = Json.nodes().objectNode();
+        envelope.put("payloadType", "t");
+        envelope.put("payload", "e30=");
+        ObjectNode sig = envelope.putArray("signatures").addObject();
+        sig.put("sig", Base64.getEncoder().encodeToString(new byte[64]));
+        sig.set("cert", cert);
+        assertEquals(
+                "no signature verified against the trust root: certificate signature does not verify",
+                assertThrows(IllegalArgumentException.class, () -> Verify.verifyEnvelope(envelope, trust))
+                        .getMessage());
+    }
+
     // --- TrustRoot.fromDict: the content-addressing invariant. --------------------------------------
 
     @Test
@@ -713,6 +779,55 @@ class VerifyTest {
         ObjectNode result = Verify.verifyRelease(dir, fixture.trust());
         assertFalse(result.get("verified").asBoolean());
         assertEquals("release manifest cannot be canonicalized", result.get("reason").asText());
+    }
+
+    @Test
+    void verifyReleaseSoftFailsOnAnIntegralValuedFloatManifestField(@TempDir Path dir) throws Exception {
+        // Verifier round-2: `1.0`/`1e2`/`-0.0` are still non-integer number tokens and must refuse
+        // exactly like `1.5` -- confirms Java already agrees with Python here.
+        KmsFixture fixture = kmsFixture("test-identity");
+        for (String token : new String[] {"1.0", "1e2", "-0.0"}) {
+            Files.writeString(dir.resolve("release-manifest.json"), "{\"artifacts\": [], \"size\": " + token + "}");
+            Files.writeString(dir.resolve("signatures.json"), "[]");
+            ObjectNode result = Verify.verifyRelease(dir, fixture.trust());
+            assertFalse(result.get("verified").asBoolean());
+            assertEquals("release manifest cannot be canonicalized", result.get("reason").asText());
+        }
+    }
+
+    @Test
+    void verifyReleaseTreatsAnUnsafeArtifactNameAsMissing(@TempDir Path dir) throws Exception {
+        // Verifier round-2 (adjacent probes): an absolute path, a `..` escape, or an embedded NUL
+        // byte must soft-fail as a missing artifact, never read outside the release directory and
+        // never crash with `InvalidPathException`.
+        KmsFixture fixture = kmsFixture("test-identity");
+        for (String name : new String[] {"/etc/hosts", "../../../../../../etc/hosts", "a\u0000b"}) {
+            ObjectNode manifest = Json.nodes().objectNode();
+            ArrayNode artifacts = manifest.putArray("artifacts");
+            artifacts.addObject().put("name", name).put("digest", "sha256:0");
+            Files.writeString(dir.resolve("release-manifest.json"), Json.pretty(manifest));
+            Files.writeString(dir.resolve("signatures.json"), "[]");
+            ObjectNode result = Verify.verifyRelease(dir, fixture.trust());
+            assertFalse(result.get("verified").asBoolean());
+            assertTrue(result.get("reason").asText().contains("missing artifact " + name));
+        }
+    }
+
+    @Test
+    void verifyReleaseSoftFailsOnADeeplyNestedManifestInsteadOfCrashing(@TempDir Path dir) throws Exception {
+        // Verifier round-2 (adjacent probes): confirms Jackson's own nesting-depth guard already
+        // refuses cleanly here (unlike Python's `RecursionError`/TypeScript's stack overflow).
+        KmsFixture fixture = kmsFixture("test-identity");
+        StringBuilder nested = new StringBuilder();
+        nested.append("{\"artifacts\": [], \"nested\": ");
+        nested.append("[".repeat(5000));
+        nested.append("]".repeat(5000));
+        nested.append("}");
+        Files.writeString(dir.resolve("release-manifest.json"), nested.toString());
+        Files.writeString(dir.resolve("signatures.json"), "[]");
+        ObjectNode result = Verify.verifyRelease(dir, fixture.trust());
+        assertFalse(result.get("verified").asBoolean());
+        assertEquals("release manifest is not readable JSON", result.get("reason").asText());
     }
 
     @Test

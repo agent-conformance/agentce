@@ -146,19 +146,26 @@ export function b64dStrict(value: string): Buffer {
 }
 
 /**
- * Reads a JSON file with a fatal UTF-8 decode (Node's lenient `utf-8` string coercion would
- * otherwise silently replace invalid byte sequences with U+FFFD rather than refuse, unlike Python's
- * `read_text("utf-8")` and Java's decoder); throws on a decode or parse failure, never on a
- * valid-JSON-but-wrong-shape value (the caller decides what "wrong shape" means). `ignoreBOM: true`
- * keeps a leading U+FEFF in the decoded text instead of stripping it, so a byte-order-marked file
- * fails `JSON.parse` here exactly as it does against Python's and Java's decoders, rather than
+ * Decodes a file with a fatal UTF-8 decode (Node's lenient `utf-8` string coercion would otherwise
+ * silently replace invalid byte sequences with U+FFFD rather than refuse, unlike Python's
+ * `read_text("utf-8")` and Java's decoder); throws on a decode failure. `ignoreBOM: true` keeps a
+ * leading U+FEFF in the decoded text instead of stripping it, so a byte-order-marked file fails
+ * `JSON.parse`/`parseJson` here exactly as it does against Python's and Java's decoders, rather than
  * silently parsing where they refuse.
  */
+export function readTextFileStrict(path: string): string {
+  return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(readFileSync(path));
+}
+
+/**
+ * Reads a JSON file with a fatal UTF-8 decode (see {@link readTextFileStrict}); throws on a decode
+ * or parse failure, never on a valid-JSON-but-wrong-shape value (the caller decides what "wrong
+ * shape" means). Folds a non-canonical number token (`1.0`, `1e2`, an out-of-range integer) to an
+ * ordinary number exactly as `JSON.parse` does -- callers that feed the result to `canonicalize`
+ * (so a non-canonical token must stay refusable) read with `parseJson` from `./json` instead.
+ */
 export function readJsonFileStrict(path: string): unknown {
-  const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
-    readFileSync(path),
-  );
-  return JSON.parse(text);
+  return JSON.parse(readTextFileStrict(path));
 }
 
 /**

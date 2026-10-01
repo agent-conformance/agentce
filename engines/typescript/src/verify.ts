@@ -12,11 +12,13 @@
 import { type KeyObject, createHash, createPublicKey, verify as cryptoVerify } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { confineToRoot } from "./bundle";
 import { CanonicalizationError, canonicalize, sha256Hex } from "./canonical";
 import { InputError } from "./errors";
+import { parseJson } from "./json";
 import { digestTree } from "./report";
 import { dssePae, keyidFor } from "./sign";
-import { b64dStrict, pyRepr, pyStr, readJsonFileStrict } from "./util";
+import { b64dStrict, pyRepr, pyStr, readJsonFileStrict, readTextFileStrict } from "./util";
 
 /** The detached signature a signed catalog (or corpus) directory carries (SPEC §8.7). */
 export const CATALOG_SIGNATURE_NAME = "catalog.sig.json";
@@ -83,6 +85,8 @@ function verifyCertificate(
       throw new Error("certificate signature invalid");
     }
     const leafRaw = b64dStrict(String(cert.public_key));
+    publicKeyFromRaw(leafRaw); // validate eagerly, as Python's `load_public_ed25519` does, so a
+    // malformed leaf key collapses to this function's own message, not a later deferred one.
     const identity = cert.identity;
     if (typeof identity !== "string") {
       throw new Error("missing certificate identity");
@@ -386,7 +390,10 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
 
   let manifest: unknown;
   try {
-    manifest = readJsonFileStrict(manifestPath);
+    // `parseJson`, not `readJsonFileStrict`: `manifestDigest` below canonicalizes `manifest`, which
+    // must refuse a non-canonical number token (`1.0`, `1e2`, `-0.0`) the way Python's and Java's
+    // decoders do, rather than have `JSON.parse` fold it to an ordinary number first.
+    manifest = parseJson(readTextFileStrict(manifestPath));
   } catch {
     return {
       release: releasePath,
@@ -406,7 +413,10 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
   try {
     manifestDigest = `sha256:${sha256Hex(manifest)}`;
   } catch (exc) {
-    if (!(exc instanceof CanonicalizationError)) {
+    // `RangeError` alongside `CanonicalizationError`: a manifest nested deep enough overflows the
+    // recursive serialiser's call stack before it ever reaches a number or shape it would refuse,
+    // and that must soft-fail the same way, not crash (mirrors Python's `RecursionError`).
+    if (!(exc instanceof CanonicalizationError) && !(exc instanceof RangeError)) {
       throw exc;
     }
     return {
@@ -424,14 +434,14 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
       problems.push("release manifest has an artifact entry with no name");
       continue;
     }
-    const artifactFile = join(releasePath, name);
+    const artifactFile = confineToRoot(releasePath, name);
     let artifactIsFile = false;
     try {
-      artifactIsFile = statSync(artifactFile).isFile();
+      artifactIsFile = artifactFile !== null && statSync(artifactFile).isFile();
     } catch {
       artifactIsFile = false;
     }
-    if (!artifactIsFile) {
+    if (!artifactIsFile || artifactFile === null) {
       problems.push(`missing artifact ${name}`);
       continue;
     }

@@ -13,6 +13,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from agentce import signing
+from agentce.canonical import canonicalize
 
 # A fixed key (all-zero seed) and its deterministic signature over a fixed statement.
 _ZERO_KEY = Ed25519PrivateKey.from_private_bytes(bytes(32))
@@ -95,6 +96,69 @@ def test_keyless_certificate_roundtrip() -> None:
     verified = signing.verify_envelope(env, trust)
     assert verified.identity == "ci@agent-conformance.org"
     assert verified.keyless is True
+
+
+def _signed_cert_body(
+    ca_key: Ed25519PrivateKey, body: dict[str, object]
+) -> dict[str, object]:
+    signature = ca_key.sign(canonicalize(body))
+    return {**body, "signature": signing._b64e(signature)}
+
+
+def test_keyless_certificate_non_string_identity_fails() -> None:
+    """A validly CA-signed certificate whose `identity` is not a string must collapse to the fixed
+    `certificate signature does not verify` message, not be accepted with a non-string identity --
+    verifier round-2 (adjacent probes; TypeScript and Java already reject this, Python did not)."""
+    ca = Ed25519PrivateKey.generate()
+    leaf = Ed25519PrivateKey.generate()
+    cert = _signed_cert_body(
+        ca,
+        {
+            "issuer": "dev-ca",
+            "identity": 5,
+            "algorithm": "ed25519",
+            "public_key": signing.public_ed25519_b64(leaf.public_key()),
+            "not_before": "2026-01-01T00:00:00.000Z",
+            "not_after": "2027-01-01T00:00:00.000Z",
+        },
+    )
+    trust = signing.TrustRoot(authorities={"dev-ca": ca.public_key()})
+    env = signing.sign_statement(
+        _statement(), signing.KeylessSigner(private_key=leaf, cert=cert)
+    )
+    with pytest.raises(
+        signing.VerificationError, match="certificate signature does not verify"
+    ):
+        signing.verify_envelope(env, trust)
+
+
+def test_keyless_certificate_wrong_length_leaf_key_fails() -> None:
+    """A validly CA-signed certificate whose `public_key` is not a 32-byte Ed25519 key must collapse
+    to the fixed `certificate signature does not verify` message in all three engines -- verifier
+    round-2 (adjacent probes; TypeScript/Java deferred leaf-key loading past this function's own
+    collapsing error handler and leaked a native message instead)."""
+    ca = Ed25519PrivateKey.generate()
+    cert = _signed_cert_body(
+        ca,
+        {
+            "issuer": "dev-ca",
+            "identity": "ci@agent-conformance.org",
+            "algorithm": "ed25519",
+            "public_key": signing._b64e(b"too-short"),
+            "not_before": "2026-01-01T00:00:00.000Z",
+            "not_after": "2027-01-01T00:00:00.000Z",
+        },
+    )
+    trust = signing.TrustRoot(authorities={"dev-ca": ca.public_key()})
+    env = {
+        "payloadType": "application/vnd.in-toto+json",
+        "payload": signing._b64e(json.dumps(_statement()).encode("utf-8")),
+        "signatures": [{"sig": signing._b64e(bytes(64)), "cert": cert}],
+    }
+    with pytest.raises(
+        signing.VerificationError, match="certificate signature does not verify"
+    ):
+        signing.verify_envelope(env, trust)
 
 
 def test_keyless_certificate_forged_ca_fails() -> None:

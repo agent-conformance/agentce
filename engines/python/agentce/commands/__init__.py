@@ -52,7 +52,7 @@ from ..assess import (
     evaluated_nothing,
 )
 from ..blind_spots import catalog_support_view, compute_blind_spots
-from ..bundle import copy_bundle, load_bundle
+from ..bundle import confine_to_root, copy_bundle, load_bundle
 from ..canonical import CanonicalizationError, canonical_string, canonicalize
 from ..catalog import Catalog, lint_catalog, load_catalog
 from ..collect import EnvSecretManager, SourceSpec, load_config, run_collect
@@ -764,7 +764,7 @@ def _load_release_json(
     need different grammar, not just a different noun."""
     try:
         value = json.loads(path.read_text("utf-8"))
-    except (json.JSONDecodeError, UnicodeDecodeError):
+    except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
         return None, reason
     if not isinstance(value, expected_type):
         return None, reason
@@ -781,7 +781,7 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
     if release_path.is_file():
         try:
             envelope = json.loads(release_path.read_text("utf-8"))
-        except (json.JSONDecodeError, UnicodeDecodeError):
+        except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
             return _verify_release_soft_fail(
                 result, release_path, "release envelope is not readable JSON"
             )
@@ -793,6 +793,7 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
             KeyError,
             AttributeError,
             TypeError,
+            RecursionError,
         ) as exc:
             return _verify_release_soft_fail(result, release_path, str(exc))
         result.data.update(
@@ -821,7 +822,7 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
         return _verify_release_soft_fail(result, release_path, err)
     try:
         manifest_digest = signing.sha256_prefixed(canonicalize(manifest))
-    except CanonicalizationError:
+    except (CanonicalizationError, RecursionError):
         return _verify_release_soft_fail(
             result, release_path, "release manifest cannot be canonicalized"
         )
@@ -834,8 +835,8 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
         if not isinstance(name, str):
             problems.append("release manifest has an artifact entry with no name")
             continue
-        artifact_file = release_path / name
-        if not artifact_file.is_file():
+        artifact_file = confine_to_root(release_path, name)
+        if artifact_file is None or not artifact_file.is_file():
             problems.append(f"missing artifact {name}")
             continue
         actual = signing.sha256_prefixed(artifact_file.read_bytes())
@@ -869,6 +870,7 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
             IndexError,
             AttributeError,
             TypeError,
+            RecursionError,
         ) as exc:
             problems.append(f"signature ({profile}): {exc}")
     if not problems and not signers:

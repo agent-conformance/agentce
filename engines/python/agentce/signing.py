@@ -216,7 +216,16 @@ def verify_certificate(
         ca.verify(_b64d(cert["signature"]), canonicalize(body))
         leaf_key = load_public_ed25519(cert["public_key"])
         identity = cert["identity"]
-    except (InvalidSignature, KeyError, ValueError, TypeError, AttributeError) as exc:
+        if not isinstance(identity, str):
+            raise TypeError("certificate identity is not a string")
+    except (
+        InvalidSignature,
+        KeyError,
+        ValueError,
+        TypeError,
+        AttributeError,
+        RecursionError,
+    ) as exc:
         raise VerificationError("certificate signature does not verify") from exc
     return leaf_key, identity
 
