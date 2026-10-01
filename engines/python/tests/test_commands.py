@@ -2219,3 +2219,86 @@ def test_deviation_partial_outcome_is_consistent_across_report_consumers(
     )
     assert finding["target"]["status"]["reason"] == "partial"
     assert finding.get("related-risks")
+
+
+def _resign_as_claimant(out: Path, tmp_path: Path) -> None:
+    """Drop every signature and sign again with the key the embedded trust-root.json pins, the
+    way anyone holding a bundle can once it carries its own trust root (18.65 round 3)."""
+    claim = json.loads((out / "claim.json").read_text(encoding="utf-8"))
+    claim.pop("signatures", None)
+    (out / "claim.json").write_text(
+        json.dumps(claim, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    for old in (out / "signatures").glob("*"):
+        old.unlink()
+    argv = ["sign", str(out), "--as", "claimant", "--profile", "kms"]
+    assert cli.main([*argv, "--key", str(tmp_path / "claimant.pem")]) == 0
+
+
+def _manifest_output_escapes(out: Path) -> None:
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    manifest["outputs"]["../escape.md"] = "sha256:" + "0" * 64
+    (out / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
+    )
+
+
+def _manifest_limitations_not_list(out: Path) -> None:
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    manifest["limitations"] = "none"
+    (out / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
+    )
+
+
+def _packaging_order_not_list(out: Path) -> None:
+    packaging = json.loads((out / "packaging.json").read_text(encoding="utf-8"))
+    packaging["catalog_dir_order"] = "x"
+    (out / "packaging.json").write_text(
+        json.dumps(packaging, indent=2, sort_keys=True), encoding="utf-8"
+    )
+    # packaging.json is a manifest-tracked output: record its new digest so only its shape is wrong.
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    manifest["outputs"]["packaging.json"] = (
+        "sha256:" + hashlib.sha256((out / "packaging.json").read_bytes()).hexdigest()
+    )
+    (out / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
+    )
+
+
+@pytest.mark.parametrize(
+    ("corrupt", "cause"),
+    [
+        (
+            _manifest_output_escapes,
+            "manifest.json is not shaped like the one `agentce assess` writes.",
+        ),
+        (
+            _manifest_limitations_not_list,
+            "manifest.json is not shaped like the one `agentce assess` writes.",
+        ),
+        (
+            _packaging_order_not_list,
+            "packaging.json is not shaped like the one `agentce assess` writes.",
+        ),
+    ],
+)
+def test_verify_report_resigned_document_shape_is_refused_not_a_crash(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    corrupt: Callable[[Path], None],
+    cause: str,
+) -> None:
+    """Under an embedded trust root a signature that verifies says nothing about the documents'
+    shape: a re-signed manifest.json or packaging.json of the wrong shape is refused with its key,
+    never `internal.unexpected` and never a read outside the report directory (18.65 round 3)."""
+    out, _key = _packaged_and_signed(tmp_path)
+    corrupt(out)
+    _resign_as_claimant(out, tmp_path)
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert (envelope["error"]["key"], envelope["error"]["cause"]) == (
+        "verify.report_output_tampered",
+        cause,
+    )
