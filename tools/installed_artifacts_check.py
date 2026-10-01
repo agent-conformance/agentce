@@ -1630,7 +1630,7 @@ def _sign_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
 
 
 def _report_validate_problems(
-    exe: list[str], runner: Runner, cwd: Path, qs_out: Path
+    exe: list[str], runner: Runner, cwd: Path, qs_out: Path, *, error_key: str = "message_key"
 ) -> list[str]:
     """`agentce report --validate <dir>` against this installed artifact's own freshly-written
     quickstart output (item 18.27), run the way a user reaches it (C4), network disabled: a clean
@@ -1638,7 +1638,10 @@ def _report_validate_problems(
     discriminating case `report_validate_parity_check.py`'s `case6-oscal-nist` uses) is caught only
     if the vendored NIST 1.1.2 schema actually shipped inside this installed artifact, not merely in
     the repo's build tree -- a packaging gap C1-C3 (which run from the checkout) cannot see; a
-    missing `report_dir` refuses before opening any artifact."""
+    missing `report_dir` refuses before opening any artifact. `error_key` is the error envelope's
+    own field name for the message key -- `message_key` for the TS/Java callers this exists for,
+    `key` for the self-test's own direct Python-engine call (the same per-engine split
+    `report_validate_parity_check.py`'s case16 already documents)."""
     problems: list[str] = []
     proc = runner.run(
         [*exe, "report", "--validate", str(qs_out), "--json"], cwd, offline=True
@@ -1695,10 +1698,10 @@ def _report_validate_problems(
         return problems + [
             f"report --validate missing-dir: output is not JSON: {proc.stdout.strip()[:200]!r}"
         ]
-    key = envelope.get("error", {}).get("message_key")
+    key = envelope.get("error", {}).get(error_key)
     if proc.returncode != 3 or key != "input.validate_not_a_directory":
         problems.append(
-            f"report --validate missing-dir: exit {proc.returncode}, message_key={key!r}, "
+            f"report --validate missing-dir: exit {proc.returncode}, {error_key}={key!r}, "
             "expected exit 3, 'input.validate_not_a_directory'"
         )
     return problems
@@ -2342,6 +2345,23 @@ def self_test() -> int:
                 tmp / "py-reference"
             )  # missing; guarded reads below just skip
         py_spec_version = _python_spec_version(py_reference) or "0.0"
+        if py_reference.is_dir():
+            # Exercises `_report_validate_problems`'s three real branches (clean, oscal-nist,
+            # missing-dir) against the real Python engine binary and its own quickstart output --
+            # not just the inert npm/jar fixtures below, which only ever reach the clean branch's
+            # earliest JSON-parse failure and never prove the oscal-nist/missing-dir logic sound.
+            real_validate_problems = _report_validate_problems(
+                ["uv", "run", "--frozen", "--project", str(PY_ENGINE), "agentce"],
+                runner,
+                tmp,
+                py_reference,
+                error_key="key",
+            )
+            if real_validate_problems:
+                failures.append(
+                    "report --validate against a real python quickstart found problems: "
+                    + "; ".join(real_validate_problems)
+                )
         good = tmp / "good"
         (good / "packs" / "p").mkdir(parents=True)
         for name in CANONICAL_OUTPUTS:
