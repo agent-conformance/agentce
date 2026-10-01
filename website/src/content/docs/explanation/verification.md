@@ -185,9 +185,18 @@ claim's `signatures[]` and written to `signatures/<role>-<profile>.dsse.json`. T
 ## Known differences between the engines
 
 `agentce verify` gives the same verdict, exit code and message key in the Python, TypeScript and
-Java engines for every input the verification suite tries. Two differences remain, and neither
-changes a verdict:
+Java engines for every input the verification suite tries. The differences below remain. The first
+two change the exit code or the message key; the rest change only how the output reads.
 
+- **`--flag=value` when the value holds a space.** `verify "--catalog=/path/with a space"`, and the
+  same form of `--bundle` and `--release`, verifies in Python. TypeScript and Java refuse it with
+  `input.verify_unrecognized_flag` (exit `3`). Pass the path as its own argument,
+  `--catalog "/path/with a space"`, and all three engines read it.
+- **Files the engine can't open.** When a file or folder inside the target can't be opened, for
+  example because its permissions are `000`, the engines can give different message keys, and some
+  cases end in `internal.unexpected` with engine-specific text. An unreadable `events/` folder in a
+  bundle gives `input.bundle_manifest_mismatch` in Python and `input.bundle_manifest_path` in
+  TypeScript and Java. No engine reports such a target as verified.
 - **The path in the output.** Python prints the target path in normalized form, so `--catalog
   spec/catalogs/base/eu-ai-act/./` comes back as `"catalog": "spec/catalogs/base/eu-ai-act"`.
   TypeScript and Java print the path as you typed it. Compare the `verified` field and the digest,
@@ -195,6 +204,9 @@ changes a verdict:
 - **`--help` and `-h`.** Python prints the usage text for `verify` and exits `0`. TypeScript and
   Java refuse both with `input.verify_unrecognized_flag` (exit `3`), as they do for `sign` and
   `readiness`. The `fix` line of that refusal names the flags `verify` accepts.
+- **Field names in a `--json` error.** Python names the fields of the `error` object `key`, `cause`,
+  `fix` and `exit_code`. TypeScript and Java name them `message_key`, `detail` and `fix`. The
+  message key, the text and the top-level `exit_code` are the same in all three.
 
 ## Threat model
 
