@@ -1,6 +1,6 @@
 /** Shared helpers. */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 /**
@@ -143,6 +143,17 @@ export function b64dStrict(value: string): Buffer {
     throw new Error(`invalid base64: ${pyRepr(value)}`);
   }
   return Buffer.from(value, "base64");
+}
+
+/**
+ * Reads a JSON file with a fatal UTF-8 decode (Node's lenient `utf-8` string coercion would
+ * otherwise silently replace invalid byte sequences with U+FFFD rather than refuse, unlike Python's
+ * `read_text("utf-8")` and Java's decoder); throws on a decode or parse failure, never on a
+ * valid-JSON-but-wrong-shape value (the caller decides what "wrong shape" means).
+ */
+export function readJsonFileStrict(path: string): unknown {
+  const text = new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(path));
+  return JSON.parse(text);
 }
 
 /**

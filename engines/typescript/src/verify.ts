@@ -10,13 +10,13 @@
  */
 
 import { type KeyObject, createHash, createPublicKey, verify as cryptoVerify } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { canonicalize, sha256Hex } from "./canonical";
 import { InputError } from "./errors";
 import { digestTree } from "./report";
 import { dssePae, keyidFor } from "./sign";
-import { b64dStrict, pyRepr, pyStr } from "./util";
+import { b64dStrict, pyRepr, pyStr, readJsonFileStrict } from "./util";
 
 /** The detached signature a signed catalog (or corpus) directory carries (SPEC §8.7). */
 export const CATALOG_SIGNATURE_NAME = "catalog.sig.json";
@@ -248,15 +248,6 @@ function statementSubjectDigest(statement: unknown): string {
   return `sha256:${digest.sha256}`;
 }
 
-/** Reads a JSON file with a fatal UTF-8 decode (Node's lenient `utf-8` string coercion would
- * otherwise silently replace invalid byte sequences with U+FFFD rather than refuse, unlike Python's
- * `read_text("utf-8")`); throws on a decode or parse failure, never on a valid-JSON-but-wrong-shape
- * value (the caller decides what "wrong shape" means). */
-function readJsonFileStrict(path: string): unknown {
-  const text = new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(path));
-  return JSON.parse(text);
-}
-
 export interface CatalogVerifyResult {
   readonly verified: boolean;
   readonly digest: string;
@@ -270,6 +261,7 @@ export interface CatalogVerifyResult {
  * `verify_catalog_directory`, `signing.py:426-461`, `commands/__init__.py:321-352`). */
 export function verifyCatalog(dir: string, trust: TrustRoot): CatalogVerifyResult {
   const digest = digestTree(dir, new Set([CATALOG_SIGNATURE_NAME]));
+  const fail = (reason: string): CatalogVerifyResult => ({ verified: false, digest, reason });
   const sigPath = join(dir, CATALOG_SIGNATURE_NAME);
   let sigIsFile = false;
   try {
@@ -278,25 +270,21 @@ export function verifyCatalog(dir: string, trust: TrustRoot): CatalogVerifyResul
     sigIsFile = false;
   }
   if (!sigIsFile) {
-    return { verified: false, digest, reason: UNSIGNED_SENTENCE };
+    return fail(UNSIGNED_SENTENCE);
   }
   let envelope: unknown;
   try {
     envelope = readJsonFileStrict(sigPath);
   } catch (exc) {
     const message = exc instanceof Error ? exc.message : String(exc);
-    return {
-      verified: false,
-      digest,
-      reason: `${CATALOG_SIGNATURE_NAME} is not readable JSON: ${message}`,
-    };
+    return fail(`${CATALOG_SIGNATURE_NAME} is not readable JSON: ${message}`);
   }
   let verified: VerifiedEnvelope;
   try {
     verified = verifyEnvelope(envelope, trust);
   } catch (exc) {
     const message = exc instanceof Error ? exc.message : String(exc);
-    return { verified: false, digest, reason: message };
+    return fail(message);
   }
   let signedDigest: string;
   try {
@@ -304,18 +292,10 @@ export function verifyCatalog(dir: string, trust: TrustRoot): CatalogVerifyResul
     signedDigest = statementSubjectDigest(statement);
   } catch (exc) {
     const message = exc instanceof Error ? exc.message : String(exc);
-    return {
-      verified: false,
-      digest,
-      reason: `the signed statement carries no catalog digest: ${message}`,
-    };
+    return fail(`the signed statement carries no catalog digest: ${message}`);
   }
   if (signedDigest !== digest) {
-    return {
-      verified: false,
-      digest,
-      reason: "the signature covers a different catalog digest than the directory content",
-    };
+    return fail("the signature covers a different catalog digest than the directory content");
   }
   return {
     verified: true,
@@ -389,9 +369,14 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
 
   const manifestPath = join(releasePath, "release-manifest.json");
   const signaturesPath = join(releasePath, "signatures.json");
-  const manifestExists = existsSync(manifestPath) && statSync(manifestPath).isFile();
-  const signaturesExist = existsSync(signaturesPath) && statSync(signaturesPath).isFile();
-  if (!manifestExists || !signaturesExist) {
+  const isFile = (path: string): boolean => {
+    try {
+      return statSync(path).isFile();
+    } catch {
+      return false;
+    }
+  };
+  if (!isFile(manifestPath) || !isFile(signaturesPath)) {
     throw new InputError(
       "input.release_bundle",
       `${releasePath} is not a release bundle (release-manifest.json/signatures.json).`,

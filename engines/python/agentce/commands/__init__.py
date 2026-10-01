@@ -755,6 +755,22 @@ def _verify_release_soft_fail(
     return result
 
 
+def _load_release_json(
+    path: Path, expected_type: type, reason: str
+) -> tuple[Any, str | None]:
+    """Parse a release bundle JSON file, returning `(value, None)` on success or `(None, reason)`
+    on a read/decode/shape failure -- the caller passes the exact, already-pluralized `reason` text
+    (e.g. "release signatures are not readable JSON") since the manifest and signature-list callers
+    need different grammar, not just a different noun."""
+    try:
+        value = json.loads(path.read_text("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None, reason
+    if not isinstance(value, expected_type):
+        return None, reason
+    return value, None
+
+
 def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
     """Verify a release bundle (or a single DSSE envelope) offline against the vendored trust root.
 
@@ -798,16 +814,11 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
             f"{release_path} is not a release bundle (release-manifest.json/signatures.json).",
             "pass the --out directory produced by the release tooling.",
         )
-    try:
-        manifest = json.loads(manifest_path.read_text("utf-8"))
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        return _verify_release_soft_fail(
-            result, release_path, "release manifest is not readable JSON"
-        )
-    if not isinstance(manifest, dict):
-        return _verify_release_soft_fail(
-            result, release_path, "release manifest is not readable JSON"
-        )
+    manifest, err = _load_release_json(
+        manifest_path, dict, "release manifest is not readable JSON"
+    )
+    if err:
+        return _verify_release_soft_fail(result, release_path, err)
     manifest_digest = signing.sha256_prefixed(canonicalize(manifest))
     problems: list[str] = []
     for artifact in manifest.get("artifacts", []):
@@ -822,16 +833,11 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
         actual = signing.sha256_prefixed(artifact_file.read_bytes())
         if actual != artifact.get("digest"):
             problems.append(f"digest mismatch for {name}")
-    try:
-        signature_entries = json.loads(signatures_path.read_text("utf-8"))
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        return _verify_release_soft_fail(
-            result, release_path, "release signatures are not readable JSON"
-        )
-    if not isinstance(signature_entries, list):
-        return _verify_release_soft_fail(
-            result, release_path, "release signatures are not readable JSON"
-        )
+    signature_entries, err = _load_release_json(
+        signatures_path, list, "release signatures are not readable JSON"
+    )
+    if err:
+        return _verify_release_soft_fail(result, release_path, err)
     signers: list[dict[str, Any]] = []
     for entry in signature_entries:
         if not isinstance(entry, dict):

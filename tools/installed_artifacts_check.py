@@ -48,6 +48,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import atexit
 import contextlib
 import filecmp
 import json
@@ -1633,6 +1634,32 @@ def _sign_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
     return problems
 
 
+def _verify_json(proc: subprocess.CompletedProcess[str]) -> dict:
+    """Parse a `verify` subprocess's stdout, defaulting to `{}` on malformed JSON so callers can
+    still report every missing/wrong field as its own problem rather than short-circuiting."""
+    try:
+        return json.loads(proc.stdout)
+    except ValueError:
+        return {}
+
+
+_canonical_verify_fixtures_cache: Path | None = None
+
+
+def _canonical_verify_fixtures() -> Path:
+    """`verify_parity_check.build_canonical_fixtures` shells into `engines/python`'s `uv`
+    environment to re-derive the same deterministic KMS/keyless keys and DSSE envelopes every
+    time; build it once per process and let each of this file's five call sites copy from the
+    cached directory instead of paying for its own subprocess spin."""
+    global _canonical_verify_fixtures_cache
+    if _canonical_verify_fixtures_cache is None:
+        cache_dir = Path(tempfile.mkdtemp(prefix="agentce-verify-fixtures-"))
+        verify_parity_check.build_canonical_fixtures(cache_dir)
+        atexit.register(shutil.rmtree, cache_dir, ignore_errors=True)
+        _canonical_verify_fixtures_cache = cache_dir
+    return _canonical_verify_fixtures_cache
+
+
 def _verify_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
     """`agentce verify --catalog/--release` against four of `tools/verify_parity_check.py`'s own
     scenarios (item 18.28's C4), run against the installed artifact the way a user reaches it,
@@ -1642,7 +1669,7 @@ def _verify_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
     (scenario 3, the exact unsigned sentence), the valid kms-signed release (scenario 4), and the
     valid certificate/keyless-signed release (scenario 6)."""
     canonical = cwd / "verify-fixture"
-    verify_parity_check.build_canonical_fixtures(canonical)
+    shutil.copytree(_canonical_verify_fixtures(), canonical)
     problems: list[str] = []
 
     tampered = json.loads((canonical / "release-kms.json").read_text(encoding="utf-8"))
@@ -1654,10 +1681,7 @@ def _verify_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
     proc = runner.run(
         [*exe, "verify", "--release", str(tampered_path), "--json"], cwd, offline=True
     )
-    try:
-        envelope = json.loads(proc.stdout)
-    except ValueError:
-        envelope = {}
+    envelope = _verify_json(proc)
     if proc.returncode != 3:
         problems.append(
             f"verify --release tampered: exit {proc.returncode}, expected 3"
@@ -1685,10 +1709,7 @@ def _verify_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
         cwd,
         offline=True,
     )
-    try:
-        envelope = json.loads(proc.stdout)
-    except ValueError:
-        envelope = {}
+    envelope = _verify_json(proc)
     if proc.returncode != 3 or envelope.get("verified") is not False:
         problems.append(
             f"verify --catalog unsigned: exit {proc.returncode}, "
@@ -1711,10 +1732,7 @@ def _verify_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
             cwd,
             offline=True,
         )
-        try:
-            envelope = json.loads(proc.stdout)
-        except ValueError:
-            envelope = {}
+        envelope = _verify_json(proc)
         if proc.returncode != 0 or envelope.get("verified") is not True:
             problems.append(
                 f"verify --release {label}: exit {proc.returncode}, "

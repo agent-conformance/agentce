@@ -185,6 +185,19 @@ def test_verify_release_bundle_manifest_not_json_refused(
     assert env["reason"] == "release manifest is not readable JSON"
 
 
+def test_verify_release_bundle_signatures_not_json_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "release-manifest.json").write_text(
+        json.dumps({"artifacts": []}), encoding="utf-8"
+    )
+    (tmp_path / "signatures.json").write_text("not json", encoding="utf-8")
+    code, env = run(["verify", "--release", str(tmp_path), "--json"], capsys)
+    assert code == 3
+    assert env["verified"] is False
+    assert env["reason"] == "release signatures are not readable JSON"
+
+
 def test_verify_release_bundle_signatures_entry_not_object_refused(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

@@ -359,56 +359,49 @@ public final class Verify {
     public static ObjectNode verifyCatalog(Path dir, TrustRoot trust) {
         String digest = Catalog.digestTree(dir, Set.of(CATALOG_SIGNATURE_NAME));
         Path sigPath = dir.resolve(CATALOG_SIGNATURE_NAME);
-        ObjectNode out = Json.nodes().objectNode();
         if (!Files.isRegularFile(sigPath)) {
-            out.put("verified", false);
-            out.put("digest", digest);
-            out.put("reason", UNSIGNED_SENTENCE);
-            return out;
+            return catalogSoftFail(digest, UNSIGNED_SENTENCE);
         }
         JsonNode envelope;
         try {
             envelope = readJsonFileStrict(sigPath);
         } catch (RuntimeException e) {
-            out.put("verified", false);
-            out.put("digest", digest);
-            out.put("reason", CATALOG_SIGNATURE_NAME + " is not readable JSON: " + e.getMessage());
-            return out;
+            return catalogSoftFail(digest, CATALOG_SIGNATURE_NAME + " is not readable JSON: " + e.getMessage());
         }
         VerifiedEnvelope verified;
         try {
             verified = verifyEnvelope(envelope, trust);
         } catch (RuntimeException e) {
-            out.put("verified", false);
-            out.put("digest", digest);
-            out.put("reason", e.getMessage());
-            return out;
+            return catalogSoftFail(digest, e.getMessage());
         }
         String signedDigest;
         try {
             JsonNode statement = Json.parse(decodeStrict(verified.payload()).toString());
             signedDigest = statementSubjectDigest(statement);
         } catch (RuntimeException | CharacterCodingException e) {
-            out.put("verified", false);
-            out.put("digest", digest);
-            out.put("reason", "the signed statement carries no catalog digest: " + e.getMessage());
-            return out;
+            return catalogSoftFail(digest, "the signed statement carries no catalog digest: " + e.getMessage());
         }
         if (!signedDigest.equals(digest)) {
-            out.put("verified", false);
-            out.put("digest", digest);
-            out.put("reason", "the signature covers a different catalog digest than the directory content");
-            return out;
+            return catalogSoftFail(
+                digest, "the signature covers a different catalog digest than the directory content");
         }
+        ObjectNode out = Json.nodes().objectNode();
         out.put("verified", true);
         out.put("digest", digest);
         out.put("signer", verified.identity());
-        if (verified.keyid() != null) {
-            out.put("keyid", verified.keyid());
-        } else {
-            out.putNull("keyid");
-        }
+        putNullableKeyid(out, verified);
         out.put("keyless", verified.keyless());
+        return out;
+    }
+
+    /** The shared soft-fail shape for a catalog that cannot be verified: mirrors {@code
+     * _verify_catalog}'s own three-field shape; every early-return soft-fail in {@link
+     * #verifyCatalog} uses this shape. */
+    private static ObjectNode catalogSoftFail(String digest, String reason) {
+        ObjectNode out = Json.nodes().objectNode();
+        out.put("verified", false);
+        out.put("digest", digest);
+        out.put("reason", reason);
         return out;
     }
 
@@ -422,6 +415,17 @@ public final class Verify {
         out.put("verified", false);
         out.put("reason", reason);
         return out;
+    }
+
+    /** Sets {@code out}'s {@code "keyid"} field to {@code verified.keyid()}, or JSON {@code null}
+     * when the signer had none -- shared by {@link #verifyCatalog} and {@link #verifyRelease}'s
+     * single-file success path, which both carry the same optional field. */
+    private static void putNullableKeyid(ObjectNode out, VerifiedEnvelope verified) {
+        if (verified.keyid() != null) {
+            out.put("keyid", verified.keyid());
+        } else {
+            out.putNull("keyid");
+        }
     }
 
     /** Verifies a release bundle (or a single DSSE envelope) offline against {@code trust} -- the
@@ -442,11 +446,7 @@ public final class Verify {
                 out.put("release", releasePath.toString());
                 out.put("verified", true);
                 out.put("signer", verified.identity());
-                if (verified.keyid() != null) {
-                    out.put("keyid", verified.keyid());
-                } else {
-                    out.putNull("keyid");
-                }
+                putNullableKeyid(out, verified);
                 out.put("keyless", verified.keyless());
                 return out;
             } catch (RuntimeException e) {

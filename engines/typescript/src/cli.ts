@@ -56,7 +56,14 @@ import { computeSecurityView } from "./securityView";
 import { INTOTO_STATEMENT_TYPE, KmsSigner, type Signer, signStatement, signSubjects } from "./sign";
 import { StateDir, windowEnd } from "./state";
 import { GraphStore } from "./store";
-import { byteCompare, jsonStringifyAscii, pyRepr, sortKeysDeep, writeJsonl } from "./util";
+import {
+  byteCompare,
+  jsonStringifyAscii,
+  pyRepr,
+  readJsonFileStrict,
+  sortKeysDeep,
+  writeJsonl,
+} from "./util";
 import { summarize } from "./verdict";
 import { vendoredTrust, verifyCatalog, verifyRelease } from "./verify";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
@@ -1078,9 +1085,9 @@ function cmdSign(argv: string[]): CommandResult {
   }
   // A fatal decode, not `readFileSync(claimPath, "utf-8")`: Node's utf-8 string coercion silently
   // replaces invalid byte sequences with U+FFFD, while Python's and Java's decoders refuse
-  // (18.26 round-3 verifier finding). `TextDecoder`'s `fatal: true` throws instead.
-  const claimText = new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(claimPath));
-  const parsedClaim: unknown = JSON.parse(claimText);
+  // (18.26 round-3 verifier finding). `readJsonFileStrict`'s `TextDecoder` with `fatal: true`
+  // throws instead.
+  const parsedClaim: unknown = readJsonFileStrict(claimPath);
   if (!isRecord(parsedClaim)) {
     // Matches Python's `claim.setdefault("signatures", [])` (AttributeError on a non-dict claim)
     // and Java's `(ObjectNode) Json.parseFile(claimPath)` cast (ClassCastException) -- both crash
