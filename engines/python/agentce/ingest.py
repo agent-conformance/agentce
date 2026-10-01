@@ -20,9 +20,12 @@ from .bundle import Bundle
 from .errors import InputError
 from .quarantine import QuarantineReason, QuarantineRecord
 from .schema import event_types, validate_event
+from .signing import MAX_JSON_DEPTH
 
 #: Default maximum size of a single event line, in bytes (SPEC App. F ``oversize``).
 DEFAULT_MAX_EVENT_BYTES = 1_048_576
+#: The whitespace JSON itself allows around a value (RFC 8259 §2); nothing else is trimmed from a line.
+_JSON_WHITESPACE = " \t\r\n"
 
 _TYPE_RE = re.compile(r"^org\.agent-conformance\.evidence\.(?P<name>[A-Za-z0-9]+)\.v1$")
 
@@ -61,141 +64,183 @@ def ingest(
     last_time: dict[str, str] = {}
 
     for path in bundle.event_files:
-        with path.open("r", encoding="utf-8") as handle:
-            for raw in handle:
-                line = raw.strip()
-                if not line:
-                    continue
-                if len(line.encode("utf-8")) > max_event_bytes:
-                    result.quarantined.append(
-                        QuarantineRecord(
-                            QuarantineReason.OVERSIZE,
-                            detail=f"event exceeds {max_event_bytes} bytes",
-                        )
+        # One line rule the three engines share (18.65): lines end at \n, \r\n or a lone \r
+        # (`bytes.splitlines`), each line is strict UTF-8 on its own, and only JSON's own whitespace
+        # is trimmed. A line that is not UTF-8 is quarantined like a line that is not JSON, instead
+        # of the whole file failing to decode.
+        for raw_line in path.read_bytes().splitlines():
+            try:
+                raw = raw_line.decode("utf-8")
+            except UnicodeDecodeError:
+                result.quarantined.append(
+                    QuarantineRecord(
+                        QuarantineReason.SCHEMA_INVALID, detail="invalid UTF-8"
                     )
-                    continue
-                try:
-                    event = json.loads(line)
-                except json.JSONDecodeError as exc:
-                    result.quarantined.append(
-                        QuarantineRecord(
-                            QuarantineReason.SCHEMA_INVALID,
-                            detail=f"invalid JSON: {exc.msg}",
-                        )
-                    )
-                    continue
-                except RecursionError as exc:
-                    raise InputError(
-                        "input.event_structure_too_deep",
-                        "an evidence event line is nested too deeply to parse safely.",
-                        "flatten the event's structure; reference deeply nested content by an "
-                        "opaque locator instead (SPEC R12).",
-                    ) from exc
-                if not isinstance(event, dict):
-                    result.quarantined.append(
-                        QuarantineRecord(
-                            QuarantineReason.SCHEMA_INVALID,
-                            detail="event is not a JSON object",
-                        )
-                    )
-                    continue
-
-                errors = validate_event(event)
-                if errors:
-                    result.quarantined.append(
-                        QuarantineRecord(
-                            QuarantineReason.SCHEMA_INVALID,
-                            event_id=_opt(event, "id"),
-                            source=_opt(event, "source"),
-                            type=_opt(event, "type"),
-                            detail=errors[0],
-                        )
-                    )
-                    continue
-
-                type_value = str(event["type"])
-                name = _event_type_name(type_value)
-                if name is None or name not in valid_types:
-                    result.quarantined.append(
-                        QuarantineRecord(
-                            QuarantineReason.UNKNOWN_TYPE,
-                            event_id=str(event["id"]),
-                            source=str(event["source"]),
-                            type=type_value,
-                            detail=f"unrecognised event type {type_value!r}",
-                        )
-                    )
-                    continue
-
-                source = str(event["source"])
-                if bundle.sources is not None and source not in bundle.sources:
-                    result.quarantined.append(
-                        QuarantineRecord(
-                            QuarantineReason.UNKNOWN_SOURCE,
-                            event_id=str(event["id"]),
-                            source=source,
-                            type=type_value,
-                            detail="source is not declared in the bundle manifest",
-                        )
-                    )
-                    continue
-
-                declared_class = (
-                    bundle.source_classes.get(source)
-                    if bundle.source_classes is not None
-                    else None
                 )
-                if declared_class is not None:
-                    event_class = str(event["agentcesourceclass"])
-                    if event_class != declared_class:
-                        result.quarantined.append(
-                            QuarantineRecord(
-                                QuarantineReason.CLASS_MISMATCH,
-                                event_id=str(event["id"]),
-                                source=source,
-                                type=type_value,
-                                detail=(
-                                    f"event class {event_class!r} differs from the "
-                                    f"declared class {declared_class!r} for this source"
-                                ),
-                            )
-                        )
-                        continue
+                continue
+            line = raw.strip(_JSON_WHITESPACE)
+            if not line:
+                continue
+            if len(line.encode("utf-8")) > max_event_bytes:
+                result.quarantined.append(
+                    QuarantineRecord(
+                        QuarantineReason.OVERSIZE,
+                        detail=f"event exceeds {max_event_bytes} bytes",
+                    )
+                )
+                continue
+            if _max_nesting(line) > MAX_JSON_DEPTH:
+                raise _too_deep()
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError as exc:
+                result.quarantined.append(
+                    QuarantineRecord(
+                        QuarantineReason.SCHEMA_INVALID,
+                        detail=f"invalid JSON: {exc.msg}",
+                    )
+                )
+                continue
+            except RecursionError as exc:
+                raise _too_deep() from exc
+            if not isinstance(event, dict):
+                result.quarantined.append(
+                    QuarantineRecord(
+                        QuarantineReason.SCHEMA_INVALID,
+                        detail="event is not a JSON object",
+                    )
+                )
+                continue
 
-                event_id = str(event["id"])
-                if event_id in seen_ids:
+            errors = validate_event(event)
+            if errors:
+                result.quarantined.append(
+                    QuarantineRecord(
+                        QuarantineReason.SCHEMA_INVALID,
+                        event_id=_opt(event, "id"),
+                        source=_opt(event, "source"),
+                        type=_opt(event, "type"),
+                        detail=errors[0],
+                    )
+                )
+                continue
+
+            type_value = str(event["type"])
+            name = _event_type_name(type_value)
+            if name is None or name not in valid_types:
+                result.quarantined.append(
+                    QuarantineRecord(
+                        QuarantineReason.UNKNOWN_TYPE,
+                        event_id=str(event["id"]),
+                        source=str(event["source"]),
+                        type=type_value,
+                        detail=f"unrecognised event type {type_value!r}",
+                    )
+                )
+                continue
+
+            source = str(event["source"])
+            if bundle.sources is not None and source not in bundle.sources:
+                result.quarantined.append(
+                    QuarantineRecord(
+                        QuarantineReason.UNKNOWN_SOURCE,
+                        event_id=str(event["id"]),
+                        source=source,
+                        type=type_value,
+                        detail="source is not declared in the bundle manifest",
+                    )
+                )
+                continue
+
+            declared_class = (
+                bundle.source_classes.get(source)
+                if bundle.source_classes is not None
+                else None
+            )
+            if declared_class is not None:
+                event_class = str(event["agentcesourceclass"])
+                if event_class != declared_class:
                     result.quarantined.append(
                         QuarantineRecord(
-                            QuarantineReason.DUPLICATE_ID,
-                            event_id=event_id,
+                            QuarantineReason.CLASS_MISMATCH,
+                            event_id=str(event["id"]),
                             source=source,
                             type=type_value,
-                            detail="event id already seen in this bundle",
+                            detail=(
+                                f"event class {event_class!r} differs from the "
+                                f"declared class {declared_class!r} for this source"
+                            ),
                         )
                     )
                     continue
 
-                stream = _stream_of(event)
-                time_value = str(event["time"])
-                previous = last_time.get(stream)
-                if previous is not None and time_value < previous:
-                    result.quarantined.append(
-                        QuarantineRecord(
-                            QuarantineReason.TIME_ORDER,
-                            event_id=event_id,
-                            source=source,
-                            stream=stream,
-                            type=type_value,
-                            detail=f"time {time_value} precedes {previous} in the stream",
-                        )
+            event_id = str(event["id"])
+            if event_id in seen_ids:
+                result.quarantined.append(
+                    QuarantineRecord(
+                        QuarantineReason.DUPLICATE_ID,
+                        event_id=event_id,
+                        source=source,
+                        type=type_value,
+                        detail="event id already seen in this bundle",
                     )
-                    continue
+                )
+                continue
 
-                seen_ids.add(event_id)
-                last_time[stream] = time_value
-                result.accepted.append(event)
+            stream = _stream_of(event)
+            time_value = str(event["time"])
+            previous = last_time.get(stream)
+            if previous is not None and time_value < previous:
+                result.quarantined.append(
+                    QuarantineRecord(
+                        QuarantineReason.TIME_ORDER,
+                        event_id=event_id,
+                        source=source,
+                        stream=stream,
+                        type=type_value,
+                        detail=f"time {time_value} precedes {previous} in the stream",
+                    )
+                )
+                continue
+
+            seen_ids.add(event_id)
+            last_time[stream] = time_value
+            result.accepted.append(event)
 
     return result
+
+
+def _too_deep() -> InputError:
+    return InputError(
+        "input.event_structure_too_deep",
+        "an evidence event line is nested too deeply to parse safely.",
+        "flatten the event's structure; reference deeply nested content by an "
+        "opaque locator instead (SPEC R12).",
+    )
+
+
+def _max_nesting(line: str) -> int:
+    """The deepest `[`/`{` nesting in `line`, counted lexically (brackets inside strings ignored)
+    before any parse, so the limit is the same number in all three engines whatever their parser's
+    own recursion limit, and an unclosed line counts too (18.65 round 3)."""
+    depth = deepest = 0
+    in_string = escaped = False
+    for ch in line:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+        elif ch == '"':
+            in_string = True
+        elif ch in "[{":
+            depth += 1
+            deepest = max(deepest, depth)
+        elif ch in "]}":
+            depth -= 1
+    return deepest
 
 
 def _opt(event: dict[str, Any], key: str) -> str | None:

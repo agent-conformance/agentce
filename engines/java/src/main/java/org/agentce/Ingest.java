@@ -2,10 +2,14 @@ package org.agentce;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -68,14 +72,22 @@ public final class Ingest {
         Map<String, String> lastTime = new HashMap<>();
 
         for (Path path : bundle.eventFiles) {
-            List<String> lines;
+            byte[] content;
             try {
-                lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+                content = Files.readAllBytes(path);
             } catch (IOException e) {
                 throw new IllegalStateException("cannot read " + path + ": " + e.getMessage(), e);
             }
-            for (String raw : lines) {
-                String line = raw.strip();
+            for (byte[] rawLine : splitLines(content)) {
+                String raw;
+                try {
+                    raw = decodeStrict(rawLine);
+                } catch (CharacterCodingException e) {
+                    result.quarantined.add(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
+                            .detail("invalid UTF-8"));
+                    continue;
+                }
+                String line = trimJsonWhitespace(raw);
                 if (line.isEmpty()) {
                     continue;
                 }
@@ -83,6 +95,13 @@ public final class Ingest {
                     result.quarantined.add(new Quarantine.Record(Quarantine.Reason.OVERSIZE)
                             .detail("event exceeds " + maxEventBytes + " bytes"));
                     continue;
+                }
+                if (maxNesting(line) > Verify.MAX_JSON_DEPTH) {
+                    throw new InputError(
+                            "input.event_structure_too_deep",
+                            "an evidence event line is nested too deeply to parse safely.",
+                            "flatten the event's structure; reference deeply nested content by an "
+                                    + "opaque locator instead (SPEC R12).");
                 }
                 JsonNode event;
                 try {
@@ -172,5 +191,86 @@ public final class Ingest {
             }
         }
         return result;
+    }
+
+    /**
+     * One line rule the three engines share (18.65, Python's {@code bytes.splitlines}): a line ends at
+     * \n, \r\n or a lone \r. Split on bytes, before decoding, so each line is decoded (and refused) on
+     * its own; \r and \n never occur inside a multi-byte UTF-8 sequence.
+     */
+    static List<byte[]> splitLines(byte[] raw) {
+        List<byte[]> lines = new ArrayList<>();
+        int start = 0;
+        for (int i = 0; i < raw.length; i++) {
+            if (raw[i] == '\n' || raw[i] == '\r') {
+                lines.add(Arrays.copyOfRange(raw, start, i));
+                if (raw[i] == '\r' && i + 1 < raw.length && raw[i + 1] == '\n') {
+                    i++;
+                }
+                start = i + 1;
+            }
+        }
+        if (start < raw.length) {
+            lines.add(Arrays.copyOfRange(raw, start, raw.length));
+        }
+        return lines;
+    }
+
+    private static String decodeStrict(byte[] bytes) throws CharacterCodingException {
+        return StandardCharsets.UTF_8
+                .newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString();
+    }
+
+    /**
+     * Mirrors {@code ingest._max_nesting}: the deepest {@code [}/{@code {} nesting in {@code line},
+     * counted lexically (brackets inside strings ignored) before any parse, so the limit is the same
+     * number in all three engines.
+     */
+    static int maxNesting(String line) {
+        int depth = 0;
+        int deepest = 0;
+        boolean inString = false;
+        boolean escaped = false;
+        for (int i = 0; i < line.length(); i++) {
+            char ch = line.charAt(i);
+            if (inString) {
+                if (escaped) {
+                    escaped = false;
+                } else if (ch == '\\') {
+                    escaped = true;
+                } else if (ch == '"') {
+                    inString = false;
+                }
+            } else if (ch == '"') {
+                inString = true;
+            } else if (ch == '[' || ch == '{') {
+                depth++;
+                deepest = Math.max(deepest, depth);
+            } else if (ch == ']' || ch == '}') {
+                depth--;
+            }
+        }
+        return deepest;
+    }
+
+    /** Trims only the whitespace JSON itself allows around a value (RFC 8259 §2). */
+    private static String trimJsonWhitespace(String text) {
+        int start = 0;
+        int end = text.length();
+        while (start < end && isJsonWhitespace(text.charAt(start))) {
+            start++;
+        }
+        while (end > start && isJsonWhitespace(text.charAt(end - 1))) {
+            end--;
+        }
+        return text.substring(start, end);
+    }
+
+    private static boolean isJsonWhitespace(char ch) {
+        return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
     }
 }

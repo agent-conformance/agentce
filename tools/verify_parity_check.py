@@ -243,6 +243,35 @@ verify_flow_census.build_signed_variants(
     out, signing, dev_trust, canonicalize, manifest_digest, Path({catalog!r})
 )
 
+# The `--report` rows: a real `assess --package-for-sharing` report of the quickstart, signed as
+# claimant with `--write-trust-root`, then its re-signed variants.
+import contextlib
+import io
+from agentce import cli
+from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat
+
+quickstart = Path({quickstart!r})
+report = out / verify_flow_census.REPORT_DIR
+claimant_pem = out / "claimant.pem"
+claimant_pem.write_bytes(
+    dev_trust.kms_key().private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
+)
+with contextlib.redirect_stdout(io.StringIO()):
+    assess_code = cli.main([
+        "assess", "--bundle", str(quickstart / "evidence"),
+        "--profile", str(quickstart / "applicability.yaml"),
+        "--domain", str(quickstart / "domain.linkml.yaml"),
+        "--out", str(report), "--package-for-sharing", "--quiet",
+    ])
+    sign_code = cli.main([
+        "sign", str(report), "--as", "claimant", "--profile", "kms",
+        "--key", str(claimant_pem), "--write-trust-root", "--quiet",
+    ])
+assert sign_code == 0, (assess_code, sign_code)
+verify_flow_census.build_report_variants(
+    out, signing, canonicalize, dev_trust.KmsSigner(private_key=dev_trust.kms_key())
+)
+
 print(json.dumps({{"manifest_digest": manifest_digest, "profiles": ["kms", "sigstore-public"]}}))
 """
 
@@ -252,7 +281,10 @@ def build_canonical_fixtures(canonical: Path) -> dict[str, Any]:
     (not a `tools` dependency) -- builds every cryptographically-signed fixture this check reuses,
     copied crypto-free into each scenario's per-engine directories below."""
     script = _BUILD_SCRIPT.format(
-        out=str(canonical), tools=str(ROOT / "tools"), catalog=str(EU_AI_ACT)
+        out=str(canonical),
+        tools=str(ROOT / "tools"),
+        catalog=str(EU_AI_ACT),
+        quickstart=str(EVIDENCE_BUNDLE.parent),
     )
     out, code = _run(
         ["uv", "run", "--frozen", "--project", str(PY_ENGINE), "python", "-c", script],
@@ -483,11 +515,19 @@ def _run_mutation(
     root.mkdir(parents=True)
     path = mutation.build(root)
     target = mutation.arg(path) if mutation.arg is not None else str(path)
+    argv = target if isinstance(target, list) else [flag, target]
     runs = {}
-    for engine, run in ENGINE_VERIFY.items():
-        out, code = run([flag, target, "--json"])
+    for engine in verify_flow_census.ENGINES_BY_FLOW[mutation.flow]:
+        out, code = ENGINE_VERIFY[engine]([*argv, "--json"])
         runs[engine] = (out.replace(str(root), "<dir>"), code)
     return runs
+
+
+def _is_envelope(out: str) -> bool:
+    try:
+        return isinstance(json.loads(out), dict)
+    except json.JSONDecodeError:
+        return False
 
 
 def _census_view(out: str, code: int) -> str:
@@ -522,12 +562,13 @@ def run_census(canonical: Path, tmp: Path, failures: list[str]) -> None:
         label = f"census {mutation.name}"
         for engine, (out, code) in runs.items():
             _assert(
-                "internal.unexpected" not in out,
+                "internal.unexpected" not in out and _is_envelope(out),
                 failures,
                 f"{label}:{engine}: crashed ({out.strip()[:300]!r})",
             )
-        outputs = [_census_view(*runs[e]) for e in ENGINE_VERIFY]
-        readiness_parity_check.compare_ports(label, outputs, failures)
+        if len(runs) > 1:
+            outputs = [_census_view(*runs[e]) for e in runs]
+            readiness_parity_check.compare_ports(label, outputs, failures)
         if runs["python"][1] == 0:
             verified.append(mutation.name)
     print(

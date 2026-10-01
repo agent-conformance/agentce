@@ -26,7 +26,7 @@ from collections.abc import Iterable, Iterator
 from contextlib import redirect_stdout
 from dataclasses import dataclass
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import yaml
@@ -440,6 +440,70 @@ def _parse_untrusted_object(
     return parsed
 
 
+def _is_str_list(value: Any) -> bool:
+    return isinstance(value, list) and all(isinstance(v, str) for v in value)
+
+
+def _is_report_statement(value: Any) -> bool:
+    """The shape `_verify_report` reads from a verified claimant statement: an object `predicate`
+    and a `subject` list of `{name, digest: {sha256}}` objects, every value a string. An embedded
+    trust-root.json lets anyone sign, so a signature that verifies says nothing about this shape
+    (18.65 round 3)."""
+    if not isinstance(value, dict) or not isinstance(value.get("predicate"), dict):
+        return False
+    subjects = value.get("subject")
+    return isinstance(subjects, list) and all(
+        isinstance(s, dict)
+        and isinstance(s.get("name"), str)
+        and isinstance(s.get("digest"), dict)
+        and isinstance(s["digest"].get("sha256"), str)
+        for s in subjects
+    )
+
+
+def _is_report_output_name(name: str) -> bool:
+    """A manifest output name `_verify_report` may open: a relative path that stays inside the
+    report directory (no absolute path, no `..` part, no NUL byte)."""
+    path = PurePosixPath(name)
+    return (
+        bool(name)
+        and "\0" not in name
+        and "\\" not in name
+        and not path.is_absolute()
+        and ".." not in path.parts
+    )
+
+
+def _is_report_manifest(manifest: dict[str, Any]) -> bool:
+    """The shape `_verify_report` reads from manifest.json (`engine`, `outputs`, `inputs`,
+    `limitations`); digest-gated, but under an embedded trust root the signer is whoever wrote the
+    bundle (18.65 round 3)."""
+    outputs = manifest.get("outputs", {})
+    inputs = manifest.get("inputs", {})
+    if not (
+        isinstance(manifest.get("engine", {}), dict)
+        and isinstance(outputs, dict)
+        and all(isinstance(n, str) and _is_report_output_name(n) for n in outputs)
+        and isinstance(inputs, dict)
+        and _is_str_list(manifest.get("limitations", []))
+    ):
+        return False
+    catalogs = inputs.get("catalogs", [])
+    return isinstance(catalogs, list) and all(
+        isinstance(ref, dict)
+        and isinstance(ref.get("id"), str)
+        and isinstance(ref.get("version"), str)
+        for ref in catalogs
+    )
+
+
+def _is_report_packaging(packaging: dict[str, Any]) -> bool:
+    """The shape `_verify_report` reads from packaging.json."""
+    return _is_str_list(packaging.get("catalog_dir_order", [])) and isinstance(
+        packaging.get("catalog_dir_digests", {}), dict
+    )
+
+
 def _verify_report(
     result: CommandResult,
     report_dir: Path,
@@ -538,11 +602,13 @@ def _verify_report(
         except (signing.VerificationError, ValueError) as exc:
             last_error = exc
             continue
-        if not isinstance(parsed_statement, dict):
-            last_error = signing.VerificationError("the payload is not a JSON object")
+        if not _is_report_statement(parsed_statement):
+            last_error = signing.VerificationError(
+                "the payload is not a statement shaped like the one `agentce sign` writes"
+            )
             continue
         statement: dict[str, Any] = parsed_statement
-        if statement.get("predicate", {}).get("role") != "claimant":
+        if statement["predicate"].get("role") != "claimant":
             last_error = signing.VerificationError(
                 "the verified predicate's own role is not 'claimant'"
             )
@@ -566,7 +632,7 @@ def _verify_report(
             file=sys.stderr,
         )
 
-    subject_map = {s["name"]: s for s in verified_statement.get("subject", [])}
+    subject_map = {s["name"]: s for s in verified_statement["subject"]}
     for name in REQUIRED_REPORT_SUBJECTS:
         if name not in subject_map:
             raise InputError(
@@ -597,10 +663,16 @@ def _verify_report(
         noun="manifest.json",
         fix="regenerate the report with `agentce assess`.",
     )
+    if not _is_report_manifest(manifest):
+        raise InputError(
+            "verify.report_output_tampered",
+            "manifest.json is not shaped like the one `agentce assess` writes.",
+            "regenerate the report with `agentce assess`.",
+        )
     claim_body = {k: v for k, v in claim.items() if k != "signatures"}
     try:
         claim_body_canonical = canonicalize(claim_body)
-    except CanonicalizationError:
+    except (CanonicalizationError, RecursionError):
         raise InputError(
             "verify.report_claim_tampered",
             "claim.json does not match the digest the signature covers.",
@@ -647,7 +719,26 @@ def _verify_report(
             "the report was altered after signing; regenerate and re-sign it.",
         )
 
-    packaging = json.loads((report_dir / "packaging.json").read_text("utf-8"))
+    packaging_fix = "regenerate the report with `agentce assess --package-for-sharing`."
+    packaging_path = report_dir / "packaging.json"
+    if not packaging_path.is_file():
+        raise InputError(
+            "verify.report_output_tampered",
+            f"{report_dir} has no packaging.json.",
+            packaging_fix,
+        )
+    packaging = _parse_untrusted_object(
+        packaging_path.read_bytes(),
+        key="verify.report_output_tampered",
+        noun="packaging.json",
+        fix=packaging_fix,
+    )
+    if not _is_report_packaging(packaging):
+        raise InputError(
+            "verify.report_output_tampered",
+            "packaging.json is not shaped like the one `agentce assess` writes.",
+            packaging_fix,
+        )
     if not packaging.get("packaged"):
         result.data.update(
             {
@@ -668,7 +759,13 @@ def _verify_report(
             f"bundle/evidence does not load cleanly: {exc.cause}",
             "the packaged evidence was altered after signing; regenerate and re-sign the report.",
         ) from exc
-    if loaded_bundle.digest != inputs.get("bundle_digest"):
+    try:
+        bundle_digest = loaded_bundle.digest
+    except (CanonicalizationError, RecursionError):
+        bundle_digest = (
+            None  # a manifest no digest can be computed for matches no recorded one
+        )
+    if bundle_digest is None or bundle_digest != inputs.get("bundle_digest"):
         raise InputError(
             "verify.report_evidence_tampered",
             "bundle/evidence's digest does not match manifest.json's bundle_digest.",

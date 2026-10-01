@@ -565,7 +565,7 @@ def load_trust_root(path: Path) -> TrustRoot:
 
     try:
         data = json.loads(path.read_text("utf-8"))
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, RecursionError) as exc:
         raise VerificationError(f"{path} is not readable JSON: {exc}") from exc
     if not isinstance(data, dict):
         raise VerificationError(f"{path} does not hold a trust-root object")

@@ -11,13 +11,83 @@
 
 import { readFileSync } from "node:fs";
 import type { Bundle } from "./bundle";
+import { InputError } from "./errors";
 import { parseJson } from "./json";
 import { QuarantineReason, type QuarantineRecord } from "./quarantine";
 import { eventTypes, validateEvent } from "./schema";
-import { byteCompare } from "./util";
+import { byteCompare, decodeUtf8Strict } from "./util";
+import { MAX_JSON_DEPTH } from "./verify";
 
 const DEFAULT_MAX_EVENT_BYTES = 1_048_576;
 const TYPE_RE = /^org\.agent-conformance\.evidence\.([A-Za-z0-9]+)\.v1$/;
+/** The whitespace JSON itself allows around a value (RFC 8259 §2); nothing else is trimmed. */
+const JSON_WHITESPACE_EDGES = /^[ \t\r\n]+|[ \t\r\n]+$/g;
+
+/**
+ * One line rule the three engines share (18.65, Python's `bytes.splitlines`): a line ends at \n,
+ * \r\n or a lone \r. Split on bytes, before decoding, so each line is decoded (and refused) on its
+ * own; \r and \n never occur inside a multi-byte UTF-8 sequence.
+ */
+function splitLines(raw: Uint8Array): Uint8Array[] {
+  const lines: Uint8Array[] = [];
+  let start = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const byte = raw[i];
+    if (byte === 0x0a || byte === 0x0d) {
+      lines.push(raw.subarray(start, i));
+      if (byte === 0x0d && raw[i + 1] === 0x0a) {
+        i++;
+      }
+      start = i + 1;
+    }
+  }
+  if (start < raw.length) {
+    lines.push(raw.subarray(start));
+  }
+  return lines;
+}
+
+function tooDeep(): InputError {
+  return new InputError(
+    "input.event_structure_too_deep",
+    "an evidence event line is nested too deeply to parse safely.",
+    "flatten the event's structure; reference deeply nested content by an opaque locator instead (SPEC R12).",
+  );
+}
+
+/**
+ * Mirrors `ingest._max_nesting`: the deepest `[`/`{` nesting in `line`, counted lexically (brackets
+ * inside strings ignored) before any parse, so the limit is the same number in all three engines.
+ */
+function maxNesting(line: string): number {
+  let depth = 0;
+  let deepest = 0;
+  let inString = false;
+  let escaped = false;
+  for (const ch of line) {
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === "\\") {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+    } else if (ch === '"') {
+      inString = true;
+    } else if (ch === "[" || ch === "{") {
+      depth++;
+      deepest = Math.max(deepest, depth);
+    } else if (ch === "]" || ch === "}") {
+      depth--;
+    }
+  }
+  return deepest;
+}
+
+function trimJsonWhitespace(text: string): string {
+  return text.replace(JSON_WHITESPACE_EDGES, "");
+}
 
 export interface IngestResult {
   accepted: Array<Record<string, unknown>>;
@@ -59,8 +129,18 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
   const lastTime = new Map<string, string>();
 
   for (const path of bundle.eventFiles) {
-    for (const raw of readFileSync(path, "utf-8").split("\n")) {
-      const line = raw.trim();
+    for (const rawLine of splitLines(readFileSync(path))) {
+      let raw: string;
+      try {
+        raw = decodeUtf8Strict(rawLine);
+      } catch {
+        result.quarantined.push({
+          reason: QuarantineReason.SCHEMA_INVALID,
+          detail: "invalid UTF-8",
+        });
+        continue;
+      }
+      const line = trimJsonWhitespace(raw);
       if (!line) {
         continue;
       }
@@ -70,6 +150,9 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
           detail: `event exceeds ${maxEventBytes} bytes`,
         });
         continue;
+      }
+      if (maxNesting(line) > MAX_JSON_DEPTH) {
+        throw tooDeep();
       }
       let event: unknown;
       try {

@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import base64
 import copy
+import hashlib
 import json
 import os
 import shutil
@@ -39,11 +40,19 @@ from typing import Any
 CATALOG_SIGNATURE_NAME = "catalog.sig.json"
 
 
+#: The engines `verify_parity_check` runs a flow point's mutations through. `--report` is not
+#: ported to TypeScript or Java (both refuse it before opening anything, `target-argument`'s
+#: `report-empty` row pins that), so its rows run Python alone and require a clean refusal.
+ALL_ENGINES = ("python", "typescript", "java")
+PYTHON_ONLY = ("python",)
+
+
 @dataclass(frozen=True)
 class FlowPoint:
     id: str
     reads: str
     problem_classes: tuple[str, ...]
+    engines: tuple[str, ...] = ALL_ENGINES
 
 
 #: The census. Each row is one place an engine reads untrusted input during `verify --catalog` or
@@ -137,12 +146,111 @@ FLOW_POINTS = (
         ("path", "content"),
     ),
     FlowPoint(
+        "bundle-streams",
+        "each events/*.jsonl file manifest.json names: bytes -> lines -> one JSON event per line "
+        "(ingest), with the manifest's digest updated so the line itself is what is read",
+        (
+            "bytes",
+            "number-token",
+            "nesting",
+            "duplicate-key",
+            "line-break",
+            "whitespace",
+            "json-type",
+        ),
+    ),
+    FlowPoint(
         "target-argument",
-        "verify's own --catalog/--release/--bundle/--report value: empty, trailing-slash, '.'",
-        ("empty", "trailing-slash", "dot"),
+        "verify's own --catalog/--release/--bundle/--report value: empty, trailing-slash, '.', "
+        "the flag given twice, and the --flag=value spelling",
+        ("empty", "trailing-slash", "dot", "repeated", "equals"),
+    ),
+    FlowPoint(
+        "report-claim",
+        "--report's claim.json bytes -> JSON -> signatures[] and the canonical claim body, read "
+        "before any signature check (plain tampering, no re-signing)",
+        (
+            "bytes",
+            "number-token",
+            "nesting",
+            "duplicate-key",
+            "not-a-file",
+            "json-type",
+            "missing-field",
+            "base64",
+        ),
+        PYTHON_ONLY,
+    ),
+    FlowPoint(
+        "report-trust-root",
+        "--report's embedded trust-root.json bytes -> JSON -> TrustRoot (load_trust_root)",
+        (
+            "bytes",
+            "number-token",
+            "nesting",
+            "duplicate-key",
+            "not-a-file",
+            "json-type",
+            "missing-field",
+            "base64",
+        ),
+        PYTHON_ONLY,
+    ),
+    FlowPoint(
+        "report-statement",
+        "the claimant statement a verified signature carries (predicate, subject[].name/digest), "
+        "re-signed with the report's own embedded key: anyone can write trust-root.json and sign",
+        ("json-type", "missing-field"),
+        PYTHON_ONLY,
+    ),
+    FlowPoint(
+        "report-manifest",
+        "--report's manifest.json bytes -> JSON -> engine, outputs (names opened inside the "
+        "report), inputs, limitations; re-signed so the digest gate passes",
+        ("bytes", "number-token", "nesting", "duplicate-key", "json-type", "missing-field"),
+        PYTHON_ONLY,
+    ),
+    FlowPoint(
+        "report-packaging",
+        "--report's packaging.json bytes -> JSON -> packaged, catalog_dir_order, "
+        "catalog_dir_digests; re-signed through the manifest's outputs digest",
+        (
+            "bytes",
+            "number-token",
+            "nesting",
+            "duplicate-key",
+            "not-a-file",
+            "json-type",
+            "missing-field",
+        ),
+        PYTHON_ONLY,
     ),
 )
+ENGINES_BY_FLOW = {point.id: point.engines for point in FLOW_POINTS}
 FLOW_IDS = frozenset(point.id for point in FLOW_POINTS)
+
+#: The real stream file `bundle-streams` mutates (`corpus/quickstart/evidence`).
+STREAM_FILE = "events/urn-agentce-source-langgraph-gateway-eu-1.jsonl"
+
+#: Characters some languages' own trim removes and JSON does not allow around a value: each must
+#: make a stream line unreadable in all three engines alike (18.65 round 3).
+WHITESPACE_PREFIXES = (
+    ("prefix-nbsp", "\u00a0".encode()),
+    ("prefix-bom-mid-file", "\ufeff".encode()),
+    ("prefix-em-space", "\u2003".encode()),
+    ("prefix-unit-separator", b"\x1f"),
+    ("prefix-tab", b"\t"),
+    ("prefix-space", b" "),
+)
+
+#: Where `build_report_variants` writes the signed `--report` fixture and its re-signed variants,
+#: inside the canonical fixture directory; a variant's REMOVED file names files to delete
+#: (`"missing"`) or replace with a directory (`"directory"`).
+REPORT_DIR = "report"
+REPORT_VARIANTS = "report-signed"
+REMOVED = "census-removed.json"
+#: A marker value for `report_with`: replace the file with an empty directory.
+DIRECTORY = object()
 
 #: One representative per JSON type. A node is replaced by every representative whose type differs
 #: from its own.
@@ -380,7 +488,8 @@ class Mutation:
     build: Callable[[Path], Path]
     #: Overrides the argv value computed from `build`'s returned path (default: `str(path)`) --
     #: `target-argument` mutations build a valid fixture but pass a different spelling of its path.
-    arg: Callable[[Path], str] | None = None
+    #: A list replaces the whole `<flag> <value>` pair (a repeated flag, the `--flag=value` form).
+    arg: Callable[[Path], str | list[str]] | None = None
 
 
 def _write(path: Path, data: bytes | Any) -> None:
@@ -403,7 +512,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         build: Callable[[Path], Path],
         *,
         target: str | None = None,
-        arg: Callable[[Path], str] | None = None,
+        arg: Callable[[Path], str | list[str]] | None = None,
     ) -> None:
         if target is None:
             target = "catalog" if flow.startswith("catalog-") else "release"
@@ -775,6 +884,57 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         target="bundle",
     )
 
+    # bundle-streams (each events/*.jsonl line ingest reads). The first line of one real stream is
+    # replaced, or the file's line structure changed, and manifest.json's digest for that file is
+    # updated so ingest's own reading is what decides the outcome, not the content check.
+    stream_name = STREAM_FILE
+    stream_bytes = (evidence_bundle / stream_name).read_bytes()
+    first_line, _, rest = stream_bytes.partition(b"\n")
+
+    def bundle_stream(data: bytes) -> Callable[[Path], Path]:
+        def edit(dest: Path) -> None:
+            (dest / stream_name).write_bytes(data)
+            manifest = json.loads((dest / "manifest.json").read_bytes())
+            for entry in manifest["files"]:
+                if entry["path"] == stream_name:
+                    entry["sha256"] = hashlib.sha256(data).hexdigest()
+            _write(dest / "manifest.json", manifest)
+
+        return bundle_evidence_with(edit)
+
+    for name, cls, line in byte_mutations(first_line):
+        add(name, "bundle-streams", cls, bundle_stream(line + b"\n" + rest), target="bundle")
+    for name, sample in TYPE_SAMPLES:
+        if name != "object":
+            line = json.dumps(sample).encode()
+            add(
+                f"line={name}",
+                "bundle-streams",
+                "json-type",
+                bundle_stream(line + b"\n" + rest),
+                target="bundle",
+            )
+    for name, data in (
+        ("crlf", stream_bytes.replace(b"\n", b"\r\n")),
+        ("lone-cr", stream_bytes.replace(b"\n", b"\r")),
+        ("cr-inside-line", first_line.replace(b",", b",\r", 1) + b"\n" + rest),
+        ("no-final-newline", stream_bytes.rstrip(b"\n")),
+        ("blank-lines", b"\n\n" + stream_bytes.replace(b"\n", b"\n\n")),
+        ("vertical-tab", first_line + b"\x0b\n" + rest),
+        ("form-feed", first_line + b"\x0c\n" + rest),
+        ("unicode-line-separator", first_line.replace(b",", b",\xe2\x80\xa8", 1) + b"\n" + rest),
+        ("next-line", first_line.replace(b",", b",\xc2\x85", 1) + b"\n" + rest),
+    ):
+        add(name, "bundle-streams", "line-break", bundle_stream(data), target="bundle")
+    for name, prefix in WHITESPACE_PREFIXES:
+        add(
+            name,
+            "bundle-streams",
+            "whitespace",
+            bundle_stream(prefix + first_line + b"\n" + rest),
+            target="bundle",
+        )
+
     # target-argument (verify's own --catalog/--release/--bundle/--report value).
     def report_dir_unused(d: Path) -> Path:
         dest = d / "report-unused"
@@ -827,6 +987,56 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         target="report",
         arg=arg_empty,
     )
+    # The flag given twice (the same value, or one of them empty, in either order) and the
+    # `--flag=value` spelling: one rule in all three engines (18.65 round 3).
+    def repeated(first: Callable[[Path], str], second: Callable[[Path], str]):
+        def argv(path: Path, flag: str) -> list[str]:
+            return [flag, first(path), flag, second(path)]
+
+        return argv
+
+    def same(path: Path) -> str:
+        return str(path)
+
+    for flag_target, builder in (
+        ("catalog", catalog_with(lambda _dest: None)),
+        ("release", bundle_with(lambda _dest: None)),
+        ("bundle", bundle_evidence_with(lambda _dest: None)),
+        ("report", report_dir_unused),
+    ):
+        flag = "--" + flag_target
+        for name, argv in (
+            ("twice", repeated(same, same)),
+            ("twice-then-empty", repeated(same, arg_empty)),
+            ("empty-then-twice", repeated(arg_empty, same)),
+        ):
+            add(
+                f"{flag_target}-{name}",
+                "target-argument",
+                "repeated",
+                builder,
+                target=flag_target,
+                arg=lambda path, argv=argv, flag=flag: argv(path, flag),
+            )
+        if flag_target != "report":
+            # TypeScript/Java parse `--report=<dir>` and then stop at "not implemented", so only
+            # its empty form below has one answer to compare across the three engines.
+            add(
+                f"{flag_target}-equals",
+                "target-argument",
+                "equals",
+                builder,
+                target=flag_target,
+                arg=lambda path, flag=flag: [f"{flag}={path}"],
+            )
+        add(
+            f"{flag_target}-equals-empty",
+            "target-argument",
+            "equals",
+            builder,
+            target=flag_target,
+            arg=lambda _path, flag=flag: [f"{flag}="],
+        )
     # A trailing slash on a plain file (not a release-bundle directory) must refuse the same way a
     # nonexistent path does (F5, 18.65): `release-trailing-slash` above exercises a bundle
     # *directory*, which already ends in a real directory either way, so it never reaches the
@@ -840,6 +1050,58 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         arg=arg_trailing_slash,
     )
 
+    mutations.extend(report_mutations(canonical))
+    return mutations
+
+
+def report_mutations(canonical: Path) -> list[Mutation]:
+    """The `--report` rows, over the signed report `build_report_variants` wrote into `canonical`:
+    claim.json and trust-root.json tampered in place (both are read before any signature check),
+    and the re-signed statement, manifest.json and packaging.json variants it saved."""
+    base = canonical / REPORT_DIR
+    mutations: list[Mutation] = []
+
+    def report_with(files: dict[str, bytes | Any | None]) -> Callable[[Path], Path]:
+        def build(d: Path) -> Path:
+            dest = d / "report"
+            shutil.copytree(base, dest, symlinks=True)
+            for name, data in files.items():
+                target = dest / name
+                target.unlink(missing_ok=True)
+                if data is DIRECTORY:
+                    target.mkdir()
+                elif data is not None:
+                    _write(target, data)
+            return dest
+
+        return build
+
+    def add(name: str, flow: str, cls: str, files: dict[str, bytes | Any | None]) -> None:
+        mutations.append(
+            Mutation(f"{flow}:{name}", flow, cls, "report", report_with(files))
+        )
+
+    for flow, file_name in (
+        ("report-claim", "claim.json"),
+        ("report-trust-root", "trust-root.json"),
+    ):
+        original = (base / file_name).read_bytes()
+        for name, cls, data in byte_mutations(original):
+            add(name, flow, cls, {file_name: data})
+        for name, cls, doc in node_mutations(json.loads(original)):
+            add(name, flow, cls, {file_name: doc})
+        add("missing", flow, "not-a-file", {file_name: None})
+        add("directory", flow, "not-a-file", {file_name: DIRECTORY})
+
+    variants = canonical / REPORT_VARIANTS
+    classes = json.loads((variants / "classes.json").read_text(encoding="utf-8"))
+    for stem, (flow, cls) in sorted(classes.items()):
+        files: dict[str, bytes | Any | None] = {
+            f.name: f.read_bytes() for f in sorted((variants / stem).iterdir())
+        }
+        for name, how in json.loads(files.pop(REMOVED, b"{}")).items():
+            files[name] = DIRECTORY if how == "directory" else None
+        add(stem.split("__", 1)[1], flow, cls, files)
     return mutations
 
 
@@ -953,6 +1215,91 @@ def build_signed_variants(
             envelope_over(canonicalize(single_statement), signer),
         )
     (signed / "classes.json").write_text(
+        json.dumps(classes, sort_keys=True), encoding="utf-8"
+    )
+
+
+def build_report_variants(
+    out: Path, signing: Any, canonicalize: Any, signer: Any
+) -> None:
+    """Writes the re-signed `--report` variants of the signed report at `out/REPORT_DIR` to
+    `out/REPORT_VARIANTS/<flow>__<name>/` (only the files that change) and their classes to
+    `classes.json`. `signer` holds the key the report's embedded trust-root.json names, as anyone
+    who writes that file holds theirs, so every variant gets past the signature check to the
+    reader behind it."""
+    base = out / REPORT_DIR
+    variants = out / REPORT_VARIANTS
+    variants.mkdir()
+    classes: dict[str, list[str]] = {}
+    claim = json.loads((base / "claim.json").read_bytes())
+    entry = next(s for s in claim["signatures"] if s.get("role") == "claimant")
+    statement = json.loads(signing._b64d(entry["payload"]))
+    manifest_bytes = (base / "manifest.json").read_bytes()
+
+    def save(
+        flow: str,
+        name: str,
+        cls: str,
+        *,
+        statement_doc: Any = None,
+        manifest: bytes | None = None,
+        packaging: bytes | None = None,
+        removed: dict[str, str] | None = None,
+    ) -> None:
+        files: dict[str, bytes] = {}
+        if packaging is not None or removed:
+            doc = json.loads(manifest_bytes)
+            if packaging is not None:
+                doc["outputs"]["packaging.json"] = signing.sha256_prefixed(packaging)
+                files["packaging.json"] = packaging
+            else:
+                del doc["outputs"]["packaging.json"]
+            manifest = json.dumps(doc, indent=2, sort_keys=True).encode() + b"\n"
+        if manifest is not None:
+            files["manifest.json"] = manifest
+            statement_doc = copy.deepcopy(statement)
+            for subject in statement_doc["subject"]:
+                if subject["name"] == "manifest.json":
+                    subject["digest"]["sha256"] = hashlib.sha256(manifest).hexdigest()
+        try:
+            canonicalize(statement_doc)
+        except ValueError:
+            return  # a float the signer itself refuses; the unsigned claim walk covers that
+        envelope = signing.sign_statement(statement_doc, signer)
+        signed_claim = {
+            **claim,
+            "signatures": [{"role": "claimant", "profile": "kms", **envelope}],
+        }
+        files["claim.json"] = json.dumps(signed_claim, sort_keys=True).encode()
+        if removed:
+            files[REMOVED] = json.dumps(removed).encode()
+        stem = f"{flow}__{name.replace('/', '.')}"
+        (variants / stem).mkdir()
+        for file_name, data in files.items():
+            (variants / stem / file_name).write_bytes(data)
+        classes[stem] = [flow, cls]
+
+    for name, cls, doc in node_mutations(statement):
+        save("report-statement", name, cls, statement_doc=doc)
+    for name, cls, data in byte_mutations(manifest_bytes):
+        save("report-manifest", name, cls, manifest=data)
+    for name, cls, doc in node_mutations(json.loads(manifest_bytes)):
+        data = json.dumps(doc, indent=2, sort_keys=True).encode() + b"\n"
+        save("report-manifest", name, cls, manifest=data)
+    packaging_bytes = (base / "packaging.json").read_bytes()
+    for name, cls, data in byte_mutations(packaging_bytes):
+        save("report-packaging", name, cls, packaging=data)
+    for name, cls, doc in node_mutations(json.loads(packaging_bytes)):
+        data = json.dumps(doc, indent=2, sort_keys=True).encode() + b"\n"
+        save("report-packaging", name, cls, packaging=data)
+    for how in ("missing", "directory"):
+        save(
+            "report-packaging",
+            how,
+            "not-a-file",
+            removed={"packaging.json": how},
+        )
+    (variants / "classes.json").write_text(
         json.dumps(classes, sort_keys=True), encoding="utf-8"
     )
 
