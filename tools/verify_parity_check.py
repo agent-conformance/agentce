@@ -405,6 +405,32 @@ def _run_release_scenario(
     return runs
 
 
+def _run_bundle_scenario(
+    name: str,
+    args: list[str],
+    failures: list[str],
+    *,
+    expect_exit: int,
+) -> dict[str, tuple[str, int]]:
+    """Like `_run_catalog_scenario`/`_run_release_scenario`, but for `--bundle`: there is no
+    per-engine fixture to build, since the evidence bundle is read-only and shared (identical
+    for all three engines), and its success shape (`streams`/`stream_count`/`broken_streams`) has
+    no `verified` field to assert on."""
+    runs = _run_engines(args)
+    for engine, (out, code) in runs.items():
+        _assert(
+            code == expect_exit,
+            failures,
+            f"{name}:{engine}: exit {code}, expected {expect_exit} ({out.strip()[:200]!r})",
+        )
+    readiness_parity_check.compare_ports(
+        f"{name}:error",
+        [_normalized(runs[e][0]) for e in ("python", "typescript", "java")],
+        failures,
+    )
+    return runs
+
+
 def run_real_check() -> int:
     failures: list[str] = []
 
@@ -743,8 +769,7 @@ def run_real_check() -> int:
         # top-level type) -- folded into the same "not readable JSON" text as a file that does not
         # parse at all (Dispositions), byte-identical, never a crash.
         def _manifest_wrong_type(d: Path) -> Path:
-            dest = d / "bundle"
-            shutil.copytree(canonical / "bundle", dest)
+            dest = _copy_bundle(d)
             (dest / "release-manifest.json").write_text(
                 json.dumps([]), encoding="utf-8"
             )
@@ -768,8 +793,7 @@ def run_real_check() -> int:
         # Scenario 14: bundle signatures.json replaced by a bare integer (valid JSON, wrong
         # top-level type, not an array) -- same deliberate fold, byte-identical, never a crash.
         def _signatures_wrong_type(d: Path) -> Path:
-            dest = d / "bundle"
-            shutil.copytree(canonical / "bundle", dest)
+            dest = _copy_bundle(d)
             (dest / "signatures.json").write_text(json.dumps(5), encoding="utf-8")
             return dest
 
@@ -792,8 +816,7 @@ def run_real_check() -> int:
         # folded into the same "no name" text as a missing `name` (Dispositions: "has a name that
         # is not a string" and "has no name" are the same defect from a caller's point of view).
         def _artifact_name_not_string(d: Path) -> Path:
-            dest = d / "bundle"
-            shutil.copytree(canonical / "bundle", dest)
+            dest = _copy_bundle(d)
             manifest_path = dest / "release-manifest.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             manifest["artifacts"][0]["name"] = 5
@@ -821,8 +844,7 @@ def run_real_check() -> int:
         # (`payloadType` wrong type) -- the per-entry loop's exception tuple catches it and wraps
         # it with the entry's profile, same as any other per-entry failure.
         def _entry_envelope_malformed(d: Path) -> Path:
-            dest = d / "bundle"
-            shutil.copytree(canonical / "bundle", dest)
+            dest = _copy_bundle(d)
             signatures_path = dest / "signatures.json"
             entries = json.loads(signatures_path.read_text(encoding="utf-8"))
             entries[0]["envelope"]["payloadType"] = 5
@@ -849,8 +871,7 @@ def run_real_check() -> int:
         # statement it signs has an empty `subject` list -- `statement_subject_digest`'s
         # `IndexError`, caught by the per-entry tuple and wrapped the same as any other failure.
         def _entry_subject_empty(d: Path) -> Path:
-            dest = d / "bundle"
-            shutil.copytree(canonical / "bundle", dest)
+            dest = _copy_bundle(d)
             signatures_path = dest / "signatures.json"
             entries = json.loads(signatures_path.read_text(encoding="utf-8"))
             empty_subject_env = json.loads(
@@ -908,8 +929,7 @@ def run_real_check() -> int:
         # mutation of the artifact file only (manifest/signatures stay validly signed), byte-
         # identical fixed text.
         def _missing_artifact(d: Path) -> Path:
-            dest = d / "bundle"
-            shutil.copytree(canonical / "bundle", dest)
+            dest = _copy_bundle(d)
             (dest / "artifact-a.txt").unlink()
             return dest
 
@@ -933,8 +953,7 @@ def run_real_check() -> int:
         # signatures untouched) -- the artifact's recomputed digest no longer matches the one the
         # manifest names, byte-identical fixed text.
         def _artifact_tampered(d: Path) -> Path:
-            dest = d / "bundle"
-            shutil.copytree(canonical / "bundle", dest)
+            dest = _copy_bundle(d)
             (dest / "artifact-a.txt").write_bytes(b"tampered content\n")
             return dest
 
@@ -959,8 +978,7 @@ def run_real_check() -> int:
         # "missing artifact" nor "digest mismatch" fires), but the manifest's own recomputed digest
         # no longer matches what either signature covers: both entries report the same fixed text.
         def _manifest_digest_moved(d: Path) -> Path:
-            dest = d / "bundle"
-            shutil.copytree(canonical / "bundle", dest)
+            dest = _copy_bundle(d)
             manifest_path = dest / "release-manifest.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             manifest["note"] = "this field was added after signing"
@@ -1011,21 +1029,13 @@ def run_real_check() -> int:
 
         # Scenario B1 (point 4, critic round-2 finding #13): `verify --bundle` on a real,
         # already-signed evidence bundle (`corpus/quickstart/evidence`, not a synthetic fixture) --
-        # this is the item's full evidence-integrity path, not only the catalog/release DSSE primitives,
-        # so it is compared with its own runner rather than `_run_catalog_scenario`/
-        # `_run_release_scenario` (there is no per-engine fixture copy to make: the bundle is read
-        # only, identical for all three engines).
-        bundle_runs = _run_engines(["--bundle", str(EVIDENCE_BUNDLE), "--json"])
-        for engine, (out, code) in bundle_runs.items():
-            _assert(
-                code == 0,
-                failures,
-                f"sB1-verify-bundle-evidence:{engine}: exit {code}, expected 0 ({out.strip()[:200]!r})",
-            )
-        readiness_parity_check.compare_ports(
-            "sB1-verify-bundle-evidence:error",
-            [_normalized(bundle_runs[e][0]) for e in ("python", "typescript", "java")],
+        # this is the item's full evidence-integrity path, not only the catalog/release DSSE
+        # primitives.
+        _run_bundle_scenario(
+            "sB1-verify-bundle-evidence",
+            ["--bundle", str(EVIDENCE_BUNDLE), "--json"],
             failures,
+            expect_exit=0,
         )
 
     for failure in failures:
