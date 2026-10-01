@@ -28,21 +28,32 @@ public final class Bundle {
     public final List<Path> eventFiles;
     public final Set<String> sources;
     public final Map<String, String> sourceClasses;
-    public final String digest;
+    private String digestCache;
 
     private Bundle(
             Path root,
             JsonNode manifest,
             List<Path> eventFiles,
             Set<String> sources,
-            Map<String, String> sourceClasses,
-            String digest) {
+            Map<String, String> sourceClasses) {
         this.root = root;
         this.manifest = manifest;
         this.eventFiles = eventFiles;
         this.sources = sources;
         this.sourceClasses = sourceClasses;
-        this.digest = digest;
+    }
+
+    /**
+     * The bundle digest: SHA-256 of the RFC 8785 canonical manifest (SPEC §8.1). Computed on first
+     * use, not at load time: {@code verify --bundle} never reads it, and canonicalizing the manifest
+     * throws on a float anywhere in it (Python's {@code Bundle.digest} is a lazy {@code @property}
+     * for the same reason -- 18.65).
+     */
+    public String digest() {
+        if (digestCache == null) {
+            digestCache = "sha256:" + Canonical.sha256Hex(manifest);
+        }
+        return digestCache;
     }
 
     private static String fileSha256Hex(Path path) {
@@ -126,12 +137,15 @@ public final class Bundle {
             throw new InputError(
                     "input.bundle_manifest_missing",
                     "the bundle at " + bundleDir + " has no manifest.json.",
-                    "add a manifest.json listing every file with its SHA-256.");
+                    "an agent writes a bundle by running with the agentce_emit emitter on: set "
+                            + "`AGENTCE_EMIT=1 AGENTCE_EMIT_OUT=<dir>` and see docs/integrate.md; to watch one "
+                            + "built, run `examples/custom-loop/run.sh <dir>` from a checkout, then `agentce "
+                            + "validate --bundle <dir>`.");
         }
         JsonNode manifest;
         try {
-            manifest = Json.parseFile(manifestPath);
-        } catch (RuntimeException exc) {
+            manifest = Verify.parseUntrustedJson(Files.readAllBytes(manifestPath));
+        } catch (IOException | RuntimeException exc) {
             // A fixed message, not the parser's own text: Jackson's exception text would make this
             // refusal's cause diverge from the other two engines for the same malformed input, for no
             // reason a reader could use (F3, 18.65).
@@ -217,7 +231,6 @@ public final class Bundle {
                 manifest,
                 eventFiles,
                 sources,
-                sourceClasses.isEmpty() ? null : sourceClasses,
-                "sha256:" + Canonical.sha256Hex(manifest));
+                sourceClasses.isEmpty() ? null : sourceClasses);
     }
 }

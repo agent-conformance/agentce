@@ -123,7 +123,7 @@ public final class Conformance {
         var activity = Activity.summarizeActivity(ingested.accepted, profile);
         var blindSpots = BlindSpots.computeBlindSpots(assertions, profile, cat.catalogs, ingested.accepted);
         Report.writeReport(
-                outDir, assertions, bundle.digest, cat.labels, ECS_OPERATOR, List.of("conformance", pid), List.of(),
+                outDir, assertions, bundle.digest(), cat.labels, ECS_OPERATOR, List.of("conformance", pid), List.of(),
                 "en", cat.catalogs, activity, blindSpots);
     }
 

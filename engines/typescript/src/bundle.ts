@@ -11,8 +11,7 @@ import { readFileSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { sha256Hex } from "./canonical";
 import { InputError } from "./errors";
-import { parseJson } from "./json";
-import { readTextFileStrict } from "./util";
+import { parseUntrustedJson } from "./verify";
 
 export interface Bundle {
   root: string;
@@ -89,8 +88,7 @@ function safeMember(root: string, rel: string): string {
   if (member === null) {
     throw new InputError(
       "input.bundle_manifest_path",
-      `manifest lists an unsafe path ${rel}: it is absolute, contains '..', resolves outside ` +
-        "the bundle root (a symlink or junction escapes it), or cannot be safely resolved.",
+      `manifest lists an unsafe path ${rel}: it is absolute, contains '..', resolves outside the bundle root (a symlink or junction escapes it), or cannot be safely resolved.`,
       "the manifest must list only paths that stay inside the bundle after symlinks resolve.",
     );
   }
@@ -103,12 +101,19 @@ export function loadBundle(bundleDir: string): Bundle {
     throw new InputError(
       "input.bundle_manifest_missing",
       `the bundle at ${bundleDir} has no manifest.json.`,
-      "add a manifest.json listing every file with its SHA-256.",
+      "an agent writes a bundle by running with the agentce_emit emitter on: set " +
+        "`AGENTCE_EMIT=1 AGENTCE_EMIT_OUT=<dir>` and see docs/integrate.md; to watch one built, run " +
+        "`examples/custom-loop/run.sh <dir>` from a checkout, then `agentce validate --bundle <dir>`.",
     );
   }
   let parsed: unknown;
   try {
-    parsed = parseJson(readTextFileStrict(manifestPath));
+    // The untrusted-JSON reader (verify.ts), not the lenient `parseJson`: strict UTF-8, no BOM,
+    // bounded nesting, well-formed strings/keys -- the same guard Python's `load_bundle` already
+    // gets from `parse_untrusted_json` and Java's `Bundle.load` now gets from
+    // `Verify.parseUntrustedJson` (18.65). `keepNumberTokens` so a float survives to `digest`'s
+    // lazy canonicalize check instead of being silently folded.
+    parsed = parseUntrustedJson(readFileSync(manifestPath), true);
   } catch {
     // A fixed message, not the parser's own text: the three engines' JSON readers each produce
     // different exception text for the same malformed input, which would make this refusal's
@@ -197,12 +202,20 @@ export function loadBundle(bundleDir: string): Bundle {
     }
   }
 
-  return {
+  const result: Bundle = {
     root: bundleDir,
     manifest,
     eventFiles: eventFiles.sort(),
     sources,
     sourceClasses: sourceClasses.size > 0 ? sourceClasses : null,
-    digest: `sha256:${sha256Hex(manifest)}`,
+    // A getter, not a field computed here: `verify --bundle` never reads `digest`, and canonicalizing
+    // the manifest throws on a float anywhere in it (Python's `Bundle.digest` is a lazy `@property`
+    // for the same reason -- 18.65).
+    digest: undefined as unknown as string,
   };
+  Object.defineProperty(result, "digest", {
+    get: () => `sha256:${sha256Hex(manifest)}`,
+    enumerable: true,
+  });
+  return result;
 }

@@ -74,7 +74,7 @@ test("validateEvent rejects an unknown payload type", () => {
   assert.ok(errors.length > 0);
 });
 
-test("a manifest number the canonical form refuses is refused, not folded to a whole number", () => {
+test("a manifest number the canonical form refuses is refused on digest, not folded to a whole number, and never blocks loading", () => {
   for (const [token, reason] of [
     ["2.0", "non_integer_number"],
     ["1e2", "non_integer_number"],
@@ -88,8 +88,12 @@ test("a manifest number the canonical form refuses is refused, not folded to a w
       `"bundle_format": "1.0", "note": ${token}`,
     );
     writeFileSync(join(dir, "manifest.json"), manifest);
+    // `digest` is lazy (18.65): loading, and ingest, never touch it, matching the Python
+    // reference's `@property`. It still throws the same way once something reads it.
+    const bundle = loadBundle(dir);
+    assert.equal(ingest(bundle).accepted.length, 1, token);
     assert.throws(
-      () => loadBundle(dir),
+      () => bundle.digest,
       (err: unknown) => err instanceof CanonicalizationError && err.reason === reason,
       token,
     );

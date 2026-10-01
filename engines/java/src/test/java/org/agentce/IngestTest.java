@@ -15,7 +15,7 @@ class IngestTest {
     void bundleDigestIsTheCanonicalSha256OfTheManifest() {
         assertEquals(
                 "sha256:3b1a171abe9f0d3f1945a353c4b608d1f7e8bbaf526053f7280c9f92d8ee94be",
-                Bundle.load(BUNDLE).digest);
+                Bundle.load(BUNDLE).digest());
     }
 
     @Test

@@ -507,7 +507,7 @@ public final class Cli {
         Bundle bundle = Bundle.load(Paths.get(bundleDir)); // raises InputError (exit 3) on a missing/mismatching manifest
         Ingest.Result ingested = Ingest.ingest(bundle);
         result.data.put("bundle", bundleDir);
-        result.data.put("bundle_digest", bundle.digest);
+        result.data.put("bundle_digest", bundle.digest());
         result.data.put("accepted", ingested.accepted.size());
         result.data.put("quarantined", ingested.quarantined.size());
         ObjectNode quarantineByReason = result.data.putObject("quarantine_by_reason");
@@ -603,7 +603,7 @@ public final class Cli {
         List<String> supersedes = List.of();
         if (options.state() != null) {
             state = StateDir.load(Paths.get(options.state())); // incompatible state_version aborts with exit 3
-            supersedes = state.plan(bundle.digest, ingested.accepted, newWindowEnd);
+            supersedes = state.plan(bundle.digest(), ingested.accepted, newWindowEnd);
         }
 
         String operatorEnv = System.getenv("AGENTCE_OPERATOR");
@@ -611,12 +611,12 @@ public final class Cli {
         ObjectNode activity = Activity.summarizeActivity(ingested.accepted, profileObj);
         ObjectNode blindSpots = BlindSpots.computeBlindSpots(evaluated, profileObj, resolved.catalogs(), ingested.accepted);
         Report.writeReport(
-                out, evaluated, bundle.digest, resolved.labels(),
+                out, evaluated, bundle.digest(), resolved.labels(),
                 operatorEnv != null ? operatorEnv : "unknown",
                 invocation, supersedes, Messages.DEFAULT_LANGUAGE, resolved.catalogs(), activity, blindSpots,
                 profileObj, null, ingested.accepted);
         if (state != null) {
-            state.record(bundle.digest, out.resolve("manifest.json"), newWindowEnd);
+            state.record(bundle.digest(), out.resolve("manifest.json"), newWindowEnd);
         }
 
         int nonConformant = 0;
@@ -627,7 +627,7 @@ public final class Cli {
         }
         Verdict.Summary summary = Verdict.summarize(evaluated);
         result.data.put("bundle", bundleDir);
-        result.data.put("bundle_digest", bundle.digest);
+        result.data.put("bundle_digest", bundle.digest());
         result.data.put("profile", profilePath);
         ArrayNode catalogsArr = result.data.putArray("catalogs");
         resolved.labels().forEach(catalogsArr::add);
