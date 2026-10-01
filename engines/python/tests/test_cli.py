@@ -145,6 +145,31 @@ def test_verify_empty_value_with_a_second_real_target_uses_the_real_one(
     assert "catalog" not in env
 
 
+def test_verify_repeated_target_flag_refuses(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """`--catalog A --catalog B` used to silently take argparse's default last-value-wins behaviour,
+    which TypeScript's and Java's own first-occurrence argv scan disagreed with for the identical
+    command line; now all three refuse (verifier round 2, 18.65)."""
+    code, env = run(["verify", "--catalog", "a", "--catalog", "b", "--json"], capsys)
+    assert code == 3
+    assert env["error"]["key"] == "input.verify_target"
+
+
+def test_verify_equals_form_target_flag(
+    make_bundle: Callable[..., Path],
+    example_event: dict[str, Any],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """`--bundle=<dir>` (argparse's native `=` syntax) must verify the same bundle `--bundle <dir>`
+    would -- TypeScript's and Java's own argv scanners had no `=` support at all for this flag,
+    diverging from Python's already-accepted syntax (verifier round 2, 18.65)."""
+    bundle = make_bundle([example_event])
+    code, env = run(["verify", f"--bundle={bundle}", "--json"], capsys)
+    assert code in (0, 1)
+    assert "bundle" in env
+
+
 def test_verify_bundle(
     make_bundle: Callable[..., Path],
     example_event: dict[str, Any],

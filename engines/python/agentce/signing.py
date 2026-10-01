@@ -571,5 +571,8 @@ def load_trust_root(path: Path) -> TrustRoot:
         raise VerificationError(f"{path} does not hold a trust-root object")
     try:
         return TrustRoot.from_dict(data)
-    except (KeyError, TypeError, ValueError) as exc:
+    except (AttributeError, KeyError, TypeError, ValueError) as exc:
+        # `from_dict` assumes `keys`/`certificate_authorities` are objects and each entry is one too
+        # (verifier round 2, 18.65): a tampered `keys: "x"` reaches `.items()` on a string, which is
+        # `AttributeError`, not one of the JSON-decode-shaped errors already caught here.
         raise VerificationError(f"{path} is not a usable trust root: {exc}") from exc

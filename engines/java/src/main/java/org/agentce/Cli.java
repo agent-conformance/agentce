@@ -180,6 +180,43 @@ public final class Cli {
         return out;
     }
 
+    /** Every value for a {@code --name} or {@code --name=value} token in {@code args}, in order --
+     * {@code cmdVerify}'s own target flags need {@code =} support and repeat detection that {@link
+     * #flagValue}/{@link #flagValues} (shared CLI-wide, out of scope for this item) don't provide
+     * (verifier round 2, 18.65). */
+    private static List<String> verifyTargetFlagValues(String[] args, String name) {
+        List<String> out = new ArrayList<>();
+        String bare = "--" + name;
+        String prefix = bare + "=";
+        for (int i = 0; i < args.length; i++) {
+            String token = args[i];
+            if (bare.equals(token)) {
+                if (i + 1 < args.length) {
+                    out.add(args[i + 1]);
+                    i++;
+                }
+            } else if (token.startsWith(prefix)) {
+                out.add(token.substring(prefix.length()));
+            }
+        }
+        return out;
+    }
+
+    /** {@code cmdVerify}'s own reader for a target flag: refuses a repeated {@code --name}/{@code
+     * --name=value} instead of silently keeping the first occurrence (the same input Python's {@code
+     * _verify_target_flag} now refuses too, verifier round 2, 18.65), and normalizes an empty value to
+     * {@code null} (F4, 18.65). */
+    private static String verifyTargetFlag(String[] args, String name) {
+        List<String> values = verifyTargetFlagValues(args, name);
+        if (values.size() > 1) {
+            throw new InputError(
+                    "input.verify_target",
+                    "--" + name + " was given more than once.",
+                    "pass --" + name + " <path> once.");
+        }
+        return emptyToNull(values.isEmpty() ? null : values.get(0));
+    }
+
     private static String requireDir(String raw, String key, String what) {
         return requireDir(raw, key, what, "pass --" + key + " <dir>.");
     }
@@ -1333,10 +1370,10 @@ public final class Cli {
         // must never fall through to `requireDir`/`Files.exists`, where `Paths.get("")` resolves to
         // the current working directory and a catalog or release check could wrongly verify it (F4,
         // 18.65).
-        String bundle = emptyToNull(flagValue(args, "bundle"));
-        String catalog = emptyToNull(flagValue(args, "catalog"));
-        String release = emptyToNull(flagValue(args, "release"));
-        String report = emptyToNull(flagValue(args, "report"));
+        String bundle = verifyTargetFlag(args, "bundle");
+        String catalog = verifyTargetFlag(args, "catalog");
+        String release = verifyTargetFlag(args, "release");
+        String report = verifyTargetFlag(args, "report");
         int chosenCount = (bundle != null ? 1 : 0) + (catalog != null ? 1 : 0)
                 + (release != null ? 1 : 0) + (report != null ? 1 : 0);
         if (chosenCount != 1) {

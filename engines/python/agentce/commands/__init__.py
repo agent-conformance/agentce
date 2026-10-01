@@ -176,10 +176,21 @@ def _opt_str(ns: argparse.Namespace, name: str) -> str | None:
     return None if value is None else str(value)
 
 
-def _opt_str_nonempty(ns: argparse.Namespace, name: str) -> str | None:
-    """Like `_opt_str`, but an empty string is treated as not given -- TypeScript's and Java's
-    `emptyToUndefined` (verifier round 1, 18.65)."""
-    return _opt_str(ns, name) or None
+def _verify_target_flag(ns: argparse.Namespace, name: str) -> str | None:
+    """`cmd_verify`'s own target flags (`--bundle`/`--catalog`/`--release`/`--report`) are
+    `action="append"` (see `cli.py`), so an empty value normalizes the same way `_opt_str_nonempty`
+    would (TypeScript's/Java's `emptyToUndefined`, verifier round 1, 18.65), and a repeated flag
+    refuses instead of argparse's default `store` silently keeping only the last value -- `--catalog A
+    --catalog B` must not give a different, unlabelled answer from TypeScript's/Java's own refusal for
+    the same command line (verifier round 2, 18.65)."""
+    values: list[str] | None = getattr(ns, name, None)
+    if values and len(values) > 1:
+        raise InputError(
+            "input.verify_target",
+            f"--{name} was given more than once.",
+            f"pass --{name} <path> once.",
+        )
+    return (values[0] or None) if values else None
 
 
 def _flag(ns: argparse.Namespace, name: str) -> bool:
@@ -264,10 +275,10 @@ def cmd_verify(ns: argparse.Namespace) -> CommandResult:
     # `is not None`, so leaving an empty string as itself (rather than None) would let a second,
     # truthy target lose the exactly-one selection below and still be shadowed by the empty one's
     # own `is not None` branch.
-    bundle = _opt_str_nonempty(ns, "bundle")
-    catalog = _opt_str_nonempty(ns, "catalog")
-    release = _opt_str_nonempty(ns, "release")
-    report = _opt_str_nonempty(ns, "report")
+    bundle = _verify_target_flag(ns, "bundle")
+    catalog = _verify_target_flag(ns, "catalog")
+    release = _verify_target_flag(ns, "release")
+    report = _verify_target_flag(ns, "report")
     chosen = [
         name
         for name, value in (
@@ -587,8 +598,16 @@ def _verify_report(
         fix="regenerate the report with `agentce assess`.",
     )
     claim_body = {k: v for k, v in claim.items() if k != "signatures"}
+    try:
+        claim_body_canonical = canonicalize(claim_body)
+    except CanonicalizationError:
+        raise InputError(
+            "verify.report_claim_tampered",
+            "claim.json does not match the digest the signature covers.",
+            "the claim was altered after signing; regenerate and re-sign the report.",
+        ) from None
     if (
-        hashlib.sha256(canonicalize(claim_body)).hexdigest()
+        hashlib.sha256(claim_body_canonical).hexdigest()
         != subject_map["claim.json"]["digest"]["sha256"]
     ):
         raise InputError(

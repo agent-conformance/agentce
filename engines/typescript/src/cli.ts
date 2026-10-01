@@ -108,6 +108,42 @@ function flagValues(argv: string[], name: string): string[] {
   return out;
 }
 
+/** Every value for a `--name` or `--name=value` token in argv, in order -- `cmdVerify`'s own target
+ * flags need `=` support and repeat detection that `flagValue`/`flagValues` (shared CLI-wide, out of
+ * scope for this item) don't provide (verifier round 2, 18.65). */
+function verifyTargetFlagValues(argv: string[], name: string): string[] {
+  const out: string[] = [];
+  const bare = `--${name}`;
+  const prefix = `${bare}=`;
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i] as string;
+    if (token === bare) {
+      if (i + 1 < argv.length) {
+        out.push(argv[i + 1] as string);
+        i++;
+      }
+    } else if (token.startsWith(prefix)) {
+      out.push(token.slice(prefix.length));
+    }
+  }
+  return out;
+}
+
+/** `cmdVerify`'s own reader for a target flag: refuses a repeated `--name`/`--name=value` instead of
+ * silently keeping the first occurrence (the same input Python's `_verify_target_flag` now refuses
+ * too, verifier round 2, 18.65), and normalizes an empty value to `undefined` (F4, 18.65). */
+function verifyTargetFlag(argv: string[], name: string): string | undefined {
+  const values = verifyTargetFlagValues(argv, name);
+  if (values.length > 1) {
+    throw new InputError(
+      "input.verify_target",
+      `--${name} was given more than once.`,
+      `pass --${name} <path> once.`,
+    );
+  }
+  return emptyToUndefined(values[0]);
+}
+
 function requireDir(
   raw: string | undefined,
   key: string,
@@ -1172,10 +1208,10 @@ function cmdVerify(argv: string[]): CommandResult {
   const result = new CommandResult("verify");
   // An empty value (`--catalog ""`) is treated as not provided (F4, 18.65): otherwise it would fall
   // through to `requireDir`, which refuses it under a different key than the other two engines.
-  const bundle = emptyToUndefined(flagValue(argv, "bundle"));
-  const catalog = emptyToUndefined(flagValue(argv, "catalog"));
-  const release = emptyToUndefined(flagValue(argv, "release"));
-  const report = emptyToUndefined(flagValue(argv, "report"));
+  const bundle = verifyTargetFlag(argv, "bundle");
+  const catalog = verifyTargetFlag(argv, "catalog");
+  const release = verifyTargetFlag(argv, "release");
+  const report = verifyTargetFlag(argv, "report");
   const chosenCount = [bundle, catalog, release, report].filter((v) => v !== undefined).length;
   if (chosenCount !== 1) {
     throw new InputError(

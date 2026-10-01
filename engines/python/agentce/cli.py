@@ -161,11 +161,19 @@ def build_parser() -> argparse.ArgumentParser:
         "every canonical output byte for byte (verify.report_reproduction_mismatch); "
         "(9) success (`reproduced: true`).",
     )
-    p.add_argument("--bundle", help="verify an evidence bundle's integrity")
-    p.add_argument("--catalog", help="verify a catalog's signatures")
-    p.add_argument("--release", help="verify a release artifact's signatures")
+    # `action="append"` (rather than the default `store`, which would silently keep only the last
+    # value) lets `cmd_verify` detect and refuse a repeated target flag instead of picking a winner
+    # TypeScript/Java don't agree on (verifier round 2, 18.65).
+    p.add_argument(
+        "--bundle", action="append", help="verify an evidence bundle's integrity"
+    )
+    p.add_argument("--catalog", action="append", help="verify a catalog's signatures")
+    p.add_argument(
+        "--release", action="append", help="verify a release artifact's signatures"
+    )
     p.add_argument(
         "--report",
+        action="append",
         help="re-run a shareable report bundle (assess --package-for-sharing) offline and check "
         "it reproduces byte for byte, refusing any tampering",
     )

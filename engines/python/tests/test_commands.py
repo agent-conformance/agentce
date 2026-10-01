@@ -909,6 +909,24 @@ def test_verify_report_signed_signatures_shape_tamper(
     assert envelope["error"]["key"] == expected_key
 
 
+def test_verify_report_claim_body_noncanonical_number_is_tampered_not_a_crash(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A float spliced into an already-*signed* claim.json's body (no re-signing): `canonicalize`
+    refuses any non-integer number, and `_verify_report` called it unguarded while recomputing the
+    claim digest, crashing `internal.unexpected: CanonicalizationError` instead of refusing with the
+    same `verify.report_claim_tampered` key a digest mismatch already uses (verifier round 2,
+    18.65) -- a tampered body that cannot even be canonicalized can never match the recorded digest
+    either way."""
+    out, _key = _packaged_and_signed(tmp_path)
+    claim = json.loads((out / "claim.json").read_text(encoding="utf-8"))
+    claim["not_canonical"] = 1.5
+    (out / "claim.json").write_text(json.dumps(claim), encoding="utf-8")
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert envelope["error"]["key"] == "verify.report_claim_tampered"
+
+
 @pytest.mark.parametrize("tampered_file", ["report.md", "packaging.json"])
 def test_verify_report_output_tampered(
     tmp_path: Path, tampered_file: str, capsys: pytest.CaptureFixture[str]
@@ -1086,6 +1104,22 @@ def test_verify_report_forged_keyid_trust_root_is_refused(
     # `TrustRoot.from_dict`'s own content-addressed invariant must refuse this before
     # verification even starts -- assert THIS exact key, not `verify.report_signature_invalid`
     # (round-2 critic defect 2, the live-forged-signature bypass).
+    assert envelope["error"]["key"] == "input.trust_root_invalid"
+
+
+def test_verify_report_trust_root_malformed_keys_field(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A trust root whose `keys` field is a string, not an object: `TrustRoot.from_dict` calls
+    `(data.get("keys") or {}).items()`, so a truthy non-dict reaches `.items()` directly and crashed
+    `internal.unexpected: AttributeError` instead of refusing with `input.trust_root_invalid`, the
+    key the docstring already promises for every malformed trust root (verifier round 2, 18.65)."""
+    out, _key = _packaged_and_signed(tmp_path)
+    tampered = json.loads((out / "trust-root.json").read_text(encoding="utf-8"))
+    tampered["keys"] = "x"
+    (out / "trust-root.json").write_text(json.dumps(tampered), encoding="utf-8")
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
     assert envelope["error"]["key"] == "input.trust_root_invalid"
 
 
