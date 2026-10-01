@@ -90,6 +90,13 @@ function flagValue(argv: string[], name: string): string | undefined {
   return index >= 0 && index + 1 < argv.length ? argv[index + 1] : undefined;
 }
 
+/** `undefined` stays `undefined`; an empty string becomes `undefined` too, matching the Python
+ * reference's `if value` truthiness check (`commands/__init__.py:261-269`), which has no TypeScript
+ * equivalent. */
+function emptyToUndefined(value: string | undefined): string | undefined {
+  return value === undefined || value === "" ? undefined : value;
+}
+
 /** Every value following a (repeatable) `--name` in argv, in order. */
 function flagValues(argv: string[], name: string): string[] {
   const out: string[] = [];
@@ -1163,10 +1170,12 @@ function cmdSign(argv: string[]): CommandResult {
  * disposition) and falls to {@link notImplemented} once validation passes. */
 function cmdVerify(argv: string[]): CommandResult {
   const result = new CommandResult("verify");
-  const bundle = flagValue(argv, "bundle");
-  const catalog = flagValue(argv, "catalog");
-  const release = flagValue(argv, "release");
-  const report = flagValue(argv, "report");
+  // An empty value (`--catalog ""`) is treated as not provided (F4, 18.65): otherwise it would fall
+  // through to `requireDir`, which refuses it under a different key than the other two engines.
+  const bundle = emptyToUndefined(flagValue(argv, "bundle"));
+  const catalog = emptyToUndefined(flagValue(argv, "catalog"));
+  const release = emptyToUndefined(flagValue(argv, "release"));
+  const report = emptyToUndefined(flagValue(argv, "report"));
   const chosenCount = [bundle, catalog, release, report].filter((v) => v !== undefined).length;
   if (chosenCount !== 1) {
     throw new InputError(

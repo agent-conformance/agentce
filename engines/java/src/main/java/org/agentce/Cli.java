@@ -3,6 +3,7 @@ package org.agentce;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -159,6 +160,12 @@ public final class Cli {
     private static String flagValue(String[] args, String name) {
         int index = Arrays.asList(args).indexOf("--" + name);
         return index >= 0 && index + 1 < args.length ? args[index + 1] : null;
+    }
+
+    /** {@code null} stays {@code null}; an empty string becomes {@code null} too (Python's `if
+     * value` truthiness check has no Java equivalent, so callers that need it call this explicitly). */
+    private static String emptyToNull(String value) {
+        return value == null || value.isEmpty() ? null : value;
     }
 
     /** Every value following a (repeatable) {@code --name} in {@code args}, in order. */
@@ -1321,10 +1328,15 @@ public final class Cli {
      * validation passes. Mirrors {@code cli.ts}'s {@code cmdVerify} exactly. */
     private static CommandResult cmdVerify(String[] args) {
         CommandResult result = new CommandResult("verify");
-        String bundle = flagValue(args, "bundle");
-        String catalog = flagValue(args, "catalog");
-        String release = flagValue(args, "release");
-        String report = flagValue(args, "report");
+        // An empty value (`--catalog ""`) is treated as not provided, matching the Python
+        // reference's `if value` truthiness check (`commands/__init__.py:261-269`): an empty string
+        // must never fall through to `requireDir`/`Files.exists`, where `Paths.get("")` resolves to
+        // the current working directory and a catalog or release check could wrongly verify it (F4,
+        // 18.65).
+        String bundle = emptyToNull(flagValue(args, "bundle"));
+        String catalog = emptyToNull(flagValue(args, "catalog"));
+        String release = emptyToNull(flagValue(args, "release"));
+        String report = emptyToNull(flagValue(args, "report"));
         int chosenCount = (bundle != null ? 1 : 0) + (catalog != null ? 1 : 0)
                 + (release != null ? 1 : 0) + (report != null ? 1 : 0);
         if (chosenCount != 1) {
@@ -1383,13 +1395,20 @@ public final class Cli {
         }
 
         if (release != null) {
-            if (!Files.exists(Paths.get(release))) {
+            Path releasePath = Paths.get(release);
+            // `Paths.get("file.tar/")` drops the trailing slash while building the path, so
+            // `Files.exists` alone would say a plain file "exists" even though a trailing slash
+            // asserts a directory; a trailing slash on something that is not a directory must refuse,
+            // matching the raw-string `os.path.exists` check in the Python reference (F5, 18.65).
+            boolean trailingSlashOnNonDirectory =
+                    (release.endsWith("/") || release.endsWith(File.separator)) && !Files.isDirectory(releasePath);
+            if (!Files.exists(releasePath) || trailingSlashOnNonDirectory) {
                 throw new InputError(
                         "input.release_missing",
                         "the release artifact " + Readiness.pyRepr(Json.nodes().textNode(release)) + " does not exist.",
                         "pass --release <bundle-dir-or-envelope>.");
             }
-            ObjectNode outcome = Verify.verifyRelease(Paths.get(release), Verify.vendoredTrust());
+            ObjectNode outcome = Verify.verifyRelease(releasePath, Verify.vendoredTrust());
             result.data.setAll(outcome);
             if (outcome.path("verified").asBoolean(false)) {
                 if (outcome.has("signer")) {
