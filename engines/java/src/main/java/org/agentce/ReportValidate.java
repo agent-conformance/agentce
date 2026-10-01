@@ -119,15 +119,82 @@ public final class ReportValidate {
         return out.toString();
     }
 
-    private static List<String> schemaProblems(String prefix, Set<ValidationMessage> errors) {
-        List<Map.Entry<String, ValidationMessage>> entries = new ArrayList<>();
-        for (ValidationMessage m : errors) {
-            entries.add(Map.entry(location(m.getInstanceLocation()), m));
+    private static boolean isDigits(String s) {
+        if (s.isEmpty()) {
+            return false;
         }
-        entries.sort((a, b) -> Json.byteCompare(a.getKey(), b.getKey()));
+        for (int i = 0; i < s.length(); i++) {
+            if (!Character.isDigit(s.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Compares two {@code /}-joined locations segment by segment, comparing a pair of all-digit
+     * segments (an array index) as numbers rather than bytes, so {@code results/2} sorts before
+     * {@code results/10} -- matching Python's {@code absolute_path}, whose array-index elements are
+     * already native ints (P18-18.27 verifier round 1). */
+    private static int compareLocations(String a, String b) {
+        String[] segmentsA = a.split("/");
+        String[] segmentsB = b.split("/");
+        int len = Math.min(segmentsA.length, segmentsB.length);
+        for (int i = 0; i < len; i++) {
+            String segA = segmentsA[i];
+            String segB = segmentsB[i];
+            if (isDigits(segA) && isDigits(segB)) {
+                int diff = Long.compare(Long.parseLong(segA), Long.parseLong(segB));
+                if (diff != 0) {
+                    return diff;
+                }
+                continue;
+            }
+            int diff = Json.byteCompare(segA, segB);
+            if (diff != 0) {
+                return diff;
+            }
+        }
+        return Integer.compare(segmentsA.length, segmentsB.length);
+    }
+
+    /** The schema-location prefix before an {@code anyOf}/{@code oneOf} keyword segment, or {@code
+     * null} when {@code m} is not one of that combinator's per-branch errors (networknt, unlike Ajv,
+     * never reports the combinator failure itself as its own message -- only each branch's own
+     * errors, confirmed empirically against the vendored SARIF schema's {@code region} field). */
+    private static String combinatorGroupKey(ValidationMessage m) {
+        String schemaLocation = m.getSchemaLocation().toString();
+        var matcher = java.util.regex.Pattern.compile("/(anyOf|oneOf)/\\d+").matcher(schemaLocation);
+        if (!matcher.find()) {
+            return null;
+        }
+        return location(m.getInstanceLocation()) + "::" + schemaLocation.substring(0, matcher.start()) + "/"
+                + matcher.group(1);
+    }
+
+    private record LocatedProblem(String location, String message) {}
+
+    /** An {@code anyOf}/{@code oneOf} failure's per-branch errors are collapsed into one combinator
+     * error per group, matching Python's {@code iter_errors} (which never expands a combinator
+     * failure into its branch errors) and the TypeScript port's {@code collapseCombinatorErrors} --
+     * the one rule all three engines' validators follow at parity (P18-18.27 verifier round 1). */
+    private static List<String> schemaProblems(String prefix, Set<ValidationMessage> errors) {
+        Map<String, String> combinatorLocations = new LinkedHashMap<>();
+        List<LocatedProblem> entries = new ArrayList<>();
+        for (ValidationMessage m : errors) {
+            String groupKey = combinatorGroupKey(m);
+            if (groupKey != null) {
+                combinatorLocations.putIfAbsent(groupKey, location(m.getInstanceLocation()));
+            } else {
+                entries.add(new LocatedProblem(location(m.getInstanceLocation()), m.getMessage()));
+            }
+        }
+        for (String loc : combinatorLocations.values()) {
+            entries.add(new LocatedProblem(loc, "does not match any of the required alternatives"));
+        }
+        entries.sort((a, b) -> compareLocations(a.location(), b.location()));
         List<String> out = new ArrayList<>();
-        for (Map.Entry<String, ValidationMessage> e : entries) {
-            out.add(prefix + e.getKey() + ": " + e.getValue().getMessage());
+        for (LocatedProblem e : entries) {
+            out.add(prefix + e.location() + ": " + e.message());
         }
         return out;
     }

@@ -310,4 +310,69 @@ class ReportValidateTest {
         assertEquals(3, env.get("exit_code").asInt());
         assertEquals("input.validate_not_a_directory", env.get("error").get("message_key").asText());
     }
+
+    @Test
+    void case22TwoLocalStageViolationsInOneFileAreBothReportedLocated(@TempDir Path out) throws IOException {
+        freshFullReport(out);
+        Path path = out.resolve("assertions.json");
+        ArrayNode assertions = (ArrayNode) Json.parse(Files.readString(path));
+        ((ObjectNode) assertions.get(0)).remove("control");
+        ((ObjectNode) assertions.get(1)).remove("control");
+        Files.writeString(path, assertions.toString());
+        List<String> problems = ReportValidate.validateReport(out).stream()
+                .filter(p -> p.startsWith("assertions.json:"))
+                .toList();
+        assertEquals(
+                List.of(
+                        "assertions.json: 0: $[0]: required property 'control' not found",
+                        "assertions.json: 1: $[1]: required property 'control' not found"),
+                problems);
+    }
+
+    @Test
+    void case23AnyOfFailureAtRealSchemaStageCollapsesToOneCombinatorProblem(@TempDir Path out) throws IOException {
+        freshFullReport(out);
+        Path path = out.resolve("results.sarif");
+        ObjectNode sarif = readObject(path);
+        ArrayNode runs = (ArrayNode) sarif.get("runs");
+        ArrayNode results = (ArrayNode) ((ObjectNode) runs.get(0)).get("results");
+        ObjectNode physicalLocation = (ObjectNode) ((ObjectNode) ((ArrayNode) ((ObjectNode) results.get(0)).get("locations"))
+                .get(0))
+                .get("physicalLocation");
+        physicalLocation.set("region", Json.nodes().objectNode());
+        Files.writeString(path, sarif.toString());
+        List<String> problems = ReportValidate.validateReport(out).stream()
+                .filter(p -> p.startsWith("results.sarif (OASIS SARIF 2.1.0):"))
+                .toList();
+        assertEquals(
+                List.of(
+                        "results.sarif (OASIS SARIF 2.1.0): runs/0/results/0/locations/0/physicalLocation/region: "
+                                + "does not match any of the required alternatives"),
+                problems);
+    }
+
+    @Test
+    void case24RealSchemaViolationsAtIndices2And10SortNumerically(@TempDir Path out) throws IOException {
+        freshFullReport(out);
+        Path path = out.resolve("results.sarif");
+        ObjectNode sarif = readObject(path);
+        ArrayNode runs = (ArrayNode) sarif.get("runs");
+        ArrayNode results = (ArrayNode) ((ObjectNode) runs.get(0)).get("results");
+        // The lightweight fixture this suite's own `assess` run produces may have fewer than 11
+        // results; pad it with clones of the last one so indices 2 and 10 both exist.
+        while (results.size() <= 10) {
+            results.add(results.get(results.size() - 1).deepCopy());
+        }
+        ((ObjectNode) ((ObjectNode) results.get(2)).get("message")).remove("text");
+        ((ObjectNode) ((ObjectNode) results.get(10)).get("message")).remove("text");
+        Files.writeString(path, sarif.toString());
+        List<String> problems = ReportValidate.validateReport(out).stream()
+                .filter(p -> p.startsWith("results.sarif:"))
+                .toList();
+        assertEquals(
+                List.of(
+                        "results.sarif: runs/0/results/2/message: $.runs[0].results[2].message: required property 'text' not found",
+                        "results.sarif: runs/0/results/10/message: $.runs[0].results[10].message: required property 'text' not found"),
+                problems);
+    }
 }
