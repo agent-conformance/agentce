@@ -8,7 +8,10 @@ canonicalisation. Its evidence packs are byte-identical too, and its `oscal-ar.j
 
 The engine also implements `assess`, `validate`, `report`, and `quickstart` on the same evaluation path,
 so you can assess an agent's own evidence with it directly. This includes `report --validate` (schema
-validation of the report artifacts); see the [main quickstart](quickstart.md).
+validation of the report artifacts); see the [main quickstart](quickstart.md). It reports the same
+problems as the Python engine when a report file can be read. A damaged file, such as one with bytes
+that are not valid UTF-8 or a CSV, XML or JSONL file in an unusual shape, can still get a different
+answer, so check it with the Python engine.
 
 ## Prerequisites
 

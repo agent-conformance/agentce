@@ -7,7 +7,10 @@ The engine ships a single command-line tool, `agentce`. Every command supports `
 and returns a documented exit code. The commands below use the Python engine. The TypeScript and Java
 engines implement the same commands (`assess`, `validate`, `report`, `report --validate`, and
 `quickstart`) on the same evaluation path, and their `conformance run` command produces byte-identical
-`assertions.json` files over the simulated corpus.
+`assertions.json` files over the simulated corpus. One difference remains. On a damaged report file, such
+as one with bytes that are not valid UTF-8 or a CSV, XML or JSONL file in an unusual shape,
+`report --validate` in TypeScript or Java can disagree with Python. Check such a file with the
+Python engine.
 
 ## Declare an applicability profile
 
