@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.18.0",
+  "suite_version": "0.20.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -746,6 +746,36 @@
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; tools/skill_release_shape_check.py builds the release-shaped commit and runs the standalone install, tools/vendor_skill_engine.py builds and checks the wheel itself, and skills/README.md 'Install and pin (S-10)' documents the release procedure this gate proves."
+    },
+    {
+      "id": "VG-CRYPTO-INTEL-WHEEL",
+      "title": "Every tracked uv.lock resolving cryptography still resolves a real Intel-macOS wheel (ADR-0024)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/cryptography_intel_wheel.sh"
+      ],
+      "requires": [
+        "python3",
+        "uv",
+        "git"
+      ],
+      "timeout_s": 120,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every tracked uv.lock that names cryptography (engines/python and adapters/supply-chain, which pin the platform-marker split directly, plus every other workspace that resolves it transitively through the editable agent-conformance dependency) resolves at least one cryptography wheel tagged macosx_*_universal2 or macosx_*_x86_64, so a fresh install on an Intel Mac never falls back to a source build; the check's own self-test proves its matcher discriminates a lock with such a wheel from one that resolves only Linux/Windows/arm64 wheels",
+        "fail": "any tracked lock naming cryptography resolves no Intel-macOS wheel (a later version bump dropped the platform split, or a new workspace's lock was never generated against the split pyproject.toml), or the self-test's seeded fault (the matcher always reporting no problem) fails to turn the check red"
+      },
+      "faults": [
+        {
+          "description": "the matcher stops checking lock text for an Intel-macOS wheel and always reports no problem, so a later cryptography bump that drops the platform split in any tracked lock would pass silently",
+          "file": "tools/cryptography_intel_wheel_check.py",
+          "search": "    return bool(NAMES_CRYPTOGRAPHY.search(lock_text)) and not INTEL_WHEEL.search(\n        lock_text\n    )",
+          "replace": "    return False"
+        }
+      ],
+      "fix_hint": "Run the gate's command and read the FAIL lines; tools/cryptography_intel_wheel_check.py names each offending uv.lock, which needs `uv lock` run inside it once its editable agent-conformance dependency (engines/python/pyproject.toml, ADR-0024) carries the platform split again."
     }
   ]
 }

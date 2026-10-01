@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.20.0
+
+- Added `VG-CRYPTO-INTEL-WHEEL`: every tracked `uv.lock` that resolves `cryptography` resolves a real
+  Intel-macOS wheel (item 18.58). ADR-0024 split `engines/python/pyproject.toml` and
+  `adapters/supply-chain/pyproject.toml`'s `cryptography` requirement by platform marker so Intel macOS
+  gets the last release with a prebuilt wheel (48.x); 18.55's verifier found 20 other tracked locks
+  across the workspace (adapters, conformance, corpus, docs, `engines/python-emit`, `spec/rules`, the
+  per-framework examples) still pinned to plain `cryptography==50.0.1` with no Intel wheel, because each
+  depends on `agent-conformance` transitively and nobody had re-locked them against the split. Its seeded
+  fault disables the matcher so it never reports a problem, so a later bump that drops the platform split
+  anywhere would otherwise pass silently.
+- `gates.json`'s `suite_version` is bumped from `0.18.0` to `0.20.0`, catching up the `0.19.0` bump
+  `VG-REPORT-VALIDATE` (below) recorded here without updating the field.
+
 ## 0.19.0
 
 - Added `VG-REPORT-VALIDATE`: `report --validate` performs real schema-validation of report
