@@ -748,7 +748,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
     )
 
     # target-argument (verify's own --catalog/--release/--bundle/--report value).
-    def report_placeholder(d: Path) -> Path:
+    def report_dir_unused(d: Path) -> Path:
         dest = d / "report-unused"
         dest.mkdir()
         return dest
@@ -795,7 +795,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         "report-empty",
         "target-argument",
         "empty",
-        report_placeholder,
+        report_dir_unused,
         target="report",
         arg=arg_empty,
     )
