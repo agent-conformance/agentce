@@ -108,32 +108,92 @@ function flagValues(argv: string[], name: string): string[] {
   return out;
 }
 
-/** Every value for a `--name` or `--name=value` token in argv, in order -- `cmdVerify`'s own target
- * flags need `=` support and repeat detection that `flagValue`/`flagValues` (shared CLI-wide, out of
- * scope for this item) don't provide (verifier round 2, 18.65). */
-function verifyTargetFlagValues(argv: string[], name: string): string[] {
-  const out: string[] = [];
-  const bare = `--${name}`;
-  const prefix = `${bare}=`;
-  for (let i = 0; i < argv.length; i++) {
-    const token = argv[i] as string;
-    if (token === bare) {
-      if (i + 1 < argv.length) {
-        out.push(argv[i + 1] as string);
-        i++;
-      }
-    } else if (token.startsWith(prefix)) {
-      out.push(token.slice(prefix.length));
-    }
-  }
-  return out;
+const VERIFY_TARGETS = ["bundle", "catalog", "release", "report"] as const;
+type VerifyTarget = (typeof VERIFY_TARGETS)[number];
+
+interface VerifyArgs {
+  targets: Record<VerifyTarget, string[]>;
+  signerTrustRoot: string | undefined;
+  expectKeyid: string | undefined;
 }
 
-/** `cmdVerify`'s own reader for a target flag: refuses a repeated `--name`/`--name=value` instead of
- * silently keeping the first occurrence (the same input Python's `_verify_target_flag` now refuses
- * too, verifier round 2, 18.65), and normalizes an empty value to `undefined` (F4, 18.65). */
-function verifyTargetFlag(argv: string[], name: string): string | undefined {
-  const values = verifyTargetFlagValues(argv, name);
+function verifyUnrecognized(detail: string, fix: string): InputError {
+  return new InputError("input.verify_unrecognized_flag", detail, fix);
+}
+
+/** `agentce verify`'s argv, read the way Python's `verify` subparser (argparse, `allow_abbrev=False`)
+ * reads it, so a command line gets one answer from all three engines (18.65 round 3): the four
+ * target flags take one value each and are collected so `verifyTarget` can refuse a repeat;
+ * `--signer-trust-root`/`--expect-keyid` take one value (the last one wins); `--json`/`--debug`/
+ * `--quiet` take none; a value is the next token or the `=`-joined rest. A flag missing its value or
+ * given one it takes none of refuses at once, as argparse does mid-parse; any other token (an
+ * unknown or abbreviated flag, `--`, a positional) refuses after the scan, naming the first one, as
+ * argparse reports what it left unparsed. */
+function parseVerifyArgv(argv: string[]): VerifyArgs {
+  const parsed: VerifyArgs = {
+    targets: { bundle: [], catalog: [], release: [], report: [] },
+    signerTrustRoot: undefined,
+    expectKeyid: undefined,
+  };
+  let unknown: string | undefined;
+  for (let i = 1; i < argv.length; i++) {
+    const token = argv[i] as string;
+    const eq = looksLikeOption(token) ? token.indexOf("=") : -1;
+    const name = eq >= 0 ? token.slice(0, eq) : token;
+    if (!looksLikeOption(token) || token === "--") {
+      unknown ??= token;
+      continue;
+    }
+    if (GLOBAL_BOOLEAN_FLAGS.has(name)) {
+      if (eq >= 0) {
+        throw verifyUnrecognized(`flag '${name}' takes no value.`, `drop the value: ${name}.`);
+      }
+      continue;
+    }
+    const flag = name.slice(2);
+    const isTarget = (VERIFY_TARGETS as readonly string[]).includes(flag);
+    if (!isTarget && flag !== "signer-trust-root" && flag !== "expect-keyid") {
+      unknown ??= token;
+      continue;
+    }
+    let value: string;
+    if (eq >= 0) {
+      value = token.slice(eq + 1);
+    } else {
+      const next = argv[i + 1];
+      if (next === undefined || looksLikeOption(next)) {
+        throw verifyUnrecognized(`flag '${name}' needs a value.`, `pass ${name} <value>.`);
+      }
+      value = next;
+      i++;
+    }
+    if (isTarget) {
+      parsed.targets[flag as VerifyTarget].push(value);
+    } else if (flag === "signer-trust-root") {
+      parsed.signerTrustRoot = value;
+    } else {
+      parsed.expectKeyid = value;
+    }
+  }
+  if (unknown !== undefined) {
+    throw unknown.startsWith("-") && unknown !== "-"
+      ? verifyUnrecognized(
+          `unrecognized flag '${unknown}'.`,
+          "pass --bundle, --catalog, --release, or --report (with --signer-trust-root or " +
+            "--expect-keyid for --report), or drop the flag.",
+        )
+      : verifyUnrecognized(
+          `unrecognized argument '${unknown}'.`,
+          "pass the target with its flag, e.g. `agentce verify --bundle <dir>`.",
+        );
+  }
+  return parsed;
+}
+
+/** One target flag's value: refuses a repeated `--name` (Python's `_verify_target_flag` too,
+ * verifier round 2, 18.65) and normalizes an empty value to `undefined` (F4, 18.65). */
+function verifyTarget(args: VerifyArgs, name: VerifyTarget): string | undefined {
+  const values = args.targets[name];
   if (values.length > 1) {
     throw new InputError(
       "input.verify_target",
@@ -1208,10 +1268,11 @@ function cmdVerify(argv: string[]): CommandResult {
   const result = new CommandResult("verify");
   // An empty value (`--catalog ""`) is treated as not provided (F4, 18.65): otherwise it would fall
   // through to `requireDir`, which refuses it under a different key than the other two engines.
-  const bundle = verifyTargetFlag(argv, "bundle");
-  const catalog = verifyTargetFlag(argv, "catalog");
-  const release = verifyTargetFlag(argv, "release");
-  const report = verifyTargetFlag(argv, "report");
+  const args = parseVerifyArgv(argv);
+  const bundle = verifyTarget(args, "bundle");
+  const catalog = verifyTarget(args, "catalog");
+  const release = verifyTarget(args, "release");
+  const report = verifyTarget(args, "report");
   const chosenCount = [bundle, catalog, release, report].filter((v) => v !== undefined).length;
   if (chosenCount !== 1) {
     throw new InputError(
@@ -1220,8 +1281,7 @@ function cmdVerify(argv: string[]): CommandResult {
       "pass exactly one target, e.g. `agentce verify --bundle <dir>`.",
     );
   }
-  const signerTrustRoot = flagValue(argv, "signer-trust-root");
-  const expectKeyid = flagValue(argv, "expect-keyid");
+  const { signerTrustRoot, expectKeyid } = args;
   if (report === undefined && (signerTrustRoot !== undefined || expectKeyid !== undefined)) {
     throw new InputError(
       "input.verify_target",

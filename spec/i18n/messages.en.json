@@ -87,6 +87,8 @@
   "errors.input.sign_profile.fix": "choose one of: sigstore-public, sigstore-private, kms.",
   "errors.input.sign_unrecognized_flag.cause": "sign was given a flag it does not recognize.",
   "errors.input.sign_unrecognized_flag.fix": "pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag.",
+  "errors.input.verify_unrecognized_flag.cause": "verify was given a flag it does not recognize.",
+  "errors.input.verify_unrecognized_flag.fix": "pass --bundle, --catalog, --release, or --report (with --signer-trust-root or --expect-keyid for --report), or drop the flag.",
   "errors.sign.trust_root_requires_kms.cause": "--write-trust-root needs an exportable public key; the sigstore-public profile has none.",
   "errors.sign.trust_root_requires_kms.fix": "pass --profile kms --key <ed25519-private-key.pem> --write-trust-root.",
   "errors.sign.key_unreadable.cause": "the signing key file could not be parsed as an unencrypted PEM private key.",

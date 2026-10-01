@@ -99,6 +99,17 @@ _sign_usage_error, _sign_unknown_error = _make_argv_errors(
     "pass exactly one report directory: `agentce sign <report-dir> --as claimant|assessor`.",
 )
 
+_VERIFY_FLAG_FIX = (
+    "pass --bundle, --catalog, --release, or --report (with --signer-trust-root or "
+    "--expect-keyid for --report), or drop the flag."
+)
+_verify_usage_error, _verify_unknown_error = _make_argv_errors(
+    "input.verify_unrecognized_flag",
+    _VERIFY_FLAG_FIX,
+    "<value>",
+    "pass the target with its flag, e.g. `agentce verify --bundle <dir>`.",
+)
+
 
 def _common_flags() -> _Parser:
     common = _Parser(add_help=False)
@@ -146,6 +157,11 @@ def build_parser() -> argparse.ArgumentParser:
         "verify",
         parents=[common],
         help="integrity or signature verification",
+        # No prefix matching, as for `readiness` and `sign`: TypeScript and Java read verify's argv
+        # with one declared grammar and refuse what argparse would refuse, so `--bun <dir>` is an
+        # unrecognized flag in all three engines, not a bundle in Python alone (18.65 round 3).
+        allow_abbrev=False,
+        on_error=_verify_usage_error,
         description="Integrity or signature verification. `--report <dir>` re-runs a shareable "
         "report bundle (`assess --package-for-sharing`) offline through nine stages, in order, "
         "each with its own message key: (1) the claim exists and is signed "
@@ -639,6 +655,7 @@ def _emit_error(err: AgentceError, *, command: str, want_json: bool) -> int:
 _UNKNOWN_ARGV_ERRORS: dict[str, Callable[[str], InputError]] = {
     "readiness": _readiness_unknown_error,
     "sign": _sign_unknown_error,
+    "verify": _verify_unknown_error,
 }
 
 
@@ -655,8 +672,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise unknown_error(unknown[0])
     except SystemExit as exc:  # argparse: -h/--version exit 0; usage errors exit 3
         return exc.code if isinstance(exc.code, int) else int(ExitCode.INPUT_ERROR)
-    except AgentceError as err:  # a keyed `readiness`/`sign` usage error (`_Parser`)
-        command = "sign" if err.key.startswith("input.sign_") else "readiness"
+    except (
+        AgentceError
+    ) as err:  # a keyed `readiness`/`sign`/`verify` usage error (`_Parser`)
+        command = err.key.removeprefix("input.").split("_", 1)[0]
         return _emit_error(err, command=command, want_json="--json" in args)
 
     debug = bool(getattr(ns, "debug", False))

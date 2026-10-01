@@ -56,6 +56,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.sign_role` | --as must be `claimant` or `assessor`. | pass --as claimant|assessor. |
 | `input.sign_unrecognized_flag` | sign was given a flag it does not recognize. | pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag. |
 | `input.trust_root_invalid` | the trust root supplied by --trust-root or AGENTCE_TRUST_ROOT could not be loaded. | pass --trust-root <file> pointing at a trust root in the form of the engine's vendored data/trust/dev-root.json. |
+| `input.verify_unrecognized_flag` | verify was given a flag it does not recognize. | pass --bundle, --catalog, --release, or --report (with --signer-trust-root or --expect-keyid for --report), or drop the flag. |
 | `internal.unexpected` | an unexpected internal error occurred. | re-run with --debug to see the stack trace, then file an issue. |
 | `sign.key_algorithm` | the signing key is not an Ed25519 private key. | supply an Ed25519 key (the algorithm the engine signs with, SPEC §8.7). |
 | `sign.key_unreadable` | the signing key file could not be parsed as an unencrypted PEM private key. | supply an unencrypted Ed25519 private key PEM (`openssl genpkey -algorithm ed25519 -out key.pem`, or `agentce catalog sign --new-key <path>`). |

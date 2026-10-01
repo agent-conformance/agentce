@@ -403,12 +403,14 @@ _RERUN_COMPARE_FILES = (
 )
 
 
-def _load_report_trust_root(path: Path) -> signing.TrustRoot:
+def _load_report_trust_root(path: str | Path) -> signing.TrustRoot:
     """Load a `verify --report` trust root (external `--signer-trust-root` or an embedded
     `trust-root.json`), reusing `input.trust_root_invalid` -- the same key `--trust-root`/
     `AGENTCE_TRUST_ROOT` already use for an unreadable or malformed file, including one
-    `TrustRoot.from_dict`'s own keyid invariant refuses as forged (signing.py)."""
-    if not path.is_file():
+    `TrustRoot.from_dict`'s own keyid invariant refuses as forged (signing.py). `--signer-trust-root`
+    arrives as the raw argv string: `os.path.isfile` sees an empty value and a trailing slash, which
+    `Path()` would turn into `.` and drop (the same reason `--release` checks the raw string, F5)."""
+    if not os.path.isfile(path):
         raise InputError(
             "input.trust_root_invalid",
             f"the trust root {str(path)!r} does not exist.",
@@ -416,7 +418,7 @@ def _load_report_trust_root(path: Path) -> signing.TrustRoot:
             "`sign --write-trust-root`.",
         )
     try:
-        return signing.load_trust_root(path)
+        return signing.load_trust_root(Path(path))
     except signing.VerificationError as exc:
         raise InputError(
             "input.trust_root_invalid",
@@ -554,7 +556,7 @@ def _verify_report(
 
     if trust_root_path is not None:
         trust_source = "external"
-        trust = _load_report_trust_root(Path(trust_root_path))
+        trust = _load_report_trust_root(trust_root_path)
     else:
         embedded_path = report_dir / "trust-root.json"
         if not embedded_path.is_file():

@@ -180,34 +180,86 @@ public final class Cli {
         return out;
     }
 
-    /** Every value for a {@code --name} or {@code --name=value} token in {@code args}, in order --
-     * {@code cmdVerify}'s own target flags need {@code =} support and repeat detection that {@link
-     * #flagValue}/{@link #flagValues} (shared CLI-wide, out of scope for this item) don't provide
-     * (verifier round 2, 18.65). */
-    private static List<String> verifyTargetFlagValues(String[] args, String name) {
-        List<String> out = new ArrayList<>();
-        String bare = "--" + name;
-        String prefix = bare + "=";
-        for (int i = 0; i < args.length; i++) {
-            String token = args[i];
-            if (bare.equals(token)) {
-                if (i + 1 < args.length) {
-                    out.add(args[i + 1]);
-                    i++;
-                }
-            } else if (token.startsWith(prefix)) {
-                out.add(token.substring(prefix.length()));
-            }
-        }
-        return out;
+    private static final List<String> VERIFY_TARGETS = List.of("bundle", "catalog", "release", "report");
+
+    private record VerifyArgs(Map<String, List<String>> targets, String signerTrustRoot, String expectKeyid) {}
+
+    private static InputError verifyUnrecognized(String detail, String fix) {
+        return new InputError("input.verify_unrecognized_flag", detail, fix);
     }
 
-    /** {@code cmdVerify}'s own reader for a target flag: refuses a repeated {@code --name}/{@code
-     * --name=value} instead of silently keeping the first occurrence (the same input Python's {@code
-     * _verify_target_flag} now refuses too, verifier round 2, 18.65), and normalizes an empty value to
-     * {@code null} (F4, 18.65). */
-    private static String verifyTargetFlag(String[] args, String name) {
-        List<String> values = verifyTargetFlagValues(args, name);
+    /** {@code agentce verify}'s args, read the way Python's {@code verify} subparser (argparse,
+     * {@code allow_abbrev=False}) reads them, so a command line gets one answer from all three engines
+     * (18.65 round 3): the four target flags take one value each and are collected so {@link
+     * #verifyTarget} can refuse a repeat; {@code --signer-trust-root}/{@code --expect-keyid} take one
+     * value (the last one wins); {@code --json}/{@code --debug}/{@code --quiet} take none; a value is
+     * the next token or the {@code =}-joined rest. A flag missing its value or given one it takes none
+     * of refuses at once, as argparse does mid-parse; any other token (an unknown or abbreviated flag,
+     * {@code --}, a positional) refuses after the scan, naming the first one, as argparse reports what
+     * it left unparsed. */
+    private static VerifyArgs parseVerifyArgs(String[] args) {
+        Map<String, List<String>> targets = new LinkedHashMap<>();
+        for (String target : VERIFY_TARGETS) {
+            targets.put(target, new ArrayList<>());
+        }
+        String signerTrustRoot = null;
+        String expectKeyid = null;
+        String unknown = null;
+        for (int i = 1; i < args.length; i++) {
+            String token = args[i];
+            if (!looksLikeOption(token) || token.equals("--")) {
+                unknown = unknown == null ? token : unknown;
+                continue;
+            }
+            int eq = token.indexOf('=');
+            String name = eq >= 0 ? token.substring(0, eq) : token;
+            if (GLOBAL_BOOLEAN_FLAGS.contains(name)) {
+                if (eq >= 0) {
+                    throw verifyUnrecognized("flag '" + name + "' takes no value.", "drop the value: " + name + ".");
+                }
+                continue;
+            }
+            String flag = name.startsWith("--") ? name.substring(2) : "";
+            boolean isTarget = VERIFY_TARGETS.contains(flag);
+            if (!isTarget && !flag.equals("signer-trust-root") && !flag.equals("expect-keyid")) {
+                unknown = unknown == null ? token : unknown;
+                continue;
+            }
+            String value;
+            if (eq >= 0) {
+                value = token.substring(eq + 1);
+            } else {
+                if (i + 1 >= args.length || looksLikeOption(args[i + 1])) {
+                    throw verifyUnrecognized("flag '" + name + "' needs a value.", "pass " + name + " <value>.");
+                }
+                value = args[++i];
+            }
+            if (isTarget) {
+                targets.get(flag).add(value);
+            } else if (flag.equals("signer-trust-root")) {
+                signerTrustRoot = value;
+            } else {
+                expectKeyid = value;
+            }
+        }
+        if (unknown != null) {
+            if (unknown.startsWith("-") && !unknown.equals("-")) {
+                throw verifyUnrecognized(
+                        "unrecognized flag '" + unknown + "'.",
+                        "pass --bundle, --catalog, --release, or --report (with --signer-trust-root or "
+                                + "--expect-keyid for --report), or drop the flag.");
+            }
+            throw verifyUnrecognized(
+                    "unrecognized argument '" + unknown + "'.",
+                    "pass the target with its flag, e.g. `agentce verify --bundle <dir>`.");
+        }
+        return new VerifyArgs(targets, signerTrustRoot, expectKeyid);
+    }
+
+    /** One target flag's value: refuses a repeated {@code --name} (Python's {@code _verify_target_flag}
+     * too, verifier round 2, 18.65) and normalizes an empty value to {@code null} (F4, 18.65). */
+    private static String verifyTarget(VerifyArgs parsed, String name) {
+        List<String> values = parsed.targets().get(name);
         if (values.size() > 1) {
             throw new InputError(
                     "input.verify_target",
@@ -1370,10 +1422,11 @@ public final class Cli {
         // must never fall through to `requireDir`/`Files.exists`, where `Paths.get("")` resolves to
         // the current working directory and a catalog or release check could wrongly verify it (F4,
         // 18.65).
-        String bundle = verifyTargetFlag(args, "bundle");
-        String catalog = verifyTargetFlag(args, "catalog");
-        String release = verifyTargetFlag(args, "release");
-        String report = verifyTargetFlag(args, "report");
+        VerifyArgs parsed = parseVerifyArgs(args);
+        String bundle = verifyTarget(parsed, "bundle");
+        String catalog = verifyTarget(parsed, "catalog");
+        String release = verifyTarget(parsed, "release");
+        String report = verifyTarget(parsed, "report");
         int chosenCount = (bundle != null ? 1 : 0) + (catalog != null ? 1 : 0)
                 + (release != null ? 1 : 0) + (report != null ? 1 : 0);
         if (chosenCount != 1) {
@@ -1382,8 +1435,8 @@ public final class Cli {
                     "verify needs exactly one of --bundle, --catalog, --release, or --report.",
                     "pass exactly one target, e.g. `agentce verify --bundle <dir>`.");
         }
-        String signerTrustRoot = flagValue(args, "signer-trust-root");
-        String expectKeyid = flagValue(args, "expect-keyid");
+        String signerTrustRoot = parsed.signerTrustRoot();
+        String expectKeyid = parsed.expectKeyid();
         if (report == null && (signerTrustRoot != null || expectKeyid != null)) {
             throw new InputError(
                     "input.verify_target",
