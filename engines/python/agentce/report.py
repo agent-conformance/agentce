@@ -20,6 +20,7 @@ import platform
 import unicodedata
 import uuid
 import xml.etree.ElementTree as ET
+from collections.abc import Iterable
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -3547,20 +3548,28 @@ _OscalArValidator = jsonschema.validators.extend(
 )
 
 
+def _schema_errors_to_problems(
+    errors: Iterable[jsonschema.exceptions.ValidationError],
+) -> list[str]:
+    """Every schema-validation error as ``"<location>: <message>"``, one per error, sorted by
+    location (array indices compared as numbers, so ``2`` sorts before ``10``) -- the one rule all
+    three engines' validators follow at parity (P18-18.27 verifier round 1): ``iter_errors`` never
+    expands an ``anyOf``/``oneOf`` failure's per-branch errors into the result on its own, so a
+    combinator failure is already exactly one error here, with no extra collapsing needed."""
+    ordered = sorted(errors, key=lambda e: list(e.absolute_path))
+    problems = []
+    for error in ordered:
+        location = "/".join(str(p) for p in error.absolute_path) or "<root>"
+        problems.append(f"{location}: {error.message}")
+    return problems
+
+
 def validate_oscal_ar_nist(document: dict[str, Any]) -> list[str]:
     """Validate ``document`` against the vendored NIST OSCAL 1.1.2 assessment-results schema
     (SPEC §9: "validate offline against vendored schemas"); return a list of problems, empty on
     success."""
     schema = _load_schema("oscal-assessment-results-nist-1.1.2")
-    errors = sorted(
-        _OscalArValidator(schema).iter_errors(document),
-        key=lambda e: list(e.absolute_path),
-    )
-    problems = []
-    for error in errors:
-        location = "/".join(str(p) for p in error.absolute_path) or "<root>"
-        problems.append(f"{location}: {error.message}")
-    return problems
+    return _schema_errors_to_problems(_OscalArValidator(schema).iter_errors(document))
 
 
 def validate_sarif_2_1_0(document: dict[str, Any]) -> list[str]:
@@ -3568,15 +3577,9 @@ def validate_sarif_2_1_0(document: dict[str, Any]) -> list[str]:
     offline against vendored schemas"), not just the bounded local profile; return a list of problems,
     empty on success."""
     schema = _load_schema("sarif-2.1.0")
-    errors = sorted(
-        jsonschema.Draft4Validator(schema).iter_errors(document),
-        key=lambda e: list(e.absolute_path),
+    return _schema_errors_to_problems(
+        jsonschema.Draft4Validator(schema).iter_errors(document)
     )
-    problems = []
-    for error in errors:
-        location = "/".join(str(p) for p in error.absolute_path) or "<root>"
-        problems.append(f"{location}: {error.message}")
-    return problems
 
 
 def _validate_xml_wellformed(path: Path) -> list[str]:
@@ -3689,12 +3692,15 @@ def validate_report(out_dir: Path) -> list[str]:
             continue
         try:
             instance = json.loads(text)
-            jsonschema.validate(instance, _load_schema(schema_name))
         except json.JSONDecodeError as exc:
             problems.append(f"{filename}: invalid JSON ({exc.msg})")
             continue
-        except jsonschema.ValidationError as exc:
-            problems.append(f"{filename}: {exc.message}")
+        local_errors = jsonschema.Draft202012Validator(
+            _load_schema(schema_name)
+        ).iter_errors(instance)
+        local_problems = _schema_errors_to_problems(local_errors)
+        if local_problems:
+            problems += [f"{filename}: {p}" for p in local_problems]
             continue
         if filename == "oscal-ar.json":
             problems += [

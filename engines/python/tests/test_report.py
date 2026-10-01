@@ -1628,3 +1628,80 @@ def test_oscal_and_sarif_hash_input_matches_the_raw_value_for_markdown_special_c
     )
     observation = oscal["assessment-results"]["results"][0]["observations"][0]
     assert observation["uuid"] == expected
+
+
+def test_validate_report_local_stage_reports_every_violation_located(
+    tmp_path: Path,
+) -> None:
+    """P18-18.27 verifier round 1 (`two_locals`): before the fix, the local-profile stage's
+    `jsonschema.validate` raised only its single `best_match` error, so two assertions missing
+    `control` reported only one problem; TS's/Java's own `allErrors: true` validators already
+    reported one problem per violation. The local stage now matches the real-schema stage's own
+    `iter_errors`-based, located, sorted output."""
+    write_report(
+        tmp_path,
+        [_assertion("conformant"), _assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+    )
+    path = tmp_path / "assertions.json"
+    assertions = json.loads(path.read_text(encoding="utf-8"))
+    del assertions[0]["control"]
+    del assertions[1]["control"]
+    path.write_text(json.dumps(assertions), encoding="utf-8")
+    problems = [
+        p for p in validate_report(tmp_path) if p.startswith("assertions.json:")
+    ]
+    assert problems == [
+        "assertions.json: 0: 'control' is a required property",
+        "assertions.json: 1: 'control' is a required property",
+    ]
+
+
+def test_sarif_anyof_failure_collapses_to_one_combinator_error() -> None:
+    """P18-18.27 verifier round 1 (`anyof_region`): an empty `region` object fails all three of
+    SARIF's `anyOf` branches; `iter_errors` reports exactly the one combinator error, never
+    expanding it into one error per failing branch (this is the behaviour TS's and Java's own
+    `anyOf`/`oneOf` handling was brought to parity with)."""
+    sarif = render_sarif([_assertion("non-conformant")])
+    sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"] = {}
+    problems = validate_sarif_2_1_0(sarif)
+    assert len(problems) == 1, problems
+    assert problems[0].startswith(
+        "runs/0/results/0/locations/0/physicalLocation/region: "
+    ), problems
+
+
+def test_validate_report_sorts_array_indices_numerically_not_lexicographically(
+    tmp_path: Path,
+) -> None:
+    """P18-18.27 verifier round 1 (`idx_order`): `absolute_path`'s array-index elements are native
+    ints, so sorting by `list(e.absolute_path)` already puts index 2 before index 10 (unlike TS's and
+    Java's pre-fix string sort of the joined location, which put `results/10` first). The local
+    profile's own `message` schema (unlike the real OASIS schema's `anyOf`-based one) requires `text`
+    plainly, so this goes through `validate_report`'s full two-stage pipeline like TS's/Java's own
+    case 24, catching the violation at the local stage."""
+    assertions = [
+        dataclasses.replace(
+            _assertion("non-conformant"), subject=f"spiffe://corp/agents/{i}"
+        )
+        for i in range(11)
+    ]
+    write_report(
+        tmp_path,
+        assertions,
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+    )
+    path = tmp_path / "results.sarif"
+    sarif = json.loads(path.read_text(encoding="utf-8"))
+    results = sarif["runs"][0]["results"]
+    assert len(results) > 10, len(results)
+    del results[2]["message"]["text"]
+    del results[10]["message"]["text"]
+    path.write_text(json.dumps(sarif), encoding="utf-8")
+    problems = [p for p in validate_report(tmp_path) if p.startswith("results.sarif:")]
+    assert problems == [
+        "results.sarif: runs/0/results/2/message: 'text' is a required property",
+        "results.sarif: runs/0/results/10/message: 'text' is a required property",
+    ]
