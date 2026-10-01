@@ -474,7 +474,7 @@ class VerifyTest {
         catalogDirWith(dir, "catalog.sig.json", "not json");
         ObjectNode result = Verify.verifyCatalog(dir, fixture.trust());
         assertFalse(result.get("verified").asBoolean());
-        assertTrue(result.get("reason").asText().startsWith("catalog.sig.json is not readable JSON: "));
+        assertEquals("catalog.sig.json is not readable JSON", result.get("reason").asText());
     }
 
     @Test

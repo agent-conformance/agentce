@@ -475,7 +475,11 @@ def verify_envelope(envelope: Any, trust: TrustRoot) -> Verified:
                 # that same repr text as an explicit, pinned message (TS/Java have no native
                 # equivalent to mirror otherwise).
                 raise VerificationError("'sig'")
-            public_key.verify(_b64d(sig), pae)
+            try:
+                sig_bytes = _b64d(sig)
+            except ValueError as exc:
+                raise VerificationError(SIG_NOT_BASE64) from exc
+            public_key.verify(sig_bytes, pae)
             keyid = signature.get("keyid")
             return Verified(
                 payload=payload,
@@ -490,6 +494,7 @@ def verify_envelope(envelope: Any, trust: TrustRoot) -> Verified:
     )
 
 
+SIG_NOT_BASE64 = "'sig' is not valid base64"
 STATEMENT_UNREADABLE = "the signed statement is not readable JSON"
 STATEMENT_NO_DIGEST = "the signed statement carries no subject digest"
 

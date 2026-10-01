@@ -6,6 +6,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -164,7 +165,9 @@ public final class Catalog {
         for (String name : names) {
             Path full = dir.resolve(name);
             String rel = base.isEmpty() ? name : base + "/" + name;
-            if (Files.isDirectory(full)) {
+            // As Python's `rglob`: never descend a symlinked directory, follow a symlinked file, skip
+            // a broken link.
+            if (Files.isDirectory(full, LinkOption.NOFOLLOW_LINKS)) {
                 collectFiles(full, rel, out);
             } else if (Files.isRegularFile(full)) {
                 out.add(rel);

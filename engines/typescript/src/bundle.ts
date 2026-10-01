@@ -59,7 +59,8 @@ export function confineToRoot(root: string, rel: string): string | null {
   if (!rel || rel.startsWith("/") || rel.split("/").includes("..")) {
     return null;
   }
-  const candidate = join(root, rel);
+  // Trailing slashes dropped, as Python's `root / rel` drops them: `name/` names the file `name`.
+  const candidate = join(root, rel).replace(/(?<=.)\/+$/, "");
   let resolvedRoot: string;
   try {
     resolvedRoot = realpathSync(root);

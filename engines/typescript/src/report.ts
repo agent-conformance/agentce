@@ -10,7 +10,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { arch, platform } from "node:os";
 import { dirname, join } from "node:path";
 import type { Activity } from "./activity";
@@ -42,15 +42,25 @@ const NAMESPACE_URL = "6ba7b811-9dad-11d1-80b4-00c04fd430c8";
 const PROVENANCE_EXCLUDE = new Set(["catalog.sig.json", "catalog.yaml"]);
 
 /** Every file's POSIX relpath under `dir`, unsorted. */
+/** Python's `Path.is_file()`: follows a symlink, and an unresolvable one is not a file. */
+function isFileFollowingLinks(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
+
 function walkFiles(dir: string, base: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir).sort(byteCompare)) {
     const full = join(dir, name);
     const rel = base === "" ? name : `${base}/${name}`;
-    const st = statSync(full);
-    if (st.isDirectory()) {
+    // As Python's `rglob`: never descend a symlinked directory, follow a symlinked file, skip a
+    // broken link.
+    if (lstatSync(full).isDirectory()) {
       out.push(...walkFiles(full, rel));
-    } else if (st.isFile()) {
+    } else if (isFileFollowingLinks(full)) {
       out.push(rel);
     }
   }

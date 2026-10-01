@@ -321,9 +321,19 @@ def cmd_verify(ns: argparse.Namespace) -> CommandResult:
 
 def _verify_catalog(result: CommandResult, catalog_dir: Path) -> CommandResult:
     """Verify a catalog directory's signature offline against the vendored trust root (SPEC §8.7)."""
-    recomputed = signing.digest_tree(
-        catalog_dir, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME})
-    )
+    try:
+        recomputed = signing.digest_tree(
+            catalog_dir, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME})
+        )
+    except (
+        OSError,
+        UnicodeError,
+    ) as exc:  # unreadable, or a file name that is not UTF-8
+        raise InputError(
+            "input.catalog_unreadable",
+            f"the catalog directory {catalog_dir} holds a file that cannot be read.",
+            "make every file in the catalog directory readable, then re-run.",
+        ) from exc
     result.data.update({"catalog": str(catalog_dir), "digest": recomputed})
     try:
         verified = signing.verify_catalog_directory(

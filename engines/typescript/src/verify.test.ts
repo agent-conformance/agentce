@@ -348,13 +348,13 @@ test("verifyCatalog soft-fails with the exact unsigned sentence when catalog.sig
   }
 });
 
-test("verifyCatalog soft-fails on unparseable catalog.sig.json (shape-only, not byte-identical)", () => {
+test("verifyCatalog soft-fails on unparseable catalog.sig.json with the fixed text", () => {
   const fixture = kmsFixture();
   const dir = catalogDirWith({ "rule.yaml": "x: 1\n", "catalog.sig.json": "not json" });
   try {
     const result = verifyCatalog(dir, fixture.trust);
     assert.equal(result.verified, false);
-    assert.ok(result.reason?.startsWith("catalog.sig.json is not readable JSON: "));
+    assert.equal(result.reason, "catalog.sig.json is not readable JSON");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -769,7 +769,7 @@ for (const [label, name] of [
   });
 }
 
-test("verifyRelease soft-fails on a manifest nested far beyond the serialiser's safe call-stack depth, instead of crashing (verifier round-2)", () => {
+test("verifyRelease refuses a manifest nested past MAX_JSON_DEPTH as unreadable, instead of crashing (verifier round-2)", () => {
   const fixture = kmsFixture();
   const nested = "[".repeat(5000) + "]".repeat(5000);
   const dir = bundleDir({
@@ -779,7 +779,7 @@ test("verifyRelease soft-fails on a manifest nested far beyond the serialiser's 
   try {
     const result = verifyRelease(dir, fixture.trust) as { verified: boolean; reason?: string };
     assert.equal(result.verified, false);
-    assert.equal(result.reason, "release manifest cannot be canonicalized");
+    assert.equal(result.reason, "release manifest is not readable JSON");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

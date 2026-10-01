@@ -363,7 +363,9 @@ def test_verify_release_signatures_depth_boundary(
 ) -> None:
     """`MAX_JSON_DEPTH` containers parse (and the manifest under them canonicalizes); one more is
     refused -- the boundary all three engines share."""
-    (tmp_path / "release-manifest.json").write_text('{"artifacts": []}', encoding="utf-8")
+    (tmp_path / "release-manifest.json").write_text(
+        '{"artifacts": []}', encoding="utf-8"
+    )
     nested = "[" * depth + "]" * depth
     (tmp_path / "signatures.json").write_text(nested, encoding="utf-8")
     code, env = run(["verify", "--release", str(tmp_path), "--json"], capsys)
@@ -438,6 +440,52 @@ def test_verify_release_single_file_deeply_nested_envelope_refused(
     assert env["verified"] is False
     assert "error" not in env
     assert env["reason"] == "release envelope is not readable JSON"
+
+
+def test_verify_catalog_unreadable_file_is_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A catalog file the process cannot read is a stable input error, never internal.unexpected."""
+    (tmp_path / "catalog.yaml").write_text("id: demo\n", encoding="utf-8")
+    (tmp_path / "catalog.yaml").chmod(0)
+    try:
+        code, env = run(["verify", "--catalog", str(tmp_path), "--json"], capsys)
+    finally:
+        (tmp_path / "catalog.yaml").chmod(0o644)
+    assert code == 3
+    assert env["error"]["key"] == "input.catalog_unreadable"
+
+
+def test_verify_catalog_symlinked_directory_is_not_descended(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """digest_tree lists a symlinked directory but neither descends it nor hashes it, so a link to
+    the catalog's own parent neither loops nor changes the digest (the TS and Java walks match)."""
+    key = Ed25519PrivateKey.generate()
+    monkeypatch.setattr(signing, "vendored_trust", lambda: _trust_for(key))
+    (tmp_path / "catalog.yaml").write_text("id: demo\n", encoding="utf-8")
+    _sign_catalog(tmp_path, key)
+    (tmp_path / "link-out").symlink_to(tmp_path.parent)
+    (tmp_path / "broken").symlink_to(tmp_path / "no-such-file")
+    code, env = run(["verify", "--catalog", str(tmp_path), "--json"], capsys)
+    assert code == 0
+    assert env["verified"] is True
+
+
+@pytest.mark.parametrize("sig", ["!" * 88, "A" * 86, "AAAA AAAA"])
+def test_verify_envelope_sig_not_base64_fixed_text(sig: str) -> None:
+    """A `sig` that is not padded, alphabet-only base64 gets one fixed text, never the decoder's."""
+    key = Ed25519PrivateKey.generate()
+    envelope = signing.sign_statement(
+        signing.intoto_statement("x", "sha256:" + "0" * 64, "t", {}),
+        signing.KmsSigner(private_key=key),
+    )
+    envelope["signatures"][0]["sig"] = sig
+    with pytest.raises(signing.VerificationError) as exc:
+        signing.verify_envelope(envelope, _trust_for(key))
+    assert str(exc.value) == (
+        "no signature verified against the trust root: 'sig' is not valid base64"
+    )
 
 
 def test_verify_two_targets_is_error(
