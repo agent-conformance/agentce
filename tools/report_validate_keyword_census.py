@@ -122,15 +122,11 @@ def walk(
         if kind == "map" and isinstance(value, dict):
             for sub_key, sub_schema in value.items():
                 walk(sub_schema, f"{child_pointer}/{sub_key}", schema_file, out)
-        elif kind == "schema" and isinstance(value, dict):
-            walk(value, child_pointer, schema_file, out)
-        elif kind == "schema-or-bool" and isinstance(value, dict):
+        elif kind in ("schema", "schema-or-bool") and isinstance(value, dict):
             walk(value, child_pointer, schema_file, out)
         elif kind == "list" and isinstance(value, list):
             for i, sub_schema in enumerate(value):
                 walk(sub_schema, f"{child_pointer}/{i}", schema_file, out)
-        elif key == "properties" and isinstance(value, dict):
-            pass  # handled by the "map" branch above; kept for clarity, never reached twice
         # Always also recurse into any dict/list value under an unrecognized key (defensive: a
         # schema this census doesn't know how to interpret is walked anyway, not silently skipped).
         elif isinstance(value, (dict, list)) and key not in SCHEMA_VALUED:

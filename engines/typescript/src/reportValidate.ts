@@ -16,6 +16,7 @@ import Ajv2020 from "ajv/dist/2020";
 import anyOfDef from "ajv/dist/vocabularies/applicator/anyOf";
 import oneOfDef from "ajv/dist/vocabularies/applicator/oneOf";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
+import { byteCompare } from "./util";
 
 /** Always written, regardless of `--emit`: the run's structural core. */
 const MANDATORY_ARTIFACT_SCHEMAS: Record<string, string> = {
@@ -140,21 +141,6 @@ function pathSegments(instance: unknown, instancePath: string): Segment[] {
   return segments;
 }
 
-/** Compares strings by Unicode code point, as Python does (`<` on JS strings compares UTF-16 code
- * units, which orders astral characters differently). */
-function compareCodePoints(a: string, b: string): number {
-  const pointsA = Array.from(a, (c) => c.codePointAt(0) as number);
-  const pointsB = Array.from(b, (c) => c.codePointAt(0) as number);
-  const len = Math.min(pointsA.length, pointsB.length);
-  for (let i = 0; i < len; i++) {
-    const diff = (pointsA[i] as number) - (pointsB[i] as number);
-    if (diff !== 0) {
-      return diff;
-    }
-  }
-  return pointsA.length - pointsB.length;
-}
-
 /** Python's list ordering over `absolute_path`: array indices compare as numbers, object keys as
  * strings by code point, and a path sorts before any longer path it is a prefix of. */
 function compareSegments(a: Segment[], b: Segment[]): number {
@@ -165,7 +151,7 @@ function compareSegments(a: Segment[], b: Segment[]): number {
     const diff =
       typeof segA === "number" && typeof segB === "number"
         ? segA - segB
-        : compareCodePoints(String(segA), String(segB));
+        : byteCompare(String(segA), String(segB));
     if (diff !== 0) {
       return diff;
     }
@@ -222,11 +208,11 @@ function ajvProblems(prefix: string, instance: unknown, errors: AjvError[] | nul
     });
   }
   for (const problem of byObject.values()) {
-    const named = (problem.extraKeys ?? []).sort(compareCodePoints).map((k) => `'${k}'`);
+    const named = (problem.extraKeys ?? []).sort(byteCompare).map((k) => `'${k}'`);
     problem.message = `must NOT have additional properties (${named.join(", ")})`;
   }
   problems.sort(
-    (a, b) => compareSegments(a.segments, b.segments) || compareCodePoints(a.keyword, b.keyword),
+    (a, b) => compareSegments(a.segments, b.segments) || byteCompare(a.keyword, b.keyword),
   );
   return problems.map((p) => {
     const location = p.segments.length === 0 ? "<root>" : p.segments.join("/");

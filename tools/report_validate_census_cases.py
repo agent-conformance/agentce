@@ -23,6 +23,7 @@ Prints a JSON list of mutations. Each `BASE_DIR` is a report directory; its name
 from __future__ import annotations
 
 import copy
+import functools
 import json
 import re
 import sys
@@ -62,6 +63,7 @@ for _name in ("uri", "uri-reference"):
 FORMAT_CHECKER.checks("email")(lambda s: not isinstance(s, str) or "@" in s)
 
 
+@functools.cache
 def _validator(schema_name: str, *, formats: bool = False) -> Any:
     schema = report._load_schema(schema_name)
     checker = FORMAT_CHECKER if formats else None
@@ -82,16 +84,12 @@ class Stages:
         self.plain = [_validator(n) for n in self.names]
         self.formats = [_validator(n, formats=True) for n in self.names]
 
-    def errors(self, doc: Any) -> tuple[str | None, list[Any]]:
-        """(failing stage, its errors), or (None, []) when the document is valid."""
-        for name, validator in zip(self.names, self.plain):
-            errors = list(validator.iter_errors(doc))
-            if errors:
-                return name, errors
-        return None, []
-
-    def format_errors(self, doc: Any) -> tuple[str | None, list[Any]]:
-        for name, validator in zip(self.names, self.formats):
+    def errors(
+        self, doc: Any, *, formats: bool = False
+    ) -> tuple[str | None, list[Any]]:
+        """(failing stage, its errors), or (None, []) when the document is valid; with `formats`,
+        `format` is asserted too."""
+        for name, validator in zip(self.names, self.formats if formats else self.plain):
             errors = list(validator.iter_errors(doc))
             if errors:
                 return name, errors
@@ -176,17 +174,17 @@ def edits(node: Any) -> Iterator[dict[str, Any]]:
 
 _FORMAT_EXAMPLES = {
     "date-time": "2026-01-01T00:00:00Z",
-    "uri": "https://example.org/x",
-    "uri-reference": "https://example.org/x",
-    "email": "a@example.org",
+    "uri": "https://agent-conformance.org/spec/",
+    "uri-reference": "https://agent-conformance.org/spec/",
+    "email": "security@agent-conformance.org",
 }
 #: Strings tried, in order, against a `pattern` when synthesising a value.
 _PATTERN_EXAMPLES = (
     "x",
     "11111111-1111-4111-8111-111111111111",
     "2026-01-01T00:00:00Z",
-    "https://example.org/x",
-    "a@example.org",
+    "https://agent-conformance.org/spec/",
+    "security@agent-conformance.org",
     "en-US",
     "text/plain",
     "1.2.3.4",
@@ -442,7 +440,7 @@ def _try(
     trial = apply(doc, mutation)
     stage, errors = stages.errors(trial)
     if stage is None:
-        stage, errors = stages.format_errors(trial)
+        stage, errors = stages.errors(trial, formats=True)
         if stage is None or [e.validator for e in errors] != ["format"]:
             return None
     elif len(errors) != 1:

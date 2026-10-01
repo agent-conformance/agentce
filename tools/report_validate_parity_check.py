@@ -38,6 +38,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable
 
@@ -146,6 +147,13 @@ def _assess(out: Path, args: list[str]) -> Path:
             f"building the base report {out.name} failed (exit {proc.returncode}):\n{proc.stdout}\n{proc.stderr}"
         )
     return out
+
+
+ENGINES = (
+    ("python", python_validate),
+    ("typescript", typescript_validate),
+    ("java", java_validate),
+)
 
 
 def build_base_report(directory: Path) -> Path:
@@ -496,10 +504,12 @@ CASES: list[tuple[str, Callable[[Path], None], int]] = [
 
 #: Cases that must additionally prove the real third-party schema ran, not only the local profile
 #: (python reference, cases 6 and 8): at least one problem label names the standard in parens.
+NIST_LABEL = "oscal-ar.json (NIST OSCAL 1.1.2)"
+SARIF_LABEL = "results.sarif (OASIS SARIF 2.1.0)"
 REAL_SCHEMA_MARKERS = {
-    "case6-oscal-nist": "oscal-ar.json (NIST OSCAL 1.1.2)",
-    "case8-sarif-real": "results.sarif (OASIS SARIF 2.1.0)",
-    "case23-sarif-anyof": "results.sarif (OASIS SARIF 2.1.0)",
+    "case6-oscal-nist": NIST_LABEL,
+    "case8-sarif-real": SARIF_LABEL,
+    "case23-sarif-anyof": SARIF_LABEL,
 }
 
 
@@ -671,8 +681,8 @@ def compare_signatures(
 
 #: The label a real third-party standard's problems carry, by the census's schema name.
 STAGE_LABELS = {
-    "oscal-assessment-results-nist-1.1.2": "oscal-ar.json (NIST OSCAL 1.1.2)",
-    "sarif-2.1.0": "results.sarif (OASIS SARIF 2.1.0)",
+    "oscal-assessment-results-nist-1.1.2": NIST_LABEL,
+    "sarif-2.1.0": SARIF_LABEL,
 }
 
 
@@ -735,18 +745,21 @@ def run_census_cases(tmp: Path, base: Path, failures: list[str]) -> int:
     by_name = {b.name: b for b in bases}
     cases = census_cases(plan)
     for case, base_name, mutations in cases:
-        case_dir = tmp / case
-        shutil.copytree(by_name[base_name], case_dir)
+        shutil.copytree(by_name[base_name], tmp / case)
         for m in mutations:
-            _write_json(case_dir / m["file"], m["document"])
+            _write_json(tmp / case / m["file"], m["document"])
+    # Each (directory, engine) run is an independent read-only subprocess: run them side by side.
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        runs = {
+            (case, engine): pool.submit(validate, tmp / case)
+            for case, _, _ in cases
+            for engine, validate in ENGINES
+        }
+    for case, _, mutations in cases:
         expect_exit = 0 if all(m["keyword"] == "format" for m in mutations) else 3
         envs = []
-        for engine, validate in (
-            ("python", python_validate),
-            ("typescript", typescript_validate),
-            ("java", java_validate),
-        ):
-            out, code = validate(case_dir)
+        for engine, _ in ENGINES:
+            out, code = runs[(case, engine)].result()
             if code != expect_exit:
                 failures.append(
                     f"{case}: {engine} exited {code}, expected {expect_exit}"
