@@ -522,7 +522,7 @@ function compiledOscalNistValidator() {
         return (data: string) => re.test(data);
       },
       error: {
-        message: (cxt: { schemaCode: unknown }) => `must match pattern "${cxt.schemaCode}"`,
+        message: (cxt: { schema: unknown }) => `must match pattern "${String(cxt.schema)}"`,
       },
     });
     nistValidateCache = nistAjv.compile(loadSchemaJson("oscal-assessment-results-nist-1.1.2"));
