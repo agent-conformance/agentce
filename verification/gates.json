@@ -668,8 +668,8 @@
         {
           "description": "the signature check in verify_envelope always succeeds, so a tampered DSSE signature would be accepted",
           "file": "engines/python/agentce/signing.py",
-          "search": "            public_key.verify(_b64d(sig), pae)\n            return Verified(",
-          "replace": "            return Verified("
+          "search": "            try:\n                sig_bytes = _b64d(sig)\n            except ValueError as exc:\n                raise VerificationError(SIG_NOT_BASE64) from exc\n            public_key.verify(sig_bytes, pae)\n",
+          "replace": ""
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/commands/__init__.py's cmd_sign, ported field-for-field in engines/typescript/src/sign.ts and engines/java/src/main/java/org/agentce/Sign.java."
@@ -802,7 +802,7 @@
         {
           "description": "Python: remove _verify_release's try/except around verify_envelope, reintroducing the named defect (an unresolvable-keyid signature crashes instead of soft-failing)",
           "file": "engines/python/agentce/commands/__init__.py",
-          "search": "        try:\n            verified = signing.verify_envelope(envelope, trust)\n        except (\n            signing.VerificationError,\n            ValueError,\n            KeyError,\n            AttributeError,\n            TypeError,\n            RecursionError,\n        ) as exc:\n            return _verify_release_soft_fail(result, release_path, str(exc))\n",
+          "search": "        try:\n            verified = signing.verify_envelope(envelope, trust)\n        except signing.VerificationError as exc:\n            return _verify_release_soft_fail(result, release_path, str(exc))\n",
           "replace": "        verified = signing.verify_envelope(envelope, trust)\n"
         },
         {
