@@ -1010,8 +1010,8 @@ def run_real_check() -> int:
             )
 
         # Scenario B1 (point 4, critic round-2 finding #13): `verify --bundle` on a real,
-        # already-signed evidence bundle (`corpus/quickstart/evidence`, never a stub) -- this is
-        # the item's full evidence-integrity path, not only the catalog/release DSSE primitives,
+        # already-signed evidence bundle (`corpus/quickstart/evidence`, not a synthetic fixture) --
+        # this is the item's full evidence-integrity path, not only the catalog/release DSSE primitives,
         # so it is compared with its own runner rather than `_run_catalog_scenario`/
         # `_run_release_scenario` (there is no per-engine fixture copy to make: the bundle is read
         # only, identical for all three engines).
