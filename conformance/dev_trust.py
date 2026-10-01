@@ -145,6 +145,36 @@ def release_signer(profile: str) -> signing.Signer:
     raise ValueError(f"unknown signing profile {profile!r}")
 
 
+def deterministic_keyless_signer(label: str, profile: str) -> signing.Signer:
+    """A reproducible keyless signer for cross-engine parity fixtures (item 18.28, C3).
+
+    :func:`release_signer`'s own keyless branch deliberately generates a fresh ephemeral key
+    per call (SPEC's keyless model: a fresh key per real release). A parity check instead needs
+    the *same* certificate every run, so this derives the ephemeral leaf key from the published
+    seed too, via a label namespace (``verify-parity-cert-leaf:``) distinct from every other
+    derived key this module issues, and otherwise reuses :func:`ca_key`/:func:`issue_certificate`/
+    :class:`KeylessSigner` unchanged — never called by :mod:`release`'s real dry-run path.
+    """
+    if profile not in ("sigstore-private", "sigstore-public"):
+        raise ValueError(
+            f"deterministic_keyless_signer needs a keyless profile, got {profile!r}"
+        )
+    issuer = CA_PRIVATE if profile == "sigstore-private" else CA_PUBLIC
+    identity = (
+        CI_PRIVATE_IDENTITY if profile == "sigstore-private" else CI_PUBLIC_IDENTITY
+    )
+    leaf = derive(f"verify-parity-cert-leaf:{label}")
+    cert = issue_certificate(
+        ca_key(issuer),
+        issuer=issuer,
+        identity=identity,
+        leaf_public=leaf.public_key(),
+        not_before=_NOT_BEFORE,
+        not_after=_NOT_AFTER,
+    )
+    return KeylessSigner(private_key=leaf, cert=cert)
+
+
 #: The signature file dropped into a signed catalog directory (defined by the engine).
 SIGNATURE_NAME = signing.CATALOG_SIGNATURE_NAME
 
