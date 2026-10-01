@@ -184,6 +184,7 @@ STRING_TOKENS = (
     ("astral", '"\\ud83d\\ude00"'),
 )
 
+
 def path_names_for(base_name: str) -> tuple[tuple[str, str], ...]:
     """Path values for a manifest entry that names a real file `base_name` inside the fixture
     directory built by `bundle_with`/`bundle_evidence_with` (which also provides `outside.txt` one
@@ -370,7 +371,9 @@ class Mutation:
     name: str
     flow: str
     problem_class: str
-    target: str  # "catalog", "release", "bundle", or "report" -- which verify flag to pass
+    target: (
+        str  # "catalog", "release", "bundle", or "report" -- which verify flag to pass
+    )
     #: Writes this mutation's fixture into an empty per-engine directory and returns the path to pass
     #: to `verify --catalog`/`--release`/`--bundle`/`--report`. Reads only the canonical fixtures.
     build: Callable[[Path], Path]
