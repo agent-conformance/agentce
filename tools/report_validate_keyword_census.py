@@ -1,14 +1,12 @@
-"""Keyword census for `report --validate`'s 12 schemas (item 18.27, verifier round 2's circuit breaker).
+"""Keyword census for `report --validate`'s 12 schemas (item 18.27).
 
-Verifier round 1 and round 2 each FAILed on cross-engine divergences the C3 parity check's mutation
-list could not see (`harness/remediation/verdicts/P18-18.27-verifier.md`,
-`harness/remediation/verdicts/P18-18.27-verifier-r2.md`, private SPECS repo): each round patched the
-exact shapes the verifier happened to construct, then extended the mutation list to match -- the
-shared premise `principle-attack-the-premise` names as the actual defect. This script replaces
-"whatever shapes the verifier happened to try" with the real, complete inventory: every JSON Schema
-keyword actually used across the 10 local-profile schemas plus the 2 real third-party standards, with
-its schema file and JSON pointer, so the next fix can be checked against every keyword the validated
-report artifacts actually use -- not a guess at which ones matter.
+Two rounds of review each found a real cross-engine divergence in schema-error reporting that
+`report_validate_parity_check.py`'s mutation list could not see, because each round's fix matched only
+the exact shapes already under test rather than the full set of JSON Schema constructs the validated
+artifacts actually use. This script replaces "whatever shapes were already tested" with the real,
+complete inventory: every JSON Schema keyword actually used across the 10 local-profile schemas plus
+the 2 real third-party standards, with its schema file and JSON pointer, so the next fix can be checked
+against every keyword the validated report artifacts actually use -- not a guess at which ones matter.
 
 Usage: `uv run --project tools python tools/report_validate_keyword_census.py`. Prints one section per
 keyword, each occurrence's schema file and pointer (and, for `format`, the declared format name).
