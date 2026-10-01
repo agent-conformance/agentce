@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -115,11 +116,82 @@ def java_validate(report_dir: Path) -> tuple[str, int]:
     )
 
 
+QUICKSTART_ARGS = [
+    "--bundle",
+    str(QUICKSTART_DIR / "evidence"),
+    "--profile",
+    str(QUICKSTART_DIR / "applicability.yaml"),
+    "--domain",
+    str(QUICKSTART_DIR / "domain.linkml.yaml"),
+    "--catalog",
+    "eu-ai-act@2026.09",
+    "--catalog-dir",
+    str(CATALOG_DIR),
+]
+PROJECT_VIEW_FIXTURE = ROOT / "verification" / "gates" / "fixtures" / "project_view"
+
+
+def _assess(out: Path, args: list[str]) -> Path:
+    """Python's own `agentce assess ARGS --out OUT` (exit 1 = FINDINGS, still a complete report)."""
+    proc = subprocess.run(
+        ["uv", "run", "--frozen", "--project", str(PY_ENGINE), "agentce", "assess"]
+        + args
+        + ["--out", str(out)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode not in (0, 1):
+        raise SystemExit(
+            f"building the base report {out.name} failed (exit {proc.returncode}):\n{proc.stdout}\n{proc.stderr}"
+        )
+    return out
+
+
 def build_base_report(directory: Path) -> Path:
     """Run Python's `assess` with every `--emit` token against the bundled quickstart project,
     producing one shared, genuinely full report directory -- the same recipe
     `harness/remediation/evidence/P18-18.27/python-reference.md` captured its 21 cases against."""
-    full = directory / "full"
+    return _assess(
+        directory / "full",
+        QUICKSTART_ARGS + ["--emit", "md,html,oscal,sarif,pack,junit,csv,oscal_xml"],
+    )
+
+
+def build_view_bases(directory: Path) -> list[Path]:
+    """One report per reader view, since `buyer.json`, `security.json`, `auditor.json` and
+    `project.json` are each written only by their own `--for` run. `project.json` needs two or more
+    subjects, so it comes from the project-view gate's fixture (an unsigned test catalog, which only
+    Python checks signatures on)."""
+    bases = [
+        _assess(directory / view, QUICKSTART_ARGS + ["--for", view])
+        for view in ("buyer", "security", "auditor")
+    ]
+    fixture = PROJECT_VIEW_FIXTURE
+    bases.append(
+        _assess(
+            directory / "project",
+            [
+                "--bundle",
+                str(fixture / "evidence"),
+                "--profile",
+                str(fixture / "applicability.yaml"),
+                "--domain",
+                str(fixture / "domain.linkml.yaml"),
+                "--catalog-dir",
+                str(fixture / "catalog"),
+                "--for",
+                "risk-lead",
+                "--allow-unverified-catalog",
+            ],
+        )
+    )
+    return bases
+
+
+def discover_census_mutations(bases: list[Path]) -> dict[str, Any]:
+    """`report_validate_census_cases.py`'s plan over `bases`: one mutation per census (schema,
+    keyword) pair, found with the Python engine's own validators, plus any pair it could not reach."""
     proc = subprocess.run(
         [
             "uv",
@@ -127,32 +199,18 @@ def build_base_report(directory: Path) -> Path:
             "--frozen",
             "--project",
             str(PY_ENGINE),
-            "agentce",
-            "assess",
-            "--bundle",
-            str(QUICKSTART_DIR / "evidence"),
-            "--profile",
-            str(QUICKSTART_DIR / "applicability.yaml"),
-            "--domain",
-            str(QUICKSTART_DIR / "domain.linkml.yaml"),
-            "--catalog",
-            "eu-ai-act@2026.09",
-            "--catalog-dir",
-            str(CATALOG_DIR),
-            "--emit",
-            "md,html,oscal,sarif,pack,junit,csv,oscal_xml",
-            "--out",
-            str(full),
-        ],
+            "python",
+            str(ROOT / "tools" / "report_validate_census_cases.py"),
+        ]
+        + [str(b) for b in bases],
         cwd=ROOT,
         capture_output=True,
         text=True,
     )
-    if proc.returncode not in (0, 1):  # 1 = FINDINGS, still a real, complete report
-        raise SystemExit(
-            f"building the shared base report failed (exit {proc.returncode}):\n{proc.stdout}\n{proc.stderr}"
-        )
-    return full
+    if proc.returncode != 0:
+        raise SystemExit(f"census mutation search failed:\n{proc.stderr}")
+    plan: dict[str, Any] = json.loads(proc.stdout)
+    return plan
 
 
 def _read_json(path: Path) -> Any:
@@ -341,6 +399,69 @@ def _mutate_sarif_idx_order(report_dir: Path) -> None:
     _write_json(path, sarif)
 
 
+def _mutate_ref_branch(report_dir: Path) -> None:
+    """A `pattern` reached through `$ref` (P18-18.27 verifier round 2, D1)."""
+    path = report_dir / "oscal-ar.json"
+    oscal = _read_json(path)
+    finding = oscal["assessment-results"]["results"][0]["findings"][0]
+    finding["target"]["status"]["reason"] = "has space"
+    _write_json(path, oscal)
+
+
+def _mutate_two_keywords_one_location(report_dir: Path) -> None:
+    """`pattern` and `enum` failing at one location under `allOf` (round 2, ordering ties)."""
+    path = report_dir / "oscal-ar.json"
+    oscal = _read_json(path)
+    finding = oscal["assessment-results"]["results"][0]["findings"][0]
+    finding["target"]["status"]["state"] = "bad state"
+    _write_json(path, oscal)
+
+
+def _mutate_sarif_two_extra(report_dir: Path) -> None:
+    """Two unexpected keys on one SARIF object: one `additionalProperties` problem (round 2, D3)."""
+    path = report_dir / "results.sarif"
+    sarif = _read_json(path)
+    sarif["runs"][0]["results"][0]["message"].update(bogus2=1, bogus1=1)
+    _write_json(path, sarif)
+
+
+def _mutate_local_two_extra(report_dir: Path) -> None:
+    """Two unexpected keys at the local-profile stage (round 2, D3)."""
+    path = report_dir / "assertions.json"
+    assertions = _read_json(path)
+    assertions[0].update(zz=1, aa=2)
+    _write_json(path, assertions)
+
+
+def _mutate_sarif_format(report_dir: Path) -> None:
+    """A malformed `uri`: `format` is an annotation in all three engines, so still valid (D4)."""
+    path = report_dir / "results.sarif"
+    sarif = _read_json(path)
+    sarif["runs"][0]["tool"]["driver"]["informationUri"] = "not a uri :: at all"
+    _write_json(path, sarif)
+
+
+def _mutate_digit_and_slash_keys(report_dir: Path) -> None:
+    """Object keys `9`/`10` (compare as strings) and `/`-containing keys (JSON-pointer escaped) in
+    one map (round 2, D5 and D6)."""
+    path = report_dir / "manifest.json"
+    manifest = _read_json(path)
+    for key in ("9", "10", "packs/x.json", "packs-old.json"):
+        manifest["outputs"][key] = "bad"
+    _write_json(path, manifest)
+
+
+def _mutate_sarif_oneof_two_passing(report_dir: Path) -> None:
+    """A SARIF `graphTraversal` matching both `oneOf` branches: one problem, the combinator's own
+    (round 2, D2)."""
+    path = report_dir / "results.sarif"
+    sarif = _read_json(path)
+    sarif["runs"][0]["results"][0]["graphTraversals"] = [
+        {"runGraphIndex": 0, "resultGraphIndex": 0}
+    ]
+    _write_json(path, sarif)
+
+
 CASES: list[tuple[str, Callable[[Path], None], int]] = [
     ("case1-clean", _mutate_clean, 0),
     ("case2-missing-mandatory", _mutate_missing_mandatory, 3),
@@ -364,6 +485,13 @@ CASES: list[tuple[str, Callable[[Path], None], int]] = [
     ("case22-local-multi", _mutate_local_multi, 3),
     ("case23-sarif-anyof", _mutate_sarif_anyof, 3),
     ("case24-sarif-idx-order", _mutate_sarif_idx_order, 3),
+    ("case25-ref-branch", _mutate_ref_branch, 3),
+    ("case26-two-keywords-one-location", _mutate_two_keywords_one_location, 3),
+    ("case27-sarif-two-extra", _mutate_sarif_two_extra, 3),
+    ("case28-local-two-extra", _mutate_local_two_extra, 3),
+    ("case29-sarif-format", _mutate_sarif_format, 0),
+    ("case30-digit-and-slash-keys", _mutate_digit_and_slash_keys, 3),
+    ("case31-sarif-oneof-two-passing", _mutate_sarif_oneof_two_passing, 3),
 ]
 
 #: Cases that must additionally prove the real third-party schema ran, not only the local profile
@@ -382,28 +510,121 @@ def problem_labels(problems: list[str]) -> list[str]:
     return [p.split(": ", 1)[0] for p in problems]
 
 
+def _split_schema_problem(problem: str) -> tuple[str, str | None]:
+    """`(prefix, message)` for a schema-validation problem, `(label, None)` for any other.
+
+    A schema-validation problem's shape is `"<label>: <location>: <message>"`, where `<location>` (a
+    `/`-joined path, or `<root>`) never contains a space; every other problem's message does, so
+    testing for a space after the first `": "` tells the two shapes apart without tracking which
+    mutator produced which."""
+    first = problem.find(": ")
+    if first == -1:
+        return problem, None
+    rest = problem[first + 2 :]
+    second = rest.find(": ")
+    candidate_location = rest if second == -1 else rest[:second]
+    if candidate_location == "" or " " in candidate_location:
+        return problem[:first], None
+    location_end = first + 2 + len(candidate_location)
+    if (
+        second == -1
+    ):  # `"<label>: missing"`, `"<label>: empty"`: no message, so not a schema problem
+        return problem[:location_end], None
+    return problem[:location_end], problem[location_end + 2 :]
+
+
 def problem_prefixes(problems: list[str]) -> list[str]:
     """Each problem's label plus, for a schema-validation problem, its location (`problem_labels`
     only compares the file label, so three engines reporting a different count, order, or location of
     problems *within* the same file were invisible to it -- the real gap the P18-18.27 verifier round
-    1 found). A schema-validation problem's shape is `"<label>: <location>: <message>"`, where
-    `<location>` (a `/`-joined path, or `<root>`) never contains a space; every other problem's
-    message does, so testing for a space after the first `": "` tells the two shapes apart without
-    tracking which mutator produced which."""
+    1 found)."""
+    return [_split_schema_problem(p)[0] for p in problems]
+
+
+#: Keywords reported under one message family: Python's `jsonschema` words `anyOf` and `oneOf` the
+#: same way, and `minItems`/`minLength`/`minProperties` all as "should be non-empty".
+KEYWORD_FAMILY = {
+    "anyOf": "combinator",
+    "oneOf": "combinator",
+    "minItems": "non-empty",
+    "minLength": "non-empty",
+    "minProperties": "non-empty",
+}
+
+#: Per engine, (regex, family) tried in order against a schema problem's message. Each engine's
+#: validator library words its messages differently; these name the failing keyword's family so
+#: three engines are compared on *which* keyword failed, not only where.
+MESSAGE_FAMILIES: dict[str, list[tuple[str, str]]] = {
+    "python": [
+        (r" is not of type ", "type"),
+        (r" is a required property$", "required"),
+        (r"^Additional properties are not allowed ", "additionalProperties"),
+        (r" is not one of ", "enum"),
+        (r" was expected$", "const"),
+        (r" does not match ", "pattern"),
+        (r" is less than the minimum of ", "minimum"),
+        (r" is greater than the maximum of ", "maximum"),
+        (
+            r" (should be non-empty|is too short|does not have enough properties)$",
+            "non-empty",
+        ),
+        (r" has non-unique elements$", "uniqueItems"),
+        (r" is not valid under any of the given schemas$", "combinator"),
+        (r" is valid under each of ", "combinator"),
+    ],
+    "typescript": [
+        (r"^must be equal to one of the allowed values$", "enum"),
+        (r"^must be equal to constant$", "const"),
+        (r"^must be >= ", "minimum"),
+        (r"^must be <= ", "maximum"),
+        (r"^must be [a-z,]+$", "type"),
+        (r"^must have required property ", "required"),
+        (r"^must NOT have additional properties ", "additionalProperties"),
+        (r"^must match pattern ", "pattern"),
+        (r"^must NOT have fewer than 1 (items|characters|properties)$", "non-empty"),
+        (r"^must NOT have duplicate items ", "uniqueItems"),
+        (r"^must match (a schema in anyOf|exactly one schema in oneOf)$", "combinator"),
+    ],
+    "java": [
+        (r": \w+ found, [\w, ]+ expected$", "type"),
+        (r": required property '.*' not found$", "required"),
+        (r" are not allowed \(additional properties ", "additionalProperties"),
+        (r": does not have a value in the enumeration ", "enum"),
+        (r": must be the constant value ", "const"),
+        (r": does not match the regex pattern ", "pattern"),
+        (r": must have a minimum value of ", "minimum"),
+        (r": must have a maximum value of ", "maximum"),
+        (r": must (have|be) at least 1 ", "non-empty"),
+        (r": must have only unique items in the array$", "uniqueItems"),
+        (
+            r"(^does not match any of the required alternatives$|: must be valid to one and only one schema)",
+            "combinator",
+        ),
+    ],
+}
+
+UNCLASSIFIED = "UNCLASSIFIED"
+
+
+def message_family(engine: str, message: str) -> str:
+    """The keyword family `engine`'s schema-problem `message` reports, or `UNCLASSIFIED`."""
+    for pattern, family in MESSAGE_FAMILIES[engine]:
+        if re.search(pattern, message):
+            return family
+    return UNCLASSIFIED
+
+
+def problem_signatures(engine: str, problems: list[str]) -> list[str]:
+    """Each problem's prefix (`problem_prefixes`) plus, for a schema problem, the failing keyword's
+    family -- what the three engines must agree on, in order."""
     out = []
-    for p in problems:
-        first = p.find(": ")
-        if first == -1:
-            out.append(p)
-            continue
-        rest = p[first + 2 :]
-        second = rest.find(": ")
-        candidate_location = rest if second == -1 else rest[:second]
-        if candidate_location == "" or " " in candidate_location:
-            out.append(p[:first])
-        else:
-            location_end = first + 2 + len(candidate_location)
-            out.append(p[:location_end])
+    for problem in problems:
+        prefix, message = _split_schema_problem(problem)
+        out.append(
+            prefix
+            if message is None
+            else f"{prefix} [{message_family(engine, message)}]"
+        )
     return out
 
 
@@ -414,6 +635,126 @@ def compare_labels(
         failures.append(
             f"{case}: problem labels disagree\n  python={py}\n  typescript={ts}\n  java={java}"
         )
+
+
+def compare_signatures(
+    case: str,
+    py_env: dict[str, Any],
+    ts_env: dict[str, Any],
+    java_env: dict[str, Any],
+    failures: list[str],
+) -> None:
+    """The three engines' `problem_signatures` must be identical, and every schema message must be
+    one the engine's classifier knows (an unknown wording would otherwise compare as equal-unknown)."""
+    signatures = {
+        engine: problem_signatures(engine, env["problems"])
+        for engine, env in (
+            ("python", py_env),
+            ("typescript", ts_env),
+            ("java", java_env),
+        )
+    }
+    compare_labels(
+        case,
+        signatures["python"],
+        signatures["typescript"],
+        signatures["java"],
+        failures,
+    )
+    for engine, env in (("python", py_env), ("typescript", ts_env), ("java", java_env)):
+        for problem, signature in zip(env["problems"], signatures[engine]):
+            if signature.endswith(f"[{UNCLASSIFIED}]"):
+                failures.append(
+                    f"{case}: {engine} schema message not classified: {problem!r}"
+                )
+
+
+#: The label a real third-party standard's problems carry, by the census's schema name.
+STAGE_LABELS = {
+    "oscal-assessment-results-nist-1.1.2": "oscal-ar.json (NIST OSCAL 1.1.2)",
+    "sarif-2.1.0": "results.sarif (OASIS SARIF 2.1.0)",
+}
+
+
+def census_cases(plan: dict[str, Any]) -> list[tuple[str, str, list[dict[str, Any]]]]:
+    """The plan's mutations packed into as few report directories as possible: one mutation per
+    artifact per directory (artifacts validate independently), as `(case, base, mutations)`."""
+    by_base: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    for mutation in plan["mutations"]:
+        by_base.setdefault(mutation["base"], {}).setdefault(
+            mutation["file"], []
+        ).append(mutation)
+    cases = []
+    for base, files in by_base.items():
+        for k in range(max(len(ms) for ms in files.values())):
+            batch = [ms[k] for _, ms in sorted(files.items()) if k < len(ms)]
+            cases.append((f"census-{base}-{k}", base, batch))
+    return cases
+
+
+def census_expectations(
+    case: str,
+    mutations: list[dict[str, Any]],
+    py_env: dict[str, Any],
+    failures: list[str],
+) -> None:
+    """Python (the reference) must report each mutation exactly where the census search said, under
+    the keyword's family -- or, for `format`, report nothing for that file at all."""
+    signatures = problem_signatures("python", py_env["problems"])
+    for m in mutations:
+        label = STAGE_LABELS.get(m["stage"], m["file"])
+        pair = f"({m['stage']}, {m['keyword']})"
+        if m["keyword"] == "format":
+            if any(p.startswith(f"{m['file']}") for p in py_env["problems"]):
+                failures.append(
+                    f"{case}: {pair} must not be a problem: {py_env['problems']}"
+                )
+            continue
+        family = KEYWORD_FAMILY.get(m["reported_as"], m["reported_as"])
+        expected = f"{label}: {m['location']} [{family}]"
+        if expected not in signatures:
+            failures.append(
+                f"{case}: {pair} expected {expected!r}, python gave {signatures}"
+            )
+
+
+def uncovered_failures(plan: dict[str, Any]) -> list[str]:
+    """A census pair no mutation reached is a gap in this check, never a pass."""
+    return [
+        f"census pair ({schema}, {keyword}) has no mutation: no {keyword} failure was found in any base report"
+        for schema, keyword in plan["uncovered"]
+    ]
+
+
+def run_census_cases(tmp: Path, base: Path, failures: list[str]) -> int:
+    """Every census (schema, keyword) pair, failed once, compared across the three engines; returns
+    the number of `--validate` invocations per engine."""
+    bases = [base] + build_view_bases(tmp)
+    plan = discover_census_mutations(bases)
+    failures += uncovered_failures(plan)
+    by_name = {b.name: b for b in bases}
+    cases = census_cases(plan)
+    for case, base_name, mutations in cases:
+        case_dir = tmp / case
+        shutil.copytree(by_name[base_name], case_dir)
+        for m in mutations:
+            _write_json(case_dir / m["file"], m["document"])
+        expect_exit = 0 if all(m["keyword"] == "format" for m in mutations) else 3
+        envs = []
+        for engine, validate in (
+            ("python", python_validate),
+            ("typescript", typescript_validate),
+            ("java", java_validate),
+        ):
+            out, code = validate(case_dir)
+            if code != expect_exit:
+                failures.append(
+                    f"{case}: {engine} exited {code}, expected {expect_exit}"
+                )
+            envs.append(json.loads(out))
+        compare_signatures(case, envs[0], envs[1], envs[2], failures)
+        census_expectations(case, mutations, envs[0], failures)
+    return len(cases)
 
 
 def self_test() -> int:
@@ -522,14 +863,18 @@ def self_test() -> int:
     region = "runs/0/results/0/locations/0/physicalLocation/region"
     compare_labels(
         "self-test-location-count-divergence",
-        problem_prefixes([f"results.sarif (OASIS SARIF 2.1.0): {region}: combinator message"]),
+        problem_prefixes(
+            [f"results.sarif (OASIS SARIF 2.1.0): {region}: combinator message"]
+        ),
         problem_prefixes(
             [
                 f"results.sarif (OASIS SARIF 2.1.0): {region}: branch 1",
                 f"results.sarif (OASIS SARIF 2.1.0): {region}: branch 2",
             ]
         ),
-        problem_prefixes([f"results.sarif (OASIS SARIF 2.1.0): {region}: combinator message"]),
+        problem_prefixes(
+            [f"results.sarif (OASIS SARIF 2.1.0): {region}: combinator message"]
+        ),
         location_count_divergence,
     )
     if not location_count_divergence:
@@ -537,11 +882,114 @@ def self_test() -> int:
             "comparator failed to catch a same-location problem-count divergence between engines"
         )
 
+    # Each engine's real wording for every keyword family (captured from the census cases' own
+    # output), so a classifier that drifts from what an engine actually prints fails here.
+    real_messages = {
+        "python": {
+            "type": "'x x' is not of type 'object'",
+            "required": "'control' is a required property",
+            "additionalProperties": "Additional properties are not allowed ('zz_unexpected' was unexpected)",
+            "enum": "'x x' is not one of ['automated', 'semi-automated', 'manual']",
+            "const": "'2.1.0' was expected",
+            "pattern": "'x x' does not match '^[A-Z]{2,4}$'",
+            "minimum": "-1 is less than the minimum of 0",
+            "maximum": "1000000000 is greater than the maximum of 4",
+            "non-empty": "[] should be non-empty",
+            "uniqueItems": "[{'id': 'a'}, {'id': 'a'}] has non-unique elements",
+            "combinator": "{} is not valid under any of the given schemas",
+        },
+        "typescript": {
+            "type": "must be object",
+            "required": "must have required property 'control'",
+            "additionalProperties": "must NOT have additional properties ('zz_unexpected')",
+            "enum": "must be equal to one of the allowed values",
+            "const": "must be equal to constant",
+            "pattern": 'must match pattern "^[A-Z]{2,4}$"',
+            "minimum": "must be >= 0",
+            "maximum": "must be <= 4",
+            "non-empty": "must NOT have fewer than 1 items",
+            "uniqueItems": "must NOT have duplicate items (items ## 0 and 1 are identical)",
+            "combinator": "must match exactly one schema in oneOf",
+        },
+        "java": {
+            "type": "$: string found, object expected",
+            "required": "$[0]: required property 'control' not found",
+            "additionalProperties": "properties 'zz_unexpected' are not allowed (additional properties are not allowed)",
+            "enum": '$[0].mode: does not have a value in the enumeration ["automated", "semi-automated", "manual"]',
+            "const": "$.version: must be the constant value '2.1.0'",
+            "pattern": "$[0].family: does not match the regex pattern ^[A-Z]{2,4}$",
+            "minimum": "$.counts.conformant: must have a minimum value of 0",
+            "maximum": "$[0].rung: must have a maximum value of 4",
+            "non-empty": "$.runs: must have at least 1 items but found 0",
+            "uniqueItems": "$.runs[0].tool.driver.rules: must have only unique items in the array",
+            "combinator": "does not match any of the required alternatives",
+        },
+    }
+    for engine, by_family in real_messages.items():
+        for family, message in by_family.items():
+            got = message_family(engine, message)
+            if got != family:
+                failures.append(
+                    f"{engine} classifier: {message!r} gave {got!r}, expected {family!r}"
+                )
+        if message_family(engine, "an engine's newly worded message") != UNCLASSIFIED:
+            failures.append(f"{engine} classifier accepted a message it has never seen")
+
+    # Same location, different failing keyword: the location-only comparison called this a match.
+    unclassified: list[str] = []
+    compare_signatures(
+        "self-test-unclassified",
+        {"problems": ["assertions.json: 0: 'control' is a required property"]},
+        {"problems": ["assertions.json: 0: must have required property 'control'"]},
+        {"problems": ["assertions.json: 0: a wording no classifier knows"]},
+        unclassified,
+    )
+    if not any("not classified" in f for f in unclassified):
+        failures.append("an unclassified schema message was not reported as a failure")
+    family_divergence: list[str] = []
+    compare_signatures(
+        "self-test-family-divergence",
+        {"problems": ["assertions.json: 0/rung: -1 is less than the minimum of 0"]},
+        {"problems": ["assertions.json: 0/rung: must be <= 4"]},
+        {
+            "problems": [
+                "assertions.json: 0/rung: $[0].rung: must have a minimum value of 0"
+            ]
+        },
+        family_divergence,
+    )
+    if not family_divergence:
+        failures.append(
+            "comparator missed two engines failing different keywords at one location"
+        )
+
+    # A census pair the mutation search could not reach must fail the check, never pass silently.
+    if not uncovered_failures({"mutations": [], "uncovered": [["buyer", "const"]]}):
+        failures.append("an uncovered census pair was not reported as a failure")
+    packed = census_cases(
+        {
+            "mutations": [
+                {"base": "full", "file": "a.json", "keyword": "type"},
+                {"base": "full", "file": "a.json", "keyword": "enum"},
+                {"base": "full", "file": "b.json", "keyword": "type"},
+            ],
+            "uncovered": [],
+        }
+    )
+    if [(case, len(batch)) for case, _, batch in packed] != [
+        ("census-full-0", 2),
+        ("census-full-1", 1),
+    ]:
+        failures.append(
+            f"census mutations packed wrongly (two in one file must split): {packed}"
+        )
+
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if not failures:
         print(
-            "report_validate_parity_check self-test: comparator + label extraction discriminate"
+            "report_validate_parity_check self-test: comparator, label extraction and keyword "
+            "classifiers discriminate"
         )
     return 1 if failures else 0
 
@@ -586,10 +1034,7 @@ def run_real_check() -> int:
             py_labels = problem_labels(py_env["problems"])
             ts_labels = problem_labels(ts_env["problems"])
             java_labels = problem_labels(java_env["problems"])
-            py_prefixes = problem_prefixes(py_env["problems"])
-            ts_prefixes = problem_prefixes(ts_env["problems"])
-            java_prefixes = problem_prefixes(java_env["problems"])
-            compare_labels(case, py_prefixes, ts_prefixes, java_prefixes, failures)
+            compare_signatures(case, py_env, ts_env, java_env, failures)
 
             marker = REAL_SCHEMA_MARKERS.get(case)
             if marker is not None:
@@ -603,6 +1048,8 @@ def run_real_check() -> int:
                             f"{case}: {engine_name} never named the real third-party standard "
                             f"({marker!r}); labels were {labels}"
                         )
+
+        census_count = run_census_cases(tmp, base, failures)
 
         # Case 16: a path that is not a directory refuses before any artifact is opened. Each
         # engine's own error-envelope field name differs (`error.key` in Python, `error.message_key`
@@ -631,7 +1078,10 @@ def run_real_check() -> int:
         print(f"MISMATCH: {failure}", file=sys.stderr)
     if failures:
         return 1
-    print(f"MATCH: {len(CASES) + 1} invocations agree across python, typescript, java")
+    print(
+        f"MATCH: {len(CASES) + 1 + census_count} invocations agree across python, typescript, java "
+        f"({census_count} cover every census (schema, keyword) pair)"
+    )
     return 0
 
 
