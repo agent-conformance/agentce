@@ -215,10 +215,11 @@ public final class Bundle {
                 // `asText()`, Python's `str()` and TypeScript's `String()` each render a non-string
                 // JSON value differently, which would make a tampered source's trust classification
                 // diverge across engines for no reason a reader could use (verifier round 1, 18.65).
-                if (!item.isObject() || !item.has("id") || !item.get("id").isTextual()) {
+                JsonNode idNode = item.isObject() ? item.get("id") : null;
+                if (idNode == null || !idNode.isTextual()) {
                     continue;
                 }
-                String sourceId = item.get("id").asText();
+                String sourceId = idNode.asText();
                 ids.add(sourceId);
                 JsonNode cls = item.get("class");
                 if (cls != null && cls.isTextual() && !cls.asText().isEmpty()) {

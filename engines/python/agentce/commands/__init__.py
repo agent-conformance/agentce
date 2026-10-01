@@ -176,6 +176,12 @@ def _opt_str(ns: argparse.Namespace, name: str) -> str | None:
     return None if value is None else str(value)
 
 
+def _opt_str_nonempty(ns: argparse.Namespace, name: str) -> str | None:
+    """Like `_opt_str`, but an empty string is treated as not given -- TypeScript's and Java's
+    `emptyToUndefined` (verifier round 1, 18.65)."""
+    return _opt_str(ns, name) or None
+
+
 def _flag(ns: argparse.Namespace, name: str) -> bool:
     return bool(getattr(ns, name, False))
 
@@ -254,14 +260,14 @@ def cmd_validate(ns: argparse.Namespace) -> CommandResult:
 
 def cmd_verify(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="verify")
-    # An empty value (`--bundle ""`) is treated as not given (F4, 18.65), the same as TypeScript's
-    # and Java's `emptyToUndefined`: dispatch below branches on `is not None`, so leaving an empty
-    # string as itself (rather than None) would let a second, truthy target lose the exactly-one
-    # selection below and still be shadowed by the empty one's own `is not None` branch.
-    bundle = _opt_str(ns, "bundle") or None
-    catalog = _opt_str(ns, "catalog") or None
-    release = _opt_str(ns, "release") or None
-    report = _opt_str(ns, "report") or None
+    # An empty value (`--bundle ""`) is treated as not given (F4, 18.65): dispatch below branches on
+    # `is not None`, so leaving an empty string as itself (rather than None) would let a second,
+    # truthy target lose the exactly-one selection below and still be shadowed by the empty one's
+    # own `is not None` branch.
+    bundle = _opt_str_nonempty(ns, "bundle")
+    catalog = _opt_str_nonempty(ns, "catalog")
+    release = _opt_str_nonempty(ns, "release")
+    report = _opt_str_nonempty(ns, "report")
     chosen = [
         name
         for name, value in (
