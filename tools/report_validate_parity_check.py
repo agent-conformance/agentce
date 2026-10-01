@@ -202,7 +202,11 @@ def _mutate_oscal_local(report_dir: Path) -> None:
     _write_json(path, oscal)
 
 
-def _mutate_oscal_nist(report_dir: Path) -> None:
+def seed_oscal_nist_fault(report_dir: Path) -> None:
+    """The real-schema-only OSCAL violation `case6-oscal-nist` uses -- public (unlike this module's
+    other per-case mutators) so `verification/gates/report_validate_engines.sh` (VG-REPORT-VALIDATE)
+    can call it directly; the one case C3's own `REAL_SCHEMA_MARKERS` names as the discriminating
+    proof an engine skipping the real third-party standard would wrongly pass."""
     path = report_dir / "oscal-ar.json"
     oscal = _read_json(path)
     oscal["assessment-results"]["uuid"] = "not-a-uuid"
@@ -300,7 +304,7 @@ CASES: list[tuple[str, Callable[[Path], None], int]] = [
     ("case3-invalid-json", _mutate_invalid_json, 3),
     ("case4-local-schema", _mutate_local_schema, 3),
     ("case5-oscal-local", _mutate_oscal_local, 3),
-    ("case6-oscal-nist", _mutate_oscal_nist, 3),
+    ("case6-oscal-nist", seed_oscal_nist_fault, 3),
     ("case7-sarif-local", _mutate_sarif_local, 3),
     ("case8-sarif-real", _mutate_sarif_real, 3),
     ("case9-csv", _mutate_csv, 3),

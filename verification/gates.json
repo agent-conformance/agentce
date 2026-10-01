@@ -675,6 +675,37 @@
       "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/commands/__init__.py's cmd_sign, ported field-for-field in engines/typescript/src/sign.ts and engines/java/src/main/java/org/agentce/Sign.java."
     },
     {
+      "id": "VG-REPORT-VALIDATE",
+      "title": "report --validate performs real schema-validation of report artifacts, including the two-stage real-third-party-standard check for oscal-ar.json, in all three engines",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/report_validate_engines.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 900,
+      "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
+      "rubric": {
+        "pass": "each engine validates a clean, fully-emitted report directory (exit 0, valid=true); each engine catches a copy whose oscal-ar.json satisfies AgentCE's own bounded local profile but violates the real vendored NIST OSCAL 1.1.2 standard (exit 3, valid=false, a problem naming 'oscal-ar.json (NIST OSCAL 1.1.2)'); each engine refuses a report directory that does not exist (exit 3, keyed input.validate_not_a_directory) before opening any artifact",
+        "fail": "any engine fails the clean report, accepts the real-schema-only OSCAL violation as valid or without naming the real standard, or accepts a missing report directory"
+      },
+      "faults": [
+        {
+          "description": "the real-schema second-stage NIST OSCAL check is skipped, so a document satisfying only the bounded local profile is wrongly reported valid",
+          "file": "engines/python/agentce/report.py",
+          "search": "        if filename == \"oscal-ar.json\":\n            problems += [\n                f\"oscal-ar.json (NIST OSCAL 1.1.2): {p}\"\n                for p in validate_oscal_ar_nist(instance)\n            ]",
+          "replace": "        if False and filename == \"oscal-ar.json\":\n            problems += [\n                f\"oscal-ar.json (NIST OSCAL 1.1.2): {p}\"\n                for p in validate_oscal_ar_nist(instance)\n            ]"
+        }
+      ],
+      "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/report.py's validate_report, ported field-for-field in engines/typescript/src/reportValidate.ts and engines/java/src/main/java/org/agentce/ReportValidate.java."
+    },
+    {
       "id": "VG-SKILL-RELEASE-SHAPE",
       "title": "A release-shaped commit still carries a working, in-sync vendored engine wheel for both agent skills, standalone and offline",
       "tier": "quick",

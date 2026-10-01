@@ -3,6 +3,16 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.19.0
+
+- Added `VG-REPORT-VALIDATE`: `report --validate` performs real schema-validation of report
+  artifacts, including the two-stage real-third-party-standard check for `oscal-ar.json`, in all
+  three engines (18.27, contract critic round 2 F7). Reuses
+  `tools/report_validate_parity_check.py`'s own `build_base_report`/`seed_oscal_nist_fault` to build
+  a shared report directory and its real-schema-only OSCAL violation, matching `VG-SIGN`'s
+  own-fixtures-reuse precedent. Its seeded fault disables Python's second-stage NIST OSCAL check, so
+  a document satisfying only AgentCE's bounded local profile is wrongly reported valid.
+
 ## 0.18.0
 
 - Added `VG-SKILL-RELEASE-SHAPE`: once everyday commits stop tracking the two agent skills' vendored
