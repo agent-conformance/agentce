@@ -417,7 +417,7 @@ public final class Verify {
         return "sha256:" + sha256.textValue();
     }
 
-    private static CharBuffer decodeStrict(byte[] bytes) throws CharacterCodingException {
+    static CharBuffer decodeStrict(byte[] bytes) throws CharacterCodingException {
         return StandardCharsets.UTF_8
                 .newDecoder()
                 .onMalformedInput(CodingErrorAction.REPORT)

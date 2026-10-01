@@ -672,9 +672,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise unknown_error(unknown[0])
     except SystemExit as exc:  # argparse: -h/--version exit 0; usage errors exit 3
         return exc.code if isinstance(exc.code, int) else int(ExitCode.INPUT_ERROR)
-    except (
-        AgentceError
-    ) as err:  # a keyed `readiness`/`sign`/`verify` usage error (`_Parser`)
+    # A keyed `readiness`/`sign`/`verify` usage error (`_Parser`).
+    except AgentceError as err:
         command = err.key.removeprefix("input.").split("_", 1)[0]
         return _emit_error(err, command=command, want_json="--json" in args)
 

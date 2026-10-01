@@ -89,7 +89,11 @@ def ingest(
                     )
                 )
                 continue
-            if _max_nesting(line) > MAX_JSON_DEPTH:
+            # The bracket count bounds the nesting, so most lines skip the character scan.
+            if (
+                line.count("[") + line.count("{") > MAX_JSON_DEPTH
+                and _max_nesting(line) > MAX_JSON_DEPTH
+            ):
                 raise _too_deep()
             try:
                 event = json.loads(line)

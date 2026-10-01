@@ -59,6 +59,15 @@ function tooDeep(): InputError {
  * Mirrors `ingest._max_nesting`: the deepest `[`/`{` nesting in `line`, counted lexically (brackets
  * inside strings ignored) before any parse, so the limit is the same number in all three engines.
  */
+function bracketCount(line: string): number {
+  let count = 0;
+  for (let i = 0; i < line.length; i++) {
+    const code = line.charCodeAt(i);
+    if (code === 0x5b || code === 0x7b) count++;
+  }
+  return count;
+}
+
 function maxNesting(line: string): number {
   let depth = 0;
   let deepest = 0;
@@ -151,7 +160,8 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
         });
         continue;
       }
-      if (maxNesting(line) > MAX_JSON_DEPTH) {
+      // The bracket count bounds the nesting, so most lines skip the character scan.
+      if (bracketCount(line) > MAX_JSON_DEPTH && maxNesting(line) > MAX_JSON_DEPTH) {
         throw tooDeep();
       }
       let event: unknown;

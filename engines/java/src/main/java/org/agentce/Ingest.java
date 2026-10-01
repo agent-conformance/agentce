@@ -2,9 +2,7 @@ package org.agentce;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
-import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -81,7 +79,7 @@ public final class Ingest {
             for (byte[] rawLine : splitLines(content)) {
                 String raw;
                 try {
-                    raw = decodeStrict(rawLine);
+                    raw = Verify.decodeStrict(rawLine).toString();
                 } catch (CharacterCodingException e) {
                     result.quarantined.add(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
                             .detail("invalid UTF-8"));
@@ -96,7 +94,9 @@ public final class Ingest {
                             .detail("event exceeds " + maxEventBytes + " bytes"));
                     continue;
                 }
-                if (maxNesting(line) > Verify.MAX_JSON_DEPTH) {
+                // The bracket count bounds the nesting, so most lines skip the character scan.
+                if (bracketCount(line) > Verify.MAX_JSON_DEPTH
+                        && maxNesting(line) > Verify.MAX_JSON_DEPTH) {
                     throw new InputError(
                             "input.event_structure_too_deep",
                             "an evidence event line is nested too deeply to parse safely.",
@@ -216,20 +216,16 @@ public final class Ingest {
         return lines;
     }
 
-    private static String decodeStrict(byte[] bytes) throws CharacterCodingException {
-        return StandardCharsets.UTF_8
-                .newDecoder()
-                .onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT)
-                .decode(ByteBuffer.wrap(bytes))
-                .toString();
-    }
-
     /**
      * Mirrors {@code ingest._max_nesting}: the deepest {@code [}/{@code {} nesting in {@code line},
      * counted lexically (brackets inside strings ignored) before any parse, so the limit is the same
      * number in all three engines.
      */
+    /** Every {@code [} and {@code {} in {@code line}: an upper bound on its nesting. */
+    private static long bracketCount(String line) {
+        return line.chars().filter(ch -> ch == '[' || ch == '{').count();
+    }
+
     static int maxNesting(String line) {
         int depth = 0;
         int deepest = 0;

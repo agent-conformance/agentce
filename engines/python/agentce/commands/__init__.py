@@ -764,9 +764,8 @@ def _verify_report(
     try:
         bundle_digest = loaded_bundle.digest
     except (CanonicalizationError, RecursionError):
-        bundle_digest = (
-            None  # a manifest no digest can be computed for matches no recorded one
-        )
+        # A manifest no digest can be computed for matches no recorded one.
+        bundle_digest = None
     if bundle_digest is None or bundle_digest != inputs.get("bundle_digest"):
         raise InputError(
             "verify.report_evidence_tampered",

@@ -929,16 +929,15 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
     # bundle-streams (each events/*.jsonl line ingest reads). The first line of one real stream is
     # replaced, or the file's line structure changed, and manifest.json's digest for that file is
     # updated so ingest's own reading is what decides the outcome, not the content check.
-    stream_name = STREAM_FILE
-    stream_bytes = (evidence_bundle / stream_name).read_bytes()
+    stream_bytes = (evidence_bundle / STREAM_FILE).read_bytes()
     first_line, _, rest = stream_bytes.partition(b"\n")
 
     def bundle_stream(data: bytes) -> Callable[[Path], Path]:
         def edit(dest: Path) -> None:
-            (dest / stream_name).write_bytes(data)
+            (dest / STREAM_FILE).write_bytes(data)
             manifest = json.loads((dest / "manifest.json").read_bytes())
             for entry in manifest["files"]:
-                if entry["path"] == stream_name:
+                if entry["path"] == STREAM_FILE:
                     entry["sha256"] = hashlib.sha256(data).hexdigest()
             _write(dest / "manifest.json", manifest)
 
@@ -1047,9 +1046,6 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
 
         return argv
 
-    def same(path: Path) -> str:
-        return str(path)
-
     for flag_target, builder in (
         ("catalog", catalog_with(lambda _dest: None)),
         ("release", bundle_with(lambda _dest: None)),
@@ -1058,9 +1054,9 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
     ):
         flag = "--" + flag_target
         for name, argv in (
-            ("twice", repeated(same, same)),
-            ("twice-then-empty", repeated(same, arg_empty)),
-            ("empty-then-twice", repeated(arg_empty, same)),
+            ("twice", repeated(str, str)),
+            ("twice-then-empty", repeated(str, arg_empty)),
+            ("empty-then-twice", repeated(arg_empty, str)),
         ):
             add(
                 f"{flag_target}-{name}",
