@@ -771,7 +771,7 @@
         {
           "description": "the matcher stops checking lock text for an Intel-macOS wheel and always reports no problem, so a later cryptography bump that drops the platform split in any tracked lock would pass silently",
           "file": "tools/cryptography_intel_wheel_check.py",
-          "search": "    return bool(NAMES_CRYPTOGRAPHY.search(lock_text)) and not INTEL_WHEEL.search(\n        lock_text\n    )",
+          "search": "    return not any(\n        INTEL_TAG.match(_platform_tag(wheel.get(\"url\", \"\")))\n        for pkg in packages\n        for wheel in pkg.get(\"wheels\", [])\n    )",
           "replace": "    return False"
         }
       ],

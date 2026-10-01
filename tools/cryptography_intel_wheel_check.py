@@ -8,8 +8,8 @@ prebuilt wheel (48.x) while every other platform keeps the advisory-clean 50.x l
 own re-lock inherits that split -- but only once someone actually runs ``uv lock`` there. 18.55's verifier
 found 20 such locks still pinned to plain ``cryptography==50.0.1`` with no Intel wheel (O1): AGENTS.md's
 own documented docs and conformance commands would still fail a fresh Intel-macOS install. This script is
-the standing check a later dependency bump could otherwise silently regress: it greps every tracked lock
-that names ``cryptography`` for a wheel macOS/x86_64 can actually install.
+the standing check a later dependency bump could otherwise silently regress: it parses every tracked lock
+that names ``cryptography`` and checks its resolved wheels for one macOS/x86_64 can actually install.
 
 Usage: ``uv run --project tools python tools/cryptography_intel_wheel_check.py``. Exit 0 when every
 tracked lock naming ``cryptography`` resolves an Intel-macOS wheel (``macosx_*_universal2`` or
@@ -24,34 +24,56 @@ import json
 import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 
-#: Same shape as the item's own acceptance check and ADR-0024's verification bullet: a cryptography
-#: wheel filename whose platform tag is the universal2 fat binary or a bare Intel macOS build.
-INTEL_WHEEL = re.compile(
-    r"cryptography-[0-9.]+-[a-z0-9]+-[a-z0-9_.]+-macosx_[0-9_]+_(universal2|x86_64)\.whl"
-)
-
-NAMES_CRYPTOGRAPHY = re.compile(r'^name = "cryptography"$', re.MULTILINE)
+#: A cryptography wheel's platform tag that macOS/x86_64 can actually install: the universal2 fat
+#: binary, or a bare Intel build. Same two architectures as the item's acceptance check and ADR-0024's
+#: verification bullet; the shape mirrors (but is not the same regex as) ``environment.py``'s
+#: ``PREBUILT_MACOS_TAG``, which matches a bare tag string (``arm64`` included, no ``x86_64``) read from
+#: an installed distribution's own ``WHEEL`` file, not a wheel filename's trailing segment read from a
+#: lock. A future wheel-tagging change upstream needs both updated together.
+INTEL_TAG = re.compile(r"^macosx_\d+_\d+_(universal2|x86_64)$")
 
 
 def tracked_uv_locks() -> list[Path]:
+    """Every tracked ``uv.lock``, found the way the rest of ``tools/`` lists tracked files (list all,
+    filter in Python), not by handing git a pathspec glob."""
     out = subprocess.run(
-        ["git", "ls-files", "*uv.lock"],
+        ["git", "ls-files", "-z"],
         cwd=ROOT,
         capture_output=True,
         text=True,
         check=True,
     )
-    return [ROOT / line for line in out.stdout.splitlines() if line]
+    return [ROOT / p for p in out.stdout.split("\0") if p.endswith("uv.lock")]
+
+
+def _platform_tag(wheel_url: str) -> str:
+    """The platform-tag segment of a wheel filename, e.g. ``macosx_10_9_universal2`` from
+    ``.../cryptography-48.0.1-cp311-abi3-macosx_10_9_universal2.whl``."""
+    filename = wheel_url.rsplit("/", 1)[-1]
+    return filename.removesuffix(".whl").rsplit("-", 1)[-1]
 
 
 def lacks_intel_wheel(lock_text: str) -> bool:
-    """True when the lock names ``cryptography`` but resolves no Intel-macOS wheel for it."""
-    return bool(NAMES_CRYPTOGRAPHY.search(lock_text)) and not INTEL_WHEEL.search(
-        lock_text
+    """True when the lock names ``cryptography`` but resolves no Intel-macOS wheel for it. Parses the
+    lock as TOML (as ``tools/no_ml_check.py``'s own ``packages_in_uv_lock`` does) rather than
+    pattern-matching the raw text, so a reformatted or reordered lock is read the same way ``uv`` reads
+    it."""
+    data: dict[str, Any] = tomllib.loads(lock_text)
+    packages = [
+        pkg for pkg in data.get("package", []) if pkg.get("name") == "cryptography"
+    ]
+    if not packages:
+        return False
+    return not any(
+        INTEL_TAG.match(_platform_tag(wheel.get("url", "")))
+        for pkg in packages
+        for wheel in pkg.get("wheels", [])
     )
 
 
@@ -67,16 +89,16 @@ def self_test() -> int:
     with_wheel = (
         '[[package]]\nname = "cryptography"\nversion = "48.0.1"\n'
         "wheels = [\n"
-        '    { url = "https://files.pythonhosted.org/packages/.../cryptography-48.0.1-cp311-abi3-'
+        '    { url = "https://files.pythonhosted.org/packages/aa/cryptography-48.0.1-cp311-abi3-'
         'macosx_10_9_universal2.whl" },\n'
         "]\n"
     )
     without_wheel = (
         '[[package]]\nname = "cryptography"\nversion = "50.0.1"\n'
         "wheels = [\n"
-        '    { url = "https://files.pythonhosted.org/packages/.../cryptography-50.0.1-cp311-abi3-'
+        '    { url = "https://files.pythonhosted.org/packages/bb/cryptography-50.0.1-cp311-abi3-'
         'manylinux_2_28_x86_64.whl" },\n'
-        '    { url = "https://files.pythonhosted.org/packages/.../cryptography-50.0.1-cp311-abi3-'
+        '    { url = "https://files.pythonhosted.org/packages/cc/cryptography-50.0.1-cp311-abi3-'
         'macosx_11_0_arm64.whl" },\n'
         "]\n"
     )
