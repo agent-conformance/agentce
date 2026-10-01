@@ -1629,6 +1629,81 @@ def _sign_problems(exe: list[str], runner: Runner, cwd: Path) -> list[str]:
     return problems
 
 
+def _report_validate_problems(
+    exe: list[str], runner: Runner, cwd: Path, qs_out: Path
+) -> list[str]:
+    """`agentce report --validate <dir>` against this installed artifact's own freshly-written
+    quickstart output (item 18.27), run the way a user reaches it (C4), network disabled: a clean
+    run validates with no problems; a copy with a real-schema-only OSCAL violation (the same
+    discriminating case `report_validate_parity_check.py`'s `case6-oscal-nist` uses) is caught only
+    if the vendored NIST 1.1.2 schema actually shipped inside this installed artifact, not merely in
+    the repo's build tree -- a packaging gap C1-C3 (which run from the checkout) cannot see; a
+    missing `report_dir` refuses before opening any artifact."""
+    problems: list[str] = []
+    proc = runner.run(
+        [*exe, "report", "--validate", str(qs_out), "--json"], cwd, offline=True
+    )
+    try:
+        envelope = json.loads(proc.stdout)
+    except ValueError:
+        return [
+            f"report --validate clean: output is not JSON: {proc.stdout.strip()[:200]!r}"
+        ]
+    if proc.returncode != 0 or envelope.get("valid") is not True:
+        problems.append(
+            f"report --validate clean: exit {proc.returncode}, valid={envelope.get('valid')!r}, "
+            f"expected exit 0, valid=true (problems={envelope.get('problems')!r})"
+        )
+
+    corrupted = cwd / "report-validate-corrupted"
+    if corrupted.exists():
+        shutil.rmtree(corrupted)
+    shutil.copytree(qs_out, corrupted)
+    oscal_path = corrupted / "oscal-ar.json"
+    oscal = json.loads(oscal_path.read_text(encoding="utf-8"))
+    oscal["assessment-results"]["uuid"] = "not-a-uuid"
+    oscal_path.write_text(json.dumps(oscal), encoding="utf-8")
+    proc = runner.run(
+        [*exe, "report", "--validate", str(corrupted), "--json"], cwd, offline=True
+    )
+    try:
+        envelope = json.loads(proc.stdout)
+    except ValueError:
+        return problems + [
+            f"report --validate oscal-nist: output is not JSON: {proc.stdout.strip()[:200]!r}"
+        ]
+    marker = "oscal-ar.json (NIST OSCAL 1.1.2)"
+    problem_list = envelope.get("problems") or []
+    if (
+        proc.returncode != 3
+        or envelope.get("valid") is not False
+        or not any(p.startswith(marker) for p in problem_list)
+    ):
+        problems.append(
+            f"report --validate oscal-nist: exit {proc.returncode}, valid={envelope.get('valid')!r}, "
+            f"problems={problem_list!r}, expected exit 3 naming {marker!r} "
+            "(the vendored NIST schema may not be packaged into this installed artifact)"
+        )
+
+    missing = cwd / "report-validate-does-not-exist"
+    proc = runner.run(
+        [*exe, "report", "--validate", str(missing), "--json"], cwd, offline=True
+    )
+    try:
+        envelope = json.loads(proc.stdout)
+    except ValueError:
+        return problems + [
+            f"report --validate missing-dir: output is not JSON: {proc.stdout.strip()[:200]!r}"
+        ]
+    key = envelope.get("error", {}).get("message_key")
+    if proc.returncode != 3 or key != "input.validate_not_a_directory":
+        problems.append(
+            f"report --validate missing-dir: exit {proc.returncode}, message_key={key!r}, "
+            "expected exit 3, 'input.validate_not_a_directory'"
+        )
+    return problems
+
+
 _ZERO_DIGEST = "sha256:" + "0" * 64
 
 
@@ -2026,6 +2101,9 @@ def _npm_run_problems(
         bundled_eu_ai_act if bundled_eu_ai_act.is_dir() else None,
         bundled_quickstart if bundled_quickstart.is_dir() else None,
     )
+    problems += [
+        f"npm: {p}" for p in _report_validate_problems(exe, runner, empty, qs_out)
+    ]
     return problems
 
 
@@ -2144,6 +2222,9 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
             bundled_eu_ai_act,
             bundled_quickstart,
         )
+        problems += [
+            f"jar: {p}" for p in _report_validate_problems(exe, runner, empty, qs_out)
+        ]
         return problems
 
 
@@ -2343,6 +2424,7 @@ def self_test() -> int:
             "lacks data/catalogs/base",
             "quickstart: ",
             "version: ",
+            "report --validate",
         ):
             if not any(expected in p for p in found):
                 failures.append(
@@ -2364,6 +2446,7 @@ def self_test() -> int:
                 "the jar lacks",
                 "quickstart: ",
                 "version: ",
+                "report --validate",
             ):
                 if not any(expected in p for p in found):
                     failures.append(
