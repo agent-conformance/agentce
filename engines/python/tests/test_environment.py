@@ -51,8 +51,10 @@ def test_cryptography_platform_pin_matches_across_packages() -> None:
         (["cp311-abi3-macosx_12_0_arm64"], "prebuilt"),
         (["cp311-abi3-macosx_11_0_universal2"], "prebuilt"),
         (["cp311-abi3-win_amd64"], "prebuilt"),
-        # No release publishes an architecture-specific macOS x86_64 wheel, so this tag can only be a
-        # local build (unlike the universal2 fat binary above).
+        # No CPython release in the pinned 48.x/50.x lines publishes an architecture-specific macOS
+        # x86_64 wheel (cryptography 46.0.0-46.0.3 shipped one, but tagged pp*, not cp*, for PyPy
+        # only), so this cp*-tagged form can only be a local build (unlike the universal2 fat binary
+        # above).
         (["cp312-abi3-macosx_10_12_x86_64"], "source-build"),
         (["cp312-abi3-linux_x86_64"], "source-build"),
         (["cp312-abi3-win32"], "source-build"),

@@ -20,16 +20,18 @@ installs on both Intel and Apple-silicon macOS, not a source build. No release b
 50.x adds an Intel wheel back; ADR 0014's `!=50.0.2` pin (commit `c2fbeba`) fixed nothing, because the
 absence started four releases earlier.
 
-Pinning Intel macOS to 48.0.1 reaches a prebuilt wheel at the cost of two advisories `50.0.x` clears:
+Pinning Intel macOS to 48.0.1 reaches a prebuilt wheel at the cost of three advisories `50.0.x` clears:
 
 | Advisory | Severity | Vulnerable range | Fixed in | Surface |
 |---|---|---|---|---|
 | GHSA-g6cj-pr64-35w5 (PKCS#7 `EnvelopedData` decryption: Bleichenbacher oracle) | high | `>= 44.0.0, < 50.0.0` | 50.0.0 | `cryptography.hazmat.primitives.serialization.pkcs7` |
 | GHSA-jwv3-5hgf-82ww (duplicate self-signed intermediates: exponential path-building) | high | `>= 42.0.0, < 49.0.0` | 49.0.0 | `cryptography.x509` chain verification |
+| GHSA-m2h6-j472-rp4c (wildcard DNS name escapes a name-constrained sub-CA) | medium | `>= 45.0.0, < 49.0.0` | 49.0.0 | `cryptography.x509` chain verification |
 
-(Checked via `gh api /advisories/<id>` against the PyPI index on 2026-09-30.) The third advisory the
-50.x upgrade cleared, GHSA-537c-gmf6-5ccf (vulnerable OpenSSL bundled in the wheel), is fixed in
-48.0.1 itself, so it does not apply here.
+(Checked via `gh api /advisories/<id>` against the PyPI index on 2026-09-30.) The medium one does not trip
+`fail-on-severity: high` on its own; the allow-list (below) covers all three regardless. The fourth
+advisory the 50.x upgrade cleared, GHSA-537c-gmf6-5ccf (vulnerable OpenSSL bundled in the wheel), is
+fixed in 48.0.1 itself, so it does not apply here.
 
 Neither vulnerable surface is reachable from this repository: `engines/python/agentce/signing.py`
 imports only `cryptography.exceptions.InvalidSignature` and
@@ -89,13 +91,16 @@ envelopes or build X.509 certificate chains.
   as every other platform in the matrix; the Rust/OpenSSL prerequisite in Getting Started is gone for
   the common case. The `python-install-matrix` CI job's Intel leg now expects `wheel: prebuilt` and no
   longer provisions OpenSSL.
-- Intel macOS runs an older `cryptography` release than every other platform, with two known
+- Intel macOS runs an older `cryptography` release than every other platform, with three known
   unreachable-but-unpatched advisories (above) until upstream ships an Intel wheel again. This is a
   known limitation, not a silent gap: it is recorded here, in Getting Started, and in
   `agentce doctor`'s `environment` section (the installed version and wheel tag are always reported).
-- `uv.lock` in both packages now carries two `cryptography` entries (48.0.1 and 50.0.1) distinguished
-  by resolution marker; `tools/no_ml_check.py`'s denylist scan is unaffected (`cryptography` is not on
-  the no-ML denylist; the scan is not platform-aware and checks both entries the same way).
+- Every tracked `uv.lock` resolving `cryptography` — not just the two packages that pin it directly, but
+  every other workspace that depends on `agent-conformance` (editable from `engines/python`) — now
+  carries two `cryptography` entries (48.0.1 and 50.0.1) distinguished by resolution marker, because
+  `uv lock` re-resolves the editable dependency's own split specifier (item 18.58). `tools/no_ml_check.py`'s
+  denylist scan is unaffected (`cryptography` is not on the no-ML denylist; the scan is not
+  platform-aware and checks both entries the same way).
 - No effect on determinism: `cryptography` is a signing/verification dependency, not part of the
   canonical form or the evaluation path, and every platform still signs and verifies against the same
   Ed25519 vectors (SPEC §6.7, ADR 0006).
@@ -113,5 +118,9 @@ envelopes or build X.509 certificate chains.
   branch's phase-merge PR): passes with the two-advisory allow-list; `gh run view <run-id> --log`
   shows no other advisory.
 - `engines/python/tests/test_environment.py::test_wheel_source_classifies_platform_tags` covers the
-  `macosx_10_9_universal2` tag as `prebuilt` and keeps the architecture-specific
-  `macosx_10_12_x86_64` tag (which no release publishes) as `source-build`.
+  `macosx_10_9_universal2` tag as `prebuilt` and keeps the architecture-specific `macosx_10_12_x86_64`
+  tag as `source-build` (no CPython release in the pinned 48.x/50.x lines publishes a bare macOS
+  x86_64 wheel; cryptography 46.0.0-46.0.3 shipped one, but tagged `pp*` for PyPy only, not `cp*`).
+- Item 18.58 extends this to every other tracked `uv.lock` that resolves `cryptography` transitively
+  (the 20 workspaces besides the two above): `tools/cryptography_intel_wheel_check.py` greps every
+  tracked lock for an Intel-macOS wheel, in CI, with a seeded fault.

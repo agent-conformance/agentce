@@ -6,9 +6,10 @@ release since then ships an Intel-macOS wheel (ADR-0024). ``engines/python/pypro
 ``adapters/supply-chain/pyproject.toml`` therefore pin darwin/x86_64 to the 48.x line instead, whose
 universal2 wheel (tagged ``macosx_10_9_universal2``) installs on Intel Macs as a real prebuilt
 binary, not a source build. Installing outside that matched set (for example a bare ``macosx_*_x86_64``
-tag, which no release publishes) still compiles from source and needs a Rust toolchain and an OpenSSL 3
-build. This module reads what the running interpreter actually has installed and reports it, so a user
-learns what is missing from ``agentce doctor`` instead of from a build failure.
+tag, which no release in the pinned 48.x/50.x lines publishes for CPython; 46.0.0-46.0.3 shipped one,
+but only for PyPy, tagged ``pp*`` rather than ``cp*``) still compiles from source and needs a Rust
+toolchain and an OpenSSL 3 build. This module reads what the running interpreter actually has installed
+and reports it, so a user learns what is missing from ``agentce doctor`` instead of from a build failure.
 
 Nothing here is a constant standing in for a measurement: the interpreter version comes from
 ``sys.version_info``, and the wheel provenance from the installed distribution's own ``WHEEL`` file.
