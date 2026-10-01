@@ -167,6 +167,21 @@ FLOW_POINTS = (
         ("empty", "trailing-slash", "dot", "repeated", "equals"),
     ),
     FlowPoint(
+        "verify-argv",
+        "verify's argv grammar beyond the target values: a flag missing its value, a value on a "
+        "flag that takes none, unknown and abbreviated flags, positionals, '--', and the = form of "
+        "--signer-trust-root/--expect-keyid",
+        (
+            "missing-value",
+            "takes-no-value",
+            "unknown-flag",
+            "abbreviation",
+            "positional",
+            "double-dash",
+            "equals",
+        ),
+    ),
+    FlowPoint(
         "report-claim",
         "--report's claim.json bytes -> JSON -> signatures[] and the canonical claim body, read "
         "before any signature check (plain tampering, no re-signing)",
@@ -1087,6 +1102,44 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         arg=arg_trailing_slash,
     )
 
+    # verify's argv grammar (18.65 round 3): every token form argparse refuses or reads differently
+    # from a hand scanner, each beside a valid evidence bundle so only the argv decides the answer.
+    evidence_ok = bundle_evidence_with(lambda _dest: None)
+    for name, cls, tokens in (
+        ("bundle-missing-value", "missing-value", ["--bundle"]),
+        ("bundle-value-is-a-flag", "missing-value", ["--bundle", "--json"]),
+        (
+            "signer-missing-value",
+            "missing-value",
+            ["--bundle", "{}", "--signer-trust-root"],
+        ),
+        ("keyid-missing-value", "missing-value", ["--bundle", "{}", "--expect-keyid"]),
+        ("json-with-value", "takes-no-value", ["--bundle", "{}", "--json=1"]),
+        ("quiet-with-value", "takes-no-value", ["--bundle", "{}", "--quiet="]),
+        ("unknown-flag", "unknown-flag", ["--bundle", "{}", "--unknown"]),
+        ("unknown-flag-equals", "unknown-flag", ["--bundle", "{}", "--unknown=1"]),
+        ("unknown-short-flag", "unknown-flag", ["-x", "{}"]),
+        ("unknown-before-missing", "unknown-flag", ["--unknown", "--bundle"]),
+        ("abbreviated", "abbreviation", ["--bun", "{}"]),
+        ("upper-case", "abbreviation", ["--BUNDLE", "{}"]),
+        ("positional", "positional", ["--bundle", "{}", "extra"]),
+        ("dash", "positional", ["--bundle", "{}", "-"]),
+        ("negative-number", "positional", ["--bundle", "{}", "-1"]),
+        ("double-dash-after", "double-dash", ["--bundle", "{}", "--"]),
+        ("double-dash-before", "double-dash", ["--", "--bundle", "{}"]),
+        ("signer-equals", "equals", ["--bundle", "{}", "--signer-trust-root=x"]),
+        ("keyid-equals", "equals", ["--bundle", "{}", "--expect-keyid=k"]),
+        ("keyid-equals-empty", "equals", ["--bundle", "{}", "--expect-keyid="]),
+    ):
+        add(
+            name,
+            "verify-argv",
+            cls,
+            evidence_ok,
+            target="bundle",
+            arg=lambda path, tokens=tokens: [t.format(path) for t in tokens],
+        )
+
     mutations.extend(report_mutations(canonical))
     return mutations
 
@@ -1414,6 +1467,10 @@ READ_CALLS = frozenset(
         "is_file",
         "is_dir",
         "exists",
+        "isfile",
+        "isdir",
+        "islink",
+        "getsize",
         "parse_untrusted_json",
     }
 )
@@ -1620,12 +1677,11 @@ INVENTORY_FLAGS: dict[str, tuple[str, ...] | str] = {
     "--catalog": ("target-argument", "catalog-sig-file"),
     "--release": ("target-argument", "release-file", "manifest-file"),
     "--report": ("target-argument", "report-claim"),
-    "--signer-trust-root": ("signer-trust-root",),
-    "--expect-keyid": "disposition: compared as a string with each claimant signature's keyid; "
-    "opens nothing",
-    "--json": _OUTPUT_SWITCH,
+    "--signer-trust-root": ("signer-trust-root", "verify-argv"),
+    "--expect-keyid": ("verify-argv",),
+    "--json": ("verify-argv",),
     "--debug": _OUTPUT_SWITCH,
-    "--quiet": _OUTPUT_SWITCH,
+    "--quiet": ("verify-argv",),
 }
 
 #: Every read site reachable from `cmd_verify` (`surface_inventory`), keyed by function and the call
@@ -1649,7 +1705,7 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "manifest-file",
         "signatures-file",
     ),
-    "agentce.commands._load_report_trust_root: path.is_file()": (
+    "agentce.commands._load_report_trust_root: os.path.isfile(path)": (
         "report-trust-root",
         "signer-trust-root",
     ),
