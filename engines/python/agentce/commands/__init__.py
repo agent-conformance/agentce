@@ -309,13 +309,17 @@ def cmd_verify(ns: argparse.Namespace) -> CommandResult:
     if report is not None:
         report_dir = _require_dir(report, key="report", what="the report directory")
         return _verify_report(result, report_dir, signer_trust_root, expect_keyid)
-    release_path = Path(release)  # type: ignore[arg-type]
-    if not release_path.exists():
+    # `os.path.exists` on the raw string, not `Path(release).exists()`: pathlib drops a trailing
+    # slash while building its parts, so `Path("file.tar/").exists()` silently checks "file.tar"
+    # and answers True for a plain file, losing the OS's own "this must be a directory" refusal
+    # (`os.stat` sees the trailing slash and raises ENOTDIR) that a trailing slash asserts (F5, 18.65).
+    if not os.path.exists(release):  # type: ignore[arg-type]
         raise InputError(
             "input.release_missing",
             f"the release artifact {release!r} does not exist.",
             "pass --release <bundle-dir-or-envelope>.",
         )
+    release_path = Path(release)  # type: ignore[arg-type]
     return _verify_release(result, release_path)
 
 
@@ -422,13 +426,20 @@ def _verify_report(
             "pass the directory `agentce assess` wrote and `agentce sign` signed.",
         )
     try:
-        claim = json.loads(claim_path.read_text("utf-8"))
-    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        parsed_claim = signing.parse_untrusted_json(claim_path.read_bytes())
+    except (OSError, ValueError) as exc:
         raise InputError(
             "verify.report_claim_malformed",
-            f"claim.json is not valid JSON: {exc}.",
+            "claim.json is not valid JSON.",
             "regenerate the report; claim.json must be well-formed JSON.",
         ) from exc
+    if not isinstance(parsed_claim, dict):
+        raise InputError(
+            "verify.report_claim_malformed",
+            "claim.json is not an object.",
+            "regenerate the report; claim.json must be well-formed JSON.",
+        )
+    claim: dict[str, Any] = parsed_claim
     signatures = claim.get("signatures") or []
     if not signatures:
         raise InputError(
@@ -471,14 +482,14 @@ def _verify_report(
     for candidate in candidates:
         try:
             v = signing.verify_envelope(candidate, trust)
-            statement = json.loads(v.payload)
-        except (
-            signing.VerificationError,
-            json.JSONDecodeError,
-            UnicodeDecodeError,
-        ) as exc:
+            parsed_statement = signing.parse_untrusted_json(v.payload)
+        except (signing.VerificationError, ValueError) as exc:
             last_error = exc
             continue
+        if not isinstance(parsed_statement, dict):
+            last_error = signing.VerificationError("the payload is not a JSON object")
+            continue
+        statement: dict[str, Any] = parsed_statement
         if statement.get("predicate", {}).get("role") != "claimant":
             last_error = signing.VerificationError(
                 "the verified predicate's own role is not 'claimant'"
@@ -528,7 +539,21 @@ def _verify_report(
             "manifest.json does not match the digest the signature covers.",
             "the manifest was altered after signing; regenerate and re-sign the report.",
         )
-    manifest = json.loads(manifest_bytes.decode("utf-8"))
+    try:
+        parsed_manifest = signing.parse_untrusted_json(manifest_bytes)
+    except ValueError as exc:
+        raise InputError(
+            "verify.report_output_tampered",
+            "manifest.json is not valid JSON.",
+            "regenerate the report with `agentce assess`.",
+        ) from exc
+    if not isinstance(parsed_manifest, dict):
+        raise InputError(
+            "verify.report_output_tampered",
+            "manifest.json is not an object.",
+            "regenerate the report with `agentce assess`.",
+        )
+    manifest: dict[str, Any] = parsed_manifest
     claim_body = {k: v for k, v in claim.items() if k != "signatures"}
     if (
         hashlib.sha256(canonicalize(claim_body)).hexdigest()
