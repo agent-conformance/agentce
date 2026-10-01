@@ -402,7 +402,8 @@ def problem_prefixes(problems: list[str]) -> list[str]:
         if candidate_location == "" or " " in candidate_location:
             out.append(p[:first])
         else:
-            out.append(p[: first + 2 + len(candidate_location)])
+            location_end = first + 2 + len(candidate_location)
+            out.append(p[:location_end])
     return out
 
 

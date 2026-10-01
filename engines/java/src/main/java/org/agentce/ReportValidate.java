@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
@@ -120,15 +121,7 @@ public final class ReportValidate {
     }
 
     private static boolean isDigits(String s) {
-        if (s.isEmpty()) {
-            return false;
-        }
-        for (int i = 0; i < s.length(); i++) {
-            if (!Character.isDigit(s.charAt(i))) {
-                return false;
-            }
-        }
-        return true;
+        return !s.isEmpty() && s.chars().allMatch(Character::isDigit);
     }
 
     /** Compares two {@code /}-joined locations segment by segment, comparing a pair of all-digit
@@ -157,18 +150,21 @@ public final class ReportValidate {
         return Integer.compare(segmentsA.length, segmentsB.length);
     }
 
+    private static final Pattern COMBINATOR_SEGMENT = Pattern.compile("/(anyOf|oneOf)/\\d+");
+
     /** The schema-location prefix before an {@code anyOf}/{@code oneOf} keyword segment, or {@code
      * null} when {@code m} is not one of that combinator's per-branch errors (networknt, unlike Ajv,
      * never reports the combinator failure itself as its own message -- only each branch's own
-     * errors, confirmed empirically against the vendored SARIF schema's {@code region} field). */
-    private static String combinatorGroupKey(ValidationMessage m) {
+     * errors, confirmed empirically against the vendored SARIF schema's {@code region} field).
+     * {@code location} is the caller's already-computed {@code location(m.getInstanceLocation())},
+     * passed in rather than recomputed. */
+    private static String combinatorGroupKey(String location, ValidationMessage m) {
         String schemaLocation = m.getSchemaLocation().toString();
-        var matcher = java.util.regex.Pattern.compile("/(anyOf|oneOf)/\\d+").matcher(schemaLocation);
+        var matcher = COMBINATOR_SEGMENT.matcher(schemaLocation);
         if (!matcher.find()) {
             return null;
         }
-        return location(m.getInstanceLocation()) + "::" + schemaLocation.substring(0, matcher.start()) + "/"
-                + matcher.group(1);
+        return location + "::" + schemaLocation.substring(0, matcher.start()) + "/" + matcher.group(1);
     }
 
     private record LocatedProblem(String location, String message) {}
@@ -181,11 +177,12 @@ public final class ReportValidate {
         Map<String, String> combinatorLocations = new LinkedHashMap<>();
         List<LocatedProblem> entries = new ArrayList<>();
         for (ValidationMessage m : errors) {
-            String groupKey = combinatorGroupKey(m);
+            String loc = location(m.getInstanceLocation());
+            String groupKey = combinatorGroupKey(loc, m);
             if (groupKey != null) {
-                combinatorLocations.putIfAbsent(groupKey, location(m.getInstanceLocation()));
+                combinatorLocations.putIfAbsent(groupKey, loc);
             } else {
-                entries.add(new LocatedProblem(location(m.getInstanceLocation()), m.getMessage()));
+                entries.add(new LocatedProblem(loc, m.getMessage()));
             }
         }
         for (String loc : combinatorLocations.values()) {
