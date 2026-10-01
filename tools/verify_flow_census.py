@@ -127,6 +127,7 @@ FLOW_POINTS = (
             "not-a-file",
             "json-type",
             "missing-field",
+            "source-id",
         ),
     ),
     FlowPoint(
@@ -723,6 +724,30 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
             bundle_evidence_with(set_file("manifest.json", doc)),
             target="bundle",
         )
+    # A `sources[].id` wrapped in a single-element array holding its own real value: Python's
+    # `str(["x"])` ("['x']"), TypeScript's `String(["x"])` ("x", JS array-to-string joins a
+    # single-element array to its bare element) and Java's Jackson `asText()` ("") each render this
+    # differently, and only TypeScript's happens to still equal the real id -- so unlike every other
+    # node_mutations case above, a generic placeholder value can't expose this; the mutation has to
+    # wrap the id this manifest actually declares (verifier round 1, 18.65).
+    wrapped_sources = [
+        {**source, "id": [source["id"]]}
+        if isinstance(source.get("id"), str)
+        else source
+        for source in bundle_manifest.get("sources", [])
+    ]
+    add(
+        "source-id-wrapped-in-array",
+        "bundle-manifest",
+        "source-id",
+        bundle_evidence_with(
+            set_file(
+                "manifest.json",
+                replaced(bundle_manifest, ("sources",), wrapped_sources),
+            )
+        ),
+        target="bundle",
+    )
     bundle_file_name = "events/_benign-quarantine.jsonl"
     for name, path_value in path_names_for(bundle_file_name):
         doc = replaced(bundle_manifest, ("files", 0, "path"), path_value)

@@ -189,10 +189,15 @@ export function loadBundle(bundleDir: string): Bundle {
   if (Array.isArray(declared)) {
     const ids = new Set<string>();
     for (const item of declared) {
-      if (!isRecord(item) || !("id" in item)) {
+      // A non-string `id` (an array, object, number, null) folds into the same "not declared" skip
+      // as a missing one, rather than coercing with `String()`: Python's `str()`, TypeScript's
+      // `String()` and Java's Jackson `asText()` each render a non-string JSON value differently,
+      // which would make a tampered source's trust classification diverge across engines for no
+      // reason a reader could use (verifier round 1, 18.65).
+      if (!isRecord(item) || typeof item.id !== "string") {
         continue;
       }
-      const sourceId = String(item.id);
+      const sourceId = item.id;
       ids.add(sourceId);
       if (typeof item.class === "string" && item.class) {
         sourceClasses.set(sourceId, item.class);

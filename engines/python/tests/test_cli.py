@@ -126,6 +126,25 @@ def test_verify_requires_exactly_one_target(capsys: pytest.CaptureFixture[str]) 
     assert env["error"]["key"] == "input.verify_target"
 
 
+def test_verify_empty_value_with_a_second_real_target_uses_the_real_one(
+    make_bundle: Callable[..., Path],
+    example_event: dict[str, Any],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """`cmd_verify` picked its one target by truthiness for the exactly-one check but dispatched on
+    `is not None`, so `--catalog "" --bundle <dir>` passed the check (one truthy value) and then still
+    took the empty flag's own branch first, silently verifying `Path("")` (the working directory)
+    instead of the bundle the user actually named (verifier round 1, 18.65). `--catalog ""` must be
+    treated as not given, the same as TypeScript's and Java's `emptyToUndefined`."""
+    bundle = make_bundle([example_event])
+    code, env = run(
+        ["verify", "--catalog", "", "--bundle", str(bundle), "--json"], capsys
+    )
+    assert code in (0, 1)  # 1 if the lone unchained example event verifies only "weak"
+    assert "bundle" in env
+    assert "catalog" not in env
+
+
 def test_verify_bundle(
     make_bundle: Callable[..., Path],
     example_event: dict[str, Any],

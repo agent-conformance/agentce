@@ -214,9 +214,15 @@ def load_bundle(bundle_dir: Path) -> Bundle:
     if isinstance(declared, list):
         ids: set[str] = set()
         for item in declared:
-            if not isinstance(item, dict) or "id" not in item:
+            # A non-string `id` (an array, object, number, null) folds into the same "not declared"
+            # skip as a missing one, rather than coercing with `str()`: Python's `str(["x"])`,
+            # TypeScript's `String(["x"])` and Java's Jackson `asText()` each render a non-string
+            # JSON value differently, which would make a tampered source's trust classification
+            # diverge across engines for no reason a reader could use (the same reasoning
+            # `bundle.py`'s `files[].path`/`sha256` guard already applies; verifier round 1, 18.65).
+            if not isinstance(item, dict) or not isinstance(item.get("id"), str):
                 continue
-            source_id = str(item["id"])
+            source_id = item["id"]
             ids.add(source_id)
             declared_class = item.get("class")
             if isinstance(declared_class, str) and declared_class:

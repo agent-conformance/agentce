@@ -210,7 +210,12 @@ public final class Bundle {
         if (declared != null && declared.isArray()) {
             Set<String> ids = new LinkedHashSet<>();
             for (JsonNode item : declared) {
-                if (!item.isObject() || !item.has("id")) {
+                // A non-string `id` (an array, object, number, null) folds into the same "not
+                // declared" skip as a missing one, rather than coercing with `asText()`: Jackson's
+                // `asText()`, Python's `str()` and TypeScript's `String()` each render a non-string
+                // JSON value differently, which would make a tampered source's trust classification
+                // diverge across engines for no reason a reader could use (verifier round 1, 18.65).
+                if (!item.isObject() || !item.has("id") || !item.get("id").isTextual()) {
                     continue;
                 }
                 String sourceId = item.get("id").asText();

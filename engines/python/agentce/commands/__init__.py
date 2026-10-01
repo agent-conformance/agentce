@@ -254,10 +254,14 @@ def cmd_validate(ns: argparse.Namespace) -> CommandResult:
 
 def cmd_verify(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="verify")
-    bundle = _opt_str(ns, "bundle")
-    catalog = _opt_str(ns, "catalog")
-    release = _opt_str(ns, "release")
-    report = _opt_str(ns, "report")
+    # An empty value (`--bundle ""`) is treated as not given (F4, 18.65), the same as TypeScript's
+    # and Java's `emptyToUndefined`: dispatch below branches on `is not None`, so leaving an empty
+    # string as itself (rather than None) would let a second, truthy target lose the exactly-one
+    # selection below and still be shadowed by the empty one's own `is not None` branch.
+    bundle = _opt_str(ns, "bundle") or None
+    catalog = _opt_str(ns, "catalog") or None
+    release = _opt_str(ns, "release") or None
+    report = _opt_str(ns, "report") or None
     chosen = [
         name
         for name, value in (
@@ -454,6 +458,12 @@ def _verify_report(
         fix=claim_fix,
     )
     signatures = claim.get("signatures") or []
+    if not isinstance(signatures, list):
+        raise InputError(
+            "verify.report_claim_malformed",
+            "claim.json's signatures field is not a list.",
+            claim_fix,
+        )
     if not signatures:
         raise InputError(
             "verify.report_unsigned",
@@ -476,13 +486,25 @@ def _verify_report(
         trust_source = "embedded"
         trust = _load_report_trust_root(embedded_path)
 
-    candidates = [s for s in signatures if s.get("role") == "claimant"]
+    # A plain tamper can turn a signature-list entry into anything JSON allows (a string, a number,
+    # `null`, a nested list); `isinstance(s, dict)` drops those here, the same "well-formed but
+    # wrong-shape input refuses cleanly, not every malformed entry individually diagnosed" standard
+    # applied to claim.json's own top level above (verifier round 1, 18.65).
+    candidates = [
+        s for s in signatures if isinstance(s, dict) and s.get("role") == "claimant"
+    ]
     if expect_keyid is not None:
-        candidates = [
-            s
-            for s in candidates
-            if any(sig.get("keyid") == expect_keyid for sig in s.get("signatures", []))
-        ]
+
+        def _has_expect_keyid(entry: dict[str, Any]) -> bool:
+            nested = entry.get("signatures")
+            if not isinstance(nested, list):
+                return False
+            return any(
+                isinstance(sig, dict) and sig.get("keyid") == expect_keyid
+                for sig in nested
+            )
+
+        candidates = [s for s in candidates if _has_expect_keyid(s)]
         if not candidates:
             raise InputError(
                 "verify.report_keyid_mismatch",

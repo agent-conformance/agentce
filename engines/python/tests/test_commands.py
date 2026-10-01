@@ -862,6 +862,53 @@ def test_verify_report_claim_stage_tamper_cases(
     assert envelope["error"]["key"] == expected_key
 
 
+def _corrupt_signed_signatures_not_list(out: Path) -> None:
+    """`claim.json`'s `signatures` field set to a non-list -- a plain edit to an already-signed
+    report, no re-signing needed since it is read before any signature check (verifier round 1,
+    18.65: `candidates = [s for s in signatures ...]` crashed `AttributeError`/`TypeError` iterating
+    a string or an int)."""
+    claim = json.loads((out / "claim.json").read_text(encoding="utf-8"))
+    claim["signatures"] = "x"
+    (out / "claim.json").write_text(
+        json.dumps(claim, indent=2, sort_keys=True), encoding="utf-8"
+    )
+
+
+def _corrupt_signed_signature_entry_not_dict(out: Path) -> None:
+    """One `signatures[]` entry replaced with a non-object; the list comprehension's `s.get(...)`
+    crashed `AttributeError` before the `isinstance(s, dict)` guard (verifier round 1, 18.65)."""
+    claim = json.loads((out / "claim.json").read_text(encoding="utf-8"))
+    claim["signatures"][0] = 1
+    (out / "claim.json").write_text(
+        json.dumps(claim, indent=2, sort_keys=True), encoding="utf-8"
+    )
+
+
+@pytest.mark.parametrize(
+    ("corrupt", "expected_key"),
+    [
+        (_corrupt_signed_signatures_not_list, "verify.report_claim_malformed"),
+        (_corrupt_signed_signature_entry_not_dict, "verify.report_signature_invalid"),
+    ],
+)
+def test_verify_report_signed_signatures_shape_tamper(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    corrupt: Callable[[Path], None],
+    expected_key: str,
+) -> None:
+    """A plain tamper of an already-*signed* report's `signatures` shape refuses cleanly with a
+    stable key instead of crashing `internal.unexpected` (verifier round 1, 18.65): a non-list
+    `signatures` is the same claim-shape refusal as claim.json's own top level; one malformed entry
+    in an otherwise-valid list is dropped, leaving no claimant candidate -- the same clean outcome an
+    unsigned report gets."""
+    out, _key = _packaged_and_signed(tmp_path)
+    corrupt(out)
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert envelope["error"]["key"] == expected_key
+
+
 @pytest.mark.parametrize("tampered_file", ["report.md", "packaging.json"])
 def test_verify_report_output_tampered(
     tmp_path: Path, tampered_file: str, capsys: pytest.CaptureFixture[str]
