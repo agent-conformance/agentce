@@ -29,9 +29,9 @@ Pinning Intel macOS to 48.0.1 reaches a prebuilt wheel at the cost of three advi
 | GHSA-m2h6-j472-rp4c (wildcard DNS name escapes a name-constrained sub-CA) | medium | `>= 45.0.0, < 49.0.0` | 49.0.0 | `cryptography.x509` chain verification |
 
 (Checked via `gh api /advisories/<id>` against the PyPI index on 2026-09-30.) The medium one does not trip
-`fail-on-severity: high` on its own; the allow-list (below) covers all three regardless. The fourth
-advisory the 50.x upgrade cleared, GHSA-537c-gmf6-5ccf (vulnerable OpenSSL bundled in the wheel), is
-fixed in 48.0.1 itself, so it does not apply here.
+`fail-on-severity: high` on its own, so it needs no allow-list entry; the allow-list (below) covers only the
+two high ones. The fourth advisory the 50.x upgrade cleared, GHSA-537c-gmf6-5ccf (vulnerable OpenSSL bundled
+in the wheel), is fixed in 48.0.1 itself, so it does not apply here.
 
 Neither vulnerable surface is reachable from this repository: `engines/python/agentce/signing.py`
 imports only `cryptography.exceptions.InvalidSignature` and
@@ -122,5 +122,5 @@ envelopes or build X.509 certificate chains.
   tag as `source-build` (no CPython release in the pinned 48.x/50.x lines publishes a bare macOS
   x86_64 wheel; cryptography 46.0.0-46.0.3 shipped one, but tagged `pp*` for PyPy only, not `cp*`).
 - Item 18.58 extends this to every other tracked `uv.lock` that resolves `cryptography` transitively
-  (the 20 workspaces besides the two above): `tools/cryptography_intel_wheel_check.py` greps every
-  tracked lock for an Intel-macOS wheel, in CI, with a seeded fault.
+  (the 20 workspaces besides the two above): `tools/cryptography_intel_wheel_check.py` parses every
+  tracked lock as TOML and checks its resolved wheels for an Intel-macOS one, in CI, with a seeded fault.
