@@ -337,6 +337,15 @@ def _mutate_recorded_missing(report_dir: Path) -> None:
     (report_dir / "report.html").unlink()
 
 
+def _mutate_recorded_missing_multi(report_dir: Path) -> None:
+    """Three recorded outputs missing at once (18.61): `report.md`, `results.sarif` and
+    `report.html` all deleted after a run recorded them. With a single missing output
+    (`_mutate_recorded_missing`), the three engines' problem order can never diverge; with two or
+    more, Python previously iterated a set union whose order followed `PYTHONHASHSEED`."""
+    for filename in ("report.md", "results.sarif", "report.html"):
+        (report_dir / filename).unlink()
+
+
 def _mutate_xml_multi_root(report_dir: Path) -> None:
     (report_dir / "report.junit.xml").write_text(
         '<?xml version="1.0"?>\n<a/><b/>\n', encoding="utf-8"
@@ -500,6 +509,7 @@ CASES: list[tuple[str, Callable[[Path], None], int]] = [
     ("case29-sarif-format", _mutate_sarif_format, 0),
     ("case30-digit-and-slash-keys", _mutate_digit_and_slash_keys, 3),
     ("case31-sarif-oneof-two-passing", _mutate_sarif_oneof_two_passing, 3),
+    ("case32-recorded-missing-multi", _mutate_recorded_missing_multi, 3),
 ]
 
 #: Cases that must additionally prove the real third-party schema ran, not only the local profile

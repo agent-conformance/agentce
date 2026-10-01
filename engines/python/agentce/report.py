@@ -3676,8 +3676,12 @@ def validate_report(out_dir: Path) -> list[str]:
         if not (out_dir / filename).is_file():
             problems.append(f"{filename}: missing")
     recorded = _recorded_outputs(out_dir)
-    for filename in (
-        set(_ARTIFACT_SCHEMAS) | {"report.md", "report.html"} | set(_OPTIONAL_ARTIFACTS)
+    # A declared sequence, not a set: a set's iteration order follows PYTHONHASHSEED, which made
+    # this loop's problem order non-deterministic across runs whenever two or more recorded outputs
+    # were missing at once (18.61; mirrors TypeScript's `Set` and Java's `LinkedHashSet` over the
+    # same three pieces, in the same order).
+    for filename in dict.fromkeys(
+        (*_ARTIFACT_SCHEMAS, "report.md", "report.html", *_OPTIONAL_ARTIFACTS)
     ):
         if filename in recorded and not (out_dir / filename).is_file():
             problems.append(

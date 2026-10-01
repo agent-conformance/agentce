@@ -5,7 +5,10 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
 import re
+import subprocess
+import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
@@ -1499,6 +1502,40 @@ def test_validate_report_catches_a_recorded_output_that_went_missing(
     (tmp_path / "report.html").unlink()
     problems = validate_report(tmp_path)
     assert any("report.html" in p and "manifest.json" in p for p in problems), problems
+
+
+def test_validate_report_recorded_outputs_order_is_hash_seed_independent(
+    tmp_path: Path,
+) -> None:
+    """With two or more recorded outputs missing, `validate_report`'s problem order must not depend
+    on `PYTHONHASHSEED` (P18-18.27 verifier round 3, F2): it used to iterate a set union of
+    filenames, whose order follows the string-hash seed. Each seed runs in its own subprocess, since
+    the seed is read once at interpreter start."""
+    write_report(
+        tmp_path,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+    )
+    for filename in ("report.md", "report.html"):
+        (tmp_path / filename).unlink()
+    script = (
+        "import json\n"
+        "from pathlib import Path\n"
+        "from agentce.report import validate_report\n"
+        f"print(json.dumps(validate_report(Path({str(tmp_path)!r}))))\n"
+    )
+    outputs = set()
+    for seed in range(8):
+        proc = subprocess.run(
+            [sys.executable, "-c", script],
+            env={**os.environ, "PYTHONHASHSEED": str(seed)},
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        outputs.add(proc.stdout.strip())
+    assert len(outputs) == 1, outputs
 
 
 # --- Item 18.21: the verdict/crosswalk/mode/catalog-label escaping gap --------------------------
