@@ -157,6 +157,9 @@ test("case 6: a bad OSCAL uuid passes the local profile but fails the real NIST 
       problems.some((p) => p.startsWith("oscal-ar.json (NIST OSCAL 1.1.2): ")),
       JSON.stringify(problems),
     );
+    // The NIST stage's own `pattern` keyword names the pattern once, not as a quoted JSON literal.
+    const uuid = problems.find((p) => p.includes("assessment-results/uuid: "));
+    assert.match(uuid ?? "", /: must match pattern "\^\[0-9A-Fa-f\]/, JSON.stringify(problems));
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
@@ -470,4 +473,102 @@ test("case 24: real-schema violations at indices 2 and 10 sort numerically, not 
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
+});
+
+// P18-18.27 verifier round 2's D1-D6 shapes, pinned to the same lists as the Python and Java
+// engines' own tests: one problem per failing combinator (also through `$ref`) and per object with
+// unexpected keys, `format` never asserted, object keys ordered as strings by code point.
+const NIST = "oscal-ar.json (NIST OSCAL 1.1.2)";
+const SARIF = "results.sarif (OASIS SARIF 2.1.0)";
+const STATUS = "assessment-results/results/0/findings/0/target/status";
+
+/** `validateReport` after `edit` changes `file`'s JSON value at the `at` path. */
+function validateAfter(
+  file: string,
+  at: (string | number)[],
+  edit: (node: Record<string, unknown>) => void,
+): string[] {
+  const out = freshFullReport();
+  try {
+    const path = join(out, file);
+    const document = JSON.parse(readFileSync(path, "utf-8"));
+    edit(at.reduce((node, step) => node[step], document));
+    writeFileSync(path, JSON.stringify(document));
+    return validateReport(out);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+}
+
+/** `"<label>: <location>"` of each problem under `label` (message text dropped). */
+function locations(problems: string[], label: string): string[] {
+  const prefix = `${label}: `;
+  return problems
+    .filter((p) => p.startsWith(prefix))
+    .map((p) => prefix + p.slice(prefix.length).split(": ")[0]);
+}
+
+const statusPath = ["assessment-results", "results", 0, "findings", 0, "target", "status"];
+
+test("D1: a combinator failing through $ref is one problem", () => {
+  const problems = validateAfter("oscal-ar.json", statusPath, (o) => {
+    o.reason = "has space";
+  });
+  assert.deepEqual(locations(problems, NIST), [`${NIST}: ${STATUS}/reason`]);
+});
+
+test("D2: a oneOf matching two branches is one problem", () => {
+  const problems = validateAfter("results.sarif", ["runs", 0, "results", 0], (o) => {
+    o.graphTraversals = [{ runGraphIndex: 0, resultGraphIndex: 0 }];
+  });
+  assert.deepEqual(locations(problems, SARIF), [`${SARIF}: runs/0/results/0/graphTraversals/0`]);
+});
+
+test("D3: two unexpected keys on one object are one problem", () => {
+  const problems = validateAfter("results.sarif", ["runs", 0, "results", 0, "message"], (o) => {
+    o.bogus2 = 1;
+    o.bogus1 = 1;
+  });
+  assert.deepEqual(locations(problems, SARIF), [`${SARIF}: runs/0/results/0/message`]);
+});
+
+test("D3: two unexpected keys at the local stage are one problem", () => {
+  const problems = validateAfter("assertions.json", [0], (o) => {
+    o.zz = 1;
+    o.aa = 2;
+  });
+  assert.deepEqual(locations(problems, "assertions.json"), ["assertions.json: 0"]);
+});
+
+test("D4: format is never asserted", () => {
+  const problems = validateAfter("results.sarif", ["runs", 0, "tool", "driver"], (o) => {
+    o.informationUri = "not a uri :: at all";
+  });
+  assert.deepEqual(problems, []);
+});
+
+test("D5/D6: object keys sort as strings by code point, '/' keys unescaped", () => {
+  const problems = validateAfter("manifest.json", ["outputs"], (o) => {
+    for (const key of ["9", "10", "packs/x.json", "packs-old.json"]) o[key] = "bad";
+  });
+  assert.deepEqual(locations(problems, "manifest.json"), [
+    "manifest.json: outputs/10",
+    "manifest.json: outputs/9",
+    "manifest.json: outputs/packs-old.json",
+    "manifest.json: outputs/packs/x.json",
+  ]);
+});
+
+test("two keywords at one location order by keyword", () => {
+  const problems = validateAfter("oscal-ar.json", statusPath, (o) => {
+    o.state = "bad state";
+  });
+  assert.deepEqual(locations(problems, NIST), [
+    `${NIST}: ${STATUS}/state`,
+    `${NIST}: ${STATUS}/state`,
+  ]);
+  assert.ok(
+    problems[0].includes("allowed values") && problems[1].includes("must match pattern"),
+    JSON.stringify(problems),
+  );
 });

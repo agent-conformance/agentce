@@ -375,4 +375,87 @@ class ReportValidateTest {
                         "results.sarif: runs/0/results/10/message: $.runs[0].results[10].message: required property 'text' not found"),
                 problems);
     }
+
+    // P18-18.27 verifier round 2's D1-D6 shapes, pinned to the same lists as the Python and TypeScript
+    // engines' own tests: one problem per failing combinator (also through `$ref`) and per object with
+    // unexpected keys, `format` never asserted, object keys ordered as strings by code point.
+
+    private static final String NIST = "oscal-ar.json (NIST OSCAL 1.1.2)";
+    private static final String SARIF = "results.sarif (OASIS SARIF 2.1.0)";
+    private static final String STATUS = "assessment-results/results/0/findings/0/target/status";
+
+    /** Report `out` after `edit` changes `file`'s JSON object at JSON pointer `at`. */
+    private static List<String> validateAfter(Path out, String file, String at,
+            java.util.function.Consumer<ObjectNode> edit) throws IOException {
+        freshFullReport(out);
+        Path path = out.resolve(file);
+        JsonNode document = Json.parse(Files.readString(path, StandardCharsets.UTF_8));
+        edit.accept((ObjectNode) document.at(at));
+        Files.writeString(path, document.toString());
+        return ReportValidate.validateReport(out);
+    }
+
+    /** `"<label>: <location>"` of each problem under `label` (message text dropped). */
+    private static List<String> locations(List<String> problems, String label) {
+        String prefix = label + ": ";
+        return problems.stream()
+                .filter(p -> p.startsWith(prefix))
+                .map(p -> prefix + p.substring(prefix.length()).split(": ", 2)[0])
+                .toList();
+    }
+
+    @Test
+    void d1CombinatorThroughRefIsOneProblem(@TempDir Path out) throws IOException {
+        List<String> problems = validateAfter(out, "oscal-ar.json", "/assessment-results/results/0/findings/0/target/status",
+                o -> o.put("reason", "has space"));
+        assertEquals(List.of(NIST + ": " + STATUS + "/reason"), locations(problems, NIST));
+    }
+
+    @Test
+    void d2OneOfMatchingTwoBranchesIsOneProblem(@TempDir Path out) throws IOException {
+        List<String> problems = validateAfter(out, "results.sarif", "/runs/0/results/0",
+                o -> o.putArray("graphTraversals").addObject().put("runGraphIndex", 0).put("resultGraphIndex", 0));
+        assertEquals(List.of(SARIF + ": runs/0/results/0/graphTraversals/0"), locations(problems, SARIF));
+    }
+
+    @Test
+    void d3TwoUnexpectedKeysAreOneProblem(@TempDir Path out) throws IOException {
+        List<String> problems = validateAfter(out, "results.sarif", "/runs/0/results/0/message",
+                o -> o.put("bogus2", 1).put("bogus1", 1));
+        assertEquals(List.of(SARIF + ": runs/0/results/0/message"), locations(problems, SARIF));
+    }
+
+    @Test
+    void d3LocalStageTwoUnexpectedKeysAreOneProblem(@TempDir Path out) throws IOException {
+        List<String> problems = validateAfter(out, "assertions.json", "/0", o -> o.put("zz", 1).put("aa", 2));
+        assertEquals(List.of("assertions.json: 0"), locations(problems, "assertions.json"));
+    }
+
+    @Test
+    void d4FormatIsNeverAsserted(@TempDir Path out) throws IOException {
+        List<String> problems = validateAfter(out, "results.sarif", "/runs/0/tool/driver",
+                o -> o.put("informationUri", "not a uri :: at all"));
+        assertEquals(List.of(), problems);
+    }
+
+    @Test
+    void d5d6ObjectKeysSortAsStringsByCodePoint(@TempDir Path out) throws IOException {
+        List<String> problems = validateAfter(out, "manifest.json", "/outputs", o -> {
+            for (String key : List.of("9", "10", "packs/x.json", "packs-old.json")) {
+                o.put(key, "bad");
+            }
+        });
+        assertEquals(
+                List.of("manifest.json: outputs/10", "manifest.json: outputs/9",
+                        "manifest.json: outputs/packs-old.json", "manifest.json: outputs/packs/x.json"),
+                locations(problems, "manifest.json"));
+    }
+
+    @Test
+    void twoKeywordsAtOneLocationOrderByKeyword(@TempDir Path out) throws IOException {
+        List<String> problems = validateAfter(out, "oscal-ar.json", "/assessment-results/results/0/findings/0/target/status",
+                o -> o.put("state", "bad state"));
+        assertEquals(List.of(NIST + ": " + STATUS + "/state", NIST + ": " + STATUS + "/state"), locations(problems, NIST));
+        assertTrue(problems.get(0).contains("enumeration") && problems.get(1).contains("regex pattern"), problems.toString());
+    }
 }

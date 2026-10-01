@@ -1705,3 +1705,109 @@ def test_validate_report_sorts_array_indices_numerically_not_lexicographically(
         "results.sarif: runs/0/results/2/message: 'text' is a required property",
         "results.sarif: runs/0/results/10/message: 'text' is a required property",
     ]
+
+
+def _locations(problems: list[str], label: str) -> list[str]:
+    """`"<label>: <location>"` of each problem under `label` (message text dropped)."""
+    prefix = f"{label}: "
+    return [
+        prefix + p[len(prefix) :].split(": ", 1)[0]
+        for p in problems
+        if p.startswith(prefix)
+    ]
+
+
+_NIST = "oscal-ar.json (NIST OSCAL 1.1.2)"
+_SARIF = "results.sarif (OASIS SARIF 2.1.0)"
+_STATUS = "assessment-results/results/0/findings/0/target/status"
+
+
+@pytest.mark.parametrize(
+    ("filename", "mutate", "label", "expected"),
+    [
+        pytest.param(
+            "oscal-ar.json",
+            lambda d: d["assessment-results"]["results"][0]["findings"][0]["target"][
+                "status"
+            ].update(reason="has space"),
+            _NIST,
+            [f"{_NIST}: {_STATUS}/reason"],
+            id="D1-combinator-through-ref-is-one-problem",
+        ),
+        pytest.param(
+            "results.sarif",
+            lambda d: d["runs"][0]["results"][0].update(
+                graphTraversals=[{"runGraphIndex": 0, "resultGraphIndex": 0}]
+            ),
+            _SARIF,
+            [f"{_SARIF}: runs/0/results/0/graphTraversals/0"],
+            id="D2-oneOf-matching-two-branches-is-one-problem",
+        ),
+        pytest.param(
+            "results.sarif",
+            lambda d: d["runs"][0]["results"][0]["message"].update(bogus2=1, bogus1=1),
+            _SARIF,
+            [f"{_SARIF}: runs/0/results/0/message"],
+            id="D3-two-unexpected-keys-are-one-problem",
+        ),
+        pytest.param(
+            "assertions.json",
+            lambda d: d[0].update(zz=1, aa=2),
+            "assertions.json",
+            ["assertions.json: 0"],
+            id="D3-local-stage-two-unexpected-keys-are-one-problem",
+        ),
+        pytest.param(
+            "results.sarif",
+            lambda d: d["runs"][0]["tool"]["driver"].update(
+                informationUri="not a uri :: at all"
+            ),
+            _SARIF,
+            [],
+            id="D4-format-is-never-asserted",
+        ),
+        pytest.param(
+            "manifest.json",
+            lambda d: d["outputs"].update(
+                {k: "bad" for k in ("9", "10", "packs/x.json", "packs-old.json")}
+            ),
+            "manifest.json",
+            [
+                "manifest.json: outputs/10",
+                "manifest.json: outputs/9",
+                "manifest.json: outputs/packs-old.json",
+                "manifest.json: outputs/packs/x.json",
+            ],
+            id="D5-D6-object-keys-sort-as-strings-by-code-point",
+        ),
+        pytest.param(
+            "oscal-ar.json",
+            lambda d: d["assessment-results"]["results"][0]["findings"][0]["target"][
+                "status"
+            ].update(state="bad state"),
+            _NIST,
+            [f"{_NIST}: {_STATUS}/state", f"{_NIST}: {_STATUS}/state"],
+            id="two-keywords-at-one-location-order-by-keyword",
+        ),
+    ],
+)
+def test_validate_report_follows_the_reference_problem_model(
+    tmp_path: Path, filename: str, mutate: Any, label: str, expected: list[str]
+) -> None:
+    """P18-18.27 verifier round 2's D1-D6 shapes, which TypeScript's and Java's own tests pin to the
+    same lists: one problem per failing combinator (also through `$ref`) and per object with
+    unexpected keys, `format` never asserted, object keys ordered as strings by code point."""
+    write_report(
+        tmp_path,
+        [_assertion("non-conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+    )
+    path = tmp_path / filename
+    document = json.loads(path.read_text(encoding="utf-8"))
+    mutate(document)
+    path.write_text(json.dumps(document), encoding="utf-8")
+    problems = validate_report(tmp_path)
+    assert _locations(problems, label) == expected, problems
+    if len(expected) == 2:  # one location, two keywords: `enum` sorts before `pattern`
+        assert "is not one of" in problems[0] and "does not match" in problems[1]
