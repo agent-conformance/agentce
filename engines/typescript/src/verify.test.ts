@@ -5,7 +5,7 @@
 
 import assert from "node:assert/strict";
 import { sign as cryptoSign, verify as cryptoVerify, generateKeyPairSync } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -15,10 +15,35 @@ import { dssePae, keyidFor, signStatement } from "./sign";
 import {
   TrustRoot,
   publicKeyFromRaw,
+  vendoredTrustPath,
   verifyCatalog,
   verifyEnvelope,
   verifyRelease,
 } from "./verify";
+
+// --- The vendored trust root is a byte-for-byte copy of Python's, as `verify.ts`'s own header
+// claims -- a sync test, not merely a shared fixture, so the two can never silently drift apart
+// (mirrors 18.35's upcoming i18n sync-test shape; this item adds its own narrow one rather than
+// waiting on that item). ---------------------------------------------------------------------
+
+test("the vendored TypeScript trust root parses to the same value as Python's dev-root.json", () => {
+  const tsRoot = JSON.parse(readFileSync(vendoredTrustPath(), "utf-8"));
+  const pythonPath = join(
+    __dirname,
+    "..",
+    "..",
+    "python",
+    "agentce",
+    "data",
+    "trust",
+    "dev-root.json",
+  );
+  const pythonRoot = JSON.parse(readFileSync(pythonPath, "utf-8"));
+  assert.deepEqual(tsRoot, pythonRoot);
+  // `canonicalize` sorts keys deeply (the same canonicalisation every signed statement uses), so
+  // this is the same "parses to the same sorted value" check regardless of on-disk key order.
+  assert.equal(canonicalize(tsRoot).toString("utf-8"), canonicalize(pythonRoot).toString("utf-8"));
+});
 
 function ed25519RawPair(): {
   privateKeyObject: ReturnType<typeof generateKeyPairSync>["privateKey"];
@@ -460,14 +485,15 @@ function bundleDir(files: Record<string, string>): string {
   return dir;
 }
 
-test("verifyRelease soft-fails with the fixed sentence on an unreadable manifest, no manifestDigest/signers field", () => {
+test("verifyRelease soft-fails with the fixed sentence on an unreadable manifest, no manifest_digest/signers field", () => {
   const fixture = kmsFixture();
   const dir = bundleDir({ "release-manifest.json": "not json", "signatures.json": "[]" });
   try {
     const result = verifyRelease(dir, fixture.trust);
     assert.equal(result.verified, false);
     assert.equal((result as { reason?: string }).reason, "release manifest is not readable JSON");
-    assert.ok(!("manifestDigest" in result));
+    assert.ok(!("manifest_digest" in result));
+    assert.ok(!("signers" in result));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -485,7 +511,7 @@ test("verifyRelease soft-fails on a manifest that parses but is not an object (e
   }
 });
 
-test("verifyRelease soft-fails with the fixed sentence on unreadable signatures.json", () => {
+test("verifyRelease soft-fails with the fixed sentence on unreadable signatures.json, no manifest_digest/signers field", () => {
   const fixture = kmsFixture();
   const dir = bundleDir({ "release-manifest.json": "{}", "signatures.json": "not json" });
   try {
@@ -495,6 +521,11 @@ test("verifyRelease soft-fails with the fixed sentence on unreadable signatures.
       (result as { reason?: string }).reason,
       "release signatures are not readable JSON",
     );
+    // `_verify_release_soft_fail` is the one function every such Python return calls, and it only
+    // ever sets {release, verified, reason} -- not even for this late a failure, after
+    // `manifest_digest` was already computed locally (a divergence this port once had, fixed here).
+    assert.ok(!("manifest_digest" in result));
+    assert.ok(!("signers" in result));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -510,6 +541,7 @@ test("verifyRelease folds signatures.json valid-JSON-but-not-array (e.g. 5) into
       (result as { reason?: string }).reason,
       "release signatures are not readable JSON",
     );
+    assert.ok(!("manifest_digest" in result));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -608,9 +640,11 @@ test("verifyRelease verifies a real directory-bundle release signed by one kms e
   try {
     const result = verifyRelease(dir, fixture.trust) as {
       verified: boolean;
+      manifest_digest: string;
       signers: ReadonlyArray<{ readonly identity: string }>;
     };
     assert.equal(result.verified, true);
+    assert.equal(result.manifest_digest, manifestDigest);
     assert.equal(result.signers.length, 1);
     assert.equal(result.signers[0]?.identity, "bundle-signer");
   } finally {

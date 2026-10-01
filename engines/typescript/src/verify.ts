@@ -326,8 +326,11 @@ export function verifyCatalog(dir: string, trust: TrustRoot): CatalogVerifyResul
   };
 }
 
-/** The shared soft-fail shape for a release that cannot be verified at all (no `manifestDigest`/
- * `signers` field): mirrors `_verify_release_soft_fail`'s own three-field shape exactly. */
+/** The shared soft-fail shape for a release that cannot be verified at all (no `manifest_digest`/
+ * `signers` field): mirrors `_verify_release_soft_fail`'s own three-field shape exactly -- every
+ * early-return soft-fail in this function, including the directory-bundle branch's own JSON-parse
+ * failures, uses this shape, never the richer bundle shape below (Python's `_verify_release_soft_fail`
+ * is the one function every such return calls, and it only ever sets these three fields). */
 export interface ReleaseSoftFail {
   readonly release: string;
   readonly verified: false;
@@ -345,7 +348,7 @@ export interface ReleaseSingleResult {
 export interface ReleaseBundleResult {
   readonly release: string;
   readonly verified: boolean;
-  readonly manifestDigest: string;
+  readonly manifest_digest: string;
   readonly signers: ReadonlyArray<{ readonly profile: unknown; readonly identity: string }>;
   readonly reason?: string;
 }
@@ -445,11 +448,13 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
   try {
     signatureEntries = readJsonFileStrict(signaturesPath);
   } catch {
+    // The bare 3-field soft-fail shape (`_verify_release_soft_fail`'s own shape) -- Python computes
+    // `manifest_digest` as a local before this point too, but never adds it to `result.data` on this
+    // path, so this port must not either (a field TS alone would carry is a real parity bug, not a
+    // cosmetic one: a consumer branching on the field's presence would see a different shape per engine).
     return {
       release: releasePath,
       verified: false,
-      manifestDigest,
-      signers: [],
       reason: "release signatures are not readable JSON",
     };
   }
@@ -457,8 +462,6 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
     return {
       release: releasePath,
       verified: false,
-      manifestDigest,
-      signers: [],
       reason: "release signatures are not readable JSON",
     };
   }
@@ -487,12 +490,12 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
   }
 
   if (problems.length === 0) {
-    return { release: releasePath, verified: true, manifestDigest, signers };
+    return { release: releasePath, verified: true, manifest_digest: manifestDigest, signers };
   }
   return {
     release: releasePath,
     verified: false,
-    manifestDigest,
+    manifest_digest: manifestDigest,
     signers,
     reason: problems.join("; "),
   };
