@@ -24,6 +24,7 @@ least one mutation.
 from __future__ import annotations
 
 import argparse
+import ast
 import base64
 import copy
 import hashlib
@@ -197,6 +198,24 @@ FLOW_POINTS = (
         PYTHON_ONLY,
     ),
     FlowPoint(
+        "signer-trust-root",
+        "--signer-trust-root's file, the same loader as report-trust-root reached through argv: "
+        "bytes -> JSON -> TrustRoot, and the argv value's own spellings",
+        (
+            "bytes",
+            "number-token",
+            "nesting",
+            "duplicate-key",
+            "not-a-file",
+            "json-type",
+            "missing-field",
+            "base64",
+            "empty",
+            "trailing-slash",
+        ),
+        PYTHON_ONLY,
+    ),
+    FlowPoint(
         "report-statement",
         "the claimant statement a verified signature carries (predicate, subject[].name/digest), "
         "re-signed with the report's own embedded key: anyone can write trust-root.json and sign",
@@ -255,6 +274,7 @@ WHITESPACE_PREFIXES = (
 #: (`"missing"`) or replace with a directory (`"directory"`).
 REPORT_DIR = "report"
 REPORT_VARIANTS = "report-signed"
+SIGNER_TRUST_ROOT = "signer-trust-root.json"
 REMOVED = "census-removed.json"
 #: A marker value for `report_with`: replace the file with an empty directory.
 DIRECTORY = object()
@@ -1112,6 +1132,46 @@ def report_mutations(canonical: Path) -> list[Mutation]:
         add("missing", flow, "not-a-file", {file_name: None})
         add("directory", flow, "not-a-file", {file_name: DIRECTORY})
 
+    # `--signer-trust-root <file>`: the same loader, reached through argv instead of the report
+    # directory. The report stays untouched; the external file (or its argv spelling) is mutated.
+    def with_signer(
+        name: str, cls: str, data: bytes | Any | None, spell: str = "{}"
+    ) -> None:
+        def build(d: Path) -> Path:
+            dest = report_with({})(d)
+            target = d / SIGNER_TRUST_ROOT
+            if data is DIRECTORY:
+                target.mkdir()
+            elif data is not None:
+                _write(target, data)
+            return dest
+
+        def arg(dest: Path) -> list[str]:
+            value = spell.format(dest.parent / SIGNER_TRUST_ROOT)
+            return ["--report", str(dest), "--signer-trust-root", value]
+
+        mutations.append(
+            Mutation(
+                f"signer-trust-root:{name}",
+                "signer-trust-root",
+                cls,
+                "report",
+                build,
+                arg,
+            )
+        )
+
+    original = (base / "trust-root.json").read_bytes()
+    for name, cls, data in byte_mutations(original):
+        with_signer(name, cls, data)
+    for name, cls, doc in node_mutations(json.loads(original)):
+        with_signer(name, cls, doc)
+    with_signer("missing", "not-a-file", None)
+    with_signer("directory", "not-a-file", DIRECTORY)
+    with_signer("dot", "not-a-file", original, ".")
+    with_signer("empty", "empty", original, "")
+    with_signer("trailing-slash", "trailing-slash", original, "{}/")
+
     variants = canonical / REPORT_VARIANTS
     classes = json.loads((variants / "classes.json").read_text(encoding="utf-8"))
     for stem, (flow, cls) in sorted(classes.items()):
@@ -1326,6 +1386,382 @@ def build_report_variants(
 # --- Census report and self-test. -------------------------------------------------------------------
 
 
+# --- Surface inventory: derived from the Python reference's code, not a hand list -----------------
+
+ROOT = Path(__file__).resolve().parent.parent
+PYTHON_PACKAGE = ROOT / "engines" / "python" / "agentce"
+VERIFY_ENTRY = "agentce.commands.cmd_verify"
+
+#: Calls that read the filesystem or parse bytes. A call whose name is in this set, anywhere in a
+#: function reachable from `cmd_verify`, is a read site the inventory must account for.
+READ_CALLS = frozenset(
+    {
+        "read_bytes",
+        "read_text",
+        "open",
+        "loads",
+        "load",
+        "safe_load",
+        "iterdir",
+        "rglob",
+        "glob",
+        "walk",
+        "scandir",
+        "listdir",
+        "readlink",
+        "stat",
+        "lstat",
+        "is_file",
+        "is_dir",
+        "exists",
+        "parse_untrusted_json",
+    }
+)
+
+
+def load_sources(package: Path = PYTHON_PACKAGE) -> dict[str, str]:
+    """Dotted path -> source text for every file of the Python reference; a package keeps its
+    `.__init__` suffix so relative imports resolve against the right base."""
+    return {
+        ".".join(
+            path.relative_to(package.parent).with_suffix("").parts
+        ): path.read_text(encoding="utf-8")
+        for path in sorted(package.rglob("*.py"))
+    }
+
+
+class _CallGraph:
+    """Every function and method of the package, and an over-approximating call resolver: a call
+    through an attribute it cannot pin to one definition resolves to every method of that name, so
+    a read can only be over-reported, never missed."""
+
+    def __init__(self, sources: dict[str, str]) -> None:
+        self.trees = {
+            name.removesuffix(".__init__"): ast.parse(text, name)
+            for name, text in sources.items()
+        }
+        self.packages = {
+            name.removesuffix(".__init__")
+            for name in sources
+            if name.endswith(".__init__")
+        }
+        self.defs: dict[str, ast.FunctionDef | ast.AsyncFunctionDef] = {}
+        self.module_of: dict[str, str] = {}
+        self.methods: dict[str, list[str]] = {}
+        for module, tree in self.trees.items():
+            for node in tree.body:
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    self.defs[f"{module}.{node.name}"] = node
+                    self.module_of[f"{module}.{node.name}"] = module
+                elif isinstance(node, ast.ClassDef):
+                    for item in node.body:
+                        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            qual = f"{module}.{node.name}.{item.name}"
+                            self.defs[qual] = item
+                            self.module_of[qual] = module
+                            self.methods.setdefault(item.name, []).append(qual)
+        self.imports = {module: self._imports(module) for module in self.trees}
+
+    def _imports(self, module: str) -> dict[str, str]:
+        package = module if module in self.packages else module.rpartition(".")[0]
+        names: dict[str, str] = {}
+        for node in ast.walk(self.trees[module]):
+            if isinstance(node, ast.ImportFrom):
+                base = node.module or ""
+                if node.level:
+                    parts = package.split(".")
+                    parts = parts[: len(parts) - (node.level - 1)]
+                    base = ".".join([*parts, base] if base else parts)
+                for alias in node.names:
+                    names[alias.asname or alias.name] = f"{base}.{alias.name}"
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    names[alias.asname or alias.name] = alias.name
+        return names
+
+    def callees(self, module: str, call: ast.Call) -> list[str]:
+        func, imported = call.func, self.imports[module]
+        if isinstance(func, ast.Name):
+            found = [
+                qual
+                for qual in (
+                    f"{module}.{func.id}",
+                    imported.get(func.id, ""),
+                    f"{module}.{func.id}.__init__",
+                    imported.get(func.id, "") + ".__init__",
+                )
+                if qual in self.defs
+            ]
+            return found
+        if isinstance(func, ast.Attribute):
+            if isinstance(func.value, ast.Name):
+                target = imported.get(func.value.id, f"{module}.{func.value.id}")
+                if f"{target}.{func.attr}" in self.defs:
+                    return [f"{target}.{func.attr}"]
+            return list(self.methods.get(func.attr, ()))
+        return []
+
+
+def _site_label(call: ast.Call) -> str:
+    """A read site's stable name: the call as written, with its first argument (line numbers move
+    with every edit; the expression only changes when the read itself does)."""
+    first = ast.unparse(call.args[0]) if call.args else ""
+    return f"{ast.unparse(call.func)}({first})"
+
+
+def surface_inventory(sources: dict[str, str]) -> tuple[set[str], set[str]]:
+    """The flags `agentce verify` accepts and every read site reachable from `cmd_verify`, both
+    taken from the Python reference's own source."""
+    graph = _CallGraph(sources)
+    seen: set[str] = set()
+    stack = [VERIFY_ENTRY]
+    reads: set[str] = set()
+    while stack:
+        qual = stack.pop()
+        if qual in seen:
+            continue
+        seen.add(qual)
+        if qual in INVENTORY_BOUNDARIES:
+            continue
+        module = graph.module_of[qual]
+        for node in ast.walk(graph.defs[qual]):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = (
+                func.attr
+                if isinstance(func, ast.Attribute)
+                else getattr(func, "id", None)
+            )
+            if name in READ_CALLS:
+                reads.add(f"{qual}: {_site_label(node)}")
+            stack.extend(graph.callees(module, node))
+    return _verify_flags(graph), reads
+
+
+def _verify_flags(graph: _CallGraph) -> set[str]:
+    """Option strings of the `verify` subparser in `build_parser`, plus its `parents=` flags."""
+    flags: set[str] = set()
+    in_verify = False
+    for stmt in graph.defs["agentce.cli.build_parser"].body:
+        call = getattr(stmt, "value", None)
+        if not isinstance(call, ast.Call) or not isinstance(call.func, ast.Attribute):
+            continue
+        if call.func.attr == "add_parser":
+            in_verify = bool(call.args) and ast.literal_eval(call.args[0]) == "verify"
+            if in_verify and any(k.arg == "parents" for k in call.keywords):
+                flags |= _option_strings(graph.defs["agentce.cli._common_flags"])
+        elif call.func.attr == "add_argument" and in_verify:
+            flags |= _option_strings(stmt)
+    return flags
+
+
+def _option_strings(node: ast.AST) -> set[str]:
+    return {
+        str(arg.value)
+        for call in ast.walk(node)
+        if isinstance(call, ast.Call)
+        and isinstance(call.func, ast.Attribute)
+        and call.func.attr == "add_argument"
+        for arg in call.args
+        if isinstance(arg, ast.Constant) and str(arg.value).startswith("-")
+    }
+
+
+def inventory_problems(sources: dict[str, str]) -> list[str]:
+    """A flag or read site with no census row or disposition, or an inventory entry the code no
+    longer has. Each entry names census row ids, or is a string starting "disposition:"."""
+    flags, reads = surface_inventory(sources)
+    problems = []
+    for kind, found, listed in (
+        ("flag", flags, INVENTORY_FLAGS),
+        ("read", reads, INVENTORY_READS),
+    ):
+        problems += [
+            f"unlisted {kind}: {entry}" for entry in sorted(found - listed.keys())
+        ]
+        problems += [
+            f"stale {kind}: {entry}" for entry in sorted(listed.keys() - found)
+        ]
+        for entry, target in sorted(listed.items()):
+            if isinstance(target, str):
+                if not target.startswith("disposition:"):
+                    problems.append(
+                        f"{kind} {entry}: a disposition must say so: {target}"
+                    )
+            else:
+                problems += [
+                    f"{kind} {entry} names no census row: {row}"
+                    for row in target
+                    if row not in FLOW_IDS
+                ]
+    return problems
+
+
+#: Where the call-graph walk stops, and why. `_verify_report` re-runs `assess` in-process through
+#: `cli.main`, which dispatches on `args.func` at runtime; the re-run reads only the packaged inputs
+#: the `report-packaging` row's digest checks have already matched, and any error it raises is
+#: contained by `main` and compared as output (`verify.report_reproduction_mismatch`).
+INVENTORY_BOUNDARIES = {
+    "agentce.cli.main": "the assess re-run: inputs digest-matched first, errors contained by main",
+}
+
+_OUTPUT_SWITCH = "disposition: an output switch; reads no input"
+_HASHED_ONLY = (
+    "disposition: bytes only hashed and compared to a signed digest; any content is a mismatch, "
+    "never a parse"
+)
+_PACKAGED = "disposition: reads a file shipped inside the installed engine, not the verified input"
+
+#: Every flag of `agentce verify`, mapped to the census rows whose mutations exercise it, or to a
+#: written disposition. `inventory_problems` fails when the code grows a flag this map lacks.
+INVENTORY_FLAGS: dict[str, tuple[str, ...] | str] = {
+    "--bundle": ("target-argument", "bundle-manifest"),
+    "--catalog": ("target-argument", "catalog-sig-file"),
+    "--release": ("target-argument", "release-file", "manifest-file"),
+    "--report": ("target-argument", "report-claim"),
+    "--signer-trust-root": ("signer-trust-root",),
+    "--expect-keyid": "disposition: compared as a string with each claimant signature's keyid; "
+    "opens nothing",
+    "--json": _OUTPUT_SWITCH,
+    "--debug": _OUTPUT_SWITCH,
+    "--quiet": _OUTPUT_SWITCH,
+}
+
+#: Every read site reachable from `cmd_verify` (`surface_inventory`), keyed by function and the call
+#: as written, mapped to the census rows that mutate what it reads, or to a written disposition.
+INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
+    "agentce.bundle._sha256_hex: path.open('rb')": ("bundle-files",),
+    "agentce.bundle.load_bundle: manifest_path.is_file()": ("bundle-manifest",),
+    "agentce.bundle.load_bundle: manifest_path.read_bytes()": ("bundle-manifest",),
+    "agentce.bundle.load_bundle: member.stat()": ("bundle-files",),
+    "agentce.bundle.load_bundle: parse_untrusted_json(manifest_path.read_bytes())": (
+        "bundle-manifest",
+    ),
+    "agentce.bundle.safe_is_file: path.is_file()": ("bundle-files",),
+    "agentce.commands._load_release_json: path.read_bytes()": (
+        "release-file",
+        "manifest-file",
+        "signatures-file",
+    ),
+    "agentce.commands._load_release_json: signing.parse_untrusted_json(path.read_bytes())": (
+        "release-file",
+        "manifest-file",
+        "signatures-file",
+    ),
+    "agentce.commands._load_report_trust_root: path.is_file()": (
+        "report-trust-root",
+        "signer-trust-root",
+    ),
+    "agentce.commands._parse_untrusted_object: signing.parse_untrusted_json(data)": (
+        "report-claim",
+        "report-manifest",
+        "report-packaging",
+    ),
+    "agentce.commands._require_dir: path.is_dir()": ("target-argument",),
+    "agentce.commands._verify_release: artifact_file.read_bytes()": ("artifact-path",),
+    "agentce.commands._verify_release: manifest_path.is_file()": ("manifest-file",),
+    "agentce.commands._verify_release: release_path.is_file()": ("release-file",),
+    "agentce.commands._verify_release: signatures_path.is_file()": ("signatures-file",),
+    "agentce.commands._verify_report: candidate_path.is_file()": ("report-manifest",),
+    "agentce.commands._verify_report: candidate_path.read_bytes()": _HASHED_ONLY,
+    "agentce.commands._verify_report: catalog_path.is_dir()": ("report-packaging",),
+    "agentce.commands._verify_report: claim_path.is_file()": ("report-claim",),
+    "agentce.commands._verify_report: claim_path.read_bytes()": ("report-claim",),
+    "agentce.commands._verify_report: deviations_path.is_file()": ("report-packaging",),
+    "agentce.commands._verify_report: deviations_path.read_bytes()": _HASHED_ONLY,
+    "agentce.commands._verify_report: domain_path.is_file()": ("report-packaging",),
+    "agentce.commands._verify_report: domain_path.read_bytes()": _HASHED_ONLY,
+    "agentce.commands._verify_report: embedded_path.is_file()": ("report-trust-root",),
+    "agentce.commands._verify_report: manifest_path.is_file()": ("report-manifest",),
+    "agentce.commands._verify_report: manifest_path.read_bytes()": ("report-manifest",),
+    "agentce.commands._verify_report: packaging_path.is_file()": ("report-packaging",),
+    "agentce.commands._verify_report: packaging_path.read_bytes()": (
+        "report-packaging",
+    ),
+    "agentce.commands._verify_report: produced.is_file()": "disposition: the assess re-run's own "
+    "output in a scratch directory this command created",
+    "agentce.commands._verify_report: produced.read_bytes()": "disposition: the assess re-run's "
+    "own output, compared byte for byte with the shipped file",
+    "agentce.commands._verify_report: profile_path.is_file()": ("report-packaging",),
+    "agentce.commands._verify_report: profile_path.read_bytes()": _HASHED_ONLY,
+    "agentce.commands._verify_report: shipped.is_file()": ("report-manifest",),
+    "agentce.commands._verify_report: shipped.read_bytes()": "disposition: compared byte for byte "
+    "with the re-run's output; never parsed",
+    "agentce.commands._verify_report: signing.parse_untrusted_json(v.payload)": (
+        "report-statement",
+    ),
+    "agentce.commands.cmd_verify: os.path.exists(release)": ("target-argument",),
+    "agentce.ingest.ingest: json.loads(line)": ("bundle-streams",),
+    "agentce.ingest.ingest: path.read_bytes()": ("bundle-streams",),
+    "agentce.schema.evidence_schema: json.loads(text)": _PACKAGED,
+    "agentce.schema.evidence_schema: resources.files('agentce.data')"
+    ".joinpath('agentce-evidence.schema.json').read_text()": _PACKAGED,
+    "agentce.signing.digest_tree: path.is_file()": ("catalog-tree",),
+    "agentce.signing.digest_tree: path.read_bytes()": ("catalog-tree",),
+    "agentce.signing.digest_tree: root.rglob('*')": ("catalog-tree",),
+    "agentce.signing.load_trust_root: json.loads(path.read_text('utf-8'))": (
+        "report-trust-root",
+        "signer-trust-root",
+    ),
+    "agentce.signing.load_trust_root: path.read_text('utf-8')": (
+        "report-trust-root",
+        "signer-trust-root",
+    ),
+    "agentce.signing.parse_untrusted_json: json.loads(raw.decode('utf-8'))": (
+        "catalog-sig-file",
+        "release-file",
+        "bundle-manifest",
+    ),
+    "agentce.signing.statement_subject_digest: parse_untrusted_json(payload)": (
+        "catalog-statement",
+        "release-statement",
+    ),
+    "agentce.signing.vendored_trust: json.loads(vendored_trust_path().read_text('utf-8'))": (
+        _PACKAGED
+    ),
+    "agentce.signing.vendored_trust: vendored_trust_path().read_text('utf-8')": _PACKAGED,
+    "agentce.signing.verify_catalog_directory: parse_untrusted_json(sig_path.read_bytes())": (
+        "catalog-sig-file",
+    ),
+    "agentce.signing.verify_catalog_directory: sig_path.is_file()": (
+        "catalog-sig-file",
+    ),
+    "agentce.signing.verify_catalog_directory: sig_path.read_bytes()": (
+        "catalog-sig-file",
+    ),
+}
+
+
+def _seed_unlisted_surface(sources: dict[str, str]) -> dict[str, str]:
+    """A copy of the sources with one new `verify` flag and one new reader that `cmd_verify` calls
+    through a helper: what a later change could add without a census row."""
+    seeded = dict(sources)
+    commands = ast.parse(sources["agentce.commands.__init__"])
+    for node in commands.body:
+        if isinstance(node, ast.FunctionDef) and node.name == "cmd_verify":
+            node.body.insert(0, ast.parse("_census_seeded_reader(Path('.'))").body[0])
+    commands.body.append(
+        ast.parse(
+            "def _census_seeded_reader(path):\n    return path.read_bytes()"
+        ).body[0]
+    )
+    seeded["agentce.commands.__init__"] = ast.unparse(commands)
+    cli = ast.parse(sources["agentce.cli"])
+    for node in cli.body:
+        if isinstance(node, ast.FunctionDef) and node.name == "build_parser":
+            at = next(
+                i
+                for i, stmt in enumerate(node.body)
+                if "'verify'" in ast.unparse(stmt) and "add_parser" in ast.unparse(stmt)
+            )
+            node.body.insert(
+                at + 1, ast.parse("p.add_argument('--census-seeded')").body[0]
+            )
+    seeded["agentce.cli"] = ast.unparse(cli)
+    return seeded
+
+
 def self_test() -> int:
     failures: list[str] = []
     doc: Any = {"b": [1, {"c": "x"}], "a": None}
@@ -1351,11 +1787,23 @@ def self_test() -> int:
     covered = {point.id: set(point.problem_classes) for point in FLOW_POINTS}
     if len(covered) != len(FLOW_POINTS):
         failures.append("duplicate flow point id")
+    sources = load_sources()
+    failures += inventory_problems(sources)
+    seeded = inventory_problems(_seed_unlisted_surface(sources))
+    for expected in (
+        "unlisted flag: --census-seeded",
+        "unlisted read: agentce.commands._census_seeded_reader: path.read_bytes()",
+    ):
+        if expected not in seeded:
+            failures.append(f"seeded surface not caught: {expected} (got {seeded})")
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if failures:
         return 1
-    print("SELF-TEST OK: walker, node/byte mutations, census ids")
+    print(
+        "SELF-TEST OK: walker, node/byte mutations, census ids, surface inventory "
+        "(a seeded flag and reader are caught)"
+    )
     return 0
 
 
