@@ -289,7 +289,9 @@ def _mutate_non_utf8_mandatory(report_dir: Path) -> None:
 
 def _mutate_non_utf8_jsonl(report_dir: Path) -> None:
     _register_output(report_dir, "runtime_drift.jsonl")
-    (report_dir / "runtime_drift.jsonl").write_bytes(b'{"subject": "x"}\n\xff\xfenot-utf8')
+    (report_dir / "runtime_drift.jsonl").write_bytes(
+        b'{"subject": "x"}\n\xff\xfenot-utf8'
+    )
 
 
 CASES: list[tuple[str, Callable[[Path], None], int]] = [
@@ -352,6 +354,34 @@ def self_test() -> int:
     if not caught:
         failures.append(
             "comparator failed to catch a one-label tamper between three label lists"
+        )
+
+    # A real divergence this script actually caught during this item's own development (contract
+    # critic round 1, F2 and F6): before the fix, TypeScript's `XMLValidator.validate` accepted a
+    # self-closing root followed by a sibling element outright, so TS reported no problem for
+    # `report.junit.xml` where Python's `ElementTree` and Java's `XMLStreamReader` both did -- these
+    # are the three engines' real `problem_labels()` output for that exact case, not synthetic
+    # `a.json`/`b.json` strings, so this self-test exercises the comparator against the shape of
+    # divergence the real check exists to catch, not just an arbitrary tamper.
+    real_divergence: list[str] = []
+    compare_labels(
+        "self-test-real-divergence-shape",
+        problem_labels(
+            [
+                "report.junit.xml: invalid XML (junk after document element: line 2, column 4)"
+            ]
+        ),
+        problem_labels([]),  # the pre-fix TypeScript bug: no problem reported at all
+        problem_labels(
+            [
+                "report.junit.xml: invalid XML (The markup in the document following the root element must be well-formed.)"
+            ]
+        ),
+        real_divergence,
+    )
+    if not real_divergence:
+        failures.append(
+            "comparator failed to catch the real pre-fix TS/Java-vs-Python divergence shape (F2/F6)"
         )
 
     label_cases = [
