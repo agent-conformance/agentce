@@ -18,6 +18,7 @@ from typing import Any
 from . import canonical
 from .errors import InputError
 from .error_catalogue import MESSAGE_KEYS
+from .signing import parse_untrusted_json
 
 #: Ceiling on any single manifest-listed file's byte size, checked with `stat()` before the file is
 #: opened or hashed (SPEC §8.1) -- so a hostile bundle cannot force gigabytes to stream through
@@ -131,19 +132,20 @@ def load_bundle(bundle_dir: Path) -> Bundle:
             MESSAGE_KEYS["input.bundle_manifest_missing"].fix,
         )
     try:
-        manifest: dict[str, Any] = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        parsed = parse_untrusted_json(manifest_path.read_bytes())
+    except (OSError, ValueError) as exc:
         raise InputError(
             "input.bundle_manifest_invalid",
-            f"manifest.json is not valid JSON: {exc}.",
+            "manifest.json is not valid JSON.",
             "regenerate the bundle so its manifest.json is well-formed.",
         ) from exc
-    except RecursionError as exc:
+    if not isinstance(parsed, dict):
         raise InputError(
             "input.bundle_manifest_invalid",
-            "manifest.json is nested too deeply to parse safely.",
-            "flatten manifest.json's structure; it exceeds the engine's safe nesting depth.",
-        ) from exc
+            "manifest.json is not an object.",
+            "regenerate the bundle so its manifest.json is well-formed.",
+        )
+    manifest: dict[str, Any] = parsed
 
     files = manifest.get("files")
     if not isinstance(files, list) or not files:
