@@ -364,7 +364,7 @@ public final class Verify {
         return value;
     }
 
-    private static JsonNode readUntrustedJsonFile(Path path) {
+    static JsonNode readUntrustedJsonFile(Path path) {
         try {
             return parseUntrustedJson(Files.readAllBytes(path));
         } catch (IOException e) {

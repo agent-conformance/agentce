@@ -11,7 +11,7 @@ import { readFileSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { sha256Hex } from "./canonical";
 import { InputError } from "./errors";
-import { parseUntrustedJson } from "./verify";
+import { readUntrustedJsonFile } from "./verify";
 
 export interface Bundle {
   root: string;
@@ -108,12 +108,13 @@ export function loadBundle(bundleDir: string): Bundle {
   }
   let parsed: unknown;
   try {
-    // The untrusted-JSON reader (verify.ts), not the lenient `parseJson`: strict UTF-8, no BOM,
-    // bounded nesting, well-formed strings/keys -- the same guard Python's `load_bundle` already
-    // gets from `parse_untrusted_json` and Java's `Bundle.load` now gets from
-    // `Verify.parseUntrustedJson` (18.65). `keepNumberTokens` so a float survives to `digest`'s
-    // lazy canonicalize check instead of being silently folded.
-    parsed = parseUntrustedJson(readFileSync(manifestPath), true);
+    // The untrusted-JSON reader (verify.ts's own file-reading wrapper, shared with its other
+    // readers), not the lenient `parseJson`: strict UTF-8, no BOM, bounded nesting, well-formed
+    // strings/keys -- the same guard Python's `load_bundle` already gets from
+    // `parse_untrusted_json` and Java's `Bundle.load` now gets from `Verify.parseUntrustedJson`
+    // (18.65). `keepNumberTokens` so a float survives to `digest`'s lazy canonicalize check instead
+    // of being silently folded.
+    parsed = readUntrustedJsonFile(manifestPath, true);
   } catch {
     // A fixed message, not the parser's own text: the three engines' JSON readers each produce
     // different exception text for the same malformed input, which would make this refusal's
@@ -202,20 +203,19 @@ export function loadBundle(bundleDir: string): Bundle {
     }
   }
 
-  const result: Bundle = {
+  // Computed at most once, and only if read: `verify --bundle` never reads `digest`, and
+  // canonicalizing the manifest throws on a float anywhere in it (Python's `Bundle.digest` is a
+  // lazy `@property` for the same reason, Java's a memoizing method -- 18.65). `assess`/`conformance`
+  // read `.digest` repeatedly in one run, so this caches rather than recomputing on every access.
+  let digestCache: string | undefined;
+  return {
     root: bundleDir,
     manifest,
     eventFiles: eventFiles.sort(),
     sources,
     sourceClasses: sourceClasses.size > 0 ? sourceClasses : null,
-    // A getter, not a field computed here: `verify --bundle` never reads `digest`, and canonicalizing
-    // the manifest throws on a float anywhere in it (Python's `Bundle.digest` is a lazy `@property`
-    // for the same reason -- 18.65).
-    digest: undefined as unknown as string,
+    get digest(): string {
+      return (digestCache ??= `sha256:${sha256Hex(manifest)}`);
+    },
   };
-  Object.defineProperty(result, "digest", {
-    get: () => `sha256:${sha256Hex(manifest)}`,
-    enumerable: true,
-  });
-  return result;
 }

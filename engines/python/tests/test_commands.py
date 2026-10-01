@@ -824,6 +824,13 @@ def _corrupt_claim_malformed(out: Path) -> None:
     (out / "claim.json").write_text("not json", encoding="utf-8")
 
 
+def _corrupt_claim_not_object(out: Path) -> None:
+    """Well-formed JSON that is not an object -- distinct from `_corrupt_claim_malformed`'s
+    syntax error, this exercises the `isinstance(parsed_claim, dict)` guard a non-object claim.json
+    needs to avoid crashing on its first `.get()` call (18.65 F1-class fix)."""
+    (out / "claim.json").write_text("[]", encoding="utf-8")
+
+
 def _corrupt_claim_unsigned(out: Path) -> None:
     claim = json.loads((out / "claim.json").read_text(encoding="utf-8"))
     claim["signatures"] = []
@@ -837,6 +844,7 @@ def _corrupt_claim_unsigned(out: Path) -> None:
     [
         (_corrupt_claim_no_claim, "verify.report_no_claim"),
         (_corrupt_claim_malformed, "verify.report_claim_malformed"),
+        (_corrupt_claim_not_object, "verify.report_claim_malformed"),
         (_corrupt_claim_unsigned, "verify.report_unsigned"),
     ],
 )

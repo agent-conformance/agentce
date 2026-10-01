@@ -404,6 +404,21 @@ def _load_report_trust_root(path: Path) -> signing.TrustRoot:
         ) from exc
 
 
+def _parse_untrusted_object(
+    data: bytes, *, key: str, noun: str, fix: str
+) -> dict[str, Any]:
+    """`signing.parse_untrusted_json` plus an object-type check, folded into one `InputError` --
+    the shape `verify --report`'s claim.json and manifest.json readers share (18.65 F1-class fix:
+    a non-object document must refuse cleanly, not crash on its first `.get()` call)."""
+    try:
+        parsed = signing.parse_untrusted_json(data)
+    except ValueError as exc:
+        raise InputError(key, f"{noun} is not valid JSON.", fix) from exc
+    if not isinstance(parsed, dict):
+        raise InputError(key, f"{noun} is not an object.", fix)
+    return parsed
+
+
 def _verify_report(
     result: CommandResult,
     report_dir: Path,
@@ -425,21 +440,16 @@ def _verify_report(
             f"{report_dir} has no claim.json.",
             "pass the directory `agentce assess` wrote and `agentce sign` signed.",
         )
+    claim_fix = "regenerate the report; claim.json must be well-formed JSON."
     try:
-        parsed_claim = signing.parse_untrusted_json(claim_path.read_bytes())
-    except (OSError, ValueError) as exc:
+        claim_bytes = claim_path.read_bytes()
+    except OSError as exc:
         raise InputError(
-            "verify.report_claim_malformed",
-            "claim.json is not valid JSON.",
-            "regenerate the report; claim.json must be well-formed JSON.",
+            "verify.report_claim_malformed", "claim.json is not valid JSON.", claim_fix
         ) from exc
-    if not isinstance(parsed_claim, dict):
-        raise InputError(
-            "verify.report_claim_malformed",
-            "claim.json is not an object.",
-            "regenerate the report; claim.json must be well-formed JSON.",
-        )
-    claim: dict[str, Any] = parsed_claim
+    claim = _parse_untrusted_object(
+        claim_bytes, key="verify.report_claim_malformed", noun="claim.json", fix=claim_fix
+    )
     signatures = claim.get("signatures") or []
     if not signatures:
         raise InputError(
@@ -539,21 +549,12 @@ def _verify_report(
             "manifest.json does not match the digest the signature covers.",
             "the manifest was altered after signing; regenerate and re-sign the report.",
         )
-    try:
-        parsed_manifest = signing.parse_untrusted_json(manifest_bytes)
-    except ValueError as exc:
-        raise InputError(
-            "verify.report_output_tampered",
-            "manifest.json is not valid JSON.",
-            "regenerate the report with `agentce assess`.",
-        ) from exc
-    if not isinstance(parsed_manifest, dict):
-        raise InputError(
-            "verify.report_output_tampered",
-            "manifest.json is not an object.",
-            "regenerate the report with `agentce assess`.",
-        )
-    manifest: dict[str, Any] = parsed_manifest
+    manifest = _parse_untrusted_object(
+        manifest_bytes,
+        key="verify.report_output_tampered",
+        noun="manifest.json",
+        fix="regenerate the report with `agentce assess`.",
+    )
     claim_body = {k: v for k, v in claim.items() if k != "signatures"}
     if (
         hashlib.sha256(canonicalize(claim_body)).hexdigest()

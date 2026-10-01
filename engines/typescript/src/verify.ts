@@ -78,7 +78,7 @@ export function parseUntrustedJson(raw: Buffer, keepNumberTokens = false): unkno
 }
 
 /** {@link parseUntrustedJson} over a file's bytes (mirrors Java's `readUntrustedJsonFile`). */
-function readUntrustedJsonFile(path: string, keepNumberTokens = false): unknown {
+export function readUntrustedJsonFile(path: string, keepNumberTokens = false): unknown {
   return parseUntrustedJson(readFileSync(path), keepNumberTokens);
 }
 
