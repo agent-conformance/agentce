@@ -111,6 +111,8 @@ def walk(
                 else ""
             )
             out[key].append((schema_file, pointer, str(extra)))
+        if key == "additionalProperties" and value is False:
+            out[key].append((schema_file, pointer, "false"))
         if key in ("oneOf", "anyOf", "allOf", "not", "if") and isinstance(
             value, (list, dict)
         ):
@@ -145,6 +147,100 @@ def census() -> dict[str, list[tuple[str, str, str]]]:
     return out
 
 
+#: Keywords a schema problem can be reported under: each (schema, keyword) pair the census finds for
+#: one of these is a class of failure `report_validate_parity_check.py` must reach with a mutation.
+#: `format` is listed although it never fails: it is an annotation in all three engines, so its
+#: mutation proves exactly that. `$ref` and `allOf` only route to other keywords.
+ASSERTION_KEYWORDS = {
+    "type",
+    "enum",
+    "const",
+    "pattern",
+    "required",
+    "minimum",
+    "maximum",
+    "minLength",
+    "minItems",
+    "minProperties",
+    "uniqueItems",
+    "additionalProperties",
+    "anyOf",
+    "oneOf",
+    "format",
+}
+
+#: The applicators the engines' location model knows (Java counts instance steps through
+#: `properties`, `items` and `additionalProperties`; `$ref`, `allOf`, `anyOf`, `oneOf` stay put).
+KNOWN_APPLICATORS = {
+    "properties",
+    "items",
+    "additionalProperties",
+    "$ref",
+    "allOf",
+    "anyOf",
+    "oneOf",
+    "$defs",
+    "definitions",
+}
+
+#: Keys that carry no validation (annotations and identifiers).
+ANNOTATIONS = {
+    "$schema",
+    "$id",
+    "id",
+    "$comment",
+    "title",
+    "description",
+    "default",
+    "examples",
+    "contentEncoding",
+}
+
+
+def assertion_pairs() -> set[tuple[str, str]]:
+    """Every (schema, keyword) pair whose keyword is in :data:`ASSERTION_KEYWORDS`."""
+    return {
+        (schema_file, keyword)
+        for keyword, occurrences in census().items()
+        if keyword in ASSERTION_KEYWORDS
+        for schema_file, _, _ in occurrences
+    }
+
+
+def unknown_keywords() -> set[tuple[str, str]]:
+    """(schema, keyword) for any schema keyword outside the known assertion, applicator and
+    annotation sets -- a construct the engines' problem model was never checked against. An
+    `items` given as a list (draft-04 tuple form) counts as unknown too."""
+    unknown: set[tuple[str, str]] = set()
+    known = ASSERTION_KEYWORDS | KNOWN_APPLICATORS | ANNOTATIONS
+
+    def visit(node: Any, schema_file: str) -> None:
+        if not isinstance(node, dict):
+            return
+        for key, value in node.items():
+            if key not in known or (key == "items" and isinstance(value, list)):
+                unknown.add((schema_file, key))
+            if key in ("properties", "$defs", "definitions") and isinstance(
+                value, dict
+            ):
+                for sub_schema in value.values():
+                    visit(sub_schema, schema_file)
+            elif key in ("items", "additionalProperties") and isinstance(value, dict):
+                visit(value, schema_file)
+            elif key in ("allOf", "anyOf", "oneOf") and isinstance(value, list):
+                for sub_schema in value:
+                    visit(sub_schema, schema_file)
+
+    for name in LOCAL_SCHEMAS:
+        visit(
+            json.loads((ROOT / "spec" / "report" / f"{name}.schema.json").read_text()),
+            name,
+        )
+    for name, path in VENDOR_SCHEMAS:
+        visit(json.loads(path.read_text()), name)
+    return unknown
+
+
 def render(out: dict[str, list[tuple[str, str, str]]]) -> str:
     lines = []
     for keyword in sorted(out):
@@ -171,6 +267,12 @@ def self_test() -> None:
         s == "oscal-assessment-results-nist-1.1.2"
         for s, _, _ in out.get("anyOf", []) + out.get("oneOf", [])
     ), "expected a combinator in the vendored NIST OSCAL schema (round 2's D1/D2)"
+    assert ("assertions", "additionalProperties") in assertion_pairs(), (
+        "expected `additionalProperties: false` in the local assertions profile"
+    )
+    assert not unknown_keywords(), (
+        f"schema keywords outside the engines' problem model: {sorted(unknown_keywords())}"
+    )
     print(
         f"report_validate_keyword_census self-test: {len(out)} distinct keywords discriminate"
     )
