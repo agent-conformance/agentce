@@ -207,7 +207,14 @@ FLOW_POINTS = (
         "report-manifest",
         "--report's manifest.json bytes -> JSON -> engine, outputs (names opened inside the "
         "report), inputs, limitations; re-signed so the digest gate passes",
-        ("bytes", "number-token", "nesting", "duplicate-key", "json-type", "missing-field"),
+        (
+            "bytes",
+            "number-token",
+            "nesting",
+            "duplicate-key",
+            "json-type",
+            "missing-field",
+        ),
         PYTHON_ONLY,
     ),
     FlowPoint(
@@ -903,7 +910,13 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         return bundle_evidence_with(edit)
 
     for name, cls, line in byte_mutations(first_line):
-        add(name, "bundle-streams", cls, bundle_stream(line + b"\n" + rest), target="bundle")
+        add(
+            name,
+            "bundle-streams",
+            cls,
+            bundle_stream(line + b"\n" + rest),
+            target="bundle",
+        )
     for name, sample in TYPE_SAMPLES:
         if name != "object":
             line = json.dumps(sample).encode()
@@ -922,7 +935,10 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         ("blank-lines", b"\n\n" + stream_bytes.replace(b"\n", b"\n\n")),
         ("vertical-tab", first_line + b"\x0b\n" + rest),
         ("form-feed", first_line + b"\x0c\n" + rest),
-        ("unicode-line-separator", first_line.replace(b",", b",\xe2\x80\xa8", 1) + b"\n" + rest),
+        (
+            "unicode-line-separator",
+            first_line.replace(b",", b",\xe2\x80\xa8", 1) + b"\n" + rest,
+        ),
         ("next-line", first_line.replace(b",", b",\xc2\x85", 1) + b"\n" + rest),
     ):
         add(name, "bundle-streams", "line-break", bundle_stream(data), target="bundle")
@@ -987,6 +1003,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         target="report",
         arg=arg_empty,
     )
+
     # The flag given twice (the same value, or one of them empty, in either order) and the
     # `--flag=value` spelling: one rule in all three engines (18.65 round 3).
     def repeated(first: Callable[[Path], str], second: Callable[[Path], str]):
@@ -1019,7 +1036,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
                 arg=lambda path, argv=argv, flag=flag: argv(path, flag),
             )
         if flag_target != "report":
-            # TypeScript/Java parse `--report=<dir>` and then stop at "not implemented", so only
+            # TypeScript/Java parse `--report=<dir>` and then refuse --report as unported, so only
             # its empty form below has one answer to compare across the three engines.
             add(
                 f"{flag_target}-equals",
@@ -1076,7 +1093,9 @@ def report_mutations(canonical: Path) -> list[Mutation]:
 
         return build
 
-    def add(name: str, flow: str, cls: str, files: dict[str, bytes | Any | None]) -> None:
+    def add(
+        name: str, flow: str, cls: str, files: dict[str, bytes | Any | None]
+    ) -> None:
         mutations.append(
             Mutation(f"{flow}:{name}", flow, cls, "report", report_with(files))
         )
