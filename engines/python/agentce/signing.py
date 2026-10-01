@@ -32,6 +32,8 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -67,6 +69,8 @@ __all__ = [
     "issue_certificate",
     "sign_statement",
     "statement_subject_digest",
+    "parse_untrusted_json",
+    "describe_untrusted",
     "verify_envelope",
     "verify_catalog_directory",
     "load_trust_root",
@@ -85,6 +89,61 @@ class VerificationError(Exception):
 
 class UnsignedError(VerificationError):
     """The directory carries no detached signature at all, so there is nothing to verify."""
+
+
+#: The deepest container nesting `parse_untrusted_json` accepts: Jackson's own default limit, which
+#: the Java engine enforces natively, so all three engines refuse at the same depth.
+MAX_JSON_DEPTH = 1000
+
+_SURROGATE = re.compile("[\ud800-\udfff]")
+_PLAIN_ASCII = re.compile(r"[ !#-&(-\[\]-~]*")
+
+
+def _refuse_constant(token: str) -> Any:
+    raise ValueError(f"non-standard JSON token {token}")
+
+
+def parse_untrusted_json(raw: bytes) -> Any:
+    """Parse JSON that `verify` reads from an untrusted file or signed payload, or raise ``ValueError``.
+
+    One rule set the three engines share, so the same bytes are refused or accepted alike: strict
+    UTF-8 with no byte-order mark, standard JSON only (no ``NaN``/``Infinity``, no trailing data),
+    containers nested at most :data:`MAX_JSON_DEPTH` deep, and every string and key well-formed
+    Unicode (an escaped lone surrogate such as ``"\\ud800"`` is refused). Callers turn the
+    ``ValueError`` into their own fixed reason text; its message is never shown."""
+    try:
+        value = json.loads(raw.decode("utf-8"), parse_constant=_refuse_constant)
+    except (ValueError, RecursionError) as exc:
+        raise ValueError("not readable JSON") from exc
+    stack: list[tuple[Any, int]] = [(value, 1)]
+    while stack:
+        node, depth = stack.pop()
+        if isinstance(node, str):
+            if _SURROGATE.search(node):
+                raise ValueError("not readable JSON")
+        elif isinstance(node, (list, dict)):
+            if depth > MAX_JSON_DEPTH:
+                raise ValueError("not readable JSON")
+            children = (
+                list(node.values()) + list(node) if isinstance(node, dict) else node
+            )
+            stack.extend((child, depth + 1) for child in children)
+    return value
+
+
+def describe_untrusted(value: Any) -> str:
+    """How a refusal names a value read from an untrusted document (a keyid, an issuer): ``None``,
+    a quoted plain-ASCII string, or a fixed description -- never a language's own repr of an arbitrary
+    value, which the three engines cannot reproduce alike."""
+    if value is None:
+        return "None"
+    if isinstance(value, str):
+        return (
+            f"'{value}'"
+            if _PLAIN_ASCII.fullmatch(value)
+            else "<a string with special characters>"
+        )
+    return "<not a string>"
 
 
 def _b64e(data: bytes) -> str:
@@ -210,7 +269,9 @@ def verify_certificate(
     issuer = cert.get("issuer")
     ca = authorities.get(issuer) if isinstance(issuer, str) else None
     if ca is None:
-        raise VerificationError(f"unknown certificate issuer {issuer!r}")
+        raise VerificationError(
+            f"unknown certificate issuer {describe_untrusted(issuer)}"
+        )
     body = {k: v for k, v in cert.items() if k != "signature"}
     try:
         ca.verify(_b64d(cert["signature"]), canonicalize(body))
@@ -342,7 +403,9 @@ class TrustRoot:
             return verify_certificate(cert, self.authorities)
         keyid = signature.get("keyid")
         if not isinstance(keyid, str) or keyid not in self.keys:
-            raise VerificationError(f"no trusted key for keyid {keyid!r}")
+            raise VerificationError(
+                f"no trusted key for keyid {describe_untrusted(keyid)}"
+            )
         return self.keys[keyid], self.key_identities.get(keyid, keyid)
 
 
@@ -404,7 +467,7 @@ def verify_envelope(envelope: Any, trust: TrustRoot) -> Verified:
                 # A non-object entry has no keyid to resolve; route it through the same
                 # missing-keyid message `TrustRoot.resolve` gives for an absent `keyid` field, so the
                 # text is one the per-entry loop already defines, not a second ad-hoc string.
-                raise VerificationError(f"no trusted key for keyid {None!r}")
+                raise VerificationError("no trusted key for keyid None")
             public_key, identity = trust.resolve(signature)
             sig = signature.get("sig")
             if not isinstance(sig, str):
@@ -413,10 +476,11 @@ def verify_envelope(envelope: Any, trust: TrustRoot) -> Verified:
                 # equivalent to mirror otherwise).
                 raise VerificationError("'sig'")
             public_key.verify(_b64d(sig), pae)
+            keyid = signature.get("keyid")
             return Verified(
                 payload=payload,
                 identity=identity,
-                keyid=signature.get("keyid"),
+                keyid=keyid if isinstance(keyid, str) else None,
                 keyless="cert" in signature,
             )
         except (InvalidSignature, VerificationError, ValueError) as exc:
@@ -426,10 +490,25 @@ def verify_envelope(envelope: Any, trust: TrustRoot) -> Verified:
     )
 
 
-def statement_subject_digest(statement: dict[str, Any]) -> str:
-    """Return the ``sha256:`` digest of an in-toto Statement's single subject."""
-    digest = statement["subject"][0]["digest"]
-    return "sha256:" + digest["sha256"]
+STATEMENT_UNREADABLE = "the signed statement is not readable JSON"
+STATEMENT_NO_DIGEST = "the signed statement carries no subject digest"
+
+
+def statement_subject_digest(payload: bytes) -> str:
+    """Return the ``sha256:`` digest of the first subject of the in-toto Statement in ``payload``
+    (a verified envelope's payload bytes), or raise :class:`VerificationError` with one of two fixed
+    texts: the payload is not readable JSON, or it has no ``subject[0].digest.sha256`` string."""
+    try:
+        statement = parse_untrusted_json(payload)
+    except ValueError as exc:
+        raise VerificationError(STATEMENT_UNREADABLE) from exc
+    subject = statement.get("subject") if isinstance(statement, dict) else None
+    first = subject[0] if isinstance(subject, list) and subject else None
+    digest = first.get("digest") if isinstance(first, dict) else None
+    sha256 = digest.get("sha256") if isinstance(digest, dict) else None
+    if not isinstance(sha256, str):
+        raise VerificationError(STATEMENT_NO_DIGEST)
+    return "sha256:" + sha256
 
 
 def verify_catalog_directory(directory: Path, trust: TrustRoot) -> Verified:
@@ -441,8 +520,6 @@ def verify_catalog_directory(directory: Path, trust: TrustRoot) -> Verified:
     absent signature raises the :class:`UnsignedError` subclass, so a caller that reports "unsigned"
     differently from "did not verify" can tell them apart. Never contacts the network.
     """
-    import json
-
     sig_path = directory / CATALOG_SIGNATURE_NAME
     if not sig_path.is_file():
         raise UnsignedError(
@@ -450,18 +527,13 @@ def verify_catalog_directory(directory: Path, trust: TrustRoot) -> Verified:
             "(SPEC §8.7)."
         )
     try:
-        envelope = json.loads(sig_path.read_text("utf-8"))
+        envelope = parse_untrusted_json(sig_path.read_bytes())
     except (OSError, ValueError) as exc:
         raise VerificationError(
-            f"{CATALOG_SIGNATURE_NAME} is not readable JSON: {exc}"
+            f"{CATALOG_SIGNATURE_NAME} is not readable JSON"
         ) from exc
     verified = verify_envelope(envelope, trust)
-    try:
-        signed_digest = statement_subject_digest(json.loads(verified.payload))
-    except (ValueError, KeyError, IndexError, TypeError) as exc:
-        raise VerificationError(
-            f"the signed statement carries no catalog digest: {exc}"
-        ) from exc
+    signed_digest = statement_subject_digest(verified.payload)
     recomputed = digest_tree(directory, exclude=frozenset({CATALOG_SIGNATURE_NAME}))
     if signed_digest != recomputed:
         raise VerificationError(

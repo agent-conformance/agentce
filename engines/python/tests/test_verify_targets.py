@@ -338,10 +338,9 @@ def test_verify_release_bundle_artifact_name_unsafe_is_missing(
 def test_verify_release_bundle_manifest_deeply_nested_refused(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A manifest nested far beyond the interpreter's recursion limit must soft-fail, not crash with
-    `internal.unexpected` (`RecursionError`) -- verifier round-2 (adjacent probes). Built as raw text
-    (not `json.dumps` on a Python object), since building the fixture that way would itself
-    recurse."""
+    """A manifest nested past `MAX_JSON_DEPTH` is refused as unreadable, the same depth Java's Jackson
+    refuses natively, never a crash -- verifier round-2 (adjacent probes). Built as raw text (not
+    `json.dumps` on a Python object), since building the fixture that way would itself recurse."""
     nested_text = '{"artifacts": [], "nested": ' + "[" * 5000 + "]" * 5000 + "}"
     (tmp_path / "release-manifest.json").write_text(nested_text, encoding="utf-8")
     (tmp_path / "signatures.json").write_text("[]", encoding="utf-8")
@@ -349,7 +348,80 @@ def test_verify_release_bundle_manifest_deeply_nested_refused(
     assert code == 3
     assert env["verified"] is False
     assert "error" not in env
-    assert env["reason"] == "release manifest cannot be canonicalized"
+    assert env["reason"] == "release manifest is not readable JSON"
+
+
+@pytest.mark.parametrize(
+    ("depth", "reason"),
+    [
+        (1000, "signature (None): signature entry is not an object"),
+        (1001, "release signatures are not readable JSON"),
+    ],
+)
+def test_verify_release_signatures_depth_boundary(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], depth: int, reason: str
+) -> None:
+    """`MAX_JSON_DEPTH` containers parse (and the manifest under them canonicalizes); one more is
+    refused -- the boundary all three engines share."""
+    (tmp_path / "release-manifest.json").write_text('{"artifacts": []}', encoding="utf-8")
+    nested = "[" * depth + "]" * depth
+    (tmp_path / "signatures.json").write_text(nested, encoding="utf-8")
+    code, env = run(["verify", "--release", str(tmp_path), "--json"], capsys)
+    assert code == 3
+    assert "error" not in env
+    assert env["reason"] == reason
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '{"x": NaN}',
+        '{"x": Infinity}',
+        '{"x": "\\ud800"}',
+        '{"\\udc00": 1}',
+        "\ufeff{}",
+        "{} x",
+    ],
+)
+def test_parse_untrusted_json_refuses(text: str) -> None:
+    with pytest.raises(ValueError):
+        signing.parse_untrusted_json(text.encode("utf-8"))
+
+
+def test_parse_untrusted_json_accepts_a_surrogate_pair_and_max_depth() -> None:
+    assert signing.parse_untrusted_json(b'"\\ud83d\\ude00"') == "\U0001f600"
+    depth = signing.MAX_JSON_DEPTH
+    assert signing.parse_untrusted_json(b"[" * depth + b"]" * depth) is not None
+
+
+@pytest.mark.parametrize(
+    ("value", "text"),
+    [
+        (None, "None"),
+        ("sha256:ab", "'sha256:ab'"),
+        ("it's", "<a string with special characters>"),
+        ("caf\u00e9", "<a string with special characters>"),
+        (True, "<not a string>"),
+        ([], "<not a string>"),
+    ],
+)
+def test_describe_untrusted(value: object, text: str) -> None:
+    assert signing.describe_untrusted(value) == text
+
+
+@pytest.mark.parametrize(
+    ("payload", "reason"),
+    [
+        (b"{", signing.STATEMENT_UNREADABLE),
+        (b'{"subject": NaN}', signing.STATEMENT_UNREADABLE),
+        (b"[]", signing.STATEMENT_NO_DIGEST),
+        (b'{"subject": {}}', signing.STATEMENT_NO_DIGEST),
+        (b'{"subject": [{"digest": {"sha256": 7}}]}', signing.STATEMENT_NO_DIGEST),
+    ],
+)
+def test_statement_subject_digest_fixed_texts(payload: bytes, reason: str) -> None:
+    with pytest.raises(signing.VerificationError, match=f"^{reason}$"):
+        signing.statement_subject_digest(payload)
 
 
 def test_verify_release_single_file_deeply_nested_envelope_refused(

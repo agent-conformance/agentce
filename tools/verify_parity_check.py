@@ -35,14 +35,17 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
 import readiness_parity_check
+import verify_flow_census
 
 ROOT = Path(__file__).resolve().parent.parent
 PY_ENGINE = ROOT / "engines" / "python"
@@ -111,12 +114,15 @@ def java_verify(args: list[str]) -> tuple[str, int]:
     )
 
 
+ENGINE_VERIFY = {
+    "python": python_verify,
+    "typescript": typescript_verify,
+    "java": java_verify,
+}
+
+
 def _run_engines(args: list[str]) -> dict[str, tuple[str, int]]:
-    return {
-        "python": python_verify(args),
-        "typescript": typescript_verify(args),
-        "java": java_verify(args),
-    }
+    return {engine: run(args) for engine, run in ENGINE_VERIFY.items()}
 
 
 def _per_engine_dirs(tmp: Path, name: str) -> dict[str, Path]:
@@ -229,6 +235,14 @@ empty_subject_env = signing.sign_statement(
     json.dumps(empty_subject_env), encoding="utf-8"
 )
 
+# The census's re-signed variants (statement and certificate fields), tools/verify_flow_census.py.
+import sys
+sys.path.insert(0, {tools!r})
+import verify_flow_census
+verify_flow_census.build_signed_variants(
+    out, signing, dev_trust, canonicalize, manifest_digest, Path({catalog!r})
+)
+
 print(json.dumps({{"manifest_digest": manifest_digest, "profiles": ["kms", "sigstore-public"]}}))
 """
 
@@ -237,7 +251,9 @@ def build_canonical_fixtures(canonical: Path) -> dict[str, Any]:
     """The one shelled call into `engines/python`'s own `uv` environment that needs `cryptography`
     (not a `tools` dependency) -- builds every cryptographically-signed fixture this check reuses,
     copied crypto-free into each scenario's per-engine directories below."""
-    script = _BUILD_SCRIPT.format(out=str(canonical))
+    script = _BUILD_SCRIPT.format(
+        out=str(canonical), tools=str(ROOT / "tools"), catalog=str(EU_AI_ACT)
+    )
     out, code = _run(
         ["uv", "run", "--frozen", "--project", str(PY_ENGINE), "python", "-c", script],
         cwd=ROOT,
@@ -355,7 +371,7 @@ def _run_catalog_scenario(
         if mutate is not None:
             mutate(catalog_dir)
     runs = {
-        engine: _run_engines(["--catalog", str(d / "catalog"), "--json"])[engine]
+        engine: ENGINE_VERIFY[engine](["--catalog", str(d / "catalog"), "--json"])
         for engine, d in dirs.items()
     }
     for engine, (out, code) in runs.items():
@@ -397,7 +413,7 @@ def _run_release_scenario(
     runs: dict[str, tuple[str, int]] = {}
     for engine, d in dirs.items():
         release_path = build(d)
-        runs[engine] = _run_engines(["--release", str(release_path), "--json"])[engine]
+        runs[engine] = ENGINE_VERIFY[engine](["--release", str(release_path), "--json"])
     for engine, (out, code) in runs.items():
         _assert(
             code == expect_exit,
@@ -445,6 +461,52 @@ def _run_bundle_scenario(
         failures,
     )
     return runs
+
+
+def _run_mutation(
+    mutation: verify_flow_census.Mutation, root: Path
+) -> dict[str, tuple[str, int]]:
+    flag = "--catalog" if mutation.target == "catalog" else "--release"
+    runs = {}
+    for engine, run in ENGINE_VERIFY.items():
+        d = root / engine
+        d.mkdir(parents=True)
+        runs[engine] = run([flag, str(mutation.build(d)), "--json"])
+    return runs
+
+
+def run_census(canonical: Path, tmp: Path, failures: list[str]) -> None:
+    """Every mutation `verify_flow_census.generate` derives from the census, through all three
+    engines: byte-identical output and exit code, a JSON envelope, never `internal.unexpected`."""
+    mutations = verify_flow_census.generate(canonical, EU_AI_ACT)
+    failures.extend(verify_flow_census.coverage_problems(mutations))
+    with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:
+        results = list(
+            pool.map(
+                lambda im: _run_mutation(im[1], tmp / "census" / str(im[0])),
+                enumerate(mutations),
+            )
+        )
+    verified = []
+    for mutation, runs in zip(mutations, results, strict=True):
+        label = f"census {mutation.name}"
+        for engine, (out, code) in runs.items():
+            _assert(
+                "internal.unexpected" not in out,
+                failures,
+                f"{label}:{engine}: crashed ({out.strip()[:300]!r})",
+            )
+        outputs = [
+            _normalized(runs[e][0]) + f"exit {runs[e][1]}\n"
+            for e in ("python", "typescript", "java")
+        ]
+        readiness_parity_check.compare_ports(label, outputs, failures)
+        if runs["python"][1] == 0:
+            verified.append(mutation.name)
+    print(
+        f"census: {len(mutations)} mutations over {len(verify_flow_census.FLOW_POINTS)} flow "
+        f"points; still verified (unsigned fields only): {', '.join(verified) or 'none'}"
+    )
 
 
 def run_real_check() -> int:
@@ -1120,6 +1182,8 @@ def run_real_check() -> int:
             failures,
             expect_exit=0,
         )
+
+        run_census(canonical, tmp, failures)
 
     for failure in failures:
         print(f"MISMATCH: {failure}", file=sys.stderr)

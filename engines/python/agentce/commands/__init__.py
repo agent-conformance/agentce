@@ -12,6 +12,7 @@ until then report ``status: not_implemented`` and exit ``ok``.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import io
 import json
@@ -21,7 +22,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from contextlib import redirect_stdout
 from dataclasses import dataclass
 from datetime import date
@@ -334,7 +335,7 @@ def _verify_catalog(result: CommandResult, catalog_dir: Path) -> CommandResult:
         result.note(f"catalog {catalog_dir.name}: unsigned")
         result.add_code(int(ExitCode.INPUT_ERROR))
         return result
-    except (signing.VerificationError, ValueError, KeyError, IndexError) as exc:
+    except signing.VerificationError as exc:
         result.data["verified"] = False
         result.data["reason"] = str(exc)
         result.note(f"catalog {catalog_dir.name}: verification failed — {exc}")
@@ -741,6 +742,19 @@ def _verify_report(
     return result
 
 
+@contextlib.contextmanager
+def _deep_recursion() -> Iterator[None]:
+    """Room for `canonicalize`'s recursion over a document `signing.parse_untrusted_json` already
+    accepted (at most `MAX_JSON_DEPTH` deep), which the default limit cannot hold; TypeScript and
+    Java canonicalize the same depth without help."""
+    limit = sys.getrecursionlimit()
+    sys.setrecursionlimit(max(limit, 4 * signing.MAX_JSON_DEPTH + 1000))
+    try:
+        yield
+    finally:
+        sys.setrecursionlimit(limit)
+
+
 def _verify_release_soft_fail(
     result: CommandResult, release_path: Path, reason: str
 ) -> CommandResult:
@@ -763,8 +777,8 @@ def _load_release_json(
     (e.g. "release signatures are not readable JSON") since the manifest and signature-list callers
     need different grammar, not just a different noun."""
     try:
-        value = json.loads(path.read_text("utf-8"))
-    except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
+        value = signing.parse_untrusted_json(path.read_bytes())
+    except (OSError, ValueError):
         return None, reason
     if not isinstance(value, expected_type):
         return None, reason
@@ -779,22 +793,14 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
     code for all three engines; `--catalog`'s pre-existing unreadable-JSON path is unchanged)."""
     trust = signing.vendored_trust()
     if release_path.is_file():
-        try:
-            envelope = json.loads(release_path.read_text("utf-8"))
-        except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
-            return _verify_release_soft_fail(
-                result, release_path, "release envelope is not readable JSON"
-            )
+        envelope, err = _load_release_json(
+            release_path, object, "release envelope is not readable JSON"
+        )
+        if err:
+            return _verify_release_soft_fail(result, release_path, err)
         try:
             verified = signing.verify_envelope(envelope, trust)
-        except (
-            signing.VerificationError,
-            ValueError,
-            KeyError,
-            AttributeError,
-            TypeError,
-            RecursionError,
-        ) as exc:
+        except signing.VerificationError as exc:
             return _verify_release_soft_fail(result, release_path, str(exc))
         result.data.update(
             {
@@ -821,8 +827,9 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
     if err:
         return _verify_release_soft_fail(result, release_path, err)
     try:
-        manifest_digest = signing.sha256_prefixed(canonicalize(manifest))
-    except (CanonicalizationError, RecursionError):
+        with _deep_recursion():
+            manifest_digest = signing.sha256_prefixed(canonicalize(manifest))
+    except CanonicalizationError:
         return _verify_release_soft_fail(
             result, release_path, "release manifest cannot be canonicalized"
         )
@@ -836,11 +843,14 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
             problems.append("release manifest has an artifact entry with no name")
             continue
         artifact_file = confine_to_root(release_path, name)
-        if artifact_file is None or not artifact_file.is_file():
+        try:
+            content = artifact_file.read_bytes() if artifact_file else None
+        except OSError:
+            content = None
+        if content is None:
             problems.append(f"missing artifact {name}")
             continue
-        actual = signing.sha256_prefixed(artifact_file.read_bytes())
-        if actual != artifact.get("digest"):
+        if signing.sha256_prefixed(content) != artifact.get("digest"):
             problems.append(f"digest mismatch for {name}")
     signature_entries, err = _load_release_json(
         signatures_path, list, "release signatures are not readable JSON"
@@ -853,25 +863,18 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
             problems.append("signature (None): signature entry is not an object")
             continue
         profile = entry.get("profile")
+        if not isinstance(profile, str):
+            profile = None
         try:
+            if "envelope" not in entry:
+                raise signing.VerificationError("'envelope'")
             verified = signing.verify_envelope(entry["envelope"], trust)
-            if (
-                signing.statement_subject_digest(json.loads(verified.payload))
-                != manifest_digest
-            ):
+            if signing.statement_subject_digest(verified.payload) != manifest_digest:
                 raise signing.VerificationError(
                     "signature does not cover the release manifest"
                 )
             signers.append({"profile": profile, "identity": verified.identity})
-        except (
-            signing.VerificationError,
-            ValueError,
-            KeyError,
-            IndexError,
-            AttributeError,
-            TypeError,
-            RecursionError,
-        ) as exc:
+        except signing.VerificationError as exc:
             problems.append(f"signature ({profile}): {exc}")
     if not problems and not signers:
         problems.append("release bundle carries no signatures")
