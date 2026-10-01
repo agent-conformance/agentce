@@ -104,20 +104,27 @@ export function loadBundle(bundleDir: string): Bundle {
       "add a manifest.json listing every file with its SHA-256.",
     );
   }
-  let manifest: Record<string, unknown>;
+  let parsed: unknown;
   try {
-    const parsed = parseJson(readFileSync(manifestPath, "utf-8"));
-    if (!isRecord(parsed)) {
-      throw new Error("manifest is not an object");
-    }
-    manifest = parsed;
-  } catch (exc) {
+    parsed = parseJson(readFileSync(manifestPath, "utf-8"));
+  } catch {
+    // A fixed message, not the parser's own text: the three engines' JSON readers each produce
+    // different exception text for the same malformed input, which would make this refusal's
+    // cause diverge across engines for no reason a reader could use (F3, 18.65).
     throw new InputError(
       "input.bundle_manifest_invalid",
-      `manifest.json is not valid JSON: ${exc}.`,
+      "manifest.json is not valid JSON.",
       "regenerate the bundle so its manifest.json is well-formed.",
     );
   }
+  if (!isRecord(parsed)) {
+    throw new InputError(
+      "input.bundle_manifest_invalid",
+      "manifest.json is not an object.",
+      "regenerate the bundle so its manifest.json is well-formed.",
+    );
+  }
+  const manifest: Record<string, unknown> = parsed;
 
   const files = manifest.files;
   if (!Array.isArray(files) || files.length === 0) {

@@ -129,9 +129,12 @@ public final class Bundle {
         try {
             manifest = Json.parseFile(manifestPath);
         } catch (RuntimeException exc) {
+            // A fixed message, not the parser's own text: Jackson's exception text would make this
+            // refusal's cause diverge from the other two engines for the same malformed input, for no
+            // reason a reader could use (F3, 18.65).
             throw new InputError(
                     "input.bundle_manifest_invalid",
-                    "manifest.json is not valid JSON: " + exc.getMessage() + ".",
+                    "manifest.json is not valid JSON.",
                     "regenerate the bundle so its manifest.json is well-formed.");
         }
         if (manifest == null || !manifest.isObject()) {
