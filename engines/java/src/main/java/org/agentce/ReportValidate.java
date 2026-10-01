@@ -2,6 +2,9 @@ package org.agentce;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.networknt.schema.JsonSchema;
+import com.networknt.schema.FormatKeyword;
+import com.networknt.schema.JsonMetaSchema;
+import com.networknt.schema.JsonNodePath;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
@@ -17,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
@@ -97,101 +99,153 @@ public final class ReportValidate {
         });
     }
 
+    /** A factory whose meta-schema knows no format, so {@code format} is an annotation, never an
+     * assertion -- as in the other two engines: Python's validators run without a FormatChecker and
+     * the TypeScript port sets {@code validateFormats: false}. networknt asserts known formats for
+     * draft-04/07 whatever {@code formatAssertionsEnabled} says, and refuses a plain override of the
+     * {@code format} keyword (P18-18.27 verifier round 2, D4). */
+    private static JsonSchemaFactory formatsAsAnnotations(SpecVersion.VersionFlag version, JsonMetaSchema metaSchema) {
+        JsonMetaSchema withoutFormats = JsonMetaSchema.builder(metaSchema)
+                .formatKeywordFactory(formats -> new FormatKeyword(Map.of()))
+                .build();
+        return JsonSchemaFactory.builder(JsonSchemaFactory.getInstance(version)).metaSchema(withoutFormats).build();
+    }
+
     private static final JsonSchemaFactory LOCAL_FACTORY =
-            JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
+            formatsAsAnnotations(SpecVersion.VersionFlag.V202012, JsonMetaSchema.getV202012());
     private static final Map<String, JsonSchema> LOCAL_VALIDATORS = new ConcurrentHashMap<>();
 
     private static JsonSchema localValidatorFor(String schemaName) {
         return LOCAL_VALIDATORS.computeIfAbsent(schemaName, n -> LOCAL_FACTORY.getSchema(loadSchemaJson(n)));
     }
 
-    private static String location(com.networknt.schema.JsonNodePath path) {
-        int count = path.getNameCount();
-        if (count == 0) {
-            return "<root>";
+    /** A problem's location as typed steps, as networknt records them: an object key is a {@code
+     * String}, an array index an {@code Integer}. Never re-split from a joined string, so a key
+     * holding {@code /} or digits stays one key (verifier round 2, D5/D6). */
+    private static List<Object> segments(JsonNodePath path) {
+        List<Object> out = new ArrayList<>();
+        for (int i = 0; i < path.getNameCount(); i++) {
+            out.add(path.getElement(i));
         }
-        StringBuilder out = new StringBuilder();
-        for (int i = 0; i < count; i++) {
-            if (i > 0) {
-                out.append('/');
-            }
-            out.append(path.getElement(i));
-        }
-        return out.toString();
+        return out;
     }
 
-    private static boolean isDigits(String s) {
-        return !s.isEmpty() && s.chars().allMatch(Character::isDigit);
-    }
-
-    /** Compares two {@code /}-joined locations segment by segment, comparing a pair of all-digit
-     * segments (an array index) as numbers rather than bytes, so {@code results/2} sorts before
-     * {@code results/10} -- matching Python's {@code absolute_path}, whose array-index elements are
-     * already native ints (P18-18.27 verifier round 1). */
-    private static int compareLocations(String a, String b) {
-        String[] segmentsA = a.split("/");
-        String[] segmentsB = b.split("/");
-        int len = Math.min(segmentsA.length, segmentsB.length);
+    /** Python's list ordering over {@code absolute_path}: array indices compare as numbers, object
+     * keys as strings by code point (UTF-8 byte order is code-point order), and a path sorts before
+     * any longer path it is a prefix of. */
+    private static int compareSegments(List<Object> a, List<Object> b) {
+        int len = Math.min(a.size(), b.size());
         for (int i = 0; i < len; i++) {
-            String segA = segmentsA[i];
-            String segB = segmentsB[i];
-            if (isDigits(segA) && isDigits(segB)) {
-                int diff = Long.compare(Long.parseLong(segA), Long.parseLong(segB));
-                if (diff != 0) {
-                    return diff;
-                }
-                continue;
-            }
-            int diff = Json.byteCompare(segA, segB);
+            Object segA = a.get(i);
+            Object segB = b.get(i);
+            int diff = segA instanceof Integer x && segB instanceof Integer y
+                    ? Integer.compare(x, y)
+                    : Json.byteCompare(String.valueOf(segA), String.valueOf(segB));
             if (diff != 0) {
                 return diff;
             }
         }
-        return Integer.compare(segmentsA.length, segmentsB.length);
+        return Integer.compare(a.size(), b.size());
     }
 
-    private static final Pattern COMBINATOR_SEGMENT = Pattern.compile("/(anyOf|oneOf)/\\d+");
-
-    /** The schema-location prefix before an {@code anyOf}/{@code oneOf} keyword segment, or {@code
-     * null} when {@code m} is not one of that combinator's per-branch errors (networknt, unlike Ajv,
-     * never reports the combinator failure itself as its own message -- only each branch's own
-     * errors, confirmed empirically against the vendored SARIF schema's {@code region} field).
-     * {@code location} is the caller's already-computed {@code location(m.getInstanceLocation())},
-     * passed in rather than recomputed. */
-    private static String combinatorGroupKey(String location, ValidationMessage m) {
-        String schemaLocation = m.getSchemaLocation().toString();
-        var matcher = COMBINATOR_SEGMENT.matcher(schemaLocation);
-        if (!matcher.find()) {
-            return null;
-        }
-        return location + "::" + schemaLocation.substring(0, matcher.start()) + "/" + matcher.group(1);
-    }
-
-    private record LocatedProblem(String location, String message) {}
-
-    /** An {@code anyOf}/{@code oneOf} failure's per-branch errors are collapsed into one combinator
-     * error per group, matching Python's {@code iter_errors} (which never expands a combinator
-     * failure into its branch errors) and the TypeScript port's {@code collapseCombinatorErrors} --
-     * the one rule all three engines' validators follow at parity (P18-18.27 verifier round 1). */
-    private static List<String> schemaProblems(String prefix, Set<ValidationMessage> errors) {
-        Map<String, String> combinatorLocations = new LinkedHashMap<>();
-        List<LocatedProblem> entries = new ArrayList<>();
-        for (ValidationMessage m : errors) {
-            String loc = location(m.getInstanceLocation());
-            String groupKey = combinatorGroupKey(loc, m);
-            if (groupKey != null) {
-                combinatorLocations.putIfAbsent(groupKey, loc);
-            } else {
-                entries.add(new LocatedProblem(loc, m.getMessage()));
+    /** The index of the outermost {@code anyOf}/{@code oneOf} step in an evaluation path, or -1.
+     * The evaluation path keeps every {@code $ref} hop ({@code /anyOf/0/$ref/pattern}), where the
+     * schema location names only the {@code $ref} target -- so a branch reached through a {@code
+     * $ref} is still found (verifier round 2, D1). */
+    private static int outermostCombinator(JsonNodePath evaluationPath) {
+        for (int i = 0; i < evaluationPath.getNameCount(); i++) {
+            Object step = evaluationPath.getElement(i);
+            if ("anyOf".equals(step) || "oneOf".equals(step)) {
+                return i;
             }
         }
-        for (String loc : combinatorLocations.values()) {
-            entries.add(new LocatedProblem(loc, "does not match any of the required alternatives"));
+        return -1;
+    }
+
+    /** How many steps into the instance an evaluation path takes after {@code from}, ignoring its
+     * last step (the keyword that failed): {@code properties/<name>}, {@code items} and {@code
+     * additionalProperties} each step one level down. These are the only applicators the validated
+     * schemas use besides {@code $ref}, {@code allOf}, {@code anyOf} and {@code oneOf}, which stay at
+     * the same instance; {@code tools/report_validate_keyword_census.py} fails on any other. */
+    private static int instanceSteps(JsonNodePath evaluationPath, int from) {
+        int steps = 0;
+        for (int i = from; i < evaluationPath.getNameCount() - 1; i++) {
+            Object step = evaluationPath.getElement(i);
+            if ("properties".equals(step)) {
+                steps++;
+                i++; // the property name
+            } else if ("items".equals(step) || "additionalProperties".equals(step)) {
+                steps++;
+            }
         }
-        entries.sort((a, b) -> compareLocations(a.location(), b.location()));
+        return steps;
+    }
+
+    private static String display(List<Object> location) {
+        if (location.isEmpty()) {
+            return "<root>";
+        }
+        StringBuilder out = new StringBuilder();
+        for (Object step : location) {
+            if (out.length() > 0) {
+                out.append('/');
+            }
+            out.append(step);
+        }
+        return out.toString();
+    }
+
+    private record LocatedProblem(List<Object> location, String keyword, String message) {}
+
+    /** Every schema error as {@code "<prefix><location>: <message>"}, following the Python reference's
+     * model (P18-18.27; {@code python-reference.md}'s Design notes): one problem per failing {@code
+     * anyOf}/{@code oneOf} at the combinator's own instance location, grouped by evaluation path
+     * (networknt's own {@code oneOf} message when it gives one; it gives none for {@code anyOf}); one
+     * {@code additionalProperties} problem per object naming its unexpected keys in code-point order,
+     * where networknt reports one per key; sorted by location, then keyword, keeping validator order
+     * for ties. */
+    private static List<String> schemaProblems(String prefix, Set<ValidationMessage> errors) {
+        Map<String, LocatedProblem> combinators = new LinkedHashMap<>();
+        Map<String, List<Object>> extraKeyLocations = new LinkedHashMap<>();
+        Map<String, List<String>> extraKeys = new LinkedHashMap<>();
+        List<LocatedProblem> problems = new ArrayList<>();
+        for (ValidationMessage m : errors) {
+            List<Object> location = segments(m.getInstanceLocation());
+            JsonNodePath evaluationPath = m.getEvaluationPath();
+            int combinator = outermostCombinator(evaluationPath);
+            if (combinator >= 0) {
+                List<Object> at = location.subList(0, location.size() - instanceSteps(evaluationPath, combinator + 1));
+                String keyword = (String) evaluationPath.getElement(combinator);
+                String group = at + "::" + segments(evaluationPath).subList(0, combinator + 1);
+                boolean own = combinator == evaluationPath.getNameCount() - 1;
+                if (own || !combinators.containsKey(group)) {
+                    String message = own ? m.getMessage() : "does not match any of the required alternatives";
+                    combinators.put(group, new LocatedProblem(new ArrayList<>(at), keyword, message));
+                }
+                continue;
+            }
+            if ("additionalProperties".equals(m.getType())) {
+                String group = location + "::" + evaluationPath;
+                extraKeyLocations.putIfAbsent(group, location);
+                extraKeys.computeIfAbsent(group, g -> new ArrayList<>()).add(m.getProperty());
+                continue;
+            }
+            problems.add(new LocatedProblem(location, m.getType(), m.getMessage()));
+        }
+        problems.addAll(combinators.values());
+        for (Map.Entry<String, List<String>> entry : extraKeys.entrySet()) {
+            List<String> keys = entry.getValue();
+            keys.sort(Json::byteCompare);
+            problems.add(new LocatedProblem(extraKeyLocations.get(entry.getKey()), "additionalProperties",
+                    "properties '" + String.join("', '", keys) + "' are not allowed (additional properties are not allowed)"));
+        }
+        problems.sort((a, b) -> {
+            int diff = compareSegments(a.location(), b.location());
+            return diff != 0 ? diff : Json.byteCompare(a.keyword(), b.keyword());
+        });
         List<String> out = new ArrayList<>();
-        for (LocatedProblem e : entries) {
-            out.add(prefix + e.location() + ": " + e.message());
+        for (LocatedProblem problem : problems) {
+            out.add(prefix + display(problem.location()) + ": " + problem.message());
         }
         return out;
     }
@@ -417,7 +471,8 @@ public final class ReportValidate {
     // --- Real third-party standards: validated only once AgentCE's own bounded profile has already
     // accepted the document (see the class docstring). --------------------------------------------
 
-    private static final JsonSchemaFactory NIST_FACTORY = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V7);
+    private static final JsonSchemaFactory NIST_FACTORY =
+            formatsAsAnnotations(SpecVersion.VersionFlag.V7, JsonMetaSchema.getV7());
     private static volatile JsonSchema nistValidator;
 
     private static JsonSchema compiledOscalNistValidator() {
@@ -437,7 +492,8 @@ public final class ReportValidate {
         return schemaProblems("oscal-ar.json (NIST OSCAL 1.1.2): ", errors);
     }
 
-    private static final JsonSchemaFactory SARIF_FACTORY = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V4);
+    private static final JsonSchemaFactory SARIF_FACTORY =
+            formatsAsAnnotations(SpecVersion.VersionFlag.V4, JsonMetaSchema.getV4());
     private static volatile JsonSchema sarifValidator;
 
     private static JsonSchema compiledSarifValidator() {
