@@ -411,3 +411,63 @@ test("case 16: --validate given a non-directory path refuses before opening any 
     "input.validate_not_a_directory",
   );
 });
+
+test("case 22: two local-stage violations in one file are both reported, located", () => {
+  const out = freshFullReport();
+  try {
+    const path = join(out, "assertions.json");
+    const assertions = JSON.parse(readFileSync(path, "utf-8"));
+    assertions[0].control = undefined;
+    assertions[1].control = undefined;
+    writeFileSync(path, JSON.stringify(assertions));
+    const problems = validateReport(out).filter((p) => p.startsWith("assertions.json:"));
+    assert.deepEqual(problems, [
+      "assertions.json: 0: must have required property 'control'",
+      "assertions.json: 1: must have required property 'control'",
+    ]);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("case 23: an anyOf failure at the real schema stage collapses to one combinator problem", () => {
+  const out = freshFullReport();
+  try {
+    const path = join(out, "results.sarif");
+    const sarif = JSON.parse(readFileSync(path, "utf-8"));
+    sarif.runs[0].results[0].locations[0].physicalLocation.region = {};
+    writeFileSync(path, JSON.stringify(sarif));
+    const problems = validateReport(out).filter((p) =>
+      p.startsWith("results.sarif (OASIS SARIF 2.1.0):"),
+    );
+    assert.deepEqual(problems, [
+      "results.sarif (OASIS SARIF 2.1.0): runs/0/results/0/locations/0/physicalLocation/region: must match a schema in anyOf",
+    ]);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("case 24: real-schema violations at indices 2 and 10 sort numerically, not lexicographically", () => {
+  const out = freshFullReport();
+  try {
+    const path = join(out, "results.sarif");
+    const sarif = JSON.parse(readFileSync(path, "utf-8"));
+    const results = sarif.runs[0].results;
+    // The lightweight fixture this suite's own `assess` run produces may have fewer than 11
+    // results; pad it with clones of the last one so indices 2 and 10 both exist.
+    while (results.length <= 10) {
+      results.push(JSON.parse(JSON.stringify(results[results.length - 1])));
+    }
+    results[2].message.text = undefined;
+    results[10].message.text = undefined;
+    writeFileSync(path, JSON.stringify(sarif));
+    const problems = validateReport(out).filter((p) => p.startsWith("results.sarif:"));
+    assert.deepEqual(problems, [
+      "results.sarif: runs/0/results/2/message: must have required property 'text'",
+      "results.sarif: runs/0/results/10/message: must have required property 'text'",
+    ]);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});

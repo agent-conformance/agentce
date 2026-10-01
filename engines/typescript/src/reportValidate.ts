@@ -80,12 +80,59 @@ function messageLocation(instancePath: string): string {
   return path === "" ? "<root>" : path;
 }
 
+/** Compares two `/`-joined locations segment by segment, comparing a pair of all-digit segments
+ * (an array index) as numbers rather than strings, so `results/2` sorts before `results/10` --
+ * matching Python's `absolute_path`, whose array-index elements are already native ints
+ * (P18-18.27 verifier round 1). */
+function compareLocations(a: string, b: string): number {
+  const segmentsA = a.split("/");
+  const segmentsB = b.split("/");
+  const len = Math.min(segmentsA.length, segmentsB.length);
+  for (let i = 0; i < len; i++) {
+    const segA = segmentsA[i] as string;
+    const segB = segmentsB[i] as string;
+    if (/^\d+$/.test(segA) && /^\d+$/.test(segB)) {
+      const diff = Number(segA) - Number(segB);
+      if (diff !== 0) {
+        return diff;
+      }
+      continue;
+    }
+    if (segA !== segB) {
+      return segA < segB ? -1 : 1;
+    }
+  }
+  return segmentsA.length - segmentsB.length;
+}
+
+/** An `anyOf`/`oneOf` failure's per-branch errors are discarded, keeping only the combinator error
+ * itself: Ajv's `allErrors: true` reports every failing branch alongside it, but Python's
+ * `iter_errors` never expands a combinator failure that way, and that is the one rule all three
+ * engines' validators follow at parity (P18-18.27 verifier round 1). */
+function collapseCombinatorErrors<T extends { keyword?: string; schemaPath: string }>(
+  errors: T[],
+): T[] {
+  const combinatorPaths = errors
+    .filter((e) => e.keyword === "anyOf" || e.keyword === "oneOf")
+    .map((e) => e.schemaPath);
+  if (combinatorPaths.length === 0) {
+    return errors;
+  }
+  return errors.filter(
+    (e) => !combinatorPaths.some((p) => e.schemaPath !== p && e.schemaPath.startsWith(`${p}/`)),
+  );
+}
+
 function ajvProblems(
   prefix: string,
-  errors: { instancePath: string; message?: string }[] | null | undefined,
+  rawErrors:
+    | { instancePath: string; message?: string; keyword?: string; schemaPath: string }[]
+    | null
+    | undefined,
 ): string[] {
-  const withPath = (errors ?? []).map((e) => ({ location: messageLocation(e.instancePath), e }));
-  withPath.sort((a, b) => (a.location < b.location ? -1 : a.location > b.location ? 1 : 0));
+  const errors = collapseCombinatorErrors(rawErrors ?? []);
+  const withPath = errors.map((e) => ({ location: messageLocation(e.instancePath), e }));
+  withPath.sort((a, b) => compareLocations(a.location, b.location));
   return withPath.map(({ location, e }) => `${prefix}${location}: ${e.message ?? "invalid"}`);
 }
 
