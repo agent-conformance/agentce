@@ -799,6 +799,18 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         target="report",
         arg=arg_empty,
     )
+    # A trailing slash on a plain file (not a release-bundle directory) must refuse the same way a
+    # nonexistent path does (F5, 18.65): `release-trailing-slash` above exercises a bundle
+    # *directory*, which already ends in a real directory either way, so it never reaches the
+    # raw-string `os.path.exists`-style check this row targets.
+    add(
+        "release-file-trailing-slash",
+        "target-argument",
+        "trailing-slash",
+        single_file((canonical / "release-kms.json").read_bytes()),
+        target="release",
+        arg=arg_trailing_slash,
+    )
 
     return mutations
 
