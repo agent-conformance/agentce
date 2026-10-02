@@ -90,9 +90,16 @@ def _any_value(value: object) -> object:
     if "stringValue" in value:
         return value["stringValue"]
     if "intValue" in value:
-        # int64 is JSON-encoded as a string in the OTLP/JSON protobuf mapping.
+        # int64 is JSON-encoded as a string in the OTLP/JSON protobuf mapping; a non-integer string
+        # (malformed telemetry) is treated the same as any other unmapped value, never raised (SPEC
+        # 12.1's "degrade, not crash" contract -- test_robustness.py).
         raw = value["intValue"]
-        return int(raw) if isinstance(raw, str) else raw
+        if not isinstance(raw, str):
+            return raw
+        try:
+            return int(raw)
+        except ValueError:
+            return None
     if "boolValue" in value:
         return value["boolValue"]
     if "doubleValue" in value:
@@ -100,12 +107,18 @@ def _any_value(value: object) -> object:
     if "arrayValue" in value:
         inner = value["arrayValue"]
         items = inner.get("values", []) if isinstance(inner, dict) else []
+        if not isinstance(items, list):
+            return []
         return [_any_value(item) for item in items]
     if "kvlistValue" in value:
         inner = value["kvlistValue"]
         pairs = inner.get("values", []) if isinstance(inner, dict) else []
+        if not isinstance(pairs, list):
+            return {}
         return {
-            p["key"]: _any_value(p.get("value")) for p in pairs if isinstance(p, dict)
+            p["key"]: _any_value(p.get("value"))
+            for p in pairs
+            if isinstance(p, dict) and isinstance(p.get("key"), str)
         }
     return None
 
@@ -146,7 +159,13 @@ def _rfc3339_millis(unix_nanos: object) -> str | None:
         nanos, 1_000_000
     )  # truncate to milliseconds; never round up
     seconds, millis = divmod(millis_total, 1000)
-    moment = datetime.datetime.fromtimestamp(seconds, tz=datetime.timezone.utc)
+    try:
+        moment = datetime.datetime.fromtimestamp(seconds, tz=datetime.timezone.utc)
+    except (ValueError, OverflowError, OSError):
+        # A timestamp so far out of range the platform clock cannot represent it (a malformed or
+        # hostile export) is treated as no timestamp at all, never raised (SPEC 12.1's "degrade, not
+        # crash" contract -- test_robustness.py).
+        return None
     return f"{moment.strftime('%Y-%m-%dT%H:%M:%S')}.{millis:03d}Z"
 
 
@@ -562,6 +581,10 @@ def adapt(
         document = json.loads(payload)
     except json.JSONDecodeError as exc:
         raise AdapterError("invalid_json", exc.msg) from exc
+    except UnicodeDecodeError as exc:
+        # Bytes that are not valid UTF-8 at all (hostile or corrupted input) are a decode failure,
+        # not a JSON syntax failure, but still refuse with a stable key rather than crash.
+        raise AdapterError("invalid_encoding", str(exc)) from exc
     if not isinstance(document, dict):
         raise AdapterError("not_otlp", "top-level value is not a JSON object")
 
