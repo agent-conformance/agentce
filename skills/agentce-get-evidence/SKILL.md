@@ -46,6 +46,18 @@ policy). Never guess these.
 | S-9 | Content minimisation: record hashes, locations, and counts — never prompt/tool content, personal data, or secrets. |
 | S-10 | Signed, pinned distribution: install by commit-pinned reference. |
 
+## Quick path
+
+No repository access yet, or just want a first read? `agentce assess <folder of OTel GenAI /
+OpenInference trace exports>` needs no catalog choice and no declaration: it derives an evidence
+bundle and a profile from the records alone and reports `insufficient_evidence` for every control it
+cannot yet verify (never `not_applicable` — the records-only path makes no claim about what is out of
+scope). The `blind_spots.json` it writes names the one record type most worth adding next. Read
+`references/quick-path.md` before relying on this path for anything past a first look: most of
+baseline@2026.09's controls need a declared decision type, an incident record, or consequential-tagged
+provenance that trace records alone never carry, so Phases A-C below are still how a deployment earns
+anything past that first read.
+
 ## Phases
 
 **A — Declare** (`references/declare.md`). Enumerate subjects and decision types; draft the Annex III
@@ -100,4 +112,5 @@ deviation register is written by the operator, never by this skill (S-3).
 
 `references/declare.md` → `references/instrument.md` → `references/validate-iterate.md`;
 `references/trust-classes.md` and `references/annex-iii-classification.md` for the two judgement calls;
-`references/frameworks/<style>.md` for framework-specific instrumentation notes.
+`references/frameworks/<style>.md` for framework-specific instrumentation notes;
+`references/quick-path.md` for the records-folder mechanism above.
