@@ -1083,6 +1083,71 @@ def test_verify_report_evidence_tampered(
     assert envelope["error"]["key"] == "verify.report_evidence_tampered"
 
 
+def test_verify_report_bundle_digest_self_consistent_edit_is_still_tampered(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A tamperer who edits an event file AND recomputes its own manifest entry's sha256 (so
+    `load_bundle`'s per-file check -- the one every other case above trips -- stays green) still
+    changes the manifest's own bytes, so the outer `bundle_digest` equality at
+    commands/__init__.py:769 (distinct from `load_bundle`'s per-file checks, and otherwise never
+    exercised by any test) must catch it on its own (verifier round 3, 18.8, mutation M8)."""
+    out, _key = _packaged_and_signed(tmp_path)
+    evidence = out / "bundle" / "evidence"
+    event_file = next((evidence / "events").glob("*.jsonl"))
+    event_file.write_bytes(event_file.read_bytes() + b"\n")
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    rel = str(event_file.relative_to(evidence))
+    new_sha256 = hashlib.sha256(event_file.read_bytes()).hexdigest()
+    entry = next(e for e in manifest["files"] if e["path"] == rel)
+    assert entry["sha256"] != new_sha256, (
+        "the edit must actually change the file's digest"
+    )
+    entry["sha256"] = new_sha256
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert envelope["error"]["key"] == "verify.report_evidence_tampered"
+
+
+def test_verify_report_bundle_digest_canonicalization_failure(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`canonical.sha256_hex` raises `CanonicalizationError` for any float value anywhere in the
+    manifest it canonicalizes; `load_bundle` itself never rejects an unrecognised top-level manifest
+    key, so this is reachable only through the lazy `Bundle.digest` property, hitting
+    commands/__init__.py:764-768's except branch -- distinct from the ordinary mismatch path at 769
+    the self-consistent-edit test above exercises (18.8.R1 branch-coverage gate)."""
+    out, _key = _packaged_and_signed(tmp_path)
+    manifest_path = out / "bundle" / "evidence" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["agentce_bundle_extra_float"] = 1.5
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert envelope["error"]["key"] == "verify.report_evidence_tampered"
+
+
+def test_verify_report_rerun_missing_compare_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """commands/__init__.py:895-901's "a compare file is simply missing" branch is distinct from
+    "present but byte-different" (902-903), which the reproduction-mismatch test below exercises
+    exclusively. A compare-file name present in neither the shipped report nor the re-run's own
+    output hits the missing-file branch directly (18.8.R1 branch-coverage gate)."""
+    from agentce import commands
+
+    out, _key = _packaged_and_signed(tmp_path)
+    monkeypatch.setattr(
+        commands,
+        "_RERUN_COMPARE_FILES",
+        commands._RERUN_COMPARE_FILES + ("does-not-exist.json",),
+    )
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert envelope["error"]["key"] == "verify.report_reproduction_mismatch"
+
+
 def test_verify_report_catalog_dir_digest_tampered(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -1103,6 +1168,164 @@ def test_verify_report_catalog_dir_digest_tampered(
     assert envelope["error"]["key"] == "verify.report_evidence_tampered"
 
 
+def test_verify_report_claim_unreadable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`claim_path.is_file()` can be true while `read_bytes()` still raises `OSError` (a permission
+    change, a device error) -- commands/__init__.py:531-536, distinct from the malformed-JSON case,
+    which shares the same `verify.report_claim_malformed` key (18.8.R1 branch-coverage gate)."""
+    out, _key = _packaged_and_signed(tmp_path)
+    claim_path = out / "claim.json"
+    real_read_bytes = Path.read_bytes
+
+    def _flaky_read_bytes(self: Path, *args: Any, **kwargs: Any) -> bytes:
+        if self == claim_path:
+            raise OSError("simulated unreadable claim.json")
+        return real_read_bytes(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_bytes", _flaky_read_bytes)
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert envelope["error"]["key"] == "verify.report_claim_malformed"
+
+
+def test_verify_report_signature_shaped_wrong_falls_through(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A claimant signature that verifies cryptographically but whose signed payload is not shaped
+    like the statement `agentce sign` writes (commands/__init__.py:607-611) must be skipped, not
+    accepted -- distinct from the no-candidate-verified case at 621-626, which shares the same
+    `verify.report_signature_invalid` key (18.8.R1 branch-coverage gate)."""
+    from agentce import signing
+
+    out, key = _packaged_and_signed(tmp_path)
+    claim_path = out / "claim.json"
+    claim = json.loads(claim_path.read_text(encoding="utf-8"))
+    bad_statement = {"predicate": {"role": "claimant"}, "subject": "not-a-list"}
+    envelope = signing.sign_statement(bad_statement, signing.KmsSigner(private_key=key))
+    claim["signatures"] = [{"role": "claimant", "profile": "kms", **envelope}]
+    claim_path.write_text(json.dumps(claim), encoding="utf-8")
+    code, envelope_out = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert envelope_out["error"]["key"] == "verify.report_signature_invalid"
+
+
+def test_verify_report_manifest_missing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """manifest.json literally absent (not merely tampered content, the pre-existing
+    `verify.report_output_tampered` case) -- commands/__init__.py:645-651 (18.8.R1 branch-coverage
+    gate)."""
+    out, _key = _packaged_and_signed(tmp_path)
+    (out / "manifest.json").unlink()
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert envelope["error"]["key"] == "verify.report_output_tampered"
+
+
+def test_verify_report_output_file_missing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A manifest-tracked output literally missing from disk -- commands/__init__.py:711-713,
+    distinct from the digest-mismatch branch at 714-716 that every other output-tampered test here
+    exercises by appending bytes rather than deleting (18.8.R1 branch-coverage gate)."""
+    out, _key = _packaged_and_signed(tmp_path)
+    (out / "report.md").unlink()
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert envelope["error"]["key"] == "verify.report_output_tampered"
+    assert "report.md" in envelope["error"]["cause"]
+
+
+def test_verify_report_packaging_missing_at_direct_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`packaging.json` is itself manifest-tracked, so a plain delete is caught by the outputs loop
+    first (commands/__init__.py:708-722); the dedicated `{report_dir} has no packaging.json` check
+    at 726-727 -- same `verify.report_output_tampered` key -- is reachable only if packaging.json
+    goes missing between that loop and this later, separate check (a TOCTOU race a real filesystem
+    could also produce). Simulated by making only the second `is_file()` call on that path return
+    False (18.8.R1 branch-coverage gate)."""
+    out, _key = _packaged_and_signed(tmp_path)
+    packaging_path = out / "packaging.json"
+    real_is_file = Path.is_file
+    seen = {"n": 0}
+
+    def _flaky_is_file(self: Path) -> bool:
+        if self == packaging_path:
+            seen["n"] += 1
+            return seen["n"] == 1
+        return real_is_file(self)
+
+    monkeypatch.setattr(Path, "is_file", _flaky_is_file)
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert envelope["error"]["key"] == "verify.report_output_tampered"
+    assert "no packaging.json" in envelope["error"]["cause"]
+
+
+def test_verify_report_without_domain_binding_still_reproduces(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A bundle assessed with no `--domain` binding leaves `domain_binding_digest` absent from
+    manifest.json's inputs, so the domain-tampered check at commands/__init__.py:786-796 and the
+    re-run's own `--domain` arg-building at 855-856 both take their `is not None` condition's False
+    branch, never exercised by any other test here (every other case uses the quickstart fixture's
+    domain binding) (18.8.R1 branch-coverage gate)."""
+    argv = [
+        "assess",
+        "--bundle",
+        str(_QUICKSTART / "evidence"),
+        "--profile",
+        str(_QUICKSTART / "applicability.yaml"),
+        "--out",
+        str(tmp_path / "o"),
+        "--package-for-sharing",
+    ]
+    assert cli.main(argv) == 0
+    out = tmp_path / "o"
+    key_path = tmp_path / "claimant.pem"
+    _write_kms_key(key_path)
+    assert (
+        cli.main(
+            [
+                "sign",
+                str(out),
+                "--as",
+                "claimant",
+                "--profile",
+                "kms",
+                "--key",
+                str(key_path),
+                "--write-trust-root",
+            ]
+        )
+        == 0
+    )
+    assert not (out / "bundle" / "domain.linkml.yaml").exists()
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 0
+    assert envelope["reproduced"] is True
+
+
+def test_verify_report_deviation_register_tampered(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A packaged deviation register tampered after signing -- step 7's dedicated
+    `deviation_register_digest` check at commands/__init__.py:797-808, distinct from the
+    evidence/profile/domain/catalog cases above, and only reachable when `--deviations` was actually
+    passed (18.8.R1 branch-coverage gate)."""
+    deviations_path = tmp_path / "deviations.yaml"
+    deviations_path.write_text("deviations: []\n", encoding="utf-8")
+    out, _key = _packaged_and_signed(tmp_path, "--deviations", str(deviations_path))
+    packaged_deviations = out / "bundle" / "deviations.yaml"
+    assert packaged_deviations.is_file()
+    packaged_deviations.write_text("deviations: []\n# TAMPER\n", encoding="utf-8")
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 3
+    assert envelope["error"]["key"] == "verify.report_evidence_tampered"
+
+
 def test_verify_report_no_trust_root(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -1116,7 +1339,9 @@ def test_verify_report_no_trust_root(
     assert envelope["error"]["key"] == "verify.report_no_trust_root"
 
 
-def test_verify_report_unpackaged_reports_null(tmp_path: Path) -> None:
+def test_verify_report_unpackaged_reports_null(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     out = tmp_path / "o"
     assert cli.main(_assess_argv(out)) == 0
     key_path = tmp_path / "claimant.pem"
@@ -1137,8 +1362,13 @@ def test_verify_report_unpackaged_reports_null(tmp_path: Path) -> None:
         )
         == 0
     )
-    code = cli.main(["verify", "--report", str(out), "--json"])
+    code, envelope = _verify_report_json(capsys, str(out))
     assert code == 0
+    # The unpackaged branch (commands/__init__.py:744-752) is distinct from the reproduced-True
+    # happy path: nothing asserted `reproduced`/`reason` here before, so a mutation that always set
+    # `reproduced: True` would pass this test undetected (verifier round 3, 18.8, mutation M20).
+    assert envelope["reproduced"] is None
+    assert envelope["reason"] == "this report was not packaged for re-running"
 
 
 def test_verify_report_byo_catalog_dir_round_trip(tmp_path: Path) -> None:
@@ -1189,6 +1419,89 @@ def test_verify_report_byo_catalog_dir_round_trip(tmp_path: Path) -> None:
         if old_env is not None:
             os.environ["AGENTCE_TRUST_ROOT"] = old_env
     assert code == 0
+
+
+def test_verify_report_byo_catalog_dir_trusts_only_its_own_scratch_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Step 8's catalog-dir re-run (commands/__init__.py:825-874) must trust only a scratch trust
+    root built from THIS report's own verified signer key, never the recipient's ambient
+    `AGENTCE_TRUST_ROOT`. `test_verify_report_byo_catalog_dir_round_trip` always packages with
+    `--allow-unverified-catalog`, so the catalog-dir's own signature is never actually checked at
+    re-run time (verifier round 3, 18.8). Here the catalog IS signed -- with the same key that signs
+    the report -- and packaged WITHOUT the override; the recipient's `AGENTCE_TRUST_ROOT` is pointed
+    at the vendored dev-root, which does not know this key, to prove the scratch root is what is
+    actually consulted, not a coincidentally-permissive ambient one."""
+    import shutil as _shutil
+
+    from agentce import signing
+
+    key_path = tmp_path / "claimant.pem"
+    key = _write_kms_key(key_path)
+    keyid = signing.keyid_for(key.public_key())
+    claimant_trust_path = tmp_path / "claimant-trust-root.json"
+    claimant_trust_path.write_text(
+        json.dumps(
+            signing.TrustRoot.document(
+                keyid, signing.public_ed25519_b64(key.public_key()), "claimant"
+            )
+        ),
+        encoding="utf-8",
+    )
+    catalog_dir = tmp_path / "catalog"
+    _shutil.copytree(_AUD_FIXTURE / "catalog", catalog_dir)
+    statement = signing.intoto_statement(
+        subject_name=catalog_dir.name,
+        digest=signing.digest_tree(
+            catalog_dir, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME})
+        ),
+        predicate_type="https://agent-conformance.org/attestation/catalog/v1",
+        predicate={"kind": "catalog", "id": catalog_dir.name},
+    )
+    envelope = signing.sign_statement(statement, signing.KmsSigner(private_key=key))
+    (catalog_dir / signing.CATALOG_SIGNATURE_NAME).write_text(
+        json.dumps(envelope), encoding="utf-8"
+    )
+
+    out = tmp_path / "o"
+    argv = [
+        "assess",
+        "--bundle",
+        str(_QUICKSTART / "evidence"),
+        "--profile",
+        str(_QUICKSTART / "applicability.yaml"),
+        "--domain",
+        str(_QUICKSTART / "domain.linkml.yaml"),
+        "--catalog-dir",
+        str(catalog_dir),
+        "--trust-root",
+        str(claimant_trust_path),
+        "--out",
+        str(out),
+        "--package-for-sharing",
+    ]
+    assert cli.main(argv) == 0
+    assert (
+        cli.main(
+            [
+                "sign",
+                str(out),
+                "--as",
+                "claimant",
+                "--profile",
+                "kms",
+                "--key",
+                str(key_path),
+                "--write-trust-root",
+            ]
+        )
+        == 0
+    )
+
+    monkeypatch.setenv("AGENTCE_TRUST_ROOT", str(signing.vendored_trust_path()))
+    code, envelope = _verify_report_json(capsys, str(out))
+    assert code == 0
+    assert envelope["reproduced"] is True
 
 
 def test_verify_report_expect_keyid_match_and_mismatch(
