@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.22.0",
+  "suite_version": "0.23.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -849,6 +849,48 @@
         }
       ],
       "fix_hint": "run verification/gates/otel_genai_parity.sh and read the MISMATCH lines, each naming the vector and the two engines that disagree; the reference implementation is engines/python/agentce/records/otel_genai.py, ported in engines/typescript/src/otelGenai.ts and engines/java/src/main/java/org/agentce/OtelGenai.java."
+    },
+    {
+      "id": "VG-ASSESS-EXIT-INSUFFICIENT-EVIDENCE",
+      "title": "assess returns exit code 2 (insufficient evidence on any severity: high control) identically across Python, TypeScript, and Java (SPEC.md:1076, SPEC Sec.8.5)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/assess_exit_code_parity.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 400,
+      "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
+      "rubric": {
+        "pass": "tools/assess_exit_code_parity_check.py's --self-test confirms the comparator discriminates a one-value tamper, then the real cross-engine run over fresh builds of the TypeScript dist/ and the Java runnable jar agrees with python, typescript, and java on the exit code (and, for the insufficient-evidence project, the full exit_status array) for all four reference projects: credit/langgraph/insufficient-evidence (2), known-pass (0), known-fail (1), and corpus/quickstart (0)",
+        "fail": "any project's exit code (or, for insufficient-evidence, its exit_status array) disagrees between python, typescript, or java, or the self-test's comparator fails to discriminate the seeded one-value tamper"
+      },
+      "faults": [
+        {
+          "description": "Python: the severity-high insufficient_evidence check is scoped away entirely, so assess never adds ExitCode.INSUFFICIENT_EVIDENCE regardless of the run's own assertions",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    if high_insufficient:\n        result.add_code(int(ExitCode.INSUFFICIENT_EVIDENCE))\n",
+          "replace": "    if False:\n        result.add_code(int(ExitCode.INSUFFICIENT_EVIDENCE))\n"
+        },
+        {
+          "description": "TypeScript: the severity-high insufficient_evidence check is scoped away entirely, so assess never adds ExitCode.INSUFFICIENT_EVIDENCE regardless of the run's own assertions",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "  if (highInsufficient.length > 0) {\n    result.addCode(ExitCode.INSUFFICIENT_EVIDENCE);\n  }\n",
+          "replace": "  if (false) {\n    result.addCode(ExitCode.INSUFFICIENT_EVIDENCE);\n  }\n"
+        },
+        {
+          "description": "Java: the severity-high insufficient_evidence check is scoped away entirely, so assess never adds ExitCode.INSUFFICIENT_EVIDENCE regardless of the run's own assertions",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "        if (!highInsufficient.isEmpty()) {\n            result.addCode(ExitCode.INSUFFICIENT_EVIDENCE.code);\n        }\n",
+          "replace": "        if (false) {\n            result.addCode(ExitCode.INSUFFICIENT_EVIDENCE.code);\n        }\n"
+        }
+      ],
+      "fix_hint": "run verification/gates/assess_exit_code_parity.sh and read the MISMATCH lines, each naming the project and the engine(s) whose exit code or exit_status disagrees; the exit-2 wiring is engines/python/agentce/commands/__init__.py's high_insufficient block, ported in engines/typescript/src/cli.ts and engines/java/src/main/java/org/agentce/Cli.java."
     }
   ]
 }

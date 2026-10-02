@@ -3,6 +3,18 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.23.0
+
+- Added `VG-ASSESS-EXIT-INSUFFICIENT-EVIDENCE`: `assess` returns exit code 2 (insufficient evidence on
+  any `severity: high` control) identically across Python, TypeScript, and Java, over four real corpus
+  projects (`credit/langgraph/insufficient-evidence` -> 2, `known-pass` -> 0, `known-fail` -> 1,
+  `corpus/quickstart` -> 0) (item 18.30, SPEC.md:1076 / SPEC Sec.8.5). Wraps
+  `tools/assess_exit_code_parity_check.py`'s `--self-test` (proving the comparator discriminates a
+  one-value tamper before trusting it) and its real cross-engine invocation over fresh builds of the
+  TypeScript `dist/` and the Java runnable jar. Its three seeded faults each drop one engine's
+  severity-high `insufficient_evidence` check entirely, so that engine never adds exit code 2 regardless
+  of its own assertions.
+
 ## 0.22.0
 
 - Added `VG-OTEL-GENAI-PARITY`: the otel-genai adapter's translation layer (bytes -> canonical
