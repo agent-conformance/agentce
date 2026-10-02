@@ -19,7 +19,7 @@ fails the check.
 | Field | Value |
 |---|---|
 | Corpus set | v1 |
-| Manifest SHA-256 | `sha256:525b3f503ab7f0fcb75e2d99b8732e54bee756da25d7bdad46e29aeb6ab691f0` |
+| Manifest SHA-256 | `sha256:3ce7e195a7280ce5133e25dc3a7cffe1df1d29de634272274a9b24dab68bbf58` |
 | Projects | 30 (credit domain × six implementation styles × five variants) |
 | Corpus version | 2026.09 |
 | Validated catalog | eu-ai-act@2026.09 |
@@ -36,3 +36,8 @@ fails the check.
   applicability profile now validates against the applicability-profile schema (each evidence source
   carries `class_justification`), and the coverage-gap projects declare their independent denominator by
   a schema-defined kind whose own events are the yardstick.
+- **v1 (2026.09), pin re-extended (18.31)** — the corpus was still unpublished, so the pin was again
+  corrected in place. `corpus/generator/generate.py`'s new `_manifest_sources()` helper declares each
+  source's real trust class in every project's manifest instead of leaving it to the event's own
+  self-assertion (SPEC §6.4: an undeclared source's event now defaults to `self_report`), which changes
+  every generated manifest's bytes.
