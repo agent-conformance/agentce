@@ -230,7 +230,7 @@ def _manifest_sources(
     classes: dict[str, str] = {}
     for event in events:
         classes.setdefault(str(event["source"]), str(event["agentcesourceclass"]))
-    all_ids = sorted({str(e["source"]) for e in events} | set(role_sources.values()))
+    all_ids = sorted(set(classes) | set(role_sources.values()))
     sources: list[dict[str, Any]] = []
     for source_id in all_ids:
         declared_class = classes.get(source_id, "self_report")

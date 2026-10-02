@@ -1,6 +1,8 @@
 package org.agentce;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -74,5 +76,61 @@ final class Fixtures {
             array.forEach(out::add);
         }
         return out;
+    }
+
+    // --- Ingest-bundle builders (item 18.31: a schema-valid event plus the on-disk bundle it
+    // belongs to, for tests that need ingest()'s real class-correction/class-mismatch behaviour over
+    // a declared or undeclared source, not just the fixed committed ingest-bundle fixture). ----------
+
+    /** A minimal, schema-valid {@code SessionStart} event from {@code source}, claiming {@code
+     * agentClass}, with an export-chained integrity block whose hash is already correctly set. */
+    static ObjectNode buildIngestEvent(String source, String agentClass) {
+        ObjectNode integrity = Json.nodes().objectNode();
+        integrity.put("hash", "");
+        integrity.put("prev", Integrity.GENESIS_PREV);
+        integrity.put("stream", "s1");
+        integrity.put("strength", "export_chained");
+        ObjectNode data = Json.nodes().objectNode();
+        data.put("@context", "https://agent-conformance.org/contexts/evidence/v1");
+        data.put("@type", "SessionStart");
+        data.set("integrity", integrity);
+        data.put("session_id", "sess-1");
+        ObjectNode event = Json.nodes().objectNode();
+        event.put("agentcesourceclass", agentClass);
+        event.set("data", data);
+        event.put("datacontenttype", "application/ld+json");
+        event.put("id", "e1");
+        event.put("source", source);
+        event.put("specversion", "1.0");
+        event.put("subject", "spiffe://corp/agents/test");
+        event.put("time", "2026-05-01T08:00:00.000Z");
+        event.put("type", "org.agent-conformance.evidence.SessionStart.v1");
+        integrity.put("hash", Integrity.recomputeHash(event));
+        return event;
+    }
+
+    /**
+     * Writes a bundle at {@code root} with one event and a manifest {@code sources} entry for {@code
+     * source}: {@code declaredClass} non-null declares that class; {@code null} declares the source
+     * with no class at all (undeclared, SPEC §6.4).
+     */
+    static Bundle writeIngestBundle(Path root, JsonNode event, String source, String declaredClass)
+            throws IOException {
+        Files.createDirectories(root.resolve("events"));
+        byte[] content = (Json.compact(event) + "\n").getBytes(StandardCharsets.UTF_8);
+        Files.write(root.resolve("events/log.jsonl"), content);
+
+        ObjectNode manifest = Json.nodes().objectNode();
+        ArrayNode files = manifest.putArray("files");
+        ObjectNode fileEntry = files.addObject();
+        fileEntry.put("path", "events/log.jsonl");
+        fileEntry.put("sha256", "sha256:" + Canonical.sha256Hex(content));
+        ObjectNode sourceEntry = manifest.putArray("sources").addObject();
+        sourceEntry.put("id", source);
+        if (declaredClass != null) {
+            sourceEntry.put("class", declaredClass);
+        }
+        Files.writeString(root.resolve("manifest.json"), Json.compact(manifest), StandardCharsets.UTF_8);
+        return Bundle.load(root);
     }
 }
