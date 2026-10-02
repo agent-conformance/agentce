@@ -114,7 +114,8 @@ public final class Conformance {
         Path proj = corpusRoot.resolve("projects").resolve(pid);
         Bundle bundle = Bundle.load(proj.resolve("evidence"));
         Ingest.Result ingested = Ingest.ingest(bundle);
-        Integrity.verifyBundle(ingested.accepted, bundle.manifest, bundle.root); // findings inform, never abort
+        // findings inform, never abort; hash what the source signed, not the trust-corrected copy
+        Integrity.verifyBundle(ingested.rawAccepted, bundle.manifest, bundle.root);
         DomainBinding domain = DomainBinding.load(proj.resolve("domain.linkml.yaml"));
         Profile profile = Profile.load(proj.resolve("applicability.yaml"));
         Coverage.computeCoverage(ingested.accepted, profile, bundle.root);

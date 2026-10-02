@@ -1,6 +1,7 @@
 package org.agentce;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
@@ -21,6 +22,15 @@ import java.util.regex.Pattern;
  * {@code events/*.jsonl}, validate it against the JSON Schema, and quarantine anything the engine
  * refuses with a stable reason (SPEC App. F). Quarantine is an output, never a silent drop. A faithful
  * port of the reference.
+ *
+ * <p>A source the manifest declares with no trust class (or a bundle with no manifest classes at all)
+ * is "undeclared": its events keep flowing, but {@code accepted} never trusts the event's own
+ * self-asserted {@code agentcesourceclass} at face value -- it is corrected down to the weakest class,
+ * {@code self_report}, for every downstream reader (SPEC §6.4). That correction never reaches {@code
+ * rawAccepted}, which stays byte-identical to what the source emitted, because SPEC §6.6 defines each
+ * event's {@code integrity.hash} over the whole CloudEvent ({@code agentcesourceclass} included) as
+ * received -- callers verifying integrity must hash what was actually signed, not the engine's
+ * trust-corrected copy.
  */
 public final class Ingest {
     private Ingest() {}
@@ -30,7 +40,12 @@ public final class Ingest {
             Pattern.compile("^org\\.agent-conformance\\.evidence\\.(?<name>[A-Za-z0-9]+)\\.v1$");
 
     public static final class Result {
+        /** What assessment, activity, and graph building read: an undeclared source's event carries
+         * {@code agentcesourceclass: "self_report"} here, never its own unproven self-assertion. */
         public final List<JsonNode> accepted = new ArrayList<>();
+        /** The same events exactly as received. Pass this, never {@code accepted}, to integrity
+         * verification (SPEC §6.6), which must hash what the source actually signed. */
+        public final List<JsonNode> rawAccepted = new ArrayList<>();
         public final List<Quarantine.Record> quarantined = new ArrayList<>();
     }
 
@@ -148,6 +163,7 @@ public final class Ingest {
                     continue;
                 }
 
+                JsonNode rawEvent = event;
                 String declaredClass = bundle.sourceClasses != null ? bundle.sourceClasses.get(source) : null;
                 if (declaredClass != null) {
                     String eventClass = event.get("agentcesourceclass").asText();
@@ -160,6 +176,12 @@ public final class Ingest {
                                         + declaredClass + "' for this source"));
                         continue;
                     }
+                } else if (!"self_report".equals(event.get("agentcesourceclass").asText())) {
+                    // SPEC §6.4: the manifest declares no trust class for this source, so the event's
+                    // own self-assertion is never trusted as-is. `rawEvent` (added below, unmodified)
+                    // keeps the original for integrity hashing (SPEC §6.6); this copy is what every
+                    // assessment, activity, and graph reader sees.
+                    event = ((ObjectNode) event).deepCopy().put("agentcesourceclass", "self_report");
                 }
 
                 String eventId = event.get("id").asText();
@@ -188,6 +210,7 @@ public final class Ingest {
                 seenIds.add(eventId);
                 lastTime.put(stream, timeValue);
                 result.accepted.add(event);
+                result.rawAccepted.add(rawEvent);
             }
         }
         return result;

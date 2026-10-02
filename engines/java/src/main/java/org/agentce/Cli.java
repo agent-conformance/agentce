@@ -696,7 +696,8 @@ public final class Cli {
         writeQuarantineJsonl(ingested.quarantined, out.resolve("quarantine.jsonl"));
 
         // Stage 2: integrity verification, one IntegrityResult per stream.
-        List<Integrity.Result> integrityResults = Integrity.verifyBundle(ingested.accepted, bundle.manifest, bundle.root);
+        List<Integrity.Result> integrityResults =
+                Integrity.verifyBundle(ingested.rawAccepted, bundle.manifest, bundle.root);
         List<ObjectNode> integrityNodes = new ArrayList<>();
         for (Integrity.Result r : integrityResults) {
             integrityNodes.add(r.toJson());
@@ -1516,7 +1517,8 @@ public final class Cli {
             String bundleDir = requireDir(bundle, "bundle", "the evidence bundle");
             Bundle loaded = Bundle.load(Paths.get(bundleDir));
             Ingest.Result ingested = Ingest.ingest(loaded);
-            List<Integrity.Result> results = Integrity.verifyBundle(ingested.accepted, loaded.manifest, loaded.root);
+            List<Integrity.Result> results =
+                    Integrity.verifyBundle(ingested.rawAccepted, loaded.manifest, loaded.root);
             Set<String> clean = Set.of("verified", "verified_weak");
             int broken = 0;
             ArrayNode streams = Json.nodes().arrayNode();
