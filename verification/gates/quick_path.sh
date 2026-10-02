@@ -28,62 +28,65 @@ fail() {
   exit 1
 }
 
+# Runs `agentce <args...>`, writing stdout to $out_file and stderr (the structured logs,
+# agentce.logsetup) to $err_file separately -- a step whose $out_file must parse as clean JSON
+# (step 2) would otherwise see a log line interleaved into it -- and failing with $label and the
+# command's own tail of stderr unless it exits with $expected_code. Every step below is one call.
+run_step() {
+  local label="$1" expected_code="$2" out_file="$3" err_file="$4"
+  shift 4
+  set +e
+  run_py "$@" >"$out_file" 2>"$err_file"
+  local code=$?
+  set -e
+  if [ "$code" -ne "$expected_code" ]; then
+    fail "$label exited $code, expected $expected_code: $(tail -n 5 "$err_file")"
+  fi
+}
+
+# Every assertion in $1/assertions.json has outcome $2 (python3 -c does the one-outcomes check used
+# by both step 1 and step 2).
+assert_only_outcome() {
+  local out="$1" expected="$2" label="$3"
+  local outcomes
+  outcomes="$(python3 -c "
+import json
+data = json.load(open('$out/assertions.json'))
+print(sorted({a['outcome'] for a in data}))
+")"
+  if [ "$outcomes" != "['$expected']" ]; then
+    fail "$label: expected every assertion $expected, got $outcomes"
+  fi
+}
+
 # Step 1: a records-folder run against the default baseline catalog -- every assertion
 # insufficient_evidence, none not_applicable (the records side of the divergence; a records run has
 # no formal applicability declaration, so an empty population says the records show none, never
 # that the control is out of scope).
-set +e
-run_py assess "$fixture/records" --out "$work/step1" >"$work/step1.log" 2>&1
-code=$?
-set -e
-if [ "$code" -ne 0 ]; then
-  fail "step 1 (records/, default catalog) exited $code, expected 0: $(tail -n 5 "$work/step1.log")"
-fi
-step1_outcomes="$(python3 -c "
-import json
-data = json.load(open('$work/step1/assertions.json'))
-print(sorted({a['outcome'] for a in data}))
-")"
-if [ "$step1_outcomes" != "['insufficient_evidence']" ]; then
-  fail "step 1: expected every assertion insufficient_evidence (none not_applicable), got $step1_outcomes"
-fi
+run_step "step 1 (records/, default catalog)" 0 "$work/step1.out" "$work/step1.err" \
+  assess "$fixture/records" --out "$work/step1"
+assert_only_outcome "$work/step1" insufficient_evidence "step 1"
 
 # Step 2: the very same derived evidence, reduced to a formal --bundle/--profile assessment -- every
 # assertion flips to not_applicable and the run judges nothing (exit 3, input.nothing_evaluated):
 # the bundle side of the divergence this gate exists to prove.
-set +e
-run_py assess --bundle "$work/step1/records-bundle" --profile "$work/step1/applicability.yaml" \
-  --out "$work/step2" --json >"$work/step2.json" 2>"$work/step2.log"
-code=$?
-set -e
-if [ "$code" -ne 3 ]; then
-  fail "step 2 (--bundle/--profile on the same evidence) exited $code, expected 3: $(tail -n 5 "$work/step2.log")"
-fi
-step2_key="$(python3 -c "import json; print(json.load(open('$work/step2.json'))['error']['key'])")"
-if [ "$step2_key" != "input.nothing_evaluated" ]; then
-  fail "step 2: expected error key input.nothing_evaluated, got $step2_key"
-fi
-step2_outcomes="$(python3 -c "
+run_step "step 2 (--bundle/--profile on the same evidence)" 3 "$work/step2.json" "$work/step2.err" \
+  assess --bundle "$work/step1/records-bundle" --profile "$work/step1/applicability.yaml" \
+  --out "$work/step2" --json
+python3 -c "
 import json
-data = json.load(open('$work/step2/assertions.json'))
-print(sorted({a['outcome'] for a in data}))
-")"
-if [ "$step2_outcomes" != "['not_applicable']" ]; then
-  fail "step 2: expected every assertion not_applicable, got $step2_outcomes"
-fi
+error = json.load(open('$work/step2.json'))
+exit(0 if error['error']['key'] == 'input.nothing_evaluated' else 1)
+" || fail "step 2: expected error key input.nothing_evaluated"
+assert_only_outcome "$work/step2" not_applicable "step 2"
 
 # Step 3: the same records folder against the gate-only QP-UNLOCK catalog -- a self-reported
 # ToolCall but no ModelCall leaves exactly one requirement missing: one assertion
 # (QP-UNLOCK, insufficient_evidence) and one named blind spot naming QP-UNLOCK as unlocked,
 # checks_unlocked: 1.
-set +e
-run_py assess "$fixture/records" --catalog-dir "$fixture/catalog" --allow-unverified-catalog \
-  --out "$work/step3" >"$work/step3.log" 2>&1
-code=$?
-set -e
-if [ "$code" -ne 0 ]; then
-  fail "step 3 (QP-UNLOCK catalog) exited $code, expected 0: $(tail -n 5 "$work/step3.log")"
-fi
+run_step "step 3 (QP-UNLOCK catalog)" 0 "$work/step3.out" "$work/step3.err" \
+  assess "$fixture/records" --catalog-dir "$fixture/catalog" --allow-unverified-catalog \
+  --out "$work/step3"
 if ! python3 - "$work/step3" <<'PY'
 import json
 import sys
