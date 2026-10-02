@@ -5,14 +5,13 @@
  * `bytes -> (events, AdapterReport)` over an OTLP/JSON trace export; no network, no learned component.
  */
 
-import { NonCanonicalNumber, parseJson } from "./json";
+import { MAX_INT_STR_DIGITS, NonCanonicalNumber, parseJson } from "./json";
 import { byteCompare, decodeUtf8Strict } from "./util";
 
 export const BASE_CONTEXT = "https://agent-conformance.org/contexts/evidence/v1";
 
 const VALID_SOURCE_CLASSES = new Set(["self_report", "enforcement_point", "independent_system"]);
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
-const MAX_INT_STR_DIGITS = 4300; // CPython's sys.int_max_str_digits default, enforced the same way
 
 /** The input could not be adapted. `reason` is a stable key, matching the Python reference's. */
 export class OtelGenaiAdapterError extends Error {
@@ -103,6 +102,9 @@ function parsePythonIntGrammar(raw: string): IntValue | null {
   for (let i = start; i < end; i++) {
     const ch = raw[i];
     if (ch >= "0" && ch <= "9") {
+      if (digits.length === MAX_INT_STR_DIGITS) {
+        return null;
+      }
       digits += ch;
       afterDigit = true;
     } else if (ch === "_" && afterDigit) {
@@ -111,7 +113,7 @@ function parsePythonIntGrammar(raw: string): IntValue | null {
       return null;
     }
   }
-  if (!afterDigit || digits.length > MAX_INT_STR_DIGITS) {
+  if (!afterDigit) {
     return null;
   }
   const big = BigInt(`${sign}${digits}`);
@@ -273,7 +275,7 @@ function otelGenaiVersion(...schemaUrls: unknown[]): string | null {
     }
     let end = url.length;
     while (end > 0 && url[end - 1] === "/") {
-      end--; // Python's url.rstrip("/"): a linear scan, not a per-start-position regex
+      end--; // url.rstrip("/")
     }
     const stripped = url.slice(0, end);
     const idx = stripped.lastIndexOf("/");

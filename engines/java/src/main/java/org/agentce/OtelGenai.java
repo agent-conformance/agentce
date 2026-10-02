@@ -32,7 +32,6 @@ public final class OtelGenai {
 
     private static final Set<String> VALID_SOURCE_CLASSES =
             Set.of("self_report", "enforcement_point", "independent_system");
-    private static final int MAX_INT_STR_DIGITS = 4300; // CPython's sys.int_max_str_digits default
     private static final Pattern ALL_DIGITS = Pattern.compile("^[0-9]+$");
     private static final BigInteger NANOS_PER_MILLI = BigInteger.valueOf(1_000_000);
     private static final BigInteger MILLIS_PER_SECOND = BigInteger.valueOf(1000);
@@ -109,14 +108,14 @@ public final class OtelGenai {
             negative = raw.charAt(start) == '-';
             start++;
         }
-        StringBuilder digits = new StringBuilder(end - start + 1);
-        if (negative) {
-            digits.append('-');
-        }
+        StringBuilder digits = new StringBuilder(Math.min(end - start, Json.MAX_INT_STR_DIGITS + 1));
         boolean afterDigit = false;
         for (int i = start; i < end; i++) {
             char c = raw.charAt(i);
             if (c >= '0' && c <= '9') {
+                if (digits.length() == Json.MAX_INT_STR_DIGITS) {
+                    return null;
+                }
                 digits.append(c);
                 afterDigit = true;
             } else if (c == '_' && afterDigit) {
@@ -125,11 +124,11 @@ public final class OtelGenai {
                 return null;
             }
         }
-        int digitCount = digits.length() - (negative ? 1 : 0);
-        if (!afterDigit || digitCount > MAX_INT_STR_DIGITS) {
+        if (!afterDigit) {
             return null;
         }
-        return Json.nodes().numberNode(new BigInteger(digits.toString()));
+        BigInteger value = new BigInteger(digits.toString());
+        return Json.nodes().numberNode(negative ? value.negate() : value);
     }
 
     /** The whitespace {@code int(str)} trims, ASCII only (contract disposition 1): space and \t through \r. */
@@ -279,7 +278,7 @@ public final class OtelGenai {
             }
             int end = url.length();
             while (end > 0 && url.charAt(end - 1) == '/') {
-                end--; // Python's url.rstrip("/"): a linear scan, not a per-start-position regex
+                end--; // url.rstrip("/")
             }
             String stripped = url.substring(0, end);
             int idx = stripped.lastIndexOf('/');

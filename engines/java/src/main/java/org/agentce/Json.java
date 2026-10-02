@@ -32,14 +32,15 @@ import java.util.List;
 public final class Json {
     private Json() {}
 
-    /**
-     * Python's {@code json.loads} refuses an integer literal longer than {@code sys.int_max_str_digits}
-     * (CPython's default, 4300 digits) and accepts a fractional/exponent literal of any length.
-     * Jackson's own default caps every number token at 1000 characters, so that cap is lifted and
-     * Python's integer rule applied instead ({@link IntegerDigitLimit}).
-     */
-    private static final int MAX_INT_LITERAL_DIGITS = 4300;
+    /** CPython's {@code sys.int_max_str_digits} default: the most digits {@code int(str)} reads. */
+    static final int MAX_INT_STR_DIGITS = 4300;
 
+    /**
+     * Python's {@code json.loads} refuses an integer literal longer than {@link #MAX_INT_STR_DIGITS}
+     * and accepts a fractional/exponent literal of any length. Jackson's default caps every number
+     * token at 1000 characters, so that cap is lifted and Python's integer rule applied instead
+     * ({@link IntegerDigitLimit}).
+     */
     private static final ObjectMapper MAPPER = new ObjectMapper(JsonFactory.builder()
                     .streamReadConstraints(StreamReadConstraints.builder()
                             .maxNumberLength(Integer.MAX_VALUE)
@@ -58,10 +59,11 @@ public final class Json {
         @Override
         public JsonToken nextToken() throws IOException {
             JsonToken token = delegate.nextToken();
-            if (token == JsonToken.VALUE_NUMBER_INT) {
+            if (token == JsonToken.VALUE_NUMBER_INT && delegate.getTextLength() > MAX_INT_STR_DIGITS) {
                 boolean negative = delegate.getTextCharacters()[delegate.getTextOffset()] == '-';
-                if (delegate.getTextLength() - (negative ? 1 : 0) > MAX_INT_LITERAL_DIGITS) {
-                    throw new JsonParseException(this, "integer literal exceeds 4300 digits");
+                if (delegate.getTextLength() - (negative ? 1 : 0) > MAX_INT_STR_DIGITS) {
+                    throw new JsonParseException(
+                            this, "integer literal exceeds " + MAX_INT_STR_DIGITS + " digits");
                 }
             }
             return token;
