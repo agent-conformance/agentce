@@ -14,9 +14,11 @@ fails if a gate in `gates.json` is not named in this file.
   construction; this gate guards the three remaining ways the split can still silently stop proving
   something: the demo step rekeyed off a literal matrix value or an `if:`/`continue-on-error`; the
   required `quick` job's own gating logic losing its dependency on `demo-fault`'s result (GitHub
-  treats a skipped required check as passing); and `shard.py`'s own partition line truncating or
-  duplicating a gate, which a wiring check alone cannot see -- checked by actually running
-  `shard.py --dry-run` against the real gate list. Three seeded faults, one per failure mode.
+  treats a skipped required check as passing, so `quick`'s own step is exact-matched against its
+  canonical dependency-check text, not a substring search); and `shard.py`'s own partition line
+  truncating or duplicating a gate, which a wiring check alone cannot see -- checked by loading
+  `shard.py` in-process and calling its `partition()` against the real gate list. Three seeded
+  faults, one per failure mode.
 
 ## 0.24.0
 

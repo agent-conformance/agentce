@@ -12,17 +12,21 @@ matrix shape -- and a thin ``quick`` job (the required check) that fails unless 
 independent ways that design can silently stop proving anything:
 
 1. ``verification/shard.py``'s own partition line could be truncated or off-by-one (for example
-   ``mine[:1]``), dropping gates no CI log would call out as missing. Checked by actually running
-   ``shard.py --dry-run`` for every index of a real total and confirming the union, against the real
-   ``verification/run --list``, assigns every gate to exactly one shard.
+   ``mine[:1]``), dropping gates no CI log would call out as missing. Checked by loading the real,
+   on-disk ``shard.py`` in-process and calling its ``partition()`` for every index of two different
+   totals, confirming the union, against the real ``verification/run --list``, assigns every gate to
+   exactly one shard.
 2. The demo step's ``run:`` could stop being exactly ``verification/shard.py "$job-index" "$job-
    total"`` (a trailing ``|| true``, an ``echo`` prefix, a job- or step-level ``if:`` that skips it
    under some condition) and still contain the same substrings a looser regex would accept. Checked
    by an exact (whitespace-stripped) match, and by rejecting any ``if:`` on the job or the step.
 3. The ``quick`` job's own gating logic could stop actually depending on ``demo-fault``'s result (for
-   example ``needs: [build]``), defeating the one property the item asks for by name: a failed,
-   cancelled or skipped shard must still fail the required check. Checked by reading ``quick``'s
-   ``needs``, its ``if: always()``, and that its step compares both dependencies' results.
+   example ``needs: [build]``, ``exit 1`` changed to ``exit 0``, ``!=`` flipped to ``==``, a trailing
+   ``|| true``, or a stray ``if:``/``continue-on-error`` on the step), defeating the one property the
+   item asks for by name: a failed, cancelled or skipped shard must still fail the required check.
+   Checked by reading ``quick``'s ``needs``, its ``if: always()``, and by an exact (whitespace-
+   stripped) match on its step's ``run:`` against the canonical dependency-check text -- the same
+   exact-match style check 2 uses for the demo step, not a substring search.
 
 Usage:
     ci_demo_coverage_check.py              # checks the real workflow and the real shard.py
@@ -113,11 +117,33 @@ def wiring_problems(job: Any) -> list[str]:
 
 
 _ALWAYS = re.compile(r"\balways\(\)")
+CANONICAL_QUICK_RUN = (
+    'if [ "${{ needs.build.result }}" != "success" ] || '
+    '[ "${{ needs.demo-fault.result }}" != "success" ]; then\n'
+    '  echo "build: ${{ needs.build.result }}, demo-fault: ${{ needs.demo-fault.result }}"\n'
+    '  echo "a required job failed, was cancelled, or was skipped"\n'
+    "  exit 1\n"
+    "fi\n"
+    'echo "build and every demo-fault shard succeeded"'
+)
+
+
+def _quick_step(job: dict[str, Any]) -> dict[str, Any] | None:
+    steps = job.get("steps")
+    if not isinstance(steps, list) or not steps:
+        return None
+    step = steps[0]
+    return step if isinstance(step, dict) else None
 
 
 def quick_wiring_problems(job: Any) -> list[str]:
     """`quick` is the required check; GitHub treats a *skipped* required check as passing, so
-    `quick` must be a real job whose own logic fails unless both dependencies truly succeeded."""
+    `quick` must be a real job whose own logic fails unless both dependencies truly succeeded. An
+    exact (whitespace-stripped) match on the step's ``run:`` -- the same style ``wiring_problems``
+    already uses for the demo step -- is what actually proves this: a looser regex search for
+    ``needs.X.result ... success`` still matches after ``exit 1`` is changed to ``exit 0``, after
+    ``!=`` is flipped to ``==``, after a trailing ``|| true``, or with a step- or job-level ``if:``
+    or ``continue-on-error`` added, each of which lets a failed dependency leave `quick` green."""
     if not isinstance(job, dict):
         return [f"jobs.{QUICK_JOB} is missing or not a mapping"]
     problems: list[str] = []
@@ -133,18 +159,30 @@ def quick_wiring_problems(job: Any) -> list[str]:
             f"jobs.{QUICK_JOB} has no if: always() (got {job.get('if')!r}), so it could be skipped "
             "entirely if an earlier job failed -- and GitHub treats a skipped required check as passing"
         )
-    raw_steps = job.get("steps")
-    steps: list[Any] = raw_steps if isinstance(raw_steps, list) else []
-    blob = " ".join(
-        str(step.get("run", "")) for step in steps if isinstance(step, dict)
-    )
-    for required in ("build", DEMO_JOB):
-        if not re.search(
-            rf'needs\.{re.escape(required)}\.result.{{0,20}}["\']success["\']', blob
-        ):
-            problems.append(
-                f"no step in jobs.{QUICK_JOB} compares needs.{required}.result to success"
-            )
+    if job.get("continue-on-error"):
+        problems.append(
+            f"jobs.{QUICK_JOB} sets continue-on-error, so a failed dependency would not fail the job"
+        )
+    step = _quick_step(job)
+    if step is None:
+        return problems + [
+            f"no step in jobs.{QUICK_JOB} checks the dependencies' results"
+        ]
+    if step.get("continue-on-error"):
+        problems.append(
+            f"the {QUICK_JOB} step sets continue-on-error, so its own exit would not fail the job"
+        )
+    if "if" in step:
+        problems.append(
+            f"the {QUICK_JOB} step has an if: ({step['if']!r}), which could skip its own check"
+        )
+    run_text = str(step.get("run", "")).strip()
+    if run_text != CANONICAL_QUICK_RUN:
+        problems.append(
+            f"jobs.{QUICK_JOB}'s step's run: is not exactly the canonical dependency check, so an "
+            f"edit (exit 0, != flipped to ==, a trailing || true) could silently stop it from "
+            f"exiting non-zero on failure: {run_text!r}"
+        )
     return problems
 
 
@@ -161,7 +199,7 @@ def _coverage_problems(
     extra = sorted(set(assignments) - set(gates))
     if extra:
         problems.append(
-            f"shard.py --dry-run (total={total}) produced gate(s) not in `verification/run --list`: {extra}"
+            f"shard.py's partition() (total={total}) produced gate(s) not in `verification/run --list`: {extra}"
         )
     return problems
 
@@ -264,15 +302,11 @@ def self_test() -> int:
         ("demo job with an if:", {**good_job, "if": "false"}, False),
     ]
     failures = _misjudged(cases, wiring_problems)
-    quick_good = {
+    quick_good_step: dict[str, Any] = {"run": CANONICAL_QUICK_RUN}
+    quick_good: dict[str, Any] = {
         "needs": ["build", "demo-fault"],
         "if": "always()",
-        "steps": [
-            {
-                "run": 'if [ "${{ needs.build.result }}" != "success" ] || '
-                '[ "${{ needs.demo-fault.result }}" != "success" ]; then exit 1; fi'
-            }
-        ],
+        "steps": [quick_good_step],
     }
     quick_cases: list[tuple[str, Any, bool]] = [
         ("correctly wired quick job", quick_good, True),
@@ -288,6 +322,45 @@ def self_test() -> int:
                     }
                 ],
             },
+            False,
+        ),
+        (
+            "quick job with continue-on-error",
+            {**quick_good, "continue-on-error": True},
+            False,
+        ),
+        (
+            "quick step with continue-on-error",
+            {
+                **quick_good,
+                "steps": [{**quick_good_step, "continue-on-error": True}],
+            },
+            False,
+        ),
+        (
+            "quick step with an if:",
+            {**quick_good, "steps": [{**quick_good_step, "if": "false"}]},
+            False,
+        ),
+        (
+            "quick step's exit 1 changed to exit 0",
+            {
+                **quick_good,
+                "steps": [{"run": CANONICAL_QUICK_RUN.replace("exit 1", "exit 0")}],
+            },
+            False,
+        ),
+        (
+            "quick step's != flipped to ==",
+            {
+                **quick_good,
+                "steps": [{"run": CANONICAL_QUICK_RUN.replace("!=", "==")}],
+            },
+            False,
+        ),
+        (
+            "quick step with a trailing || true",
+            {**quick_good, "steps": [{"run": CANONICAL_QUICK_RUN + " || true"}]},
             False,
         ),
     ]

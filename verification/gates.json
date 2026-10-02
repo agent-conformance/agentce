@@ -935,8 +935,8 @@
       "timeout_s": 60,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "tools/ci_demo_coverage_check.py's --self-test confirms its comparator discriminates correct job-index/job-total wiring from a matrix-value-keyed invocation and from continue-on-error swallowing a failure, then the real run confirms .github/workflows/verification.yml's demo-fault job's step invokes verification/shard.py with exactly strategy.job-index and strategy.job-total and sets continue-on-error nowhere",
-        "fail": "the self-test's comparator fails to discriminate either bad case, or the real run finds the demo-fault job's step not wired to strategy.job-index/strategy.job-total, or continue-on-error set on the job or the step"
+        "pass": "tools/ci_demo_coverage_check.py's --self-test confirms its comparator discriminates correct job-index/job-total wiring from a matrix-value-keyed, swallowed, conditional or under-checked invocation on either the demo-fault step or the quick job, that shard.py's own partition() assigns every gate to exactly one shard at two different totals, then the real run confirms .github/workflows/verification.yml's demo-fault job's step invokes verification/shard.py with exactly strategy.job-index and strategy.job-total, and that quick's step is an exact match for its canonical dependency-check run text with needs/if/continue-on-error wired correctly on both jobs",
+        "fail": "the self-test's comparator fails to discriminate any of the bad cases, shard.py's partition() drops or duplicates a gate, or the real run finds the demo-fault job's step not wired to strategy.job-index/strategy.job-total, quick's step not an exact match for its canonical run text, or continue-on-error/a stray if: on either job or step"
       },
       "faults": [
         {
