@@ -2108,6 +2108,37 @@ def _numerics_problems(engine_cmd: list[str], cwd: Path, runner: Runner) -> list
     return problems
 
 
+def _otel_genai_fixture_problems(
+    exe: list[str], runner: Runner, empty: Path
+) -> list[str]:
+    """Run the shipped package's own ``otel-genai-fixture`` seam verb against the vendored
+    ``otel-genai-chat`` fixture (item 18.29 C4): proves the otel-genai adapter port is actually
+    present and working inside the installed artifact, not only inside the checkout's own build."""
+    fixture_dir = empty / "otel-genai-fixture"
+    fixture_dir.mkdir()
+    chat = _OTEL_FIXTURES / "otel-genai-chat"
+    shutil.copy2(chat / "input.json", fixture_dir / "input.json")
+    shutil.copy2(chat / "adapt.json", fixture_dir / "adapt.json")
+    proc = runner.run(
+        [*exe, "otel-genai-fixture", str(fixture_dir)], empty, offline=True
+    )
+    if proc.returncode != 0:
+        return [_fail("otel-genai-fixture", proc)]
+    got_events = [
+        json.loads(line.removeprefix("EVENT "))
+        for line in proc.stdout.splitlines()
+        if line.startswith("EVENT ")
+    ]
+    want_events = [
+        json.loads(line)
+        for line in (chat / "expected.jsonl").read_text("utf-8").splitlines()
+        if line.strip()
+    ]
+    if got_events != want_events:
+        return ["otel-genai-fixture: events do not match expected.jsonl"]
+    return []
+
+
 def check_npm(runner: Runner, *, offline_install: bool) -> list[str]:
     if shutil.which("npm") is None or shutil.which("pnpm") is None:
         return ["npm and pnpm are required to build and install the package"]
@@ -2197,6 +2228,7 @@ def _npm_run_problems(
     problems += [f"npm: {p}" for p in _readiness_problems(exe, runner, empty)]
     problems += [f"npm: {p}" for p in _sign_problems(exe, runner, empty)]
     problems += [f"npm: {p}" for p in _verify_problems(exe, runner, empty)]
+    problems += [f"npm: {p}" for p in _otel_genai_fixture_problems(exe, runner, empty)]
     package = empty / "node_modules" / "@agent-conformance" / "cli"
     for rel in (
         "schema/agentce-evidence.schema.json",
@@ -2308,6 +2340,9 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
         problems += [f"jar: {p}" for p in _readiness_problems(exe, runner, empty)]
         problems += [f"jar: {p}" for p in _sign_problems(exe, runner, empty)]
         problems += [f"jar: {p}" for p in _verify_problems(exe, runner, empty)]
+        problems += [
+            f"jar: {p}" for p in _otel_genai_fixture_problems(exe, runner, empty)
+        ]
         with zipfile.ZipFile(jar) as zf:
             names = set(zf.namelist())
         for entry in (
@@ -2570,6 +2605,7 @@ def self_test() -> int:
             "quickstart: ",
             "version: ",
             "report --validate",
+            "otel-genai-fixture",
         ):
             if not any(expected in p for p in found):
                 failures.append(
@@ -2592,6 +2628,7 @@ def self_test() -> int:
                 "quickstart: ",
                 "version: ",
                 "report --validate",
+                "otel-genai-fixture",
             ):
                 if not any(expected in p for p in found):
                     failures.append(

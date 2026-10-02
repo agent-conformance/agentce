@@ -204,6 +204,12 @@ jobs:
           uv run --project tools --frozen python tools/verify_flow_census.py --self-test
           uv run --project tools --frozen python tools/verify_parity_check.py --self-test
           uv run --project tools --frozen python tools/verify_parity_check.py
+      - name: Cross-engine otel-genai adapter translation must agree (self-test, then the real invocation)
+        run: |
+          uv run --project engines/python --frozen python tools/otel_genai_adapter_check.py --self-test
+          (cd engines/typescript && pnpm build)
+          (cd engines/java && ./gradlew :assemble -q)
+          uv run --project engines/python --frozen python tools/otel_genai_adapter_check.py
       - name: The check itself must be able to fail
         run: python3 tools/installed_artifacts_check.py --self-test
       - name: Build each artifact, install it outside the checkout, run it with no network

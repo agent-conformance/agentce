@@ -3,6 +3,18 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.22.0
+
+- Added `VG-OTEL-GENAI-PARITY`: the otel-genai adapter's translation layer (bytes -> canonical
+  AgentCE events) is byte-identical across Python, TypeScript, and Java over all 9 vendor fixtures
+  (`adapters/otel-genai/fixtures/`) plus all 16 hostile vectors
+  (`spec/model/test-vectors/otel-genai-hostile/`), 25 vectors in total (item 18.29). Wraps
+  `tools/otel_genai_adapter_check.py`'s `--self-test` (proving the comparator itself discriminates
+  the truncation/enum-filter fault class before trusting it) and its real cross-engine invocation
+  over fresh builds of the TypeScript `dist/` and the Java runnable jar. Its seeded fault drops the
+  tool-protocol enum filter from the TypeScript port, caught specifically by the
+  `truncation-and-enums` vector's out-of-enum `protocol` value.
+
 ## 0.21.0
 
 - Added `VG-VERIFY`: a tampered or unsigned catalog or release artifact is refused with a stable,
