@@ -122,8 +122,28 @@ final class Fixtures {
      */
     static Bundle writeIngestBundle(Path root, JsonNode event, String source, String declaredClass)
             throws IOException {
+        ArrayNode sources = Json.nodes().arrayNode();
+        ObjectNode sourceEntry = sources.addObject();
+        sourceEntry.put("id", source);
+        if (declaredClass != null) {
+            sourceEntry.put("class", declaredClass);
+        }
+        return writeIngestBundle(root, List.of(event), sources);
+    }
+
+    /**
+     * As {@link #writeIngestBundle(Path, JsonNode, String, String)}, for several events sharing one
+     * bundle with a manifest {@code sources} array built by the caller -- letting a test declare a raw
+     * JSON {@code class} value (including {@code null} or a non-string) that a single {@code String}
+     * parameter can't express.
+     */
+    static Bundle writeIngestBundle(Path root, List<JsonNode> events, ArrayNode sources) throws IOException {
         Files.createDirectories(root.resolve("events"));
-        byte[] content = (Json.compact(event) + "\n").getBytes(StandardCharsets.UTF_8);
+        StringBuilder lines = new StringBuilder();
+        for (JsonNode event : events) {
+            lines.append(Json.compact(event)).append("\n");
+        }
+        byte[] content = lines.toString().getBytes(StandardCharsets.UTF_8);
         Files.write(root.resolve("events/log.jsonl"), content);
 
         ObjectNode manifest = Json.nodes().objectNode();
@@ -131,11 +151,7 @@ final class Fixtures {
         ObjectNode fileEntry = files.addObject();
         fileEntry.put("path", "events/log.jsonl");
         fileEntry.put("sha256", "sha256:" + Canonical.sha256Hex(content));
-        ObjectNode sourceEntry = manifest.putArray("sources").addObject();
-        sourceEntry.put("id", source);
-        if (declaredClass != null) {
-            sourceEntry.put("class", declaredClass);
-        }
+        manifest.set("sources", sources);
         Files.writeString(root.resolve("manifest.json"), Json.compact(manifest), StandardCharsets.UTF_8);
         return Bundle.load(root);
     }

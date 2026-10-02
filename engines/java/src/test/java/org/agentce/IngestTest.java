@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -132,27 +131,13 @@ class IngestTest {
             events.add(Fixtures.buildIngestEvent(sources[i], "enforcement_point", "e" + i, "s" + i));
         }
 
-        Path root = tempDir.resolve("bundle");
-        Files.createDirectories(root.resolve("events"));
-        StringBuilder lines = new StringBuilder();
-        for (JsonNode event : events) {
-            lines.append(Json.compact(event)).append("\n");
-        }
-        byte[] content = lines.toString().getBytes(StandardCharsets.UTF_8);
-        Files.write(root.resolve("events/log.jsonl"), content);
-
-        ObjectNode manifest = Json.nodes().objectNode();
-        ArrayNode files = manifest.putArray("files");
-        ObjectNode fileEntry = files.addObject();
-        fileEntry.put("path", "events/log.jsonl");
-        fileEntry.put("sha256", "sha256:" + Canonical.sha256Hex(content));
-        ArrayNode sourceArray = manifest.putArray("sources");
+        ArrayNode sourceArray = Json.nodes().arrayNode();
         sourceArray.addObject().put("id", sources[0]).put("class", "");
         sourceArray.addObject().put("id", sources[1]).putNull("class");
         sourceArray.addObject().put("id", sources[2]).put("class", 42);
-        Files.writeString(root.resolve("manifest.json"), Json.compact(manifest), StandardCharsets.UTF_8);
+        Bundle bundle = Fixtures.writeIngestBundle(tempDir.resolve("bundle"), events, sourceArray);
 
-        Ingest.Result result = Ingest.ingest(Bundle.load(root));
+        Ingest.Result result = Ingest.ingest(bundle);
         assertEquals(3, result.accepted.size());
         assertEquals(List.of(), result.quarantined);
         for (JsonNode event : result.accepted) {
