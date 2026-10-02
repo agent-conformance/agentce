@@ -93,6 +93,58 @@ public final class Cli {
             return 0;
         }
 
+        // otel-genai-fixture is a plain computation seam (the same pattern as `security-view`
+        // above), driven by the otel-genai adapter's cross-engine parity check (18.29, C3/C4): it
+        // reads `<dir>/input.json` and `<dir>/adapt.json` the same way the Python reference's
+        // fixtures module does, calls `adapt`, and for each emitted event (in the adapter's own
+        // pinned time/id order) attempts `canonicalString`; on success prints `EVENT <result>`. On
+        // a `CanonicalizationError`, nothing further goes to stdout -- `ERROR canonical:<reason>`
+        // goes to stderr and the process exits 1, so the check can tell "the adapter accepted this
+        // but the event cannot be serialised" apart from "the adapter refused the whole document"
+        // (an `OtelGenaiAdapterError`, printed the same way without the `canonical:` prefix). On a
+        // clean run, one final `REPORT <json>` line follows every `EVENT` line.
+        if ("otel-genai-fixture".equals(command)) {
+            if (args.length < 2) {
+                System.err.println("otel-genai-fixture: a directory path is required");
+                return ExitCode.INPUT_ERROR.code;
+            }
+            Path dir = Paths.get(args[1]);
+            byte[] inputBytes;
+            JsonNode adaptArgs;
+            try {
+                inputBytes = Files.readAllBytes(dir.resolve("input.json"));
+                adaptArgs = Json.parseFile(dir.resolve("adapt.json"));
+            } catch (IOException | RuntimeException e) {
+                System.err.println("otel-genai-fixture: " + e.getMessage());
+                return ExitCode.INPUT_ERROR.code;
+            }
+            String subject = adaptArgs.has("subject") ? adaptArgs.get("subject").asText() : null;
+            String sourceClass = adaptArgs.has("source_class") && !adaptArgs.get("source_class").isNull()
+                    ? adaptArgs.get("source_class").asText()
+                    : null;
+            String source = adaptArgs.has("source") && !adaptArgs.get("source").isNull()
+                    ? adaptArgs.get("source").asText()
+                    : null;
+            try {
+                OtelGenai.AdaptResult result = OtelGenai.adapt(inputBytes, subject, sourceClass, source);
+                for (JsonNode event : result.events()) {
+                    String line;
+                    try {
+                        line = Canonical.canonicalString(event);
+                    } catch (Canonical.CanonicalizationError exc) {
+                        System.err.println("ERROR canonical:" + exc.reason);
+                        return 1;
+                    }
+                    System.out.println("EVENT " + line);
+                }
+                System.out.println("REPORT " + otelGenaiReportLine(result.report()));
+                return 0;
+            } catch (OtelGenai.OtelGenaiAdapterError exc) {
+                System.err.println("ERROR " + exc.reason);
+                return 1;
+            }
+        }
+
         boolean json = Arrays.asList(args).contains("--json");
         boolean debug = Arrays.asList(args).contains("--debug");
         CommandResult result;
@@ -1543,6 +1595,39 @@ public final class Cli {
             result.addCode(ExitCode.INPUT_ERROR.code);
         }
         return result;
+    }
+
+    /**
+     * The {@code otel-genai-fixture} seam's {@code REPORT} line: compact JSON (no indentation, no
+     * backslash-u escaping of non-ASCII -- there is none in any committed vector), field order
+     * fixed to match TypeScript's {@code JSON.stringify} output byte for byte (18.29, C3).
+     */
+    private static String otelGenaiReportLine(OtelGenai.AdapterReport report) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"adapter\":").append(Json.quote(report.adapter()));
+        sb.append(",\"conventions\":[");
+        for (int i = 0; i < report.conventions().size(); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append(Json.quote(report.conventions().get(i)));
+        }
+        sb.append("],\"spans_seen\":").append(report.spansSeen());
+        sb.append(",\"events_emitted\":").append(report.eventsEmitted());
+        sb.append(",\"skipped\":[");
+        List<OtelGenai.SkippedSpan> skipped = report.skipped();
+        for (int i = 0; i < skipped.size(); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            OtelGenai.SkippedSpan s = skipped.get(i);
+            sb.append("{\"name\":").append(Json.quote(s.name()));
+            sb.append(",\"reason\":").append(Json.quote(s.reason()));
+            sb.append(",\"span_id\":").append(Json.quote(s.spanId()));
+            sb.append('}');
+        }
+        sb.append("]}");
+        return sb.toString();
     }
 
     private static CommandResult notImplemented(String command) {
