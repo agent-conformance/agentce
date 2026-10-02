@@ -712,7 +712,7 @@ def test_assess_exit_code_2_is_not_tripped_by_a_medium_severity_gap(
     assert cli.main(_assess_argv(out)) == 0
 
 
-def test_assess_a_deviation_on_a_high_severity_insufficient_evidence_control_suppresses_exit_code_2(
+def test_assess_a_deviation_on_a_high_severity_insufficient_evidence_control_is_refused_before_exit_code_2_applies(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A deviation can never apply to an ``insufficient_evidence`` outcome in the first place
