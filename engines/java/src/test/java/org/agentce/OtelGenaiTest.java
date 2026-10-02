@@ -122,7 +122,7 @@ class OtelGenaiTest {
 
     @Test
     void theHostileVectorSetIsPresent() {
-        assertTrue(listDirs(HOSTILE_DIR).size() >= 16);
+        assertTrue(listDirs(HOSTILE_DIR).size() >= 18);
     }
 
     @TestFactory

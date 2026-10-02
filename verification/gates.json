@@ -822,7 +822,7 @@
     },
     {
       "id": "VG-OTEL-GENAI-PARITY",
-      "title": "The otel-genai adapter's translation layer (bytes -> canonical AgentCE events) is byte-identical across Python, TypeScript, and Java over all 9 vendor fixtures plus all 16 hostile vectors",
+      "title": "The otel-genai adapter's translation layer (bytes -> canonical AgentCE events) is byte-identical across Python, TypeScript, and Java over all 9 vendor fixtures plus all 18 hostile vectors",
       "tier": "quick",
       "cwd": ".",
       "cmd": [

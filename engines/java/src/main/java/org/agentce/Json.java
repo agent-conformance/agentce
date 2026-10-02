@@ -36,15 +36,23 @@ public final class Json {
     }
 
     /**
-     * Parse a JSON document, refusing trailing content after the root value. {@code readTree}
-     * alone stops at the end of the first value and silently ignores whatever follows; Python's
-     * {@code json.loads} and JavaScript's {@code JSON.parse} both refuse it, so a parser left
-     * un-checked here was the one engine that would sign a {@code claim.json} carrying appended
-     * garbage (18.26 round-3 verifier finding).
+     * Parse a JSON document, refusing trailing content after the root value and an empty or
+     * whitespace-only document. {@code readTree} alone stops at the end of the first value and
+     * silently ignores whatever follows; Python's {@code json.loads} and JavaScript's {@code
+     * JSON.parse} both refuse it, so a parser left un-checked here was the one engine that would
+     * sign a {@code claim.json} carrying appended garbage (18.26 round-3 verifier finding).
+     * {@code readTree} also returns {@code null} (not an exception) for an empty or
+     * whitespace-only document, which Python's {@code json.loads} and the engine's own {@code
+     * parseJson} both reject as a {@code JSONDecodeError}/syntax error; returning {@code null}
+     * here instead of throwing pushes a {@code NullPointerException} onto every caller that
+     * assumes a parse either throws or returns a node (18.29 verifier round 1, F1).
      */
     public static JsonNode parse(String text) {
         try (JsonParser parser = MAPPER.getFactory().createParser(text)) {
             JsonNode node = MAPPER.readTree(parser);
+            if (node == null) {
+                throw new IllegalArgumentException("invalid JSON: no content");
+            }
             if (parser.nextToken() != null) {
                 throw new IllegalArgumentException("invalid JSON: unexpected trailing content after the document");
             }

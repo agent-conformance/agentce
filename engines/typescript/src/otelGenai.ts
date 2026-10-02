@@ -728,7 +728,11 @@ export function adapt(payload: Uint8Array, opts: AdaptOptions): AdaptResult {
   }
   let text: string;
   try {
-    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    // `ignoreBOM: true` stops the decoder from also silently eating a second leading BOM left
+    // behind by a doubled-BOM payload; that U+FEFF then reaches `parseJson` as ordinary text and
+    // fails the same way Python's `json.loads` rejects it ("Unexpected UTF-8 BOM") after
+    // `utf-8-sig` strips only the first one (18.29 verifier round 1, F2).
+    text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
   } catch {
     throw new OtelGenaiAdapterError("invalid_encoding", "payload is not valid UTF-8");
   }

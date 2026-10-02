@@ -5,8 +5,8 @@ item 18.29, contract `P18-18.29` C3).
 Three independently-interpreted ports of the same adapter (18.29's C1/C2) can each pass their own
 unit-test suite while silently disagreeing on an edge case none of those suites happens to probe.
 This check never trusts that: it runs the identical 9 vendor fixtures
-(`adapters/otel-genai/fixtures/`) and 16 hostile vectors
-(`spec/model/test-vectors/otel-genai-hostile/`) -- 25 in total -- through all three engines and
+(`adapters/otel-genai/fixtures/`) and 18 hostile vectors
+(`spec/model/test-vectors/otel-genai-hostile/`) -- 27 in total -- through all three engines and
 asserts their `EVENT`/`REPORT`/`ERROR` output is byte-identical.
 
 Python's own adapter (`agentce.records.otel_genai`, the engine's vendored copy C0 hardened) is
@@ -17,7 +17,7 @@ are driven as built artifacts (`engines/typescript/dist/cli.js`, the Java runnab
 through the shared `otel-genai-fixture <dir>` seam verb (`cli.ts`/`Cli.java`).
 
 * `--self-test` needs no TypeScript/Java build: it proves two things about this checker itself, not
-  about any engine. First, every one of the 25 vectors' own expected output
+  about any engine. First, every one of the 27 vectors' own expected output
   (`expected.jsonl`/`expected-report.json`, or `expected-error.json` -- both plain `AdapterError`
   reasons and `canonical:<reason>` canonicalization refusals) matches what Python's own adapter
   actually produces, so a later edit to a vector's expected file cannot silently drift from the
@@ -28,7 +28,7 @@ through the shared `otel-genai-fixture <dir>` seam verb (`cli.ts`/`Cli.java`).
   output -- proving the check design actually discriminates on this fault class, not only that the
   seam exists.
 * The real invocation (the caller builds TypeScript's `dist/` and the Java runnable jar first) runs,
-  for each of the 25 vectors, a fresh temporary directory holding only that vector's own
+  for each of the 27 vectors, a fresh temporary directory holding only that vector's own
   `input.json` and `adapt.json` (never its `expected*.json*`, so a seam that merely echoes the
   directory it is given cannot pass) through Python's `adapt` directly, the built TypeScript
   `dist/cli.js otel-genai-fixture <dir>`, and the built Java jar's `otel-genai-fixture <dir>`, and
@@ -59,9 +59,9 @@ JAVA_ENGINE = ROOT / "engines" / "java"
 FIXTURES_DIR = ROOT / "adapters" / "otel-genai" / "fixtures"
 HOSTILE_DIR = ROOT / "spec" / "model" / "test-vectors" / "otel-genai-hostile"
 
-#: The vendor fixtures plus hostile vectors this check exercises every engine against -- 9 + 16 = 25
-#: (contract `P18-18.29` C3).
-EXPECTED_VECTOR_COUNT = 25
+#: The vendor fixtures plus hostile vectors this check exercises every engine against -- 9 + 18 = 27
+#: (contract `P18-18.29` C3; 18.29 verifier round 1 added `empty-input` and `doubled-bom`).
+EXPECTED_VECTOR_COUNT = 27
 
 
 def all_vector_dirs() -> list[Path]:
@@ -138,7 +138,7 @@ def python_fixture_lines(vector_dir: Path) -> tuple[list[str], list[str], int]:
 
 @functools.lru_cache(maxsize=1)
 def _typescript_entry() -> Path:
-    """The built TypeScript CLI entry point, resolved once -- every one of the 25 vectors drives
+    """The built TypeScript CLI entry point, resolved once -- every one of the 27 vectors drives
     the same build, so there is exactly one entry point to find, not one lookup per vector."""
     entry = TS_ENGINE / "dist" / "cli.js"
     if not entry.is_file():
