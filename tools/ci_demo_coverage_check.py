@@ -52,6 +52,41 @@ DEMO_JOB = "demo-fault"
 QUICK_JOB = "quick"
 SHARD_SCRIPT = "verification/shard.py"
 CANONICAL_RUN = 'python3 verification/shard.py "${{ strategy.job-index }}" "${{ strategy.job-total }}"'
+# Three reviews in a row (contract-critic r1, r2, verifier r1) each found an edit to
+# verification.yml that an earlier, blocklist-style version of this check did not reject
+# (continue-on-error, a rewired run line, needs, exit 0, || true, a step if:). Listing bad edits one
+# at a time cannot converge: a step `shell: "true {0}"` override, for example, changes how `run:` is
+# interpreted and defeats every check above without tripping any of them. So this check now asserts
+# the good shape instead: a step may carry only `name`/`run` (checked exactly), a job may carry only
+# the keys it has today, and neither a workflow- nor job-level `defaults.run.shell` may exist.
+STEP_ALLOWED_KEYS = {"name", "run"}
+DEMO_JOB_ALLOWED_KEYS = {"runs-on", "steps", "strategy", "timeout-minutes"}
+QUICK_JOB_ALLOWED_KEYS = {"if", "needs", "runs-on", "steps", "timeout-minutes"}
+
+
+def _unknown_keys(mapping: dict[str, Any], allowed: set[str], label: str) -> list[str]:
+    extra = sorted(set(mapping) - allowed)
+    if not extra:
+        return []
+    return [f"{label} has key(s) outside the allowed set {sorted(allowed)}: {extra}"]
+
+
+def _shell_override_problems(mapping: dict[str, Any], label: str) -> list[str]:
+    defaults = mapping.get("defaults")
+    run_defaults = defaults.get("run") if isinstance(defaults, dict) else None
+    if isinstance(run_defaults, dict) and "shell" in run_defaults:
+        return [
+            f"{label} sets defaults.run.shell, which can silently change how run: text is interpreted"
+        ]
+    return []
+
+
+def workflow_level_problems(doc: Any) -> list[str]:
+    if not isinstance(doc, dict):
+        return []
+    return _shell_override_problems(doc, "the workflow")
+
+
 # Two arbitrary probe sizes for the generic, total-agnostic partition() function below --
 # correctness here does not depend on matching the workflow's real lane count: 7 just catches an
 # off-by-one that only shows up once a total doesn't divide the gate count evenly.
@@ -84,18 +119,12 @@ def _demo_step(job: dict[str, Any]) -> dict[str, Any] | None:
 def _step_wiring_problems(
     step: dict[str, Any], label: str, canonical_run: str
 ) -> list[str]:
-    """Shared by `wiring_problems` and `quick_wiring_problems`: a step's own continue-on-error,
-    `if:`, and exact (whitespace-stripped) run-text match against `canonical_run`, so a fix to one
-    job's step-level checks can't silently stay out of sync with the other's."""
-    problems: list[str] = []
-    if step.get("continue-on-error"):
-        problems.append(
-            f"the {label} step sets continue-on-error, so a failure would not fail the job"
-        )
-    if "if" in step:
-        problems.append(
-            f"the {label} step has an if: ({step['if']!r}), which could skip it"
-        )
+    """Shared by `wiring_problems` and `quick_wiring_problems`: the step may carry only an allowed
+    key (so a `shell:` override, `continue-on-error`, `if:`, or any other added key is rejected by
+    construction, not by naming it), and its `run:` must exactly (whitespace-stripped) match
+    `canonical_run` -- so a fix to one job's step-level checks can't silently stay out of sync with
+    the other's."""
+    problems = _unknown_keys(step, STEP_ALLOWED_KEYS, f"the {label} step")
     run_text = str(step.get("run", "")).strip()
     if run_text != canonical_run:
         problems.append(
@@ -106,20 +135,13 @@ def _step_wiring_problems(
 
 
 def wiring_problems(job: Any) -> list[str]:
-    """The demo-fault job's step must be exactly the canonical invocation, with no `if:` on the job
-    or the step, and no continue-on-error swallowing a failure -- each independently defeats the
-    complete-by-construction partition without the other two noticing."""
+    """The demo-fault job may carry only an allowed key (so `continue-on-error`, `if:`, or
+    `defaults.run.shell` are rejected by construction, not by naming them one at a time), and its
+    step must be exactly the canonical invocation."""
     if not isinstance(job, dict):
         return [f"jobs.{DEMO_JOB} is missing or not a mapping"]
-    problems: list[str] = []
-    if job.get("continue-on-error"):
-        problems.append(
-            f"jobs.{DEMO_JOB} sets continue-on-error, so a failed shard would not fail the job"
-        )
-    if "if" in job:
-        problems.append(
-            f"jobs.{DEMO_JOB} has a job-level if: ({job['if']!r}), which could skip the whole job"
-        )
+    problems = _unknown_keys(job, DEMO_JOB_ALLOWED_KEYS, f"jobs.{DEMO_JOB}")
+    problems += _shell_override_problems(job, f"jobs.{DEMO_JOB}")
     step = _demo_step(job)
     if step is None:
         return problems + [f"no step in jobs.{DEMO_JOB} invokes {SHARD_SCRIPT}"]
@@ -148,15 +170,16 @@ def _quick_step(job: dict[str, Any]) -> dict[str, Any] | None:
 
 def quick_wiring_problems(job: Any) -> list[str]:
     """`quick` is the required check; GitHub treats a *skipped* required check as passing, so
-    `quick` must be a real job whose own logic fails unless both dependencies truly succeeded. An
-    exact (whitespace-stripped) match on the step's ``run:`` -- the same style ``wiring_problems``
-    already uses for the demo step -- is what actually proves this: a looser regex search for
-    ``needs.X.result ... success`` still matches after ``exit 1`` is changed to ``exit 0``, after
-    ``!=`` is flipped to ``==``, after a trailing ``|| true``, or with a step- or job-level ``if:``
-    or ``continue-on-error`` added, each of which lets a failed dependency leave `quick` green."""
+    `quick` must be a real job whose own logic fails unless both dependencies truly succeeded.
+    `quick` may carry only an allowed key (so `continue-on-error` or `defaults.run.shell` are
+    rejected by construction), its `needs`/`if: always()` values are read directly, and its step's
+    `run:` must exactly (whitespace-stripped) match the canonical dependency-check text -- the same
+    exact-match style `wiring_problems` already uses for the demo step, not a substring search that
+    `exit 1` -> `exit 0`, `!=` -> `==`, or a trailing `|| true` could still slip past."""
     if not isinstance(job, dict):
         return [f"jobs.{QUICK_JOB} is missing or not a mapping"]
-    problems: list[str] = []
+    problems = _unknown_keys(job, QUICK_JOB_ALLOWED_KEYS, f"jobs.{QUICK_JOB}")
+    problems += _shell_override_problems(job, f"jobs.{QUICK_JOB}")
     needs = job.get("needs")
     needed = set(needs) if isinstance(needs, list) else set()
     for required in ("build", DEMO_JOB):
@@ -168,10 +191,6 @@ def quick_wiring_problems(job: Any) -> list[str]:
         problems.append(
             f"jobs.{QUICK_JOB} has no if: always() (got {job.get('if')!r}), so it could be skipped "
             "entirely if an earlier job failed -- and GitHub treats a skipped required check as passing"
-        )
-    if job.get("continue-on-error"):
-        problems.append(
-            f"jobs.{QUICK_JOB} sets continue-on-error, so a failed dependency would not fail the job"
         )
     step = _quick_step(job)
     if step is None:
@@ -224,8 +243,10 @@ def check_workflow(
         return [f"{workflow_path}: not valid YAML: {exc}"]
     raw_jobs = doc.get("jobs") if isinstance(doc, dict) else None
     jobs: dict[str, Any] = raw_jobs if isinstance(raw_jobs, dict) else {}
-    problems = wiring_problems(jobs.get(DEMO_JOB)) + quick_wiring_problems(
-        jobs.get(QUICK_JOB)
+    problems = (
+        workflow_level_problems(doc)
+        + wiring_problems(jobs.get(DEMO_JOB))
+        + quick_wiring_problems(jobs.get(QUICK_JOB))
     )
     result = subprocess.run(
         ["python3", str(root / "verification" / "run"), "--list"],
@@ -295,6 +316,26 @@ def self_test() -> int:
             False,
         ),
         ("demo job with an if:", {**good_job, "if": "false"}, False),
+        (
+            "demo step with a shell: override",
+            {"steps": [{**good_step, "shell": "true {0}"}]},
+            False,
+        ),
+        (
+            "demo step with an unknown key",
+            {"steps": [{**good_step, "mystery": True}]},
+            False,
+        ),
+        (
+            "demo job with defaults.run.shell",
+            {**good_job, "defaults": {"run": {"shell": "true {0}"}}},
+            False,
+        ),
+        (
+            "demo job with an unknown key",
+            {**good_job, "mystery": True},
+            False,
+        ),
     ]
     failures = _misjudged(cases, wiring_problems)
     quick_good_step: dict[str, Any] = {"run": CANONICAL_QUICK_RUN}
@@ -358,8 +399,37 @@ def self_test() -> int:
             {**quick_good, "steps": [{"run": CANONICAL_QUICK_RUN + " || true"}]},
             False,
         ),
+        (
+            "quick step with a shell: override",
+            {**quick_good, "steps": [{**quick_good_step, "shell": "true {0}"}]},
+            False,
+        ),
+        (
+            "quick step with an unknown key",
+            {**quick_good, "steps": [{**quick_good_step, "mystery": True}]},
+            False,
+        ),
+        (
+            "quick job with defaults.run.shell",
+            {**quick_good, "defaults": {"run": {"shell": "true {0}"}}},
+            False,
+        ),
+        (
+            "quick job with an unknown key",
+            {**quick_good, "mystery": True},
+            False,
+        ),
     ]
     failures += _misjudged(quick_cases, quick_wiring_problems)
+    workflow_cases: list[tuple[str, Any, bool]] = [
+        ("workflow without defaults", {}, True),
+        (
+            "workflow with defaults.run.shell",
+            {"defaults": {"run": {"shell": "true {0}"}}},
+            False,
+        ),
+    ]
+    failures += _misjudged(workflow_cases, workflow_level_problems)
     gates = ["A", "B", "C", "D", "E", "F"]
     partition_cases: list[tuple[str, dict[str, list[int]], bool]] = [
         ("complete 6-way assignment", {g: [i] for i, g in enumerate(gates)}, True),
