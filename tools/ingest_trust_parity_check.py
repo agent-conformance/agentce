@@ -174,6 +174,13 @@ def compare(
         failures.append(f"{label}: {engine_a} and {engine_b} disagree ({a!r} vs {b!r})")
 
 
+def compare_all(label: str, values: dict[str, str], failures: list[str]) -> None:
+    """Pairwise-`compare`s every adjacent engine's value in `values` (keyed by engine name)."""
+    names = list(values)
+    for a, b in zip(names, names[1:]):
+        compare(label, values[a], values[b], a, b, failures)
+
+
 def self_test() -> int:
     failures: list[str] = []
     unmoved: list[str] = []
@@ -232,9 +239,7 @@ def run_real_check() -> int:
                 failures.append(
                     f"verify:{engine}: stream status is {status!r}, expected 'verified_weak'"
                 )
-        names = list(statuses)
-        for a, b in zip(names, names[1:]):
-            compare("verify:status", statuses[a], statuses[b], a, b, failures)
+        compare_all("verify:status", statuses, failures)
 
         # 2. `assess --bundle`: the report never trusts the self-assertion. `activity.json` must
         # bucket this ApprovalDecided event's recorder under self_report, never independent_system
@@ -286,9 +291,7 @@ def run_real_check() -> int:
                     f"{recorder.get('independent_system')!r}, expected 0 (the raw event claims "
                     "'independent_system', but its source is undeclared)"
                 )
-        names = list(activity)
-        for a, b in zip(names, names[1:]):
-            compare("assess:activity.json", activity[a], activity[b], a, b, failures)
+        compare_all("assess:activity.json", activity, failures)
 
     for failure in failures:
         print(f"MISMATCH: {failure}", file=sys.stderr)

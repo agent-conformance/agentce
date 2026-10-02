@@ -283,7 +283,7 @@ def test_manifest_class_empty_null_or_non_string_is_treated_as_undeclared(
     simply forgot the field."""
     import json
 
-    from conftest import sha256_hex, write_bundle
+    from conftest import write_bundle
 
     sources = [
         f"urn:agentce:source:undeclared-{suffix}"
@@ -297,19 +297,10 @@ def test_manifest_class_empty_null_or_non_string_is_treated_as_undeclared(
         events.append(event)
 
     root = write_bundle(
-        tmp_path / "bundle", [json.dumps(e) for e in events], write_manifest=False
+        tmp_path / "bundle",
+        [json.dumps(e) for e in events],
+        source_classes={sources[0]: "", sources[1]: None, sources[2]: 42},
     )
-    events_file = root / "events" / "stream.jsonl"
-    manifest = {
-        "agentce_bundle_version": 1,
-        "files": [{"path": "events/stream.jsonl", "sha256": sha256_hex(events_file)}],
-        "sources": [
-            {"id": sources[0], "class": ""},
-            {"id": sources[1], "class": None},
-            {"id": sources[2], "class": 42},
-        ],
-    }
-    (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
     result = ingest(load_bundle(root))
     assert len(result.accepted) == 3

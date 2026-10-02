@@ -28,13 +28,15 @@ def write_bundle(
     lines: Sequence[str],
     *,
     sources: Sequence[str] | None = None,
-    source_classes: Mapping[str, str] | None = None,
+    source_classes: Mapping[str, Any] | None = None,
     write_manifest: bool = True,
 ) -> Path:
     """Write a bundle at ``root`` whose single events file carries ``lines`` (already serialised).
 
     ``sources`` lists source ids with no declared class; ``source_classes`` maps a source id to the
-    trust class its manifest entry declares (for the ``class_mismatch`` check, SPEC §6.4).
+    trust class its manifest entry declares (for the ``class_mismatch`` check, SPEC §6.4). A caller
+    testing a malformed manifest may pass a non-``str`` value (``None``, a number, ...): the manifest
+    is JSON, so nothing here enforces the annotation at runtime.
     """
     (root / "events").mkdir(parents=True, exist_ok=True)
     events_file = root / "events" / "stream.jsonl"
