@@ -1,0 +1,47 @@
+{
+  "resourceSpans": [
+    "not-a-dict",
+    {
+      "resource": {
+        "attributes": []
+      },
+      "scopeSpans": "not-a-list"
+    },
+    {
+      "resource": {
+        "attributes": []
+      },
+      "scopeSpans": [
+        "not-a-dict"
+      ]
+    },
+    {
+      "resource": {
+        "attributes": []
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "x"
+          },
+          "spans": "no"
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": []
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "x"
+          },
+          "spans": [
+            "no"
+          ]
+        }
+      ]
+    }
+  ]
+}

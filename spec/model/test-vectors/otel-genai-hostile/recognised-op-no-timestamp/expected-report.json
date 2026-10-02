@@ -1,0 +1,13 @@
+{
+  "adapter": "otel-genai",
+  "conventions": [],
+  "events_emitted": 0,
+  "skipped": [
+    {
+      "name": "s",
+      "reason": "unrecognised_operation",
+      "span_id": "2222222222222222"
+    }
+  ],
+  "spans_seen": 1
+}
