@@ -543,7 +543,7 @@ function runAssess(options: AssessOptions): CommandResult {
   writeQuarantine(ingested.quarantined, join(out, "quarantine.jsonl"));
 
   // Stage 2: integrity verification, one IntegrityResult per stream.
-  const integrityResults = verifyBundle(ingested.accepted, bundle.manifest, bundle.root);
+  const integrityResults = verifyBundle(ingested.rawAccepted, bundle.manifest, bundle.root);
   writeJsonl(integrityResults.map(integrityResultToJson), join(out, "integrity.jsonl"));
 
   // Stage 3: build the provenance graph (in-memory store; ADR-0001's TypeScript variant).
@@ -1314,7 +1314,7 @@ function cmdVerify(argv: string[]): CommandResult {
     const bundleDir = requireDir(bundle, "bundle", "the evidence bundle");
     const loaded = loadBundle(bundleDir);
     const ingested = ingest(loaded);
-    const results = verifyBundle(ingested.accepted, loaded.manifest, loaded.root);
+    const results = verifyBundle(ingested.rawAccepted, loaded.manifest, loaded.root);
     const clean = new Set(["verified", "verified_weak"]);
     const broken = results.filter((r) => !clean.has(r.status));
     result.data.bundle = bundleDir;

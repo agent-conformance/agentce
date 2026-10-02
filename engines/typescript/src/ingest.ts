@@ -7,6 +7,14 @@
  * an event whose class differs from the declared one (`class_mismatch`), a repeated id
  * (`duplicate_id`), or an out-of-order timestamp within a stream (`time_order`). Quarantine is an
  * output, never a silent drop. This is a faithful port of the Python reference.
+ *
+ * A source the manifest declares with no trust class (or a bundle with no manifest classes at all) is
+ * "undeclared": its events keep flowing, but `accepted` never trusts the event's own self-asserted
+ * `agentcesourceclass` at face value -- it is corrected down to the weakest class, `self_report`, for
+ * every downstream reader (SPEC §6.4). That correction never reaches `rawAccepted`, which stays
+ * byte-identical to what the source emitted, because SPEC §6.6 defines each event's `integrity.hash`
+ * over the whole CloudEvent (`agentcesourceclass` included) as received -- callers verifying integrity
+ * must hash what was actually signed, not the engine's trust-corrected copy.
  */
 
 import { readFileSync } from "node:fs";
@@ -99,7 +107,12 @@ function trimJsonWhitespace(text: string): string {
 }
 
 export interface IngestResult {
+  /** What assessment, activity, and graph building read; an undeclared source's event carries
+   * `agentcesourceclass: "self_report"` here, never its own unproven self-assertion. */
   accepted: Array<Record<string, unknown>>;
+  /** The same events exactly as received. Pass this, never `accepted`, to integrity verification
+   * (SPEC §6.6), which must hash what the source actually signed. */
+  rawAccepted: Array<Record<string, unknown>>;
   quarantined: QuarantineRecord[];
 }
 
@@ -132,7 +145,7 @@ function optStr(event: Record<string, unknown>, key: string): string | undefined
 }
 
 export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES): IngestResult {
-  const result: IngestResult = { accepted: [], quarantined: [] };
+  const result: IngestResult = { accepted: [], rawAccepted: [], quarantined: [] };
   const validTypes = eventTypes();
   const seenIds = new Set<string>();
   const lastTime = new Map<string, string>();
@@ -219,6 +232,8 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
         continue;
       }
 
+      const rawEvent = event;
+      let effectiveEvent = event;
       const declaredClass =
         bundle.sourceClasses !== null ? bundle.sourceClasses.get(source) : undefined;
       if (declaredClass !== undefined) {
@@ -233,9 +248,15 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
           });
           continue;
         }
+      } else if (String(event.agentcesourceclass) !== "self_report") {
+        // SPEC §6.4: the manifest declares no trust class for this source, so the event's own
+        // self-assertion is never trusted as-is. `rawEvent` (pushed below, unmodified) keeps the
+        // original for integrity hashing (SPEC §6.6); this shallow copy is what every assessment,
+        // activity, and graph reader sees.
+        effectiveEvent = { ...event, agentcesourceclass: "self_report" };
       }
 
-      const eventId = String(event.id);
+      const eventId = String(effectiveEvent.id);
       if (seenIds.has(eventId)) {
         result.quarantined.push({
           reason: QuarantineReason.DUPLICATE_ID,
@@ -247,8 +268,8 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
         continue;
       }
 
-      const stream = streamOf(event);
-      const timeValue = String(event.time);
+      const stream = streamOf(effectiveEvent);
+      const timeValue = String(effectiveEvent.time);
       const previous = lastTime.get(stream);
       if (previous !== undefined && byteCompare(timeValue, previous) < 0) {
         result.quarantined.push({
@@ -264,7 +285,8 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
 
       seenIds.add(eventId);
       lastTime.set(stream, timeValue);
-      result.accepted.push(event);
+      result.accepted.push(effectiveEvent);
+      result.rawAccepted.push(rawEvent);
     }
   }
   return result;

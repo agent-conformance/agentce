@@ -120,7 +120,7 @@ function assessProject(
   const proj = join(corpusRoot, "projects", pid);
   const bundle = loadBundle(join(proj, "evidence"));
   const ingested = ingest(bundle);
-  verifyBundle(ingested.accepted, bundle.manifest, bundle.root); // findings inform, never abort
+  verifyBundle(ingested.rawAccepted, bundle.manifest, bundle.root); // findings inform, never abort; hash what the source signed, not the trust-corrected copy
   const domain = DomainBinding.load(join(proj, "domain.linkml.yaml"));
   const profile = loadProfile(join(proj, "applicability.yaml"));
   computeCoverage(ingested.accepted, profile, bundle.root);

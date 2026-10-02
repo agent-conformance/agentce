@@ -1,6 +1,7 @@
 /** Bundle loading, schema validation, and ingest quarantine (cross-checked with the Python engine). */
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,10 +10,48 @@ import { loadBundle } from "./bundle";
 import { CanonicalizationError } from "./canonical";
 import { InputError } from "./errors";
 import { ingest } from "./ingest";
+import { GENESIS_PREV, IntegrityStatus, recomputeHash, verifyBundle } from "./integrity";
 import { countsByReason } from "./quarantine";
 import { eventTypes, validateEvent } from "./schema";
 
 const BUNDLE = join(__dirname, "..", "testdata", "ingest-bundle");
+
+/** A schema-valid ToolCall event, self-asserting `agentcesourceclass`, for the undeclared-source
+ * trust-class tests below (SPEC §6.4, item 18.31). */
+function enforcementPointEvent(): Record<string, unknown> {
+  return {
+    specversion: "1.0",
+    id: "evt-undeclared-source",
+    source: "urn:agentce:source:gw:eu-1",
+    subject: "spiffe://corp/agents/a",
+    time: "2026-05-01T08:00:00.000Z",
+    type: "org.agent-conformance.evidence.ToolCall.v1",
+    datacontenttype: "application/ld+json",
+    agentcesourceclass: "enforcement_point",
+    data: {
+      "@context": "https://agent-conformance.org/contexts/evidence/v1",
+      "@type": "ToolCall",
+      tool: { name: "t" },
+    },
+  };
+}
+
+function writeBundle(events: Array<Record<string, unknown>>, sources: string[] | null): string {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-ingest-"));
+  mkdirSync(join(dir, "events"));
+  const lines = `${events.map((e) => JSON.stringify(e)).join("\n")}\n`;
+  writeFileSync(join(dir, "events", "stream.jsonl"), lines);
+  const hash = createHash("sha256").update(lines).digest("hex");
+  const manifest: Record<string, unknown> = {
+    bundle_format: "1.0",
+    files: [{ path: "events/stream.jsonl", sha256: `sha256:${hash}` }],
+  };
+  if (sources !== null) {
+    manifest.sources = sources.map((id) => ({ id }));
+  }
+  writeFileSync(join(dir, "manifest.json"), JSON.stringify(manifest));
+  return dir;
+}
 
 test("bundle digest is the canonical SHA-256 of the manifest (matches the reference)", () => {
   assert.equal(
@@ -98,4 +137,61 @@ test("a manifest number the canonical form refuses is refused on digest, not fol
       token,
     );
   }
+});
+
+test("a source declared without a class defaults its event to self_report (SPEC §6.4)", () => {
+  const event = enforcementPointEvent();
+  const dir = writeBundle([event], [String(event.source)]);
+  const result = ingest(loadBundle(dir));
+  assert.equal(result.accepted.length, 1);
+  assert.equal(result.quarantined.length, 0);
+  assert.equal(result.accepted[0]?.agentcesourceclass, "self_report");
+});
+
+test("a bundle with no declared classes at all defaults every event to self_report", () => {
+  const event = enforcementPointEvent();
+  const dir = writeBundle([event], null);
+  const result = ingest(loadBundle(dir));
+  assert.equal(result.accepted.length, 1);
+  assert.equal(result.accepted[0]?.agentcesourceclass, "self_report");
+});
+
+test("an undeclared source already self_report is unchanged (accepted and raw are the same object)", () => {
+  const event: Record<string, unknown> = {
+    ...enforcementPointEvent(),
+    agentcesourceclass: "self_report",
+  };
+  const dir = writeBundle([event], [String(event.source)]);
+  const result = ingest(loadBundle(dir));
+  assert.equal(result.accepted.length, 1);
+  assert.equal(result.accepted[0]?.agentcesourceclass, "self_report");
+  assert.equal(result.accepted[0], result.rawAccepted[0]);
+});
+
+test("an undeclared source's trust-class correction never reaches rawAccepted, which integrity hashes", () => {
+  // SPEC §6.6 hashes the whole CloudEvent, agentcesourceclass included, as the source emitted it:
+  // rawAccepted must stay byte-identical so a genuinely unmodified, undeclared-source event still
+  // verifies, while the corrected copy (accepted) would wrongly look tampered.
+  const event = enforcementPointEvent();
+  const stream = "urn:agentce:source:gw:eu-1|spiffe://corp/agents/a";
+  const data = event.data as Record<string, unknown>;
+  data.integrity = { prev: GENESIS_PREV, stream, strength: "export_chained" };
+  data.integrity = { ...(data.integrity as Record<string, unknown>), hash: recomputeHash(event) };
+  const dir = writeBundle([event], [String(event.source)]);
+  const bundle = loadBundle(dir);
+  const result = ingest(bundle);
+  assert.equal(result.accepted[0]?.agentcesourceclass, "self_report");
+  assert.equal(result.rawAccepted[0]?.agentcesourceclass, "enforcement_point");
+
+  const verified = verifyBundle(result.rawAccepted, bundle.manifest, bundle.root);
+  assert.deepEqual(
+    verified.map((r) => r.status),
+    [IntegrityStatus.VERIFIED_WEAK],
+  );
+
+  const tamperedView = verifyBundle(result.accepted, bundle.manifest, bundle.root);
+  assert.deepEqual(
+    tamperedView.map((r) => r.status),
+    [IntegrityStatus.FAILED],
+  );
 });
