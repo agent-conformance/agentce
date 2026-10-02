@@ -224,39 +224,39 @@ def run_three_engine_check() -> int:
     with tempfile.TemporaryDirectory(prefix="assess-exit-code-parity-") as raw:
         tmp = Path(raw)
         for label, project, expected_code, expected_status in PROJECTS:
-            py_out, py_code = python_assess(project, tmp / f"{label}-python")
-            ts_out, ts_code = typescript_assess(project, tmp / f"{label}-typescript")
-            java_out, java_code = java_assess(project, tmp / f"{label}-java")
-
-            if not (py_code == ts_code == java_code == expected_code):
+            results = {
+                name: assess(project, tmp / f"{label}-{name}")
+                for name, assess in ENGINES.items()
+            }
+            codes = {name: code for name, (_out, code) in results.items()}
+            if not all(code == expected_code for code in codes.values()):
                 failures.append(
                     f"{label}: expected exit {expected_code} in all three engines, got "
-                    f"python={py_code}, typescript={ts_code}, java={java_code}"
+                    + ", ".join(
+                        f"{name}={code}" for name, code in sorted(codes.items())
+                    )
                 )
 
             if expected_status is not None:
-                py_status = json.loads(py_out).get("exit_status")
-                ts_status = json.loads(ts_out).get("exit_status")
-                java_status = json.loads(java_out).get("exit_status")
-                compare(
-                    f"{label}-exit_status",
-                    json.dumps(py_status),
-                    json.dumps(ts_status),
-                    "python",
-                    "typescript",
-                    failures,
-                )
-                compare(
-                    f"{label}-exit_status",
-                    json.dumps(py_status),
-                    json.dumps(java_status),
-                    "python",
-                    "java",
-                    failures,
-                )
-                if py_status != expected_status:
+                statuses = {
+                    name: json.loads(out).get("exit_status")
+                    for name, (out, _code) in results.items()
+                }
+                reference = statuses["python"]
+                for name in ENGINES:
+                    if name == "python":
+                        continue
+                    compare(
+                        f"{label}-exit_status",
+                        json.dumps(reference),
+                        json.dumps(statuses[name]),
+                        "python",
+                        name,
+                        failures,
+                    )
+                if reference != expected_status:
                     failures.append(
-                        f"{label}: python's own exit_status is {py_status!r}, expected {expected_status!r} "
+                        f"{label}: python's own exit_status is {reference!r}, expected {expected_status!r} "
                         "-- the expected-code table above is wrong"
                     )
 

@@ -807,7 +807,7 @@ public final class Cli {
         // severity: high. Java's assess has no records-folder entrypoint (Python-only, 18.30
         // Dispositions), so this check applies unconditionally, unlike Python's `scanned is None`
         // scoping.
-        java.util.TreeSet<String> highInsufficient = new java.util.TreeSet<>();
+        TreeSet<String> highInsufficient = new TreeSet<>();
         for (Assertions.Assertion a : evaluated) {
             if ("insufficient_evidence".equals(a.outcome) && "high".equals(a.severity)) {
                 highInsufficient.add(a.control);
