@@ -5,10 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -112,5 +115,48 @@ class IngestTest {
 
         List<Integrity.Result> tampered = Integrity.verifyBundle(result.accepted, bundle.manifest, bundle.root);
         assertEquals(List.of("failed"), tampered.stream().map(r -> r.status).toList());
+    }
+
+    @Test
+    void manifestClassEmptyNullOrNonStringIsTreatedAsUndeclared(@TempDir Path tempDir) throws IOException {
+        // A manifest entry naming a source is not the same as declaring its class (SPEC §6.4): an
+        // empty string, JSON null, or a non-string value must get the same honest default as a source
+        // with no `class` key at all, not be coerced or rejected.
+        String[] sources = {
+            "urn:agentce:source:undeclared-empty",
+            "urn:agentce:source:undeclared-null",
+            "urn:agentce:source:undeclared-number",
+        };
+        List<JsonNode> events = new ArrayList<>();
+        for (int i = 0; i < sources.length; i++) {
+            events.add(Fixtures.buildIngestEvent(sources[i], "enforcement_point", "e" + i, "s" + i));
+        }
+
+        Path root = tempDir.resolve("bundle");
+        Files.createDirectories(root.resolve("events"));
+        StringBuilder lines = new StringBuilder();
+        for (JsonNode event : events) {
+            lines.append(Json.compact(event)).append("\n");
+        }
+        byte[] content = lines.toString().getBytes(StandardCharsets.UTF_8);
+        Files.write(root.resolve("events/log.jsonl"), content);
+
+        ObjectNode manifest = Json.nodes().objectNode();
+        ArrayNode files = manifest.putArray("files");
+        ObjectNode fileEntry = files.addObject();
+        fileEntry.put("path", "events/log.jsonl");
+        fileEntry.put("sha256", "sha256:" + Canonical.sha256Hex(content));
+        ArrayNode sourceArray = manifest.putArray("sources");
+        sourceArray.addObject().put("id", sources[0]).put("class", "");
+        sourceArray.addObject().put("id", sources[1]).putNull("class");
+        sourceArray.addObject().put("id", sources[2]).put("class", 42);
+        Files.writeString(root.resolve("manifest.json"), Json.compact(manifest), StandardCharsets.UTF_8);
+
+        Ingest.Result result = Ingest.ingest(Bundle.load(root));
+        assertEquals(3, result.accepted.size());
+        assertEquals(List.of(), result.quarantined);
+        for (JsonNode event : result.accepted) {
+            assertEquals("self_report", event.get("agentcesourceclass").asText());
+        }
     }
 }

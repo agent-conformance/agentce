@@ -195,3 +195,33 @@ test("an undeclared source's trust-class correction never reaches rawAccepted, w
     [IntegrityStatus.FAILED],
   );
 });
+
+test('a manifest class of "", null, or a non-string value is treated as undeclared (SPEC §6.4)', () => {
+  // A manifest entry naming a source is not the same as declaring its class: an empty string, `null`,
+  // or a non-string JSON value must get the same honest default as a source with no `class` key at
+  // all, not be coerced or rejected -- a hostile or malformed manifest gets no special treatment.
+  const sources = ["empty", "null", "number"].map(
+    (suffix) => `urn:agentce:source:undeclared-${suffix}`,
+  );
+  const events = sources.map((source, index) => ({
+    ...enforcementPointEvent(),
+    source,
+    id: `evt-undeclared-${index}`,
+  }));
+  const dir = writeBundle(events, null);
+  const manifestPath = join(dir, "manifest.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as Record<string, unknown>;
+  manifest.sources = [
+    { id: sources[0], class: "" },
+    { id: sources[1], class: null },
+    { id: sources[2], class: 42 },
+  ];
+  writeFileSync(manifestPath, JSON.stringify(manifest));
+
+  const result = ingest(loadBundle(dir));
+  assert.equal(result.accepted.length, 3);
+  assert.equal(result.quarantined.length, 0);
+  for (const event of result.accepted) {
+    assert.equal(event.agentcesourceclass, "self_report");
+  }
+});

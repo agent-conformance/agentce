@@ -85,10 +85,16 @@ final class Fixtures {
     /** A minimal, schema-valid {@code SessionStart} event from {@code source}, claiming {@code
      * agentClass}, with an export-chained integrity block whose hash is already correctly set. */
     static ObjectNode buildIngestEvent(String source, String agentClass) {
+        return buildIngestEvent(source, agentClass, "e1", "s1");
+    }
+
+    /** As {@link #buildIngestEvent(String, String)}, with an explicit event {@code id} and integrity
+     * {@code stream} so a test can build several independent events without id/stream collisions. */
+    static ObjectNode buildIngestEvent(String source, String agentClass, String id, String stream) {
         ObjectNode integrity = Json.nodes().objectNode();
         integrity.put("hash", "");
         integrity.put("prev", Integrity.GENESIS_PREV);
-        integrity.put("stream", "s1");
+        integrity.put("stream", stream);
         integrity.put("strength", "export_chained");
         ObjectNode data = Json.nodes().objectNode();
         data.put("@context", "https://agent-conformance.org/contexts/evidence/v1");
@@ -99,7 +105,7 @@ final class Fixtures {
         event.put("agentcesourceclass", agentClass);
         event.set("data", data);
         event.put("datacontenttype", "application/ld+json");
-        event.put("id", "e1");
+        event.put("id", id);
         event.put("source", source);
         event.put("specversion", "1.0");
         event.put("subject", "spiffe://corp/agents/test");
