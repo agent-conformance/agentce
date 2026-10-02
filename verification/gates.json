@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.23.0",
+  "suite_version": "0.24.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -891,6 +891,34 @@
         }
       ],
       "fix_hint": "run verification/gates/assess_exit_code_parity.sh and read the MISMATCH lines, each naming the project and the engine(s) whose exit code or exit_status disagrees; the exit-2 wiring is engines/python/agentce/commands/__init__.py's high_insufficient block, ported in engines/typescript/src/cli.ts and engines/java/src/main/java/org/agentce/Cli.java."
+    },
+    {
+      "id": "VG-REPORT-BRANCH-COVERAGE",
+      "title": "`_verify_report`'s own reproduction steps (engines/python/agentce/commands/__init__.py) are 100% branch-covered by the Python engine's own test_verify_report* tests, so no two raise sites sharing a message key can hide a missed branch",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/report_branch_coverage.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 300,
+      "invariant": "Lint and type-check are clean; tests pass with the coverage thresholds each package declares.",
+      "rubric": {
+        "pass": "tools/verify_report_branch_coverage_check.py's --self-test confirms its comparator discriminates a function with a missing branch from one fully covered, then the real run collects coverage.py branch data from the test_verify_report*-named tests alone and finds zero missing lines and zero missing branches in _verify_report's own per-function report",
+        "fail": "the self-test's comparator fails to discriminate a missing branch, the real run's test_verify_report* tests do not all pass, or coverage.py's per-function report lists any missing line or missing branch for _verify_report"
+      },
+      "faults": [
+        {
+          "description": "the outer, signed bundle_digest equality check at commands/__init__.py:769 is short-circuited off, so a tampered bundle whose per-file hashes were recomputed to match (passing load_bundle's own check) would be reported reproduced instead of refused -- exactly the gap three separate verifier rounds on item 18.8 found no test caught (mutation M8); disabling it fails the branch-coverage gate's own test_verify_report_bundle_digest_self_consistent_edit_is_still_tampered",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    if bundle_digest is None or bundle_digest != inputs.get(\"bundle_digest\"):",
+          "replace": "    if False:  # bundle_digest is None or bundle_digest != inputs.get(\"bundle_digest\")"
+        }
+      ],
+      "fix_hint": "run verification/gates/report_branch_coverage.sh and read which test failed, or read coverage.py's own missing_lines/missing_branches for _verify_report in the JSON report it writes; the function is engines/python/agentce/commands/__init__.py's _verify_report."
     }
   ]
 }

@@ -3,6 +3,19 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.24.0
+
+- Added `VG-REPORT-BRANCH-COVERAGE`: `_verify_report`'s own reproduction steps
+  (`engines/python/agentce/commands/__init__.py`) are 100% branch-covered by the Python engine's own
+  `test_verify_report*` tests. `_verify_report` has about 15 raise sites across its 9 reproduction steps,
+  several sharing a message key, so an exit-code/key check alone cannot tell two such branches apart --
+  three separate verifier rounds on item 18.8 each found a live mutation an exit-code/key check missed
+  (item 18.8.R1). Wraps `tools/verify_report_branch_coverage_check.py`'s `--self-test` (proving the
+  comparator discriminates a missing branch before trusting it) and its real run, which collects
+  coverage.py branch data from the `test_verify_report*`-named tests alone and reads coverage.py's own
+  per-function report for `_verify_report`. Its seeded fault disables the outer, signed `bundle_digest`
+  equality check (mutation M8).
+
 ## 0.23.0
 
 - Added `VG-ASSESS-EXIT-INSUFFICIENT-EVIDENCE`: `assess` returns exit code 2 (insufficient evidence on
