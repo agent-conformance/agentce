@@ -479,7 +479,9 @@ public final class Report {
      * catalogue (RFC 0008 Sec.7: "the pre-existing, accepted scope boundary that rendered
      * report.md/report.html output has never been a three-engine byte-identity requirement"). */
     private static String blindSpotStepText(String stepKind, String ownerLabel) {
-        return "request".equals(stepKind) ? "a request to " + ownerLabel : "a code change for " + ownerLabel;
+        return "request".equals(stepKind)
+                ? "a request to " + ownerLabel
+                : "a code change for " + ownerLabel + " (see the agentce-get-evidence skill)";
     }
 
     /** {@code (label, value)} for every blind spot, in the module's own ranked order (never re-sorted

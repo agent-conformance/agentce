@@ -9,8 +9,8 @@
 
 ## Top gaps across agents
 
-- `ModelCall (self_report)`: unlocks 1 check(s), needed by 1 more; rung 1 -- a code change for the agent team. Adapters that can supply this: otel-genai. Agents: spiffe://corp/agents/project-view-fixture-a, spiffe://corp/agents/project-view-fixture-b.
-- `ToolCall (self_report)`: unlocks 0 check(s), needed by 1 more; rung 1 -- a code change for the agent team. Adapters that can supply this: mcp-gateway, otel-genai. Agents: spiffe://corp/agents/project-view-fixture-b.
+- `ModelCall (self_report)`: unlocks 1 check(s), needed by 1 more; rung 1 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: otel-genai. Agents: spiffe://corp/agents/project-view-fixture-a, spiffe://corp/agents/project-view-fixture-b.
+- `ToolCall (self_report)`: unlocks 0 check(s), needed by 1 more; rung 1 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: mcp-gateway, otel-genai. Agents: spiffe://corp/agents/project-view-fixture-b.
 
 ## Undeclared agents
 

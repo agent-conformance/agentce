@@ -224,6 +224,50 @@ def test_blind_spots_section_renders_after_activity_before_verdict(
     assert on_disk == blind_spots
 
 
+def test_blind_spots_code_change_step_points_to_the_skill_not_the_quick_path(
+    tmp_path: Path,
+) -> None:
+    """18.32 C2: a `code_change` blind-spot step (rung 1-2, owner `agent_team`) must point to the
+    agentce-get-evidence skill generically in all three renderers -- never "quick path", since the
+    OTel-only records path is one of several ways that skill closes a gap."""
+    control = _minimum_evidence_control("BSP-03", "ModelCall", "self_report")
+    catalog = Catalog(
+        id="cat",
+        version="2026.09",
+        directory=_BASE_CATALOG_DIR,
+        controls=[control],
+        shapes={},
+    )
+    assertion = Assertion(
+        control=control.id,
+        control_version=control.version,
+        subject="spiffe://corp/agents/a",
+        outcome="insufficient_evidence",
+        rung=1,
+        mode="automated",
+        window=_WINDOW,
+        population=(1, 0),
+        severity="high",
+        family="BSP",
+    )
+    profile = Profile(subjects=[Subject(id="spiffe://corp/agents/a")])
+    blind_spots = compute_blind_spots([assertion], profile, [catalog], [])
+    assert blind_spots["blind_spots"][0]["step_kind"] == "code_change"
+    write_report(
+        tmp_path,
+        [assertion],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[catalog],
+        blind_spots=blind_spots,
+    )
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
+    html_body = (tmp_path / "report.html").read_text(encoding="utf-8")
+    cli_lines = "\n".join(blind_spots_cli_lines(blind_spots, messages.catalogue()))
+    for rendering in (md, html_body, cli_lines):
+        assert "agentce-get-evidence" in rendering
+        assert "quick path" not in rendering.lower()
+
+
 def test_blind_spots_defaults_to_the_honest_empty_answer(tmp_path: Path) -> None:
     write_report(
         tmp_path,

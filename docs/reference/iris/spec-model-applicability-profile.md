@@ -12,6 +12,7 @@ The applicability profile (applicability.yaml) declares the subjects assessed an
 |---|---|---|
 | `profile_version` | integer |  |
 | `observation_window` | `window` |  |
+| `pilot_window` | boolean | True when the observation window is an intentionally short pilot rather than a full window (SPEC 13.3.3 step 7, 13.3.4); recorded as a limitation rather than a failure. |
 | `content_capture` | object |  |
 | `subjects` | array |  |
 | `catalogs` | array |  |

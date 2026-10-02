@@ -227,7 +227,7 @@
   "report.blind_spots_owner_platform_or_security": "platform or security",
   "report.blind_spots_owner_ticketing_or_iam": "whoever runs ticketing or IAM",
   "report.blind_spots_row": "unlocks {checks_unlocked} check(s), needed by {needed_by} more; rung {ladder_rung} -- {step}. Adapters that can supply this: {adapters}.",
-  "report.blind_spots_step_code_change": "a code change for {owner}",
+  "report.blind_spots_step_code_change": "a code change for {owner} (see the agentce-get-evidence skill)",
   "report.blind_spots_step_request": "a request to {owner}",
   "report.buyer_answer_conformant": "{control} meets what this question asks, based on the records this run checked.",
   "report.buyer_answer_insufficient_evidence": "The records don't show enough evidence yet for {control} to answer this question.",

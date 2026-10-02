@@ -434,7 +434,9 @@ const OWNER_LABEL: Record<string, string> = {
  * pre-existing, accepted scope boundary that rendered report.md/report.html output has never been a
  * three-engine byte-identity requirement"). */
 function blindSpotStepText(stepKind: string, ownerLabel: string): string {
-  return stepKind === "request" ? `a request to ${ownerLabel}` : `a code change for ${ownerLabel}`;
+  return stepKind === "request"
+    ? `a request to ${ownerLabel}`
+    : `a code change for ${ownerLabel} (see the agentce-get-evidence skill)`;
 }
 
 /** `sanitizeForMarkdown` with the field placeholder rather than the name placeholder (mirrors the
