@@ -83,18 +83,35 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * string case and `_asInt`'s string case -- the same Python `int()` call in the reference.
  */
 function parsePythonIntGrammar(raw: string): IntValue | null {
-  const trimmed = raw.replace(/^[ \t\n\r\v\f]+|[ \t\n\r\v\f]+$/g, "");
+  // One linear pass, never a regex: an anchored trailing-whitespace regex rescans from every start
+  // position, so it is quadratic on a long whitespace run (18.29 verifier round 2, F3's class).
+  let start = 0;
+  let end = raw.length;
+  while (start < end && isAsciiSpace(raw.charCodeAt(start))) {
+    start++;
+  }
+  while (end > start && isAsciiSpace(raw.charCodeAt(end - 1))) {
+    end--;
+  }
   let sign = "";
-  let rest = trimmed;
-  if (rest.startsWith("+") || rest.startsWith("-")) {
-    sign = rest[0] === "-" ? "-" : "";
-    rest = rest.slice(1);
+  if (start < end && (raw[start] === "+" || raw[start] === "-")) {
+    sign = raw[start] === "-" ? "-" : "";
+    start++;
   }
-  if (!/^[0-9](_?[0-9])*$/.test(rest)) {
-    return null;
+  let digits = "";
+  let afterDigit = false;
+  for (let i = start; i < end; i++) {
+    const ch = raw[i];
+    if (ch >= "0" && ch <= "9") {
+      digits += ch;
+      afterDigit = true;
+    } else if (ch === "_" && afterDigit) {
+      afterDigit = false;
+    } else {
+      return null;
+    }
   }
-  const digits = rest.replace(/_/g, "");
-  if (digits.length > MAX_INT_STR_DIGITS) {
+  if (!afterDigit || digits.length > MAX_INT_STR_DIGITS) {
     return null;
   }
   const big = BigInt(`${sign}${digits}`);
@@ -102,6 +119,11 @@ function parsePythonIntGrammar(raw: string): IntValue | null {
     return new NonCanonicalNumber(`${sign}${digits}`, "integer_out_of_range");
   }
   return Number(big);
+}
+
+/** The whitespace `int(str)` trims, ASCII only (contract disposition 1): space and \t through \r. */
+function isAsciiSpace(code: number): boolean {
+  return code === 0x20 || (code >= 0x09 && code <= 0x0d);
 }
 
 /** Decode one OTLP `AnyValue` to a plain scalar/list/object (protobuf-JSON encoding). */
@@ -249,7 +271,11 @@ function otelGenaiVersion(...schemaUrls: unknown[]): string | null {
     if (url === null) {
       continue;
     }
-    const stripped = url.replace(/\/+$/, "");
+    let end = url.length;
+    while (end > 0 && url[end - 1] === "/") {
+      end--; // Python's url.rstrip("/"): a linear scan, not a per-start-position regex
+    }
+    const stripped = url.slice(0, end);
     const idx = stripped.lastIndexOf("/");
     const tail = idx === -1 ? stripped : stripped.slice(idx + 1);
     const parts = tail.split(".");

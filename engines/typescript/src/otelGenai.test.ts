@@ -77,7 +77,7 @@ for (const name of fixtureNames) {
 const hostileNames = readdirSync(HOSTILE_DIR).sort();
 
 test("the hostile vector set is present", () => {
-  assert.ok(hostileNames.length >= 18);
+  assert.ok(hostileNames.length >= 20);
 });
 
 for (const name of hostileNames) {

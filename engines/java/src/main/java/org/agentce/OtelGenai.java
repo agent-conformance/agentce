@@ -33,7 +33,6 @@ public final class OtelGenai {
     private static final Set<String> VALID_SOURCE_CLASSES =
             Set.of("self_report", "enforcement_point", "independent_system");
     private static final int MAX_INT_STR_DIGITS = 4300; // CPython's sys.int_max_str_digits default
-    private static final Pattern INT_GRAMMAR = Pattern.compile("^[0-9](_?[0-9])*$");
     private static final Pattern ALL_DIGITS = Pattern.compile("^[0-9]+$");
     private static final BigInteger NANOS_PER_MILLI = BigInteger.valueOf(1_000_000);
     private static final BigInteger MILLIS_PER_SECOND = BigInteger.valueOf(1000);
@@ -91,23 +90,51 @@ public final class OtelGenai {
      * sys.int_max_str_digits} digits. Returns a {@code BigIntegerNode} of full precision -- unlike
      * the TypeScript port, no out-of-range wrapper is needed here, since {@link Canonical#canonicalString}
      * already refuses a too-large integer reading the same {@code JsonNode} directly.
+     *
+     * <p>One linear pass, never a regex: {@code java.util.regex} matches a repeated group by
+     * recursing once per character, so a few thousand digits overflowed the stack before the digit
+     * cap was ever checked (18.29 verifier round 2, F3).
      */
     private static JsonNode parsePythonIntGrammar(String raw) {
-        String trimmed = raw.replaceAll("^[ \\t\\n\\r\\u000B\\f]+|[ \\t\\n\\r\\u000B\\f]+$", "");
-        String sign = "";
-        String rest = trimmed;
-        if (rest.startsWith("+") || rest.startsWith("-")) {
-            sign = rest.startsWith("-") ? "-" : "";
-            rest = rest.substring(1);
+        int start = 0;
+        int end = raw.length();
+        while (start < end && isAsciiSpace(raw.charAt(start))) {
+            start++;
         }
-        if (!INT_GRAMMAR.matcher(rest).matches()) {
+        while (end > start && isAsciiSpace(raw.charAt(end - 1))) {
+            end--;
+        }
+        boolean negative = false;
+        if (start < end && (raw.charAt(start) == '+' || raw.charAt(start) == '-')) {
+            negative = raw.charAt(start) == '-';
+            start++;
+        }
+        StringBuilder digits = new StringBuilder(end - start + 1);
+        if (negative) {
+            digits.append('-');
+        }
+        boolean afterDigit = false;
+        for (int i = start; i < end; i++) {
+            char c = raw.charAt(i);
+            if (c >= '0' && c <= '9') {
+                digits.append(c);
+                afterDigit = true;
+            } else if (c == '_' && afterDigit) {
+                afterDigit = false;
+            } else {
+                return null;
+            }
+        }
+        int digitCount = digits.length() - (negative ? 1 : 0);
+        if (!afterDigit || digitCount > MAX_INT_STR_DIGITS) {
             return null;
         }
-        String digits = rest.replace("_", "");
-        if (digits.length() > MAX_INT_STR_DIGITS) {
-            return null;
-        }
-        return Json.nodes().numberNode(new BigInteger(sign + digits));
+        return Json.nodes().numberNode(new BigInteger(digits.toString()));
+    }
+
+    /** The whitespace {@code int(str)} trims, ASCII only (contract disposition 1): space and \t through \r. */
+    private static boolean isAsciiSpace(char c) {
+        return c == ' ' || (c >= '\t' && c <= '\r');
     }
 
     /** Decode one OTLP {@code AnyValue} to a plain scalar/list/object (protobuf-JSON encoding). */
@@ -250,7 +277,11 @@ public final class OtelGenai {
             if (url == null) {
                 continue;
             }
-            String stripped = url.replaceAll("/+$", "");
+            int end = url.length();
+            while (end > 0 && url.charAt(end - 1) == '/') {
+                end--; // Python's url.rstrip("/"): a linear scan, not a per-start-position regex
+            }
+            String stripped = url.substring(0, end);
             int idx = stripped.lastIndexOf('/');
             String tail = idx == -1 ? stripped : stripped.substring(idx + 1);
             String[] parts = tail.split("\\.", -1);

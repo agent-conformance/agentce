@@ -585,6 +585,10 @@ def adapt(
         # Bytes that are not valid UTF-8 at all (hostile or corrupted input) are a decode failure,
         # not a JSON syntax failure, but still refuse with a stable key rather than crash.
         raise AdapterError("invalid_encoding", str(exc)) from exc
+    except ValueError as exc:
+        # json.loads raises a bare ValueError (not JSONDecodeError) for an integer literal longer than
+        # sys.int_max_str_digits (4300 digits): still malformed input, refused with the same key.
+        raise AdapterError("invalid_json", str(exc)) from exc
     if not isinstance(document, dict):
         raise AdapterError("not_otlp", "top-level value is not a JSON object")
 

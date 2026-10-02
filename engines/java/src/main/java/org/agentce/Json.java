@@ -1,7 +1,13 @@
 package org.agentce;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.StreamReadConstraints;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.core.util.JsonParserDelegate;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,9 +32,41 @@ import java.util.List;
 public final class Json {
     private Json() {}
 
-    private static final ObjectMapper MAPPER = new ObjectMapper()
+    /**
+     * Python's {@code json.loads} refuses an integer literal longer than {@code sys.int_max_str_digits}
+     * (CPython's default, 4300 digits) and accepts a fractional/exponent literal of any length.
+     * Jackson's own default caps every number token at 1000 characters, so that cap is lifted and
+     * Python's integer rule applied instead ({@link IntegerDigitLimit}).
+     */
+    private static final int MAX_INT_LITERAL_DIGITS = 4300;
+
+    private static final ObjectMapper MAPPER = new ObjectMapper(JsonFactory.builder()
+                    .streamReadConstraints(StreamReadConstraints.builder()
+                            .maxNumberLength(Integer.MAX_VALUE)
+                            .build())
+                    .enable(StreamReadFeature.USE_FAST_BIG_NUMBER_PARSER)
+                    .build())
             .enable(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS)
             .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
+
+    /** Refuses an over-long integer token before Jackson builds its {@code BigInteger}. */
+    private static final class IntegerDigitLimit extends JsonParserDelegate {
+        IntegerDigitLimit(JsonParser parser) {
+            super(parser);
+        }
+
+        @Override
+        public JsonToken nextToken() throws IOException {
+            JsonToken token = delegate.nextToken();
+            if (token == JsonToken.VALUE_NUMBER_INT) {
+                boolean negative = delegate.getTextCharacters()[delegate.getTextOffset()] == '-';
+                if (delegate.getTextLength() - (negative ? 1 : 0) > MAX_INT_LITERAL_DIGITS) {
+                    throw new JsonParseException(this, "integer literal exceeds 4300 digits");
+                }
+            }
+            return token;
+        }
+    }
 
     /** The node factory for building output trees. */
     public static JsonNodeFactory nodes() {
@@ -48,7 +86,7 @@ public final class Json {
      * assumes a parse either throws or returns a node (18.29 verifier round 1, F1).
      */
     public static JsonNode parse(String text) {
-        try (JsonParser parser = MAPPER.getFactory().createParser(text)) {
+        try (JsonParser parser = new IntegerDigitLimit(MAPPER.getFactory().createParser(text))) {
             JsonNode node = MAPPER.readTree(parser);
             if (node == null) {
                 throw new IllegalArgumentException("invalid JSON: no content");

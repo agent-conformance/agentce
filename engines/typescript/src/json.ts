@@ -29,6 +29,9 @@ export class NonCanonicalNumber {
 // A number token only needs the slow path when it has a fraction or exponent, or enough digits to
 // leave the safe-integer range; every other document parses identically with the native parser.
 const NEEDS_TOKEN_SCAN = /[0-9][.eE]|[0-9]{16}/;
+// Python's json.loads refuses an integer literal longer than sys.int_max_str_digits (CPython's default,
+// 4300 digits); so does this reader, so the engines agree on which documents parse at all.
+const MAX_INT_LITERAL_DIGITS = 4300;
 const NUMBER_TOKEN = /-?(?:0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?/y;
 
 class Reader {
@@ -94,6 +97,9 @@ class Reader {
     this.pos += token.length;
     if (match[1] !== undefined || match[2] !== undefined) {
       return new NonCanonicalNumber(token, "non_integer_number");
+    }
+    if (token.length - (token[0] === "-" ? 1 : 0) > MAX_INT_LITERAL_DIGITS) {
+      return this.fail("Integer literal exceeds 4300 digits");
     }
     const big = BigInt(token);
     if (big > MAX_SAFE || big < -MAX_SAFE) {

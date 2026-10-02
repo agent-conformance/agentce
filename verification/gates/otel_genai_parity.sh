@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Build gate helper for VG-OTEL-GENAI-PARITY (item 18.29): the otel-genai adapter's translation
 # layer (bytes -> canonical AgentCE events) is byte-identical across Python, TypeScript, and Java
-# over all 9 vendor fixtures (adapters/otel-genai/fixtures/) plus all 18 hostile vectors
-# (spec/model/test-vectors/otel-genai-hostile/) -- 27 vectors in total, each read fresh into a
+# over all 9 vendor fixtures (adapters/otel-genai/fixtures/) plus all 20 hostile vectors
+# (spec/model/test-vectors/otel-genai-hostile/) -- 29 vectors in total, each read fresh into a
 # temporary directory holding only its own input.json/adapt.json (tools/otel_genai_adapter_check.py's
 # `--self-test` proves the comparator itself discriminates the truncation/enum-filter fault class
 # before the real cross-engine run trusts it).
