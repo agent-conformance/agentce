@@ -63,8 +63,19 @@ def _no_ci_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """`assess --for`'s CI auto-detection (contracts/P18-18.7.md) reads the real `CI` environment
     variable; GitHub Actions sets `CI=true` for every job, which would otherwise make every
     no-`--emit` test in this suite pick up an extra `report.junit.xml` under real CI. The handful of
-    tests that exercise CI detection on purpose set `CI` themselves, after this fixture has run."""
+    tests that exercise CI detection on purpose set `CI` themselves, after this fixture has run.
+
+    `verify --report`'s step 9 (`commands/__init__.py`'s `_verify_report`) also reads the real
+    `GITHUB_STEP_SUMMARY` environment variable, which GitHub Actions sets for every job to a real
+    file path; left ambient, every test here except the one that sets it on purpose
+    (`test_verify_report_happy_path_reproduces`, 18.8.R1) would exercise only the "already set"
+    branch under CI and only the "unset" branch locally, so the branch-coverage gate
+    (`VG-REPORT-BRANCH-COVERAGE`) passed locally (`FAIL: _verify_report is not at 100% branch
+    coverage -- missing branches [[892, 895]]` reproduced it on CI, 18.8.R1). Unset here, like `CI`
+    above, so both branches are covered deterministically regardless of which environment runs the
+    suite."""
     monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
 
 
 @pytest.fixture
