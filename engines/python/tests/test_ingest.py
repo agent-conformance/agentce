@@ -270,3 +270,48 @@ def test_nesting_past_the_limit_refuses_and_brackets_in_strings_do_not_count(
     deep_text = b'"' + b"[" * (MAX_JSON_DEPTH + 1) + b'"\n'
     result = _ingest_bytes(make_bundle, deep_text)
     assert [q.detail for q in result.quarantined] == ["event is not a JSON object"]
+
+
+def test_manifest_class_empty_null_or_non_string_is_treated_as_undeclared(
+    tmp_path: Any,
+    clone: Callable[[dict[str, Any]], dict[str, Any]],
+    example_event: dict[str, Any],
+) -> None:
+    """A manifest entry naming a source is not the same as declaring its class (SPEC §6.4): an empty
+    string, `null`, or a non-string JSON value must be treated exactly like no `class` key at all, not
+    coerced or rejected -- a hostile or malformed manifest gets the same honest default as one that
+    simply forgot the field."""
+    import json
+
+    from conftest import sha256_hex, write_bundle
+
+    sources = [
+        f"urn:agentce:source:undeclared-{suffix}"
+        for suffix in ("empty", "null", "number")
+    ]
+    events = []
+    for index, source in enumerate(sources):
+        event = clone(example_event)
+        event["source"] = source
+        event["id"] = "a" * 63 + str(index)
+        events.append(event)
+
+    root = write_bundle(
+        tmp_path / "bundle", [json.dumps(e) for e in events], write_manifest=False
+    )
+    events_file = root / "events" / "stream.jsonl"
+    manifest = {
+        "agentce_bundle_version": 1,
+        "files": [{"path": "events/stream.jsonl", "sha256": sha256_hex(events_file)}],
+        "sources": [
+            {"id": sources[0], "class": ""},
+            {"id": sources[1], "class": None},
+            {"id": sources[2], "class": 42},
+        ],
+    }
+    (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    result = ingest(load_bundle(root))
+    assert len(result.accepted) == 3
+    assert result.quarantined == []
+    assert all(e["agentcesourceclass"] == "self_report" for e in result.accepted)
