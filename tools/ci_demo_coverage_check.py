@@ -32,10 +32,12 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import re
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import yaml
@@ -46,11 +48,23 @@ DEMO_JOB = "demo-fault"
 QUICK_JOB = "quick"
 SHARD_SCRIPT = "verification/shard.py"
 CANONICAL_RUN = 'python3 verification/shard.py "${{ strategy.job-index }}" "${{ strategy.job-total }}"'
-PARTITION_TOTALS = (
-    6,
-    7,
-)  # 6 matches the workflow's lane count; 7 catches an off-by-one that
-# only shows up once total doesn't divide the gate count evenly
+# Two arbitrary probe sizes for the generic, total-agnostic partition() function below --
+# correctness here does not depend on matching the workflow's real lane count: 7 just catches an
+# off-by-one that only shows up once a total doesn't divide the gate count evenly.
+PARTITION_TOTALS = (6, 7)
+
+
+def _load_shard_module(root: Path) -> ModuleType:
+    """Load the real, on-disk ``verification/shard.py`` as a module (rather than a subprocess),
+    so a seeded fault edited into its source is picked up on the next load with no extra
+    `verification/run --list` re-invocation per probed total."""
+    spec = importlib.util.spec_from_file_location(
+        "ci_demo_coverage_shard", root / SHARD_SCRIPT
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _demo_step(job: dict[str, Any]) -> dict[str, Any] | None:
@@ -124,14 +138,13 @@ def quick_wiring_problems(job: Any) -> list[str]:
     blob = " ".join(
         str(step.get("run", "")) for step in steps if isinstance(step, dict)
     )
-    if not re.search(r'needs\.build\.result.{0,20}["\']success["\']', blob):
-        problems.append(
-            f"no step in jobs.{QUICK_JOB} compares needs.build.result to success"
-        )
-    if not re.search(r'needs\.demo-fault\.result.{0,20}["\']success["\']', blob):
-        problems.append(
-            f"no step in jobs.{QUICK_JOB} compares needs.demo-fault.result to success"
-        )
+    for required in ("build", DEMO_JOB):
+        if not re.search(
+            rf'needs\.{re.escape(required)}\.result.{{0,20}}["\']success["\']', blob
+        ):
+            problems.append(
+                f"no step in jobs.{QUICK_JOB} compares needs.{required}.result to success"
+            )
     return problems
 
 
@@ -156,21 +169,14 @@ def _coverage_problems(
 def partition_problems(
     gates: list[str], total: int, root: Path = REPO_ROOT
 ) -> list[str]:
-    """Actually run ``shard.py --dry-run`` for every index of ``total`` and confirm the union,
-    against the real gate list, assigns every gate to exactly one shard -- catching a truncated or
-    off-by-one edit to ``partition()`` that a wiring check alone cannot see."""
+    """Actually call the real, on-disk ``shard.py``'s ``partition()`` for every index of ``total``
+    and confirm the union, against the real gate list, assigns every gate to exactly one shard --
+    catching a truncated or off-by-one edit to ``partition()`` that a wiring check alone cannot see."""
+    shard = _load_shard_module(root)
     assignments: dict[str, list[int]] = {}
     for index in range(total):
-        result = subprocess.run(
-            ["python3", str(root / SHARD_SCRIPT), "--dry-run", str(index), str(total)],
-            capture_output=True,
-            text=True,
-            check=True,
-            cwd=root,
-        )
-        for gate in result.stdout.splitlines():
-            if gate:
-                assignments.setdefault(gate, []).append(index)
+        for gate in shard.partition(gates, index, total):
+            assignments.setdefault(gate, []).append(index)
     return _coverage_problems(gates, assignments, total)
 
 
@@ -201,6 +207,12 @@ def check_workflow(
     for total in PARTITION_TOTALS:
         problems += partition_problems(gates, total, root)
     return problems
+
+
+def _misjudged(cases: list[tuple[str, Any, bool]], check: Any) -> list[str]:
+    """The names of every case where ``check(arg)`` disagrees with the ``should_pass`` it was
+    seeded with (a non-empty problem list means the comparator judged it bad)."""
+    return [name for name, arg, should_pass in cases if bool(check(arg)) == should_pass]
 
 
 def self_test() -> int:
@@ -251,11 +263,7 @@ def self_test() -> int:
         ),
         ("demo job with an if:", {**good_job, "if": "false"}, False),
     ]
-    failures = [
-        name
-        for name, job, should_pass in cases
-        if bool(wiring_problems(job)) == should_pass
-    ]
+    failures = _misjudged(cases, wiring_problems)
     quick_good = {
         "needs": ["build", "demo-fault"],
         "if": "always()",
@@ -283,11 +291,7 @@ def self_test() -> int:
             False,
         ),
     ]
-    failures += [
-        name
-        for name, job, should_pass in quick_cases
-        if bool(quick_wiring_problems(job)) == should_pass
-    ]
+    failures += _misjudged(quick_cases, quick_wiring_problems)
     gates = ["A", "B", "C", "D", "E", "F"]
     partition_cases: list[tuple[str, dict[str, list[int]], bool]] = [
         ("complete 6-way assignment", {g: [i] for i, g in enumerate(gates)}, True),
@@ -302,11 +306,10 @@ def self_test() -> int:
             False,
         ),
     ]
-    failures += [
-        name
-        for name, assignments, should_pass in partition_cases
-        if bool(_coverage_problems(gates, assignments, len(gates))) == should_pass
-    ]
+    failures += _misjudged(
+        partition_cases,
+        lambda assignments: _coverage_problems(gates, assignments, len(gates)),
+    )
     if failures:
         print(f"self-test FAIL: misjudged case(s): {failures}")
         return 1
