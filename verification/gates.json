@@ -919,6 +919,46 @@
         }
       ],
       "fix_hint": "run verification/gates/report_branch_coverage.sh and read which test failed, or read coverage.py's own missing_lines/missing_branches for _verify_report in the JSON report it writes; the function is engines/python/agentce/commands/__init__.py's _verify_report."
+    },
+    {
+      "id": "VG-DEMO-SHARD-COVERAGE",
+      "title": "The CI demo-fault job (18.74) is wired to strategy.job-index/strategy.job-total, not a value written into the matrix, so no edit can silently stop demoing some gates",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/ci_demo_coverage.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 60,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "tools/ci_demo_coverage_check.py's --self-test confirms its comparator discriminates correct job-index/job-total wiring from a matrix-value-keyed invocation and from continue-on-error swallowing a failure, then the real run confirms .github/workflows/verification.yml's demo-fault job's step invokes verification/shard.py with exactly strategy.job-index and strategy.job-total and sets continue-on-error nowhere",
+        "fail": "the self-test's comparator fails to discriminate either bad case, or the real run finds the demo-fault job's step not wired to strategy.job-index/strategy.job-total, or continue-on-error set on the job or the step"
+      },
+      "faults": [
+        {
+          "description": "the demo step is rewired to key off the matrix's own lane value instead of strategy.job-index, which stops being a complete partition the moment the matrix gains a second dimension or the lane list is edited without updating job-total by hand",
+          "file": ".github/workflows/verification.yml",
+          "search": "python3 verification/shard.py \"${{ strategy.job-index }}\" \"${{ strategy.job-total }}\"",
+          "replace": "python3 verification/shard.py \"${{ matrix.lane }}\" \"${{ strategy.job-total }}\""
+        },
+        {
+          "description": "shard.py's own partition line is truncated to only the first shard's worth of each run (an off-by-one/slice-style bug), so most gates past the first handful are silently never assigned to any shard and never demoed again",
+          "file": "verification/shard.py",
+          "search": "return [gate for position, gate in enumerate(gates) if position % total == index]",
+          "replace": "return [gate for position, gate in enumerate(gates) if position % total == index and position < total]"
+        },
+        {
+          "description": "the required quick check stops depending on demo-fault's result, so a failed, cancelled or skipped shard would no longer fail the one check branch protection requires",
+          "file": ".github/workflows/verification.yml",
+          "search": "needs: [build, demo-fault]",
+          "replace": "needs: [build]"
+        }
+      ],
+      "fix_hint": "run verification/gates/ci_demo_coverage.sh and read which wiring problem it found; the step is .github/workflows/verification.yml's jobs.demo-fault's 'This shard's seeded-fault demos' step, checked by tools/ci_demo_coverage_check.py."
     }
   ]
 }

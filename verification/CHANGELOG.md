@@ -3,6 +3,21 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.25.0
+
+- Added `VG-DEMO-SHARD-COVERAGE`: the CI `demo-fault` job (18.74) partitions every gate's seeded-fault
+  demo across a parallel matrix, each job running `verification/shard.py <job-index> <job-total>`
+  rather than naming gates in the workflow file, so the sequential
+  `for gate in $(./verification/run --list)` loop no longer has to run one gate at a time inside the
+  required `quick` check's own timeout. `strategy.job-index`/`strategy.job-total` are GitHub's own
+  contiguous numbering of every job the matrix actually creates, so the partition is complete by
+  construction; this gate guards the three remaining ways the split can still silently stop proving
+  something: the demo step rekeyed off a literal matrix value or an `if:`/`continue-on-error`; the
+  required `quick` job's own gating logic losing its dependency on `demo-fault`'s result (GitHub
+  treats a skipped required check as passing); and `shard.py`'s own partition line truncating or
+  duplicating a gate, which a wiring check alone cannot see -- checked by actually running
+  `shard.py --dry-run` against the real gate list. Three seeded faults, one per failure mode.
+
 ## 0.24.0
 
 - Added `VG-REPORT-BRANCH-COVERAGE`: `_verify_report`'s own reproduction steps
