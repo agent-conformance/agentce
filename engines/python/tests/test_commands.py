@@ -667,6 +667,128 @@ def test_package_for_sharing_catalog_dir_is_digested_and_copied(tmp_path: Path) 
     assert validate_report(out) == []
 
 
+# --- 18.30 C2: assess exits 2 for insufficient evidence on a severity: high control
+# (contracts/P18-18.30.md, SPEC.md:1076). ---
+
+
+def _aud_argv(out: Path, *extra: str) -> list[str]:
+    return [
+        "assess",
+        "--bundle",
+        str(_AUD_FIXTURE / "evidence"),
+        "--profile",
+        str(_AUD_FIXTURE / "applicability.yaml"),
+        "--domain",
+        str(_AUD_FIXTURE / "domain.linkml.yaml"),
+        "--catalog-dir",
+        str(_AUD_FIXTURE / "catalog"),
+        "--allow-unverified-catalog",
+        "--out",
+        str(out),
+        *extra,
+    ]
+
+
+def test_assess_exits_insufficient_evidence_on_a_severity_high_control(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """AUD-01 is severity: high and insufficient_evidence by fixture design: the run exits 2, and
+    the JSON envelope's ``exit_status`` names the code (``["insufficient_evidence"]``, no other code
+    applying here since this fixture's one control has no other failure mode)."""
+    out = tmp_path / "o"
+    code = cli.main([*_aud_argv(out), "--json"])
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 2
+    assert envelope["exit_code"] == 2
+    assert envelope["exit_status"] == ["insufficient_evidence"]
+
+
+def test_assess_exit_code_2_is_not_tripped_by_a_medium_severity_gap(
+    tmp_path: Path,
+) -> None:
+    """``corpus/quickstart`` has 19 ``insufficient_evidence`` assertions, all severity: medium, so it
+    must stay exit 0 -- the check is scoped to severity: high, not to the outcome alone."""
+    out = tmp_path / "o"
+    assert cli.main(_assess_argv(out)) == 0
+
+
+def test_assess_a_deviation_on_a_high_severity_insufficient_evidence_control_suppresses_exit_code_2(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A deviation can never apply to an ``insufficient_evidence`` outcome in the first place
+    (SPEC §13.3.4, ``readiness.deviation_lint``: "insufficient_evidence is an evidence gap, not a
+    risk acceptance"), so there is no way to use ``--deviations`` to suppress exit code 2 -- the
+    register naming AUD-01 is refused up front (exit 3, ``input.deviation_invalid``), before a
+    report is even written."""
+    import yaml
+
+    dev = tmp_path / "deviations.yaml"
+    dev.write_text(
+        yaml.safe_dump(
+            {
+                "deviations": [
+                    {
+                        "control": "AUD-01",
+                        "rationale": "test rationale",
+                        "compensating_control": "manual review",
+                        "owner": "user:owner@example.com",
+                        "approver": "user:approver@example.com",
+                        "granted": "2026-01-01T00:00:00.000Z",
+                        "expiry": "2026-06-01T00:00:00.000Z",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    out = tmp_path / "o"
+    code = cli.main([*_aud_argv(out, "--deviations", str(dev)), "--json"])
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "input.deviation_invalid"
+
+
+def test_assess_fail_on_does_not_suppress_exit_code_2(tmp_path: Path) -> None:
+    """``--fail-on`` narrows which assertions count toward exit code 1, but SPEC's exit-2 clause has
+    no such scoping: a ``--fail-on`` expression matching nothing still leaves exit 2 in force."""
+    out = tmp_path / "o"
+    code = cli.main(_aud_argv(out, "--fail-on", 'control=="DOES-NOT-MATCH-ANYTHING"'))
+    assert code == 2
+
+
+def test_assess_records_folder_scan_never_trips_exit_code_2(tmp_path: Path) -> None:
+    """A records-folder ``assess <folder>`` scan (``scanned is not None``) is excluded from the
+    exit-2 check even though its derived, incomplete profile routinely has severity-high
+    ``insufficient_evidence`` gaps by design (contracts/P18-18.30.md Dispositions)."""
+    import shutil
+
+    fixtures = _REPO_ROOT / "adapters" / "otel-genai" / "fixtures"
+    folder = tmp_path / "records"
+    folder.mkdir(parents=True, exist_ok=True)
+    shutil.copy(
+        fixtures / "otel-genai-agent-session" / "input.json", folder / "session.json"
+    )
+    shutil.copy(fixtures / "openinference-rag" / "input.json", folder / "rag.json")
+    document = json.loads(
+        (fixtures / "otel-genai-chat" / "input.json").read_text(encoding="utf-8")
+    )
+    (folder / "chat.jsonl").write_text(
+        json.dumps(document) + "\n\n" + json.dumps(document) + "\n", encoding="utf-8"
+    )
+    out = tmp_path / "o"
+    code = cli.main(["assess", str(folder), "--out", str(out), "--json"])
+    assertions = json.loads((out / "assertions.json").read_text())
+    high_insufficient = [
+        a
+        for a in assertions
+        if a["outcome"] == "insufficient_evidence" and a["severity"] == "high"
+    ]
+    assert (
+        high_insufficient
+    )  # the fixture does carry a severity-high gap (baseline@2026.09)
+    assert code != 2
+
+
 # --- 18.8 C2: `sign --write-trust-root` (contracts/P18-18.8.md). ---
 
 

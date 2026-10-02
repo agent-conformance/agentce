@@ -1541,6 +1541,11 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     result.note(
         f"assessed {len(evaluated)} (control, subject) pairs; {non_conformant} non-conformant"
     )
+    if high_insufficient:
+        result.note(
+            "insufficient evidence on severity-high control(s): "
+            + ", ".join(high_insufficient)
+        )
     return result
 
 
