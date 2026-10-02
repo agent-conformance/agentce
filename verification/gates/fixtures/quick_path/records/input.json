@@ -1,0 +1,108 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {"key": "service.name", "value": {"stringValue": "credit-underwriter"}}
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {"name": "opentelemetry.instrumentation.google_adk", "version": "1.2.0"},
+          "schemaUrl": "https://opentelemetry.io/schemas/1.36.0",
+          "spans": [
+            {
+              "traceId": "9f3e0000000000001111222233334455",
+              "spanId": "a1a1a1a1a1a1a1a1",
+              "name": "invoke_agent credit-underwriter",
+              "startTimeUnixNano": "1734200000000000000",
+              "endTimeUnixNano": "1734200010000000000",
+              "attributes": [
+                {"key": "gen_ai.operation.name", "value": {"stringValue": "invoke_agent"}},
+                {"key": "gen_ai.agent.id", "value": {"stringValue": "spiffe://corp/agents/credit-underwriter"}},
+                {"key": "gen_ai.agent.name", "value": {"stringValue": "credit-underwriter"}},
+                {"key": "gen_ai.conversation.id", "value": {"stringValue": "conv-9"}},
+                {"key": "deployment.environment.name", "value": {"stringValue": "production"}}
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "9f3e0000000000001111222233334455",
+              "spanId": "b2b2b2b2b2b2b2b2",
+              "parentSpanId": "a1a1a1a1a1a1a1a1",
+              "name": "execute_tool credit_bureau_lookup",
+              "startTimeUnixNano": "1734200001000000000",
+              "endTimeUnixNano": "1734200001500000000",
+              "attributes": [
+                {"key": "gen_ai.operation.name", "value": {"stringValue": "execute_tool"}},
+                {"key": "gen_ai.tool.name", "value": {"stringValue": "credit_bureau_lookup"}},
+                {"key": "gen_ai.tool.server", "value": {"stringValue": "mcp://bureau-gateway"}},
+                {"key": "gen_ai.tool.protocol", "value": {"stringValue": "mcp"}},
+                {"key": "gen_ai.tool.call.arguments", "value": {"stringValue": "[redacted-by-exporter]"}},
+                {"key": "gen_ai.tool.call.result", "value": {"stringValue": "[redacted-by-exporter]"}},
+                {"key": "gen_ai.conversation.id", "value": {"stringValue": "conv-9"}},
+                {"key": "gen_ai.agent.id", "value": {"stringValue": "spiffe://corp/agents/credit-underwriter"}},
+                {"key": "gen_ai.agent.name", "value": {"stringValue": "credit-underwriter"}}
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "9f3e0000000000001111222233334455",
+              "spanId": "c3c3c3c3c3c3c3c3",
+              "parentSpanId": "a1a1a1a1a1a1a1a1",
+              "name": "retrieve credit-policies",
+              "startTimeUnixNano": "1734200002000000000",
+              "endTimeUnixNano": "1734200002300000000",
+              "attributes": [
+                {"key": "gen_ai.operation.name", "value": {"stringValue": "retrieve"}},
+                {"key": "gen_ai.data_source.id", "value": {"stringValue": "kb://credit-policies"}},
+                {"key": "gen_ai.data_source.kind", "value": {"stringValue": "vector_store"}},
+                {"key": "gen_ai.retrieval.document.count", "value": {"intValue": "4"}},
+                {"key": "gen_ai.conversation.id", "value": {"stringValue": "conv-9"}},
+                {"key": "gen_ai.agent.id", "value": {"stringValue": "spiffe://corp/agents/credit-underwriter"}},
+                {"key": "gen_ai.agent.name", "value": {"stringValue": "credit-underwriter"}}
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "9f3e0000000000001111222233334455",
+              "spanId": "d4d4d4d4d4d4d4d4",
+              "parentSpanId": "a1a1a1a1a1a1a1a1",
+              "name": "memory.write episodic",
+              "startTimeUnixNano": "1734200003000000000",
+              "endTimeUnixNano": "1734200003100000000",
+              "attributes": [
+                {"key": "gen_ai.operation.name", "value": {"stringValue": "memory.write"}},
+                {"key": "gen_ai.memory.store", "value": {"stringValue": "episodic"}},
+                {"key": "gen_ai.memory.record.id", "value": {"stringValue": "rec-credit-9"}},
+                {"key": "gen_ai.memory.trust", "value": {"stringValue": "trusted"}},
+                {"key": "gen_ai.conversation.id", "value": {"stringValue": "conv-9"}},
+                {"key": "gen_ai.agent.id", "value": {"stringValue": "spiffe://corp/agents/credit-underwriter"}},
+                {"key": "gen_ai.agent.name", "value": {"stringValue": "credit-underwriter"}}
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "9f3e0000000000001111222233334455",
+              "spanId": "e5e5e5e5e5e5e5e5",
+              "parentSpanId": "a1a1a1a1a1a1a1a1",
+              "name": "memory.read episodic",
+              "startTimeUnixNano": "1734200004000000000",
+              "endTimeUnixNano": "1734200004100000000",
+              "attributes": [
+                {"key": "gen_ai.operation.name", "value": {"stringValue": "memory.read"}},
+                {"key": "gen_ai.memory.store", "value": {"stringValue": "episodic"}},
+                {"key": "gen_ai.memory.record.ids", "value": {"arrayValue": {"values": [{"stringValue": "rec-credit-9"}, {"stringValue": "rec-credit-4"}]}}},
+                {"key": "gen_ai.memory.trust_min", "value": {"stringValue": "untrusted"}},
+                {"key": "gen_ai.conversation.id", "value": {"stringValue": "conv-9"}},
+                {"key": "gen_ai.agent.id", "value": {"stringValue": "spiffe://corp/agents/credit-underwriter"}},
+                {"key": "gen_ai.agent.name", "value": {"stringValue": "credit-underwriter"}}
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

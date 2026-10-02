@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# Build gate helper for VG-QUICK-PATH: `agentce assess <folder>` (SPEC §12, §13.4 AX-1) reads a
+# folder of trace exports with no --bundle/--profile and proves three things a real scan must keep
+# true (18.32): the records-vs-bundle divergence (the same derived evidence judges
+# insufficient_evidence as a records run but not_applicable once reduced to a formal bundle+profile,
+# SPEC §8.7 -- a records run never claims a control out of scope for lack of evidence), the
+# checks_unlocked signal on a real scan through a tight gate-only catalog, and that the derived
+# profile's pilot_window keeps passing the skill's own lint (closing the loop with 18.32 C1).
+#
+# The fixture (verification/gates/fixtures/quick_path/) is one pinned copy of the otel-genai
+# adapter's own agent-session trace export (adapters/otel-genai/fixtures/otel-genai-agent-session/
+# input.json): it carries a self-reported ToolCall but no ModelCall at all, so the gate-only
+# QP-UNLOCK control (minimum_evidence: a self-reported ToolCall and a self-reported ModelCall) is
+# missing exactly one requirement -- insufficient_evidence with one blind spot, not the needed_by
+# case (VG-BLIND-SPOTS already covers two requirements missing at once).
+set -euo pipefail
+root="$(cd "$(dirname "$0")/../.." && pwd)"
+fixture="$root/verification/gates/fixtures/quick_path"
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
+run_py() {
+  (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "$@")
+}
+
+fail() {
+  echo "quick-path: $1" >&2
+  exit 1
+}
+
+# Step 1: a records-folder run against the default baseline catalog -- every assertion
+# insufficient_evidence, none not_applicable (the records side of the divergence; a records run has
+# no formal applicability declaration, so an empty population says the records show none, never
+# that the control is out of scope).
+set +e
+run_py assess "$fixture/records" --out "$work/step1" >"$work/step1.log" 2>&1
+code=$?
+set -e
+if [ "$code" -ne 0 ]; then
+  fail "step 1 (records/, default catalog) exited $code, expected 0: $(tail -n 5 "$work/step1.log")"
+fi
+step1_outcomes="$(python3 -c "
+import json
+data = json.load(open('$work/step1/assertions.json'))
+print(sorted({a['outcome'] for a in data}))
+")"
+if [ "$step1_outcomes" != "['insufficient_evidence']" ]; then
+  fail "step 1: expected every assertion insufficient_evidence (none not_applicable), got $step1_outcomes"
+fi
+
+# Step 2: the very same derived evidence, reduced to a formal --bundle/--profile assessment -- every
+# assertion flips to not_applicable and the run judges nothing (exit 3, input.nothing_evaluated):
+# the bundle side of the divergence this gate exists to prove.
+set +e
+run_py assess --bundle "$work/step1/records-bundle" --profile "$work/step1/applicability.yaml" \
+  --out "$work/step2" --json >"$work/step2.json" 2>"$work/step2.log"
+code=$?
+set -e
+if [ "$code" -ne 3 ]; then
+  fail "step 2 (--bundle/--profile on the same evidence) exited $code, expected 3: $(tail -n 5 "$work/step2.log")"
+fi
+step2_key="$(python3 -c "import json; print(json.load(open('$work/step2.json'))['error']['key'])")"
+if [ "$step2_key" != "input.nothing_evaluated" ]; then
+  fail "step 2: expected error key input.nothing_evaluated, got $step2_key"
+fi
+step2_outcomes="$(python3 -c "
+import json
+data = json.load(open('$work/step2/assertions.json'))
+print(sorted({a['outcome'] for a in data}))
+")"
+if [ "$step2_outcomes" != "['not_applicable']" ]; then
+  fail "step 2: expected every assertion not_applicable, got $step2_outcomes"
+fi
+
+# Step 3: the same records folder against the gate-only QP-UNLOCK catalog -- a self-reported
+# ToolCall but no ModelCall leaves exactly one requirement missing: one assertion
+# (QP-UNLOCK, insufficient_evidence) and one named blind spot naming QP-UNLOCK as unlocked,
+# checks_unlocked: 1.
+set +e
+run_py assess "$fixture/records" --catalog-dir "$fixture/catalog" --allow-unverified-catalog \
+  --out "$work/step3" >"$work/step3.log" 2>&1
+code=$?
+set -e
+if [ "$code" -ne 0 ]; then
+  fail "step 3 (QP-UNLOCK catalog) exited $code, expected 0: $(tail -n 5 "$work/step3.log")"
+fi
+if ! python3 - "$work/step3" <<'PY'
+import json
+import sys
+
+out = sys.argv[1]
+assertions = json.load(open(f"{out}/assertions.json", encoding="utf-8"))
+if [(a["control"], a["outcome"]) for a in assertions] != [("QP-UNLOCK", "insufficient_evidence")]:
+    print(f"assertions.json: {assertions}", file=sys.stderr)
+    sys.exit(1)
+
+spots = json.load(open(f"{out}/blind-spots.json", encoding="utf-8"))["blind_spots"]
+if len(spots) != 1:
+    print(f"blind-spots.json: expected exactly one blind spot, got {spots}", file=sys.stderr)
+    sys.exit(1)
+spot = spots[0]
+unlocked_controls = {c["control"] for c in spot["unlocked_checks"]}
+if (
+    spot["event"] != "ModelCall"
+    or spot["class"] != "self_report"
+    or spot["checks_unlocked"] != 1
+    or "QP-UNLOCK" not in unlocked_controls
+):
+    print(f"blind-spots.json: unexpected blind spot {spot}", file=sys.stderr)
+    sys.exit(1)
+PY
+then
+  fail "step 3: assertions.json/blind-spots.json did not match the gate's rubric"
+fi
+
+# Step 4: the step-1 derived profile still passes the skill's own lint despite its short,
+# exploratory window -- closing the loop with 18.32 C1 (pilot_window: true); the gate fails if C1's
+# fix regresses.
+lint_out="$(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen --quiet python \
+  "$root/skills/agentce-get-evidence/scripts/lint_profile.py" \
+  --profile "$work/step1/applicability.yaml" --json)"
+if ! echo "$lint_out" | python3 -c "import json, sys; sys.exit(0 if json.load(sys.stdin)['clean'] is True else 1)"; then
+  fail "step 4: the derived profile no longer passes the skill's lint: $lint_out"
+fi
+
+echo "quick-path: records-vs-bundle divergence, checks_unlocked, and the derived profile's lint are all OK"

@@ -3,6 +3,16 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.26.0
+
+- Added `VG-QUICK-PATH`: the records-folder quick path (`agentce assess <folder>`, 18.32) proves the
+  records-vs-bundle divergence on one pinned trace export -- the same derived evidence judges every
+  control insufficient_evidence as a records run but not_applicable once reduced to a formal
+  --bundle/--profile assessment, which then judges nothing (exit 3, `input.nothing_evaluated`) -- the
+  checks_unlocked signal on a real scan through a gate-only catalog (one control missing a
+  self-reported ModelCall), and that the derived profile's `pilot_window: true` keeps passing the
+  agentce-get-evidence skill's own lint despite its short, exploratory window.
+
 ## 0.25.0
 
 - Added `VG-DEMO-SHARD-COVERAGE`: the CI `demo-fault` job (18.74) partitions every gate's seeded-fault

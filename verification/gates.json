@@ -959,6 +959,40 @@
         }
       ],
       "fix_hint": "run verification/gates/ci_demo_coverage.sh and read which wiring problem it found; the step is .github/workflows/verification.yml's jobs.demo-fault's 'This shard's seeded-fault demos' step, checked by tools/ci_demo_coverage_check.py."
+    },
+    {
+      "id": "VG-QUICK-PATH",
+      "title": "The records-folder quick path (`agentce assess <folder>`, SPEC §12, §13.4 AX-1) proves the records-vs-bundle divergence, checks_unlocked on a real scan, and the derived profile's pilot_window still passing the skill's own lint",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/quick_path.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 300,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "a records-folder run against the default baseline catalog has every assertion insufficient_evidence and none not_applicable (exit 0); the very same derived evidence, reduced to a formal --bundle/--profile run, has every assertion not_applicable and judges nothing (exit 3, input.nothing_evaluated); the same records folder against the gate-only QP-UNLOCK catalog (one control requiring a self-reported ToolCall and ModelCall) has exactly one assertion (QP-UNLOCK, insufficient_evidence) and exactly one blind spot (event: ModelCall, class: self_report, checks_unlocked: 1, naming QP-UNLOCK in unlocked_checks); and the step-1 derived applicability.yaml passes the agentce-get-evidence skill's own lint_profile.py (clean: true) despite its short, exploratory window",
+        "fail": "any of the four assertions above does not hold: a wrong exit code, an assertion outcome other than the one named, a missing or wrong blind spot, or the derived profile failing the skill's lint"
+      },
+      "faults": [
+        {
+          "description": "the records-folder scan stops defaulting the derived profile's observation window to a pilot window, so the short window the fixture gives fails the skill's 90-day lint rule",
+          "file": "engines/python/agentce/records/__init__.py",
+          "search": "            \"pilot_window\": True,\n",
+          "replace": "            \"pilot_window\": False,\n"
+        },
+        {
+          "description": "every run is forced to the formal bundle's applicability declaration, so a records-folder run with no population for a control claims it out of scope (not_applicable) instead of reporting the evidence as insufficient -- which empties every baseline control's population for this fixture and makes the records run itself judge nothing",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "        applicability_declared=scanned is None,\n",
+          "replace": "        applicability_declared=True,\n"
+        }
+      ],
+      "fix_hint": "run verification/gates/quick_path.sh and read the FAIL line; the reference implementation is engines/python/agentce/records/__init__.py (ScannedRecords.profile) and engines/python/agentce/commands/__init__.py's cmd_assess (applicability_declared)."
     }
   ]
 }

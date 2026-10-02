@@ -1,0 +1,7 @@
+# A small, gate-only catalog for VG-QUICK-PATH: one control (QP-UNLOCK) that names both a ToolCall
+# and a ModelCall, self-reported, to prove the records-folder quick path's own checks_unlocked
+# signal on a real scan. Not a base or third-party catalog; loaded only via --catalog-dir
+# --allow-unverified-catalog by this gate's own script.
+id: quick-path-fixture
+version: "2026.09"
+title: "VG-QUICK-PATH gate fixture"

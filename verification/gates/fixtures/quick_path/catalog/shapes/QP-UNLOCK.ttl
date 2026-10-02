@@ -1,0 +1,7 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+
+# No sh:property and no agentce:targetWhere: every ToolCall node is in population and none fails,
+# so the outcome is governed entirely by minimum_evidence (the case under test), never by a breach.
+agentce:QP-UNLOCK-Shape a sh:NodeShape ;
+  sh:targetClass agentce:ToolCall .
