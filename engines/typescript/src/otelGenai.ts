@@ -6,7 +6,7 @@
  */
 
 import { NonCanonicalNumber, parseJson } from "./json";
-import { byteCompare } from "./util";
+import { byteCompare, decodeUtf8Strict } from "./util";
 
 export const BASE_CONTEXT = "https://agent-conformance.org/contexts/evidence/v1";
 
@@ -728,11 +728,11 @@ export function adapt(payload: Uint8Array, opts: AdaptOptions): AdaptResult {
   }
   let text: string;
   try {
-    // `ignoreBOM: true` stops the decoder from also silently eating a second leading BOM left
-    // behind by a doubled-BOM payload; that U+FEFF then reaches `parseJson` as ordinary text and
-    // fails the same way Python's `json.loads` rejects it ("Unexpected UTF-8 BOM") after
-    // `utf-8-sig` strips only the first one (18.29 verifier round 1, F2).
-    text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+    // `decodeUtf8Strict` keeps a leading BOM rather than stripping it, so a doubled-BOM payload's
+    // second BOM survives into `text` as a literal U+FEFF and fails `parseJson` the same way
+    // Python's `json.loads` rejects it ("Unexpected UTF-8 BOM") after `utf-8-sig` strips only the
+    // first one (18.29 verifier round 1, F2) -- the same decoder `readTextFileStrict` uses.
+    text = decodeUtf8Strict(bytes);
   } catch {
     throw new OtelGenaiAdapterError("invalid_encoding", "payload is not valid UTF-8");
   }
