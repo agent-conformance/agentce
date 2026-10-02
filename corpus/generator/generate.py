@@ -218,6 +218,29 @@ def _chain(events: list[dict[str, Any]], strength: str) -> None:
         prev_by_stream[stream] = digest
 
 
+def _manifest_sources(
+    events: list[dict[str, Any]], role_sources: dict[str, str]
+) -> list[dict[str, Any]]:
+    """Declare each source's real trust class in the manifest (SPEC §6.4): ingest defaults a source
+    with no declared class to ``self_report`` (18.31), so every source whose events genuinely earn a
+    stronger class must say so here, or the engine would downgrade it on every run. A source that is
+    itself ``self_report`` needs no entry; its events default to exactly the class they already
+    carry.
+    """
+    classes: dict[str, str] = {}
+    for event in events:
+        classes.setdefault(str(event["source"]), str(event["agentcesourceclass"]))
+    all_ids = sorted({str(e["source"]) for e in events} | set(role_sources.values()))
+    sources: list[dict[str, Any]] = []
+    for source_id in all_ids:
+        declared_class = classes.get(source_id, "self_report")
+        entry: dict[str, Any] = {"id": source_id}
+        if declared_class != "self_report":
+            entry["class"] = declared_class
+        sources.append(entry)
+    return sources
+
+
 def _ref(eid: str) -> str:
     return f"agentce:event/{eid}"
 
@@ -895,10 +918,7 @@ def _write_project(
     manifest = {
         "agentce_bundle_version": 1,
         "domain": domain.name,
-        "sources": [
-            {"id": s}
-            for s in sorted({str(e["source"]) for e in events} | set(sources.values()))
-        ],
+        "sources": _manifest_sources(events, sources),
         "files": sorted(files, key=lambda f: f["path"]),
     }
     (evidence / "manifest.json").write_text(
@@ -1093,7 +1113,7 @@ def _write_multi_agent(
     manifest = {
         "agentce_bundle_version": 1,
         "domain": domain.name,
-        "sources": [{"id": s} for s in sorted(set(sources.values()))],
+        "sources": _manifest_sources(events, sources),
         "files": sorted(files, key=lambda f: f["path"]),
     }
     (evidence / "manifest.json").write_text(

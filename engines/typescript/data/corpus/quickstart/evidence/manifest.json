@@ -25,10 +25,12 @@
   ],
   "sources": [
     {
-      "id": "urn:agentce:source:incident-register:corp"
+      "id": "urn:agentce:source:incident-register:corp",
+      "class": "independent_system"
     },
     {
-      "id": "urn:agentce:source:langgraph-gateway:eu-1"
+      "id": "urn:agentce:source:langgraph-gateway:eu-1",
+      "class": "enforcement_point"
     },
     {
       "id": "urn:agentce:source:langgraph-runtime-bulk:eu-1"
@@ -40,7 +42,8 @@
       "id": "urn:agentce:source:langgraph-session:eu-1"
     },
     {
-      "id": "urn:agentce:source:workload-idp:eu-1"
+      "id": "urn:agentce:source:workload-idp:eu-1",
+      "class": "enforcement_point"
     }
   ]
 }
