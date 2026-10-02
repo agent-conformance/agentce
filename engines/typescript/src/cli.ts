@@ -16,6 +16,7 @@ import { assessSubjects, evaluatedNothing } from "./assess";
 import { computeBlindSpots } from "./blindSpots";
 import { loadBundle } from "./bundle";
 import { catalogsDir as bundledCatalogsDir, quickstartDir } from "./bundled";
+import { CanonicalizationError, canonicalString } from "./canonical";
 import { type Catalog, loadCatalog } from "./catalog";
 import { runEcs } from "./conformance";
 import { computeCoverage } from "./coverage";
@@ -36,6 +37,7 @@ import { integrityResultToJson, verifyBundle } from "./integrity";
 import { DEFAULT_LANGUAGE, catalogue } from "./messages";
 import { evaluateInstalledNoMl, loadVendoredDenylist } from "./noMl";
 import { computeVectorFile } from "./numerics";
+import { OtelGenaiAdapterError, adapt as adaptOtelGenai } from "./otelGenai";
 import { type Profile, loadProfile } from "./profile";
 import { writeQuarantine } from "./quarantine";
 import { NOT_READY, computeReadiness, loadDeviationRegister, parseGapsFile } from "./readiness";
@@ -1444,6 +1446,66 @@ export function main(argv: string[]): number {
     const assertions = (data.assertions as unknown[]).map(assertionFromJson);
     console.log(JSON.stringify(computeSecurityView(activity, assertions)));
     return 0;
+  }
+
+  // otel-genai-fixture is a plain computation seam (the same pattern as `security-view` above),
+  // driven by the otel-genai adapter's cross-engine parity check (18.29, C3/C4): it reads
+  // `<dir>/input.json` and `<dir>/adapt.json` the same way the Python reference's fixtures module
+  // does, calls `adapt`, and for each emitted event (in the adapter's own pinned time/id order)
+  // attempts `canonicalString`; on success prints `EVENT <result>`. On a `CanonicalizationError`,
+  // nothing further goes to stdout -- `ERROR canonical:<reason>` goes to stderr and the process exits
+  // 1, so the check can tell "the adapter accepted this but the event cannot be serialised" apart
+  // from "the adapter refused the whole document" (an `OtelGenaiAdapterError`, printed the same way
+  // without the `canonical:` prefix). On a clean run, one final `REPORT <json>` line follows every
+  // `EVENT` line.
+  if (command === "otel-genai-fixture") {
+    const dir = argv[1];
+    if (dir === undefined) {
+      console.error("otel-genai-fixture: a directory path is required");
+      return ExitCode.INPUT_ERROR;
+    }
+    const inputBytes = readFileSync(join(dir, "input.json"));
+    const adaptArgs = JSON.parse(readFileSync(join(dir, "adapt.json"), "utf-8"));
+    try {
+      const result = adaptOtelGenai(inputBytes, {
+        subject: adaptArgs.subject,
+        sourceClass: adaptArgs.source_class,
+        source: adaptArgs.source,
+      });
+      for (const event of result.events) {
+        let line: string;
+        try {
+          line = canonicalString(event);
+        } catch (exc) {
+          if (exc instanceof CanonicalizationError) {
+            console.error(`ERROR canonical:${exc.reason}`);
+            return 1;
+          }
+          throw exc;
+        }
+        console.log(`EVENT ${line}`);
+      }
+      console.log(
+        `REPORT ${JSON.stringify({
+          adapter: result.report.adapter,
+          conventions: result.report.conventions,
+          spans_seen: result.report.spansSeen,
+          events_emitted: result.report.eventsEmitted,
+          skipped: result.report.skipped.map((s) => ({
+            name: s.name,
+            reason: s.reason,
+            span_id: s.spanId,
+          })),
+        })}`,
+      );
+      return 0;
+    } catch (exc) {
+      if (exc instanceof OtelGenaiAdapterError) {
+        console.error(`ERROR ${exc.reason}`);
+        return 1;
+      }
+      throw exc;
+    }
   }
 
   const json = argv.includes("--json");
