@@ -8,25 +8,35 @@ loop across a parallel ``demo-fault`` matrix job, where each job runs
 ``verification/shard.py <job-index> <job-total>`` -- GitHub's own contiguous 0..job-total-1 numbering
 of every job the matrix actually creates, so the partition is complete by construction regardless of
 matrix shape -- and a thin ``quick`` job (the required check) that fails unless both ``build`` and
-``demo-fault`` succeeded. Contract-critic review on this item found, and this check now covers, three
-independent ways that design can silently stop proving anything:
+``demo-fault`` succeeded. Three review rounds in a row each found a workflow edit that an earlier,
+blocklist-style version of this check (naming one bad edit at a time: ``continue-on-error``, a
+rewired ``run:`` line, ``needs``, ``exit 0``, ``|| true``, a stray ``if:``) did not reject -- a step
+``shell: "true {0}"`` override, for example, changes how ``run:`` text is interpreted and defeats
+every blocklist entry at once without tripping any of them. So this check instead asserts the good
+shape: a step may carry only ``name``/``run`` (``run:`` matched exactly), a job may carry only the
+keys it has today, no workflow- or job-level ``defaults.run.shell`` may exist, and ``quick``'s own
+``if:`` must be exactly ``always()`` (or the equivalent ``${{ always() }}``) -- not merely contain
+``always()`` as a substring of some larger, possibly-false expression. This covers four independent
+ways the design can silently stop proving anything:
 
 1. ``verification/shard.py``'s own partition line could be truncated or off-by-one (for example
    ``mine[:1]``), dropping gates no CI log would call out as missing. Checked by loading the real,
    on-disk ``shard.py`` in-process and calling its ``partition()`` for every index of two different
    totals, confirming the union, against the real ``verification/run --list``, assigns every gate to
    exactly one shard.
-2. The demo step's ``run:`` could stop being exactly ``verification/shard.py "$job-index" "$job-
-   total"`` (a trailing ``|| true``, an ``echo`` prefix, a job- or step-level ``if:`` that skips it
-   under some condition) and still contain the same substrings a looser regex would accept. Checked
-   by an exact (whitespace-stripped) match, and by rejecting any ``if:`` on the job or the step.
+2. The demo step could carry an unknown key (``continue-on-error``, ``if:``, ``shell:``) or its
+   ``run:`` could stop being exactly ``verification/shard.py "$job-index" "$job-total"``. Checked by
+   an allowlist of permitted step/job keys plus an exact (whitespace-stripped) match on ``run:``.
 3. The ``quick`` job's own gating logic could stop actually depending on ``demo-fault``'s result (for
    example ``needs: [build]``, ``exit 1`` changed to ``exit 0``, ``!=`` flipped to ``==``, a trailing
-   ``|| true``, or a stray ``if:``/``continue-on-error`` on the step), defeating the one property the
-   item asks for by name: a failed, cancelled or skipped shard must still fail the required check.
-   Checked by reading ``quick``'s ``needs``, its ``if: always()``, and by an exact (whitespace-
-   stripped) match on its step's ``run:`` against the canonical dependency-check text -- the same
-   exact-match style check 2 uses for the demo step, not a substring search.
+   ``|| true``, a stray ``if:``/``continue-on-error``/``shell:``, or an ``if:`` that merely mentions
+   ``always()`` without being exactly that), defeating the one property the item asks for by name: a
+   failed, cancelled or skipped shard must still fail the required check. Checked by the same
+   job/step key allowlist plus exact matches on ``needs``, ``if:``, and the step's ``run:``.
+4. A workflow- or job-level ``defaults.run.shell`` override could change how any step's ``run:`` text
+   is interpreted without changing the text itself, defeating checks 2 and 3 without tripping either
+   one. Checked by rejecting ``defaults.run.shell`` at the workflow root (job-level is already
+   subsumed by the key allowlists in checks 2 and 3, since ``defaults`` is not an allowed job key).
 
 Usage:
     ci_demo_coverage_check.py              # checks the real workflow and the real shard.py
