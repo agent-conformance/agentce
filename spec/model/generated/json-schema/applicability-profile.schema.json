@@ -9,6 +9,7 @@
   "properties": {
     "profile_version": {"type": "integer", "minimum": 1},
     "observation_window": {"$ref": "#/$defs/window"},
+    "pilot_window": {"type": "boolean", "description": "True when the observation window is an intentionally short pilot rather than a full window (SPEC 13.3.3 step 7, 13.3.4); recorded as a limitation rather than a failure."},
     "content_capture": {
       "type": "object",
       "additionalProperties": false,

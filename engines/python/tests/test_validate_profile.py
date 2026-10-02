@@ -54,6 +54,16 @@ def test_valid_profile_has_no_errors() -> None:
     assert vp.validate_profile(yaml.safe_load(_VALID_PROFILE)) == []
 
 
+def test_pilot_window_is_an_accepted_optional_field() -> None:
+    """A derived profile sets `pilot_window: true` (18.32 C1) when its observation window is a short
+    pilot rather than a full 90-day window (SPEC §13.3.3 step 7, §13.3.4); the schema must accept it."""
+    import yaml
+
+    profile = yaml.safe_load(_VALID_PROFILE)
+    profile["pilot_window"] = True
+    assert vp.validate_profile(profile) == []
+
+
 def test_missing_required_field_is_reported() -> None:
     import yaml
 

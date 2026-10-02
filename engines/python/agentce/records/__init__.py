@@ -75,7 +75,10 @@ class ScannedRecords:
         """The default applicability profile (SPEC §6.5): the subject, the observation window read
         from the events, the baseline lens, one self-reported evidence source per source URI, and
         the tools and models this scan actually saw -- declared up front so a fresh, unedited first
-        run shows nothing as undeclared (18.4); anything new a later run sees is the useful signal."""
+        run shows nothing as undeclared (18.4); anything new a later run sees is the useful signal.
+        Always sets ``pilot_window: true`` (SPEC §13.3.3 step 7, §13.3.4): a scan derives this
+        profile from whatever records it happens to find, so its observation window is exploratory
+        by construction and is never asserted as a full 90-day window."""
         times = [str(e["time"]) for e in self.events]
         # `summarize_activity` is the one place that extracts tool/model names from events
         # (agentce.activity); reuse it rather than re-deriving the same names here. Each subject's
@@ -109,6 +112,7 @@ class ScannedRecords:
         return {
             "profile_version": 1,
             "observation_window": {"start": min(times), "end": max(times)},
+            "pilot_window": True,
             "catalogs": [bundled.DEFAULT_LENS],
             "subjects": subjects,
         }

@@ -11,15 +11,21 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 from agentce import bundle, cli
 from agentce.tools.validate_profile import validate_profile
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
+_LINT_PROFILE = (
+    _REPO_ROOT / "skills" / "agentce-get-evidence" / "scripts" / "lint_profile.py"
+)
 _FIXTURES = _REPO_ROOT / "adapters" / "otel-genai" / "fixtures"
 _ADAPTER_SOURCE = (
     _REPO_ROOT
@@ -149,8 +155,6 @@ def test_records_alone_do_not_declare_what_the_agent_decides(
 def test_the_default_profile_is_schema_valid_and_names_the_baseline(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    import yaml
-
     out = tmp_path / "out"
     _run(["assess", str(_records(tmp_path / "records")), "--out", str(out)], capsys)
     profile = yaml.safe_load((out / "applicability.yaml").read_text(encoding="utf-8"))
@@ -163,6 +167,34 @@ def test_the_default_profile_is_schema_valid_and_names_the_baseline(
         "self_report"
     }
     assert validate_profile(profile) == []
+
+
+def test_the_derived_profile_passes_lint_and_doctor_despite_its_short_window(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A records-folder scan derives a short, exploratory window (the fixtures span minutes, not 90
+    days); ``pilot_window: true`` on the derived profile must make it pass every check an adopter
+    runs on it (18.32 C1): the skill's own lint, schema validation, and ``agentce doctor``."""
+    out = tmp_path / "out"
+    _run(["assess", str(_records(tmp_path / "records")), "--out", str(out)], capsys)
+    profile_path = out / "applicability.yaml"
+    profile = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
+
+    assert profile["pilot_window"] is True
+    assert validate_profile(profile) == []
+
+    lint = subprocess.run(
+        [sys.executable, str(_LINT_PROFILE), "--profile", str(profile_path), "--json"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert lint.returncode == 0, lint.stdout + lint.stderr
+    assert json.loads(lint.stdout)["clean"] is True
+
+    doctor_code, doctor_env = _run(["doctor", "--project", str(out)], capsys)
+    problem_keys = {p["key"] for p in doctor_env["problems"]}
+    assert "schema_invalid" not in problem_keys, doctor_env["problems"]
 
 
 def test_files_that_are_not_records_are_listed_with_a_reason(
