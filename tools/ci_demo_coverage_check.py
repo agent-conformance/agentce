@@ -141,7 +141,6 @@ def wiring_problems(job: Any) -> list[str]:
     if not isinstance(job, dict):
         return [f"jobs.{DEMO_JOB} is missing or not a mapping"]
     problems = _unknown_keys(job, DEMO_JOB_ALLOWED_KEYS, f"jobs.{DEMO_JOB}")
-    problems += _shell_override_problems(job, f"jobs.{DEMO_JOB}")
     step = _demo_step(job)
     if step is None:
         return problems + [f"no step in jobs.{DEMO_JOB} invokes {SHARD_SCRIPT}"]
@@ -179,7 +178,6 @@ def quick_wiring_problems(job: Any) -> list[str]:
     if not isinstance(job, dict):
         return [f"jobs.{QUICK_JOB} is missing or not a mapping"]
     problems = _unknown_keys(job, QUICK_JOB_ALLOWED_KEYS, f"jobs.{QUICK_JOB}")
-    problems += _shell_override_problems(job, f"jobs.{QUICK_JOB}")
     needs = job.get("needs")
     needed = set(needs) if isinstance(needs, list) else set()
     for required in ("build", DEMO_JOB):
@@ -269,6 +267,32 @@ def _misjudged(cases: list[tuple[str, Any, bool]], check: Any) -> list[str]:
     return [name for name, arg, should_pass in cases if bool(check(arg)) == should_pass]
 
 
+def _shape_violation_cases(
+    prefix: str, good_step: dict[str, Any], good_job: dict[str, Any]
+) -> list[tuple[str, Any, bool]]:
+    """The four allowlist-violating shapes (a step-level `shell:` override or unknown key, a
+    job-level `defaults.run.shell` or unknown key) that both the demo-fault and quick jobs must
+    reject identically -- shared so the two case lists can't silently drift apart."""
+    return [
+        (
+            f"{prefix} step with a shell: override",
+            {**good_job, "steps": [{**good_step, "shell": "true {0}"}]},
+            False,
+        ),
+        (
+            f"{prefix} step with an unknown key",
+            {**good_job, "steps": [{**good_step, "mystery": True}]},
+            False,
+        ),
+        (
+            f"{prefix} job with defaults.run.shell",
+            {**good_job, "defaults": {"run": {"shell": "true {0}"}}},
+            False,
+        ),
+        (f"{prefix} job with an unknown key", {**good_job, "mystery": True}, False),
+    ]
+
+
 def self_test() -> int:
     good_step = {"run": CANONICAL_RUN}
     good_job = {"steps": [good_step]}
@@ -316,26 +340,7 @@ def self_test() -> int:
             False,
         ),
         ("demo job with an if:", {**good_job, "if": "false"}, False),
-        (
-            "demo step with a shell: override",
-            {"steps": [{**good_step, "shell": "true {0}"}]},
-            False,
-        ),
-        (
-            "demo step with an unknown key",
-            {"steps": [{**good_step, "mystery": True}]},
-            False,
-        ),
-        (
-            "demo job with defaults.run.shell",
-            {**good_job, "defaults": {"run": {"shell": "true {0}"}}},
-            False,
-        ),
-        (
-            "demo job with an unknown key",
-            {**good_job, "mystery": True},
-            False,
-        ),
+        *_shape_violation_cases("demo", good_step, good_job),
     ]
     failures = _misjudged(cases, wiring_problems)
     quick_good_step: dict[str, Any] = {"run": CANONICAL_QUICK_RUN}
@@ -399,26 +404,7 @@ def self_test() -> int:
             {**quick_good, "steps": [{"run": CANONICAL_QUICK_RUN + " || true"}]},
             False,
         ),
-        (
-            "quick step with a shell: override",
-            {**quick_good, "steps": [{**quick_good_step, "shell": "true {0}"}]},
-            False,
-        ),
-        (
-            "quick step with an unknown key",
-            {**quick_good, "steps": [{**quick_good_step, "mystery": True}]},
-            False,
-        ),
-        (
-            "quick job with defaults.run.shell",
-            {**quick_good, "defaults": {"run": {"shell": "true {0}"}}},
-            False,
-        ),
-        (
-            "quick job with an unknown key",
-            {**quick_good, "mystery": True},
-            False,
-        ),
+        *_shape_violation_cases("quick", quick_good_step, quick_good),
     ]
     failures += _misjudged(quick_cases, quick_wiring_problems)
     workflow_cases: list[tuple[str, Any, bool]] = [
