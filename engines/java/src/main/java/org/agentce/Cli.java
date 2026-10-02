@@ -1598,36 +1598,24 @@ public final class Cli {
     }
 
     /**
-     * The {@code otel-genai-fixture} seam's {@code REPORT} line: compact JSON (no indentation, no
-     * backslash-u escaping of non-ASCII -- there is none in any committed vector), field order
-     * fixed to match TypeScript's {@code JSON.stringify} output byte for byte (18.29, C3).
+     * The {@code otel-genai-fixture} seam's {@code REPORT} line: compact JSON, field order fixed
+     * to match TypeScript's {@code JSON.stringify} output byte for byte (18.29, C3).
      */
     private static String otelGenaiReportLine(OtelGenai.AdapterReport report) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("{\"adapter\":").append(Json.quote(report.adapter()));
-        sb.append(",\"conventions\":[");
-        for (int i = 0; i < report.conventions().size(); i++) {
-            if (i > 0) {
-                sb.append(',');
-            }
-            sb.append(Json.quote(report.conventions().get(i)));
+        ObjectNode node = Json.nodes().objectNode();
+        node.put("adapter", report.adapter());
+        ArrayNode conventions = node.putArray("conventions");
+        report.conventions().forEach(conventions::add);
+        node.put("spans_seen", report.spansSeen());
+        node.put("events_emitted", report.eventsEmitted());
+        ArrayNode skipped = node.putArray("skipped");
+        for (OtelGenai.SkippedSpan s : report.skipped()) {
+            ObjectNode entry = skipped.addObject();
+            entry.put("name", s.name());
+            entry.put("reason", s.reason());
+            entry.put("span_id", s.spanId());
         }
-        sb.append("],\"spans_seen\":").append(report.spansSeen());
-        sb.append(",\"events_emitted\":").append(report.eventsEmitted());
-        sb.append(",\"skipped\":[");
-        List<OtelGenai.SkippedSpan> skipped = report.skipped();
-        for (int i = 0; i < skipped.size(); i++) {
-            if (i > 0) {
-                sb.append(',');
-            }
-            OtelGenai.SkippedSpan s = skipped.get(i);
-            sb.append("{\"name\":").append(Json.quote(s.name()));
-            sb.append(",\"reason\":").append(Json.quote(s.reason()));
-            sb.append(",\"span_id\":").append(Json.quote(s.spanId()));
-            sb.append('}');
-        }
-        sb.append("]}");
-        return sb.toString();
+        return Json.compact(node);
     }
 
     private static CommandResult notImplemented(String command) {

@@ -100,6 +100,17 @@ public final class Json {
         return out.toString();
     }
 
+    /** Compact JSON, no indentation, field order as inserted (never sorted) -- for a caller whose
+     * own field order is already the contract, such as a seam verb matching another engine's
+     * {@code JSON.stringify} output byte for byte. */
+    public static String compact(JsonNode value) {
+        try {
+            return MAPPER.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("cannot serialise JSON", e);
+        }
+    }
+
     private static void prettyValue(JsonNode value, int depth, StringBuilder out) {
         if (value == null || value.isNull()) {
             out.append("null");

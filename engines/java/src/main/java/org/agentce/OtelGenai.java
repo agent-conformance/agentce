@@ -5,10 +5,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
-import java.nio.charset.CodingErrorAction;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -62,6 +59,15 @@ public final class OtelGenai {
 
     /** The events an export produced, in canonical time order, and the run report. */
     public record AdaptResult(List<JsonNode> events, AdapterReport report) {}
+
+    /** {@link #envelope}, with a span's {@code subject}/{@code source}/{@code sourceClass} already
+     * bound -- {@code mapSpan}'s own branches vary only {@code eventType}/{@code eventId}/{@code
+     * time}/{@code payload}, matching the closure {@code makeEnvelope}/{@code envelope} in the
+     * TypeScript and Python ports. */
+    @FunctionalInterface
+    private interface EnvelopeMaker {
+        ObjectNode make(String eventType, String eventId, String time, ObjectNode payload);
+    }
 
     /** The decoded fields of one OTLP span the mapper needs. */
     private record Span(
@@ -646,49 +652,30 @@ public final class OtelGenai {
             return List.of();
         }
         String baseId = "otel:" + span.traceId() + "/" + span.spanId();
+        EnvelopeMaker makeEnvelope = (eventType, eventId, time, payload) ->
+                envelope(span, eventType, eventId, time, payload, subject, resolvedSource, sourceClass);
 
         if (MODEL_OPS.contains(operation)) {
             String modelOp = operation.equals("embeddings") ? "embeddings" : "chat";
-            return List.of(envelope(
-                    span, "ModelCall", baseId, spanTime, modelCall(span, modelOp), subject, resolvedSource, sourceClass));
+            return List.of(makeEnvelope.make("ModelCall", baseId, spanTime, modelCall(span, modelOp)));
         }
         if (operation.equals("execute_tool")) {
-            return List.of(
-                    envelope(span, "ToolCall", baseId, spanTime, toolCall(span), subject, resolvedSource, sourceClass));
+            return List.of(makeEnvelope.make("ToolCall", baseId, spanTime, toolCall(span)));
         }
         if (AGENT_OPS.contains(operation)) {
             String endTime = span.end() != null ? span.end() : spanTime;
             return List.of(
-                    envelope(
-                            span,
-                            "SessionStart",
-                            baseId + "#session-start",
-                            spanTime,
-                            sessionStart(span),
-                            subject,
-                            resolvedSource,
-                            sourceClass),
-                    envelope(
-                            span,
-                            "SessionEnd",
-                            baseId + "#session-end",
-                            endTime,
-                            sessionEnd(span),
-                            subject,
-                            resolvedSource,
-                            sourceClass));
+                    makeEnvelope.make("SessionStart", baseId + "#session-start", spanTime, sessionStart(span)),
+                    makeEnvelope.make("SessionEnd", baseId + "#session-end", endTime, sessionEnd(span)));
         }
         if (RETRIEVE_OPS.contains(operation)) {
-            return List.of(envelope(
-                    span, "ResourceAccess", baseId, spanTime, resourceAccess(span), subject, resolvedSource, sourceClass));
+            return List.of(makeEnvelope.make("ResourceAccess", baseId, spanTime, resourceAccess(span)));
         }
         if (operation.equals("memory.write")) {
-            return List.of(envelope(
-                    span, "MemoryWrite", baseId, spanTime, memoryWrite(span), subject, resolvedSource, sourceClass));
+            return List.of(makeEnvelope.make("MemoryWrite", baseId, spanTime, memoryWrite(span)));
         }
         if (operation.equals("memory.read")) {
-            return List.of(
-                    envelope(span, "MemoryRead", baseId, spanTime, memoryRead(span), subject, resolvedSource, sourceClass));
+            return List.of(makeEnvelope.make("MemoryRead", baseId, spanTime, memoryRead(span)));
         }
         return List.of();
     }
@@ -717,11 +704,7 @@ public final class OtelGenai {
         }
         String text;
         try {
-            var decoder = StandardCharsets.UTF_8
-                    .newDecoder()
-                    .onMalformedInput(CodingErrorAction.REPORT)
-                    .onUnmappableCharacter(CodingErrorAction.REPORT);
-            text = decoder.decode(ByteBuffer.wrap(bytes)).toString();
+            text = Verify.decodeStrict(bytes).toString();
         } catch (CharacterCodingException e) {
             throw new OtelGenaiAdapterError("invalid_encoding", "payload is not valid UTF-8");
         }

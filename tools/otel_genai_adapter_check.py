@@ -42,6 +42,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import shutil
 import subprocess
@@ -135,22 +136,21 @@ def python_fixture_lines(vector_dir: Path) -> tuple[list[str], list[str], int]:
 # --- TypeScript / Java: driven as built artifacts. ---------------------------------------------------
 
 
-def typescript_fixture(vector_dir: Path) -> tuple[str, str, int]:
+@functools.lru_cache(maxsize=1)
+def _typescript_entry() -> Path:
+    """The built TypeScript CLI entry point, resolved once -- every one of the 25 vectors drives
+    the same build, so there is exactly one entry point to find, not one lookup per vector."""
     entry = TS_ENGINE / "dist" / "cli.js"
     if not entry.is_file():
         raise SystemExit(
             f"typescript dist is not built: {entry} is missing (run `pnpm build` in engines/typescript first)"
         )
-    proc = subprocess.run(
-        ["node", str(entry), "otel-genai-fixture", str(vector_dir)],
-        capture_output=True,
-        text=True,
-        cwd=ROOT,
-    )
-    return proc.stdout, proc.stderr, proc.returncode
+    return entry
 
 
-def java_fixture(vector_dir: Path) -> tuple[str, str, int]:
+@functools.lru_cache(maxsize=1)
+def _java_jar() -> Path:
+    """The built Java runnable jar, resolved once -- same reasoning as `_typescript_entry`."""
     jars = sorted(
         (JAVA_ENGINE / "build" / "libs").glob("agentce-*-all.jar"),
         key=lambda p: p.stat().st_mtime,
@@ -159,8 +159,22 @@ def java_fixture(vector_dir: Path) -> tuple[str, str, int]:
         raise SystemExit(
             "java runnable jar is not built (run `./gradlew :assemble -q` in engines/java first)"
         )
+    return jars[-1]
+
+
+def typescript_fixture(vector_dir: Path) -> tuple[str, str, int]:
     proc = subprocess.run(
-        ["java", "-jar", str(jars[-1]), "otel-genai-fixture", str(vector_dir)],
+        ["node", str(_typescript_entry()), "otel-genai-fixture", str(vector_dir)],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+    )
+    return proc.stdout, proc.stderr, proc.returncode
+
+
+def java_fixture(vector_dir: Path) -> tuple[str, str, int]:
+    proc = subprocess.run(
+        ["java", "-jar", str(_java_jar()), "otel-genai-fixture", str(vector_dir)],
         capture_output=True,
         text=True,
         cwd=ROOT,
