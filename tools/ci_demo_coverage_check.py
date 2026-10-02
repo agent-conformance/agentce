@@ -81,6 +81,30 @@ def _demo_step(job: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def _step_wiring_problems(
+    step: dict[str, Any], label: str, canonical_run: str
+) -> list[str]:
+    """Shared by `wiring_problems` and `quick_wiring_problems`: a step's own continue-on-error,
+    `if:`, and exact (whitespace-stripped) run-text match against `canonical_run`, so a fix to one
+    job's step-level checks can't silently stay out of sync with the other's."""
+    problems: list[str] = []
+    if step.get("continue-on-error"):
+        problems.append(
+            f"the {label} step sets continue-on-error, so a failure would not fail the job"
+        )
+    if "if" in step:
+        problems.append(
+            f"the {label} step has an if: ({step['if']!r}), which could skip it"
+        )
+    run_text = str(step.get("run", "")).strip()
+    if run_text != canonical_run:
+        problems.append(
+            f"the {label} step's run: is not exactly the canonical invocation, so an edit could "
+            f"silently defeat it: {run_text!r}"
+        )
+    return problems
+
+
 def wiring_problems(job: Any) -> list[str]:
     """The demo-fault job's step must be exactly the canonical invocation, with no `if:` on the job
     or the step, and no continue-on-error swallowing a failure -- each independently defeats the
@@ -99,21 +123,7 @@ def wiring_problems(job: Any) -> list[str]:
     step = _demo_step(job)
     if step is None:
         return problems + [f"no step in jobs.{DEMO_JOB} invokes {SHARD_SCRIPT}"]
-    if step.get("continue-on-error"):
-        problems.append(
-            f"the {SHARD_SCRIPT} step sets continue-on-error, so a failed demo would not fail the job"
-        )
-    if "if" in step:
-        problems.append(
-            f"the {SHARD_SCRIPT} step has an if: ({step['if']!r}), which could skip it for some lanes"
-        )
-    run_text = str(step.get("run", "")).strip()
-    if run_text != CANONICAL_RUN:
-        problems.append(
-            f"the {SHARD_SCRIPT} step's run: is not exactly {CANONICAL_RUN!r}, so its partition is "
-            f"not guaranteed complete for whatever the matrix actually enumerates: {run_text!r}"
-        )
-    return problems
+    return problems + _step_wiring_problems(step, SHARD_SCRIPT, CANONICAL_RUN)
 
 
 _ALWAYS = re.compile(r"\balways\(\)")
@@ -168,22 +178,7 @@ def quick_wiring_problems(job: Any) -> list[str]:
         return problems + [
             f"no step in jobs.{QUICK_JOB} checks the dependencies' results"
         ]
-    if step.get("continue-on-error"):
-        problems.append(
-            f"the {QUICK_JOB} step sets continue-on-error, so its own exit would not fail the job"
-        )
-    if "if" in step:
-        problems.append(
-            f"the {QUICK_JOB} step has an if: ({step['if']!r}), which could skip its own check"
-        )
-    run_text = str(step.get("run", "")).strip()
-    if run_text != CANONICAL_QUICK_RUN:
-        problems.append(
-            f"jobs.{QUICK_JOB}'s step's run: is not exactly the canonical dependency check, so an "
-            f"edit (exit 0, != flipped to ==, a trailing || true) could silently stop it from "
-            f"exiting non-zero on failure: {run_text!r}"
-        )
-    return problems
+    return problems + _step_wiring_problems(step, QUICK_JOB, CANONICAL_QUICK_RUN)
 
 
 def _coverage_problems(
