@@ -19,8 +19,10 @@
 #           from buyer.json's answers ("maps to nothing in scope, not nothing").
 #   BUY-04: no crosswalk entry at all, conformant -- also absent from answers, by a different route.
 #
-# `agentce assess` returns ExitCode.OK (0) for this fixture: no non-conformant outcome and no
-# --fail-on (assess only adds FINDINGS for those), so the exit code is asserted explicitly.
+# `agentce assess` returns exit code 2 for this fixture: no non-conformant outcome and no --fail-on
+# (assess only adds FINDINGS for those), but BUY-02 is severity: high and insufficient_evidence, which
+# SPEC.md:1076 (item 18.30) requires to add INSUFFICIENT_EVIDENCE -- so the exit code is asserted
+# explicitly.
 #
 # The golden (buyer_view_golden.json) is always a capture of the Python engine's own canonicalized
 # `buyer.json`. Regenerate with: verification/gates/buyer_view.sh --write
@@ -40,8 +42,8 @@ run_assess() {
     --allow-unverified-catalog --for buyer --out "$out" >/dev/null 2>&1)
   local code=$?
   set -e
-  if [ "$code" -ne 0 ]; then
-    echo "buyer-view: assess exited $code, expected 0 (no non-conformant outcome in this fixture, no --fail-on)" >&2
+  if [ "$code" -ne 2 ]; then
+    echo "buyer-view: assess exited $code, expected 2 (BUY-02 is severity: high insufficient_evidence, SPEC.md:1076)" >&2
     return 1
   fi
   return 0
@@ -241,8 +243,8 @@ set +e
   --allow-unverified-catalog --for buyer --package-for-sharing --out "$pkg_out" >/dev/null 2>&1)
 pkg_code=$?
 set -e
-if [ "$pkg_code" -ne 0 ]; then
-  echo "buyer-view: packaged assess exited $pkg_code, expected 0" >&2
+if [ "$pkg_code" -ne 2 ]; then
+  echo "buyer-view: packaged assess exited $pkg_code, expected 2 (BUY-02 is severity: high insufficient_evidence, SPEC.md:1076)" >&2
   status=1
 elif [ -f "$pkg_out/buyer.md" ] && ! grep -q 'agentce verify --report' "$pkg_out/buyer.md"; then
   echo "buyer-view: packaged buyer.md missing the packaged how-to-check line (agentce verify --report ...)" >&2

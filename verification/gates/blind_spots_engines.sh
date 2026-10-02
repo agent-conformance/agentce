@@ -73,7 +73,12 @@ PY
 }
 
 if [ "${1:-}" = "--write" ]; then
+  # NEED-01 and NEED-02 (both severity: high) are insufficient_evidence by fixture design, so this
+  # exits 2 now (SPEC.md:1076, item 18.30) -- tolerated: this gate checks the written artifact, never
+  # the process exit code.
+  set +e
   (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_args[@]}" --out "$work/python" >/dev/null)
+  set -e
   if ! check_golden "$work/python/blind-spots.json"; then
     echo "blind-spots: the Python reference engine's own output did not honestly surface the fixture's needed_by case or its ranking; refusing to write a bad golden" >&2
     exit 1
@@ -88,10 +93,15 @@ if ! check_golden "$golden"; then
   exit 1
 fi
 
+# NEED-01 and NEED-02 (both severity: high) are insufficient_evidence by fixture design, so every
+# engine's run below now exits 2 (SPEC.md:1076, item 18.30) -- tolerated: this gate compares the
+# written artifact to the golden, never the process exit code.
+set +e
 (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_args[@]}" --out "$work/python" >/dev/null)
 (cd "$root/engines/typescript" && pnpm --silent agentce "${args[@]}" --out "$work/typescript" >/dev/null)
 (cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist \
   && ./build/install/agentce/bin/agentce "${args[@]}" --out "$work/java" >/dev/null)
+set -e
 
 status=0
 for engine in python typescript java; do

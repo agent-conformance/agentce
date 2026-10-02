@@ -618,7 +618,7 @@
       "timeout_s": 300,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
-        "pass": "a real `assess --for buyer` run writes buyer.json/.md/.html (never report.md/.html) matching the committed golden byte-for-byte, exit code 0; BUY-01 (caiq/IAM-13.1) answers conformant with its evidence ref present and HTML-escaped; BUY-02 (caiq, a hostile clause id) answers insufficient_evidence with the exact catalogue answer text, a non-null gap_step, and its hostile clause id HTML-escaped; BUY-03 (eu-ai-act only) and BUY-04 (no crosswalk) are both absent from answers; the ai-controls-matrix section shows the disclosed empty-framework text; the caiq section's heading names caiq/4.0.2 verbatim, next to it; buyer.json's counts equal a fresh aggregate() over the run's own assertions.json; `agentce report --validate` exits 0",
+        "pass": "a real `assess --for buyer` run writes buyer.json/.md/.html (never report.md/.html) matching the committed golden byte-for-byte, exit code 2 (BUY-02 is severity: high insufficient_evidence, SPEC.md:1076); BUY-01 (caiq/IAM-13.1) answers conformant with its evidence ref present and HTML-escaped; BUY-02 (caiq, a hostile clause id) answers insufficient_evidence with the exact catalogue answer text, a non-null gap_step, and its hostile clause id HTML-escaped; BUY-03 (eu-ai-act only) and BUY-04 (no crosswalk) are both absent from answers; the ai-controls-matrix section shows the disclosed empty-framework text; the caiq section's heading names caiq/4.0.2 verbatim, next to it; buyer.json's counts equal a fresh aggregate() over the run's own assertions.json; `agentce report --validate` exits 0",
         "fail": "any of the above fact, file, or golden-match check fails, a stray report.md/.html appears, a hostile fragment renders unescaped, or an out-of-scope control leaks into answers"
       },
       "faults": [
@@ -629,7 +629,7 @@
           "replace": "BUYER_FRAMEWORKS: tuple[str, ...] = (\"caiq\", \"ai-controls-matrix\", \"eu-ai-act\")\n"
         },
         {
-          "description": "the per-outcome report.buyer_answer_insufficient_evidence message key is deleted from the vendored catalogue, so rendering BUY-02's answer raises KeyError and the gate's own run_assess exits non-zero instead of the fixture's real exit code 0",
+          "description": "the per-outcome report.buyer_answer_insufficient_evidence message key is deleted from the vendored catalogue, so rendering BUY-02's answer raises KeyError and the gate's own run_assess exits non-zero instead of the fixture's real exit code 2",
           "file": "engines/python/agentce/data/i18n/messages.en.json",
           "search": "  \"report.buyer_answer_insufficient_evidence\": \"The records don't show enough evidence yet for {control} to answer this question.\",\n",
           "replace": ""

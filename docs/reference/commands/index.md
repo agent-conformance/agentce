@@ -23,4 +23,4 @@ One page per command (SPEC §8.5). Each is generated from the engine's own argum
 
 ## Exit codes
 
-Every command shares one scheme: `0` success with nothing needing action; `1` findings requiring action; `2` insufficient evidence on a high-severity control (`assess`); `3` an input, version, or signature-verification error. When several apply the highest is returned and the `--json` output carries them all.
+Every command shares one scheme: `0` success with nothing needing action; `1` findings requiring action; `2` insufficient evidence on a high-severity control (`assess --bundle`/`--profile` only, not a records-folder `assess <folder>` scan); `3` an input, version, or signature-verification error. When several apply the highest is returned and the `--json` output carries them all.

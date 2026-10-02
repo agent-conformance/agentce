@@ -133,7 +133,9 @@ PROJECT_VIEW_FIXTURE = ROOT / "verification" / "gates" / "fixtures" / "project_v
 
 
 def _assess(out: Path, args: list[str]) -> Path:
-    """Python's own `agentce assess ARGS --out OUT` (exit 1 = FINDINGS, still a complete report)."""
+    """Python's own `agentce assess ARGS --out OUT` (exit 1 = FINDINGS, exit 2 =
+    INSUFFICIENT_EVIDENCE on a severity:high control, SPEC.md:1076 -- both still a complete
+    report; `build_view_bases`'s project-view fixture has exactly this shape)."""
     proc = subprocess.run(
         ["uv", "run", "--frozen", "--project", str(PY_ENGINE), "agentce", "assess"]
         + args
@@ -142,7 +144,7 @@ def _assess(out: Path, args: list[str]) -> Path:
         capture_output=True,
         text=True,
     )
-    if proc.returncode not in (0, 1):
+    if proc.returncode not in (0, 1, 2):
         raise SystemExit(
             f"building the base report {out.name} failed (exit {proc.returncode}):\n{proc.stdout}\n{proc.stderr}"
         )

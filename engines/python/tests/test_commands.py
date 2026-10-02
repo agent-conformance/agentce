@@ -651,7 +651,9 @@ def test_package_for_sharing_catalog_dir_is_digested_and_copied(tmp_path: Path) 
         str(out),
         "--package-for-sharing",
     ]
-    assert cli.main(argv) == 0
+    # AUD-01 is severity: high and insufficient_evidence by fixture design, so this exits 2
+    # (SPEC.md:1076, item 18.30), not 0.
+    assert cli.main(argv) == 2
     packaging = json.loads((out / "packaging.json").read_text())
     assert len(packaging["catalog_dir_order"]) == 1
     label = packaging["catalog_dir_order"][0]

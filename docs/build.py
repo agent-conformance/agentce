@@ -178,7 +178,8 @@ def _command_pages() -> dict[Path, str]:
         f"{rows}\n\n"
         "## Exit codes\n\n"
         "Every command shares one scheme: `0` success with nothing needing action; `1` findings "
-        "requiring action; `2` insufficient evidence on a high-severity control (`assess`); `3` an "
+        "requiring action; `2` insufficient evidence on a high-severity control (`assess "
+        "--bundle`/`--profile` only, not a records-folder `assess <folder>` scan); `3` an "
         "input, version, or signature-verification error. When several apply the highest is "
         "returned and the `--json` output carries them all.\n"
     )
@@ -767,7 +768,8 @@ def _site_command_pages() -> dict[Path, str]:
         f"{rows}\n\n"
         "## Exit codes\n\n"
         "Every command shares one scheme: `0` success with nothing needing action; `1` findings "
-        "requiring action; `2` insufficient evidence on a high-severity control (`assess`); `3` an "
+        "requiring action; `2` insufficient evidence on a high-severity control (`assess "
+        "--bundle`/`--profile` only, not a records-folder `assess <folder>` scan); `3` an "
         "input, version, or signature-verification error. When several apply the highest is "
         "returned and the `--json` output carries them all.\n"
     )

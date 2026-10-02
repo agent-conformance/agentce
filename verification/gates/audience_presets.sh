@@ -42,10 +42,15 @@ run_assess() {
   if [ "$ci" != "unset" ]; then
     env_args+=("CI=$ci")
   fi
+  # AUD-01 (severity: high) is insufficient_evidence in every preset's run by fixture design (the
+  # comment above), so every call here now exits 2 (SPEC.md:1076, item 18.30) -- tolerated here since
+  # this gate checks the written file set, never the process exit code.
+  set +e
   (cd "$root/engines/python" && env "${env_args[@]}" uv run --frozen agentce assess \
     --bundle "$fixture/evidence" --profile "$fixture/applicability.yaml" \
     --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" \
     --allow-unverified-catalog --out "$work/$out" "$@" >/dev/null)
+  set -e
 }
 
 run_validate() {

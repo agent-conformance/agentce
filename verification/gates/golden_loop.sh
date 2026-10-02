@@ -34,10 +34,15 @@ trap 'rm -rf "$work"' EXIT
 
 run_assess() {
   local bundle="$1" out="$2"
+  # before/ LOOP-01 (severity: high) is insufficient_evidence by fixture design, so that call now
+  # exits 2 (SPEC.md:1076, item 18.30) -- tolerated here since this gate checks the written output,
+  # never the process exit code.
+  set +e
   (cd "$root/engines/python" && env -u VIRTUAL_ENV PYTHONDONTWRITEBYTECODE=1 uv run --frozen agentce assess \
     --bundle "$bundle" --profile "$fixture/applicability.yaml" \
     --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" \
     --allow-unverified-catalog --out "$out" >/dev/null)
+  set -e
 }
 
 run_diff() {

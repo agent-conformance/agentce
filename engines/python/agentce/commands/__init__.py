@@ -1504,6 +1504,26 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             result.add_code(int(ExitCode.FINDINGS))
     elif non_conformant:
         result.add_code(int(ExitCode.FINDINGS))
+    high_insufficient: list[str] = []
+    if scanned is None:
+        # SPEC §8.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any
+        # records-folder discovery scan (contracts/P18-18.30.md Dispositions; item 18.72 is the
+        # follow-up that decides whether records-mode gets its own signal). This excludes a records
+        # run with a declared --profile too, not only the derived-profile case: RECORDS_LIMITATION is
+        # appended unconditionally whenever `scanned is not None` (above), since even a declared
+        # profile over discovered records does not carry the formal bundle's manifest-backed
+        # applicability declaration (`applicability_declared=False`) -- so every records-folder run's
+        # near-universal severity-high evidence gaps on a first scan are not the same signal a formal
+        # assessment's gap is.
+        high_insufficient = sorted(
+            {
+                a.control
+                for a in evaluated
+                if a.outcome == "insufficient_evidence" and a.severity == "high"
+            }
+        )
+    if high_insufficient:
+        result.add_code(int(ExitCode.INSUFFICIENT_EVIDENCE))
     if evaluated_nothing(evaluated):
         raise _nothing_evaluated(profile_obj, ingested.accepted, len(evaluated))
     catalogue = messages.catalogue(_opt_str(ns, "report_language") or "en")
