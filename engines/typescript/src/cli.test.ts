@@ -128,6 +128,60 @@ test("assess on the vendored quickstart bundle matches quickstart's own output",
   }
 });
 
+/** `verification/gates/fixtures/<name>`: one control (AUD-01, severity: high) the fixture's evidence
+ * bundle never satisfies, shared with the Python engine's own 18.30 tests and the VG-AUDIENCE-PRESETS
+ * gate (not vendored under `data/`, since it is a cross-engine test fixture, not shipped product data). */
+function gateFixtureDir(name: string): string {
+  return join(__dirname, "..", "..", "..", "verification", "gates", "fixtures", name);
+}
+
+test("assess exits 2 (insufficient_evidence) on a severity: high control (SPEC.md:1076, 18.30)", () => {
+  const out = mkdtempSync(join(tmpdir(), "agentce-cli-exit2-"));
+  try {
+    const fixture = gateFixtureDir("audience_presets");
+    const { exitCode, envelope } = runJson([
+      "assess",
+      "--bundle",
+      join(fixture, "evidence"),
+      "--profile",
+      join(fixture, "applicability.yaml"),
+      "--domain",
+      join(fixture, "domain.linkml.yaml"),
+      "--catalog-dir",
+      join(fixture, "catalog"),
+      "--allow-unverified-catalog",
+      "--out",
+      out,
+    ]);
+    assert.equal(exitCode, 2);
+    assert.equal(envelope.exit_code, 2);
+    assert.deepEqual(envelope.exit_status, ["insufficient_evidence"]);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("assess exit code 2 is not tripped by a medium-severity insufficient_evidence gap", () => {
+  const out = mkdtempSync(join(tmpdir(), "agentce-cli-exit2-medium-"));
+  try {
+    const quickstart = quickstartDir();
+    const { exitCode } = runJson([
+      "assess",
+      "--bundle",
+      join(quickstart, "evidence"),
+      "--profile",
+      join(quickstart, "applicability.yaml"),
+      "--domain",
+      join(quickstart, "domain.linkml.yaml"),
+      "--out",
+      out,
+    ]);
+    assert.notEqual(exitCode, 2);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
 /** The quickstart profile with its `catalogs:` list removed, written into `dir`. */
 function profileWithoutCatalogs(dir: string): string {
   const kept: string[] = [];

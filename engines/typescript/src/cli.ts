@@ -625,6 +625,19 @@ function runAssess(options: AssessOptions): CommandResult {
   if (nonConformant > 0) {
     result.addCode(ExitCode.FINDINGS);
   }
+  // SPEC.md:1076 (SPEC Sec.8.5): exit 2 whenever any assertion is both insufficient_evidence and
+  // severity: high. TypeScript's assess has no records-folder entrypoint (Python-only, 18.30
+  // Dispositions), so this check applies unconditionally, unlike Python's `scanned is None` scoping.
+  const highInsufficient = Array.from(
+    new Set(
+      evaluated
+        .filter((a) => a.outcome === "insufficient_evidence" && a.severity === "high")
+        .map((a) => a.control),
+    ),
+  ).sort();
+  if (highInsufficient.length > 0) {
+    result.addCode(ExitCode.INSUFFICIENT_EVIDENCE);
+  }
   if (evaluatedNothing(evaluated)) {
     throw nothingEvaluated(profileObj, ingested.accepted, evaluated.length);
   }
@@ -638,6 +651,11 @@ function runAssess(options: AssessOptions): CommandResult {
   result.note(
     `assessed ${evaluated.length} (control, subject) pairs; ${nonConformant} non-conformant`,
   );
+  if (highInsufficient.length > 0) {
+    result.note(
+      `insufficient evidence on severity-high control(s): ${highInsufficient.join(", ")}`,
+    );
+  }
   return result;
 }
 

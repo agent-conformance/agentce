@@ -79,6 +79,25 @@ class CliTest {
     }
 
     @Test
+    void assessExitsTwoOnASeverityHighInsufficientEvidenceControl(@TempDir Path out) {
+        // verification/gates/fixtures/audience_presets: one control (AUD-01, severity: high) the
+        // fixture's evidence bundle never satisfies -- shared with the Python engine's own 18.30 tests
+        // and the VG-AUDIENCE-PRESETS gate (SPEC.md:1076, SPEC Sec.8.5).
+        Path fixture = REPO.resolve("verification/gates/fixtures/audience_presets");
+        JsonNode env = runJson(
+                "assess",
+                "--bundle", fixture.resolve("evidence").toString(),
+                "--profile", fixture.resolve("applicability.yaml").toString(),
+                "--domain", fixture.resolve("domain.linkml.yaml").toString(),
+                "--catalog-dir", fixture.resolve("catalog").toString(),
+                "--out", out.toString());
+        assertEquals(2, env.get("exit_code").asInt());
+        ArrayNode exitStatus = (ArrayNode) env.get("exit_status");
+        assertEquals(1, exitStatus.size());
+        assertEquals("insufficient_evidence", exitStatus.get(0).asText());
+    }
+
+    @Test
     void quickstartAssessesTheBundledProjectOffline(@TempDir Path out) {
         JsonNode env = runJson("quickstart", "--out", out.toString());
         assertEquals(0, env.get("exit_code").asInt());

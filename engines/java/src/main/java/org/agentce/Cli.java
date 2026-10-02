@@ -803,6 +803,19 @@ public final class Cli {
         if (nonConformant > 0) {
             result.addCode(ExitCode.FINDINGS.code);
         }
+        // SPEC.md:1076 (SPEC Sec.8.5): exit 2 whenever any assertion is both insufficient_evidence and
+        // severity: high. Java's assess has no records-folder entrypoint (Python-only, 18.30
+        // Dispositions), so this check applies unconditionally, unlike Python's `scanned is None`
+        // scoping.
+        java.util.TreeSet<String> highInsufficient = new java.util.TreeSet<>();
+        for (Assertions.Assertion a : evaluated) {
+            if ("insufficient_evidence".equals(a.outcome) && "high".equals(a.severity)) {
+                highInsufficient.add(a.control);
+            }
+        }
+        if (!highInsufficient.isEmpty()) {
+            result.addCode(ExitCode.INSUFFICIENT_EVIDENCE.code);
+        }
         if (evaluatedNothing(evaluated)) {
             throw nothingEvaluated(profileObj, ingested.accepted, evaluated.size());
         }
@@ -814,6 +827,9 @@ public final class Cli {
         }
         result.note("verdict: " + summary.verdict());
         result.note("assessed " + evaluated.size() + " (control, subject) pairs; " + nonConformant + " non-conformant");
+        if (!highInsufficient.isEmpty()) {
+            result.note("insufficient evidence on severity-high control(s): " + String.join(", ", highInsufficient));
+        }
         return result;
     }
 
