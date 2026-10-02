@@ -37,7 +37,6 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -147,7 +146,7 @@ def wiring_problems(job: Any) -> list[str]:
     return problems + _step_wiring_problems(step, SHARD_SCRIPT, CANONICAL_RUN)
 
 
-_ALWAYS = re.compile(r"\balways\(\)")
+CANONICAL_QUICK_IF_VALUES = {"always()", "${{ always() }}"}
 CANONICAL_QUICK_RUN = (
     'if [ "${{ needs.build.result }}" != "success" ] || '
     '[ "${{ needs.demo-fault.result }}" != "success" ]; then\n'
@@ -171,9 +170,13 @@ def quick_wiring_problems(job: Any) -> list[str]:
     """`quick` is the required check; GitHub treats a *skipped* required check as passing, so
     `quick` must be a real job whose own logic fails unless both dependencies truly succeeded.
     `quick` may carry only an allowed key (so `continue-on-error` or `defaults.run.shell` are
-    rejected by construction), its `needs`/`if: always()` values are read directly, and its step's
-    `run:` must exactly (whitespace-stripped) match the canonical dependency-check text -- the same
-    exact-match style `wiring_problems` already uses for the demo step, not a substring search that
+    rejected by construction); its `needs` must name both dependencies; its `if:` must exactly
+    (whitespace-stripped) equal `always()` (a substring search would still match a condition that
+    merely mentions `always()` without being exactly that, for example `always() &&
+    github.event_name == 'push'`, which can still evaluate false and skip the job -- the same class
+    of gap this whole redesign exists to close); and its step's `run:` must exactly (whitespace-
+    stripped) match the canonical dependency-check text -- the same exact-match style
+    `wiring_problems` already uses for the demo step, not a substring search that
     `exit 1` -> `exit 0`, `!=` -> `==`, or a trailing `|| true` could still slip past."""
     if not isinstance(job, dict):
         return [f"jobs.{QUICK_JOB} is missing or not a mapping"]
@@ -185,10 +188,12 @@ def quick_wiring_problems(job: Any) -> list[str]:
             problems.append(
                 f"jobs.{QUICK_JOB}.needs does not include {required!r}: {needs!r}"
             )
-    if not _ALWAYS.search(str(job.get("if", ""))):
+    if str(job.get("if", "")).strip() not in CANONICAL_QUICK_IF_VALUES:
         problems.append(
-            f"jobs.{QUICK_JOB} has no if: always() (got {job.get('if')!r}), so it could be skipped "
-            "entirely if an earlier job failed -- and GitHub treats a skipped required check as passing"
+            f"jobs.{QUICK_JOB}'s if: is not exactly always() (got {job.get('if')!r}), so a condition "
+            "that merely mentions always() without being exactly that -- for example "
+            "'always() && github.event_name == \\'push\\'' -- could still evaluate false and skip "
+            "this job entirely, and GitHub treats a skipped required check as passing"
         )
     step = _quick_step(job)
     if step is None:
@@ -353,6 +358,21 @@ def self_test() -> int:
         ("correctly wired quick job", quick_good, True),
         ("quick needs only build", {**quick_good, "needs": ["build"]}, False),
         ("quick with no if: always()", {**quick_good, "if": "success()"}, False),
+        (
+            "quick if: mentions always() but is not exactly that (verifier round 2)",
+            {**quick_good, "if": "always() && github.event_name == 'push'"},
+            False,
+        ),
+        (
+            "quick if: negates always() (verifier round 2)",
+            {**quick_good, "if": "${{ !always() }}"},
+            False,
+        ),
+        (
+            "quick if: the ${{ }}-wrapped canonical form",
+            {**quick_good, "if": "${{ always() }}"},
+            True,
+        ),
         (
             "quick step checking only needs.build.result",
             {
