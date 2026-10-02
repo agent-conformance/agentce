@@ -74,11 +74,15 @@ PY
 
 if [ "${1:-}" = "--write" ]; then
   # NEED-01 and NEED-02 (both severity: high) are insufficient_evidence by fixture design, so this
-  # exits 2 now (SPEC.md:1076, item 18.30) -- tolerated: this gate checks the written artifact, never
-  # the process exit code.
+  # exits 2 (SPEC.md:1076, item 18.30).
   set +e
   (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_args[@]}" --out "$work/python" >/dev/null)
+  code=$?
   set -e
+  if [ "$code" -ne 2 ]; then
+    echo "blind-spots: python assess (--write) exited $code, expected 2 (NEED-01/NEED-02 severity: high insufficient_evidence, SPEC.md:1076)" >&2
+    exit 1
+  fi
   if ! check_golden "$work/python/blind-spots.json"; then
     echo "blind-spots: the Python reference engine's own output did not honestly surface the fixture's needed_by case or its ranking; refusing to write a bad golden" >&2
     exit 1
@@ -94,14 +98,36 @@ if ! check_golden "$golden"; then
 fi
 
 # NEED-01 and NEED-02 (both severity: high) are insufficient_evidence by fixture design, so every
-# engine's run below now exits 2 (SPEC.md:1076, item 18.30) -- tolerated: this gate compares the
-# written artifact to the golden, never the process exit code.
+# engine's assess run below exits 2 (SPEC.md:1076, item 18.30). The Java build itself stays under
+# set -euo pipefail: a build failure is a real crash, not an exit-code question.
+(cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist)
+
 set +e
 (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_args[@]}" --out "$work/python" >/dev/null)
-(cd "$root/engines/typescript" && pnpm --silent agentce "${args[@]}" --out "$work/typescript" >/dev/null)
-(cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist \
-  && ./build/install/agentce/bin/agentce "${args[@]}" --out "$work/java" >/dev/null)
+py_code=$?
 set -e
+if [ "$py_code" -ne 2 ]; then
+  echo "blind-spots: python assess exited $py_code, expected 2 (NEED-01/NEED-02 severity: high insufficient_evidence, SPEC.md:1076)" >&2
+  exit 1
+fi
+
+set +e
+(cd "$root/engines/typescript" && pnpm --silent agentce "${args[@]}" --out "$work/typescript" >/dev/null)
+ts_code=$?
+set -e
+if [ "$ts_code" -ne 2 ]; then
+  echo "blind-spots: typescript assess exited $ts_code, expected 2 (NEED-01/NEED-02 severity: high insufficient_evidence, SPEC.md:1076)" >&2
+  exit 1
+fi
+
+set +e
+(cd "$root/engines/java" && ./build/install/agentce/bin/agentce "${args[@]}" --out "$work/java" >/dev/null)
+java_code=$?
+set -e
+if [ "$java_code" -ne 2 ]; then
+  echo "blind-spots: java assess exited $java_code, expected 2 (NEED-01/NEED-02 severity: high insufficient_evidence, SPEC.md:1076)" >&2
+  exit 1
+fi
 
 status=0
 for engine in python typescript java; do

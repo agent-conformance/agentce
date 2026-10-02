@@ -43,14 +43,18 @@ run_assess() {
     env_args+=("CI=$ci")
   fi
   # AUD-01 (severity: high) is insufficient_evidence in every preset's run by fixture design (the
-  # comment above), so every call here now exits 2 (SPEC.md:1076, item 18.30) -- tolerated here since
-  # this gate checks the written file set, never the process exit code.
+  # comment above), so every call here exits 2 (SPEC.md:1076, item 18.30).
   set +e
   (cd "$root/engines/python" && env "${env_args[@]}" uv run --frozen agentce assess \
     --bundle "$fixture/evidence" --profile "$fixture/applicability.yaml" \
     --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" \
     --allow-unverified-catalog --out "$work/$out" "$@" >/dev/null)
+  local code=$?
   set -e
+  if [ "$code" -ne 2 ]; then
+    echo "audience-presets: assess --out $out exited $code, expected 2 (AUD-01 is severity: high insufficient_evidence, SPEC.md:1076)" >&2
+    exit 1
+  fi
 }
 
 run_validate() {

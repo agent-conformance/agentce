@@ -73,13 +73,22 @@ sys.exit(0 if ok else 1)
 PY
 }
 
+assert_code() {
+  local label="$1" code="$2"
+  if [ "$code" -ne 2 ]; then
+    echo "project-view: $label assess exited $code, expected 2 (severity: high insufficient_evidence, SPEC.md:1076)" >&2
+    exit 1
+  fi
+}
+
 if [ "${1:-}" = "--write" ]; then
   # PROJ-01 (severity: high) is insufficient_evidence by fixture design, so every engine's run below
-  # now exits 2 (SPEC.md:1076, item 18.30) -- tolerated: this gate checks the written artifact, never
-  # the process exit code.
+  # exits 2 (SPEC.md:1076, item 18.30).
   set +e
   (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_multi_args[@]}" --out "$work/python" >/dev/null)
+  code=$?
   set -e
+  assert_code "python (--write)" "$code"
   if ! check_properties "$work/python/project.json"; then
     echo "project-view: the Python reference engine's own output did not honestly surface the fixture's undeclared agent or its cross-agent top gap; refusing to write a bad golden" >&2
     exit 1
@@ -88,12 +97,16 @@ if [ "${1:-}" = "--write" ]; then
   cp "$work/python/project.md" "$root/verification/gates/project_view_golden_python.md"
   set +e
   (cd "$root/engines/typescript" && pnpm --silent agentce "${multi_args[@]}" --out "$work/typescript" >/dev/null)
+  code=$?
   set -e
+  assert_code "typescript (--write)" "$code"
   cp "$work/typescript/project.md" "$root/verification/gates/project_view_golden_typescript.md"
+  (cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist)
   set +e
-  (cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist \
-    && ./build/install/agentce/bin/agentce "${multi_args[@]}" --out "$work/java" >/dev/null)
+  (cd "$root/engines/java" && ./build/install/agentce/bin/agentce "${multi_args[@]}" --out "$work/java" >/dev/null)
+  code=$?
   set -e
+  assert_code "java (--write)" "$code"
   cp "$work/java/project.md" "$root/verification/gates/project_view_golden_java.md"
   echo "project-view: wrote $golden and the three per-engine project.md goldens from a live run"
   exit 0
@@ -105,16 +118,24 @@ if ! check_properties "$golden"; then
 fi
 
 # PROJ-01 and (in the reused one-subject fixture) NEED-01/NEED-02 are severity: high
-# insufficient_evidence by fixture design, so every run below now exits 2 (SPEC.md:1076, item 18.30)
-# -- tolerated: this gate compares the written artifact to the golden, never the process exit code.
+# insufficient_evidence by fixture design, so every run below exits 2 (SPEC.md:1076, item 18.30). The
+# Java build itself stays under set -euo pipefail: a build failure is a real crash, not an exit-code
+# question.
+(cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist)
+
 set +e
 (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_multi_args[@]}" --out "$work/python-multi" >/dev/null)
+code=$?; assert_code "python-multi" "$code"
 (cd "$root/engines/typescript" && pnpm --silent agentce "${multi_args[@]}" --out "$work/typescript-multi" >/dev/null)
-(cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist \
-  && ./build/install/agentce/bin/agentce "${multi_args[@]}" --out "$work/java-multi" >/dev/null)
+code=$?; assert_code "typescript-multi" "$code"
+(cd "$root/engines/java" && ./build/install/agentce/bin/agentce "${multi_args[@]}" --out "$work/java-multi" >/dev/null)
+code=$?; assert_code "java-multi" "$code"
 (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_one_args[@]}" --out "$work/python-one" >/dev/null)
+code=$?; assert_code "python-one" "$code"
 (cd "$root/engines/typescript" && pnpm --silent agentce "${one_args[@]}" --out "$work/typescript-one" >/dev/null)
+code=$?; assert_code "typescript-one" "$code"
 (cd "$root/engines/java" && ./build/install/agentce/bin/agentce "${one_args[@]}" --out "$work/java-one" >/dev/null)
+code=$?; assert_code "java-one" "$code"
 set -e
 
 status=0

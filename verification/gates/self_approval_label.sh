@@ -23,20 +23,24 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
 run_assess() {
-  local bundle="$1" out="$2"
-  # spoofed/ SELF-01 (severity: high) is insufficient_evidence by fixture design, so that call now
-  # exits 2 (SPEC.md:1076, item 18.30) -- tolerated here since this gate checks the written output,
-  # never the process exit code.
+  local bundle="$1" out="$2" expected="$3"
   set +e
   (cd "$root/engines/python" && env -u VIRTUAL_ENV PYTHONDONTWRITEBYTECODE=1 uv run --frozen agentce assess \
     --bundle "$bundle" --profile "$fixture/applicability.yaml" \
     --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" \
     --allow-unverified-catalog --report-language en --out "$out" >/dev/null)
+  local code=$?
   set -e
+  if [ "$code" -ne "$expected" ]; then
+    echo "self-approval: assess over $bundle exited $code, expected $expected" >&2
+    exit 1
+  fi
 }
 
-run_assess "$fixture/honest/evidence" "$work/honest"
-run_assess "$fixture/spoofed/evidence" "$work/spoofed"
+# honest/ SELF-01 is conformant (exit 0); spoofed/ SELF-01 (severity: high) is insufficient_evidence
+# by fixture design, so that call exits 2 (SPEC.md:1076, item 18.30).
+run_assess "$fixture/honest/evidence" "$work/honest" 0
+run_assess "$fixture/spoofed/evidence" "$work/spoofed" 2
 
 status=0
 

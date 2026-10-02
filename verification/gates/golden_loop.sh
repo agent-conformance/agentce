@@ -33,24 +33,28 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
 run_assess() {
-  local bundle="$1" out="$2"
-  # before/ LOOP-01 (severity: high) is insufficient_evidence by fixture design, so that call now
-  # exits 2 (SPEC.md:1076, item 18.30) -- tolerated here since this gate checks the written output,
-  # never the process exit code.
+  local bundle="$1" out="$2" expected="$3"
   set +e
   (cd "$root/engines/python" && env -u VIRTUAL_ENV PYTHONDONTWRITEBYTECODE=1 uv run --frozen agentce assess \
     --bundle "$bundle" --profile "$fixture/applicability.yaml" \
     --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" \
     --allow-unverified-catalog --out "$out" >/dev/null)
+  local code=$?
   set -e
+  if [ "$code" -ne "$expected" ]; then
+    echo "golden-loop: assess over $bundle exited $code, expected $expected" >&2
+    exit 1
+  fi
 }
 
 run_diff() {
   (cd "$root/engines/python" && env -u VIRTUAL_ENV PYTHONDONTWRITEBYTECODE=1 uv run --frozen agentce diff "$1" "$2" --format "$3")
 }
 
-run_assess "$fixture/before/evidence" "$work/before"
-run_assess "$fixture/after/evidence" "$work/after"
+# before/ LOOP-01 (severity: high) is insufficient_evidence by fixture design, so that call exits 2
+# (SPEC.md:1076, item 18.30); after/ closes LOOP-01 to conformant with no other finding, so it exits 0.
+run_assess "$fixture/before/evidence" "$work/before" 2
+run_assess "$fixture/after/evidence" "$work/after" 0
 
 status=0
 
