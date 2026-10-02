@@ -118,10 +118,14 @@ fi
 
 # Step 4: the step-1 derived profile still passes the skill's own lint despite its short,
 # exploratory window -- closing the loop with 18.32 C1 (pilot_window: true); the gate fails if C1's
-# fix regresses.
+# fix regresses. lint_profile.py exits 1 on a non-clean profile, so the call runs outside `set -e`
+# (like run_step) and its own output drives the fail message, instead of the script exiting silently
+# on the command substitution's exit code.
+set +e
 lint_out="$(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen --quiet python \
   "$root/skills/agentce-get-evidence/scripts/lint_profile.py" \
   --profile "$work/step1/applicability.yaml" --json)"
+set -e
 if ! echo "$lint_out" | python3 -c "import json, sys; sys.exit(0 if json.load(sys.stdin)['clean'] is True else 1)"; then
   fail "step 4: the derived profile no longer passes the skill's lint: $lint_out"
 fi
