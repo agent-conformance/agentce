@@ -9,8 +9,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import pytest
+
 from agentce_adapters import adapt
 from agentce_adapters.otel_genai import (
+    AdapterError,
     _any_value,
     _as_int,
     _as_str,
@@ -271,3 +274,36 @@ def test_malformed_span_containers_are_tolerated() -> None:
     result = adapt(otlp, subject="s")
     assert result.events == []
     assert result.report.spans_seen == 0
+
+
+# --- Hardening regressions (18.29 C0): each of these used to raise an unhandled exception from
+# --- _any_value/_rfc3339_millis/adapt() on malformed telemetry the module's own docstring and the
+# --- tests above already claim is tolerated. Pinned here so a revert of the hardening is caught by
+# --- this file, not only noticed by a port in another engine.
+
+
+def test_non_numeric_int_value_string_is_tolerated() -> None:
+    assert _any_value({"intValue": "5.5"}) is None
+
+
+def test_non_list_array_value_values_is_tolerated() -> None:
+    assert _any_value({"arrayValue": {"values": 5}}) == []
+
+
+def test_non_list_kvlist_value_values_is_tolerated() -> None:
+    assert _any_value({"kvlistValue": {"values": 5}}) == {}
+
+
+def test_keyless_kvlist_pair_is_dropped() -> None:
+    assert _any_value({"kvlistValue": {"values": [{"novkey": True}]}}) == {}
+
+
+def test_out_of_range_timestamp_falls_back_instead_of_raising() -> None:
+    assert _rfc3339_millis("999999999999999999999999") is None
+
+
+def test_invalid_utf8_bytes_raise_a_typed_adapter_error() -> None:
+    otlp = json.dumps({"resourceSpans": []}).encode("utf-8").replace(b"[]", b"[\xff]")
+    with pytest.raises(AdapterError) as excinfo:
+        adapt(otlp, subject="s")
+    assert excinfo.value.reason in {"invalid_encoding", "invalid_json"}

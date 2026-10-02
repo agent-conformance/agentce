@@ -1,0 +1,70 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": []
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "x"
+          },
+          "schemaUrl": "https://opentelemetry.io/schemas/1.36.0",
+          "spans": [
+            {
+              "traceId": "e200000000000000e200000000000000",
+              "spanId": "e300000000000001",
+              "name": "proto-span",
+              "startTimeUnixNano": "1700000000000000000",
+              "endTimeUnixNano": "1700000001000000000",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "real"
+                  }
+                },
+                {
+                  "key": "__proto__",
+                  "value": {
+                    "kvlistValue": {
+                      "values": [
+                        {
+                          "key": "gen_ai.system",
+                          "value": {
+                            "stringValue": "evil"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "e200000000000000e200000000000000",
+              "spanId": "e400000000000002",
+              "name": "victim-span",
+              "startTimeUnixNano": "1700000002000000000",
+              "endTimeUnixNano": "1700000003000000000",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

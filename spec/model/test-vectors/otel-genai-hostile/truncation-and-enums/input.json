@@ -1,0 +1,103 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": []
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "x"
+          },
+          "schemaUrl": "https://opentelemetry.io/schemas/1.36.0",
+          "spans": [
+            {
+              "traceId": "a100000000000000a100000000000000",
+              "spanId": "a100000000000001",
+              "name": "chat-span",
+              "startTimeUnixNano": 1700000000123999999,
+              "endTimeUnixNano": "1700000001000000000",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "a100000000000000a100000000000000",
+              "spanId": "a200000000000002",
+              "name": "tool-span",
+              "startTimeUnixNano": "1700000002000000000",
+              "endTimeUnixNano": "1700000003000000000",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "execute_tool"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "t"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.protocol",
+                  "value": {
+                    "stringValue": "grpc"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "a100000000000000a100000000000000",
+              "spanId": "a300000000000003",
+              "name": "mem-write-span",
+              "startTimeUnixNano": "1700000004000000000",
+              "endTimeUnixNano": "1700000005000000000",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "memory.write"
+                  }
+                },
+                {
+                  "key": "gen_ai.memory.trust",
+                  "value": {
+                    "stringValue": "secret"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "a100000000000000a100000000000000",
+              "spanId": "a400000000000004",
+              "name": "mem-read-span",
+              "startTimeUnixNano": "1700000006000000000",
+              "endTimeUnixNano": "1700000007000000000",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "memory.read"
+                  }
+                },
+                {
+                  "key": "gen_ai.memory.trust_min",
+                  "value": {
+                    "stringValue": "x"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

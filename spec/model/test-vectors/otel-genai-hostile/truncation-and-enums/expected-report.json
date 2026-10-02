@@ -1,0 +1,9 @@
+{
+  "adapter": "otel-genai",
+  "conventions": [
+    "otel-genai:1.36"
+  ],
+  "events_emitted": 4,
+  "skipped": [],
+  "spans_seen": 4
+}

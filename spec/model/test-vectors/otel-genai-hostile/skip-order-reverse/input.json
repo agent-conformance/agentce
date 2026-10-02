@@ -1,0 +1,45 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": []
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "x"
+          },
+          "schemaUrl": "https://opentelemetry.io/schemas/1.36.0",
+          "spans": [
+            {
+              "traceId": "d100000000000000d100000000000000",
+              "spanId": "d200000000000002",
+              "name": "s-hi",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "unmapped_kind"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "d100000000000000d100000000000000",
+              "spanId": "d100000000000001",
+              "name": "s-lo",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "unmapped_kind"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
