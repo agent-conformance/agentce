@@ -102,7 +102,7 @@ def main() -> int:
                 "-q",
                 "-p",
                 "no:cacheprovider",
-                "--cov=agentce",
+                "--cov=agentce.commands",
                 "--cov-branch",
                 f"--cov-report=json:{report_path}",
                 # The repo-wide 90% floor (pyproject.toml) does not apply to this scoped run: only

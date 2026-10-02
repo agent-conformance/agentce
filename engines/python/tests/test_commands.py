@@ -19,15 +19,14 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _QUICKSTART = _REPO_ROOT / "corpus" / "quickstart"
 
 
-def _assess_argv(out: Path, *extra: str) -> list[str]:
+def _assess_argv(out: Path, *extra: str, domain: bool = True) -> list[str]:
     return [
         "assess",
         "--bundle",
         str(_QUICKSTART / "evidence"),
         "--profile",
         str(_QUICKSTART / "applicability.yaml"),
-        "--domain",
-        str(_QUICKSTART / "domain.linkml.yaml"),
+        *(["--domain", str(_QUICKSTART / "domain.linkml.yaml")] if domain else []),
         "--out",
         str(out),
         *extra,
@@ -890,11 +889,16 @@ def test_write_trust_root_dry_run_writes_nothing(tmp_path: Path) -> None:
 
 
 def _packaged_and_signed(
-    tmp_path: Path, *assess_extra: str
+    tmp_path: Path, *assess_extra: str, domain: bool = True
 ) -> tuple[Path, Ed25519PrivateKey]:
     """A `--package-for-sharing` quickstart report, signed as claimant with `--write-trust-root`."""
     out = tmp_path / "o"
-    assert cli.main(_assess_argv(out, "--package-for-sharing", *assess_extra)) == 0
+    assert (
+        cli.main(
+            _assess_argv(out, "--package-for-sharing", *assess_extra, domain=domain)
+        )
+        == 0
+    )
     key_path = tmp_path / "claimant.pem"
     key = _write_kms_key(key_path)
     assert (
@@ -1168,6 +1172,21 @@ def test_verify_report_catalog_dir_digest_tampered(
     assert envelope["error"]["key"] == "verify.report_evidence_tampered"
 
 
+def _patch_path_method(
+    monkeypatch: pytest.MonkeyPatch, name: str, target: Path, fake: Callable[[], Any]
+) -> None:
+    """Monkeypatch `Path.<name>` so calls on `target` run `fake()`; every other path keeps the real
+    method."""
+    real = getattr(Path, name)
+
+    def _wrapped(self: Path, *args: Any, **kwargs: Any) -> Any:
+        if self == target:
+            return fake()
+        return real(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, name, _wrapped)
+
+
 def test_verify_report_claim_unreadable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -1176,14 +1195,11 @@ def test_verify_report_claim_unreadable(
     which shares the same `verify.report_claim_malformed` key (18.8.R1 branch-coverage gate)."""
     out, _key = _packaged_and_signed(tmp_path)
     claim_path = out / "claim.json"
-    real_read_bytes = Path.read_bytes
 
-    def _flaky_read_bytes(self: Path, *args: Any, **kwargs: Any) -> bytes:
-        if self == claim_path:
-            raise OSError("simulated unreadable claim.json")
-        return real_read_bytes(self, *args, **kwargs)
+    def _raise_oserror() -> bytes:
+        raise OSError("simulated unreadable claim.json")
 
-    monkeypatch.setattr(Path, "read_bytes", _flaky_read_bytes)
+    _patch_path_method(monkeypatch, "read_bytes", claim_path, _raise_oserror)
     code, envelope = _verify_report_json(capsys, str(out))
     assert code == 3
     assert envelope["error"]["key"] == "verify.report_claim_malformed"
@@ -1248,16 +1264,13 @@ def test_verify_report_packaging_missing_at_direct_check(
     False (18.8.R1 branch-coverage gate)."""
     out, _key = _packaged_and_signed(tmp_path)
     packaging_path = out / "packaging.json"
-    real_is_file = Path.is_file
-    seen = {"n": 0}
+    calls: list[None] = []
 
-    def _flaky_is_file(self: Path) -> bool:
-        if self == packaging_path:
-            seen["n"] += 1
-            return seen["n"] == 1
-        return real_is_file(self)
+    def _true_once_then_false() -> bool:
+        calls.append(None)
+        return len(calls) == 1
 
-    monkeypatch.setattr(Path, "is_file", _flaky_is_file)
+    _patch_path_method(monkeypatch, "is_file", packaging_path, _true_once_then_false)
     code, envelope = _verify_report_json(capsys, str(out))
     assert code == 3
     assert envelope["error"]["key"] == "verify.report_output_tampered"
@@ -1272,36 +1285,7 @@ def test_verify_report_without_domain_binding_still_reproduces(
     re-run's own `--domain` arg-building at 855-856 both take their `is not None` condition's False
     branch, never exercised by any other test here (every other case uses the quickstart fixture's
     domain binding) (18.8.R1 branch-coverage gate)."""
-    argv = [
-        "assess",
-        "--bundle",
-        str(_QUICKSTART / "evidence"),
-        "--profile",
-        str(_QUICKSTART / "applicability.yaml"),
-        "--out",
-        str(tmp_path / "o"),
-        "--package-for-sharing",
-    ]
-    assert cli.main(argv) == 0
-    out = tmp_path / "o"
-    key_path = tmp_path / "claimant.pem"
-    _write_kms_key(key_path)
-    assert (
-        cli.main(
-            [
-                "sign",
-                str(out),
-                "--as",
-                "claimant",
-                "--profile",
-                "kms",
-                "--key",
-                str(key_path),
-                "--write-trust-root",
-            ]
-        )
-        == 0
-    )
+    out, _key = _packaged_and_signed(tmp_path, domain=False)
     assert not (out / "bundle" / "domain.linkml.yaml").exists()
     code, envelope = _verify_report_json(capsys, str(out))
     assert code == 0
