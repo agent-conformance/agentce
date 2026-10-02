@@ -116,13 +116,85 @@ def test_class_match_is_accepted(
     assert result.quarantined == []
 
 
-def test_source_declared_without_a_class_is_not_class_checked(
+def test_source_declared_without_a_class_defaults_to_self_report(
     make_bundle: Callable[..., Any], example_event: dict[str, Any]
 ) -> None:
+    # The source is declared (passes UNKNOWN_SOURCE) but the manifest names no class for it; the
+    # event's own self-assertion (enforcement_point) is never trusted as-is (SPEC §6.4).
     source = str(example_event["source"])
+    assert example_event["agentcesourceclass"] == "enforcement_point"
     result = _ingest(make_bundle, [example_event], sources=[source])
     assert len(result.accepted) == 1
     assert result.quarantined == []
+    assert result.accepted[0]["agentcesourceclass"] == "self_report"
+
+
+def test_bundle_with_no_declared_classes_at_all_defaults_to_self_report(
+    make_bundle: Callable[..., Any], example_event: dict[str, Any]
+) -> None:
+    # No manifest "sources" entries at all: every source is implicitly undeclared, so every event's
+    # self-asserted class is corrected the same way as a source named without a class.
+    result = _ingest(make_bundle, [example_event])
+    assert len(result.accepted) == 1
+    assert result.accepted[0]["agentcesourceclass"] == "self_report"
+
+
+def test_undeclared_source_already_self_report_is_unchanged(
+    make_bundle: Callable[..., Any],
+    clone: Callable[[dict[str, Any]], dict[str, Any]],
+    example_event: dict[str, Any],
+) -> None:
+    event = clone(example_event)
+    event["agentcesourceclass"] = "self_report"
+    source = str(event["source"])
+    result = _ingest(make_bundle, [event], sources=[source])
+    assert len(result.accepted) == 1
+    assert result.accepted[0]["agentcesourceclass"] == "self_report"
+    # No correction was needed, so the accepted and raw copies are the identical object.
+    assert result.accepted[0] is result.raw_accepted[0]
+
+
+def test_class_match_is_accepted_keeps_raw_and_accepted_identical(
+    make_bundle: Callable[..., Any], example_event: dict[str, Any]
+) -> None:
+    source = str(example_event["source"])
+    result = _ingest(
+        make_bundle, [example_event], source_classes={source: "enforcement_point"}
+    )
+    assert len(result.accepted) == 1
+    assert result.accepted[0] is result.raw_accepted[0]
+
+
+def test_undeclared_source_correction_never_reaches_raw_accepted(
+    make_bundle: Callable[..., Any],
+    clone: Callable[[dict[str, Any]], dict[str, Any]],
+    example_event: dict[str, Any],
+) -> None:
+    """The correction that makes `accepted` honest must never change the bytes integrity
+    verification hashes (SPEC §6.6 hashes the whole CloudEvent, `agentcesourceclass` included, as the
+    source emitted it): `raw_accepted` stays byte-identical so a genuinely unmodified, undeclared-source
+    event still verifies, while the corrected copy would wrongly look tampered."""
+    from agentce.integrity import IntegrityStatus, recompute_hash, verify_bundle
+
+    event = clone(example_event)
+    integrity_block = event["data"]["integrity"]
+    integrity_block["prev"] = "0" * 64
+    integrity_block["strength"] = "export_chained"
+    integrity_block.pop("sig_ref", None)
+    integrity_block["hash"] = recompute_hash(event)
+    source = str(event["source"])
+
+    bundle = load_bundle(make_bundle([event], sources=[source]))
+    result = ingest(bundle)
+    assert result.accepted[0]["agentcesourceclass"] == "self_report"
+    assert result.raw_accepted[0]["agentcesourceclass"] == "enforcement_point"
+    assert result.raw_accepted[0] == event
+
+    verified = verify_bundle(result.raw_accepted, bundle.manifest, bundle.root)
+    assert [r.status for r in verified] == [IntegrityStatus.VERIFIED_WEAK.value]
+
+    tampered_view = verify_bundle(result.accepted, bundle.manifest, bundle.root)
+    assert [r.status for r in tampered_view] == [IntegrityStatus.FAILED.value]
 
 
 def _ingest_bytes(make_bundle: Callable[..., Any], body: bytes) -> Any:

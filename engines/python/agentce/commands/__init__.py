@@ -307,7 +307,7 @@ def cmd_verify(ns: argparse.Namespace) -> CommandResult:
         bundle_dir = _require_dir(bundle, key="bundle", what="the evidence bundle")
         loaded = load_bundle(bundle_dir)
         ingested = ingest(loaded)
-        results = verify_bundle(ingested.accepted, loaded.manifest, loaded.root)
+        results = verify_bundle(ingested.raw_accepted, loaded.manifest, loaded.root)
         clean = {IntegrityStatus.VERIFIED.value, IntegrityStatus.VERIFIED_WEAK.value}
         broken = [r for r in results if r.status not in clean]
         result.data.update(
@@ -1251,7 +1251,9 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             catalog_dir_digests[label] = signing.digest_tree(src_dir)
             shutil.copytree(src_dir, bundle_out / "catalog" / str(i))
     # Stage 2: integrity verification, one IntegrityResult per stream.
-    integrity_results = verify_bundle(ingested.accepted, loaded.manifest, loaded.root)
+    integrity_results = verify_bundle(
+        ingested.raw_accepted, loaded.manifest, loaded.root
+    )
     _write_jsonl((r.to_json() for r in integrity_results), out_dir / "integrity.jsonl")
     # Stage 3: build the provenance graph into the on-disk store (ADR-0001).
     domain_path = _opt_str(ns, "domain")

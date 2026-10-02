@@ -107,8 +107,8 @@ def _assess_project(
     bundle = load_bundle(proj / "evidence")
     ingested = ingest(bundle)
     verify_bundle(
-        ingested.accepted, bundle.manifest, bundle.root
-    )  # findings inform, never abort
+        ingested.raw_accepted, bundle.manifest, bundle.root
+    )  # findings inform, never abort; hash what the source signed, not the trust-corrected copy
     domain = DomainBinding.load(proj / "domain.linkml.yaml")
     profile = Profile.load(proj / "applicability.yaml")
     compute_coverage(ingested.accepted, profile, bundle.root)

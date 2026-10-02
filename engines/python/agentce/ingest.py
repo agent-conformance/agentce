@@ -7,6 +7,14 @@ oversize line, malformed JSON or a schema violation (``schema_invalid``), an unr
 whose ``agentcesourceclass`` differs from the class the bundle declares for its source
 (``class_mismatch``, SPEC §6.4), a repeated id (``duplicate_id``), or an out-of-order timestamp within
 a stream (``time_order``). Quarantine is an output, never a silent drop.
+
+A source the manifest declares with no trust class (or a bundle with no manifest classes at all) is
+"undeclared": its events keep flowing, but ``accepted`` never trusts the event's own self-asserted
+``agentcesourceclass`` at face value -- it is corrected down to the weakest class, ``self_report``,
+for every downstream reader (SPEC §6.4). That correction never reaches ``raw_accepted``, which stays
+byte-identical to what the source emitted, because SPEC §6.6 defines each event's ``integrity.hash``
+over the whole CloudEvent (``agentcesourceclass`` included) as received -- callers verifying integrity
+must hash what was actually signed, not the engine's trust-corrected copy.
 """
 
 from __future__ import annotations
@@ -32,9 +40,16 @@ _TYPE_RE = re.compile(r"^org\.agent-conformance\.evidence\.(?P<name>[A-Za-z0-9]+
 
 @dataclass
 class IngestResult:
-    """The outcome of ingest: the accepted events, in order, and the quarantine records."""
+    """The outcome of ingest: the accepted events, in order, and the quarantine records.
+
+    ``accepted`` is what assessment, activity, and graph building read: an undeclared source's event
+    carries ``agentcesourceclass: self_report`` here, never its own unproven self-assertion. ``raw_accepted``
+    is the same events exactly as received -- pass this, never ``accepted``, to integrity verification
+    (SPEC §6.6), which must hash what the source actually signed.
+    """
 
     accepted: list[dict[str, Any]] = field(default_factory=list)
+    raw_accepted: list[dict[str, Any]] = field(default_factory=list)
     quarantined: list[QuarantineRecord] = field(default_factory=list)
 
 
@@ -156,6 +171,7 @@ def ingest(
                 )
                 continue
 
+            raw_event = event
             declared_class = (
                 bundle.source_classes.get(source)
                 if bundle.source_classes is not None
@@ -177,6 +193,12 @@ def ingest(
                         )
                     )
                     continue
+            elif str(event["agentcesourceclass"]) != "self_report":
+                # SPEC §6.4: the manifest declares no trust class for this source, so the event's own
+                # self-assertion is never trusted as-is. `raw_event` (appended below, unmodified) keeps
+                # the original for integrity hashing (SPEC §6.6); this shallow copy is what every
+                # assessment, activity, and graph reader sees.
+                event = {**event, "agentcesourceclass": "self_report"}
 
             event_id = str(event["id"])
             if event_id in seen_ids:
@@ -210,6 +232,7 @@ def ingest(
             seen_ids.add(event_id)
             last_time[stream] = time_value
             result.accepted.append(event)
+            result.raw_accepted.append(raw_event)
 
     return result
 
