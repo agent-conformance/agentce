@@ -26,7 +26,7 @@ from . import signing
 from .domain import DomainBinding
 from .errors import InputError
 from .graph import build_graph
-from .psp import Shape, load_shapes
+from .psp import PropertyShape, Shape, load_shapes
 from .structural import evaluate_control
 
 _EXPECTED_TO_CHECK = {"passed", "failed", "inapplicable"}
@@ -180,6 +180,149 @@ def _tolerance_value(tolerance: dict[str, Any]) -> Fraction:
         return Fraction(str(tolerance.get("max", 0)))
     except (ValueError, ZeroDivisionError):
         return Fraction(0)
+
+
+def _property_fingerprint(prop: PropertyShape) -> tuple[Any, ...]:
+    return (
+        repr(prop.path),
+        prop.min_count,
+        prop.max_count,
+        prop.cls,
+        prop.datatype,
+        prop.node_kind,
+        tuple(sorted(prop.in_values)) if prop.in_values else None,
+        prop.has_value,
+        prop.node,
+        prop.qualified_value_shape,
+        prop.qualified_min_count,
+        prop.equals,
+        prop.disjoint,
+        prop.less_than,
+        prop.less_than_or_equals,
+        prop.min_inclusive,
+        prop.max_inclusive,
+    )
+
+
+def _shape_fingerprint(shape: Shape) -> tuple[Any, ...]:
+    """A shape's semantic content (SPEC §7.2's Portable Shape Profile), excluding its own IRI and any
+    ``sh:name``/``sh:message`` annotation: two shapes with this same fingerprint test the same thing
+    regardless of which control's file declares them."""
+    return (
+        shape.target_class,
+        tuple(sorted(shape.target_nodes)),
+        tuple(sorted(shape.target_where)),
+        tuple(sorted(_property_fingerprint(prop) for prop in shape.properties)),
+    )
+
+
+def _fixture_fingerprint(directory: Path, control: ControlSpec) -> tuple[Any, ...]:
+    """A control's test fixtures, by content: the same ``case id``/``expected`` pairs over the exact
+    same events mean two controls exercise the same scenarios, whatever their fixture file names."""
+    cases: list[tuple[Any, ...]] = []
+    for case in sorted(control.test_cases, key=lambda entry: entry["id"]):
+        path = directory / case["fixture"]
+        events: tuple[str, ...] | None = None
+        if path.is_file():
+            events = tuple(
+                json.dumps(event, sort_keys=True) for event in _load_events(path)
+            )
+        cases.append((case["id"], case.get("expected"), events))
+    return tuple(cases)
+
+
+def _rule_uniqueness_pairs(catalog: Catalog) -> list[tuple[str, str]]:
+    """Raw ``(later_control_id, earlier_control_id)`` pairs sharing an identical shape and fixture
+    set, in control order. See ``rule_uniqueness_problems``, which formats these as messages, and
+    ``new_rule_uniqueness_problems``, which excludes pairs already named in a committed baseline."""
+    pairs: list[tuple[str, str]] = []
+    seen: dict[tuple[Any, ...], str] = {}
+    for control in catalog.controls:
+        if control.rung != 2:
+            continue
+        shape = catalog.shape_for(control)
+        if shape is None:
+            continue
+        key = (
+            _shape_fingerprint(shape),
+            _fixture_fingerprint(catalog.directory, control),
+        )
+        earlier = seen.get(key)
+        if earlier is not None:
+            pairs.append((control.id, earlier))
+        else:
+            seen[key] = control.id
+    return pairs
+
+
+def _rule_uniqueness_message(later: str, earlier: str) -> str:
+    return (
+        f"{later}: shares an identical shape and fixture set with {earlier}; "
+        f"its rule does not test what its title says (SPEC §7.3 rule uniqueness)"
+    )
+
+
+def rule_uniqueness_problems(catalog: Catalog) -> list[str]:
+    """SPEC §7.3: a control's rule must test what its own title says. Two rung-2 controls that share
+    an identical shape (same target and every property constraint) and an identical fixture set (same
+    case ids over the exact same events) mean one of them is silently testing the other's rule under
+    its own title -- found in 18.37, where DOC-01 shipped with REC-01's shape and fixtures verbatim
+    (in both the baseline and eu-ai-act catalogs), and ROB-02 shipped with DAT-01's shape and
+    fixtures verbatim (in eu-ai-act). An empty list means every rung-2 control in the catalog tests
+    something its own shape and fixtures do not share with any other control."""
+    return [
+        _rule_uniqueness_message(later, earlier)
+        for later, earlier in _rule_uniqueness_pairs(catalog)
+    ]
+
+
+def _new_problems(
+    pairs: list[tuple[str, str]], baseline_pairs: frozenset[frozenset[str]]
+) -> list[str]:
+    return [
+        _rule_uniqueness_message(later, earlier)
+        for later, earlier in pairs
+        if frozenset((later, earlier)) not in baseline_pairs
+    ]
+
+
+def _stale_pairs(
+    pairs: list[tuple[str, str]], baseline_pairs: frozenset[frozenset[str]]
+) -> frozenset[frozenset[str]]:
+    real_pairs = frozenset(frozenset(pair) for pair in pairs)
+    return baseline_pairs - real_pairs
+
+
+def new_rule_uniqueness_problems(
+    catalog: Catalog, baseline_pairs: frozenset[frozenset[str]]
+) -> list[str]:
+    """Like ``rule_uniqueness_problems``, but a pair already named in ``baseline_pairs`` (disclosed,
+    pre-existing debt -- see ``verification/gates/fixtures/rule_uniqueness/baseline.json`` and item
+    18.37c, which pays it down) is not reported. A genuinely new duplicate -- any pair not already in
+    the baseline -- is still reported, which is what makes the VG-CATALOG-RULE-UNIQUE gate a real
+    regression check rather than a disabled one."""
+    return _new_problems(_rule_uniqueness_pairs(catalog), baseline_pairs)
+
+
+def stale_rule_uniqueness_pairs(
+    catalog: Catalog, baseline_pairs: frozenset[frozenset[str]]
+) -> frozenset[frozenset[str]]:
+    """Baseline pairs (see ``new_rule_uniqueness_problems``) that are no longer real duplicates in
+    this catalog. The baseline file exists to shrink as each pair is paid down (18.37a/18.37b/18.37c);
+    an entry that stops being a real duplicate must be removed from the file, not left stale while
+    pretending the debt is still live -- VG-CATALOG-RULE-UNIQUE fails on this, not just on a new
+    pair. An empty result means every committed baseline pair is still a real duplicate."""
+    return _stale_pairs(_rule_uniqueness_pairs(catalog), baseline_pairs)
+
+
+def rule_uniqueness_report(
+    catalog: Catalog, baseline_pairs: frozenset[frozenset[str]]
+) -> tuple[frozenset[frozenset[str]], list[str]]:
+    """``stale_rule_uniqueness_pairs`` and ``new_rule_uniqueness_problems`` together, computing
+    ``_rule_uniqueness_pairs`` (which re-parses every rung-2 control's shape and fixtures) exactly
+    once instead of twice -- the check driver needs both results for every catalog it scans."""
+    pairs = _rule_uniqueness_pairs(catalog)
+    return _stale_pairs(pairs, baseline_pairs), _new_problems(pairs, baseline_pairs)
 
 
 def overlay_weakens_base(
