@@ -218,6 +218,23 @@ _FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER = (
     ("javascript", "catalog.shape.script_forbidden"),
 )
 
+#: Cause/fix text per key, not per predicate name: `js` and `javascript` share one key and therefore
+#: one message.
+_FORBIDDEN_SHAPE_PREDICATE_MESSAGES = {
+    "catalog.shape.sparql_forbidden": (
+        "a shape uses sh:sparql, a SPARQL-based SHACL construct the Portable Shape "
+        "Profile forbids (spec/rules/psp.md).",
+        "remove the sh:sparql constraint; express it with the profile's declarative "
+        "vocabulary instead (spec/rules/psp.md).",
+    ),
+    "catalog.shape.script_forbidden": (
+        "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable "
+        "Shape Profile forbids (spec/rules/psp.md).",
+        "remove the sh:js constraint; express it with the profile's declarative vocabulary "
+        "instead (spec/rules/psp.md).",
+    ),
+}
+
 
 def _check_forbidden_predicates(graph: Graph) -> None:
     used = {
@@ -226,23 +243,9 @@ def _check_forbidden_predicates(graph: Graph) -> None:
         if str(predicate).startswith(SH)
     }
     for name, key in _FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER:
-        if name not in used:
-            continue
-        if key == "catalog.shape.sparql_forbidden":
-            raise InputError(
-                key,
-                "a shape uses sh:sparql, a SPARQL-based SHACL construct the Portable Shape "
-                "Profile forbids (spec/rules/psp.md).",
-                "remove the sh:sparql constraint; express it with the profile's declarative "
-                "vocabulary instead (spec/rules/psp.md).",
-            )
-        raise InputError(
-            key,
-            "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable "
-            "Shape Profile forbids (spec/rules/psp.md).",
-            "remove the sh:js constraint; express it with the profile's declarative vocabulary "
-            "instead (spec/rules/psp.md).",
-        )
+        if name in used:
+            cause, fix = _FORBIDDEN_SHAPE_PREDICATE_MESSAGES[key]
+            raise InputError(key, cause, fix)
 
 
 def parse_shapes_ttl(text: str) -> dict[str, Shape]:

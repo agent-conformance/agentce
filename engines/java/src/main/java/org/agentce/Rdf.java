@@ -130,11 +130,11 @@ public final class Rdf {
             return objs.isEmpty() ? null : objs.get(0);
         }
 
-        /** Every distinct predicate IRI used anywhere in the store, in insertion order. */
-        public List<String> predicates() {
-            List<String> out = new ArrayList<>();
+        /** Every distinct predicate IRI used anywhere in the store. */
+        public java.util.Set<String> predicates() {
+            java.util.Set<String> out = new java.util.LinkedHashSet<>();
             for (Term[] q : quads) {
-                if (q[1].kind == Kind.IRI && !out.contains(q[1].value)) {
+                if (q[1].kind == Kind.IRI) {
                     out.add(q[1].value);
                 }
             }
@@ -374,7 +374,19 @@ public final class Rdf {
 
         private Token scanIriRef() {
             pos++; // skip '<'
-            StringBuilder sb = new StringBuilder();
+            // Fast path: most IRIs carry no backslash escape, so look for one before paying for a
+            // StringBuilder and a per-character copy.
+            int start = pos;
+            int i = pos;
+            while (i < src.length() && src.charAt(i) != '>' && !(src.charAt(i) == '\\' && i + 1 < src.length())) {
+                i++;
+            }
+            if (i >= src.length() || src.charAt(i) == '>') {
+                pos = i + 1; // skip '>'
+                return new Token(Type.IRIREF, src.substring(start, i));
+            }
+            StringBuilder sb = new StringBuilder(src.substring(start, i));
+            pos = i;
             while (pos < src.length() && src.charAt(pos) != '>') {
                 char c = src.charAt(pos++);
                 if (c == '\\' && pos < src.length()) {

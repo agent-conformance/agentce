@@ -274,6 +274,23 @@ const FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER: Array<[string, string]> = [
   ["javascript", "catalog.shape.script_forbidden"],
 ];
 
+/** Cause/fix text per key, not per predicate name: `js` and `javascript` share one key and
+ * therefore one message. */
+const FORBIDDEN_SHAPE_PREDICATE_MESSAGES: Record<string, [string, string]> = {
+  "catalog.shape.sparql_forbidden": [
+    "a shape uses sh:sparql, a SPARQL-based SHACL construct the Portable Shape Profile forbids " +
+      "(spec/rules/psp.md).",
+    "remove the sh:sparql constraint; express it with the profile's declarative vocabulary " +
+      "instead (spec/rules/psp.md).",
+  ],
+  "catalog.shape.script_forbidden": [
+    "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable Shape " +
+      "Profile forbids (spec/rules/psp.md).",
+    "remove the sh:js constraint; express it with the profile's declarative vocabulary instead " +
+      "(spec/rules/psp.md).",
+  ],
+};
+
 function checkForbiddenPredicates(store: Store): void {
   const used = new Set<string>();
   for (const quad of store.getQuads(null, null, null, null)) {
@@ -283,25 +300,10 @@ function checkForbiddenPredicates(store: Store): void {
     }
   }
   for (const [name, key] of FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER) {
-    if (!used.has(name)) {
-      continue;
+    if (used.has(name)) {
+      const [cause, fix] = FORBIDDEN_SHAPE_PREDICATE_MESSAGES[key];
+      throw new InputError(key, cause, fix);
     }
-    if (key === "catalog.shape.sparql_forbidden") {
-      throw new InputError(
-        key,
-        "a shape uses sh:sparql, a SPARQL-based SHACL construct the Portable Shape Profile forbids " +
-          "(spec/rules/psp.md).",
-        "remove the sh:sparql constraint; express it with the profile's declarative vocabulary " +
-          "instead (spec/rules/psp.md).",
-      );
-    }
-    throw new InputError(
-      key,
-      "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable Shape " +
-        "Profile forbids (spec/rules/psp.md).",
-      "remove the sh:js constraint; express it with the profile's declarative vocabulary instead " +
-        "(spec/rules/psp.md).",
-    );
   }
 }
 

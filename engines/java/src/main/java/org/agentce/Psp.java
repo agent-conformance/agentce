@@ -259,6 +259,22 @@ public final class Psp {
             Map.entry("js", "catalog.shape.script_forbidden"),
             Map.entry("javascript", "catalog.shape.script_forbidden"));
 
+    /** Cause/fix text per key, not per predicate name: {@code js} and {@code javascript} share one
+     * key and therefore one message. */
+    private static final Map<String, Map.Entry<String, String>> FORBIDDEN_SHAPE_PREDICATE_MESSAGES = Map.of(
+            "catalog.shape.sparql_forbidden",
+            Map.entry(
+                    "a shape uses sh:sparql, a SPARQL-based SHACL construct the Portable Shape "
+                            + "Profile forbids (spec/rules/psp.md).",
+                    "remove the sh:sparql constraint; express it with the profile's declarative "
+                            + "vocabulary instead (spec/rules/psp.md)."),
+            "catalog.shape.script_forbidden",
+            Map.entry(
+                    "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable "
+                            + "Shape Profile forbids (spec/rules/psp.md).",
+                    "remove the sh:js constraint; express it with the profile's declarative "
+                            + "vocabulary instead (spec/rules/psp.md)."));
+
     private static void checkForbiddenPredicates(Rdf.Store store) {
         java.util.Set<String> used = new java.util.HashSet<>();
         for (String predicate : store.predicates()) {
@@ -267,24 +283,11 @@ public final class Psp {
             }
         }
         for (Map.Entry<String, String> entry : FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER) {
-            if (!used.contains(entry.getKey())) {
-                continue;
+            if (used.contains(entry.getKey())) {
+                String key = entry.getValue();
+                Map.Entry<String, String> message = FORBIDDEN_SHAPE_PREDICATE_MESSAGES.get(key);
+                throw new InputError(key, message.getKey(), message.getValue());
             }
-            String key = entry.getValue();
-            if (key.equals("catalog.shape.sparql_forbidden")) {
-                throw new InputError(
-                        key,
-                        "a shape uses sh:sparql, a SPARQL-based SHACL construct the Portable Shape "
-                                + "Profile forbids (spec/rules/psp.md).",
-                        "remove the sh:sparql constraint; express it with the profile's declarative "
-                                + "vocabulary instead (spec/rules/psp.md).");
-            }
-            throw new InputError(
-                    key,
-                    "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable "
-                            + "Shape Profile forbids (spec/rules/psp.md).",
-                    "remove the sh:js constraint; express it with the profile's declarative "
-                            + "vocabulary instead (spec/rules/psp.md).");
         }
     }
 

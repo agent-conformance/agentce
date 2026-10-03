@@ -24,6 +24,21 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _BASE = _REPO_ROOT / "spec" / "catalogs" / "base" / "eu-ai-act"
 
 
+def _mutate_shape(tmp_path: Path, triple: str) -> Path:
+    """Copy the base catalog and append ``triple`` to DAT-01's top-level shape (mirrors each other
+    engine's own ``mutateShape``/``withMutatedCatalog`` test helper for this item)."""
+    catalog_dir = tmp_path / "cat"
+    shutil.copytree(_BASE, catalog_dir)
+    shape = catalog_dir / "shapes" / "DAT-01.ttl"
+    shape.write_text(
+        shape.read_text(encoding="utf-8").replace(
+            'sh:name "S1" ] .', f'sh:name "S1" ] ; {triple} .'
+        ),
+        encoding="utf-8",
+    )
+    return catalog_dir
+
+
 def _run(
     argv: list[str], capsys: pytest.CaptureFixture[str]
 ) -> tuple[int, dict[str, Any]]:
@@ -104,15 +119,7 @@ def test_lint_detects_schema_violation(tmp_path: Path) -> None:
 def test_lint_detects_forbidden_shape_predicate(
     tmp_path: Path, triple: str, key: str
 ) -> None:
-    catalog_dir = tmp_path / "cat"
-    shutil.copytree(_BASE, catalog_dir)
-    shape = catalog_dir / "shapes" / "DAT-01.ttl"
-    shape.write_text(
-        shape.read_text(encoding="utf-8").replace(
-            'sh:name "S1" ] .', f'sh:name "S1" ] ; {triple} .'
-        ),
-        encoding="utf-8",
-    )
+    catalog_dir = _mutate_shape(tmp_path, triple)
     problems = lint_catalog(catalog_dir)
     assert any(key in problem for problem in problems)
 
@@ -128,15 +135,7 @@ def test_lint_detects_forbidden_shape_predicate(
 def test_load_refuses_forbidden_shape_predicate(
     tmp_path: Path, triple: str, key: str
 ) -> None:
-    catalog_dir = tmp_path / "cat"
-    shutil.copytree(_BASE, catalog_dir)
-    shape = catalog_dir / "shapes" / "DAT-01.ttl"
-    shape.write_text(
-        shape.read_text(encoding="utf-8").replace(
-            'sh:name "S1" ] .', f'sh:name "S1" ] ; {triple} .'
-        ),
-        encoding="utf-8",
-    )
+    catalog_dir = _mutate_shape(tmp_path, triple)
     with pytest.raises(InputError) as excinfo:
         load_catalog(catalog_dir)
     assert excinfo.value.key == key
@@ -149,15 +148,7 @@ def test_load_refuses_a_shape_carrying_both_predicates_as_sparql_deterministical
     (matching spec/rules/psp_check.py's PRIORITY_DENY), never whichever one the graph happens to
     iterate first -- the first cut iterated `graph.predicates()` directly (a set, ordered by
     PYTHONHASHSEED) and disagreed with itself across runs, and with TypeScript/Java."""
-    catalog_dir = tmp_path / "cat"
-    shutil.copytree(_BASE, catalog_dir)
-    shape = catalog_dir / "shapes" / "DAT-01.ttl"
-    shape.write_text(
-        shape.read_text(encoding="utf-8").replace(
-            'sh:name "S1" ] .', 'sh:name "S1" ] ; sh:js [] ; sh:sparql [] .'
-        ),
-        encoding="utf-8",
-    )
+    catalog_dir = _mutate_shape(tmp_path, "sh:js [] ; sh:sparql [] ")
     with pytest.raises(InputError) as excinfo:
         load_catalog(catalog_dir)
     assert excinfo.value.key == "catalog.shape.sparql_forbidden"
@@ -255,15 +246,8 @@ def test_load_refuses_forbidden_predicate_written_as_a_turtle_unicode_escape(
     """Turtle's IRIREF grammar allows `\\uXXXX`/`\\UXXXXXXXX` escapes inside `<...>`; a predicate
     scan that compared raw, undecoded IRI text (rather than the resolved IRI) would miss
     `<http://www.w3.org/ns/shacl#sp\\u0061rql>`, which is the same IRI as `sh:sparql` once decoded."""
-    catalog_dir = tmp_path / "cat"
-    shutil.copytree(_BASE, catalog_dir)
-    shape = catalog_dir / "shapes" / "DAT-01.ttl"
-    shape.write_text(
-        shape.read_text(encoding="utf-8").replace(
-            'sh:name "S1" ] .',
-            'sh:name "S1" ] ; <http://www.w3.org/ns/shacl#sp\\u0061rql> [] .',
-        ),
-        encoding="utf-8",
+    catalog_dir = _mutate_shape(
+        tmp_path, "<http://www.w3.org/ns/shacl#sp\\u0061rql> [] "
     )
     with pytest.raises(InputError) as excinfo:
         load_catalog(catalog_dir)
