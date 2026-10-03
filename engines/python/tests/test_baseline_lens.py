@@ -193,6 +193,14 @@ def test_no_baseline_citation_is_invented() -> None:
     assert _invented_citations(_BASELINE) == []
 
 
+def _control_crosswalk_pairs(control_id: str) -> set[tuple[str, str]]:
+    """Every `(framework, clause)` pair one baseline control's own YAML cites, read live from disk
+    (not re-derived), so a future edit that drops or mistypes one is caught by the tests that use this."""
+    path = _BASELINE / "controls" / f"{control_id}.yaml"
+    control = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return {(e["framework"], e["clause"]) for e in control["crosswalk"]}
+
+
 @pytest.mark.parametrize(
     ("control_id", "expected_pairs"),
     [
@@ -216,9 +224,7 @@ def test_18_16_baseline_controls_cite_their_new_mitre_atlas_and_owasp_acs_pairs(
 ) -> None:
     """18.16 C3: the crosswalk this item added is read live from each control's own YAML on disk
     (not re-derived), so a future edit that drops or mistypes one of these pairs is caught here."""
-    path = _BASELINE / "controls" / f"{control_id}.yaml"
-    control = yaml.safe_load(path.read_text(encoding="utf-8"))
-    pairs = {(e["framework"], e["clause"]) for e in control["crosswalk"]}
+    pairs = _control_crosswalk_pairs(control_id)
     assert expected_pairs <= pairs
 
 
@@ -240,9 +246,7 @@ def test_18_16a_baseline_controls_cite_the_official_asi_ids(
     Appendix A T-to-ASI mapping (not a conceptual guess), never the prior T1-T13 scheme from a
     different, older taxonomy. Read live from each control's own YAML on disk, so a future edit that
     reintroduces a T-id or mistypes an ASI id is caught here, not only by the acceptance grep."""
-    path = _BASELINE / "controls" / f"{control_id}.yaml"
-    control = yaml.safe_load(path.read_text(encoding="utf-8"))
-    pairs = {(e["framework"], e["clause"]) for e in control["crosswalk"]}
+    pairs = _control_crosswalk_pairs(control_id)
     assert expected_pairs <= pairs
     owasp_asi_clauses = {clause for fw, clause in pairs if fw == "owasp-asi-2026"}
     assert owasp_asi_clauses == {clause for _, clause in expected_pairs}
