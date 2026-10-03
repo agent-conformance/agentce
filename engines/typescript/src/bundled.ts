@@ -23,3 +23,8 @@ export function catalogsDir(): string {
 export function quickstartDir(): string {
   return join(dataRoot(), "corpus", "quickstart");
 }
+
+/** The vendored ICU MessageFormat catalogue (the language-neutral original lives in `spec/i18n/`). */
+export function i18nDir(): string {
+  return join(dataRoot(), "i18n");
+}

@@ -29,6 +29,7 @@ const TREES: [string, string, boolean][] = [
   [join(ENGINE, "data", "catalogs", "base"), join(REPO, "spec", "catalogs", "base"), false],
   [join(ENGINE, "data", "catalogs", "overlays"), join(REPO, "spec", "catalogs", "overlays"), true],
   [join(ENGINE, "data", "corpus", "quickstart"), join(REPO, "corpus", "quickstart"), false],
+  [join(ENGINE, "data", "i18n"), join(REPO, "spec", "i18n"), false],
 ];
 
 for (const [vendored, authoritative, skipRootReadme] of TREES) {
@@ -51,6 +52,7 @@ test("the vendored data is byte-identical to the Python engine's copy", () => {
     [join(ENGINE, "data", "catalogs"), join(python, "catalogs")],
     [join(ENGINE, "data", "corpus"), join(python, "corpus")],
     [join(ENGINE, "data", "support_matrices"), join(python, "support_matrices")],
+    [join(ENGINE, "data", "i18n"), join(python, "i18n")],
   ];
   for (const [ours, theirs] of pairs) {
     const a = files(ours);

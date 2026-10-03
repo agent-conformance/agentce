@@ -1,111 +1,76 @@
 package org.agentce;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Message-key catalogue for report rendering (SPEC §9.3, §8.4). All human-readable text in
- * {@code report.md} and {@code report.html} comes from message keys, so a translation changes only the
- * report — never {@code assertions.json}, the manifest digests, or the claim. A partial {@code de}
- * catalogue demonstrates the mechanism; missing keys fall back to {@code en}.
+ * Message-key catalogue for report rendering (SPEC §9.3, §8.4). All human-readable text in {@code
+ * report.md} and {@code report.html} comes from message keys, read from the vendored, language-neutral
+ * catalogue ({@code src/main/resources/i18n/}, sourced from {@code spec/i18n/}, {@code BundledDataTest}
+ * holds them in sync) that also backs Python's {@code agentce.error_catalogue} CLI strings, so a
+ * translation changes only the report -- never {@code assertions.json}, the manifest digests, or the
+ * claim. A partial {@code de} catalogue demonstrates the mechanism; missing keys fall back to {@code
+ * en}. A faithful port of the Python reference ({@code engines/python/agentce/messages.py},
+ * {@code i18n_format.py}); mirrors {@code engines/typescript/src/messages.ts}.
  */
 public final class Messages {
     private Messages() {}
 
     public static final String DEFAULT_LANGUAGE = "en";
 
-    private static final Map<String, String> EN = en();
-    private static final Map<String, Map<String, String>> CATALOGUES = catalogues();
+    /** Which of the catalogue's keys this module renders. Their text lives in the vendored catalogue,
+     * never hardcoded in this module. */
+    private static final String[] REPORT_KEY_PREFIXES = {
+        "report.", "verdict.", "next.", "outcome.", "readiness."
+    };
 
-    private static Map<String, String> en() {
-        Map<String, String> m = new LinkedHashMap<>();
-        m.put("report.title", "AgentCE conformance report");
-        m.put("report.summary_heading", "Outcome summary");
-        m.put("report.assertions_heading", "Assertions");
-        m.put("report.no_controls", "No controls were evaluated.");
-        m.put("report.verdict_heading", "Verdict");
-        m.put("report.outcomes_label", "Outcomes");
-        m.put("report.top_gaps_heading", "Top gaps");
-        m.put("report.no_gaps", "none");
-        m.put("report.gaps_more", "{n, plural, one {+# more gap} other {+# more gaps}}");
-        m.put("report.next_step_heading", "Next step");
-        m.put("report.see_report", "See report.md in {dir} for every control.");
-        m.put("report.crosswalk_unverified", "(clause reference unverified)");
-        m.put("verdict.non-conformant", "Non-conformant \u2014 at least one applicable control failed.");
-        m.put("verdict.incomplete",
-                "Incomplete \u2014 no control failed, but not every applicable control is demonstrated.");
-        m.put("verdict.conformant", "Conformant \u2014 every applicable control met its expectations with evidence.");
-        m.put("next.non-conformant",
-                "Fix the non-conformant controls listed under Top gaps, then run the assessment again.");
-        m.put("next.incomplete",
-                "Supply the missing evidence, or complete the manual checks, for the controls listed under "
-                        + "Top gaps, then run the assessment again.");
-        m.put("next.conformant",
-                "No gaps. Run the assessment again when the agent, its evidence, or the catalog changes.");
-        m.put("report.affected_persons",
-                "Affected persons may obtain an explanation and raise concerns through the deployer's "
-                        + "published contact channel (EU AI Act Arts. 26(11), 85, 86).");
-        m.put("outcome.conformant", "conformant");
-        m.put("outcome.non-conformant", "non-conformant");
-        m.put("outcome.partial", "partial");
-        m.put("outcome.not_applicable", "not applicable");
-        m.put("outcome.not_assessed", "not assessed");
-        m.put("outcome.insufficient_evidence", "insufficient evidence");
-        m.put("report.activity_heading", "What your agents did");
-        m.put("report.activity_agents_label", "Agents");
-        m.put("report.activity_models_label", "Models");
-        m.put("report.activity_tools_label", "Tools");
-        m.put("report.activity_actions_label", "Actions by effect class");
-        m.put("report.activity_approvals_label", "Approvals recorded by");
-        m.put("report.activity_denied_label", "Denied or blocked");
-        m.put("report.activity_none_agents", "no agent identity found in the records");
-        m.put("report.activity_none_undeclared", "every tool and model your agents used is declared");
-        m.put("report.activity_undeclared_heading", "Not yet declared in your profile");
-        m.put("report.activity_undeclared_tools_label", "Tools");
-        m.put("report.activity_undeclared_models_label", "Models");
-        m.put("report.activity_recorder_enforcement_point", "a system that could have stopped it");
-        m.put("report.activity_recorder_independent_system", "a system the agent cannot edit");
-        m.put("report.activity_recorder_self_report", "the agent's own account");
-        m.put("report.activity_denied_approval_rejected", "a human rejected it");
-        m.put("report.activity_denied_authz_denied", "blocked by an authorization check");
-        m.put("report.activity_denied_policy_denied", "blocked by policy");
-        m.put("report.activity_denied_refused", "the agent refused");
-        m.put("report.project_agent_column", "Agent");
-        m.put("report.project_agent_report_link", "Full report");
-        m.put("report.project_declared_badge", "Declared");
-        m.put("report.project_declared_column", "Declared");
-        m.put("report.project_deviation_entry", "{control}");
-        m.put("report.project_deviation_entry_with_expiry", "{control} (until {expiry})");
-        m.put("report.project_deviations_column", "Deviations");
-        m.put("report.project_deviations_none", "none");
-        m.put("report.project_heading", "Agents in this project");
-        m.put("report.project_title", "AgentCE project view");
-        m.put("report.project_top_gap_agents", "Agents: {agents}.");
-        m.put("report.project_top_gaps_heading", "Top gaps across agents");
-        m.put("report.project_undeclared_badge", "Undeclared");
-        m.put("report.project_undeclared_heading", "Undeclared agents");
-        m.put("report.project_verdict_column", "Verdict");
-        m.put("report.project_what_it_did_cell", "agents: {agents}; actions: {actions}");
-        m.put("report.project_what_it_did_column", "What it did");
-        return m;
+    private static String readClasspathResource(String path) {
+        try (InputStream in = Messages.class.getResourceAsStream(path)) {
+            if (in == null) {
+                return null;
+            }
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot read classpath resource " + path + ": " + e.getMessage(), e);
+        }
     }
 
-    private static Map<String, Map<String, String>> catalogues() {
-        Map<String, String> de = new LinkedHashMap<>();
-        de.put("report.title", "AgentCE-Konformitätsbericht");
-        de.put("report.summary_heading", "Ergebnisübersicht");
-        de.put("report.assertions_heading", "Aussagen");
-        de.put("report.no_controls", "Es wurden keine Kontrollen bewertet.");
-        Map<String, Map<String, String>> c = new LinkedHashMap<>();
-        c.put("en", EN);
-        c.put("de", de);
-        return c;
+    private static Map<String, String> loadCatalog(String language) {
+        String text = readClasspathResource("/i18n/messages." + language + ".json");
+        if (text == null) {
+            return Map.of();
+        }
+        Map<String, String> out = new LinkedHashMap<>();
+        JsonNode node = Json.parse(text);
+        for (Iterator<String> it = node.fieldNames(); it.hasNext(); ) {
+            String key = it.next();
+            out.put(key, node.get(key).asText());
+        }
+        return out;
+    }
+
+    private static Map<String, String> reportKeys(String language) {
+        Map<String, String> out = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : loadCatalog(language).entrySet()) {
+            for (String prefix : REPORT_KEY_PREFIXES) {
+                if (entry.getKey().startsWith(prefix)) {
+                    out.put(entry.getKey(), entry.getValue());
+                    break;
+                }
+            }
+        }
+        return out;
     }
 
     /** The message catalogue for {@code language}, backed by {@code en} for any missing key. */
     public static Map<String, String> catalogue(String language) {
-        Map<String, String> merged = new LinkedHashMap<>(EN);
-        merged.putAll(CATALOGUES.getOrDefault(language, Map.of()));
+        Map<String, String> merged = new LinkedHashMap<>(reportKeys("en"));
+        merged.putAll(reportKeys(language));
         return merged;
     }
 

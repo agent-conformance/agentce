@@ -54,6 +54,7 @@ class BundledDataTest {
         assertSameTree(onClasspath("/catalogs/base"), repo.resolve("spec/catalogs/base"), false);
         assertSameTree(onClasspath("/catalogs/overlays"), repo.resolve("spec/catalogs/overlays"), true);
         assertSameTree(onClasspath("/corpus/quickstart"), repo.resolve("corpus/quickstart"), false);
+        assertSameTree(onClasspath("/i18n"), repo.resolve("spec/i18n"), false);
     }
 
     @Test
@@ -62,7 +63,8 @@ class BundledDataTest {
         for (List<String> pair : List.of(
                 List.of("/catalogs", "catalogs"),
                 List.of("/corpus", "corpus"),
-                List.of("/support_matrices", "support_matrices"))) {
+                List.of("/support_matrices", "support_matrices"),
+                List.of("/i18n", "i18n"))) {
             assertSameTree(onClasspath(pair.get(0)), python.resolve(pair.get(1)), false);
         }
     }
