@@ -659,7 +659,24 @@ function runAssess(options: AssessOptions): CommandResult {
   return result;
 }
 
+/** This engine does not yet apply a deviation register on `assess` (18.14a C5, 18.17a/18.38 pending):
+ * refuse `--deviations <path>`, `--deviations=<path>`, and a bare trailing `--deviations` outright
+ * rather than silently ignore a register a user believed was applied. */
+function checkDeviationsNotYetSupported(argv: string[]): void {
+  const hasDeviationsFlag = argv.some(
+    (token) => token === "--deviations" || token.startsWith("--deviations="),
+  );
+  if (hasDeviationsFlag) {
+    throw new InputError(
+      "input.deviations_not_yet_supported",
+      "this engine does not yet apply a deviation register on assess.",
+      "drop --deviations, or run this assessment with the Python engine.",
+    );
+  }
+}
+
 function cmdAssess(argv: string[]): CommandResult {
+  checkDeviationsNotYetSupported(argv);
   return runAssess({
     bundle: flagValue(argv, "bundle") as string,
     profile: flagValue(argv, "profile") as string,

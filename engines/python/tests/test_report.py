@@ -470,7 +470,9 @@ def test_activity_names_cannot_inject_raw_html_into_rendered_markdown() -> None:
     assert "<h2>" not in md and "<p>" not in md and "<strong>" not in md
 
 
-def _project_assertion(subject: str, outcome: str) -> Assertion:
+def _project_assertion(
+    subject: str, outcome: str, deviation: str | None = None
+) -> Assertion:
     return Assertion(
         control="OVS-03",
         control_version="2026.09",
@@ -483,6 +485,7 @@ def _project_assertion(subject: str, outcome: str) -> Assertion:
         severity="high",
         family="OVS",
         evidence=[_EVIDENCE] if outcome != "insufficient_evidence" else [],
+        deviation=deviation,
     )
 
 
@@ -1355,6 +1358,49 @@ def test_write_report_multi_subject_writes_project_view(tmp_path: Path) -> None:
         )
         assert {a["subject"] for a in own_assertions} == {subject_id}
     assert "project.json" in manifest["outputs"]
+    assert validate_report(tmp_path) == []
+
+
+def test_project_view_deviation_end_to_end(tmp_path: Path) -> None:
+    profile = Profile(subjects=[Subject(id="A"), Subject(id="B")])
+    assertions = [
+        Assertion(
+            control="REC-01",
+            control_version="2026.09",
+            subject="A",
+            outcome="partial",
+            rung=2,
+            mode="automated",
+            window=_WINDOW,
+            population=(1, 0),
+            severity="high",
+            family="REC",
+            evidence=[_EVIDENCE],
+            deviation="REC-01",
+        ),
+        _project_assertion("B", "conformant"),
+    ]
+    manifest = write_report(
+        tmp_path,
+        assertions,
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+        profile=profile,
+        deviations=[{"control": "REC-01", "expiry": "2026-06-01T00:00:00.000Z"}],
+    )
+    assert "project.json" in manifest["outputs"]
+    project = json.loads((tmp_path / "project.json").read_text(encoding="utf-8"))
+    rows = {row["id"]: row for row in project["agents"]}
+    assert rows["A"]["deviations"] == [
+        {"control": "REC-01", "expiry": "2026-06-01T00:00:00.000Z"}
+    ]
+    assert rows["B"]["deviations"] == []
+    project_md = (tmp_path / "project.md").read_text(encoding="utf-8")
+    assert "REC-01" in project_md
+    assert "2026-06-01" in project_md
+    project_html = (tmp_path / "project.html").read_text(encoding="utf-8")
+    assert "REC-01" in project_html
+    assert "2026-06-01" in project_html
     assert validate_report(tmp_path) == []
 
 

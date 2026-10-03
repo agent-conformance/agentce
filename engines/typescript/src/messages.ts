@@ -53,6 +53,10 @@ const EN: Record<string, string> = {
   "report.project_top_gap_agents": "Agents: {agents}.",
   "report.project_undeclared_heading": "Undeclared agents",
   "report.project_agent_report_link": "Full report",
+  "report.project_deviation_entry": "{control}",
+  "report.project_deviation_entry_with_expiry": "{control} (until {expiry})",
+  "report.project_deviations_column": "Deviations",
+  "report.project_deviations_none": "none",
   "verdict.conformant": "Conformant — every applicable control met its expectations with evidence.",
   "verdict.incomplete":
     "Incomplete — no control failed, but not every applicable control is demonstrated.",

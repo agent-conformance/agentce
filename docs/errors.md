@@ -32,6 +32,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.catalog_unverified` | a --catalog-dir catalog is unsigned, or its signature does not verify against the effective trust root. | point --catalog-dir at a catalog whose catalog.sig.json verifies, or pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) for the root that signed it. |
 | `input.coverage_denominator_manifest_invalid` | a coverage denominator's manifest file is nested too deeply to parse safely. | flatten the denominator manifest's structure; it exceeds the engine's safe nesting depth. |
 | `input.deviation_invalid` | the deviation register is not a well-formed mapping with a `deviations:` list of mapping entries, or fails a rule of SPEC §13.3.4 (control not in the catalog, wrong outcome, missing field, same approver as owner, or lifetime over the maximum). | correct the deviation register and re-run. |
+| `input.deviations_not_yet_supported` | this engine does not yet apply a deviation register on assess. | drop --deviations, or run this assessment with the Python engine. |
 | `input.diff_extra_argument` | diff was given more than the two positional arguments it takes. | pass exactly two files: `agentce diff <report-a> <report-b>`. |
 | `input.diff_field_not_string` | diff was given an assertion whose control, subject, or outcome field is present but is not a JSON string. | emit control/subject/outcome as JSON strings. |
 | `input.diff_unrecognized_flag` | diff was given a flag it does not recognize. | pass --format text|json|md, or drop the flag. |

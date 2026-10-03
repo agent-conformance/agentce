@@ -834,7 +834,23 @@ public final class Cli {
         return result;
     }
 
+    /** This engine does not yet apply a deviation register on {@code assess} (18.14a C5,
+     * 18.17a/18.38 pending): refuse {@code --deviations <path>}, {@code --deviations=<path>}, and a
+     * bare trailing {@code --deviations} outright rather than silently ignore a register a user
+     * believed was applied. */
+    private static void checkDeviationsNotYetSupported(String[] args) {
+        for (String token : args) {
+            if (token.equals("--deviations") || token.startsWith("--deviations=")) {
+                throw new InputError(
+                        "input.deviations_not_yet_supported",
+                        "this engine does not yet apply a deviation register on assess.",
+                        "drop --deviations, or run this assessment with the Python engine.");
+            }
+        }
+    }
+
     private static CommandResult cmdAssess(String[] args) {
+        checkDeviationsNotYetSupported(args);
         String outArg = flagValue(args, "out");
         return runAssess(new AssessOptions(
                 flagValue(args, "bundle"),

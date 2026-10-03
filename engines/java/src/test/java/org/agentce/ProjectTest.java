@@ -26,6 +26,10 @@ class ProjectTest {
     private static final String[] WINDOW = {"2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"};
 
     private static Assertions.Assertion assertion(String subject, String control, String outcome) {
+        return assertion(subject, control, outcome, null);
+    }
+
+    private static Assertions.Assertion assertion(String subject, String control, String outcome, String deviation) {
         Assertions.Assertion a = new Assertions.Assertion();
         a.control = control;
         a.controlVersion = "2026.09";
@@ -37,7 +41,17 @@ class ProjectTest {
         a.population = new int[] {1, 0};
         a.severity = "high";
         a.family = "REC";
+        a.deviation = deviation;
         return a;
+    }
+
+    private static ObjectNode deviation(String control, String expiry) {
+        ObjectNode node = Json.nodes().objectNode();
+        node.put("control", control);
+        if (expiry != null) {
+            node.put("expiry", expiry);
+        }
+        return node;
     }
 
     private static ObjectNode checkRef(String subject, String control) {
@@ -199,5 +213,46 @@ class ProjectTest {
         assertEquals(List.of("A"), texts(row.get("agents_observed")));
         assertEquals(List.of(), texts(view.get("undeclared_agents")));
         assertEquals(0, view.get("top_gaps").size());
+        assertEquals(0, row.get("deviations").size());
+    }
+
+    @Test
+    void deviationSurfacesPerSubjectWithoutLeaking() {
+        Profile profile = profileWith("A", "B");
+        List<Assertions.Assertion> assertions = List.of(
+                assertion("A", "REC-01", "non-conformant", "REC-01"), assertion("B", "REC-02", "conformant"));
+        Set<String> declaredSubjectIds = new LinkedHashSet<>(List.of("A", "B"));
+        Map<String, ObjectNode> activityBySubject = new LinkedHashMap<>();
+        activityBySubject.put("A", activity("A"));
+        activityBySubject.put("B", activity("B"));
+        ObjectNode blindSpots = blindSpotsWrapper();
+        List<ObjectNode> deviations = List.of(deviation("REC-01", "2026-06-01T00:00:00.000Z"));
+
+        ObjectNode view = Project.computeProjectView(
+                assertions, profile, declaredSubjectIds, activityBySubject, blindSpots, deviations);
+
+        Map<String, JsonNode> rows = new LinkedHashMap<>();
+        view.get("agents").forEach(row -> rows.put(row.get("id").asText(), row));
+        assertEquals(1, rows.get("A").get("deviations").size());
+        assertEquals("REC-01", rows.get("A").get("deviations").get(0).get("control").asText());
+        assertEquals("2026-06-01T00:00:00.000Z", rows.get("A").get("deviations").get(0).get("expiry").asText());
+        assertEquals(0, rows.get("B").get("deviations").size());
+    }
+
+    @Test
+    void deviationOmitsUnknownExpiry() {
+        Profile profile = profileWith("A");
+        List<Assertions.Assertion> assertions = List.of(assertion("A", "REC-01", "non-conformant", "REC-01"));
+        Map<String, ObjectNode> activityBySubject = new LinkedHashMap<>();
+        activityBySubject.put("A", activity("A"));
+        ObjectNode blindSpots = blindSpotsWrapper();
+
+        ObjectNode view = Project.computeProjectView(
+                assertions, profile, new LinkedHashSet<>(List.of("A")), activityBySubject, blindSpots);
+
+        JsonNode row = view.get("agents").get(0);
+        assertEquals(1, row.get("deviations").size());
+        assertEquals("REC-01", row.get("deviations").get(0).get("control").asText());
+        assertFalse(row.get("deviations").get(0).has("expiry"));
     }
 }

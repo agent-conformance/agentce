@@ -216,6 +216,32 @@ class CliTest {
         assertEquals("input.catalog_unresolved", env.get("error").get("message_key").asText());
     }
 
+    @Test
+    void assessDeviationsFlagIsRefusedOutright(@TempDir Path out) {
+        JsonNode env = runJson(
+                "assess",
+                "--bundle", QUICKSTART.resolve("evidence").toString(),
+                "--profile", QUICKSTART.resolve("applicability.yaml").toString(),
+                "--domain", QUICKSTART.resolve("domain.linkml.yaml").toString(),
+                "--deviations", "/tmp/does-not-exist.yaml",
+                "--out", out.toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.deviations_not_yet_supported", env.get("error").get("message_key").asText());
+    }
+
+    @Test
+    void assessDeviationsEqualsFormIsRefusedToo(@TempDir Path out) {
+        JsonNode env = runJson(
+                "assess",
+                "--bundle", QUICKSTART.resolve("evidence").toString(),
+                "--profile", QUICKSTART.resolve("applicability.yaml").toString(),
+                "--domain", QUICKSTART.resolve("domain.linkml.yaml").toString(),
+                "--deviations=/tmp/does-not-exist.yaml",
+                "--out", out.toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.deviations_not_yet_supported", env.get("error").get("message_key").asText());
+    }
+
     /** The quickstart profile with its {@code catalogs:} list removed, written into {@code dir}. */
     private static Path profileWithoutCatalogs(Path dir) throws IOException {
         List<String> kept = new ArrayList<>();

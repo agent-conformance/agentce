@@ -565,6 +565,19 @@ def _project_agent_view_rows(
             ", ".join(_sanitize_field(a) for a in activity.get("agents", []))
             or cat["report.activity_none_agents"]
         )
+        deviation_entries = [
+            i18n_format.format_message(
+                cat["report.project_deviation_entry_with_expiry"],
+                control=_sanitize_field(d["control"]),
+                expiry=_sanitize_field(d["expiry"]),
+            )
+            if "expiry" in d
+            else i18n_format.format_message(
+                cat["report.project_deviation_entry"],
+                control=_sanitize_field(d["control"]),
+            )
+            for d in agent["deviations"]
+        ]
         rows.append(
             {
                 "id": _sanitize_field(agent["id"]),
@@ -582,6 +595,8 @@ def _project_agent_view_rows(
                         activity.get("actions_by_effect_class", {})
                     ),
                 ),
+                "deviations": ", ".join(deviation_entries)
+                or cat["report.project_deviations_none"],
             }
         )
     return rows
@@ -626,12 +641,13 @@ def render_project_md(
         f"## {cat['report.project_heading']}",
         "",
         f"| {cat['report.project_agent_column']} | {cat['report.project_declared_column']} | "
-        f"{cat['report.project_verdict_column']} | {cat['report.project_what_it_did_column']} |",
-        "|---|---|---|---|",
+        f"{cat['report.project_verdict_column']} | {cat['report.project_what_it_did_column']} | "
+        f"{cat['report.project_deviations_column']} |",
+        "|---|---|---|---|---|",
     ]
     lines += [
         f"| [{row['id']}](agents/{row['dirname']}/report.md) | {row['badge']} | "
-        f"{row['verdict']} | {row['what_it_did']} |"
+        f"{row['verdict']} | {row['what_it_did']} | {row['deviations']} |"
         for row in rows
     ]
     lines += ["", f"## {cat['report.project_top_gaps_heading']}", ""]
@@ -667,7 +683,8 @@ def render_project_html(
         f'<tr><td><a href="agents/{row["dirname"]}/report.html">'
         f"{html.escape(row['id'])}</a></td>"
         f"<td>{html.escape(row['badge'])}</td><td>{html.escape(row['verdict'])}</td>"
-        f"<td>{html.escape(row['what_it_did'])}</td></tr>"
+        f"<td>{html.escape(row['what_it_did'])}</td>"
+        f"<td>{html.escape(row['deviations'])}</td></tr>"
         for row in rows
     )
     gap_rows = _project_top_gap_rows(project_view["top_gaps"], cat)
@@ -703,6 +720,7 @@ def render_project_html(
         f'<th scope="col">{html.escape(cat["report.project_declared_column"])}</th>'
         f'<th scope="col">{html.escape(cat["report.project_verdict_column"])}</th>'
         f'<th scope="col">{html.escape(cat["report.project_what_it_did_column"])}</th>'
+        f'<th scope="col">{html.escape(cat["report.project_deviations_column"])}</th>'
         "</tr></thead>"
         f"<tbody>{body_rows}</tbody></table></section>"
         '<section aria-labelledby="project-top-gaps"><h2 id="project-top-gaps">'
@@ -3176,6 +3194,7 @@ def write_report(
             resolved_declared,
             project_activity_by_subject,
             blind_spots,
+            deviations=deviations,
         )
         write_json("project.json", project_view)
         gaps_by_subject = blind_spots_by_subject(blind_spots)

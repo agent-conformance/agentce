@@ -15,7 +15,12 @@ from agentce.project import (
 _WINDOW = ("2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
 
 
-def _assertion(subject: str, control: str, outcome: str = "conformant") -> Assertion:
+def _assertion(
+    subject: str,
+    control: str,
+    outcome: str = "conformant",
+    deviation: str | None = None,
+) -> Assertion:
     return Assertion(
         control=control,
         control_version="2026.09",
@@ -27,6 +32,7 @@ def _assertion(subject: str, control: str, outcome: str = "conformant") -> Asser
         population=(1, 0),
         severity="high",
         family="REC",
+        deviation=deviation,
     )
 
 
@@ -157,6 +163,63 @@ def test_single_subject_profile_still_returns_a_valid_one_row_view() -> None:
         "summary": view["agents"][0]["summary"],
         "blind_spots_count": 0,
         "agents_observed": ["A"],
+        "deviations": [],
     }
     assert view["undeclared_agents"] == []
     assert view["top_gaps"] == []
+
+
+def test_project_view_deviation_surfaces_per_subject_without_leaking() -> None:
+    profile = Profile(subjects=[Subject(id="A"), Subject(id="B")])
+    assertions = [
+        _assertion("A", "REC-01", "non-conformant", deviation="REC-01"),
+        _assertion("B", "REC-02", "conformant"),
+    ]
+    view = compute_project_view(
+        assertions,
+        profile,
+        frozenset({"A", "B"}),
+        {"A": {"agents": ["A"]}, "B": {"agents": ["B"]}},
+        {"blind_spots": [], "no_population": []},
+        deviations=[{"control": "REC-01", "expiry": "2026-06-01T00:00:00.000Z"}],
+    )
+    rows = {row["id"]: row for row in view["agents"]}
+    assert rows["A"]["deviations"] == [
+        {"control": "REC-01", "expiry": "2026-06-01T00:00:00.000Z"}
+    ]
+    assert rows["B"]["deviations"] == []
+
+
+def test_project_view_deviation_sorts_by_control() -> None:
+    profile = Profile(subjects=[Subject(id="A")])
+    assertions = [
+        _assertion("A", "REC-02", "non-conformant", deviation="REC-02"),
+        _assertion("A", "REC-01", "non-conformant", deviation="REC-01"),
+    ]
+    view = compute_project_view(
+        assertions,
+        profile,
+        frozenset({"A"}),
+        {"A": {"agents": ["A"]}},
+        {"blind_spots": [], "no_population": []},
+        deviations=[{"control": "REC-01"}, {"control": "REC-02"}],
+    )
+    rows = {row["id"]: row for row in view["agents"]}
+    assert [d["control"] for d in rows["A"]["deviations"]] == ["REC-01", "REC-02"]
+
+
+def test_project_view_deviation_omits_unknown_expiry() -> None:
+    profile = Profile(subjects=[Subject(id="A")])
+    assertions = [
+        _assertion("A", "REC-01", "non-conformant", deviation="REC-01"),
+    ]
+    view = compute_project_view(
+        assertions,
+        profile,
+        frozenset({"A"}),
+        {"A": {"agents": ["A"]}},
+        {"blind_spots": [], "no_population": []},
+        deviations=None,
+    )
+    rows = {row["id"]: row for row in view["agents"]}
+    assert rows["A"]["deviations"] == [{"control": "REC-01"}]

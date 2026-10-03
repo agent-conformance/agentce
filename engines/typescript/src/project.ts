@@ -80,12 +80,18 @@ export function noPopulationBySubject(noPopulation: CheckRef[]): Map<string, Che
   return bySubject;
 }
 
+export interface ProjectDeviation {
+  control: string;
+  expiry?: string;
+}
+
 export interface ProjectAgentRow {
   id: string;
   declared: boolean;
   summary: { verdict: string; counts: Record<string, number>; top_gaps: unknown[] };
   blind_spots_count: number;
   agents_observed: string[];
+  deviations: ProjectDeviation[];
 }
 
 export interface ProjectView {
@@ -107,8 +113,13 @@ export function computeProjectView(
   declaredSubjectIds: Set<string>,
   activityBySubject: Map<string, { agents: string[] }>,
   blindSpots: BlindSpots,
+  deviations?: Array<Record<string, unknown>>,
 ): ProjectView {
   const bySubject = blindSpotsBySubject(blindSpots);
+  const byControl = new Map<string, Record<string, unknown>>();
+  for (const d of deviations ?? []) {
+    byControl.set(String(d.control), d);
+  }
   const subjectIds = [
     ...new Set([...assertions.map((a) => a.subject), ...profile.subjects.map((s) => s.id)]),
   ].sort(byteCompare);
@@ -125,12 +136,23 @@ export function computeProjectView(
   const agents: ProjectAgentRow[] = subjectIds.map((subjectId) => {
     const subjectAssertions = assertionsBySubject.get(subjectId) ?? [];
     const summary = summarize(subjectAssertions);
+    const deviatedControls = [
+      ...new Set(
+        subjectAssertions.filter((a) => a.deviation !== null).map((a) => a.deviation as string),
+      ),
+    ].sort(byteCompare);
+    const subjectDeviations: ProjectDeviation[] = deviatedControls.map((control) => {
+      const entry = byControl.get(control);
+      const expiry = entry?.expiry;
+      return expiry === undefined ? { control } : { control, expiry: String(expiry) };
+    });
     return {
       id: subjectId,
       declared: declaredSubjectIds.has(subjectId),
       summary: { verdict: summary.verdict, counts: summary.counts, top_gaps: summary.topGaps },
       blind_spots_count: (bySubject.get(subjectId) ?? []).length,
       agents_observed: activityBySubject.get(subjectId)?.agents ?? [],
+      deviations: subjectDeviations,
     };
   });
 

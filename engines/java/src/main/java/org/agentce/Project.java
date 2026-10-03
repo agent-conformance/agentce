@@ -119,7 +119,26 @@ public final class Project {
             Set<String> declaredSubjectIds,
             Map<String, ObjectNode> activityBySubject,
             ObjectNode blindSpots) {
+        return computeProjectView(assertions, profile, declaredSubjectIds, activityBySubject, blindSpots, null);
+    }
+
+    /** As the five-argument overload, with {@code deviations} (the already-linted register
+     * {@code Assess#applyDeviations} would apply, SPEC §13.3.4) feeding each subject's own
+     * {@code deviations} list -- control id plus the register's own {@code expiry} when present. */
+    public static ObjectNode computeProjectView(
+            List<Assertions.Assertion> assertions,
+            Profile profile,
+            Set<String> declaredSubjectIds,
+            Map<String, ObjectNode> activityBySubject,
+            ObjectNode blindSpots,
+            List<ObjectNode> deviations) {
         Map<String, List<ObjectNode>> bySubject = blindSpotsBySubject(blindSpots);
+        Map<String, ObjectNode> byControl = new LinkedHashMap<>();
+        if (deviations != null) {
+            for (ObjectNode d : deviations) {
+                byControl.put(d.get("control").asText(), d);
+            }
+        }
 
         TreeSet<String> subjectIds = new TreeSet<>(Json::byteCompare);
         for (Assertions.Assertion a : assertions) {
@@ -151,6 +170,24 @@ public final class Project {
                 observed.forEach(n -> observedAgentsUnion.add(n.asText()));
             }
             row.set("agents_observed", agentsObserved);
+            TreeSet<String> deviatedControls = new TreeSet<>(Json::byteCompare);
+            for (Assertions.Assertion a : subjectAssertions) {
+                if (a.deviation != null) {
+                    deviatedControls.add(a.deviation);
+                }
+            }
+            ArrayNode deviationsOut = Json.nodes().arrayNode();
+            for (String control : deviatedControls) {
+                ObjectNode entry = Json.nodes().objectNode();
+                entry.put("control", control);
+                ObjectNode registered = byControl.get(control);
+                JsonNode expiry = registered != null ? registered.get("expiry") : null;
+                if (expiry != null) {
+                    entry.put("expiry", expiry.isTextual() ? expiry.asText() : expiry.toString());
+                }
+                deviationsOut.add(entry);
+            }
+            row.set("deviations", deviationsOut);
             agentRows.add(row);
         }
 

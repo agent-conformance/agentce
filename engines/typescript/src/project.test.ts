@@ -13,7 +13,12 @@ import { blindSpotsBySubject, computeProjectView, noPopulationBySubject } from "
 
 const WINDOW: [string, string] = ["2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"];
 
-function assertion(subject: string, control: string, outcome = "conformant") {
+function assertion(
+  subject: string,
+  control: string,
+  outcome = "conformant",
+  deviation: string | null = null,
+) {
   return makeAssertion({
     control,
     controlVersion: "2026.09",
@@ -25,6 +30,7 @@ function assertion(subject: string, control: string, outcome = "conformant") {
     population: [1, 0],
     severity: "high",
     family: "REC",
+    deviation,
   });
 }
 
@@ -161,6 +167,44 @@ test("single-subject profile still returns a valid one-row view", () => {
   assert.equal(view.agents[0]?.declared, true);
   assert.equal(view.agents[0]?.blind_spots_count, 0);
   assert.deepEqual(view.agents[0]?.agents_observed, ["A"]);
+  assert.deepEqual(view.agents[0]?.deviations, []);
   assert.deepEqual(view.undeclared_agents, []);
   assert.deepEqual(view.top_gaps, []);
+});
+
+test("deviation surfaces per subject without leaking", () => {
+  const profile = profileWith(["A", "B"]);
+  const assertions = [
+    assertion("A", "REC-01", "non-conformant", "REC-01"),
+    assertion("B", "REC-02", "conformant"),
+  ];
+  const view = computeProjectView(
+    assertions,
+    profile,
+    new Set(["A", "B"]),
+    new Map([
+      ["A", { agents: ["A"] }],
+      ["B", { agents: ["B"] }],
+    ]),
+    { blind_spots: [], no_population: [] },
+    [{ control: "REC-01", expiry: "2026-06-01T00:00:00.000Z" }],
+  );
+  const rows = new Map(view.agents.map((row) => [row.id, row]));
+  assert.deepEqual(rows.get("A")?.deviations, [
+    { control: "REC-01", expiry: "2026-06-01T00:00:00.000Z" },
+  ]);
+  assert.deepEqual(rows.get("B")?.deviations, []);
+});
+
+test("deviation omits unknown expiry", () => {
+  const profile = profileWith(["A"]);
+  const assertions = [assertion("A", "REC-01", "non-conformant", "REC-01")];
+  const view = computeProjectView(
+    assertions,
+    profile,
+    new Set(["A"]),
+    new Map([["A", { agents: ["A"] }]]),
+    { blind_spots: [], no_population: [] },
+  );
+  assert.deepEqual(view.agents[0]?.deviations, [{ control: "REC-01" }]);
 });

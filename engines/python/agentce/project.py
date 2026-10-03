@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from .assertions import Assertion
-from .assess import index_by_subject
+from .assess import deviations_by_control, index_by_subject
 from .profile import Profile
 from .verdict import summarize
 
@@ -67,6 +67,7 @@ def compute_project_view(
     declared_subject_ids: frozenset[str],
     activity_by_subject: dict[str, dict[str, Any]],
     blind_spots: dict[str, Any],
+    deviations: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Return ``{"agents": [...], "undeclared_agents": [...], "top_gaps": [...]}`` for a multi-agent
     run.
@@ -76,6 +77,7 @@ def compute_project_view(
     spots per subject. Deterministic: no wall-clock, no locale, no filesystem-order dependency.
     """
     by_subject = blind_spots_by_subject(blind_spots)
+    by_control = deviations_by_control(deviations)
     assertions_by_subject: dict[str, list[Assertion]] = {}
     for assertion in assertions:
         assertions_by_subject.setdefault(assertion.subject, []).append(assertion)
@@ -86,6 +88,12 @@ def compute_project_view(
     agents: list[dict[str, Any]] = []
     for subject_id in subject_ids:
         subject_assertions = assertions_by_subject.get(subject_id, [])
+        subject_deviations: list[dict[str, Any]] = []
+        for control in sorted({a.deviation for a in subject_assertions if a.deviation}):
+            entry: dict[str, Any] = {"control": control}
+            if "expiry" in by_control.get(control, {}):
+                entry["expiry"] = str(by_control[control]["expiry"])
+            subject_deviations.append(entry)
         agents.append(
             {
                 "id": subject_id,
@@ -95,6 +103,7 @@ def compute_project_view(
                 "agents_observed": activity_by_subject.get(subject_id, {}).get(
                     "agents", []
                 ),
+                "deviations": subject_deviations,
             }
         )
 

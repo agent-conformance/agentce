@@ -263,6 +263,59 @@ test("assess refuses an unresolvable catalog with a named input error, not a gue
   }
 });
 
+test("assess --deviations <path> is refused outright (18.14a C5: not yet applied here)", () => {
+  const out = mkdtempSync(join(tmpdir(), "agentce-cli-assess-deviations-"));
+  try {
+    const quickstart = quickstartDir();
+    const { exitCode, envelope } = runJson([
+      "assess",
+      "--bundle",
+      join(quickstart, "evidence"),
+      "--profile",
+      join(quickstart, "applicability.yaml"),
+      "--domain",
+      join(quickstart, "domain.linkml.yaml"),
+      "--deviations",
+      "/tmp/does-not-exist.yaml",
+      "--out",
+      out,
+    ]);
+    assert.equal(exitCode, 3);
+    assert.equal(
+      (envelope.error as { message_key: string }).message_key,
+      "input.deviations_not_yet_supported",
+    );
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("assess --deviations=<path> (the =-joined form) is refused too", () => {
+  const out = mkdtempSync(join(tmpdir(), "agentce-cli-assess-deviations-eq-"));
+  try {
+    const quickstart = quickstartDir();
+    const { exitCode, envelope } = runJson([
+      "assess",
+      "--bundle",
+      join(quickstart, "evidence"),
+      "--profile",
+      join(quickstart, "applicability.yaml"),
+      "--domain",
+      join(quickstart, "domain.linkml.yaml"),
+      "--deviations=/tmp/does-not-exist.yaml",
+      "--out",
+      out,
+    ]);
+    assert.equal(exitCode, 3);
+    assert.equal(
+      (envelope.error as { message_key: string }).message_key,
+      "input.deviations_not_yet_supported",
+    );
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
 test("validate quarantines the vendored quickstart bundle's known-bad events", () => {
   const out = mkdtempSync(join(tmpdir(), "agentce-cli-validate-"));
   try {

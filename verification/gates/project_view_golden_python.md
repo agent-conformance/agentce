@@ -2,10 +2,10 @@
 
 ## Agents in this project
 
-| Agent | Declared | Verdict | What it did |
-|---|---|---|---|
-| [spiffe://corp/agents/project-view-fixture-a](agents/spiffe___corp_agents_project-view-fixtur-8b604750/report.md) | Declared | Incomplete — no control failed, but not every applicable control is demonstrated. (insufficient evidence 1) | agents: spiffe://corp/agents/project-view-fixture-a; actions: read 1 |
-| [spiffe://corp/agents/project-view-fixture-b](agents/spiffe___corp_agents_project-view-fixtur-01209673/report.md) | Declared | Incomplete — no control failed, but not every applicable control is demonstrated. (insufficient evidence 1) | agents: spiffe://corp/agents/project-view-fixture-delegate; actions: 0 |
+| Agent | Declared | Verdict | What it did | Deviations |
+|---|---|---|---|---|
+| [spiffe://corp/agents/project-view-fixture-a](agents/spiffe___corp_agents_project-view-fixtur-8b604750/report.md) | Declared | Incomplete — no control failed, but not every applicable control is demonstrated. (insufficient evidence 1) | agents: spiffe://corp/agents/project-view-fixture-a; actions: read 1 | none |
+| [spiffe://corp/agents/project-view-fixture-b](agents/spiffe___corp_agents_project-view-fixtur-01209673/report.md) | Declared | Incomplete — no control failed, but not every applicable control is demonstrated. (insufficient evidence 1) | agents: spiffe://corp/agents/project-view-fixture-delegate; actions: 0 | none |
 
 ## Top gaps across agents
 

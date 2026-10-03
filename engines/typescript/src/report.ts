@@ -673,6 +673,7 @@ interface ProjectAgentDisplayRow {
   badge: string;
   verdict: string;
   whatItDid: string;
+  deviations: string;
 }
 
 /** One row per agent, in `projectView.agents`'s own order (never re-sorted here): the sanitised id,
@@ -703,6 +704,19 @@ function projectAgentViewRows(
         agents: agentsObserved,
         actions: activityTallyText(activity?.actions_by_effect_class ?? {}),
       }),
+      deviations:
+        agent.deviations
+          .map((d) =>
+            d.expiry === undefined
+              ? formatTemplate(cat["report.project_deviation_entry"] as string, {
+                  control: sanitizeField(d.control),
+                })
+              : formatTemplate(cat["report.project_deviation_entry_with_expiry"] as string, {
+                  control: sanitizeField(d.control),
+                  expiry: sanitizeField(d.expiry),
+                }),
+          )
+          .join(", ") || (cat["report.project_deviations_none"] as string),
     };
   });
 }
@@ -739,13 +753,14 @@ export function renderProjectMd(
     `## ${cat["report.project_heading"]}`,
     "",
     `| ${cat["report.project_agent_column"]} | ${cat["report.project_declared_column"]} | ` +
-      `${cat["report.project_verdict_column"]} | ${cat["report.project_what_it_did_column"]} |`,
-    "|---|---|---|---|",
+      `${cat["report.project_verdict_column"]} | ${cat["report.project_what_it_did_column"]} | ` +
+      `${cat["report.project_deviations_column"]} |`,
+    "|---|---|---|---|---|",
   ];
   for (const row of rows) {
     lines.push(
       `| [${row.id}](agents/${row.dirname}/report.md) | ${row.badge} | ` +
-        `${row.verdict} | ${row.whatItDid} |`,
+        `${row.verdict} | ${row.whatItDid} | ${row.deviations} |`,
     );
   }
   lines.push("", `## ${cat["report.project_top_gaps_heading"]}`, "");
@@ -782,7 +797,7 @@ export function renderProjectHtml(
       (row) =>
         `<tr><td><a href="agents/${row.dirname}/report.html">${escapeHtml(row.id)}</a></td>` +
         `<td>${escapeHtml(row.badge)}</td><td>${escapeHtml(row.verdict)}</td>` +
-        `<td>${escapeHtml(row.whatItDid)}</td></tr>`,
+        `<td>${escapeHtml(row.whatItDid)}</td><td>${escapeHtml(row.deviations)}</td></tr>`,
     )
     .join("");
   const gapRows = projectTopGapRows(projectView.top_gaps, cat);
@@ -808,7 +823,7 @@ export function renderProjectHtml(
     undeclaredHtml = `<section aria-labelledby="project-undeclared"><h2 id="project-undeclared">${escapeHtml(cat["report.project_undeclared_heading"] as string)}</h2><ul>${items}</ul></section>`;
   }
   const csp = "default-src 'none'; style-src 'unsafe-inline'; img-src 'none'";
-  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${csp}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1><section aria-labelledby="project-agents"><h2 id="project-agents">${escapeHtml(cat["report.project_heading"] as string)}</h2><table><tr><th>${escapeHtml(cat["report.project_agent_column"] as string)}</th><th>${escapeHtml(cat["report.project_declared_column"] as string)}</th><th>${escapeHtml(cat["report.project_verdict_column"] as string)}</th><th>${escapeHtml(cat["report.project_what_it_did_column"] as string)}</th></tr>${bodyRows}</table></section><section aria-labelledby="project-top-gaps"><h2 id="project-top-gaps">${escapeHtml(cat["report.project_top_gaps_heading"] as string)}</h2>${gapsHtml}</section>${undeclaredHtml}</main></body></html>\n`;
+  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${csp}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1><section aria-labelledby="project-agents"><h2 id="project-agents">${escapeHtml(cat["report.project_heading"] as string)}</h2><table><tr><th>${escapeHtml(cat["report.project_agent_column"] as string)}</th><th>${escapeHtml(cat["report.project_declared_column"] as string)}</th><th>${escapeHtml(cat["report.project_verdict_column"] as string)}</th><th>${escapeHtml(cat["report.project_what_it_did_column"] as string)}</th><th>${escapeHtml(cat["report.project_deviations_column"] as string)}</th></tr>${bodyRows}</table></section><section aria-labelledby="project-top-gaps"><h2 id="project-top-gaps">${escapeHtml(cat["report.project_top_gaps_heading"] as string)}</h2>${gapsHtml}</section>${undeclaredHtml}</main></body></html>\n`;
 }
 
 /** A deterministic OSCAL date-time for this run: the earliest evidence-window start across the

@@ -74,6 +74,10 @@ public final class Messages {
         m.put("report.project_agent_report_link", "Full report");
         m.put("report.project_declared_badge", "Declared");
         m.put("report.project_declared_column", "Declared");
+        m.put("report.project_deviation_entry", "{control}");
+        m.put("report.project_deviation_entry_with_expiry", "{control} (until {expiry})");
+        m.put("report.project_deviations_column", "Deviations");
+        m.put("report.project_deviations_none", "none");
         m.put("report.project_heading", "Agents in this project");
         m.put("report.project_title", "AgentCE project view");
         m.put("report.project_top_gap_agents", "Agents: {agents}.");

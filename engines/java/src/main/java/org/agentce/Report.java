@@ -622,7 +622,8 @@ public final class Report {
         return s.substring(0, Math.min(s.length(), 40)) + "-" + uuid(subjectId).substring(0, 8);
     }
 
-    private record ProjectAgentRow(String id, String dirname, String badge, String verdict, String whatItDid) {}
+    private record ProjectAgentRow(
+            String id, String dirname, String badge, String verdict, String whatItDid, String deviations) {}
 
     /** One row per agent, in {@code projectView["agents"]}'s own order (never re-sorted here): the
      * sanitised id, its report's directory name, the declared/undeclared badge, the
@@ -650,6 +651,19 @@ public final class Report {
             String whatItDid = cat.get("report.project_what_it_did_cell")
                     .replace("{agents}", agentsObservedText)
                     .replace("{actions}", activityTallyText(actionsByEffectClass, null));
+            List<String> deviationEntries = new ArrayList<>();
+            for (JsonNode d : agent.get("deviations")) {
+                String control = sanitizeField(d.get("control").asText());
+                JsonNode expiry = d.get("expiry");
+                deviationEntries.add(expiry == null
+                        ? cat.get("report.project_deviation_entry").replace("{control}", control)
+                        : cat.get("report.project_deviation_entry_with_expiry")
+                                .replace("{control}", control)
+                                .replace("{expiry}", sanitizeField(expiry.asText())));
+            }
+            String deviationsText = deviationEntries.isEmpty()
+                    ? cat.get("report.project_deviations_none")
+                    : String.join(", ", deviationEntries);
             rows.add(new ProjectAgentRow(
                     sanitizeField(id),
                     agentDirname(id),
@@ -657,7 +671,8 @@ public final class Report {
                             ? cat.get("report.project_declared_badge")
                             : cat.get("report.project_undeclared_badge"),
                     verdictLabel + " (" + activityTallyText(counts, labelOf) + ")",
-                    whatItDid));
+                    whatItDid,
+                    deviationsText));
         }
         return rows;
     }
@@ -694,11 +709,12 @@ public final class Report {
         lines.add("");
         lines.add("| " + cat.get("report.project_agent_column") + " | " + cat.get("report.project_declared_column")
                 + " | " + cat.get("report.project_verdict_column") + " | "
-                + cat.get("report.project_what_it_did_column") + " |");
-        lines.add("|---|---|---|---|");
+                + cat.get("report.project_what_it_did_column") + " | "
+                + cat.get("report.project_deviations_column") + " |");
+        lines.add("|---|---|---|---|---|");
         for (ProjectAgentRow row : rows) {
             lines.add("| [" + row.id() + "](agents/" + row.dirname() + "/report.md) | " + row.badge() + " | "
-                    + row.verdict() + " | " + row.whatItDid() + " |");
+                    + row.verdict() + " | " + row.whatItDid() + " | " + row.deviations() + " |");
         }
         lines.add("");
         lines.add("## " + cat.get("report.project_top_gaps_heading"));
@@ -738,7 +754,8 @@ public final class Report {
         for (ProjectAgentRow row : rows) {
             bodyRows.append("<tr><td><a href=\"agents/").append(row.dirname()).append("/report.html\">")
                     .append(esc(row.id())).append("</a></td><td>").append(esc(row.badge())).append("</td><td>")
-                    .append(esc(row.verdict())).append("</td><td>").append(esc(row.whatItDid())).append("</td></tr>");
+                    .append(esc(row.verdict())).append("</td><td>").append(esc(row.whatItDid())).append("</td><td>")
+                    .append(esc(row.deviations())).append("</td></tr>");
         }
         ArrayNode topGaps = (ArrayNode) projectView.get("top_gaps");
         List<Map.Entry<String, String>> gapRows = projectTopGapRows(topGaps, cat);
@@ -778,7 +795,8 @@ public final class Report {
                 + "<thead><tr><th scope=\"col\">" + esc(cat.get("report.project_agent_column")) + "</th>"
                 + "<th scope=\"col\">" + esc(cat.get("report.project_declared_column")) + "</th>"
                 + "<th scope=\"col\">" + esc(cat.get("report.project_verdict_column")) + "</th>"
-                + "<th scope=\"col\">" + esc(cat.get("report.project_what_it_did_column")) + "</th></tr></thead>"
+                + "<th scope=\"col\">" + esc(cat.get("report.project_what_it_did_column")) + "</th>"
+                + "<th scope=\"col\">" + esc(cat.get("report.project_deviations_column")) + "</th></tr></thead>"
                 + "<tbody>" + bodyRows + "</tbody></table></section>"
                 + "<section aria-labelledby=\"project-top-gaps\"><h2 id=\"project-top-gaps\">"
                 + esc(cat.get("report.project_top_gaps_heading")) + "</h2>" + gapsHtml + "</section>"

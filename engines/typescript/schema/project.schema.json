@@ -47,6 +47,15 @@
         "controls": {"type": "array", "items": {"type": "string"}},
         "more": {"type": "integer", "minimum": 0}
       }
+    },
+    "deviation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["control"],
+      "properties": {
+        "control": {"type": "string"},
+        "expiry": {"type": "string"}
+      }
     }
   },
   "properties": {
@@ -55,7 +64,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "declared", "summary", "blind_spots_count", "agents_observed"],
+        "required": ["id", "declared", "summary", "blind_spots_count", "agents_observed", "deviations"],
         "properties": {
           "id": {"type": "string"},
           "declared": {"type": "boolean"},
@@ -70,7 +79,8 @@
             }
           },
           "blind_spots_count": {"type": "integer", "minimum": 0},
-          "agents_observed": {"type": "array", "items": {"type": "string"}}
+          "agents_observed": {"type": "array", "items": {"type": "string"}},
+          "deviations": {"type": "array", "items": {"$ref": "#/$defs/deviation"}}
         }
       }
     },
