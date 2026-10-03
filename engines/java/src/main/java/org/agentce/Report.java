@@ -1141,6 +1141,17 @@ public final class Report {
     public static ObjectNode buildManifest(
             String bundleDigest, List<String> catalogs, Map<String, String> outputs, String operator,
             List<String> invocation, List<String> supersedes, String reportLanguage, List<Catalog> catalogObjects) {
+        return buildManifest(
+                bundleDigest, catalogs, outputs, operator, invocation, supersedes, reportLanguage, catalogObjects,
+                List.of());
+    }
+
+    /** As the eight-argument {@link #buildManifest}, plus what {@code --allow-unverified-catalog}
+     * waived (SPEC §8.7, 18.36): recorded only when non-empty, never as an empty array. */
+    public static ObjectNode buildManifest(
+            String bundleDigest, List<String> catalogs, Map<String, String> outputs, String operator,
+            List<String> invocation, List<String> supersedes, String reportLanguage, List<Catalog> catalogObjects,
+            List<String> limitations) {
         Map<String, Catalog> byLabel = new LinkedHashMap<>();
         if (catalogObjects != null) {
             for (Catalog c : catalogObjects) {
@@ -1190,6 +1201,10 @@ public final class Report {
             ArrayNode sup = manifest.putArray("supersedes");
             supersedes.forEach(sup::add);
         }
+        if (!limitations.isEmpty()) {
+            ArrayNode lim = manifest.putArray("limitations");
+            limitations.forEach(lim::add);
+        }
         return manifest;
     }
 
@@ -1233,6 +1248,18 @@ public final class Report {
             String operator, List<String> invocation, List<String> supersedes, String reportLanguage,
             List<Catalog> catalogObjects, ObjectNode activity, ObjectNode blindSpots,
             Profile profile, Set<String> declaredSubjectIds, List<JsonNode> events) {
+        return writeReport(
+                outDir, assertions, bundleDigest, catalogs, operator, invocation, supersedes, reportLanguage,
+                catalogObjects, activity, blindSpots, profile, declaredSubjectIds, events, List.of());
+    }
+
+    /** As the fourteen-argument {@link #writeReport}, plus the {@code limitations} the manifest
+     * records (18.36). */
+    public static ObjectNode writeReport(
+            Path outDir, List<Assertions.Assertion> assertions, String bundleDigest, List<String> catalogs,
+            String operator, List<String> invocation, List<String> supersedes, String reportLanguage,
+            List<Catalog> catalogObjects, ObjectNode activity, ObjectNode blindSpots,
+            Profile profile, Set<String> declaredSubjectIds, List<JsonNode> events, List<String> limitations) {
         Assertions.checkDc5(assertions);
         try {
             Files.createDirectories(outDir);
@@ -1371,7 +1398,8 @@ public final class Report {
             }
 
             ObjectNode manifest = buildManifest(
-                    bundleDigest, catalogs, outputs, operator, invocation, supersedes, reportLanguage, catalogObjects);
+                    bundleDigest, catalogs, outputs, operator, invocation, supersedes, reportLanguage, catalogObjects,
+                    limitations);
             Files.write(outDir.resolve("manifest.json"), Json.pretty(manifest).getBytes(StandardCharsets.UTF_8));
             return manifest;
         } catch (IOException e) {

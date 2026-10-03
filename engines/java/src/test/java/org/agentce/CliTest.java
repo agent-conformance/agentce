@@ -16,6 +16,8 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
+import java.security.Signature;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -90,6 +92,7 @@ class CliTest {
                 "--profile", fixture.resolve("applicability.yaml").toString(),
                 "--domain", fixture.resolve("domain.linkml.yaml").toString(),
                 "--catalog-dir", fixture.resolve("catalog").toString(),
+                "--allow-unverified-catalog",
                 "--out", out.toString());
         assertEquals(2, env.get("exit_code").asInt());
         ArrayNode exitStatus = (ArrayNode) env.get("exit_status");
@@ -1198,5 +1201,208 @@ class CliTest {
         JsonNode env = runJson("verify", "--report", dir.toString());
         assertEquals(3, env.get("exit_code").asInt());
         assertEquals("cli.not_implemented", env.get("error").get("message_key").asText());
+    }
+
+    // --- assess --catalog-dir signature verification (SPEC §8.7, 18.36): the Python reference
+    // capture's scenarios (evidence P18-18.36/python-reference.md), with Python's literal cause/fix
+    // text. Scenario 10 (quickstart honours AGENTCE_TRUST_ROOT) needs an environment variable the JVM
+    // cannot set for itself; VG-BYO-CATALOG-PARITY runs it against the real Java CLI. ---
+
+    private static final String UNSIGNED_REASON =
+            "unsigned: catalog.sig.json is absent, so there is no signature to verify (SPEC §8.7).";
+    private static final String TRUST_ROOT_FIX =
+            "pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) to a trust root in the form of the "
+                    + "engine's vendored data/trust/dev-root.json.";
+    private static final String UNVERIFIED_FIX =
+            "point --catalog-dir at a catalog whose catalog.sig.json verifies, or pass --trust-root <file> "
+                    + "(or set AGENTCE_TRUST_ROOT) for the root that signed it; --allow-unverified-catalog "
+                    + "assesses it anyway and records the override as a limitation.";
+
+    /** A throwaway Ed25519 catalog-signing key and a {@code --trust-root} file that trusts only it. */
+    private record CatalogKey(String keyid, Path trustRoot, PrivateKey privateKey) {
+        static CatalogKey create(Path work, String name) throws Exception {
+            KeyPair pair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+            byte[] spki = pair.getPublic().getEncoded();
+            byte[] raw = Arrays.copyOfRange(spki, spki.length - 32, spki.length);
+            String keyid = Sign.keyidFor(raw);
+            ObjectNode root = Json.nodes().objectNode();
+            ObjectNode entry = root.putObject("keys").putObject(keyid);
+            entry.put("public_key", Base64.getEncoder().encodeToString(raw));
+            entry.put("identity", "test://trusted-signer");
+            Path trustRoot = work.resolve(name + "-trust-root.json");
+            Files.writeString(trustRoot, Json.pretty(root));
+            return new CatalogKey(keyid, trustRoot, pair.getPrivate());
+        }
+
+        /** Signs {@code dir} over its current bytes, in the {@code catalog.sig.json} shape. */
+        void signDir(Path dir) throws IOException {
+            Files.deleteIfExists(dir.resolve("catalog.sig.json"));
+            String digest = Catalog.digestTree(dir, Set.of("catalog.sig.json"));
+            ObjectNode statement = Json.nodes().objectNode();
+            statement.put("_type", "https://in-toto.io/Statement/v1");
+            ObjectNode subject = statement.putArray("subject").addObject();
+            subject.put("name", "catalog");
+            subject.putObject("digest").put("sha256", digest.substring("sha256:".length()));
+            statement.put("predicateType", "https://agent-conformance.org/attestation/catalog/v1");
+            statement.putObject("predicate");
+            ObjectNode envelope = Sign.signStatement(statement, new Sign.Signer() {
+                @Override
+                public byte[] sign(byte[] data) {
+                    try {
+                        Signature signature = Signature.getInstance("Ed25519");
+                        signature.initSign(privateKey);
+                        signature.update(data);
+                        return signature.sign();
+                    } catch (java.security.GeneralSecurityException e) {
+                        throw new IllegalStateException(e);
+                    }
+                }
+
+                @Override
+                public String keyid() {
+                    return keyid;
+                }
+            });
+            Files.writeString(dir.resolve("catalog.sig.json"), Json.pretty(envelope));
+        }
+    }
+
+    /** A copy of the base EU AI Act catalog at {@code work/name}, with its own signature removed. */
+    private static Path unsignedCatalogCopy(Path work, String name) throws IOException {
+        Path dir = work.resolve(name);
+        try (var paths = Files.walk(CATALOG_DIR)) {
+            for (Path source : (Iterable<Path>) paths::iterator) {
+                Path target = dir.resolve(CATALOG_DIR.relativize(source).toString());
+                if (Files.isDirectory(source)) {
+                    Files.createDirectories(target);
+                } else {
+                    Files.copy(source, target);
+                }
+            }
+        }
+        Files.delete(dir.resolve("catalog.sig.json"));
+        return dir;
+    }
+
+    private static JsonNode byoAssess(Path work, String... extra) {
+        List<String> args = new ArrayList<>(List.of(
+                "assess",
+                "--bundle", QUICKSTART.resolve("evidence").toString(),
+                "--profile", QUICKSTART.resolve("applicability.yaml").toString(),
+                "--domain", QUICKSTART.resolve("domain.linkml.yaml").toString(),
+                "--catalog", "eu-ai-act@2026.09"));
+        args.addAll(List.of(extra));
+        args.addAll(List.of("--out", work.resolve("out").toString()));
+        return runJson(args.toArray(new String[0]));
+    }
+
+    private static void assertRefusal(JsonNode env, String key, String cause, String fix) {
+        assertEquals(3, env.get("exit_code").asInt(), env.toString());
+        JsonNode error = env.get("error");
+        assertEquals(key, error.get("message_key").asText());
+        if (cause != null) {
+            assertEquals(cause, error.get("detail").asText());
+        }
+        assertEquals(fix, error.get("fix").asText());
+    }
+
+    @Test
+    void assessRefusesACatalogDirSignedByAKeyTheTrustRootDoesNotKnow(@TempDir Path work) throws Exception {
+        CatalogKey key = CatalogKey.create(work, "stranger");
+        Path dir = unsignedCatalogCopy(work, "untrusted-cat");
+        key.signDir(dir);
+        JsonNode env = byoAssess(work, "--catalog-dir", dir.toString());
+        assertRefusal(env, "input.catalog_unverified",
+                "the catalog directory untrusted-cat did not verify against the effective trust root: no "
+                        + "signature verified against the trust root: no trusted key for keyid '" + key.keyid() + "'",
+                UNVERIFIED_FIX);
+        assertFalse(Files.exists(work.resolve("out")), "a refused run wrote output");
+    }
+
+    @Test
+    void assessRefusesAnUnsignedCatalogDirWithoutTheOverride(@TempDir Path work) throws Exception {
+        JsonNode env = byoAssess(work, "--catalog-dir", unsignedCatalogCopy(work, "unsigned-cat").toString());
+        assertRefusal(env, "input.catalog_unverified",
+                "the catalog directory unsigned-cat did not verify against the effective trust root: "
+                        + UNSIGNED_REASON,
+                UNVERIFIED_FIX);
+    }
+
+    @Test
+    void theOverrideAssessesAnUnsignedCatalogAndRecordsTheLimitation(@TempDir Path work) throws Exception {
+        JsonNode env = byoAssess(work,
+                "--catalog-dir", unsignedCatalogCopy(work, "unsigned-cat").toString(), "--allow-unverified-catalog");
+        assertEquals(0, env.get("exit_code").asInt(), env.toString());
+        String expected = "[\"catalog eu-ai-act@2026.09 at unsigned-cat was used unverified "
+                + "(--allow-unverified-catalog): " + UNSIGNED_REASON + "\"]";
+        assertEquals(Json.parse(expected), env.get("limitations"));
+        JsonNode manifest = Json.parseFile(work.resolve("out/manifest.json"));
+        assertEquals(Json.parse(expected), manifest.get("limitations"));
+        assertTrue(Json.parseFile(work.resolve("out/assertions.json")).size() > 0);
+    }
+
+    @Test
+    void assessAcceptsACatalogDirSignedByTheTrustRootKeyWithNoLimitation(@TempDir Path work) throws Exception {
+        CatalogKey key = CatalogKey.create(work, "signer");
+        Path dir = unsignedCatalogCopy(work, "trusted-cat");
+        key.signDir(dir);
+        JsonNode env = byoAssess(work, "--catalog-dir", dir.toString(), "--trust-root", key.trustRoot().toString());
+        assertEquals(0, env.get("exit_code").asInt(), env.toString());
+        assertFalse(env.has("limitations"));
+        assertFalse(Json.parseFile(work.resolve("out/manifest.json")).has("limitations"));
+    }
+
+    @Test
+    void assessRefusesATrustRootThatIsNotAFileEvenWithNoCatalogDir(@TempDir Path work) throws Exception {
+        String absent = work.resolve("absent.json").toString();
+        String dir = unsignedCatalogCopy(work, "unsigned-cat").toString();
+        for (String[] extra : List.of(new String[] {"--catalog-dir", dir}, new String[] {})) {
+            List<String> args = new ArrayList<>(List.of(extra));
+            args.addAll(List.of("--trust-root", absent));
+            assertRefusal(byoAssess(work, args.toArray(new String[0])), "input.trust_root_not_a_file",
+                    "the trust root '" + absent + "' is not an existing file.", "pass --trust-root <file>.");
+        }
+    }
+
+    @Test
+    void assessRefusesATrustRootThatIsNotReadableJson(@TempDir Path work) throws Exception {
+        Path root = work.resolve("bad-root.json");
+        Files.writeString(root, "{not json");
+        JsonNode env = byoAssess(work, "--trust-root", root.toString());
+        assertRefusal(env, "input.trust_root_invalid", null, TRUST_ROOT_FIX);
+        // Only the prefix: the suffix is the JSON parser's own message, which differs per engine.
+        String prefix = "the trust root '" + root + "' could not be loaded: " + root + " is not readable JSON: ";
+        assertTrue(env.get("error").get("detail").asText().startsWith(prefix), env.toString());
+    }
+
+    @Test
+    void aValidlySignedButRebrandedCatalogIsRefusedOverrideOrNot(@TempDir Path work) throws Exception {
+        CatalogKey key = CatalogKey.create(work, "rebrand");
+        Path dir = unsignedCatalogCopy(work, "rebrand-cat");
+        Path yaml = dir.resolve("catalog.yaml");
+        Files.writeString(yaml, Files.readString(yaml).replaceFirst("(?m)^id: eu-ai-act$", "id: eu-ai-act-rebrand"));
+        key.signDir(dir);
+        for (boolean override : new boolean[] {false, true}) {
+            List<String> args = new ArrayList<>(List.of(
+                    "--catalog-dir", dir.toString(), "--trust-root", key.trustRoot().toString()));
+            if (override) {
+                args.add("--allow-unverified-catalog");
+            }
+            assertRefusal(byoAssess(work, args.toArray(new String[0])), "input.catalog_mismatch",
+                    "a --catalog-dir carries 'eu-ai-act-rebrand@2026.09', which --catalog did not request "
+                            + "('eu-ai-act@2026.09').",
+                    "pass --catalog-dir for the catalog you named, or name the id@version the directory carries.");
+        }
+    }
+
+    @Test
+    void assessRefusesATrustRootWhoseTopLevelIsNotAnObject(@TempDir Path work) throws Exception {
+        Path root = work.resolve("array-root.json");
+        Files.writeString(root, "[]");
+        JsonNode env = byoAssess(work, "--trust-root", root.toString(), "--allow-unverified-catalog",
+                "--catalog-dir", unsignedCatalogCopy(work, "unsigned-cat").toString());
+        assertRefusal(env, "input.trust_root_invalid",
+                "the trust root '" + root + "' could not be loaded: " + root + " does not hold a trust-root object",
+                TRUST_ROOT_FIX);
     }
 }

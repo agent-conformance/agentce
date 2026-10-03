@@ -20,6 +20,7 @@ import java.security.PublicKey;
 import java.security.Signature;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -837,5 +838,26 @@ class VerifyTest {
         Files.writeString(dir.resolve("readme.txt"), "not a release");
         InputError error = assertThrows(InputError.class, () -> Verify.verifyRelease(dir, fixture.trust()));
         assertEquals("input.release_bundle", error.key);
+    }
+
+    // --- TrustRoot.fromDict mirrors Python's `data.get(field) or {}` (18.36 critic round 2, A). ---
+
+    @Test
+    void trustRootFromDictTreatsAFalsyKeysOrAuthoritiesValueAsEmpty() {
+        for (String empty : List.of("null", "[]", "\"\"", "0", "false")) {
+            for (String field : List.of("keys", "certificate_authorities")) {
+                Verify.TrustRoot.fromDict(Json.parse("{\"" + field + "\": " + empty + "}"));
+            }
+        }
+    }
+
+    @Test
+    void trustRootFromDictRefusesATruthyKeysValueThatIsNotAMapping() {
+        for (String bad : List.of("\"x\"", "[1]", "5", "true")) {
+            for (String field : List.of("keys", "certificate_authorities")) {
+                assertThrows(IllegalArgumentException.class,
+                        () -> Verify.TrustRoot.fromDict(Json.parse("{\"" + field + "\": " + bad + "}")), bad);
+            }
+        }
     }
 }

@@ -177,18 +177,22 @@ public final class Verify {
         /** Loads a trust root from its JSON shape. Every {@code keys} entry's declared id must equal
          * {@code keyidFor} of the key it maps to -- a forged/corrupted entry (the real signer's own
          * keyid mapped to an attacker's key) is refused, not silently accepted (matches {@code
-         * signing.py:295-297}). */
+         * signing.py:295-297}). {@code data} is already an object: the top-level check is a separate
+         * stage in {@link #loadTrustRoot}, as in Python's {@code load_trust_root}. {@code keys}/{@code
+         * certificate_authorities} each go through {@link #asMapping}, Python's {@code data.get(field)
+         * or {}} (18.36). */
         public static TrustRoot fromDict(JsonNode data) {
             Map<String, KeyEntry> keys = new LinkedHashMap<>();
-            JsonNode keysIn = data != null && data.isObject() ? data.path("keys") : Json.nodes().objectNode();
-            var keyIt = keysIn.fields();
+            var keyIt = asMapping(data.get("keys")).fields();
             while (keyIt.hasNext()) {
                 var entry = keyIt.next();
                 String keyid = entry.getKey();
                 JsonNode value = entry.getValue();
                 byte[] raw = b64dStrict(value.get("public_key"));
                 if (!Sign.keyidFor(raw).equals(keyid)) {
-                    throw new IllegalArgumentException(
+                    // Python's `from_dict` raises its own VerificationError here, which
+                    // `load_trust_root` passes through unwrapped; TrustRootError marks it the same way.
+                    throw new TrustRootError(
                             "trust root entry " + Readiness.pyRepr(Json.nodes().textNode(keyid))
                                     + " does not match its own key");
                 }
@@ -196,10 +200,7 @@ public final class Verify {
                 keys.put(keyid, new KeyEntry(raw, identity != null ? identity : keyid));
             }
             Map<String, AuthorityEntry> authorities = new LinkedHashMap<>();
-            JsonNode authsIn = data != null && data.isObject()
-                    ? data.path("certificate_authorities")
-                    : Json.nodes().objectNode();
-            var authIt = authsIn.fields();
+            var authIt = asMapping(data.get("certificate_authorities")).fields();
             while (authIt.hasNext()) {
                 var entry = authIt.next();
                 authorities.put(entry.getKey(), new AuthorityEntry(b64dStrict(entry.getValue().get("public_key"))));
@@ -228,9 +229,58 @@ public final class Verify {
      * engines/python/agentce/data/trust/dev-root.json}, pinned by {@code VerifyTest}'s sync test). */
     private static final String VENDORED_TRUST_RESOURCE = "/trust/dev-root.json";
 
-    /** Reads and parses a trust root file ({@code --trust-root}-shaped JSON) at {@code path}. */
+    /** Marks the error {@link TrustRoot#fromDict} raises itself (the content-addressing check), as
+     * opposed to a malformed shape or key, which {@link #loadTrustRoot} re-wraps (mirrors Python's
+     * {@code VerificationError} raised directly inside {@code from_dict}). */
+    private static final class TrustRootError extends IllegalArgumentException {
+        private static final long serialVersionUID = 1L;
+
+        TrustRootError(String message) {
+            super(message);
+        }
+    }
+
+    /** Python's {@code (value or {})}: a missing, null, false, zero, empty-string or empty-array value
+     * is an empty mapping; an object is itself; any other value throws, as Python's {@code .items()}
+     * on it would. */
+    private static JsonNode asMapping(JsonNode value) {
+        if (value == null || value.isNull()) {
+            return Json.nodes().objectNode();
+        }
+        if (value.isObject()) {
+            return value;
+        }
+        boolean falsy = (value.isBoolean() && !value.booleanValue())
+                || (value.isNumber() && value.doubleValue() == 0)
+                || (value.isTextual() && value.textValue().isEmpty())
+                || (value.isArray() && value.isEmpty());
+        if (falsy) {
+            return Json.nodes().objectNode();
+        }
+        throw new IllegalArgumentException("not a mapping");
+    }
+
+    /** Reads and parses a trust root file ({@code --trust-root}-shaped JSON) at {@code path}, in
+     * {@code signing.load_trust_root}'s three stages: readable JSON, a top-level object, then
+     * {@link TrustRoot#fromDict}, whose shape and key errors are re-wrapped as Python's {@code except
+     * (AttributeError, KeyError, TypeError, ValueError)} re-wraps them (18.36). */
     public static TrustRoot loadTrustRoot(Path path) {
-        return TrustRoot.fromDict(Json.parseFile(path));
+        JsonNode data;
+        try {
+            data = Json.parseFile(path);
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException(path + " is not readable JSON: " + e.getMessage(), e);
+        }
+        if (data == null || !data.isObject()) {
+            throw new IllegalArgumentException(path + " does not hold a trust-root object");
+        }
+        try {
+            return TrustRoot.fromDict(data);
+        } catch (TrustRootError e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException(path + " is not a usable trust root: " + e.getMessage(), e);
+        }
     }
 
     /** Loads the trust root vendored in the engine package. */

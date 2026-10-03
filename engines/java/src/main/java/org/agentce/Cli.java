@@ -467,21 +467,78 @@ public final class Cli {
         return found;
     }
 
-    private record Resolved(List<Catalog> catalogs, List<String> labels) {}
+    private record Resolved(List<Catalog> catalogs, List<String> labels, List<String> limitations) {}
+
+    /** The trust root catalog verification consults: {@code --trust-root}, else {@code
+     * AGENTCE_TRUST_ROOT}, else the trust root vendored in the engine (SPEC §8.7). Mirrors {@code
+     * _effective_trust_root}: resolved on every assess run, and quickstart (which has no {@code
+     * --trust-root} flag) still honours the environment variable. The fix text is Python's runtime
+     * string, not the vendored catalogue's. */
+    private static Verify.TrustRoot effectiveTrustRoot(String flagValue) {
+        String raw = flagValue != null && !flagValue.isEmpty() ? flagValue : System.getenv("AGENTCE_TRUST_ROOT");
+        if (raw == null || raw.isBlank()) {
+            return Verify.vendoredTrust();
+        }
+        String path = requireFile(raw, "trust_root", "the trust root", "pass --trust-root <file>.");
+        try {
+            return Verify.loadTrustRoot(Paths.get(path));
+        } catch (RuntimeException e) {
+            throw new InputError(
+                    "input.trust_root_invalid",
+                    "the trust root " + Readiness.pyRepr(Json.nodes().textNode(path)) + " could not be loaded: "
+                            + e.getMessage(),
+                    "pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) to a trust root in the form of the "
+                            + "engine's vendored data/trust/dev-root.json.");
+        }
+    }
+
+    /** Refuses every {@code --catalog-dir} catalog whose signature does not verify against {@code
+     * trust} (SPEC §8.7), mirroring {@code _verify_catalog_dirs}. {@code allowUnverified} lets the run
+     * proceed and returns each unverifiable catalog as a limitation instead; it covers only an absent
+     * or failing signature, never the identity cross-check in {@link #resolveCatalogs}. */
+    private static List<String> verifyCatalogDirs(
+            List<Catalog> loaded, Verify.TrustRoot trust, boolean allowUnverified) {
+        List<String> limitations = new ArrayList<>();
+        for (Catalog catalog : loaded) {
+            ObjectNode outcome = Verify.verifyCatalog(catalog.directory, trust);
+            if (outcome.get("verified").booleanValue()) {
+                continue;
+            }
+            String reason = outcome.get("reason").textValue();
+            String where = scrubPath(catalog.directory.toString());
+            if (allowUnverified) {
+                limitations.add("catalog " + catalog.id + "@" + catalog.version + " at " + where
+                        + " was used unverified (--allow-unverified-catalog): " + reason);
+                continue;
+            }
+            throw new InputError(
+                    "input.catalog_unverified",
+                    "the catalog directory " + where + " did not verify against the effective trust root: " + reason,
+                    "point --catalog-dir at a catalog whose catalog.sig.json verifies, or pass --trust-root "
+                            + "<file> (or set AGENTCE_TRUST_ROOT) for the root that signed it; "
+                            + "--allow-unverified-catalog assesses it anyway and records the override as a "
+                            + "limitation.");
+        }
+        return limitations;
+    }
 
     /**
      * The catalogs an assessment evaluates, and their {@code id@version} labels (mirrors the Python
-     * reference's {@code _resolve_catalogs}). Each {@code --catalog-dir} is loaded as given. Each
-     * requested id — the {@code --catalog} list, else the profile's declared {@code catalogs} when no
-     * directory was passed — must resolve to a directory that was passed or to a vendored catalog. A
-     * run that passes no {@code --catalog} and no {@code --catalog-dir}, whose profile declares no
+     * reference's {@code _resolve_catalogs}). Each {@code --catalog-dir} is loaded as given and its
+     * signature verified against {@code trust} first (SPEC §8.7). Each requested id — the {@code
+     * --catalog} list, else the profile's declared {@code catalogs} when no directory was passed — must
+     * resolve to a directory that was passed or to a vendored catalog, and every directory passed must
+     * be one the request names (the identity cross-check, with no override). A run that passes no {@code --catalog} and no {@code --catalog-dir}, whose profile declares no
      * catalogs, evaluates the baseline ({@link #DEFAULT_LENS}).
      */
-    private static Resolved resolveCatalogs(String requested, Profile profile, List<String> catalogDirs) {
+    private static Resolved resolveCatalogs(
+            String requested, Profile profile, List<String> catalogDirs, Verify.TrustRoot trust,
+            boolean allowUnverified) {
         List<Catalog> loaded = new ArrayList<>();
         for (String d : catalogDirs) {
             loaded.add(Catalog.load(Paths.get(requireDir(d, "catalog-dir", "the catalog directory"))));
         }
+        List<String> limitations = verifyCatalogDirs(loaded, trust, allowUnverified);
         Map<String, Catalog> byLabel = new LinkedHashMap<>();
         for (Catalog c : loaded) {
             byLabel.put(c.id + "@" + c.version, c);
@@ -543,6 +600,31 @@ public final class Cli {
                             + " (available: " + (available.isEmpty() ? "none" : String.join(", ", available)) + ").",
                     "use an available <id>@<version>, or pass --catalog-dir <dir> for a catalog on disk.");
         }
+        // A verified signature proves the bytes were not altered, not that the directory holds the
+        // catalog that was asked for: a rebranded or swapped catalog is refused here, with or without
+        // --allow-unverified-catalog (SPEC §8.7 waives only "unsigned or unverifiable").
+        if (!ids.isEmpty() && !loaded.isEmpty()) {
+            Set<String> wanted = new LinkedHashSet<>(ids);
+            List<String> unrequested = new ArrayList<>();
+            for (Catalog c : loaded) {
+                String label = c.id + "@" + c.version;
+                if (!wanted.contains(label)) {
+                    unrequested.add(Readiness.pyRepr(Json.nodes().textNode(label)));
+                }
+            }
+            if (!unrequested.isEmpty()) {
+                List<String> requestedQuoted = new ArrayList<>();
+                for (String i : ids) {
+                    requestedQuoted.add(Readiness.pyRepr(Json.nodes().textNode(i)));
+                }
+                throw new InputError(
+                        "input.catalog_mismatch",
+                        "a --catalog-dir carries " + String.join(", ", unrequested) + ", which --catalog did not "
+                                + "request (" + String.join(", ", requestedQuoted) + ").",
+                        "pass --catalog-dir for the catalog you named, or name the id@version the directory "
+                                + "carries.");
+            }
+        }
         LinkedHashSet<String> labelSet = new LinkedHashSet<>(ids);
         for (Catalog c : loaded) {
             labelSet.add(c.id + "@" + c.version);
@@ -552,7 +634,7 @@ public final class Cli {
         for (String l : labels) {
             catalogs.add(byLabel.get(l));
         }
-        return new Resolved(catalogs, labels);
+        return new Resolved(catalogs, labels, limitations);
     }
 
     private static boolean evaluatedNothing(List<Assertions.Assertion> assertions) {
@@ -677,7 +759,9 @@ public final class Cli {
             List<String> catalogDirs,
             String out,
             String state,
-            String invocationCommand) {}
+            String invocationCommand,
+            String trustRootFlag,
+            boolean allowUnverified) {}
 
     /** Run a full assessment (ingest, integrity, graph, coverage, applicability, evaluate, report) — the
      * same pipeline {@code conformance run} exercises per corpus project, generalised to an arbitrary
@@ -688,7 +772,10 @@ public final class Cli {
         String profilePath = requireFile(options.profile(), "profile", "the applicability profile");
         Path out = Paths.get(options.out());
         Profile profileObj = Profile.load(Paths.get(profilePath));
-        Resolved resolved = resolveCatalogs(options.catalog(), profileObj, options.catalogDirs());
+        // Resolved on every run, even with no --catalog-dir (python-reference.md §9).
+        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());
+        Resolved resolved = resolveCatalogs(
+                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());
 
         // Stage 1: ingest and validate. A missing/mismatching manifest aborts with exit 3.
         Bundle bundle = Bundle.load(Paths.get(bundleDir));
@@ -756,7 +843,7 @@ public final class Cli {
                 out, evaluated, bundle.digest(), resolved.labels(),
                 operatorEnv != null ? operatorEnv : "unknown",
                 invocation, supersedes, Messages.DEFAULT_LANGUAGE, resolved.catalogs(), activity, blindSpots,
-                profileObj, null, ingested.accepted);
+                profileObj, null, ingested.accepted, resolved.limitations());
         if (state != null) {
             state.record(bundle.digest(), out.resolve("manifest.json"), newWindowEnd);
         }
@@ -800,6 +887,14 @@ public final class Cli {
         if (options.state() != null) {
             ArrayNode supersedesArr = result.data.putArray("supersedes");
             supersedes.forEach(supersedesArr::add);
+        }
+        if (!resolved.limitations().isEmpty()) {
+            // The override is never silent: on stderr for the operator and in the manifest (SPEC §8.7).
+            ArrayNode limitationsArr = result.data.putArray("limitations");
+            for (String limitation : resolved.limitations()) {
+                limitationsArr.add(limitation);
+                result.note(limitation);
+            }
         }
         if (nonConformant > 0) {
             result.addCode(ExitCode.FINDINGS.code);
@@ -860,7 +955,9 @@ public final class Cli {
                 flagValues(args, "catalog-dir"),
                 outArg != null ? outArg : DEFAULT_OUT_DIR,
                 flagValue(args, "state"),
-                "assess"));
+                "assess",
+                flagValue(args, "trust-root"),
+                Arrays.asList(args).contains("--allow-unverified-catalog")));
     }
 
     /** Assess the bundled quickstart project end to end — one command, offline (SPEC §13.4 AX-1). */
@@ -884,7 +981,9 @@ public final class Cli {
                 List.of(catalogDir.toString()),
                 out,
                 null,
-                "quickstart"));
+                "quickstart",
+                null,
+                false));
         result.data.setAll(assess.data);
         result.data.put("quickstart", "ok");
         for (int code : assess.applicableCodes()) {
