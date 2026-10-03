@@ -1024,6 +1024,9 @@ export interface ManifestOptions {
   invocation: string[];
   supersedes: string[];
   reportLanguage?: string;
+  /** What `--allow-unverified-catalog` waived (SPEC §8.7): absent from an ordinary run's manifest,
+   * never an empty array (18.36). */
+  limitations?: string[];
 }
 
 export function buildManifest(options: ManifestOptions): Record<string, unknown> {
@@ -1058,6 +1061,9 @@ export function buildManifest(options: ManifestOptions): Record<string, unknown>
   };
   if (options.supersedes.length > 0) {
     manifest.supersedes = options.supersedes;
+  }
+  if (options.limitations !== undefined && options.limitations.length > 0) {
+    manifest.limitations = options.limitations;
   }
   return manifest;
 }
@@ -1094,6 +1100,8 @@ export interface WriteReportOptions {
   /** Mirrors `summarizeActivity`'s own parameter and default: every subject in `profile` counts as
    * declared when omitted. */
   declaredSubjectIds?: ReadonlySet<string>;
+  /** What `--allow-unverified-catalog` waived (SPEC §8.7, 18.36); forwarded to `buildManifest`. */
+  limitations?: string[];
 }
 
 function bareSubject(id: string): Subject {
@@ -1263,6 +1271,7 @@ export function writeReport(
     invocation: options.invocation ?? [],
     supersedes: options.supersedes ?? [],
     reportLanguage: language,
+    limitations: options.limitations,
   });
   writeFileSync(join(outDir, "manifest.json"), JSON.stringify(sortKeysDeep(manifest), null, 2));
   return manifest;

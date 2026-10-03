@@ -67,7 +67,13 @@ import {
   writeJsonl,
 } from "./util";
 import { summarize } from "./verdict";
-import { vendoredTrust, verifyCatalog, verifyRelease } from "./verify";
+import {
+  type TrustRoot,
+  loadTrustRoot,
+  vendoredTrust,
+  verifyCatalog,
+  verifyRelease,
+} from "./verify";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
 const DEFAULT_OUT_DIR = "out";
@@ -344,21 +350,93 @@ function vendoredCatalogs(): Map<string, string> {
   return found;
 }
 
+/** The trust root catalog verification consults: `--trust-root`, else `AGENTCE_TRUST_ROOT`, else the
+ * trust root vendored in the engine (SPEC §8.7). Mirrors `_effective_trust_root` exactly, including
+ * running unconditionally (even with zero `--catalog-dir`s) and honoring `AGENTCE_TRUST_ROOT` for
+ * `quickstart` too, which calls this with `flagValue` left `undefined` (it exposes no `--trust-root`
+ * flag of its own, matching Python's namespace-without-the-attribute shape). The runtime fix text
+ * below is Python's own literal string, NOT the vendored catalogue's `errors.input.trust_root_invalid
+ * .fix` (18.36 critic round 1: the two differ; only `report.*`/`verdict.*`/etc. report strings are
+ * vendored and loaded, never a hand-written CLI `InputError`'s text, per 18.35's scope). */
+function effectiveTrustRoot(
+  flagValue: string | undefined,
+  envValue: string | undefined,
+): TrustRoot {
+  const raw = flagValue || envValue;
+  if (raw === undefined || raw.trim() === "") {
+    return vendoredTrust();
+  }
+  const path = requireFile(raw, "trust_root", "the trust root");
+  try {
+    return loadTrustRoot(path);
+  } catch (exc) {
+    const message = exc instanceof Error ? exc.message : String(exc);
+    throw new InputError(
+      "input.trust_root_invalid",
+      `the trust root ${pyRepr(path)} could not be loaded: ${message}`,
+      "pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) to a trust root in the form of the " +
+        "engine's vendored data/trust/dev-root.json.",
+    );
+  }
+}
+
+/** Refuses every `--catalog-dir` catalog whose signature does not verify against `trust` (SPEC
+ * §8.7), mirroring `_verify_catalog_dirs` exactly. `allowUnverified` (`--allow-unverified-catalog`)
+ * lets the run proceed and records each unverifiable catalog as a limitation string instead; it
+ * covers only an absent or failing signature -- the identity cross-check in `resolveCatalogs` has no
+ * override. */
+function verifyCatalogDirs(
+  loaded: Catalog[],
+  trust: TrustRoot,
+  allowUnverified: boolean,
+): string[] {
+  const limitations: string[] = [];
+  for (const catalog of loaded) {
+    const outcome = verifyCatalog(catalog.directory, trust);
+    if (outcome.verified) {
+      continue;
+    }
+    if (allowUnverified) {
+      limitations.push(
+        `catalog ${catalog.id}@${catalog.version} at ${scrubPath(catalog.directory)} was used ` +
+          `unverified (--allow-unverified-catalog): ${outcome.reason}`,
+      );
+      continue;
+    }
+    throw new InputError(
+      "input.catalog_unverified",
+      `the catalog directory ${scrubPath(catalog.directory)} did not verify against the ` +
+        `effective trust root: ${outcome.reason}`,
+      "point --catalog-dir at a catalog whose catalog.sig.json verifies, or pass --trust-root " +
+        "<file> (or set AGENTCE_TRUST_ROOT) for the root that signed it; --allow-unverified-" +
+        "catalog assesses it anyway and records the override as a limitation.",
+    );
+  }
+  return limitations;
+}
+
 /**
  * The catalogs an assessment evaluates, and their `id@version` labels (mirrors the Python reference's
- * `_resolve_catalogs`). Each `--catalog-dir` is loaded as given. Each requested id — the `--catalog`
- * list, else the profile's declared `catalogs` when no directory was passed — must resolve to a
- * directory that was passed or to a vendored catalog. A run that passes no `--catalog` and no
- * `--catalog-dir`, whose profile declares no catalogs, evaluates the baseline (`DEFAULT_LENS`).
+ * `_resolve_catalogs`). Each `--catalog-dir` is loaded as given and its signature verified against
+ * `trust` before anything else happens (SPEC §8.7). Each requested id — the `--catalog` list, else
+ * the profile's declared `catalogs` when no directory was passed — must resolve to a directory that
+ * was passed or to a vendored catalog, and every directory that was passed must be one the request
+ * names (the identity cross-check below, unconditional on `allowUnverified`: a verified signature
+ * proves the bytes were not altered, not that the directory holds the catalog that was asked for). A
+ * run that passes no `--catalog` and no `--catalog-dir`, whose profile declares no catalogs,
+ * evaluates the baseline (`DEFAULT_LENS`).
  */
 function resolveCatalogs(
   requested: string | undefined,
   profile: Profile,
   catalogDirs: string[],
-): { catalogs: Catalog[]; labels: string[] } {
+  trust: TrustRoot,
+  allowUnverified: boolean,
+): { catalogs: Catalog[]; labels: string[]; limitations: string[] } {
   const loaded = catalogDirs.map((d) =>
     loadCatalog(requireDir(d, "catalog-dir", "the catalog directory")),
   );
+  const limitations = verifyCatalogDirs(loaded, trust, allowUnverified);
   const byLabel = new Map<string, Catalog>();
   for (const c of loaded) {
     byLabel.set(`${c.id}@${c.version}`, c);
@@ -403,8 +481,28 @@ function resolveCatalogs(
       "use an available <id>@<version>, or pass --catalog-dir <dir> for a catalog on disk.",
     );
   }
+  // A verified signature proves the bytes were not altered; it does not prove the directory holds
+  // the catalog that was asked for. When both a request and a directory were given, every directory
+  // must carry an id@version the request names -- a rebranded or swapped catalog is refused here
+  // even though its own signature verifies. Deliberately separate from the signature check above and
+  // with no override: SPEC §8.7's --allow-unverified-catalog waives "unsigned or unverifiable", and a
+  // catalog whose signature verifies but whose identity is not the one requested is neither.
+  if (ids.length > 0 && loaded.length > 0) {
+    const wanted = new Set(ids);
+    const unrequested = loaded
+      .map((c) => `${c.id}@${c.version}`)
+      .filter((label) => !wanted.has(label));
+    if (unrequested.length > 0) {
+      throw new InputError(
+        "input.catalog_mismatch",
+        `a --catalog-dir carries ${unrequested.map((u) => pyRepr(u)).join(", ")}, which --catalog ` +
+          `did not request (${ids.map((i) => pyRepr(i)).join(", ")}).`,
+        "pass --catalog-dir for the catalog you named, or name the id@version the directory carries.",
+      );
+    }
+  }
   const labels = [...new Set([...ids, ...loaded.map((c) => `${c.id}@${c.version}`)])];
-  return { catalogs: labels.map((l) => byLabel.get(l) as Catalog), labels };
+  return { catalogs: labels.map((l) => byLabel.get(l) as Catalog), labels, limitations };
 }
 
 /** The exit-3 error for a run whose every (control, subject) pair was inapplicable or unassessed. */
@@ -521,6 +619,13 @@ interface AssessOptions {
   out: string;
   state?: string;
   invocationCommand: string;
+  /** `--trust-root`'s value, `undefined` when the flag was not given. `cmdQuickstart` leaves this
+   * `undefined` since it exposes no `--trust-root` flag of its own; `AGENTCE_TRUST_ROOT` still
+   * applies there (`effectiveTrustRoot` reads it unconditionally), matching Python's namespace-
+   * without-the-attribute shape (python-reference.md §10, 18.36). */
+  trustRootFlag?: string;
+  /** `--allow-unverified-catalog`, `undefined`/`false` when not given. */
+  allowUnverified?: boolean;
 }
 
 /** Run a full assessment (ingest, integrity, graph, coverage, applicability, evaluate, report) — the
@@ -531,10 +636,19 @@ function runAssess(options: AssessOptions): CommandResult {
   const profilePath = requireFile(options.profile, "profile", "the applicability profile");
   const out = options.out;
   const profileObj = loadProfile(profilePath);
-  const { catalogs, labels: catalogLabels } = resolveCatalogs(
+  // The effective trust root resolves on every run, unconditionally -- even with zero
+  // `--catalog-dir`s (python-reference.md §9) -- before `resolveCatalogs` ever inspects one.
+  const trust = effectiveTrustRoot(options.trustRootFlag, process.env.AGENTCE_TRUST_ROOT);
+  const {
+    catalogs,
+    labels: catalogLabels,
+    limitations,
+  } = resolveCatalogs(
     options.catalog,
     profileObj,
     options.catalogDirs,
+    trust,
+    options.allowUnverified ?? false,
   );
 
   // Stage 1: ingest and validate. A missing/mismatching manifest aborts with exit 3.
@@ -593,6 +707,7 @@ function runAssess(options: AssessOptions): CommandResult {
     blindSpots,
     events: ingested.accepted,
     profile: profileObj,
+    limitations,
   });
   if (state !== null) {
     state.record(bundle.digest, join(out, "manifest.json"), newWindowEnd);
@@ -621,6 +736,14 @@ function runAssess(options: AssessOptions): CommandResult {
   result.data.blind_spots = blindSpots;
   if (options.state !== undefined) {
     result.data.supersedes = supersedes;
+  }
+  if (limitations.length > 0) {
+    // The override is never silent: on stderr for the operator and in the manifest for every later
+    // reader (SPEC §8.7).
+    result.data.limitations = limitations;
+    for (const limitation of limitations) {
+      result.note(limitation);
+    }
   }
   if (nonConformant > 0) {
     result.addCode(ExitCode.FINDINGS);
@@ -686,6 +809,8 @@ function cmdAssess(argv: string[]): CommandResult {
     out: flagValue(argv, "out") ?? DEFAULT_OUT_DIR,
     state: flagValue(argv, "state"),
     invocationCommand: "assess",
+    trustRootFlag: flagValue(argv, "trust-root"),
+    allowUnverified: argv.includes("--allow-unverified-catalog"),
   });
 }
 

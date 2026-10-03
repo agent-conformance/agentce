@@ -41,6 +41,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   );
 }
 
+/** Mirrors Python's `(data.get(field) or {}).items()`: a falsy value (`undefined`/`null`/`false`/`0`/
+ * `""`/an empty array) is treated as empty, no entries, no throw; a plain object (empty or not) is
+ * returned as-is; any other truthy, non-mapping value (a non-empty array, a non-empty string, a
+ * number, `true`) throws, mirroring the `AttributeError` Python raises calling `.items()` on it. */
+function asMapping(value: unknown): Record<string, unknown> {
+  if (isRecord(value)) {
+    return value;
+  }
+  const falsy =
+    value === undefined ||
+    value === null ||
+    value === false ||
+    value === 0 ||
+    value === "" ||
+    (Array.isArray(value) && value.length === 0);
+  if (falsy) {
+    return {};
+  }
+  throw new Error("not a mapping");
+}
+
 /** The deepest container nesting {@link parseUntrustedJson} accepts (mirrors `signing.MAX_JSON_DEPTH`,
  * Jackson's own default, so all three engines refuse at the same depth). */
 export const MAX_JSON_DEPTH = 1000;
@@ -155,6 +176,12 @@ function verifyCertificate(
   }
 }
 
+/** Marks an error `TrustRoot.fromDict` raises directly, itself (the content-addressing check),
+ * mirroring Python's own `VerificationError` raised directly inside `from_dict` -- as opposed to a
+ * bare language exception (`.items()` on a non-mapping, a malformed key's `AttributeError`/
+ * `KeyError`/`TypeError`/`ValueError`) that `load_trust_root` catches and re-wraps. */
+class TrustRootError extends Error {}
+
 /** The offline material a verifier trusts: pinned KMS keys and keyless certificate authorities
  * (mirrors `signing.TrustRoot` exactly). */
 export class TrustRoot {
@@ -165,22 +192,33 @@ export class TrustRoot {
 
   /** Loads a trust root from its JSON shape. Every `keys` entry's declared id must equal
    * `keyidFor` of the key it maps to -- a forged/corrupted entry (the real signer's own keyid
-   * mapped to an attacker's key) is refused, not silently accepted (`signing.py:295-297`). */
-  static fromDict(data: unknown): TrustRoot {
-    const root = isRecord(data) ? data : {};
+   * mapped to an attacker's key) is refused, not silently accepted (`signing.py:295-297`). The
+   * top-level-is-an-object check is deliberately not here: it is a separate stage in
+   * `loadTrustRoot`, matching Python's own two-stage split (`load_trust_root`'s `isinstance(data,
+   * dict)` check is outside `from_dict`, `signing.py:570-571`); this method assumes `data` already
+   * is one, exactly as Python's own `data.get(...)` calls assume. `keys`/`certificate_authorities`
+   * each go through {@link asMapping}, matching Python's `data.get(field) or {}` falsy-tolerant
+   * semantics field for field (verifier round 2, 18.36 critic round 2): `null`/`false`/`0`/`""`/an
+   * empty array means no entries, not a throw; a truthy non-mapping (a non-empty array or string, a
+   * number, `true`) throws, as Python's `.items()` on that same value would. */
+  static fromDict(data: Record<string, unknown>): TrustRoot {
     const keys = new Map<string, KeyEntry>();
-    const keysIn = isRecord(root.keys) ? root.keys : {};
+    const keysIn = asMapping(data.keys);
     for (const [keyid, raw] of Object.entries(keysIn)) {
       const entry = isRecord(raw) ? raw : {};
       const publicKeyRaw = b64dStrict(String(entry.public_key));
       if (keyidFor(publicKeyRaw) !== keyid) {
-        throw new Error(`trust root entry ${pyRepr(keyid)} does not match its own key`);
+        // Python's `from_dict` raises its own `VerificationError` here directly, so
+        // `load_trust_root`'s `except (AttributeError, KeyError, TypeError, ValueError)` never
+        // catches and re-wraps it -- `TrustRootError` marks it the same way, so `loadTrustRoot`
+        // below passes it through unwrapped too.
+        throw new TrustRootError(`trust root entry ${pyRepr(keyid)} does not match its own key`);
       }
       const identity = typeof entry.identity === "string" ? entry.identity : keyid;
       keys.set(keyid, { publicKeyRaw, identity });
     }
     const authorities = new Map<string, AuthorityEntry>();
-    const authsIn = isRecord(root.certificate_authorities) ? root.certificate_authorities : {};
+    const authsIn = asMapping(data.certificate_authorities);
     for (const [issuer, raw] of Object.entries(authsIn)) {
       const entry = isRecord(raw) ? raw : {};
       authorities.set(issuer, { publicKeyRaw: b64dStrict(String(entry.public_key)) });
@@ -210,9 +248,27 @@ export function vendoredTrustPath(): string {
   return join(__dirname, "..", "data", "trust", "dev-root.json");
 }
 
-/** Reads and parses a trust root file (`--trust-root`-shaped JSON) at `path`. */
+/** Reads and parses a trust root file (`--trust-root`-shaped JSON) at `path` (mirrors
+ * `signing.load_trust_root` exactly, including its own two-stage split): the top level must be a
+ * plain object (Python's `isinstance(data, dict)` check, `signing.py:570-571`) before `TrustRoot.
+ * fromDict` ever runs, and any error `fromDict` itself throws (a non-mapping `keys`/
+ * `certificate_authorities`, a malformed key entry) is re-wrapped the same way Python's `except
+ * (AttributeError, KeyError, TypeError, ValueError)` catches and re-raises it (`signing.py:572-578`).
+ * Callers (`effectiveTrustRoot`) catch whatever this throws and surface `input.trust_root_invalid`. */
 export function loadTrustRoot(path: string): TrustRoot {
-  return TrustRoot.fromDict(JSON.parse(readFileSync(path, "utf-8")));
+  const data: unknown = JSON.parse(readFileSync(path, "utf-8"));
+  if (!isRecord(data)) {
+    throw new Error(`${path} does not hold a trust-root object`);
+  }
+  try {
+    return TrustRoot.fromDict(data);
+  } catch (exc) {
+    if (exc instanceof TrustRootError) {
+      throw exc;
+    }
+    const message = exc instanceof Error ? exc.message : String(exc);
+    throw new Error(`${path} is not a usable trust root: ${message}`);
+  }
 }
 
 /** Loads the trust root vendored in the engine package. */
