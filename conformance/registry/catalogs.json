@@ -14,7 +14,7 @@
     {
       "id": "eu-ai-act",
       "version": "2026.09",
-      "digest": "sha256:93f202486da06841c647f2cfa0551fecfd5c4ecedf29e414ec4a499df8e2f5b1",
+      "digest": "sha256:c02daa4fd868eadbb921517c45469ac978eccde00531150b2f716ac4b825bbe5",
       "source_path": "spec/catalogs/base/eu-ai-act",
       "signing": {
         "signature_file": "catalog.sig.json",

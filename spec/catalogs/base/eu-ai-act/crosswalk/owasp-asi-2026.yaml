@@ -43,7 +43,7 @@ obligations:
     controls: []
     verified_against_text: false
   - ref: "ASI03"
-    obligation: Identity and privilege abuse is countered -- delegations carry the granting principal and scope, with access checked against them before a consequential action proceeds.
+    obligation: Identity and privilege abuse is traceable -- delegations carry the granting principal and scope, with access checked against them before a consequential action proceeds.
     schema_elements: [DelegationIssued, AuthzCheck, ResourceAccess]
     rungs: [0, 1, 2]
     controls: []
