@@ -222,6 +222,60 @@ def test_18_16_baseline_controls_cite_their_new_mitre_atlas_and_owasp_acs_pairs(
     assert expected_pairs <= pairs
 
 
+@pytest.mark.parametrize(
+    ("control_id", "expected_pairs"),
+    [
+        ("INT-01", {("owasp-asi-2026", "ASI10"), ("owasp-asi-2026", "ASI03")}),
+        ("OVS-03", {("owasp-asi-2026", "ASI09"), ("owasp-asi-2026", "ASI10")}),
+        ("REC-01", {("owasp-asi-2026", "ASI03")}),
+        ("REC-04", {("owasp-asi-2026", "ASI01"), ("owasp-asi-2026", "ASI03")}),
+        ("ROB-02", {("owasp-asi-2026", "ASI06"), ("owasp-asi-2026", "ASI05")}),
+    ],
+)
+def test_18_16a_baseline_controls_cite_the_official_asi_ids(
+    control_id: str, expected_pairs: set[tuple[str, str]]
+) -> None:
+    """18.16a: the crosswalk file this item rewrote uses the real OWASP Top 10 for Agentic
+    Applications 2026 ids (ASI01-ASI10), never the prior T1-T13 scheme from a different, older
+    taxonomy. Read live from each control's own YAML on disk, so a future edit that reintroduces a
+    T-id or mistypes an ASI id is caught here, not only by the acceptance grep."""
+    path = _BASELINE / "controls" / f"{control_id}.yaml"
+    control = yaml.safe_load(path.read_text(encoding="utf-8"))
+    pairs = {(e["framework"], e["clause"]) for e in control["crosswalk"]}
+    assert expected_pairs <= pairs
+
+
+def test_no_t_id_remains_under_owasp_asi_2026_in_any_catalog_copy() -> None:
+    """18.16a: a `T<n>` clause under `owasp-asi-2026` anywhere (the crosswalk file itself or any of
+    the five controls that cite it) means the old, wrong taxonomy crept back in -- across the
+    specification tree and every vendored engine copy."""
+    t_id = re.compile(r'framework:\s*owasp-asi-2026,\s*clause:\s*"T\d+"')
+    roots = [
+        _BASE,
+        *(
+            _REPO_ROOT / "engines" / eng / rel
+            for eng, rel in (
+                ("python", Path("agentce") / "data" / "catalogs" / "base"),
+                ("typescript", Path("data") / "catalogs" / "base"),
+                ("java", Path("src") / "main" / "resources" / "catalogs" / "base"),
+            )
+        ),
+    ]
+    for root in roots:
+        for path in root.rglob("*.yaml"):
+            assert not t_id.search(path.read_text(encoding="utf-8")), path
+
+
+def test_every_official_asi_id_is_present() -> None:
+    """18.16a: ASI01 through ASI10 (the full official list) are all named in the crosswalk file --
+    never a partial rename that drops one of the ten."""
+    data = yaml.safe_load(
+        (_CROSSWALKS / "owasp-asi-2026.yaml").read_text(encoding="utf-8")
+    )
+    refs = {o["ref"] for o in data["obligations"]}
+    assert refs == {f"ASI{i:02d}" for i in range(1, 11)}
+
+
 def test_the_baseline_covers_the_shared_areas_and_cites_only_clause_level_standards() -> (
     None
 ):

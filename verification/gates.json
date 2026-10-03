@@ -126,6 +126,12 @@
           "file": "engines/typescript/data/catalogs/base/baseline/catalog.yaml",
           "search": "min_crosswalk_frameworks: 2",
           "replace": "min_crosswalk_frameworks: 1"
+        },
+        {
+          "description": "18.16a: a control's owasp-asi-2026 citation regresses from the official ASI01-ASI10 numbering back to the old, wrong T1-T13 scheme",
+          "file": "spec/catalogs/base/baseline/controls/ROB-02.yaml",
+          "search": "{framework: owasp-asi-2026, clause: \"ASI06\", relation: maps, verified_against_text: false}",
+          "replace": "{framework: owasp-asi-2026, clause: \"T1\", relation: maps, verified_against_text: false}"
         }
       ],
       "fix_hint": "Run the gate's command from engines/python and read the failing test; the catalog is spec/catalogs/base/baseline and its vendored copies are re-made and re-signed with conformance/dev_trust.py."
