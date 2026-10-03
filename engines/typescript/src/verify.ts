@@ -256,7 +256,13 @@ export function vendoredTrustPath(): string {
  * (AttributeError, KeyError, TypeError, ValueError)` catches and re-raises it (`signing.py:572-578`).
  * Callers (`effectiveTrustRoot`) catch whatever this throws and surface `input.trust_root_invalid`. */
 export function loadTrustRoot(path: string): TrustRoot {
-  const data: unknown = JSON.parse(readFileSync(path, "utf-8"));
+  let data: unknown;
+  try {
+    data = JSON.parse(readFileSync(path, "utf-8"));
+  } catch (exc) {
+    const message = exc instanceof Error ? exc.message : String(exc);
+    throw new Error(`${path} is not readable JSON: ${message}`);
+  }
   if (!isRecord(data)) {
     throw new Error(`${path} does not hold a trust-root object`);
   }

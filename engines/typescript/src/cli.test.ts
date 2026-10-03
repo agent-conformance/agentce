@@ -5,8 +5,14 @@
  */
 
 import assert from "node:assert/strict";
-import { createPublicKey, verify as cryptoVerify, generateKeyPairSync } from "node:crypto";
 import {
+  createPublicKey,
+  sign as cryptoSign,
+  verify as cryptoVerify,
+  generateKeyPairSync,
+} from "node:crypto";
+import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -20,6 +26,8 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { quickstartDir } from "./bundled";
 import { main } from "./cli";
+import { digestTree } from "./report";
+import { keyidFor, signStatement } from "./sign";
 
 function runJson(argv: string[]): { exitCode: number; envelope: Record<string, unknown> } {
   const lines: string[] = [];
@@ -1562,4 +1570,274 @@ test("verify: a usage error is the keyed envelope Python and Java give, and an a
     assert.equal(exitCode, 3, argv.join(" "));
     assert.deepEqual([error.message_key, error.detail], ["input.verify_unrecognized_flag", detail]);
   }
+});
+
+// --- assess --catalog-dir signature verification (SPEC §8.7, 18.36): every scenario in the Python
+// reference capture (evidence P18-18.36/python-reference.md), with Python's literal cause/fix text. ---
+
+const UNSIGNED_REASON =
+  "unsigned: catalog.sig.json is absent, so there is no signature to verify (SPEC §8.7).";
+const TRUST_ROOT_FIX =
+  "pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) to a trust root in the form of the " +
+  "engine's vendored data/trust/dev-root.json.";
+const UNVERIFIED_FIX =
+  "point --catalog-dir at a catalog whose catalog.sig.json verifies, or pass --trust-root <file> " +
+  "(or set AGENTCE_TRUST_ROOT) for the root that signed it; --allow-unverified-catalog assesses it " +
+  "anyway and records the override as a limitation.";
+
+interface CatalogKey {
+  readonly keyid: string;
+  /** A `--trust-root` file that trusts this key and nothing else. */
+  readonly trustRoot: string;
+  /** Signs `dir` over its current bytes (the `catalog.sig.json` shape `catalog sign` writes). */
+  signDir(dir: string): void;
+}
+
+/** A throwaway Ed25519 catalog-signing key under `work`, as `test_catalog_signature.py` builds. */
+function catalogKey(work: string, name: string): CatalogKey {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const raw = Buffer.from(publicKey.export({ type: "spki", format: "der" }).subarray(12));
+  const keyid = keyidFor(raw);
+  const trustRoot = join(work, `${name}-trust-root.json`);
+  writeFileSync(
+    trustRoot,
+    JSON.stringify({
+      keys: { [keyid]: { public_key: raw.toString("base64"), identity: "test://trusted-signer" } },
+    }),
+  );
+  return {
+    keyid,
+    trustRoot,
+    signDir(dir: string): void {
+      rmSync(join(dir, "catalog.sig.json"), { force: true });
+      const digest = digestTree(dir, new Set(["catalog.sig.json"]));
+      const statement = {
+        _type: "https://in-toto.io/Statement/v1",
+        subject: [{ name: "catalog", digest: { sha256: digest.slice("sha256:".length) } }],
+        predicateType: "https://agent-conformance.org/attestation/catalog/v1",
+        predicate: {},
+      };
+      const envelope = signStatement(statement, {
+        keyid,
+        sign: (data: Buffer) => cryptoSign(null, data, privateKey),
+      });
+      writeFileSync(join(dir, "catalog.sig.json"), JSON.stringify(envelope));
+    },
+  };
+}
+
+/** A copy of the base EU AI Act catalog at `work/<name>`, with its own signature removed. */
+function unsignedCatalogCopy(work: string, name: string): string {
+  const dir = join(work, name);
+  cpSync(join(REPO, "spec", "catalogs", "base", "eu-ai-act"), dir, { recursive: true });
+  rmSync(join(dir, "catalog.sig.json"));
+  return dir;
+}
+
+function byoAssess(work: string, extra: string[]): ReturnType<typeof runJson> & { out: string } {
+  const quickstart = quickstartDir();
+  const out = join(work, "out");
+  return {
+    ...runJson([
+      "assess",
+      "--bundle",
+      join(quickstart, "evidence"),
+      "--profile",
+      join(quickstart, "applicability.yaml"),
+      "--domain",
+      join(quickstart, "domain.linkml.yaml"),
+      "--catalog",
+      "eu-ai-act@2026.09",
+      ...extra,
+      "--out",
+      out,
+    ]),
+    out,
+  };
+}
+
+function refusal(envelope: Record<string, unknown>): { key: string; cause: string; fix: string } {
+  const error = envelope.error as { message_key: string; detail: string; fix: string };
+  return { key: error.message_key, cause: error.detail, fix: error.fix };
+}
+
+function withWork(prefix: string, body: (work: string) => void): void {
+  const work = mkdtempSync(join(tmpdir(), prefix));
+  try {
+    body(work);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+test("assess refuses a --catalog-dir signed by a key the trust root does not know (18.36 §1)", () => {
+  withWork("agentce-byo-untrusted-", (work) => {
+    const key = catalogKey(work, "stranger");
+    const dir = unsignedCatalogCopy(work, "untrusted-cat");
+    key.signDir(dir);
+    const { exitCode, envelope, out } = byoAssess(work, ["--catalog-dir", dir]);
+    assert.equal(exitCode, 3);
+    assert.deepEqual(refusal(envelope), {
+      key: "input.catalog_unverified",
+      cause: `the catalog directory untrusted-cat did not verify against the effective trust root: no signature verified against the trust root: no trusted key for keyid '${key.keyid}'`,
+      fix: UNVERIFIED_FIX,
+    });
+    assert.equal(existsSync(out), false, "a refused run wrote output");
+  });
+});
+
+test("assess refuses an unsigned --catalog-dir without the override (18.36 §2)", () => {
+  withWork("agentce-byo-unsigned-", (work) => {
+    const dir = unsignedCatalogCopy(work, "unsigned-cat");
+    const { exitCode, envelope } = byoAssess(work, ["--catalog-dir", dir]);
+    assert.equal(exitCode, 3);
+    assert.deepEqual(refusal(envelope), {
+      key: "input.catalog_unverified",
+      cause: `the catalog directory unsigned-cat did not verify against the effective trust root: ${UNSIGNED_REASON}`,
+      fix: UNVERIFIED_FIX,
+    });
+  });
+});
+
+test("--allow-unverified-catalog assesses an unsigned catalog and records the limitation (18.36 §3)", () => {
+  withWork("agentce-byo-override-", (work) => {
+    const dir = unsignedCatalogCopy(work, "unsigned-cat");
+    const { exitCode, envelope, out } = byoAssess(work, [
+      "--catalog-dir",
+      dir,
+      "--allow-unverified-catalog",
+    ]);
+    assert.equal(exitCode, 0);
+    const expected = [
+      `catalog eu-ai-act@2026.09 at unsigned-cat was used unverified (--allow-unverified-catalog): ${UNSIGNED_REASON}`,
+    ];
+    assert.deepEqual(envelope.limitations, expected);
+    const manifest = JSON.parse(readFileSync(join(out, "manifest.json"), "utf-8"));
+    assert.deepEqual(manifest.limitations, expected);
+    const assertions = JSON.parse(readFileSync(join(out, "assertions.json"), "utf-8"));
+    assert.ok(assertions.length > 0, "the overridden run evaluated nothing");
+  });
+});
+
+test("assess accepts a --catalog-dir signed by the --trust-root key, with no limitation (18.36 §4, §8)", () => {
+  withWork("agentce-byo-trusted-", (work) => {
+    const key = catalogKey(work, "signer");
+    const dir = unsignedCatalogCopy(work, "trusted-cat");
+    key.signDir(dir);
+    const { exitCode, envelope, out } = byoAssess(work, [
+      "--catalog-dir",
+      dir,
+      "--trust-root",
+      key.trustRoot,
+    ]);
+    assert.equal(exitCode, 0, JSON.stringify(envelope.error));
+    assert.equal("limitations" in envelope, false);
+    const manifest = JSON.parse(readFileSync(join(out, "manifest.json"), "utf-8"));
+    assert.equal("limitations" in manifest, false);
+  });
+});
+
+test("assess refuses a --trust-root that is not a file, even with no --catalog-dir (18.36 §5, §9)", () => {
+  withWork("agentce-byo-absent-root-", (work) => {
+    const absent = join(work, "absent.json");
+    for (const extra of [["--catalog-dir", unsignedCatalogCopy(work, "unsigned-cat")], []]) {
+      const { exitCode, envelope } = byoAssess(work, [...extra, "--trust-root", absent]);
+      assert.equal(exitCode, 3);
+      assert.deepEqual(refusal(envelope), {
+        key: "input.trust_root_not_a_file",
+        cause: `the trust root '${absent}' is not an existing file.`,
+        fix: "pass --trust-root <file>.",
+      });
+    }
+  });
+});
+
+test("assess refuses a --trust-root that is not readable JSON (18.36 §6)", () => {
+  withWork("agentce-byo-bad-json-", (work) => {
+    const root = join(work, "bad-root.json");
+    writeFileSync(root, "{not json");
+    const { exitCode, envelope } = byoAssess(work, ["--trust-root", root]);
+    assert.equal(exitCode, 3);
+    const got = refusal(envelope);
+    assert.equal(got.key, "input.trust_root_invalid");
+    assert.equal(got.fix, TRUST_ROOT_FIX);
+    // Only the prefix: the suffix is the JSON parser's own message, which differs per engine.
+    assert.ok(
+      got.cause.startsWith(
+        `the trust root '${root}' could not be loaded: ${root} is not readable JSON: `,
+      ),
+      got.cause,
+    );
+  });
+});
+
+test("a validly signed but rebranded --catalog-dir is refused, override or not (18.36 §7)", () => {
+  withWork("agentce-byo-rebrand-", (work) => {
+    const key = catalogKey(work, "rebrand");
+    const dir = unsignedCatalogCopy(work, "rebrand-cat");
+    const yamlPath = join(dir, "catalog.yaml");
+    writeFileSync(
+      yamlPath,
+      readFileSync(yamlPath, "utf-8").replace(/^id: eu-ai-act$/m, "id: eu-ai-act-rebrand"),
+    );
+    key.signDir(dir);
+    for (const override of [[], ["--allow-unverified-catalog"]]) {
+      const { exitCode, envelope } = byoAssess(work, [
+        "--catalog-dir",
+        dir,
+        "--trust-root",
+        key.trustRoot,
+        ...override,
+      ]);
+      assert.equal(exitCode, 3);
+      assert.deepEqual(refusal(envelope), {
+        key: "input.catalog_mismatch",
+        cause:
+          "a --catalog-dir carries 'eu-ai-act-rebrand@2026.09', which --catalog did not request " +
+          "('eu-ai-act@2026.09').",
+        fix: "pass --catalog-dir for the catalog you named, or name the id@version the directory carries.",
+      });
+    }
+  });
+});
+
+test("quickstart honors AGENTCE_TRUST_ROOT although it has no --trust-root flag (18.36 §10)", () => {
+  withWork("agentce-byo-quickstart-env-", (work) => {
+    const root = join(work, "bad-root.json");
+    writeFileSync(root, "{not json");
+    const previous = process.env.AGENTCE_TRUST_ROOT;
+    process.env.AGENTCE_TRUST_ROOT = root;
+    try {
+      const { exitCode, envelope } = runJson(["quickstart", "--out", join(work, "out")]);
+      assert.equal(exitCode, 3);
+      assert.equal(refusal(envelope).key, "input.trust_root_invalid");
+      assert.equal(refusal(envelope).fix, TRUST_ROOT_FIX);
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(process.env, "AGENTCE_TRUST_ROOT");
+      } else {
+        process.env.AGENTCE_TRUST_ROOT = previous;
+      }
+    }
+  });
+});
+
+test("assess refuses a trust root whose top level is not an object (18.36 §11)", () => {
+  withWork("agentce-byo-array-root-", (work) => {
+    const root = join(work, "array-root.json");
+    writeFileSync(root, "[]");
+    const { exitCode, envelope } = byoAssess(work, [
+      "--trust-root",
+      root,
+      "--allow-unverified-catalog",
+      "--catalog-dir",
+      unsignedCatalogCopy(work, "unsigned-cat"),
+    ]);
+    assert.equal(exitCode, 3);
+    assert.deepEqual(refusal(envelope), {
+      key: "input.trust_root_invalid",
+      cause: `the trust root '${root}' could not be loaded: ${root} does not hold a trust-root object`,
+      fix: TRUST_ROOT_FIX,
+    });
+  });
 });

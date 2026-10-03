@@ -839,3 +839,23 @@ test("verifyCertificate collapses a wrong-length leaf key to 'certificate signat
     /no signature verified against the trust root: certificate signature does not verify/,
   );
 });
+
+// --- TrustRoot.fromDict mirrors Python's `data.get(field) or {}` (18.36 critic round 2, must-fix A). ---
+
+test("TrustRoot.fromDict treats a falsy keys/certificate_authorities as empty, as Python does", () => {
+  for (const empty of [null, [], "", 0, false]) {
+    assert.equal(TrustRoot.fromDict({ keys: empty }).keys.size, 0, JSON.stringify(empty));
+    assert.equal(
+      TrustRoot.fromDict({ certificate_authorities: empty }).authorities.size,
+      0,
+      JSON.stringify(empty),
+    );
+  }
+});
+
+test("TrustRoot.fromDict refuses a truthy keys value that is not a mapping, as Python does", () => {
+  for (const bad of ["x", [1], 5, true]) {
+    assert.throws(() => TrustRoot.fromDict({ keys: bad }), JSON.stringify(bad));
+    assert.throws(() => TrustRoot.fromDict({ certificate_authorities: bad }), JSON.stringify(bad));
+  }
+});

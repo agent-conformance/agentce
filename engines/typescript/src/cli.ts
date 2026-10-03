@@ -366,7 +366,7 @@ function effectiveTrustRoot(
   if (raw === undefined || raw.trim() === "") {
     return vendoredTrust();
   }
-  const path = requireFile(raw, "trust_root", "the trust root");
+  const path = requireFile(raw, "trust_root", "the trust root", "pass --trust-root <file>.");
   try {
     return loadTrustRoot(path);
   } catch (exc) {
