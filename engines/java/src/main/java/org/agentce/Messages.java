@@ -4,9 +4,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Message-key catalogue for report rendering (SPEC §9.3, §8.4). All human-readable text in {@code
@@ -54,14 +56,20 @@ public final class Messages {
         return out;
     }
 
+    /** `loadCatalog` is read-and-filter per language; a report render calls {@code catalogue()}
+     * several times, so the parsed-and-filtered result is cached per language rather than re-reading
+     * the classpath resource each time. */
+    private static final Map<String, Map<String, String>> REPORT_KEY_CACHE = new ConcurrentHashMap<>();
+
     private static Map<String, String> reportKeys(String language) {
+        return REPORT_KEY_CACHE.computeIfAbsent(language, Messages::filterReportKeys);
+    }
+
+    private static Map<String, String> filterReportKeys(String language) {
         Map<String, String> out = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : loadCatalog(language).entrySet()) {
-            for (String prefix : REPORT_KEY_PREFIXES) {
-                if (entry.getKey().startsWith(prefix)) {
-                    out.put(entry.getKey(), entry.getValue());
-                    break;
-                }
+            if (Arrays.stream(REPORT_KEY_PREFIXES).anyMatch(entry.getKey()::startsWith)) {
+                out.put(entry.getKey(), entry.getValue());
             }
         }
         return out;

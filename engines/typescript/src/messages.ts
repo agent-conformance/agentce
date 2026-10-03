@@ -21,6 +21,10 @@ export const DEFAULT_LANGUAGE = "en";
  * never hardcoded in this module. */
 const REPORT_KEY_PREFIXES = ["report.", "verdict.", "next.", "outcome.", "readiness."];
 
+/** `loadCatalog` is read-and-filter per language; a report render calls `catalogue()` several times,
+ * so the parsed-and-filtered result is cached per language rather than re-reading the file each time. */
+const reportKeyCache = new Map<string, Record<string, string>>();
+
 function loadCatalog(language: string): Record<string, string> {
   const path = join(i18nDir(), `messages.${language}.json`);
   try {
@@ -31,12 +35,15 @@ function loadCatalog(language: string): Record<string, string> {
 }
 
 function reportKeys(language: string): Record<string, string> {
+  const cached = reportKeyCache.get(language);
+  if (cached) return cached;
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(loadCatalog(language))) {
     if (REPORT_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) {
       out[key] = value;
     }
   }
+  reportKeyCache.set(language, out);
   return out;
 }
 
