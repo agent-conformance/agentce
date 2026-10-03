@@ -12,8 +12,8 @@ crosswalk:
   - {framework: iso-42001, clause: "A.5.2", relation: maps, verified_against_text: false}
   - {framework: iso-42001, clause: "A.6.2.6", relation: maps, verified_against_text: false}
   - {framework: iso-42001, clause: "A.6.2.8", relation: maps, verified_against_text: false}
-  - {framework: owasp-asi-2026, clause: "T6", relation: maps, verified_against_text: false}
-  - {framework: owasp-asi-2026, clause: "T8", relation: maps, verified_against_text: false}
+  - {framework: owasp-asi-2026, clause: "ASI01", relation: maps, verified_against_text: false}
+  - {framework: owasp-asi-2026, clause: "ASI03", relation: maps, verified_against_text: false}
   - {framework: mitre-atlas, clause: "AML.T0073", relation: maps, verified_against_text: false}
   - {framework: mitre-atlas, clause: "AML.T0074", relation: maps, verified_against_text: false}
   - {framework: caiq, clause: "LOG-08.1", relation: maps, verified_against_text: false}

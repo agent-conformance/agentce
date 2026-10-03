@@ -5,8 +5,8 @@ crosswalk:
   - {framework: eu-ai-act, clause: "Art. 15", relation: maps, verified_against_text: false}
   - {framework: nist-ai-rmf, clause: "MEASURE 2.7", relation: maps, verified_against_text: false}
   - {framework: iso-42001, clause: "8.3", relation: maps, verified_against_text: false}
-  - {framework: owasp-asi-2026, clause: "T1", relation: maps, verified_against_text: false}
-  - {framework: owasp-asi-2026, clause: "T11", relation: maps, verified_against_text: false}
+  - {framework: owasp-asi-2026, clause: "ASI06", relation: maps, verified_against_text: false}
+  - {framework: owasp-asi-2026, clause: "ASI05", relation: maps, verified_against_text: false}
   - {framework: mitre-atlas, clause: "AML.T0051", relation: maps, verified_against_text: false}
   - {framework: mitre-atlas, clause: "AML.T0051.001", relation: maps, verified_against_text: false}
   - {framework: mitre-atlas, clause: "AML.T0080", relation: maps, verified_against_text: false}

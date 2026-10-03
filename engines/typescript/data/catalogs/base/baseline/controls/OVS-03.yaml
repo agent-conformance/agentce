@@ -10,8 +10,8 @@ crosswalk:
   - {framework: eu-ai-act, clause: "Art. 14(1)-(3)", relation: maps, verified_against_text: false}
   - {framework: eu-ai-act, clause: "Art. 26(2)", relation: maps, verified_against_text: false}
   - {framework: iso-42001, clause: "A.9.2", relation: maps, verified_against_text: false}
-  - {framework: owasp-asi-2026, clause: "T10", relation: maps, verified_against_text: false}
-  - {framework: owasp-asi-2026, clause: "T7", relation: maps, verified_against_text: false}
+  - {framework: owasp-asi-2026, clause: "ASI09", relation: maps, verified_against_text: false}
+  - {framework: owasp-asi-2026, clause: "ASI10", relation: maps, verified_against_text: false}
   - {framework: mitre-atlas, clause: "AML.T0101", relation: maps, verified_against_text: false}
 interpretations: [IR-11]
 applicability:

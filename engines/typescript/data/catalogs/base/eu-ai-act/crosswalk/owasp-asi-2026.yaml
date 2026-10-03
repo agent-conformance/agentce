@@ -1,6 +1,17 @@
-# OWASP Agentic Security Initiative crosswalk: the agentic threat classes whose detection or
+# OWASP Top 10 for Agentic Applications 2026 (ASI01-ASI10, published by the OWASP GenAI Security
+# Project's Agentic Security Initiative, 9 Dec 2025): the agentic threat classes whose detection or
 # traceability AgentCE's runtime evidence supports, mapped to AgentCE schema elements, correctness-
 # ladder rungs, and base-catalog control ids.
+#
+# 18.16a (2026-10): replaces this file's prior T1-T13 scheme, drawn from a different, older "Agentic
+# AI -- Threats and Mitigations" taxonomy, with the official ASI01-ASI10 ids and titles (ids and
+# titles confirmed from three independent secondary sources that agree exactly, since the primary
+# genai.owasp.org page did not expose machine-readable text; see evidence/P18-18.16a/python-reference.md).
+# The new taxonomy is organised by attack technique, not by security property, so this is not a
+# mechanical id rename: each obligation below was re-matched to the ASI category its own evidence
+# actually supports, and T8's old "non-repudiation" obligation (no direct match in the new ten) was
+# folded into ASI03, whose own stated mechanism is an agent "attribution gap" -- exactly what
+# attributed, non-repudiable recording counters.
 #
 # Threat identifiers only; no source text is reproduced. The `obligation` field is AgentCE's own
 # statement of what its evidence makes detectable or reconstructable for that threat class -- AgentCE
@@ -8,69 +19,69 @@
 # trace a threat are present and typed, not that the threat is prevented. Every reference carries
 # `verified_against_text: false` until a reviewer confirms the mapping against the source (SPEC 7.3).
 framework: owasp-asi-2026
-title: "OWASP Top 10 for Agentic Applications (Agentic Security Initiative)"
+title: "OWASP Top 10 for Agentic Applications 2026 (ASI01-ASI10)"
 version: "2025.12"
 source:
   publisher: OWASP
-  identifier: "OWASP Agentic Security Initiative — Agentic threat taxonomy"
+  identifier: "OWASP GenAI Security Project, Agentic Security Initiative -- OWASP Top 10 for Agentic Applications 2026"
 obligations:
-  - ref: "T1"
-    obligation: Memory poisoning is traceable -- consequential decisions declare their memory reads, and untrusted writes into that memory are visible in the record.
-    schema_elements: [MemoryWrite, MemoryRead, Decision]
-    rungs: [2, 3]
-    controls: [ROB-02]
+  - ref: "ASI01"
+    obligation: Agent goal hijack is reconstructable -- the operative determination behind each consequential decision is recoverable from typed graph facts, so a reviewer can tell the agent's declared objective from one substituted afterward.
+    schema_elements: [Instruction, Decision, Outcome]
+    rungs: [2, 4]
+    controls: [REC-04]
     verified_against_text: false
-  - ref: "T2"
+  - ref: "ASI02"
     obligation: Tool misuse is traceable -- each tool call is attributed and gated by an authorization check whose decision is recorded.
     schema_elements: [ToolCall, AuthzCheck, PolicyDecision]
     rungs: [2]
     controls: []
     verified_against_text: false
-  - ref: "T3"
-    obligation: Privilege compromise is traceable -- delegations carry the granting principal and scope, and access is checked against them.
-    schema_elements: [DelegationIssued, AuthzCheck, ResourceAccess]
-    rungs: [2]
-    controls: []
-    verified_against_text: false
-  - ref: "T6"
-    obligation: Intent breaking and goal manipulation are reconstructable -- the operative determination for each decision is recoverable from typed graph facts.
-    schema_elements: [Instruction, Decision, Outcome]
-    rungs: [2, 4]
-    controls: [REC-04]
-    verified_against_text: false
-  - ref: "T7"
-    obligation: Misaligned or deceptive behavior is evidenced by the override distribution and by human actors present on observed overrides.
-    schema_elements: [Decision, Override, ApprovalDecided]
-    rungs: [3]
-    controls: [OVS-03]
-    verified_against_text: false
-  - ref: "T8"
-    obligation: Repudiation and untraceability are directly countered -- lifetime recording with actor, source timestamp, and integrity results makes actions non-repudiable.
-    schema_elements: [SessionStart, SessionEnd, Decision, IntegrityResult]
+  - ref: "ASI03"
+    obligation: Identity and privilege abuse is countered -- delegations carry the granting principal and scope with access checked against them, and the acting agent behind every consequential decision is non-repudiably recorded with actor, source timestamp, and integrity results, closing the attribution gap the abuse depends on.
+    schema_elements: [DelegationIssued, AuthzCheck, ResourceAccess, SessionStart, SessionEnd, Decision, IntegrityResult]
     rungs: [0, 1, 2]
     controls: [REC-01, REC-04, INT-01]
     verified_against_text: false
-  - ref: "T9"
-    obligation: Identity spoofing and impersonation are traceable -- acting identities are attested and delegations bind an issuer to a subject.
-    schema_elements: [Attestation, DelegationIssued, AuthzCheck]
+  - ref: "ASI04"
+    obligation: Agentic supply chain components are traceable -- every loaded skill, MCP server, model, prompt, config, or policy bundle is recorded with its digest and signer, and its attestation is checked before the components it contributes are trusted.
+    schema_elements: [BundleLoaded, Attestation]
     rungs: [2]
     controls: []
     verified_against_text: false
-  - ref: "T10"
-    obligation: Overwhelming the human-in-the-loop is evidenced by approval latency and the distribution of approval decisions, exposing rubber-stamping.
-    schema_elements: [ApprovalRequested, ApprovalDecided]
-    rungs: [3]
-    controls: [OVS-03]
-    verified_against_text: false
-  - ref: "T11"
+  - ref: "ASI05"
     obligation: Unexpected code execution is traceable -- tool calls that reach an execution surface are attributed and gated by a recorded policy decision.
     schema_elements: [ToolCall, PolicyDecision, Refusal]
     rungs: [2]
     controls: [ROB-02]
     verified_against_text: false
-  - ref: "T13"
-    obligation: Rogue agents in a multi-agent system are traceable -- every participating agent is attested and its delegations and outcomes are attributed.
-    schema_elements: [Attestation, DelegationIssued, Outcome]
+  - ref: "ASI06"
+    obligation: Memory and context poisoning is traceable -- consequential decisions declare their memory reads, and untrusted writes into that memory are visible in the record.
+    schema_elements: [MemoryWrite, MemoryRead, Decision]
+    rungs: [2, 3]
+    controls: [ROB-02]
+    verified_against_text: false
+  - ref: "ASI07"
+    obligation: Inter-agent identity spoofing and impersonation are traceable -- acting identities are attested and delegations bind an issuer to a subject, so a peer agent's claimed identity can be checked rather than assumed.
+    schema_elements: [Attestation, DelegationIssued, AuthzCheck]
     rungs: [2]
-    controls: [INT-01]
+    controls: []
+    verified_against_text: false
+  - ref: "ASI08"
+    obligation: Cascading failures across agents are reconstructable -- cross-agent task correlation and the derivedFrom chain let a reviewer trace how one agent's decision or outcome propagated into another's.
+    schema_elements: [Decision, Outcome, Incident]
+    rungs: [2, 4]
+    controls: []
+    verified_against_text: false
+  - ref: "ASI09"
+    obligation: Human-agent trust exploitation is evidenced by the distribution of approval latency and decisions, exposing the rubber-stamping a persuasive or fluent agent could induce.
+    schema_elements: [ApprovalRequested, ApprovalDecided]
+    rungs: [3]
+    controls: [OVS-03]
+    verified_against_text: false
+  - ref: "ASI10"
+    obligation: Rogue agents are traceable -- every participating agent is attested with its delegations and outcomes attributed, and misaligned or deceptive behavior is evidenced by the override distribution and the human actors present on observed overrides.
+    schema_elements: [Attestation, DelegationIssued, Outcome, Decision, Override, ApprovalDecided]
+    rungs: [2, 3]
+    controls: [OVS-03, INT-01]
     verified_against_text: false

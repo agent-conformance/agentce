@@ -4,7 +4,7 @@ title: Every consequential decision records the acting agent
 crosswalk:
   - {framework: eu-ai-act, clause: "Art. 12(1)-(2)", relation: maps, verified_against_text: false}
   - {framework: iso-42001, clause: "A.6.2.6", relation: maps, verified_against_text: false}
-  - {framework: owasp-asi-2026, clause: "T8", relation: maps, verified_against_text: false}
+  - {framework: owasp-asi-2026, clause: "ASI03", relation: maps, verified_against_text: false}
   - {framework: owasp-acs, clause: "Hook_SubagentStart+Hook_SubagentStop", relation: maps, verified_against_text: false}
   - {framework: caiq, clause: "IAM-13.1", relation: maps, verified_against_text: false}
 applicability:
