@@ -3,5 +3,5 @@
 @prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
 
 agentce:INC-01-Shape a sh:NodeShape ;
-  sh:targetClass agentce:ConsequentialDecision ;
-  sh:property [ sh:path agentce:resultedIn ; sh:minCount 1 ; sh:name "S1" ] .
+  sh:targetClass agentce:Outcome ;
+  sh:property [ sh:path agentce:adverseOutcomeLinked ; sh:hasValue true ; sh:name "S1" ] .

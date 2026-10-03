@@ -101,3 +101,9 @@ agentce:oversightModalityMatchesDeclared a owl:DatatypeProperty ; rdfs:label "ov
 agentce:danglingRef a owl:DatatypeProperty ; rdfs:label "dangling reference" ;
   rdfs:domain agentce:Activity ; rdfs:range xsd:string ;
   rdfs:comment "A refs.* value that resolves to no ingested event." .
+agentce:adverseOutcomeLinked a owl:DatatypeProperty ; rdfs:label "adverse outcome linked" ;
+  rdfs:domain agentce:Outcome ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether an adverse outcome carries an inbound resultedIn edge from the decision it resulted from; vacuously true for a non-adverse outcome." .
+agentce:explanationReconstructable a owl:DatatypeProperty ; rdfs:label "explanation reconstructable" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether a decision is notifiedBy a Notice and its own evidence chain resolves (no danglingRef), so the explanation the notice points at can be reconstructed." .

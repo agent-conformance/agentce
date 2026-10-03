@@ -4,4 +4,4 @@
 
 agentce:TRN-03-Shape a sh:NodeShape ;
   sh:targetClass agentce:ConsequentialDecision ;
-  sh:property [ sh:path agentce:notifiedBy ; sh:minCount 1 ; sh:name "S1" ] .
+  sh:property [ sh:path agentce:explanationReconstructable ; sh:hasValue true ; sh:name "S1" ] .
