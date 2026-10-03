@@ -3,15 +3,32 @@
 from __future__ import annotations
 
 import json
+import re
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
+import agentce
 import checklist_lint
 import claim_check
 import deviation_lint
 import read_outcomes
 import report_readiness
 import yaml
-from _common import _SKILL_MD, FINDINGS, OK, read_frontmatter
+from _common import (
+    _SKILL_MD,
+    FINDINGS,
+    OK,
+    VERSION_MISMATCH,
+    Finding,
+    check_pins,
+    read_frontmatter,
+    run_guarded,
+)
+from agentce.commands import PRESET_EMIT
+
+SKILL_ROOT = _SKILL_MD.parent
 
 
 def _report(
@@ -278,6 +295,97 @@ def test_pins_gate_runs(tmp_path: Path, capsys) -> None:
     from _common import run_guarded
 
     assert run_guarded(["--report", str(report), "--json"], report_readiness.body) == OK
+
+
+def test_pins_match_the_installed_engine() -> None:
+    # The skill's SKILL.md pins must match the engine it ships against, or every script would exit 3.
+    assert check_pins() is None
+
+
+def test_version_mismatch_gate_returns_exit_3(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    # If SKILL.md pins do not match the engine, every script stops with exit 3 (S-5).
+    monkeypatch.setattr(
+        "_common.check_pins",
+        lambda: Finding("skill.spec_version_mismatch", "pinned 9.9 != engine"),
+    )
+    assert run_guarded(["--json"], lambda _argv: 0) == VERSION_MISMATCH
+    # When the pins hold, the body runs and its exit code is returned.
+    monkeypatch.setattr("_common.check_pins", lambda: None)
+    assert run_guarded([], lambda _argv: 7) == 7
+
+
+def test_check_pins_catches_a_real_cli_version_mismatch(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    # Unlike the two tests above (which monkeypatch check_pins itself to test run_guarded's
+    # dispatch), this triggers check_pins()'s own detection logic against a real engine mismatch.
+    monkeypatch.setattr(agentce, "__version__", "0.0.5")
+    finding = check_pins()
+    assert finding is not None
+    assert finding.code == "skill.cli_version_mismatch"
+
+
+def test_check_pins_catches_a_real_spec_version_mismatch(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(agentce, "SPEC_VERSION", "9.9")
+    finding = check_pins()
+    assert finding is not None
+    assert finding.code == "skill.spec_version_mismatch"
+
+
+def test_claim_check_exits_3_as_a_subprocess_on_a_stale_pinned_skill_copy(
+    tmp_path: Path,
+) -> None:
+    # No existing test runs a script the way an adopter does: as a subprocess against an installed
+    # skill tree. Copy the skill, plant the stale pin the SKILL.md prose used to claim, and confirm
+    # claim_check.py exits 3 with the version_mismatch JSON shape before it even looks at --claim.
+    copy = tmp_path / "skill"
+    shutil.copytree(
+        SKILL_ROOT,
+        copy,
+        ignore=shutil.ignore_patterns(
+            ".venv", "__pycache__", ".mypy_cache", ".ruff_cache"
+        ),
+    )
+    skill_md = copy / "SKILL.md"
+    skill_md.write_text(
+        skill_md.read_text(encoding="utf-8").replace(
+            'cli_version: ">=0.1.0,<0.2"', 'cli_version: ">=0.0.1,<0.1"'
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [sys.executable, "scripts/claim_check.py", "--json"],
+        cwd=copy,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == VERSION_MISMATCH
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "version_mismatch"
+    assert payload["finding"]["code"] == "skill.cli_version_mismatch"
+
+
+def test_version_pins_prose_matches_the_frontmatter() -> None:
+    # A future bump to spec/CLI/catalog in the frontmatter without updating the prose sentence
+    # should fail here rather than leaving a reader looking at a stale enforced range.
+    skill = _SKILL_MD.read_text(encoding="utf-8")
+    match = re.search(r"spec `([^`]+)`, CLI `([^`]+)`, catalog `([^`]+)`", skill)
+    assert match is not None, "no 'Version pins' prose line found in SKILL.md"
+    prose_spec, prose_cli, prose_catalog = match.groups()
+    metadata = read_frontmatter()["metadata"]
+    assert prose_spec == metadata["spec_version"]
+    assert prose_cli == metadata["cli_version"]
+    assert [prose_catalog] == metadata["catalog_versions"]
+
+
+def test_the_named_for_presets_exist_in_the_engine() -> None:
+    # The "preparing for an audience" paragraph names every --for preset; a future rename, removal,
+    # or addition to PRESET_EMIT should fail this test rather than leave the doc silently wrong.
+    skill = _SKILL_MD.read_text(encoding="utf-8")
+    named = set(re.findall(r"`--for (\w[\w-]*)`", skill))
+    assert named == set(PRESET_EMIT)
+    for role in ("auditor", "buyer"):
+        assert re.search(
+            rf"`{role}`[^.]*hand.over|hand.over[^.]*`{role}`", skill, re.IGNORECASE
+        ), f"{role} is not named as a hand-over view"
 
 
 def test_skill_is_for_the_coding_assistant_and_never_signs() -> None:

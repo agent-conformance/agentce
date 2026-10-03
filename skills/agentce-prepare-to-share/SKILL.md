@@ -27,7 +27,7 @@ outcome; never creates a deviation without a named approver and expiry; and neve
 ## Version pins
 
 Every script verifies these pins against the installed engine before doing anything (S-5) and stops
-with exit 3 on a mismatch: spec `0.6`, CLI `>=0.0.1,<0.1`, catalog `eu-ai-act@2026.09`.
+with exit 3 on a mismatch: spec `0.6`, CLI `>=0.1.0,<0.2`, catalog `eu-ai-act@2026.09`.
 
 ## Stage 1 — Pre-run checks (`claim_check`)
 
@@ -40,6 +40,17 @@ appears in the manifest with its trust class; catalog and engine versions satisf
 
 `agentce verify` then `agentce assess` with `--manual` and `--deviations` pointed at the records from
 stage 3. A first run without them is allowed, to discover which manual controls apply.
+
+### Preparing a report for an audience
+
+`agentce assess --for <role>` narrows the emitted formats to one reader: `--for engineering` (the
+developer's AI assistant: `md`, `html`, `skill`, `remediation`), `--for compliance` (the
+compliance/GRC form: `oscal`, `oscal_xml`, `public`, `pack`, `csv`), `--for security` (`sarif`, `md`,
+`html`), `--for ci` (`sarif`, `junit`), `--for share` (`md`, `html`, `pdf`, `public`, `pack`), and
+`--for risk-lead` (the project view across every agent: `md`, `html`). `--for auditor` (`oscal`,
+`oscal_xml`, `pack`) and `--for buyer` (`pack`) are the two presets built for a hand-over to someone
+outside the team: `auditor` renders the clause-by-clause OSCAL plus the evidence pack, and `buyer`
+renders the generated questionnaire answers plus the evidence pack.
 
 ## Stage 3 — Human-supplied records
 
