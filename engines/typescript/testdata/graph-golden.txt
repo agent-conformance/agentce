@@ -99,15 +99,23 @@ E	human:reviewer	rdf:type	agentce:Agent
 E	spiffe://corp/agent-a	prov:actedOnBehalfOf	agentce:principal/4f9618842a3b141eae7bfb7cd81ee43b2ba78b2eef1a7c1d0c13c7ea559ab534
 E	spiffe://corp/agent-a	rdf:type	agentce:Agent
 L	agentce:event/appr-1	prov:atTime	2026-06-01T09:30:00.000Z	xsd:dateTime
+L	agentce:event/dec-1	agentce:actsOnUntrusted	false	xsd:boolean
 L	agentce:event/dec-1	agentce:danglingRef	agentce:event/missing-x	xsd:string
+L	agentce:event/dec-1	agentce:explanationReconstructable	false	xsd:boolean
 L	agentce:event/dec-1	agentce:oversightModalityMatchesDeclared	true	xsd:boolean
 L	agentce:event/dec-1	prov:atTime	2026-06-01T09:00:00.000Z	xsd:dateTime
+L	agentce:event/dec-2	agentce:actsOnUntrusted	false	xsd:boolean
+L	agentce:event/dec-2	agentce:explanationReconstructable	false	xsd:boolean
 L	agentce:event/dec-2	agentce:oversightModalityMatchesDeclared	false	xsd:boolean
 L	agentce:event/dec-2	prov:atTime	2026-06-01T10:00:00.000Z	xsd:dateTime
 L	agentce:event/del-1	agentce:chainVerified	true	xsd:boolean
 L	agentce:event/del-1	prov:atTime	2026-06-01T08:00:00.000Z	xsd:dateTime
+L	agentce:event/out-1	agentce:adverseOutcomeLinked	true	xsd:boolean
 L	agentce:event/out-1	prov:atTime	2026-06-01T09:10:00.000Z	xsd:dateTime
+L	agentce:event/tc-1	agentce:actsOnUntrusted	false	xsd:boolean
 L	agentce:event/tc-1	agentce:executesConsequential	true	xsd:boolean
+L	agentce:event/tc-1	agentce:withinBudget	true	xsd:boolean
+L	agentce:event/tc-1	agentce:withinScope	true	xsd:boolean
 L	agentce:event/tc-1	prov:atTime	2026-06-01T09:05:00.000Z	xsd:dateTime
 L	agentce:principal/4f9618842a3b141eae7bfb7cd81ee43b2ba78b2eef1a7c1d0c13c7ea559ab534	agentce:chainIndex	0	xsd:integer
 L	agentce:principal/ae09877c4f2f6fab64bf06beb9aa698fba9fe36828b1b24970b101a580e068c8	agentce:chainIndex	0	xsd:integer

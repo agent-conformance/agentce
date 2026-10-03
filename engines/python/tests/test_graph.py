@@ -9,6 +9,7 @@ from agentce.graph import build_graph
 from agentce.iri import event_iri, principal_iri
 
 CREDIT = "agentce:CreditDecision"
+MINOR = "agentce:MinorDecision"
 
 DOMAIN = DomainBinding.from_dict(
     {
@@ -18,7 +19,10 @@ DOMAIN = DomainBinding.from_dict(
                 "subclass_of": "agentce:ConsequentialDecision",
                 "consequential": True,
                 "required_oversight_modality": "review_before",
-            }
+            },
+            # Non-consequential: subclasses agentce:Decision directly, never ConsequentialDecision
+            # (mirrors the shipped catalogs' own `dom:Minor`; see INC-01's `d3`/`c6` fail fixtures).
+            {"id": MINOR, "subclass_of": "agentce:Decision", "consequential": False},
         ]
     }
 )
@@ -30,7 +34,20 @@ def decision(
     *,
     modality: str = "review_before",
     acted_for: list[str] | None = None,
+    decision_type: str = CREDIT,
+    used: list[str] | None = None,
 ) -> dict[str, Any]:
+    data: dict[str, Any] = {
+        "@type": "Decision",
+        "decision_type": decision_type,
+        "oversight_modality": modality,
+        "agent": {"id": "spiffe://corp/agents/a"},
+        "acted_for": acted_for
+        if acted_for is not None
+        else ["spiffe://corp/humans/alice"],
+    }
+    if used is not None:
+        data["used"] = used
     return {
         "id": event_id,
         "source": "urn:agentce:source:agent",
@@ -38,15 +55,41 @@ def decision(
         "time": time,
         "type": "org.agent-conformance.evidence.Decision.v1",
         "agentcesourceclass": "self_report",
-        "data": {
-            "@type": "Decision",
-            "decision_type": CREDIT,
-            "oversight_modality": modality,
-            "agent": {"id": "spiffe://corp/agents/a"},
-            "acted_for": acted_for
-            if acted_for is not None
-            else ["spiffe://corp/humans/alice"],
-        },
+        "data": data,
+    }
+
+
+def outcome(
+    event_id: str, time: str, *, adverse: bool, decision_ref: str | None = None
+) -> dict[str, Any]:
+    data: dict[str, Any] = {"@type": "Outcome", "adverse": adverse}
+    if decision_ref is not None:
+        data["refs"] = {"decision": decision_ref}
+    return {
+        "id": event_id,
+        "source": "urn:agentce:source:indep",
+        "subject": "spiffe://corp/agents/a",
+        "time": time,
+        "type": "org.agent-conformance.evidence.Outcome.v1",
+        "agentcesourceclass": "independent_system",
+        "data": data,
+    }
+
+
+def notice(
+    event_id: str, time: str, decision_ref: str, *, origin: str | None = None
+) -> dict[str, Any]:
+    refs: dict[str, Any] = {"decision": decision_ref}
+    if origin is not None:
+        refs["origin"] = origin
+    return {
+        "id": event_id,
+        "source": "urn:agentce:source:indep",
+        "subject": "spiffe://corp/agents/a",
+        "time": time,
+        "type": "org.agent-conformance.evidence.Notice.v1",
+        "agentcesourceclass": "independent_system",
+        "data": {"@type": "Notice", "refs": refs},
     }
 
 
@@ -226,3 +269,128 @@ def test_build_is_deterministic() -> None:
     first = build_graph(events, domain=DOMAIN).triple_count()
     second = build_graph(events, domain=DOMAIN).triple_count()
     assert first == second
+
+
+def test_adverse_outcome_linked_to_its_consequential_decision() -> None:
+    dec = decision("d1", "t", decision_type=CREDIT)
+    out = outcome("c1", "t", adverse=True, decision_ref="agentce:event/d1")
+    store = build_graph([dec, out], domain=DOMAIN)
+    assert store.literal_values(event_iri("c1"), "agentce:adverseOutcomeLinked") == [
+        "true"
+    ]
+
+
+def test_non_adverse_outcome_is_vacuously_linked() -> None:
+    out = outcome("c1", "t", adverse=False)
+    store = build_graph([out], domain=DOMAIN)
+    assert store.literal_values(event_iri("c1"), "agentce:adverseOutcomeLinked") == [
+        "true"
+    ]
+
+
+def test_adverse_outcome_with_no_decision_ref_is_not_linked() -> None:
+    out = outcome("c1", "t", adverse=True)
+    store = build_graph([out], domain=DOMAIN)
+    assert store.literal_values(event_iri("c1"), "agentce:adverseOutcomeLinked") == [
+        "false"
+    ]
+
+
+def test_adverse_outcome_with_a_dangling_decision_ref_is_not_linked() -> None:
+    """INC-01 (SPEC §7.4): a `refs.decision` that names no ingested event must not count as linked,
+    even though the outcome also carries `agentce:danglingRef` for the same value -- the two literals
+    are checked by different rules (TRN-03 fails on a dangling ref; INC-01 must fail here too)."""
+    out = outcome("c1", "t", adverse=True, decision_ref="agentce:event/ghost")
+    store = build_graph([out], domain=DOMAIN)
+    assert store.literal_values(event_iri("c1"), "agentce:adverseOutcomeLinked") == [
+        "false"
+    ]
+    assert "agentce:event/ghost" in store.literal_values(
+        event_iri("c1"), "agentce:danglingRef"
+    )
+
+
+def test_adverse_outcome_linked_to_a_non_consequential_decision_is_not_linked() -> None:
+    """INC-01 names 'their consequential decision' -- a real but non-consequential decision (the
+    shipped catalogs' own `dom:Minor`) must not satisfy it, even though the ref resolves cleanly."""
+    dec = decision("d1", "t", decision_type=MINOR)
+    out = outcome("c1", "t", adverse=True, decision_ref="agentce:event/d1")
+    store = build_graph([dec, out], domain=DOMAIN)
+    assert store.is_a(event_iri("d1"), "agentce:ConsequentialDecision") is False
+    assert store.literal_values(event_iri("c1"), "agentce:adverseOutcomeLinked") == [
+        "false"
+    ]
+
+
+def test_explanation_reconstructable_when_notified_and_no_dangling_ref() -> None:
+    dec = decision("d1", "t")
+    note = notice("c1", "t", "agentce:event/d1")
+    store = build_graph([dec, note], domain=DOMAIN)
+    assert store.literal_values(
+        event_iri("d1"), "agentce:explanationReconstructable"
+    ) == ["true"]
+
+
+def test_explanation_not_reconstructable_when_never_notified() -> None:
+    dec = decision("d1", "t")
+    store = build_graph([dec], domain=DOMAIN)
+    assert store.literal_values(
+        event_iri("d1"), "agentce:explanationReconstructable"
+    ) == ["false"]
+
+
+def test_explanation_not_reconstructable_when_notified_but_evidence_dangles() -> None:
+    """TRN-03 (SPEC §7.6): the decision was notified, but its own evidence chain does not resolve --
+    `used` names an event never ingested, so the decision carries `agentce:danglingRef` and the
+    explanation that notice points at cannot actually be reconstructed."""
+    dec = decision("d1", "t", used=["agentce:event/missing-input"])
+    note = notice("c1", "t", "agentce:event/d1")
+    store = build_graph([dec, note], domain=DOMAIN)
+    assert "agentce:event/missing-input" in store.literal_values(
+        event_iri("d1"), "agentce:danglingRef"
+    )
+    assert store.literal_values(
+        event_iri("d1"), "agentce:explanationReconstructable"
+    ) == ["false"]
+
+
+def test_explanation_not_reconstructable_when_the_notice_itself_dangles() -> None:
+    """TRN-03 (SPEC §7.6, round-2 critic finding 4): the decision's own evidence chain resolves
+    cleanly, but the Notice that notified it carries a dangling `refs.*` value of its own (here
+    `refs.origin`, a real `Refs` key per `spec/model/agentce-evidence.linkml.yaml` -- verifier round 1
+    found the prior fixture used `refs.explanation_ref`, a key `Refs` does not define, so a real
+    adapter could never produce it) -- `_dangling` lands that literal on the NOTICE node, not the
+    Decision node, so `_explanation_reconstructable` must check the notice's dangling status too, not
+    only the decision's. Before this fix, this case read `explanationReconstructable: true`."""
+    dec = decision("d1", "t")
+    note = notice("c1", "t", "agentce:event/d1", origin="agentce:event/missing-origin")
+    store = build_graph([dec, note], domain=DOMAIN)
+    assert "agentce:event/missing-origin" in store.literal_values(
+        event_iri("c1"), "agentce:danglingRef"
+    )
+    assert store.literal_values(event_iri("d1"), "agentce:danglingRef") == []
+    assert store.literal_values(
+        event_iri("d1"), "agentce:explanationReconstructable"
+    ) == ["false"]
+
+
+def test_explanation_reconstructable_is_independent_of_notice_order() -> None:
+    """Verifier-found regression: a decision notified by more than one Notice (one clean, one with
+    its own dangling ref) used to read `explanationReconstructable` from whichever Notice was mapped
+    LAST, so the same evidence gave a different verdict depending only on event order. Reconstructable
+    means at least one notifying Notice is clean -- true in both orderings."""
+    dec = decision("d1", "t")
+    clean = notice("c1", "t", "agentce:event/d1")
+    dangling = notice(
+        "c2", "t", "agentce:event/d1", origin="agentce:event/missing-origin"
+    )
+
+    clean_last = build_graph([dec, dangling, clean], domain=DOMAIN)
+    dangling_last = build_graph([dec, clean, dangling], domain=DOMAIN)
+
+    assert clean_last.literal_values(
+        event_iri("d1"), "agentce:explanationReconstructable"
+    ) == ["true"]
+    assert dangling_last.literal_values(
+        event_iri("d1"), "agentce:explanationReconstructable"
+    ) == ["true"]

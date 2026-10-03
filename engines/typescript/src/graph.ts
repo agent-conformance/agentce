@@ -50,6 +50,16 @@ const GENERIC_REFS: Record<string, string> = {
   origin: "agentce:derivedFrom",
 };
 
+/** Instruction source classes an agent may act on without corroboration (SPEC §7.7, Appendix F). Any
+ * other declared class is untrusted for the Conduct overlay's provenance and isolation controls. */
+const TRUSTED_INSTRUCTION = new Set([
+  "user",
+  "operator",
+  "service",
+  "agent_identified",
+  "memory_trusted",
+]);
+
 export type Event = Record<string, unknown>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -110,6 +120,10 @@ class Builder {
   private readonly decisionType = new Map<string, string>();
   private readonly decisionTime = new Map<string, string>();
   private readonly decisionReviewed = new Set<string>();
+  private readonly outcomeDecision = new Map<string, string>(); // Outcome IRI -> its refs.decision IRI, if any
+  private readonly decisionNotice = new Map<string, Set<string>>(); // Decision IRI -> every notifying Notice IRI (order-independent)
+  private readonly danglingNodes = new Set<string>(); // event IRI -> has >=1 agentce:danglingRef literal
+  private readonly instructionUntrusted = new Map<string, boolean>(); // Instruction IRI -> untrusted flag
 
   constructor(
     private readonly store: GraphStore,
@@ -179,6 +193,8 @@ class Builder {
     }
 
     this.mapDecisionLinks(node, ptype, event);
+    this.mapConduct(node, ptype, data);
+    this.dangling(node, event);
 
     if (ptype === "DelegationIssued") {
       this.mapDelegationPrincipals(data.chain);
@@ -233,6 +249,7 @@ class Builder {
         this.store.addEdge(node, "agentce:executes", decision);
       } else if (ptype === "Outcome") {
         this.store.addEdge(decision, "agentce:resultedIn", node);
+        this.outcomeDecision.set(node, decision);
       } else if (ptype === "ApprovalDecided") {
         this.store.addEdge(decision, "agentce:reviewedBy", node);
         this.decisionReviewed.add(decision);
@@ -242,6 +259,12 @@ class Builder {
         this.store.addEdge(decision, "agentce:interruptedBy", node);
       } else if (ptype === "Notice") {
         this.store.addEdge(decision, "agentce:notifiedBy", node);
+        let notices = this.decisionNotice.get(decision);
+        if (!notices) {
+          notices = new Set();
+          this.decisionNotice.set(decision, notices);
+        }
+        notices.add(node);
       }
     }
     if (ptype === "Refusal") {
@@ -252,12 +275,82 @@ class Builder {
     }
   }
 
+  /** Materialise the Conduct-overlay instruction-trust flag (SPEC §7.7): whether an instruction's
+   * declared source class is untrusted (Appendix F). Scope and budget are computed from the
+   * enforcement point's records in a second pass (`conductScopeBudget`). */
+  private mapConduct(node: string, ptype: string, data: Record<string, unknown>): void {
+    if (ptype !== "Instruction") {
+      return;
+    }
+    const sourceClass = data.source_class;
+    const untrusted = typeof sourceClass === "string" && !TRUSTED_INSTRUCTION.has(sourceClass);
+    this.instructionUntrusted.set(node, untrusted);
+    this.store.addLiteral(node, "agentce:instructionUntrusted", untrusted ? "true" : "false", BOOL);
+  }
+
+  /** Compute the Conduct within-scope and within-budget flags (SPEC §7.7, CND-01/CND-07) from the
+   * enforcement point's records: an action is out of scope when a `PolicyDecision` denies its
+   * request, and over budget when a `Refusal` with reason class `budget_exceeded` names it; both
+   * default to conformant, so the flags are inert for a bundle that records neither. */
+  private conductScopeBudget(events: Event[]): void {
+    const denied = new Set<string>();
+    const overBudget = new Set<string>();
+    for (const event of events) {
+      const ptype = this.ptype(event);
+      const data = dataOf(event);
+      const refs = refsOf(event);
+      const request = refs.request;
+      if (ptype === "PolicyDecision" && data.decision === "deny" && typeof request === "string") {
+        denied.add(request);
+      }
+      if (
+        ptype === "Refusal" &&
+        data.reason_class === "budget_exceeded" &&
+        typeof request === "string"
+      ) {
+        overBudget.add(request);
+      }
+    }
+    for (const event of events) {
+      if (this.ptype(event) !== "ToolCall" && this.ptype(event) !== "ResourceAccess") {
+        continue;
+      }
+      const node = eventIri(String(event.id));
+      this.store.addLiteral(node, "agentce:withinScope", denied.has(node) ? "false" : "true", BOOL);
+      this.store.addLiteral(
+        node,
+        "agentce:withinBudget",
+        overBudget.has(node) ? "false" : "true",
+        BOOL,
+      );
+    }
+  }
+
+  /** Flag every ToolCall/Decision that acts on an untrusted instruction (SPEC §7.7, CND-05). Runs
+   * after every event is mapped so the acting event may precede its instruction. */
+  private actsOnUntrusted(events: Event[]): void {
+    for (const event of events) {
+      const ptype = this.ptype(event);
+      if (ptype !== "ToolCall" && ptype !== "Decision") {
+        continue;
+      }
+      const instruction = refsOf(event).instruction;
+      const untrusted =
+        typeof instruction === "string" && (this.instructionUntrusted.get(instruction) ?? false);
+      this.store.addLiteral(
+        eventIri(String(event.id)),
+        "agentce:actsOnUntrusted",
+        untrusted ? "true" : "false",
+        BOOL,
+      );
+    }
+  }
+
   private materialise(events: Event[]): void {
     for (const event of events) {
       const node = eventIri(String(event.id));
       const ptype = this.ptype(event);
       const data = dataOf(event);
-      this.dangling(node, event);
       if (ptype === "DelegationIssued") {
         this.chainVerified(node, data);
       }
@@ -266,9 +359,15 @@ class Builder {
       }
       if (ptype === "Decision") {
         this.oversightMatches(node, data);
+        this.explanationReconstructable(node);
+      }
+      if (ptype === "Outcome") {
+        this.adverseOutcomeLinked(node, data);
       }
       this.chainTerminus(node, data);
     }
+    this.actsOnUntrusted(events);
+    this.conductScopeBudget(events);
     this.precededBy();
   }
 
@@ -288,8 +387,53 @@ class Builder {
     for (const value of candidates) {
       if (isEventRef(value) && !this.eventIris.has(value)) {
         this.store.addLiteral(node, "agentce:danglingRef", value);
+        this.danglingNodes.add(node);
       }
     }
+  }
+
+  /** INC-01 (SPEC §7.4): an adverse outcome is linked to the consequential decision it resulted
+   * from; a non-adverse outcome carries no such expectation and is vacuously linked. A
+   * `refs.decision` that is missing, dangling (names no ingested event), or resolves to a decision
+   * that is not itself a ConsequentialDecision does not count as linked -- a real link requires a
+   * real consequential decision, not merely the shape of one. */
+  private adverseOutcomeLinked(node: string, data: Record<string, unknown>): void {
+    const adverse = Boolean(data.adverse ?? false);
+    const decision = this.outcomeDecision.get(node);
+    const linked =
+      !adverse ||
+      (decision !== undefined &&
+        this.eventIris.has(decision) &&
+        this.store.isA(decision, "agentce:ConsequentialDecision"));
+    this.store.addLiteral(node, "agentce:adverseOutcomeLinked", linked ? "true" : "false", BOOL);
+  }
+
+  /** TRN-03 (SPEC §7.6): affected persons are informed (notifiedBy a Notice) and the evidence chain
+   * resolves on both ends of that notification -- no danglingRef on the decision itself (every ref
+   * or `used` value it names resolves to an ingested event) AND no danglingRef on the Notice that
+   * notified it (round-2 critic finding: a Notice's own dangling ref, e.g. a free-form
+   * explanation_ref, must not be invisible just because `dangling` lands the literal on the Notice
+   * node, not the Decision node) -- so the evidence an explanation would be built from is actually
+   * present on both legs. A decision can be notifiedBy more than one Notice; checking only the last
+   * one mapped made the result depend on event order, so this checks every notifying Notice and
+   * passes if any one of them is clean (a verifier-found regression, fixed this item). Scoped
+   * narrower than the Notice's own content_ref or the Decision's own rationale_claim_ref (SPEC model
+   * attributes, not refs edges): neither is materialised as a graph reference anywhere today, so
+   * neither can dangle in this model yet -- disclosed, out of this item's scope (see this item's
+   * contract, split to 18.37h). */
+  private explanationReconstructable(node: string): void {
+    const notices = this.decisionNotice.get(node);
+    const reconstructable =
+      !!notices &&
+      notices.size > 0 &&
+      !this.danglingNodes.has(node) &&
+      [...notices].some((notice) => !this.danglingNodes.has(notice));
+    this.store.addLiteral(
+      node,
+      "agentce:explanationReconstructable",
+      reconstructable ? "true" : "false",
+      BOOL,
+    );
   }
 
   private chainVerified(node: string, data: Record<string, unknown>): void {

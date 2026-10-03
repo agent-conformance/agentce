@@ -1,0 +1,218 @@
+{
+  "CND-01": {
+    "passed": {
+      "control": "CND-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "CND-01",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:withinScope",
+          "constraint": "sh:hasValue",
+          "message_key": "CND-01.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "CND-01",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "CND-02": {
+    "passed": {
+      "control": "CND-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "CND-02",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:reviewedBy",
+          "constraint": "sh:minCount",
+          "message_key": "CND-02.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "CND-02",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "CND-04": {
+    "passed": {
+      "control": "CND-04",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "CND-04",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:actsOn",
+          "constraint": "sh:minCount",
+          "message_key": "CND-04.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "CND-04",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "CND-05": {
+    "passed": {
+      "control": "CND-05",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "CND-05",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:actsOnUntrusted",
+          "constraint": "sh:hasValue",
+          "message_key": "CND-05.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "CND-05",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "CND-06": {
+    "passed": {
+      "control": "CND-06",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "CND-06",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/i1",
+          "path": "agentce:refusedBy",
+          "constraint": "sh:minCount",
+          "message_key": "CND-06.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "CND-06",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  },
+  "CND-07": {
+    "passed": {
+      "control": "CND-07",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 0
+      },
+      "violations": []
+    },
+    "failed": {
+      "control": "CND-07",
+      "outcome": "non-conformant",
+      "population": {
+        "applicable": 1,
+        "failed": 1
+      },
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:withinBudget",
+          "constraint": "sh:hasValue",
+          "message_key": "CND-07.S1"
+        }
+      ]
+    },
+    "inapplicable": {
+      "control": "CND-07",
+      "outcome": "conformant",
+      "population": {
+        "applicable": 0,
+        "failed": 0
+      },
+      "violations": []
+    }
+  }
+}

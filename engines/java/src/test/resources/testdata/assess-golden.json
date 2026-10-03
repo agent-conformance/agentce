@@ -265,7 +265,7 @@
       "control": "INC-01",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -273,7 +273,7 @@
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -1723,7 +1723,7 @@
       "control": "INC-01",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -1731,7 +1731,7 @@
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -3188,7 +3188,7 @@
       "control": "INC-01",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -3196,7 +3196,7 @@
         "end": "2026-01-01T00:00:00Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",

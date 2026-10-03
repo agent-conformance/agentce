@@ -114,6 +114,15 @@ class _Builder:
         self.instruction_untrusted: dict[
             str, bool
         ] = {}  # Instruction IRI -> untrusted flag
+        self.outcome_decision: dict[
+            str, str
+        ] = {}  # Outcome IRI -> its refs.decision IRI, if any
+        self.decision_notice: dict[
+            str, set[str]
+        ] = {}  # Decision IRI -> every notifying Notice IRI (order-independent)
+        self.dangling_nodes: set[str] = (
+            set()
+        )  # event IRI -> has >=1 agentce:danglingRef literal
 
     def build(self, events: list[dict[str, Any]]) -> GraphStore:
         used_classes: set[str] = set(BASE_SUBCLASS) | {
@@ -171,6 +180,7 @@ class _Builder:
 
         self._map_decision_links(node, ptype, event)
         self._map_conduct(node, ptype, data)
+        self._dangling(node, event)
 
         if ptype == "DelegationIssued":
             self._map_delegation_principals(data.get("chain"))
@@ -223,6 +233,7 @@ class _Builder:
                 self.store.add_edge(node, "agentce:executes", decision)
             elif ptype == "Outcome":
                 self.store.add_edge(decision, "agentce:resultedIn", node)
+                self.outcome_decision[node] = decision
             elif ptype == "ApprovalDecided":
                 self.store.add_edge(decision, "agentce:reviewedBy", node)
                 self.decision_reviewed.add(decision)
@@ -232,6 +243,7 @@ class _Builder:
                 self.store.add_edge(decision, "agentce:interruptedBy", node)
             elif ptype == "Notice":
                 self.store.add_edge(decision, "agentce:notifiedBy", node)
+                self.decision_notice.setdefault(decision, set()).add(node)
         if ptype == "Refusal":
             instruction = refs.get("instruction")
             if isinstance(instruction, str):
@@ -317,13 +329,15 @@ class _Builder:
             node = event_iri(str(event["id"]))
             ptype = self._ptype(event)
             data = _data(event)
-            self._dangling(node, event)
             if ptype == "DelegationIssued":
                 self._chain_verified(node, data)
             if ptype == "ToolCall":
                 self._executes_consequential(node, _refs(event))
             if ptype == "Decision":
                 self._oversight_matches(node, data)
+                self._explanation_reconstructable(node)
+            if ptype == "Outcome":
+                self._adverse_outcome_linked(node, data)
             self._chain_terminus(node, data)
         self._acts_on_untrusted(events)
         self._conduct_scope_budget(events)
@@ -337,6 +351,7 @@ class _Builder:
         for value in candidates:
             if is_event_ref(value) and value not in self.event_iris:
                 self.store.add_literal(node, "agentce:danglingRef", value)
+                self.dangling_nodes.add(node)
 
     def _chain_verified(self, node: str, data: dict[str, Any]) -> None:
         verification = data.get("verification")
@@ -376,6 +391,51 @@ class _Builder:
             node,
             "agentce:oversightModalityMatchesDeclared",
             "true" if matches else "false",
+            BOOL,
+        )
+
+    def _adverse_outcome_linked(self, node: str, data: dict[str, Any]) -> None:
+        """INC-01 (SPEC §7.4): an adverse outcome is linked to the consequential decision it
+        resulted from; a non-adverse outcome carries no such expectation and is vacuously linked.
+        A ``refs.decision`` that is missing, dangling (names no ingested event), or resolves to a
+        decision that is not itself a ``ConsequentialDecision`` does not count as linked -- a real
+        link requires a real consequential decision, not merely the shape of one."""
+        adverse = bool(data.get("adverse", False))
+        decision = self.outcome_decision.get(node)
+        linked = (not adverse) or (
+            decision is not None
+            and decision in self.event_iris
+            and self.store.is_a(decision, "agentce:ConsequentialDecision")
+        )
+        self.store.add_literal(
+            node, "agentce:adverseOutcomeLinked", "true" if linked else "false", BOOL
+        )
+
+    def _explanation_reconstructable(self, node: str) -> None:
+        """TRN-03 (SPEC §7.6): affected persons are informed (``notifiedBy`` a ``Notice``) and the
+        evidence chain resolves on both ends of that notification -- no ``danglingRef`` on the
+        decision itself (every ``refs.*``/``used`` value it names resolves to an ingested event) AND
+        no ``danglingRef`` on at least one Notice that notified it (round-2 critic finding: a Notice's
+        own dangling ``refs.*`` value, e.g. a free-form ``explanation_ref``, must not be invisible just
+        because `_dangling` lands the literal on the Notice node, not the Decision node) -- so the
+        evidence an explanation would be built from is actually present on both legs. A decision can be
+        ``notifiedBy`` more than one Notice; checking only the last one mapped made the result depend
+        on event order, so this checks every notifying Notice and passes if any one of them is clean
+        (a verifier-found regression, fixed this item). Scoped narrower than the Notice's own
+        ``content_ref`` or the Decision's own ``rationale_claim_ref`` (SPEC model attributes, not
+        ``refs.*`` edges): neither is materialised as a graph reference anywhere today, so neither can
+        dangle in this model yet -- that is new graph-builder work, not a drop-in check, and is
+        disclosed and out of this item's scope (see this item's contract, split to 18.37h)."""
+        notices = self.decision_notice.get(node)
+        reconstructable = (
+            notices is not None
+            and node not in self.dangling_nodes
+            and any(notice not in self.dangling_nodes for notice in notices)
+        )
+        self.store.add_literal(
+            node,
+            "agentce:explanationReconstructable",
+            "true" if reconstructable else "false",
             BOOL,
         )
 

@@ -21,6 +21,7 @@ final class Fixtures {
     private Fixtures() {}
 
     static final Path BASE = TestPaths.repoRoot().resolve("spec/catalogs/base/eu-ai-act");
+    static final Path CONDUCT = TestPaths.repoRoot().resolve("spec/catalogs/overlays/conduct");
 
     // --- Ed25519 PEM/PAE test helpers, shared between SignTest and CliTest's sign section
     // (item 18.26): both build and PEM-armor Ed25519/RSA/EC test keys and verify a DSSE signature

@@ -43,14 +43,15 @@ from agentce.report import (  # noqa: E402
 from agentce.structural import evaluate_control  # noqa: E402
 
 BASE = REPO / "spec" / "catalogs" / "base" / "eu-ai-act"
+CONDUCT = REPO / "spec" / "catalogs" / "overlays" / "conduct"
 TESTDATA = REPO / "engines" / "typescript" / "testdata"
 SUBJECT = "spiffe://corp/agents/a"
 CASES = ("passed", "failed", "inapplicable")
 
 
-def events_of(control_id: str, case: str) -> list[dict[str, object]]:
+def events_of(control_id: str, case: str, directory: Path = BASE) -> list[dict[str, object]]:
     """Parse a fixture's JSONL lines the same way the TS tests' own readers do."""
-    path = BASE / "test" / control_id / f"{case}.jsonl"
+    path = directory / "test" / control_id / f"{case}.jsonl"
     return [
         json.loads(line)
         for line in path.read_text(encoding="utf-8").split("\n")
@@ -87,10 +88,14 @@ def build_assess_golden(catalog: Catalog, domain: DomainBinding) -> dict[str, ob
     return result
 
 
-def build_catalog_golden(catalog: Catalog, domain: DomainBinding) -> dict[str, object]:
+def build_catalog_golden(
+    catalog: Catalog, domain: DomainBinding, directory: Path = BASE
+) -> dict[str, object]:
     """Mirrors engines/typescript/src/catalog.test.ts (lines 32-55): skip a control with no usable
     shape, skip a case with no fixture, but still record every control that has a shape (even with an
-    empty per-case map) exactly as the TS loop does."""
+    empty per-case map) exactly as the TS loop does. ``directory`` is the catalog's own directory
+    (its fixtures live under ``directory/test/<control>/<case>.jsonl``); the conduct-overlay golden
+    below reuses this same function over a different catalog and directory, never duplicating it."""
     result: dict[str, object] = {}
     for control in catalog.controls:
         shape = catalog.shape_for(control)
@@ -98,10 +103,10 @@ def build_catalog_golden(catalog: Catalog, domain: DomainBinding) -> dict[str, o
             continue
         per_case: dict[str, object] = {}
         for case in CASES:
-            fixture = BASE / "test" / control.id / f"{case}.jsonl"
+            fixture = directory / "test" / control.id / f"{case}.jsonl"
             if not fixture.is_file():
                 continue
-            events = events_of(control.id, case)
+            events = events_of(control.id, case, directory)
             store = build_graph(events, domain=domain)
             outcome = evaluate_control(
                 store,
@@ -200,6 +205,17 @@ def main() -> None:
     write_golden("assess-golden.json", build_assess_golden(catalog, domain))
     write_golden("catalog-golden.json", build_catalog_golden(catalog, domain))
     write_golden("report-golden.json", build_report_golden(catalog, domain))
+
+    # The Conduct overlay (SPEC §7.7) is a separate catalog with its own fixtures; a real,
+    # user-reachable guard that CND-01/CND-05 (withinScope/actsOnUntrusted) are materialised the
+    # same way Python does -- found missing from TS/Java entirely in 18.37, ported, and guarded here
+    # so a future regression in either engine's graph builder turns this golden red.
+    conduct_catalog = load_catalog(CONDUCT)
+    conduct_domain = DomainBinding.load(CONDUCT / "test" / "domain.yaml")
+    write_golden(
+        "conduct-golden.json",
+        build_catalog_golden(conduct_catalog, conduct_domain, CONDUCT),
+    )
 
 
 if __name__ == "__main__":

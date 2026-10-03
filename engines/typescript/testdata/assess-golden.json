@@ -1515,9 +1515,9 @@
       ],
       "family": "INC",
       "mode": "automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "rung": 2,
@@ -2989,9 +2989,9 @@
       ],
       "family": "INC",
       "mode": "automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "rung": 2,
@@ -4438,9 +4438,9 @@
       ],
       "family": "INC",
       "mode": "automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "rung": 2,

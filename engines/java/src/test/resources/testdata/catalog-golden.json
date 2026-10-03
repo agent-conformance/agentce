@@ -256,7 +256,7 @@
       "control": "INC-01",
       "outcome": "conformant",
       "population": {
-        "applicable": 1,
+        "applicable": 2,
         "failed": 0
       },
       "violations": []
@@ -265,14 +265,26 @@
       "control": "INC-01",
       "outcome": "non-conformant",
       "population": {
-        "applicable": 2,
-        "failed": 1
+        "applicable": 4,
+        "failed": 3
       },
       "violations": [
         {
-          "focus": "agentce:event/d1",
-          "path": "agentce:resultedIn",
-          "constraint": "sh:minCount",
+          "focus": "agentce:event/c4",
+          "path": "agentce:adverseOutcomeLinked",
+          "constraint": "sh:hasValue",
+          "message_key": "INC-01.S1"
+        },
+        {
+          "focus": "agentce:event/c5",
+          "path": "agentce:adverseOutcomeLinked",
+          "constraint": "sh:hasValue",
+          "message_key": "INC-01.S1"
+        },
+        {
+          "focus": "agentce:event/c6",
+          "path": "agentce:adverseOutcomeLinked",
+          "constraint": "sh:hasValue",
           "message_key": "INC-01.S1"
         }
       ]
@@ -1490,13 +1502,19 @@
       "outcome": "non-conformant",
       "population": {
         "applicable": 2,
-        "failed": 1
+        "failed": 2
       },
       "violations": [
         {
-          "focus": "agentce:event/d1",
-          "path": "agentce:notifiedBy",
-          "constraint": "sh:minCount",
+          "focus": "agentce:event/d2",
+          "path": "agentce:explanationReconstructable",
+          "constraint": "sh:hasValue",
+          "message_key": "TRN-03.S1"
+        },
+        {
+          "focus": "agentce:event/d3",
+          "path": "agentce:explanationReconstructable",
+          "constraint": "sh:hasValue",
           "message_key": "TRN-03.S1"
         }
       ]

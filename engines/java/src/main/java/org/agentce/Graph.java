@@ -66,6 +66,12 @@ public final class Graph {
         return m;
     }
 
+    /** Instruction source classes an agent may act on without corroboration (SPEC §7.7, Appendix F).
+     * Any other declared class is untrusted for the Conduct overlay's provenance and isolation
+     * controls. */
+    private static final Set<String> TRUSTED_INSTRUCTION =
+            Set.of("user", "operator", "service", "agent_identified", "memory_trusted");
+
     public static GraphStore buildGraph(List<JsonNode> events) {
         return buildGraph(events, DomainBinding.empty(), new GraphStore(), Iri.ZERO_KEY);
     }
@@ -163,6 +169,10 @@ public final class Graph {
         private final Map<String, String> decisionType = new LinkedHashMap<>();
         private final Map<String, String> decisionTime = new LinkedHashMap<>();
         private final Set<String> decisionReviewed = new LinkedHashSet<>();
+        private final Map<String, String> outcomeDecision = new LinkedHashMap<>(); // Outcome IRI -> its refs.decision IRI, if any
+        private final Map<String, Set<String>> decisionNotice = new LinkedHashMap<>(); // Decision IRI -> every notifying Notice IRI (order-independent)
+        private final Set<String> danglingNodes = new LinkedHashSet<>(); // event IRI -> has >=1 agentce:danglingRef literal
+        private final Map<String, Boolean> instructionUntrusted = new LinkedHashMap<>(); // Instruction IRI -> untrusted flag
 
         Builder(GraphStore store, DomainBinding domain, byte[] key) {
             this.store = store;
@@ -238,6 +248,8 @@ public final class Graph {
             }
 
             mapDecisionLinks(node, ptype, event);
+            mapConduct(node, ptype, data);
+            dangling(node, event);
 
             if ("DelegationIssued".equals(ptype)) {
                 mapDelegationPrincipals(data.get("chain"));
@@ -290,14 +302,20 @@ public final class Graph {
             if (decision != null) {
                 switch (ptype) {
                     case "ToolCall" -> store.addEdge(node, "agentce:executes", decision);
-                    case "Outcome" -> store.addEdge(decision, "agentce:resultedIn", node);
+                    case "Outcome" -> {
+                        store.addEdge(decision, "agentce:resultedIn", node);
+                        outcomeDecision.put(node, decision);
+                    }
                     case "ApprovalDecided" -> {
                         store.addEdge(decision, "agentce:reviewedBy", node);
                         decisionReviewed.add(decision);
                     }
                     case "Override" -> store.addEdge(decision, "agentce:overriddenBy", node);
                     case "Interrupt" -> store.addEdge(decision, "agentce:interruptedBy", node);
-                    case "Notice" -> store.addEdge(decision, "agentce:notifiedBy", node);
+                    case "Notice" -> {
+                        store.addEdge(decision, "agentce:notifiedBy", node);
+                        decisionNotice.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(node);
+                    }
                     default -> {
                         // other event types carry no decision link
                     }
@@ -311,12 +329,77 @@ public final class Graph {
             }
         }
 
+        /** Materialise the Conduct-overlay instruction-trust flag (SPEC §7.7): whether an
+         * instruction's declared source class is untrusted (Appendix F). Scope and budget are
+         * computed from the enforcement point's records in a second pass
+         * ({@code conductScopeBudget}). */
+        private void mapConduct(String node, String ptype, JsonNode data) {
+            if (!"Instruction".equals(ptype)) {
+                return;
+            }
+            String sourceClass = str(data.get("source_class"));
+            boolean untrusted = sourceClass != null && !TRUSTED_INSTRUCTION.contains(sourceClass);
+            instructionUntrusted.put(node, untrusted);
+            store.addLiteral(node, "agentce:instructionUntrusted", untrusted ? "true" : "false", BOOL);
+        }
+
+        /** Compute the Conduct within-scope and within-budget flags (SPEC §7.7, CND-01/CND-07) from
+         * the enforcement point's records: an action is out of scope when a {@code PolicyDecision}
+         * denies its request, and over budget when a {@code Refusal} with reason class
+         * {@code budget_exceeded} names it; both default to conformant, so the flags are inert for a
+         * bundle that records neither. */
+        private void conductScopeBudget(List<JsonNode> events) {
+            Set<String> denied = new LinkedHashSet<>();
+            Set<String> overBudget = new LinkedHashSet<>();
+            for (JsonNode event : events) {
+                String ptype = ptype(event);
+                JsonNode data = dataOf(event);
+                JsonNode refs = refsOf(event);
+                String request = str(refs.get("request"));
+                if ("PolicyDecision".equals(ptype) && "deny".equals(str(data.get("decision"))) && request != null) {
+                    denied.add(request);
+                }
+                if ("Refusal".equals(ptype)
+                        && "budget_exceeded".equals(str(data.get("reason_class")))
+                        && request != null) {
+                    overBudget.add(request);
+                }
+            }
+            for (JsonNode event : events) {
+                String ptype = ptype(event);
+                if (!"ToolCall".equals(ptype) && !"ResourceAccess".equals(ptype)) {
+                    continue;
+                }
+                String node = Iri.eventIri(event.get("id").asText());
+                store.addLiteral(node, "agentce:withinScope", denied.contains(node) ? "false" : "true", BOOL);
+                store.addLiteral(
+                        node, "agentce:withinBudget", overBudget.contains(node) ? "false" : "true", BOOL);
+            }
+        }
+
+        /** Flag every ToolCall/Decision that acts on an untrusted instruction (SPEC §7.7, CND-05).
+         * Runs after every event is mapped so the acting event may precede its instruction. */
+        private void actsOnUntrusted(List<JsonNode> events) {
+            for (JsonNode event : events) {
+                String ptype = ptype(event);
+                if (!"ToolCall".equals(ptype) && !"Decision".equals(ptype)) {
+                    continue;
+                }
+                String instruction = str(refsOf(event).get("instruction"));
+                boolean untrusted = instruction != null && instructionUntrusted.getOrDefault(instruction, false);
+                store.addLiteral(
+                        Iri.eventIri(event.get("id").asText()),
+                        "agentce:actsOnUntrusted",
+                        untrusted ? "true" : "false",
+                        BOOL);
+            }
+        }
+
         private void materialise(List<JsonNode> events) {
             for (JsonNode event : events) {
                 String node = Iri.eventIri(event.get("id").asText());
                 String ptype = ptype(event);
                 JsonNode data = dataOf(event);
-                dangling(node, event);
                 if ("DelegationIssued".equals(ptype)) {
                     chainVerified(node, data);
                 }
@@ -325,9 +408,15 @@ public final class Graph {
                 }
                 if ("Decision".equals(ptype)) {
                     oversightMatches(node, data);
+                    explanationReconstructable(node);
+                }
+                if ("Outcome".equals(ptype)) {
+                    adverseOutcomeLinked(node, data);
                 }
                 chainTerminus(node, data);
             }
+            actsOnUntrusted(events);
+            conductScopeBudget(events);
             precededBy();
         }
 
@@ -351,8 +440,48 @@ public final class Graph {
             for (String value : candidates) {
                 if (Iri.isEventRef(value) && !eventIris.contains(value)) {
                     store.addLiteral(node, "agentce:danglingRef", value);
+                    danglingNodes.add(node);
                 }
             }
+        }
+
+        /** INC-01 (SPEC §7.4): an adverse outcome is linked to the consequential decision it
+         * resulted from; a non-adverse outcome carries no such expectation and is vacuously linked.
+         * A refs.decision that is missing, dangling (names no ingested event), or resolves to a
+         * decision that is not itself a ConsequentialDecision does not count as linked -- a real
+         * link requires a real consequential decision, not merely the shape of one. */
+        private void adverseOutcomeLinked(String node, JsonNode data) {
+            boolean adverse = truthy(data.get("adverse"));
+            String decision = outcomeDecision.get(node);
+            boolean linked = !adverse
+                    || (decision != null
+                            && eventIris.contains(decision)
+                            && store.isA(decision, "agentce:ConsequentialDecision"));
+            store.addLiteral(node, "agentce:adverseOutcomeLinked", linked ? "true" : "false", BOOL);
+        }
+
+        /** TRN-03 (SPEC §7.6): affected persons are informed (notifiedBy a Notice) and the evidence
+         * chain resolves on both ends of that notification -- no danglingRef on the decision itself
+         * (every ref or "used" value it names resolves to an ingested event) AND no danglingRef on
+         * the Notice that notified it (round-2 critic finding: a Notice's own dangling ref, e.g. a
+         * free-form explanation_ref, must not be invisible just because dangling() lands the literal
+         * on the Notice node, not the Decision node) -- so the evidence an explanation would be built
+         * from is actually present on both legs. A decision can be notifiedBy more than one Notice;
+         * checking only the last one mapped made the result depend on event order, so this checks
+         * every notifying Notice and passes if any one of them is clean (a verifier-found regression,
+         * fixed this item). Scoped narrower than the Notice's own content_ref or the Decision's own
+         * rationale_claim_ref (SPEC model attributes, not refs edges): neither is materialised as a
+         * graph reference anywhere today, so neither can dangle in this model yet -- disclosed, out
+         * of this item's scope (see this item's contract, split to 18.37h). */
+        private void explanationReconstructable(String node) {
+            Set<String> notices = decisionNotice.get(node);
+            boolean reconstructable =
+                    notices != null
+                            && !notices.isEmpty()
+                            && !danglingNodes.contains(node)
+                            && notices.stream().anyMatch(notice -> !danglingNodes.contains(notice));
+            store.addLiteral(
+                    node, "agentce:explanationReconstructable", reconstructable ? "true" : "false", BOOL);
         }
 
         private void chainVerified(String node, JsonNode data) {

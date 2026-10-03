@@ -18,15 +18,19 @@ import org.junit.jupiter.api.io.TempDir;
  * exercises the whole rung-2 path over the real base catalog: it parses each control's Turtle shape,
  * builds the graph from the control's passed / failed / inapplicable fixtures, and evaluates the
  * control against {@code catalog-golden.json}.
+ *
+ * <p>{@code structuralEvaluationOverTheConductOverlayMatchesReference} does the same over the Conduct
+ * overlay ({@code spec/catalogs/overlays/conduct}, SPEC §7.7): a real, user-reachable regression guard
+ * that {@code withinScope}/{@code actsOnUntrusted} (CND-01/CND-05) are materialised the same way Python
+ * does -- the whole overlay was Python-only until item 18.37 found and ported it, and this is the test
+ * that would have caught it.
  */
 class CatalogTest {
     private static final String[] CASES = {"passed", "failed", "inapplicable"};
 
-    @Test
-    void structuralEvaluationMatchesReference() throws IOException {
-        JsonNode golden = Json.parseFile(TestPaths.testData().resolve("catalog-golden.json"));
-        Catalog catalog = Catalog.load(Fixtures.BASE);
-        DomainBinding domain = DomainBinding.load(Fixtures.BASE.resolve("test/domain.yaml"));
+    private static ObjectNode evaluateCatalog(Path directory) throws IOException {
+        Catalog catalog = Catalog.load(directory);
+        DomainBinding domain = DomainBinding.load(directory.resolve("test/domain.yaml"));
 
         ObjectNode result = Json.nodes().objectNode();
         for (Catalog.ControlSpec control : catalog.controls) {
@@ -36,7 +40,7 @@ class CatalogTest {
             }
             ObjectNode perCase = Json.nodes().objectNode();
             for (String c : CASES) {
-                Path fixture = Fixtures.BASE.resolve("test").resolve(control.id).resolve(c + ".jsonl");
+                Path fixture = directory.resolve("test").resolve(control.id).resolve(c + ".jsonl");
                 if (!Files.exists(fixture)) {
                     continue;
                 }
@@ -47,7 +51,20 @@ class CatalogTest {
             }
             result.set(control.id, perCase);
         }
-        assertEquals(Canonical.canonicalString(golden), Canonical.canonicalString(result));
+        return result;
+    }
+
+    @Test
+    void structuralEvaluationMatchesReference() throws IOException {
+        JsonNode golden = Json.parseFile(TestPaths.testData().resolve("catalog-golden.json"));
+        assertEquals(Canonical.canonicalString(golden), Canonical.canonicalString(evaluateCatalog(Fixtures.BASE)));
+    }
+
+    @Test
+    void structuralEvaluationOverTheConductOverlayMatchesReference() throws IOException {
+        JsonNode golden = Json.parseFile(TestPaths.testData().resolve("conduct-golden.json"));
+        assertEquals(
+                Canonical.canonicalString(golden), Canonical.canonicalString(evaluateCatalog(Fixtures.CONDUCT)));
     }
 
     // --- digestTree / provenanceDigest (item 18.22: a real catalog content digest, never
