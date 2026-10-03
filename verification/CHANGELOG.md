@@ -3,6 +3,19 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.29.0
+
+- Added `VG-I18N-ONE-CATALOGUE`: TypeScript and Java load the vendored `spec/i18n/` message catalogue
+  instead of hand-copied dictionaries (18.35, restores item 14.1's one-catalogue invariant). A direct
+  `cmp` of `spec/i18n/` against both vendored copies, each engine's own sync test and a catalogue unit
+  test that deep-equals a live read of the spec file (catching a reverted loader even if it still
+  hard-codes a few correct-looking spot values, which the sync test alone cannot), then a real-CLI leg
+  reusing `VG-PROJECT-VIEW`'s own fixture and `multi_args`: the delegate agent's own `report.md` must
+  read exactly `- Agents: spiffe://corp/agents/project-view-fixture-delegate` under its "Not yet
+  declared in your profile" heading, in all three engines. Four seeded faults: a one-byte drift in
+  each engine's vendored `messages.en.json`, and each engine's `loadCatalog` reverted to a hand-copied
+  literal.
+
 ## 0.28.0
 
 - Added `VG-CATALOG-SHAPE-SAFETY`: catalog lint (Python) and catalog loading (all three engines) refuse a
