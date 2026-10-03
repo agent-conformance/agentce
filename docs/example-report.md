@@ -27,7 +27,6 @@ This is the report the vendored quickstart project renders end to end with defau
 - `ModelCall (self_report)`: unlocks 4 check(s), needed by 0 more; rung 1 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: otel-genai.
 - `Notice (self_report)`: unlocks 3 check(s), needed by 0 more; rung 2 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: oversight.
 - `PolicyDecision (self_report)`: unlocks 3 check(s), needed by 0 more; rung 3 -- a request to platform or security. Adapters that can supply this: mcp-gateway, policy-engines.
-- `Outcome (self_report)`: unlocks 1 check(s), needed by 0 more; rung 2 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: no adapter today.
 
 ## Verdict
 
@@ -35,7 +34,7 @@ This is the report the vendored quickstart project renders end to end with defau
 
 Top gaps:
 
-- insufficient evidence: DAT-01, DAT-02, DAT-03, INC-01, INC-03 (+14 more gaps)
+- insufficient evidence: DAT-01, DAT-02, DAT-03, INC-03, OVS-01 (+13 more gaps)
 - not assessed: DAT-04, DOC-05, OVS-09, RSK-04, RSK-05
 
 Next step: Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.
@@ -45,9 +44,9 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
 - `conformant`: 25
 - `non-conformant`: 0
 - `partial`: 0
-- `not applicable`: 0
+- `not applicable`: 1
 - `not assessed`: 5
-- `insufficient evidence`: 19
+- `insufficient evidence`: 18
 
 ## Assertions
 
@@ -147,7 +146,7 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
 - **Technical documentation is complete and current** (`DOC-05` @ `spiffe://corp/agents/credit-langgraph`) -> **not assessed** (rung 3, manual; 0/0 failed)
   - `eu-ai-act Art. 11 / Annex IV (clause reference unverified)`
   - Remediation: doc-evidence-at-source
-- **Adverse outcomes are linked to their consequential decision** (`INC-01` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
+- **Adverse outcomes are linked to their consequential decision** (`INC-01` @ `spiffe://corp/agents/credit-langgraph`) -> **not applicable** (rung 2, automated; 0/0 failed)
   - `eu-ai-act Art. 72 (clause reference unverified)`
   - Remediation: inc-evidence-at-source
 - **Incident-triggering decisions carry an oversight review** (`INC-03` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
