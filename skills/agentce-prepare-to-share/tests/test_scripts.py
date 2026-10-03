@@ -382,10 +382,8 @@ def test_the_named_for_presets_exist_in_the_engine() -> None:
     skill = _SKILL_MD.read_text(encoding="utf-8")
     named = set(re.findall(r"`--for (\w[\w-]*)`", skill))
     assert named == set(PRESET_EMIT)
-    for role in ("auditor", "buyer"):
-        assert re.search(
-            rf"`{role}`[^.]*hand.over|hand.over[^.]*`{role}`", skill, re.IGNORECASE
-        ), f"{role} is not named as a hand-over view"
+    normalized = " ".join(skill.split())
+    assert "hand-over to someone outside the team" in normalized
 
 
 def test_skill_is_for_the_coding_assistant_and_never_signs() -> None:

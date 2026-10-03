@@ -43,14 +43,13 @@ stage 3. A first run without them is allowed, to discover which manual controls 
 
 ### Preparing a report for an audience
 
-`agentce assess --for <role>` narrows the emitted formats to one reader: `--for engineering` (the
-developer's AI assistant: `md`, `html`, `skill`, `remediation`), `--for compliance` (the
-compliance/GRC form: `oscal`, `oscal_xml`, `public`, `pack`, `csv`), `--for security` (`sarif`, `md`,
-`html`), `--for ci` (`sarif`, `junit`), `--for share` (`md`, `html`, `pdf`, `public`, `pack`), and
-`--for risk-lead` (the project view across every agent: `md`, `html`). `--for auditor` (`oscal`,
-`oscal_xml`, `pack`) and `--for buyer` (`pack`) are the two presets built for a hand-over to someone
-outside the team: `auditor` renders the clause-by-clause OSCAL plus the evidence pack, and `buyer`
-renders the generated questionnaire answers plus the evidence pack.
+`agentce assess --for <role>` narrows the emitted formats to one reader: `--for engineering` for the
+developer's AI assistant, `--for compliance` for the compliance/GRC form, `--for security` for the
+security team, `--for ci` for a CI pipeline gate, `--for share` for a general hand-off, and
+`--for risk-lead` for the risk lead or CIO's project view across every agent. `--for auditor` and
+`--for buyer` are the two presets built for a hand-over to someone outside the team: `auditor` renders
+the clause-by-clause OSCAL plus the evidence pack, and `buyer` renders the generated questionnaire
+answers plus the evidence pack. `agentce assess --help` lists each preset's exact emitted formats.
 
 ## Stage 3 — Human-supplied records
 
