@@ -51,14 +51,14 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
 multi_args=(assess --bundle "$fixture/evidence" --profile "$fixture/applicability.yaml" \
-  --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" --for risk-lead)
+  --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" --for risk-lead \
+  --allow-unverified-catalog)
 one_args=(assess --bundle "$one_subject/evidence" --profile "$one_subject/applicability.yaml" \
-  --domain "$one_subject/domain.linkml.yaml" --catalog-dir "$one_subject/catalog" --for risk-lead)
-# Only the Python engine verifies a --catalog-dir's signature (SPEC §8.7, item 11.3); both fixture
-# catalogs are deliberately unsigned test-only catalogs, so Python alone needs the explicit override,
-# matching blind_spots_engines.sh's own precedent.
-py_multi_args=("${multi_args[@]}" --allow-unverified-catalog)
-py_one_args=("${one_args[@]}" --allow-unverified-catalog)
+  --domain "$one_subject/domain.linkml.yaml" --catalog-dir "$one_subject/catalog" --for risk-lead \
+  --allow-unverified-catalog)
+# Every engine verifies a --catalog-dir's signature (SPEC §8.7; TypeScript and Java since 18.36), and
+# both fixture catalogs are deliberately unsigned test-only catalogs, so every engine gets the explicit
+# override, matching blind_spots_engines.sh.
 deviations_args=(assess --bundle "$deviations_fixture/evidence" \
   --profile "$deviations_fixture/applicability.yaml" \
   --domain "$deviations_fixture/domain.linkml.yaml" \
@@ -126,7 +126,7 @@ if [ "${1:-}" = "--write" ]; then
   # PROJ-01 (severity: high) is insufficient_evidence by fixture design, so every engine's run below
   # exits 2 (SPEC.md:1076, item 18.30).
   set +e
-  (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_multi_args[@]}" --out "$work/python" >/dev/null)
+  (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${multi_args[@]}" --out "$work/python" >/dev/null)
   code=$?
   set -e
   assert_code "python (--write)" "$code"
@@ -165,13 +165,13 @@ fi
 (cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist)
 
 set +e
-(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_multi_args[@]}" --out "$work/python-multi" >/dev/null)
+(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${multi_args[@]}" --out "$work/python-multi" >/dev/null)
 code=$?; assert_code "python-multi" "$code"
 (cd "$root/engines/typescript" && pnpm --silent agentce "${multi_args[@]}" --out "$work/typescript-multi" >/dev/null)
 code=$?; assert_code "typescript-multi" "$code"
 (cd "$root/engines/java" && ./build/install/agentce/bin/agentce "${multi_args[@]}" --out "$work/java-multi" >/dev/null)
 code=$?; assert_code "java-multi" "$code"
-(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_one_args[@]}" --out "$work/python-one" >/dev/null)
+(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${one_args[@]}" --out "$work/python-one" >/dev/null)
 code=$?; assert_code "python-one" "$code"
 (cd "$root/engines/typescript" && pnpm --silent agentce "${one_args[@]}" --out "$work/typescript-one" >/dev/null)
 code=$?; assert_code "typescript-one" "$code"

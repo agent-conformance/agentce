@@ -56,8 +56,8 @@ fi
 
 # Real-CLI leg: the project_view fixture, the exact multi_args project_view_engines.sh already runs.
 multi_args=(assess --bundle "$fixture/evidence" --profile "$fixture/applicability.yaml" \
-  --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" --for risk-lead)
-py_multi_args=("${multi_args[@]}" --allow-unverified-catalog)
+  --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" --for risk-lead \
+  --allow-unverified-catalog)
 
 check_delegate_line() {
   python3 - "$1" <<'PY'
@@ -82,7 +82,7 @@ PY
 
 echo "i18n-one-catalogue: real CLI (project_view fixture), all three engines"
 set +e
-(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_multi_args[@]}" --out "$work/python" >"$work/python.log" 2>&1)
+(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${multi_args[@]}" --out "$work/python" >"$work/python.log" 2>&1)
 py_code=$?
 (cd "$root/engines/typescript" && pnpm --silent agentce "${multi_args[@]}" --out "$work/typescript" >"$work/typescript.log" 2>&1)
 ts_code=$?

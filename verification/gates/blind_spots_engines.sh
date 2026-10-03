@@ -30,12 +30,10 @@ fixture="$root/verification/gates/fixtures/blind_spots"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 args=(assess --bundle "$fixture/evidence" --profile "$fixture/applicability.yaml" \
-  --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog")
-# Only the Python engine verifies a --catalog-dir's signature (SPEC §8.7, item 11.3); the fixture
-# catalog is deliberately unsigned (a test-only catalog, never published), so Python alone needs the
-# explicit override. TypeScript and Java do not verify --catalog-dir signatures at all today (a
-# pre-existing scope gap, not this item's to fix) and have no equivalent flag.
-py_args=("${args[@]}" --allow-unverified-catalog)
+  --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" --allow-unverified-catalog)
+# Every engine verifies a --catalog-dir's signature (SPEC §8.7; TypeScript and Java since 18.36), and
+# the fixture catalog is deliberately unsigned (a test-only catalog, never published), so every engine
+# gets the explicit override.
 
 # A regenerated golden could itself lose the needed_by case or the ranking (a bad capture, or a
 # Python regression at --write time): check the property once, on the golden itself, rather than
@@ -84,7 +82,7 @@ assert_code() {
 
 if [ "${1:-}" = "--write" ]; then
   set +e
-  (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_args[@]}" --out "$work/python" >/dev/null)
+  (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${args[@]}" --out "$work/python" >/dev/null)
   code=$?
   set -e
   assert_code "python (--write)" "$code"
@@ -108,7 +106,7 @@ fi
 (cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist)
 
 set +e
-(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${py_args[@]}" --out "$work/python" >/dev/null)
+(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${args[@]}" --out "$work/python" >/dev/null)
 py_code=$?
 set -e
 assert_code "python" "$py_code"
