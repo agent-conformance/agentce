@@ -1,11 +1,14 @@
 """Parse a Portable Shape Profile shape into a small AST (SPEC §7.2, ADR-0002).
 
-The PSP is a strict, bounded subset of SHACL Core (``psp_check`` gates every shape before it reaches
-here), so the AST is finite: a node shape has targets (``sh:targetClass``, ``sh:targetNode``, and the
-engine-resolved ``agentce:targetWhere`` property-value conjunction) and property shapes, each with a
-path (a predicate, an inverse, or a bounded sequence or alternative) and the profile's constraints.
-The structural evaluator compiles this AST to queries over the graph store; a SHACL library validates
-the same shape on small graphs as a cross-check.
+The PSP is a strict, bounded subset of SHACL Core, so the AST is finite: a node shape has targets
+(``sh:targetClass``, ``sh:targetNode``, and the engine-resolved ``agentce:targetWhere`` property-value
+conjunction) and property shapes, each with a path (a predicate, an inverse, or a bounded sequence or
+alternative) and the profile's constraints. The structural evaluator compiles this AST to queries over
+the graph store; a SHACL library validates the same shape on small graphs as a cross-check.
+``spec/rules/psp_check.py`` is the authoring-time checker for the profile's full excluded-feature list;
+this module independently refuses the two constructs that would let a shape carry logic no engine can
+evaluate identically (``sh:sparql``, ``sh:js``/``sh:javascript``, 18.34) before a shape ever reaches
+the evaluator, since those bytes would otherwise just be ignored, not rejected, by the parsing below.
 """
 
 from __future__ import annotations
@@ -16,6 +19,8 @@ from typing import Any
 
 from rdflib import RDF, BNode, Graph, Literal, URIRef
 from rdflib.collection import Collection
+
+from .errors import InputError
 
 SH = "http://www.w3.org/ns/shacl#"
 AGENTCE = "https://agent-conformance.org/vocab/evidence/v1#"
@@ -195,9 +200,55 @@ def parse_shapes(graph: Graph) -> dict[str, Shape]:
     return shapes
 
 
+#: SHACL predicates that embed arbitrary query or script logic. The Portable Shape Profile
+#: (spec/rules/psp.md) forbids both because they are not portable across the three engines'
+#: independent structural evaluators; left unchecked, such a predicate parses as ordinary Turtle
+#: (every ``graph.value``/``graph.objects`` call above only ever reads the predicates it names, so an
+#: unrecognised one like ``sh:sparql`` is otherwise silently dropped, not rejected) and the shape it
+#: sits on is accepted as if the construct were not there.
+#:
+#: Checked in this fixed order (matching ``spec/rules/psp_check.py``'s own ``PRIORITY_DENY``: sparql
+#: before its script counterpart), never in graph-iteration order -- ``graph.predicates()`` iterates
+#: a set, whose order depends on ``PYTHONHASHSEED``, so a shape carrying BOTH predicates would
+#: otherwise report a different key on different runs, and TypeScript/Java (which iterate quads in
+#: insertion order) would disagree with Python on which one wins.
+_FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER = (
+    ("sparql", "catalog.shape.sparql_forbidden"),
+    ("js", "catalog.shape.script_forbidden"),
+    ("javascript", "catalog.shape.script_forbidden"),
+)
+
+
+def _check_forbidden_predicates(graph: Graph) -> None:
+    used = {
+        str(predicate)[len(SH) :].lower()
+        for predicate in graph.predicates()
+        if str(predicate).startswith(SH)
+    }
+    for name, key in _FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER:
+        if name not in used:
+            continue
+        if key == "catalog.shape.sparql_forbidden":
+            raise InputError(
+                key,
+                "a shape uses sh:sparql, a SPARQL-based SHACL construct the Portable Shape "
+                "Profile forbids (spec/rules/psp.md).",
+                "remove the sh:sparql constraint; express it with the profile's declarative "
+                "vocabulary instead (spec/rules/psp.md).",
+            )
+        raise InputError(
+            key,
+            "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable "
+            "Shape Profile forbids (spec/rules/psp.md).",
+            "remove the sh:js constraint; express it with the profile's declarative vocabulary "
+            "instead (spec/rules/psp.md).",
+        )
+
+
 def parse_shapes_ttl(text: str) -> dict[str, Shape]:
     graph = Graph()
     graph.parse(data=text, format="turtle")
+    _check_forbidden_predicates(graph)
     return parse_shapes(graph)
 
 

@@ -2,6 +2,7 @@ package org.agentce;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -86,6 +87,125 @@ class CatalogTest {
         Files.writeString(tmp.resolve("readme.txt"), "tampered content\n");
         String after = Catalog.provenanceDigest(tmp);
         assertNotEquals(before, after);
+    }
+
+    // --- 18.34: the Portable Shape Profile forbids sh:sparql and sh:js; Java has no `catalog lint`
+    // command (confirmed: no `lint` subcommand in Cli.java's dispatch), so this item's Java scope is
+    // catalog *loading* only, via Catalog.load -> Psp.parseShapesTtl. ---
+
+    @Test
+    void loadRefusesAShapeUsingShSparql(@TempDir Path tmp) throws IOException {
+        copyTree(Fixtures.BASE, tmp);
+        mutateShape(tmp, "sh:sparql [] ");
+        InputError err = assertThrows(InputError.class, () -> Catalog.load(tmp));
+        assertEquals("catalog.shape.sparql_forbidden", err.key);
+    }
+
+    @Test
+    void loadRefusesAShapeUsingShJs(@TempDir Path tmp) throws IOException {
+        copyTree(Fixtures.BASE, tmp);
+        mutateShape(tmp, "sh:js [] ");
+        InputError err = assertThrows(InputError.class, () -> Catalog.load(tmp));
+        assertEquals("catalog.shape.script_forbidden", err.key);
+    }
+
+    @Test
+    void loadRefusesAShapeUsingShJavascript(@TempDir Path tmp) throws IOException {
+        copyTree(Fixtures.BASE, tmp);
+        mutateShape(tmp, "sh:javascript [] ");
+        InputError err = assertThrows(InputError.class, () -> Catalog.load(tmp));
+        assertEquals("catalog.shape.script_forbidden", err.key);
+    }
+
+    // Contract-critic round 1 (B1): a shape with BOTH predicates must always report sparql first
+    // (spec/rules/psp_check.py's PRIORITY_DENY), matching Python/TypeScript's fixed-order check,
+    // never whichever one Rdf.Store happened to insert first.
+    @Test
+    void loadRefusesAShapeCarryingBothPredicatesAsSparqlDeterministically(@TempDir Path tmp) throws IOException {
+        copyTree(Fixtures.BASE, tmp);
+        mutateShape(tmp, "sh:js [] ; sh:sparql [] ");
+        InputError err = assertThrows(InputError.class, () -> Catalog.load(tmp));
+        assertEquals("catalog.shape.sparql_forbidden", err.key);
+    }
+
+    @Test
+    void loadRefusesForbiddenPredicateUnderAnAliasedPrefixOrBareIri(@TempDir Path tmp) throws IOException {
+        copyTree(Fixtures.BASE, tmp);
+        Path shape = tmp.resolve("shapes/DAT-01.ttl");
+        String original = Files.readString(shape);
+        String aliased =
+                original
+                        .replace(
+                                "@prefix sh: <http://www.w3.org/ns/shacl#> .",
+                                "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
+                                        + "@prefix shacl: <http://www.w3.org/ns/shacl#> .")
+                        .replace("sh:name \"S1\" ] .", "sh:name \"S1\" ] ; shacl:sparql [] .");
+        Files.writeString(shape, aliased);
+        InputError err = assertThrows(InputError.class, () -> Catalog.load(tmp));
+        assertEquals("catalog.shape.sparql_forbidden", err.key);
+
+        String bareIri =
+                original.replace(
+                        "sh:name \"S1\" ] .", "sh:name \"S1\" ] ; <http://www.w3.org/ns/shacl#js> [] .");
+        Files.writeString(shape, bareIri);
+        InputError err2 = assertThrows(InputError.class, () -> Catalog.load(tmp));
+        assertEquals("catalog.shape.script_forbidden", err2.key);
+    }
+
+    @Test
+    void loadDoesNotRefuseALiteralOrACommentThatMerelyMentionsShSparql(@TempDir Path tmp) throws IOException {
+        copyTree(Fixtures.BASE, tmp);
+        Path shape = tmp.resolve("shapes/DAT-01.ttl");
+        String original = Files.readString(shape);
+        Files.writeString(
+                shape,
+                original.replace(
+                        "sh:name \"S1\" ] .",
+                        "sh:name \"S1, not sh:sparql or sh:js (documentation only)\" ] ."));
+        Catalog.load(tmp); // must not throw
+
+        Files.writeString(shape, "# this shape must never use sh:sparql or sh:js\n" + original);
+        Catalog.load(tmp); // must not throw
+    }
+
+    @Test
+    void loadRefusesForbiddenPredicateNestedInsideAPropertyShape(@TempDir Path tmp) throws IOException {
+        copyTree(Fixtures.BASE, tmp);
+        Path shape = tmp.resolve("shapes/DAT-01.ttl");
+        Files.writeString(
+                shape,
+                Files.readString(shape)
+                        .replace(
+                                "sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .",
+                                "sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ; sh:sparql [] ] ."));
+        InputError err = assertThrows(InputError.class, () -> Catalog.load(tmp));
+        assertEquals("catalog.shape.sparql_forbidden", err.key);
+    }
+
+    @Test
+    void loadRefusesForbiddenPredicateWrittenAsATurtleUnicodeEscape(@TempDir Path tmp) throws IOException {
+        // Turtle's IRIREF grammar allows backslash-u (four hex digits) and backslash-U (eight hex
+        // digits) escapes inside <...>; a parser that kept the raw, undecoded IRI text (rather than
+        // the resolved IRI) would miss this, since it is the same IRI as sh:sparql once decoded.
+        copyTree(Fixtures.BASE, tmp);
+        // Built by concatenation, not a literal escape, so javac's own raw unicode-escape
+        // preprocessing (which runs before string literals are even recognised) does not decode
+        // the backslash-u sequence itself -- the Turtle parser under test must do that decoding.
+        String uchar = "<http://www.w3.org/ns/shacl#sp" + "\\" + "u0061" + "rql> [] ";
+        mutateShape(tmp, uchar);
+        InputError err = assertThrows(InputError.class, () -> Catalog.load(tmp));
+        assertEquals("catalog.shape.sparql_forbidden", err.key);
+    }
+
+    @Test
+    void loadAcceptsTheUnmutatedBaseCatalogClean() {
+        Catalog.load(Fixtures.BASE); // must not throw
+    }
+
+    private static void mutateShape(Path catalogDir, String triple) throws IOException {
+        Path shape = catalogDir.resolve("shapes/DAT-01.ttl");
+        String original = Files.readString(shape);
+        Files.writeString(shape, original.replace("sh:name \"S1\" ] .", "sh:name \"S1\" ] ; " + triple + " ."));
     }
 
     private static void copyTree(Path source, Path target) throws IOException {

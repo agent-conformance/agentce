@@ -3,6 +3,19 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.28.0
+
+- Added `VG-CATALOG-SHAPE-SAFETY`: catalog lint (Python) and catalog loading (all three engines) refuse a
+  shape carrying `sh:sparql` or `sh:js` (18.34) -- each engine's shape parser otherwise only ever reads the
+  specific SHACL predicates it recognises, so an unrecognised one like `sh:sparql` parses as an ordinary,
+  incomplete shape and is silently accepted, letting a catalog carry logic no engine can evaluate
+  identically. TypeScript and Java have no `catalog lint` command, so their scope is catalog loading only.
+  A shape carrying both predicates always reports `sh:sparql` first, in every engine, matching
+  `spec/rules/psp_check.py`'s own priority order. The gate also runs the real `agentce catalog lint`/
+  `agentce assess --catalog-dir` CLI per engine, against both a mutated and a clean catalog, asserting the
+  message key in the real output as well as the exit code. Three seeded faults, one per engine, each
+  removing that engine's forbidden-predicate check.
+
 ## 0.27.0
 
 - Changed `VG-PROJECT-VIEW`: the project view's per-agent row now carries a `deviations` list (18.14a,

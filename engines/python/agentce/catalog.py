@@ -24,6 +24,7 @@ import yaml
 
 from . import signing
 from .domain import DomainBinding
+from .errors import InputError
 from .graph import build_graph
 from .psp import Shape, load_shapes
 from .structural import evaluate_control
@@ -238,6 +239,8 @@ def lint_catalog(
         catalog = load_catalog(directory)
     except (yaml.YAMLError, OSError) as exc:
         return [f"{directory}: cannot load catalog ({exc})"]
+    except InputError as exc:
+        return [f"{exc.key}: {exc.cause}"]
 
     meta = (
         yaml.safe_load((directory / "catalog.yaml").read_text(encoding="utf-8")) or {}

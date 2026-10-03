@@ -129,6 +129,17 @@ public final class Rdf {
             List<Term> objs = objects(subject, predicate);
             return objs.isEmpty() ? null : objs.get(0);
         }
+
+        /** Every distinct predicate IRI used anywhere in the store, in insertion order. */
+        public List<String> predicates() {
+            List<String> out = new ArrayList<>();
+            for (Term[] q : quads) {
+                if (q[1].kind == Kind.IRI && !out.contains(q[1].value)) {
+                    out.add(q[1].value);
+                }
+            }
+            return out;
+        }
     }
 
     /** Parse Turtle text into a {@link Store}. */
@@ -362,11 +373,28 @@ public final class Rdf {
         }
 
         private Token scanIriRef() {
-            int start = ++pos; // skip '<'
+            pos++; // skip '<'
+            StringBuilder sb = new StringBuilder();
             while (pos < src.length() && src.charAt(pos) != '>') {
-                pos++;
+                char c = src.charAt(pos++);
+                if (c == '\\' && pos < src.length()) {
+                    char e = src.charAt(pos);
+                    if (e == 'u') {
+                        pos++;
+                        sb.append((char) Integer.parseInt(src.substring(pos, pos + 4), 16));
+                        pos += 4;
+                    } else if (e == 'U') {
+                        pos++;
+                        sb.appendCodePoint(Integer.parseInt(src.substring(pos, pos + 8), 16));
+                        pos += 8;
+                    } else {
+                        sb.append(c);
+                    }
+                } else {
+                    sb.append(c);
+                }
             }
-            String iri = src.substring(start, pos);
+            String iri = sb.toString();
             pos++; // skip '>'
             return new Token(Type.IRIREF, iri);
         }

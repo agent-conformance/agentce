@@ -100,6 +100,8 @@ _KINDS: dict[str, str] = {
     "catalog.sign_trust_root_inside_catalog": "error",
     "catalog.support_matrix_multi": "error",
     "catalog.support_matrix_inside_catalog": "error",
+    "catalog.shape.sparql_forbidden": "error",
+    "catalog.shape.script_forbidden": "error",
     "verify.report_no_claim": "error",
     "verify.report_claim_malformed": "error",
     "verify.report_unsigned": "error",

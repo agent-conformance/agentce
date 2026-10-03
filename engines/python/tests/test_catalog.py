@@ -16,6 +16,7 @@ import pytest
 from agentce import cli, commands
 from agentce.catalog import lint_catalog, load_catalog
 from agentce.domain import DomainBinding
+from agentce.errors import InputError
 from agentce.graph import build_graph
 from agentce.structural import evaluate_control
 
@@ -87,6 +88,194 @@ def test_lint_detects_schema_violation(tmp_path: Path) -> None:
     )
     problems = lint_catalog(catalog_dir)
     assert any("INT-01" in problem and "schema" in problem for problem in problems)
+
+
+# --- 18.34: the Portable Shape Profile forbids sh:sparql and sh:js; both lint and load refuse them. ---
+
+
+@pytest.mark.parametrize(
+    ("triple", "key"),
+    [
+        ("sh:sparql [] ", "catalog.shape.sparql_forbidden"),
+        ("sh:js [] ", "catalog.shape.script_forbidden"),
+        ("sh:javascript [] ", "catalog.shape.script_forbidden"),
+    ],
+)
+def test_lint_detects_forbidden_shape_predicate(
+    tmp_path: Path, triple: str, key: str
+) -> None:
+    catalog_dir = tmp_path / "cat"
+    shutil.copytree(_BASE, catalog_dir)
+    shape = catalog_dir / "shapes" / "DAT-01.ttl"
+    shape.write_text(
+        shape.read_text(encoding="utf-8").replace(
+            'sh:name "S1" ] .', f'sh:name "S1" ] ; {triple} .'
+        ),
+        encoding="utf-8",
+    )
+    problems = lint_catalog(catalog_dir)
+    assert any(key in problem for problem in problems)
+
+
+@pytest.mark.parametrize(
+    ("triple", "key"),
+    [
+        ("sh:sparql [] ", "catalog.shape.sparql_forbidden"),
+        ("sh:js [] ", "catalog.shape.script_forbidden"),
+        ("sh:javascript [] ", "catalog.shape.script_forbidden"),
+    ],
+)
+def test_load_refuses_forbidden_shape_predicate(
+    tmp_path: Path, triple: str, key: str
+) -> None:
+    catalog_dir = tmp_path / "cat"
+    shutil.copytree(_BASE, catalog_dir)
+    shape = catalog_dir / "shapes" / "DAT-01.ttl"
+    shape.write_text(
+        shape.read_text(encoding="utf-8").replace(
+            'sh:name "S1" ] .', f'sh:name "S1" ] ; {triple} .'
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(InputError) as excinfo:
+        load_catalog(catalog_dir)
+    assert excinfo.value.key == key
+
+
+def test_load_refuses_a_shape_carrying_both_predicates_as_sparql_deterministically(
+    tmp_path: Path,
+) -> None:
+    """Contract-critic round 1 (B1): a shape with BOTH predicates must always report sparql first
+    (matching spec/rules/psp_check.py's PRIORITY_DENY), never whichever one the graph happens to
+    iterate first -- the first cut iterated `graph.predicates()` directly (a set, ordered by
+    PYTHONHASHSEED) and disagreed with itself across runs, and with TypeScript/Java."""
+    catalog_dir = tmp_path / "cat"
+    shutil.copytree(_BASE, catalog_dir)
+    shape = catalog_dir / "shapes" / "DAT-01.ttl"
+    shape.write_text(
+        shape.read_text(encoding="utf-8").replace(
+            'sh:name "S1" ] .', 'sh:name "S1" ] ; sh:js [] ; sh:sparql [] .'
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(InputError) as excinfo:
+        load_catalog(catalog_dir)
+    assert excinfo.value.key == "catalog.shape.sparql_forbidden"
+
+
+def test_load_refuses_forbidden_predicate_under_an_aliased_prefix_or_bare_iri(
+    tmp_path: Path,
+) -> None:
+    """A check that only matched the literal string `sh:sparql` would miss both of these: the
+    predicate is a resolved IRI, not textual prefix syntax, so a shape author using a different
+    prefix for the SHACL namespace, or the bare IRI, is still caught."""
+    catalog_dir = tmp_path / "cat"
+    shutil.copytree(_BASE, catalog_dir)
+    shape = catalog_dir / "shapes" / "DAT-01.ttl"
+    text = shape.read_text(encoding="utf-8")
+    aliased = text.replace(
+        "@prefix sh: <http://www.w3.org/ns/shacl#> .",
+        "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
+        "@prefix shacl: <http://www.w3.org/ns/shacl#> .",
+    ).replace('sh:name "S1" ] .', 'sh:name "S1" ] ; shacl:sparql [] .')
+    shape.write_text(aliased, encoding="utf-8")
+    with pytest.raises(InputError) as excinfo:
+        load_catalog(catalog_dir)
+    assert excinfo.value.key == "catalog.shape.sparql_forbidden"
+
+    bare_iri = text.replace(
+        'sh:name "S1" ] .', 'sh:name "S1" ] ; <http://www.w3.org/ns/shacl#js> [] .'
+    )
+    shape.write_text(bare_iri, encoding="utf-8")
+    with pytest.raises(InputError) as excinfo:
+        load_catalog(catalog_dir)
+    assert excinfo.value.key == "catalog.shape.script_forbidden"
+
+
+def test_load_does_not_refuse_a_literal_that_merely_mentions_sh_sparql(
+    tmp_path: Path,
+) -> None:
+    """An RDF predicate is always an IRI, never a literal, so a string value that happens to
+    contain the text "sh:sparql" (documentation, a control's own prose) can never be mistaken for
+    the forbidden predicate -- unlike a plain substring-over-the-file-text check, which would be
+    fooled by this."""
+    catalog_dir = tmp_path / "cat"
+    shutil.copytree(_BASE, catalog_dir)
+    shape = catalog_dir / "shapes" / "DAT-01.ttl"
+    shape.write_text(
+        shape.read_text(encoding="utf-8").replace(
+            'sh:name "S1" ] .',
+            'sh:name "S1, not sh:sparql or sh:js (documentation only)" ] .',
+        ),
+        encoding="utf-8",
+    )
+    load_catalog(catalog_dir)  # must not raise
+
+
+def test_load_does_not_refuse_a_turtle_comment_that_merely_mentions_sh_sparql(
+    tmp_path: Path,
+) -> None:
+    """A `#`-comment is not RDF data at all; a substring-over-the-raw-file-text check would still
+    be fooled by one naming "sh:sparql", unlike an RDF-predicate-based check."""
+    catalog_dir = tmp_path / "cat"
+    shutil.copytree(_BASE, catalog_dir)
+    shape = catalog_dir / "shapes" / "DAT-01.ttl"
+    shape.write_text(
+        "# this shape must never use sh:sparql or sh:js\n"
+        + shape.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    load_catalog(catalog_dir)  # must not raise
+
+
+def test_load_refuses_forbidden_predicate_nested_inside_a_property_shape(
+    tmp_path: Path,
+) -> None:
+    """The forbidden predicate can appear on any node in the graph, not only the top-level node
+    shape; a check that only inspected the node shape's own triples would miss a property shape
+    nesting the SPARQL/script construct inside `sh:property [...]`."""
+    catalog_dir = tmp_path / "cat"
+    shutil.copytree(_BASE, catalog_dir)
+    shape = catalog_dir / "shapes" / "DAT-01.ttl"
+    shape.write_text(
+        shape.read_text(encoding="utf-8").replace(
+            'sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name "S1" ] .',
+            'sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name "S1" ; sh:sparql [] ] .',
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(InputError) as excinfo:
+        load_catalog(catalog_dir)
+    assert excinfo.value.key == "catalog.shape.sparql_forbidden"
+
+
+def test_load_refuses_forbidden_predicate_written_as_a_turtle_unicode_escape(
+    tmp_path: Path,
+) -> None:
+    """Turtle's IRIREF grammar allows `\\uXXXX`/`\\UXXXXXXXX` escapes inside `<...>`; a predicate
+    scan that compared raw, undecoded IRI text (rather than the resolved IRI) would miss
+    `<http://www.w3.org/ns/shacl#sp\\u0061rql>`, which is the same IRI as `sh:sparql` once decoded."""
+    catalog_dir = tmp_path / "cat"
+    shutil.copytree(_BASE, catalog_dir)
+    shape = catalog_dir / "shapes" / "DAT-01.ttl"
+    shape.write_text(
+        shape.read_text(encoding="utf-8").replace(
+            'sh:name "S1" ] .',
+            'sh:name "S1" ] ; <http://www.w3.org/ns/shacl#sp\\u0061rql> [] .',
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(InputError) as excinfo:
+        load_catalog(catalog_dir)
+    assert excinfo.value.key == "catalog.shape.sparql_forbidden"
+
+
+def test_load_and_lint_accept_the_unmutated_base_catalog_clean() -> None:
+    """Explicit clean-base assertion for the gate's own selection (round-2 critic B3'), on top of
+    the already-passing `structuralEvaluationMatchesReference`-style coverage elsewhere: the real
+    `eu-ai-act` catalog's real shapes must never themselves trip the new check."""
+    load_catalog(_BASE)  # must not raise
+    assert lint_catalog(_BASE) == []
 
 
 # --- 18.9 C1: `agentce catalog init` (contracts/P18-18.9.md). ---

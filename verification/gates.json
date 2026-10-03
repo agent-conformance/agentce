@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.24.0",
+  "suite_version": "0.28.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1011,6 +1011,48 @@
         }
       ],
       "fix_hint": "run verification/gates/quick_path.sh and read the FAIL line; the reference implementation is engines/python/agentce/records/__init__.py (ScannedRecords.profile) and engines/python/agentce/commands/__init__.py's cmd_assess (applicability_declared)."
+    },
+    {
+      "id": "VG-CATALOG-SHAPE-SAFETY",
+      "title": "Catalog lint and catalog loading in every engine refuse a shape using sh:sparql or sh:js",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/catalog_shape_safety.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "java"
+      ],
+      "timeout_s": 300,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "a shape carrying sh:sparql or sh:js is refused with the matching message key (catalog.shape.sparql_forbidden / catalog.shape.script_forbidden) by Python's catalog lint and by catalog loading in all three engines (Python, TypeScript, Java); the unmutated base catalog still lints and loads clean in every engine",
+        "fail": "any engine's catalog loader (or Python's catalog lint) silently accepts a shape carrying sh:sparql or sh:js instead of refusing it"
+      },
+      "faults": [
+        {
+          "description": "Python's shape parser stops checking for forbidden SHACL predicates",
+          "file": "engines/python/agentce/psp.py",
+          "search": "    graph.parse(data=text, format=\"turtle\")\n    _check_forbidden_predicates(graph)\n",
+          "replace": "    graph.parse(data=text, format=\"turtle\")\n"
+        },
+        {
+          "description": "TypeScript's shape parser stops checking for forbidden SHACL predicates",
+          "file": "engines/typescript/src/psp.ts",
+          "search": "  store.addQuads(new Parser().parse(text));\n  checkForbiddenPredicates(store);\n",
+          "replace": "  store.addQuads(new Parser().parse(text));\n"
+        },
+        {
+          "description": "Java's shape parser stops checking for forbidden SHACL predicates",
+          "file": "engines/java/src/main/java/org/agentce/Psp.java",
+          "search": "checkForbiddenPredicates(store);",
+          "replace": "// checkForbiddenPredicates(store);"
+        }
+      ],
+      "fix_hint": "Run verification/gates/catalog_shape_safety.sh and read which engine's test failed; the forbidden-predicate check lives in psp.py/psp.ts/Psp.java's parseShapesTtl/parseShapes equivalents."
     }
   ]
 }

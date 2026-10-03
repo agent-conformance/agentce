@@ -7,10 +7,15 @@
  * or alternative) and the profile's constraints. The structural evaluator compiles this AST to queries
  * over the graph store. This is a faithful port of the Python reference; it parses Turtle with N3.js
  * where the reference uses rdflib, and compacts terms to the store's CURIE representation identically.
+ * `spec/rules/psp_check.py` is the authoring-time checker for the profile's full excluded-feature
+ * list; this module independently refuses the two constructs that would let a shape carry logic no
+ * engine can evaluate identically (`sh:sparql`, `sh:js`/`sh:javascript`, 18.34) before a shape ever
+ * reaches the evaluator, since those triples would otherwise just be ignored, not rejected, below.
  */
 
 import { readFileSync } from "node:fs";
 import { DataFactory, Parser, Store, type Term } from "n3";
+import { InputError } from "./errors";
 
 const { namedNode } = DataFactory;
 
@@ -258,9 +263,52 @@ export function parseShapes(store: Store): Map<string, Shape> {
   return shapes;
 }
 
+/** SHACL predicates that embed arbitrary query or script logic, forbidden by the Portable Shape
+ * Profile (spec/rules/psp.md) because they are not portable across the three engines' independent
+ * structural evaluators. Checked in this fixed order (matching `spec/rules/psp_check.py`'s own
+ * `PRIORITY_DENY`: sparql before its script counterpart), never store-iteration order -- so a shape
+ * carrying BOTH predicates reports the same key as Python and Java regardless of triple order. */
+const FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER: Array<[string, string]> = [
+  ["sparql", "catalog.shape.sparql_forbidden"],
+  ["js", "catalog.shape.script_forbidden"],
+  ["javascript", "catalog.shape.script_forbidden"],
+];
+
+function checkForbiddenPredicates(store: Store): void {
+  const used = new Set<string>();
+  for (const quad of store.getQuads(null, null, null, null)) {
+    const text = quad.predicate.value;
+    if (text.startsWith(SH)) {
+      used.add(text.slice(SH.length).toLowerCase());
+    }
+  }
+  for (const [name, key] of FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER) {
+    if (!used.has(name)) {
+      continue;
+    }
+    if (key === "catalog.shape.sparql_forbidden") {
+      throw new InputError(
+        key,
+        "a shape uses sh:sparql, a SPARQL-based SHACL construct the Portable Shape Profile forbids " +
+          "(spec/rules/psp.md).",
+        "remove the sh:sparql constraint; express it with the profile's declarative vocabulary " +
+          "instead (spec/rules/psp.md).",
+      );
+    }
+    throw new InputError(
+      key,
+      "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable Shape " +
+        "Profile forbids (spec/rules/psp.md).",
+      "remove the sh:js constraint; express it with the profile's declarative vocabulary instead " +
+        "(spec/rules/psp.md).",
+    );
+  }
+}
+
 export function parseShapesTtl(text: string): Map<string, Shape> {
   const store = new Store();
   store.addQuads(new Parser().parse(text));
+  checkForbiddenPredicates(store);
   return parseShapes(store);
 }
 

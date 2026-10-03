@@ -14,6 +14,12 @@ import java.util.Map;
  * property-value conjunction) and property shapes, each with a path (a predicate, an inverse, or a
  * bounded sequence or alternative) and the profile's constraints. A faithful port of the reference; it
  * compacts terms to the store's CURIE representation identically.
+ *
+ * <p>{@code spec/rules/psp_check.py} is the authoring-time checker for the profile's full
+ * excluded-feature list; this class independently refuses the two constructs that would let a shape
+ * carry logic no engine can evaluate identically ({@code sh:sparql}, {@code sh:js}/{@code
+ * sh:javascript}, 18.34) before a shape ever reaches the evaluator, since those triples would
+ * otherwise just be ignored, not rejected, below.
  */
 public final class Psp {
     private Psp() {}
@@ -242,8 +248,50 @@ public final class Psp {
         return shapes;
     }
 
+    /** SHACL predicates that embed arbitrary query or script logic, forbidden by the Portable Shape
+     * Profile (spec/rules/psp.md) because they are not portable across the three engines' independent
+     * structural evaluators. Checked in this fixed order (matching {@code spec/rules/psp_check.py}'s
+     * own {@code PRIORITY_DENY}: sparql before its script counterpart), never store-iteration order --
+     * so a shape carrying BOTH predicates reports the same key as Python and TypeScript regardless of
+     * triple order. */
+    private static final List<Map.Entry<String, String>> FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER = List.of(
+            Map.entry("sparql", "catalog.shape.sparql_forbidden"),
+            Map.entry("js", "catalog.shape.script_forbidden"),
+            Map.entry("javascript", "catalog.shape.script_forbidden"));
+
+    private static void checkForbiddenPredicates(Rdf.Store store) {
+        java.util.Set<String> used = new java.util.HashSet<>();
+        for (String predicate : store.predicates()) {
+            if (predicate.startsWith(SH)) {
+                used.add(predicate.substring(SH.length()).toLowerCase(java.util.Locale.ROOT));
+            }
+        }
+        for (Map.Entry<String, String> entry : FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER) {
+            if (!used.contains(entry.getKey())) {
+                continue;
+            }
+            String key = entry.getValue();
+            if (key.equals("catalog.shape.sparql_forbidden")) {
+                throw new InputError(
+                        key,
+                        "a shape uses sh:sparql, a SPARQL-based SHACL construct the Portable Shape "
+                                + "Profile forbids (spec/rules/psp.md).",
+                        "remove the sh:sparql constraint; express it with the profile's declarative "
+                                + "vocabulary instead (spec/rules/psp.md).");
+            }
+            throw new InputError(
+                    key,
+                    "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable "
+                            + "Shape Profile forbids (spec/rules/psp.md).",
+                    "remove the sh:js constraint; express it with the profile's declarative "
+                            + "vocabulary instead (spec/rules/psp.md).");
+        }
+    }
+
     public static Map<String, Shape> parseShapesTtl(String text) {
-        return parseShapes(Rdf.parse(text));
+        Rdf.Store store = Rdf.parse(text);
+        checkForbiddenPredicates(store);
+        return parseShapes(store);
     }
 
     public static Map<String, Shape> loadShapes(java.nio.file.Path path) {
