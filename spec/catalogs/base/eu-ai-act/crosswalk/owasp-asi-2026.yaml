@@ -4,14 +4,19 @@
 # ladder rungs, and base-catalog control ids.
 #
 # 18.16a (2026-10): replaces this file's prior T1-T13 scheme, drawn from a different, older "Agentic
-# AI -- Threats and Mitigations" taxonomy, with the official ASI01-ASI10 ids and titles (ids and
-# titles confirmed from three independent secondary sources that agree exactly, since the primary
-# genai.owasp.org page did not expose machine-readable text; see evidence/P18-18.16a/python-reference.md).
-# The new taxonomy is organised by attack technique, not by security property, so this is not a
-# mechanical id rename: each obligation below was re-matched to the ASI category its own evidence
-# actually supports, and T8's old "non-repudiation" obligation (no direct match in the new ten) was
-# folded into ASI03, whose own stated mechanism is an agent "attribution gap" -- exactly what
-# attributed, non-repudiable recording counters.
+# AI -- Threats and Mitigations" taxonomy, with the official ASI01-ASI10 ids and titles. The official
+# primary source (the OWASP Top 10 for Agentic Applications 2026 PDF, genai.owasp.org, 9 Dec 2025) is
+# downloadable and text-extractable (confirmed this item via pypdf, after an earlier round wrongly
+# concluded it exposed no machine-readable text); its own Appendix A, "OWASP Agentic AI Security
+# Mapping Matrix," cross-maps each ASI category to the T1-T17 ids from the older "Agentic AI Threats &
+# Mitigations" document (see evidence/P18-18.16a/python-reference.md for the fetch command and the
+# extracted table). Every T-id this file's five citing controls used is re-matched against that
+# official table, not against AgentCE's own guess at a conceptual fit:
+#   T1 -> ASI06; T2 -> ASI02; T3 -> ASI03; T6 -> ASI01 (also ASI06); T7 -> ASI01, ASI09;
+#   T8 -> ASI08, ASI09; T10 -> ASI09; T11 -> ASI05 (also ASI04); T13 -> ASI10 (also ASI04).
+# T9 (identity spoofing/impersonation, from the older document) has no row in Appendix A at all; its
+# move to ASI07 is AgentCE's own judgment call (ASI07's own description covers spoofed peer agents),
+# disclosed as such rather than claimed as an official mapping.
 #
 # Threat identifiers only; no source text is reproduced. The `obligation` field is AgentCE's own
 # statement of what its evidence makes detectable or reconstructable for that threat class -- AgentCE
@@ -38,10 +43,10 @@ obligations:
     controls: []
     verified_against_text: false
   - ref: "ASI03"
-    obligation: Identity and privilege abuse is countered -- delegations carry the granting principal and scope with access checked against them, and the acting agent behind every consequential decision is non-repudiably recorded with actor, source timestamp, and integrity results, closing the attribution gap the abuse depends on.
-    schema_elements: [DelegationIssued, AuthzCheck, ResourceAccess, SessionStart, SessionEnd, Decision, IntegrityResult]
+    obligation: Identity and privilege abuse is countered -- delegations carry the granting principal and scope, with access checked against them before a consequential action proceeds.
+    schema_elements: [DelegationIssued, AuthzCheck, ResourceAccess]
     rungs: [0, 1, 2]
-    controls: [REC-01, REC-04, INT-01]
+    controls: []
     verified_against_text: false
   - ref: "ASI04"
     obligation: Agentic supply chain components are traceable -- every loaded skill, MCP server, model, prompt, config, or policy bundle is recorded with its digest and signer, and its attestation is checked before the components it contributes are trusted.
@@ -68,20 +73,20 @@ obligations:
     controls: []
     verified_against_text: false
   - ref: "ASI08"
-    obligation: Cascading failures across agents are reconstructable -- cross-agent task correlation and the derivedFrom chain let a reviewer trace how one agent's decision or outcome propagated into another's.
-    schema_elements: [Decision, Outcome, Incident]
-    rungs: [2, 4]
-    controls: []
+    obligation: Cascading failures across agents are reconstructable and the repudiation and untraceability that let them compound are closed -- cross-agent task correlation and the derivedFrom chain let a reviewer trace how one agent's decision or outcome propagated into another's, and the acting agent behind every consequential decision is non-repudiably recorded with actor, source timestamp, and integrity results.
+    schema_elements: [Decision, Outcome, Incident, Attestation, SessionStart, SessionEnd, IntegrityResult]
+    rungs: [0, 1, 2, 4]
+    controls: [REC-01, REC-04, INT-01]
     verified_against_text: false
   - ref: "ASI09"
-    obligation: Human-agent trust exploitation is evidenced by the distribution of approval latency and decisions, exposing the rubber-stamping a persuasive or fluent agent could induce.
-    schema_elements: [ApprovalRequested, ApprovalDecided]
-    rungs: [3]
+    obligation: Human-agent trust exploitation is evidenced by the distribution of approval latency and decisions, exposing the rubber-stamping a persuasive, misaligned, or deceptive agent could induce.
+    schema_elements: [ApprovalRequested, ApprovalDecided, Decision, Outcome]
+    rungs: [2, 3]
     controls: [OVS-03]
     verified_against_text: false
   - ref: "ASI10"
-    obligation: Rogue agents are traceable -- every participating agent is attested with its delegations and outcomes attributed, and misaligned or deceptive behavior is evidenced by the override distribution and the human actors present on observed overrides.
-    schema_elements: [Attestation, DelegationIssued, Outcome, Decision, Override, ApprovalDecided]
+    obligation: Rogue agents operating in or against a multi-agent system are traceable -- every participating agent is attested with its delegations and outcomes attributed, and a human actor's override of an agent's action is itself evidenced.
+    schema_elements: [Attestation, DelegationIssued, Outcome, Decision, Override]
     rungs: [2, 3]
-    controls: [OVS-03, INT-01]
+    controls: [INT-01]
     verified_against_text: false

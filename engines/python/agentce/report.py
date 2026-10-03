@@ -57,7 +57,11 @@ from .project import (
     compute_project_view,
     no_population_by_subject,
 )
-from .security_view import FRAMEWORK_VERSIONS, compute_security_view
+from .security_view import (
+    FRAMEWORK_DISPLAY_NAMES,
+    FRAMEWORK_VERSIONS,
+    compute_security_view,
+)
 
 #: The empty, honest answer for a caller with no assertions to explain (write_report's own
 #: docstring): never recomputed from an empty `Profile()`, unlike `activity`'s fallback -- an empty
@@ -778,11 +782,17 @@ def _security_drift_lines(
 def _security_citation_text(entry: dict[str, Any], cat: dict[str, str]) -> str:
     """One clause citation with its framework's version (Role-views' "standard, catalog, version and
     clause" rule) -- delegates the "(clause reference unverified)" label to ``_crosswalk_text``
-    rather than re-checking the ``verified`` flag a second time."""
-    version = FRAMEWORK_VERSIONS.get(entry["framework"], "")
-    framework = (
-        f"{entry['framework']} {version}".strip() if version else entry["framework"]
-    )
+    rather than re-checking the ``verified`` flag a second time. A framework with a maintainer-
+    mandated display name (``FRAMEWORK_DISPLAY_NAMES``, 18.16a: owasp-asi-2026) renders under that
+    name instead of its bare id plus version."""
+    display = FRAMEWORK_DISPLAY_NAMES.get(entry["framework"])
+    if display:
+        framework = display
+    else:
+        version = FRAMEWORK_VERSIONS.get(entry["framework"], "")
+        framework = (
+            f"{entry['framework']} {version}".strip() if version else entry["framework"]
+        )
     return _crosswalk_text({**entry, "framework": framework}, cat)
 
 

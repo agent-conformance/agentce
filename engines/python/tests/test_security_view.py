@@ -180,6 +180,24 @@ def test_render_security_shows_citation_with_framework_version_and_unverified_la
     assert "(clause reference unverified)" in md
 
 
+def test_render_security_shows_owasp_asi_2026_under_its_official_display_name() -> None:
+    """18.16a: public copy and the security view name owasp-asi-2026 by its full title, "OWASP Top
+    10 for Agentic Applications 2026 (ASI01-ASI10)" -- never the bare framework id plus version
+    every other cited framework still uses (maintainer, 2026-09-29)."""
+    view = compute_security_view(
+        _EMPTY_ACTIVITY,
+        [
+            _assertion(
+                "ROB-02",
+                [{"framework": "owasp-asi-2026", "clause": "ASI06", "verified": False}],
+            )
+        ],
+    )
+    md = render_security_md(view)
+    assert "OWASP Top 10 for Agentic Applications 2026 (ASI01-ASI10) ASI06" in md
+    assert "owasp-asi-2026 2025.12" not in md
+
+
 def test_compute_security_view_is_order_independent_over_many_assertions() -> None:
     """As `test_activity.py::test_activity_is_order_independent`: a real determinism proof over more
     than two assertions (contract C4's own named "shuffled assertion order" test), distinct from the

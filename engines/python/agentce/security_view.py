@@ -30,6 +30,14 @@ FRAMEWORK_VERSIONS = {
     "owasp-acs": "0.1.0",
 }
 
+#: Public copy and the security view name owasp-asi-2026 by its full official title (maintainer,
+#: 2026-09-29, 18.16a), not the bare framework id -- this crosswalk's own `title:` field, copied by
+#: hand. Only owasp-asi-2026 carries a maintainer-mandated display name; the other two cited
+#: frameworks keep the bare-id-plus-version rendering `_security_citation_text` already used.
+FRAMEWORK_DISPLAY_NAMES = {
+    "owasp-asi-2026": "OWASP Top 10 for Agentic Applications 2026 (ASI01-ASI10)",
+}
+
 
 def compute_security_view(
     activity: dict[str, Any], assertions: list[Assertion]

@@ -225,10 +225,10 @@ def test_18_16_baseline_controls_cite_their_new_mitre_atlas_and_owasp_acs_pairs(
 @pytest.mark.parametrize(
     ("control_id", "expected_pairs"),
     [
-        ("INT-01", {("owasp-asi-2026", "ASI10"), ("owasp-asi-2026", "ASI03")}),
-        ("OVS-03", {("owasp-asi-2026", "ASI09"), ("owasp-asi-2026", "ASI10")}),
-        ("REC-01", {("owasp-asi-2026", "ASI03")}),
-        ("REC-04", {("owasp-asi-2026", "ASI01"), ("owasp-asi-2026", "ASI03")}),
+        ("INT-01", {("owasp-asi-2026", "ASI10"), ("owasp-asi-2026", "ASI08")}),
+        ("OVS-03", {("owasp-asi-2026", "ASI09")}),
+        ("REC-01", {("owasp-asi-2026", "ASI08")}),
+        ("REC-04", {("owasp-asi-2026", "ASI01"), ("owasp-asi-2026", "ASI08")}),
         ("ROB-02", {("owasp-asi-2026", "ASI06"), ("owasp-asi-2026", "ASI05")}),
     ],
 )
@@ -236,20 +236,38 @@ def test_18_16a_baseline_controls_cite_the_official_asi_ids(
     control_id: str, expected_pairs: set[tuple[str, str]]
 ) -> None:
     """18.16a: the crosswalk file this item rewrote uses the real OWASP Top 10 for Agentic
-    Applications 2026 ids (ASI01-ASI10), never the prior T1-T13 scheme from a different, older
-    taxonomy. Read live from each control's own YAML on disk, so a future edit that reintroduces a
-    T-id or mistypes an ASI id is caught here, not only by the acceptance grep."""
+    Applications 2026 ids (ASI01-ASI10), each control re-matched against the official PDF's own
+    Appendix A T-to-ASI mapping (not a conceptual guess), never the prior T1-T13 scheme from a
+    different, older taxonomy. Read live from each control's own YAML on disk, so a future edit that
+    reintroduces a T-id or mistypes an ASI id is caught here, not only by the acceptance grep."""
     path = _BASELINE / "controls" / f"{control_id}.yaml"
     control = yaml.safe_load(path.read_text(encoding="utf-8"))
     pairs = {(e["framework"], e["clause"]) for e in control["crosswalk"]}
     assert expected_pairs <= pairs
+    owasp_asi_clauses = {clause for fw, clause in pairs if fw == "owasp-asi-2026"}
+    assert owasp_asi_clauses == {clause for _, clause in expected_pairs}
+
+
+def _owasp_asi_2026_clauses_in_control_file(path: Path) -> set[str]:
+    """Every `clause` value cited under `framework: owasp-asi-2026` in one control YAML, parsed
+    (never regex-matched against raw text, so neither an unquoted clause nor a block-style crosswalk
+    entry can slip past this check)."""
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    crosswalk = data.get("crosswalk") or []
+    return {
+        str(entry["clause"])
+        for entry in crosswalk
+        if entry.get("framework") == "owasp-asi-2026"
+    }
 
 
 def test_no_t_id_remains_under_owasp_asi_2026_in_any_catalog_copy() -> None:
-    """18.16a: a `T<n>` clause under `owasp-asi-2026` anywhere (the crosswalk file itself or any of
-    the five controls that cite it) means the old, wrong taxonomy crept back in -- across the
-    specification tree and every vendored engine copy."""
-    t_id = re.compile(r'framework:\s*owasp-asi-2026,\s*clause:\s*"T\d+"')
+    """18.16a: a `T<n>` clause under `owasp-asi-2026` anywhere (any control YAML or the crosswalk
+    file's own `ref` values) means the old, wrong taxonomy crept back in -- across the specification
+    tree and every vendored engine copy. Parses each file's YAML rather than grepping its raw text,
+    so this also catches an unquoted `clause: T1` or a block-style (one-key-per-line) crosswalk entry,
+    not only the inline-flow-mapping style every file happens to use today."""
+    t_id = re.compile(r"^T\d+$")
     roots = [
         _BASE,
         *(
@@ -262,8 +280,13 @@ def test_no_t_id_remains_under_owasp_asi_2026_in_any_catalog_copy() -> None:
         ),
     ]
     for root in roots:
-        for path in root.rglob("*.yaml"):
-            assert not t_id.search(path.read_text(encoding="utf-8")), path
+        for control_path in root.glob("baseline/controls/*.yaml"):
+            clauses = _owasp_asi_2026_clauses_in_control_file(control_path)
+            assert not any(t_id.match(c) for c in clauses), (control_path, clauses)
+        crosswalk_path = root / "eu-ai-act" / "crosswalk" / "owasp-asi-2026.yaml"
+        data = yaml.safe_load(crosswalk_path.read_text(encoding="utf-8"))
+        refs = {str(o["ref"]) for o in data["obligations"]}
+        assert not any(t_id.match(r) for r in refs), (crosswalk_path, refs)
 
 
 def test_every_official_asi_id_is_present() -> None:
