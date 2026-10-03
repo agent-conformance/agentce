@@ -3,6 +3,24 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.31.0
+
+- Added `VG-CATALOG-RULE-UNIQUE`: no two rung-2 controls in any shipped catalog (the three base catalogs
+  and the four overlays) share an identical shape and fixture set, so a control's rule always tests what
+  its own title says (18.37, SPEC §7.3). Found live: DOC-01 shipped with REC-01's shape and fixtures
+  verbatim in both baseline and eu-ai-act, ROB-02 shipped with DAT-01's shape and fixtures verbatim in
+  eu-ai-act, and a further 24 unnamed eu-ai-act pairs were real duplicates nobody had caught. The check
+  (`engines/python/agentce/catalog.py`'s `rule_uniqueness_problems`/`new_rule_uniqueness_problems`/
+  `stale_rule_uniqueness_pairs`) is baseline-aware and shrink-only: `verification/gates/fixtures/
+  rule_uniqueness/baseline.json` discloses today's 27 known pairs (1 baseline, 26 eu-ai-act; the four
+  overlays confirmed to have zero), owned by 18.37a, 18.37b and 18.37c, and the gate fails on a pair not
+  already named there (a genuinely new duplicate) or on a named pair that is no longer a real duplicate
+  (a stale baseline entry) or on a catalog's disclosed-pair count exceeding its pinned `ceilings` entry
+  in the same file (shrink-only enforced, not just asserted: quietly adding a new duplicate to `pairs`
+  without also raising the matching ceiling now fails on the ceiling, rather than passing as
+  "already disclosed"). Seeded fault:
+  baseline's INC-01 edited to point at REC-01's shape and fixture files verbatim.
+
 ## 0.30.0
 
 - Added `VG-BYO-CATALOG-PARITY`: an operator's own `--catalog-dir` is untrusted input in all three engines

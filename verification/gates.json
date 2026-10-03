@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.30.0",
+  "suite_version": "0.31.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1162,6 +1162,34 @@
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/commands/__init__.py's _effective_trust_root, _verify_catalog_dirs and _resolve_catalogs plus signing.load_trust_root, ported in engines/typescript/src/cli.ts + verify.ts and engines/java/src/main/java/org/agentce/Cli.java + Verify.java."
+    },
+    {
+      "id": "VG-CATALOG-RULE-UNIQUE",
+      "title": "No two rung-2 controls in any shipped catalog (base or overlay) share an identical shape and fixture set beyond the committed, disclosed, shrink-only baseline",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/catalog_rule_uniqueness.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 120,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every rung-2 control in every catalog under spec/catalogs/{base,overlays} tests something its own shape and fixtures do not share with any other control, except the pairs already named in verification/gates/fixtures/rule_uniqueness/baseline.json (disclosed pre-existing debt owned by 18.37a, 18.37b and 18.37c), and that baseline's own per-catalog pair count has not grown past its pinned `ceilings` entry",
+        "fail": "any rung-2 control shares an identical shape and fixture set with another control through a pair NOT already in the committed baseline file (a new, undisclosed duplicate), a baseline entry that is no longer a real duplicate (stale), or a catalog's disclosed-pair count exceeding its pinned ceiling (shrink-only violation)"
+      },
+      "faults": [
+        {
+          "description": "baseline's INC-01 is edited to point at REC-01's shape and fixture files verbatim, the exact class of regression this gate exists to catch (a control silently testing another control's rule under its own title)",
+          "file": "spec/catalogs/base/baseline/controls/INC-01.yaml",
+          "search": "  shape: shapes/INC-01.ttl\nexpectations:\n  - {id: S1, text: \"Adverse outcomes are linked to their consequential decision.\"}\nseverity: medium\nevidence_strength: strong\ntolerance: {kind: count, max: 0}\ntolerance_rationale: \"INC-01 is a structural expectation with no tolerated exceptions.\"\nfalse_positive_modes:\n  - \"A condition declared as an accepted deviation in the applicability profile.\"\ntechniques:\n  - \"techniques/inc-evidence-at-source\"\ntest_cases:\n  - {id: pass, expected: passed, fixture: test/INC-01/passed.jsonl}\n  - {id: fail, expected: failed, fixture: test/INC-01/failed.jsonl}\n  - {id: na, expected: inapplicable, fixture: test/INC-01/inapplicable.jsonl}\n",
+          "replace": "  shape: shapes/REC-01.ttl\nexpectations:\n  - {id: S1, text: \"Adverse outcomes are linked to their consequential decision.\"}\nseverity: medium\nevidence_strength: strong\ntolerance: {kind: count, max: 0}\ntolerance_rationale: \"INC-01 is a structural expectation with no tolerated exceptions.\"\nfalse_positive_modes:\n  - \"A condition declared as an accepted deviation in the applicability profile.\"\ntechniques:\n  - \"techniques/inc-evidence-at-source\"\ntest_cases:\n  - {id: pass, expected: passed, fixture: test/REC-01/passed.jsonl}\n  - {id: fail, expected: failed, fixture: test/REC-01/failed.jsonl}\n  - {id: na, expected: inapplicable, fixture: test/REC-01/inapplicable.jsonl}\n"
+        }
+      ],
+      "fix_hint": "Run verification/gates/catalog_rule_uniqueness.sh and read which catalog/pair it names; the check is engines/python/agentce/catalog.py's new_rule_uniqueness_problems against verification/gates/fixtures/rule_uniqueness/baseline.json."
     }
   ]
 }
