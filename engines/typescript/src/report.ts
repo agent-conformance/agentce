@@ -1062,7 +1062,7 @@ export function buildManifest(options: ManifestOptions): Record<string, unknown>
   if (options.supersedes.length > 0) {
     manifest.supersedes = options.supersedes;
   }
-  if (options.limitations !== undefined && options.limitations.length > 0) {
+  if (options.limitations?.length) {
     manifest.limitations = options.limitations;
   }
   return manifest;

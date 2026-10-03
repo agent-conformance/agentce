@@ -1145,8 +1145,8 @@
         {
           "description": "Java's identity cross-check is removed, so a validly signed but rebranded catalog is assessed",
           "file": "engines/java/src/main/java/org/agentce/Cli.java",
-          "search": "            if (!unrequested.isEmpty()) {\n                List<String> requestedQuoted",
-          "replace": "            if (false) {\n                List<String> requestedQuoted"
+          "search": "            if (!unrequested.isEmpty()) {\n                String requestedQuoted",
+          "replace": "            if (false) {\n                String requestedQuoted"
         },
         {
           "description": "TypeScript's loadTrustRoot accepts a trust root whose top level is not an object, reading it as an empty trust root",

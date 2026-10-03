@@ -104,6 +104,10 @@ public final class Readiness {
     /** Mirrors Python's {@code repr()} for the narrow set of types this module ever feeds it: a
      * string (quote choice, backslash/control-char escaping, the same as {@code readiness.ts}'s
      * {@code pyRepr}), else {@link #pyStr}. */
+    static String pyRepr(String value) {
+        return pyRepr(Json.nodes().textNode(value));
+    }
+
     public static String pyRepr(JsonNode value) {
         if (value == null || !value.isTextual()) {
             return pyStr(value);
@@ -143,7 +147,7 @@ public final class Readiness {
 
     /** Python's implicit falsiness over a {@link JsonNode}: absent/{@code null}/{@code false}/{@code
      * 0}/{@code ""}/an empty array/an empty object. */
-    private static boolean pyTruthy(JsonNode value) {
+    static boolean pyTruthy(JsonNode value) {
         if (value == null || value.isNull() || value.isMissingNode()) {
             return false;
         }

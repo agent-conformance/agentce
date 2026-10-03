@@ -240,21 +240,13 @@ public final class Verify {
         }
     }
 
-    /** Python's {@code (value or {})}: a missing, null, false, zero, empty-string or empty-array value
-     * is an empty mapping; an object is itself; any other value throws, as Python's {@code .items()}
-     * on it would. */
+    /** Python's {@code (value or {})}: a falsy value is an empty mapping; an object is itself; any
+     * other value throws, as Python's {@code .items()} on it would. */
     private static JsonNode asMapping(JsonNode value) {
-        if (value == null || value.isNull()) {
-            return Json.nodes().objectNode();
-        }
-        if (value.isObject()) {
+        if (value != null && value.isObject()) {
             return value;
         }
-        boolean falsy = (value.isBoolean() && !value.booleanValue())
-                || (value.isNumber() && value.doubleValue() == 0)
-                || (value.isTextual() && value.textValue().isEmpty())
-                || (value.isArray() && value.isEmpty());
-        if (falsy) {
+        if (!Readiness.pyTruthy(value)) {
             return Json.nodes().objectNode();
         }
         throw new IllegalArgumentException("not a mapping");

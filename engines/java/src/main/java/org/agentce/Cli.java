@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -485,7 +486,7 @@ public final class Cli {
         } catch (RuntimeException e) {
             throw new InputError(
                     "input.trust_root_invalid",
-                    "the trust root " + Readiness.pyRepr(Json.nodes().textNode(path)) + " could not be loaded: "
+                    "the trust root " + Readiness.pyRepr(path) + " could not be loaded: "
                             + e.getMessage(),
                     "pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) to a trust root in the form of the "
                             + "engine's vendored data/trust/dev-root.json.");
@@ -540,8 +541,11 @@ public final class Cli {
         }
         List<String> limitations = verifyCatalogDirs(loaded, trust, allowUnverified);
         Map<String, Catalog> byLabel = new LinkedHashMap<>();
+        List<String> loadedLabels = new ArrayList<>();
         for (Catalog c : loaded) {
-            byLabel.put(c.id + "@" + c.version, c);
+            String label = c.id + "@" + c.version;
+            loadedLabels.add(label);
+            byLabel.put(label, c);
         }
         List<String> ids;
         if (requested != null && !requested.isEmpty()) {
@@ -605,30 +609,22 @@ public final class Cli {
         // --allow-unverified-catalog (SPEC §8.7 waives only "unsigned or unverifiable").
         if (!ids.isEmpty() && !loaded.isEmpty()) {
             Set<String> wanted = new LinkedHashSet<>(ids);
-            List<String> unrequested = new ArrayList<>();
-            for (Catalog c : loaded) {
-                String label = c.id + "@" + c.version;
-                if (!wanted.contains(label)) {
-                    unrequested.add(Readiness.pyRepr(Json.nodes().textNode(label)));
-                }
-            }
+            List<String> unrequested = loadedLabels.stream()
+                    .filter(l -> !wanted.contains(l))
+                    .map(Readiness::pyRepr)
+                    .toList();
             if (!unrequested.isEmpty()) {
-                List<String> requestedQuoted = new ArrayList<>();
-                for (String i : ids) {
-                    requestedQuoted.add(Readiness.pyRepr(Json.nodes().textNode(i)));
-                }
+                String requestedQuoted = ids.stream().map(Readiness::pyRepr).collect(Collectors.joining(", "));
                 throw new InputError(
                         "input.catalog_mismatch",
                         "a --catalog-dir carries " + String.join(", ", unrequested) + ", which --catalog did not "
-                                + "request (" + String.join(", ", requestedQuoted) + ").",
+                                + "request (" + requestedQuoted + ").",
                         "pass --catalog-dir for the catalog you named, or name the id@version the directory "
                                 + "carries.");
             }
         }
         LinkedHashSet<String> labelSet = new LinkedHashSet<>(ids);
-        for (Catalog c : loaded) {
-            labelSet.add(c.id + "@" + c.version);
-        }
+        labelSet.addAll(loadedLabels);
         List<String> labels = new ArrayList<>(labelSet);
         List<Catalog> catalogs = new ArrayList<>();
         for (String l : labels) {

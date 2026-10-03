@@ -37,7 +37,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Python's implicit dict-falsiness: `None`/`False`/`0`/`""`/an empty list/an empty mapping. */
-function pyTruthy(value: unknown): boolean {
+export function pyTruthy(value: unknown): boolean {
   if (value === null || value === undefined || value === false || value === 0 || value === "") {
     return false;
   }

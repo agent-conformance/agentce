@@ -16,6 +16,7 @@ import { confineToRoot } from "./bundle";
 import { CanonicalizationError, canonicalize, sha256Hex } from "./canonical";
 import { InputError } from "./errors";
 import { NonCanonicalNumber, parseJson } from "./json";
+import { pyTruthy } from "./readiness";
 import { digestTree } from "./report";
 import { dssePae, keyidFor } from "./sign";
 import { b64dStrict, decodeUtf8Strict, pyRepr } from "./util";
@@ -41,22 +42,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   );
 }
 
-/** Mirrors Python's `(data.get(field) or {}).items()`: a falsy value (`undefined`/`null`/`false`/`0`/
- * `""`/an empty array) is treated as empty, no entries, no throw; a plain object (empty or not) is
- * returned as-is; any other truthy, non-mapping value (a non-empty array, a non-empty string, a
- * number, `true`) throws, mirroring the `AttributeError` Python raises calling `.items()` on it. */
+/** Mirrors Python's `(data.get(field) or {}).items()`: a falsy value is no entries; a plain object
+ * is returned as-is; any other truthy value throws, as Python's `.items()` on it would. */
 function asMapping(value: unknown): Record<string, unknown> {
   if (isRecord(value)) {
     return value;
   }
-  const falsy =
-    value === undefined ||
-    value === null ||
-    value === false ||
-    value === 0 ||
-    value === "" ||
-    (Array.isArray(value) && value.length === 0);
-  if (falsy) {
+  if (!pyTruthy(value)) {
     return {};
   }
   throw new Error("not a mapping");
@@ -191,16 +183,9 @@ export class TrustRoot {
   ) {}
 
   /** Loads a trust root from its JSON shape. Every `keys` entry's declared id must equal
-   * `keyidFor` of the key it maps to -- a forged/corrupted entry (the real signer's own keyid
-   * mapped to an attacker's key) is refused, not silently accepted (`signing.py:295-297`). The
-   * top-level-is-an-object check is deliberately not here: it is a separate stage in
-   * `loadTrustRoot`, matching Python's own two-stage split (`load_trust_root`'s `isinstance(data,
-   * dict)` check is outside `from_dict`, `signing.py:570-571`); this method assumes `data` already
-   * is one, exactly as Python's own `data.get(...)` calls assume. `keys`/`certificate_authorities`
-   * each go through {@link asMapping}, matching Python's `data.get(field) or {}` falsy-tolerant
-   * semantics field for field (verifier round 2, 18.36 critic round 2): `null`/`false`/`0`/`""`/an
-   * empty array means no entries, not a throw; a truthy non-mapping (a non-empty array or string, a
-   * number, `true`) throws, as Python's `.items()` on that same value would. */
+   * `keyidFor` of the key it maps to (`signing.py:295-297`). The top-level-is-an-object check is
+   * `loadTrustRoot`'s, as in Python (`signing.py:570-571`). `keys`/`certificate_authorities` go
+   * through {@link asMapping}, Python's `data.get(field) or {}`. */
   static fromDict(data: Record<string, unknown>): TrustRoot {
     const keys = new Map<string, KeyEntry>();
     const keysIn = asMapping(data.keys);
@@ -248,13 +233,10 @@ export function vendoredTrustPath(): string {
   return join(__dirname, "..", "data", "trust", "dev-root.json");
 }
 
-/** Reads and parses a trust root file (`--trust-root`-shaped JSON) at `path` (mirrors
- * `signing.load_trust_root` exactly, including its own two-stage split): the top level must be a
- * plain object (Python's `isinstance(data, dict)` check, `signing.py:570-571`) before `TrustRoot.
- * fromDict` ever runs, and any error `fromDict` itself throws (a non-mapping `keys`/
- * `certificate_authorities`, a malformed key entry) is re-wrapped the same way Python's `except
- * (AttributeError, KeyError, TypeError, ValueError)` catches and re-raises it (`signing.py:572-578`).
- * Callers (`effectiveTrustRoot`) catch whatever this throws and surface `input.trust_root_invalid`. */
+/** Reads a trust root file (`--trust-root`-shaped JSON), mirroring `signing.load_trust_root`: the
+ * top level must be an object (`signing.py:570-571`), and any non-`TrustRootError` that `fromDict`
+ * throws is re-wrapped as Python's `except (AttributeError, KeyError, TypeError, ValueError)` does
+ * (`signing.py:572-578`). */
 export function loadTrustRoot(path: string): TrustRoot {
   let data: unknown;
   try {

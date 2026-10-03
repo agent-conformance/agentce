@@ -351,18 +351,11 @@ function vendoredCatalogs(): Map<string, string> {
 }
 
 /** The trust root catalog verification consults: `--trust-root`, else `AGENTCE_TRUST_ROOT`, else the
- * trust root vendored in the engine (SPEC §8.7). Mirrors `_effective_trust_root` exactly, including
- * running unconditionally (even with zero `--catalog-dir`s) and honoring `AGENTCE_TRUST_ROOT` for
- * `quickstart` too, which calls this with `flagValue` left `undefined` (it exposes no `--trust-root`
- * flag of its own, matching Python's namespace-without-the-attribute shape). The runtime fix text
- * below is Python's own literal string, NOT the vendored catalogue's `errors.input.trust_root_invalid
- * .fix` (18.36 critic round 1: the two differ; only `report.*`/`verdict.*`/etc. report strings are
- * vendored and loaded, never a hand-written CLI `InputError`'s text, per 18.35's scope). */
-function effectiveTrustRoot(
-  flagValue: string | undefined,
-  envValue: string | undefined,
-): TrustRoot {
-  const raw = flagValue || envValue;
+ * trust root vendored in the engine (SPEC §8.7). Mirrors `_effective_trust_root`: it runs even with
+ * zero `--catalog-dir`s, and `quickstart` (no `--trust-root` flag) still honours the variable. The
+ * fix text is Python's literal, not the vendored catalogue's. */
+function effectiveTrustRoot(flagValue: string | undefined): TrustRoot {
+  const raw = flagValue || process.env.AGENTCE_TRUST_ROOT;
   if (raw === undefined || raw.trim() === "") {
     return vendoredTrust();
   }
@@ -619,13 +612,10 @@ interface AssessOptions {
   out: string;
   state?: string;
   invocationCommand: string;
-  /** `--trust-root`'s value, `undefined` when the flag was not given. `cmdQuickstart` leaves this
-   * `undefined` since it exposes no `--trust-root` flag of its own; `AGENTCE_TRUST_ROOT` still
-   * applies there (`effectiveTrustRoot` reads it unconditionally), matching Python's namespace-
-   * without-the-attribute shape (python-reference.md §10, 18.36). */
+  /** `--trust-root`'s value; `quickstart` has no such flag, so it leaves this unset. */
   trustRootFlag?: string;
-  /** `--allow-unverified-catalog`, `undefined`/`false` when not given. */
-  allowUnverified?: boolean;
+  /** `--allow-unverified-catalog`. */
+  allowUnverified: boolean;
 }
 
 /** Run a full assessment (ingest, integrity, graph, coverage, applicability, evaluate, report) — the
@@ -638,7 +628,7 @@ function runAssess(options: AssessOptions): CommandResult {
   const profileObj = loadProfile(profilePath);
   // The effective trust root resolves on every run, unconditionally -- even with zero
   // `--catalog-dir`s (python-reference.md §9) -- before `resolveCatalogs` ever inspects one.
-  const trust = effectiveTrustRoot(options.trustRootFlag, process.env.AGENTCE_TRUST_ROOT);
+  const trust = effectiveTrustRoot(options.trustRootFlag);
   const {
     catalogs,
     labels: catalogLabels,
@@ -648,7 +638,7 @@ function runAssess(options: AssessOptions): CommandResult {
     profileObj,
     options.catalogDirs,
     trust,
-    options.allowUnverified ?? false,
+    options.allowUnverified,
   );
 
   // Stage 1: ingest and validate. A missing/mismatching manifest aborts with exit 3.
@@ -835,6 +825,7 @@ function cmdQuickstart(argv: string[]): CommandResult {
     catalogDirs: [catalogDir],
     out,
     invocationCommand: "quickstart",
+    allowUnverified: false,
   });
   Object.assign(result.data, assess.data);
   result.data.quickstart = "ok";
