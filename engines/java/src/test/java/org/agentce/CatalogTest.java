@@ -129,6 +129,22 @@ class CatalogTest {
     }
 
     @Test
+    void loadRefusesAForbiddenShapePredicateRegardlessOfCase(@TempDir Path tmp) throws IOException {
+        copyTree(Fixtures.BASE, tmp);
+        mutateShape(tmp, "sh:SPARQL [] ");
+        InputError err = assertThrows(InputError.class, () -> Catalog.load(tmp));
+        assertEquals("catalog.shape.sparql_forbidden", err.key);
+    }
+
+    @Test
+    void loadRefusesAForbiddenShapePredicateRegardlessOfCaseJavaScript(@TempDir Path tmp) throws IOException {
+        copyTree(Fixtures.BASE, tmp);
+        mutateShape(tmp, "sh:JavaScript [] ");
+        InputError err = assertThrows(InputError.class, () -> Catalog.load(tmp));
+        assertEquals("catalog.shape.script_forbidden", err.key);
+    }
+
+    @Test
     void loadRefusesForbiddenPredicateUnderAnAliasedPrefixOrBareIri(@TempDir Path tmp) throws IOException {
         copyTree(Fixtures.BASE, tmp);
         Path shape = tmp.resolve("shapes/DAT-01.ttl");

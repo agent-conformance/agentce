@@ -76,6 +76,21 @@ test("loadCatalog refuses a shape carrying both predicates as sparql determinist
   });
 });
 
+test("loadCatalog refuses a forbidden shape predicate regardless of case", () => {
+  withMutatedCatalog("sh:SPARQL [] ", (dir) => {
+    assert.throws(
+      () => loadCatalog(dir),
+      (err: unknown) => err instanceof InputError && err.key === "catalog.shape.sparql_forbidden",
+    );
+  });
+  withMutatedCatalog("sh:JavaScript [] ", (dir) => {
+    assert.throws(
+      () => loadCatalog(dir),
+      (err: unknown) => err instanceof InputError && err.key === "catalog.shape.script_forbidden",
+    );
+  });
+});
+
 test("loadCatalog still loads the unmutated base catalog clean", () => {
   assert.doesNotThrow(() => loadCatalog(BASE));
 });

@@ -154,6 +154,23 @@ def test_load_refuses_a_shape_carrying_both_predicates_as_sparql_deterministical
     assert excinfo.value.key == "catalog.shape.sparql_forbidden"
 
 
+@pytest.mark.parametrize(
+    ("triple", "key"),
+    [
+        ("sh:SPARQL [] ", "catalog.shape.sparql_forbidden"),
+        ("sh:JavaScript [] ", "catalog.shape.script_forbidden"),
+    ],
+)
+def test_load_refuses_forbidden_shape_predicate_regardless_of_case(
+    tmp_path: Path, triple: str, key: str
+) -> None:
+    """The match is on the lowercased local name, not the predicate's exact case."""
+    catalog_dir = _mutate_shape(tmp_path, triple)
+    with pytest.raises(InputError) as excinfo:
+        load_catalog(catalog_dir)
+    assert excinfo.value.key == key
+
+
 def test_load_refuses_forbidden_predicate_under_an_aliased_prefix_or_bare_iri(
     tmp_path: Path,
 ) -> None:
