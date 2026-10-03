@@ -1,0 +1,14 @@
+{
+  "agentce_bundle_version": 1,
+  "domain": "project-view-deviations-fixture",
+  "files": [
+    {
+      "path": "events/a.jsonl",
+      "sha256": "0d1cb6c98937938d970a8edb4ebd58849ff46e3f71ec26ebe5462f583f7eb3f4"
+    },
+    {
+      "path": "events/b.jsonl",
+      "sha256": "af2b346763f010ae54db961bdcdc78b7ca974edc0eee1c4d9783ce10d5588d39"
+    }
+  ]
+}

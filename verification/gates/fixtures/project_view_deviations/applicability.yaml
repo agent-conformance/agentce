@@ -1,0 +1,22 @@
+# Applicability profile for the VG-PROJECT-VIEW deviations scenario
+# (verification/gates/project_view_engines.sh, 18.14a). Two subjects declared against the
+# fixture-only PVD-01 catalog (loaded via --catalog-dir); the window end (2026-02-01) sits before the
+# register's PVD-01 expiry, so the deviation is unexpired and gets applied.
+profile_version: 1
+observation_window:
+  start: "2026-01-01T00:00:00Z"
+  end: "2026-02-01T00:00:00Z"
+content_capture:
+  mode: hashes_only
+catalogs: []
+subjects:
+  - id: "spiffe://corp/agents/project-view-deviations-fixture-a"
+    name: "Project-view deviations gate fixture subject A"
+    role: "both"
+    declared_decision_types:
+      - "dom:ProjectDeviationsFixtureDecision"
+  - id: "spiffe://corp/agents/project-view-deviations-fixture-b"
+    name: "Project-view deviations gate fixture subject B"
+    role: "both"
+    declared_decision_types:
+      - "dom:ProjectDeviationsFixtureDecision"

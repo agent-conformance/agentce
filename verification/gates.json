@@ -312,8 +312,8 @@
       "timeout_s": 900,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
-        "pass": "the 1-subject fixture (verification/gates/fixtures/blind_spots/) writes no project.json/project.md/project.html/agents/ on any engine; each engine's 3-subject fixture (verification/gates/fixtures/project_view/) project.json is byte-identical to the committed golden (project_view_golden.json), undeclared_agents correctly names the one agent no subject declares, top_gaps names a real cross-agent blind spot naming both fixture subjects, and each engine's rendered project.md matches its own committed golden (project_view_golden_<engine>.md)",
-        "fail": "the 1-subject fixture gains a spurious project view on any engine, a 3-subject engine's project.json differs from the golden, the undeclared agent is missing, top_gaps is empty or does not name both subjects, or an engine's project.md differs from its own golden"
+        "pass": "the 1-subject fixture (verification/gates/fixtures/blind_spots/) writes no project.json/project.md/project.html/agents/ on any engine; each engine's 3-subject fixture (verification/gates/fixtures/project_view/) project.json is byte-identical to the committed golden (project_view_golden.json), undeclared_agents correctly names the one agent no subject declares, top_gaps names a real cross-agent blind spot naming both fixture subjects, each engine's rendered project.md matches its own committed golden (project_view_golden_<engine>.md), and the Python-only deviations scenario (verification/gates/fixtures/project_view_deviations/) surfaces subject A's applied PVD-01 deviation with its real expiry, in both project.json and the rendered project.md, without leaking onto subject B",
+        "fail": "the 1-subject fixture gains a spurious project view on any engine, a 3-subject engine's project.json differs from the golden, the undeclared agent is missing, top_gaps is empty or does not name both subjects, an engine's project.md differs from its own golden, or the deviations scenario's subject A is missing its deviation/expiry, subject B wrongly carries one, or project.md omits the control id or expiry text"
       },
       "faults": [
         {
@@ -327,9 +327,21 @@
           "file": "engines/python/agentce/report.py",
           "search": "    if profile is not None and len(profile.subjects) > 1:\n",
           "replace": "    if profile is not None and len(profile.subjects) >= 1:\n"
+        },
+        {
+          "description": "a subject's per-control deviation loop reads every subject's assertions instead of its own, so one subject's applied deviation leaks onto every other subject's row (18.14a)",
+          "file": "engines/python/agentce/project.py",
+          "search": "        for control in sorted({a.deviation for a in subject_assertions if a.deviation}):\n",
+          "replace": "        for control in sorted({a.deviation for a in assertions if a.deviation}):\n"
+        },
+        {
+          "description": "the deviation entry's expiry-presence guard is inverted, so a real, applied deviation's expiry goes missing while an unmatched control gets a fabricated one (18.14a)",
+          "file": "engines/python/agentce/project.py",
+          "search": "            if \"expiry\" in by_control.get(control, {}):\n",
+          "replace": "            if \"expiry\" not in by_control.get(control, {}):\n"
         }
       ],
-      "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/project.py (undeclared_agents, top_gaps) and the `write_report` gate in engines/python/agentce/report.py, ported field-for-field in engines/typescript/src/project.ts + report.ts and engines/java/src/main/java/org/agentce/Project.java + Report.java."
+      "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/project.py (undeclared_agents, top_gaps, the per-subject deviations list) and the `write_report` gate in engines/python/agentce/report.py, ported field-for-field in engines/typescript/src/project.ts + report.ts and engines/java/src/main/java/org/agentce/Project.java + Report.java."
     },
     {
       "id": "VG-PROJECT-TIME",

@@ -3,6 +3,18 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.27.0
+
+- Changed `VG-PROJECT-VIEW`: the project view's per-agent row now carries a `deviations` list (18.14a,
+  Hill 7's role-views clause, second half) -- a Python-only CLI-driven scenario
+  (`verification/gates/fixtures/project_view_deviations/`, reusing `VG-AUDITOR-VIEW`'s own AUV-01
+  SHACL pattern as a new control `PVD-01`) asserts subject A's applied, unexpired deviation surfaces
+  with its real expiry in both `project.json` and the rendered `project.md`, and that subject B's row
+  stays empty -- without disturbing the existing 3-subject fixture (its own golden gained only the
+  new, always-present, empty `deviations` key). Two new seeded faults: the per-subject deviation loop
+  reading every subject's assertions instead of its own (a leak), and the expiry-presence guard
+  inverted (a real expiry goes missing while an unmatched control's is fabricated).
+
 ## 0.26.0
 
 - Added `VG-QUICK-PATH`: the records-folder quick path (`agentce assess <folder>`, 18.32) proves the

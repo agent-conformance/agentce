@@ -22,6 +22,17 @@
 # The 1-subject fixture reuses VG-BLIND-SPOTS' own fixture verbatim (already proven, elsewhere, to run
 # cleanly on all three engines): it stays a single subject, so C3's branch must never engage for it.
 #
+# The deviations fixture (verification/gates/fixtures/project_view_deviations/, 18.14a) reuses
+# VG-AUDITOR-VIEW's own proven AUV-01 SHACL pattern as a new control PVD-01. Two subjects, both
+# declaring one Decision event each (so neither is insufficient_evidence, which would make
+# readiness.deviation_lint reject the whole register): subject A's event has no `agent` field (shape
+# fails -> non-conformant, eligible for the register's unexpired PVD-01 deviation, which
+# apply_deviations flips to `partial`); subject B's event has an `agent` field (shape passes ->
+# conformant), a clean subject the anti-leak fault can leak onto. Python-only (TypeScript/Java refuse
+# `--deviations` by design, C5): runs `assess --deviations` directly, asserting the per-subject
+# `deviations` property this item's `compute_project_view` now computes, and the rendered
+# "Deviations" column in project.md.
+#
 # The golden (project_view_golden.json) is always a capture of the Python *reference* engine's own
 # output -- comparing the other two engines to Python's own output, never to themselves, is what makes
 # the parity claim non-vacuous (the same rule what_they_did_engines.sh documents). Rendered
@@ -34,6 +45,7 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 fixture="$root/verification/gates/fixtures/project_view"
 one_subject="$root/verification/gates/fixtures/blind_spots"
+deviations_fixture="$root/verification/gates/fixtures/project_view_deviations"
 golden="$root/verification/gates/project_view_golden.json"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -47,6 +59,12 @@ one_args=(assess --bundle "$one_subject/evidence" --profile "$one_subject/applic
 # matching blind_spots_engines.sh's own precedent.
 py_multi_args=("${multi_args[@]}" --allow-unverified-catalog)
 py_one_args=("${one_args[@]}" --allow-unverified-catalog)
+deviations_args=(assess --bundle "$deviations_fixture/evidence" \
+  --profile "$deviations_fixture/applicability.yaml" \
+  --domain "$deviations_fixture/domain.linkml.yaml" \
+  --catalog-dir "$deviations_fixture/catalog" \
+  --deviations "$deviations_fixture/deviations.yaml" \
+  --allow-unverified-catalog --for risk-lead)
 
 # The property assertion fault (1) (an inverted undeclared-agents set-difference) catches even if the
 # golden comparison were somehow satisfied: the known undeclared id must be present, and at least one
@@ -68,6 +86,29 @@ ok = (
         }
         for gap in top_gaps
     )
+)
+sys.exit(0 if ok else 1)
+PY
+}
+
+# The deviations scenario's property assertion (18.14a): subject A's register entry must be present,
+# unleaked onto subject B (fault (i)), and carry its real, unmangled expiry (fault (ii)); project.md
+# must render both the control id and the expiry text, proving the rendering path too.
+check_deviations_properties() {
+  python3 - "$1" "$2" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    data = json.load(f)
+with open(sys.argv[2], encoding="utf-8") as f:
+    rendered = f.read()
+by_id = {agent["id"]: agent for agent in data["agents"]}
+a = by_id.get("spiffe://corp/agents/project-view-deviations-fixture-a", {})
+b = by_id.get("spiffe://corp/agents/project-view-deviations-fixture-b", {})
+ok = (
+    a.get("deviations") == [{"control": "PVD-01", "expiry": "2026-06-01T00:00:00.000Z"}]
+    and b.get("deviations") == []
+    and "PVD-01" in rendered
+    and "2026-06-01T00:00:00.000Z" in rendered
 )
 sys.exit(0 if ok else 1)
 PY
@@ -171,5 +212,23 @@ for engine in python typescript java; do
     status=1
   fi
 done
-[ "$status" -eq 0 ] && echo "project-view: three engines match the golden, the undeclared delegate and the cross-agent top gap are honestly surfaced, and a single-subject run stays unchanged"
+
+# The deviations scenario (18.14a, C6): Python only -- TypeScript/Java refuse --deviations by design
+# (C5), so there is nothing to compare cross-engine here.
+set +e
+(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${deviations_args[@]}" --out "$work/python-deviations" >/dev/null)
+code=$?
+set -e
+# Both subjects clear PVD-01 (A via the applied deviation, B conformant outright): no
+# non-conformant or severity-high insufficient_evidence assertion survives, so this run exits 0
+# (confirmed live), unlike the 3-subject fixture's severity-high insufficient_evidence exit 2 above.
+if [ "$code" -ne 0 ]; then
+  echo "project-view: the deviations scenario's python assess exited $code, expected 0" >&2
+  status=1
+elif ! check_deviations_properties "$work/python-deviations/project.json" "$work/python-deviations/project.md"; then
+  echo "project-view: the deviations scenario's project.json/project.md did not honestly surface subject A's applied deviation (control id + expiry), left subject B's deviations empty, or leaked between the two" >&2
+  status=1
+fi
+
+[ "$status" -eq 0 ] && echo "project-view: three engines match the golden, the undeclared delegate and the cross-agent top gap are honestly surfaced, a single-subject run stays unchanged, and the deviations scenario surfaces subject A's applied deviation without leaking onto subject B"
 exit "$status"

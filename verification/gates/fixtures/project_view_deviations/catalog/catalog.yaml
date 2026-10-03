@@ -1,0 +1,9 @@
+# A small, dedicated catalog for VG-PROJECT-VIEW's deviations scenario (18.14a): one control,
+# PVD-01, reusing VG-AUDITOR-VIEW's own proven AUV-01 SHACL pattern (prov:wasAssociatedWith minCount
+# 1 on a ConsequentialDecision) -- subject A's event carries no agent (shape fails, non-conformant,
+# eligible for the register's deviation), subject B's carries one (shape passes, conformant, a clean
+# subject the anti-leak fault can leak onto). Not a base or third-party catalog; loaded only via
+# --catalog-dir --allow-unverified-catalog by this gate's own script.
+id: project-view-deviations-fixture
+version: "2026.09"
+title: "VG-PROJECT-VIEW deviations scenario gate fixture"

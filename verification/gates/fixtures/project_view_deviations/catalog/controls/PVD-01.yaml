@@ -1,0 +1,25 @@
+id: PVD-01
+version: "2026.09"
+title: "Fixture control the register's unexpired deviation accepts"
+description: >
+  Gate fixture only (verification/gates/project_view_engines.sh, 18.14a): reuses VG-AUDITOR-VIEW's
+  own AUV-01 SHACL pattern -- the fixture's Decision event carries no `agent` field, so this
+  control's shape (requiring prov:wasAssociatedWith) fails -- non-conformant -- before the deviation
+  register's unexpired PVD-01 entry applies and flips it to `partial`, surfaced in the project view's
+  new per-agent "Deviations" column.
+crosswalk: []
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: any
+  minimum_evidence:
+    - {event: Decision, class: any}
+  shape: shapes/PVD-01.ttl
+expectations:
+  - {id: F1, text: "Fixture-only; not a real requirement."}
+severity: high
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+test_cases: []

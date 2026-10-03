@@ -1,0 +1,6 @@
+# Domain ontology binding for the VG-PROJECT-VIEW deviations scenario
+# (verification/gates/project_view_engines.sh, 18.14a).
+decision_types:
+  - id: "dom:ProjectDeviationsFixtureDecision"
+    subclass_of: "agentce:ConsequentialDecision"
+    consequential: true
