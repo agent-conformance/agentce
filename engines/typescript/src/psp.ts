@@ -267,29 +267,36 @@ export function parseShapes(store: Store): Map<string, Shape> {
  * Profile (spec/rules/psp.md) because they are not portable across the three engines' independent
  * structural evaluators. Checked in this fixed order (matching `spec/rules/psp_check.py`'s own
  * `PRIORITY_DENY`: sparql before its script counterpart), never store-iteration order -- so a shape
- * carrying BOTH predicates reports the same key as Python and Java regardless of triple order. */
-const FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER: Array<[string, string]> = [
-  ["sparql", "catalog.shape.sparql_forbidden"],
-  ["js", "catalog.shape.script_forbidden"],
-  ["javascript", "catalog.shape.script_forbidden"],
-];
-
-/** Cause/fix text per key, not per predicate name: `js` and `javascript` share one key and
- * therefore one message. */
-const FORBIDDEN_SHAPE_PREDICATE_MESSAGES: Record<string, [string, string]> = {
-  "catalog.shape.sparql_forbidden": [
+ * carrying BOTH predicates reports the same key as Python and Java regardless of triple order.
+ * `js` and `javascript` share one key and therefore one message. */
+const FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER: Array<
+  [name: string, key: string, cause: string, fix: string]
+> = [
+  [
+    "sparql",
+    "catalog.shape.sparql_forbidden",
     "a shape uses sh:sparql, a SPARQL-based SHACL construct the Portable Shape Profile forbids " +
       "(spec/rules/psp.md).",
     "remove the sh:sparql constraint; express it with the profile's declarative vocabulary " +
       "instead (spec/rules/psp.md).",
   ],
-  "catalog.shape.script_forbidden": [
+  [
+    "js",
+    "catalog.shape.script_forbidden",
     "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable Shape " +
       "Profile forbids (spec/rules/psp.md).",
     "remove the sh:js constraint; express it with the profile's declarative vocabulary instead " +
       "(spec/rules/psp.md).",
   ],
-};
+  [
+    "javascript",
+    "catalog.shape.script_forbidden",
+    "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable Shape " +
+      "Profile forbids (spec/rules/psp.md).",
+    "remove the sh:js constraint; express it with the profile's declarative vocabulary instead " +
+      "(spec/rules/psp.md).",
+  ],
+];
 
 function checkForbiddenPredicates(store: Store): void {
   const used = new Set<string>();
@@ -299,9 +306,8 @@ function checkForbiddenPredicates(store: Store): void {
       used.add(text.slice(SH.length).toLowerCase());
     }
   }
-  for (const [name, key] of FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER) {
+  for (const [name, key, cause, fix] of FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER) {
     if (used.has(name)) {
-      const [cause, fix] = FORBIDDEN_SHAPE_PREDICATE_MESSAGES[key];
       throw new InputError(key, cause, fix);
     }
   }

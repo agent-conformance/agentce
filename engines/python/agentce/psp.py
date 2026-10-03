@@ -20,6 +20,7 @@ from typing import Any
 from rdflib import RDF, BNode, Graph, Literal, URIRef
 from rdflib.collection import Collection
 
+from .error_catalogue import MESSAGE_KEYS
 from .errors import InputError
 
 SH = "http://www.w3.org/ns/shacl#"
@@ -211,29 +212,14 @@ def parse_shapes(graph: Graph) -> dict[str, Shape]:
 #: before its script counterpart), never in graph-iteration order -- ``graph.predicates()`` iterates
 #: a set, whose order depends on ``PYTHONHASHSEED``, so a shape carrying BOTH predicates would
 #: otherwise report a different key on different runs, and TypeScript/Java (which iterate quads in
-#: insertion order) would disagree with Python on which one wins.
+#: insertion order) would disagree with Python on which one wins. Cause/fix text comes from
+#: ``error_catalogue.MESSAGE_KEYS`` by key, not duplicated here: `js` and `javascript` share one key
+#: and therefore one message.
 _FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER = (
     ("sparql", "catalog.shape.sparql_forbidden"),
     ("js", "catalog.shape.script_forbidden"),
     ("javascript", "catalog.shape.script_forbidden"),
 )
-
-#: Cause/fix text per key, not per predicate name: `js` and `javascript` share one key and therefore
-#: one message.
-_FORBIDDEN_SHAPE_PREDICATE_MESSAGES = {
-    "catalog.shape.sparql_forbidden": (
-        "a shape uses sh:sparql, a SPARQL-based SHACL construct the Portable Shape "
-        "Profile forbids (spec/rules/psp.md).",
-        "remove the sh:sparql constraint; express it with the profile's declarative "
-        "vocabulary instead (spec/rules/psp.md).",
-    ),
-    "catalog.shape.script_forbidden": (
-        "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable "
-        "Shape Profile forbids (spec/rules/psp.md).",
-        "remove the sh:js constraint; express it with the profile's declarative vocabulary "
-        "instead (spec/rules/psp.md).",
-    ),
-}
 
 
 def _check_forbidden_predicates(graph: Graph) -> None:
@@ -244,8 +230,8 @@ def _check_forbidden_predicates(graph: Graph) -> None:
     }
     for name, key in _FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER:
         if name in used:
-            cause, fix = _FORBIDDEN_SHAPE_PREDICATE_MESSAGES[key]
-            raise InputError(key, cause, fix)
+            entry = MESSAGE_KEYS[key]
+            raise InputError(key, entry.cause, entry.fix)
 
 
 def parse_shapes_ttl(text: str) -> dict[str, Shape]:

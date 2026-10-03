@@ -248,28 +248,33 @@ public final class Psp {
         return shapes;
     }
 
-    /** SHACL predicates that embed arbitrary query or script logic, forbidden by the Portable Shape
-     * Profile (spec/rules/psp.md) because they are not portable across the three engines' independent
-     * structural evaluators. Checked in this fixed order (matching {@code spec/rules/psp_check.py}'s
-     * own {@code PRIORITY_DENY}: sparql before its script counterpart), never store-iteration order --
-     * so a shape carrying BOTH predicates reports the same key as Python and TypeScript regardless of
-     * triple order. */
-    private static final List<Map.Entry<String, String>> FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER = List.of(
-            Map.entry("sparql", "catalog.shape.sparql_forbidden"),
-            Map.entry("js", "catalog.shape.script_forbidden"),
-            Map.entry("javascript", "catalog.shape.script_forbidden"));
+    /** One forbidden predicate's name, message key, cause, and fix, checked in this fixed order
+     * (matching {@code spec/rules/psp_check.py}'s own {@code PRIORITY_DENY}: sparql before its
+     * script counterpart), never store-iteration order -- so a shape carrying BOTH predicates
+     * reports the same key as Python and TypeScript regardless of triple order. {@code js} and
+     * {@code javascript} share one key and therefore one message. SHACL predicates that embed
+     * arbitrary query or script logic are forbidden by the Portable Shape Profile (spec/rules/psp.md)
+     * because they are not portable across the three engines' independent structural evaluators. */
+    private record ForbiddenShapePredicate(String name, String key, String cause, String fix) {}
 
-    /** Cause/fix text per key, not per predicate name: {@code js} and {@code javascript} share one
-     * key and therefore one message. */
-    private static final Map<String, Map.Entry<String, String>> FORBIDDEN_SHAPE_PREDICATE_MESSAGES = Map.of(
-            "catalog.shape.sparql_forbidden",
-            Map.entry(
+    private static final List<ForbiddenShapePredicate> FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER = List.of(
+            new ForbiddenShapePredicate(
+                    "sparql",
+                    "catalog.shape.sparql_forbidden",
                     "a shape uses sh:sparql, a SPARQL-based SHACL construct the Portable Shape "
                             + "Profile forbids (spec/rules/psp.md).",
                     "remove the sh:sparql constraint; express it with the profile's declarative "
                             + "vocabulary instead (spec/rules/psp.md)."),
-            "catalog.shape.script_forbidden",
-            Map.entry(
+            new ForbiddenShapePredicate(
+                    "js",
+                    "catalog.shape.script_forbidden",
+                    "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable "
+                            + "Shape Profile forbids (spec/rules/psp.md).",
+                    "remove the sh:js constraint; express it with the profile's declarative "
+                            + "vocabulary instead (spec/rules/psp.md)."),
+            new ForbiddenShapePredicate(
+                    "javascript",
+                    "catalog.shape.script_forbidden",
                     "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable "
                             + "Shape Profile forbids (spec/rules/psp.md).",
                     "remove the sh:js constraint; express it with the profile's declarative "
@@ -282,11 +287,9 @@ public final class Psp {
                 used.add(predicate.substring(SH.length()).toLowerCase(java.util.Locale.ROOT));
             }
         }
-        for (Map.Entry<String, String> entry : FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER) {
-            if (used.contains(entry.getKey())) {
-                String key = entry.getValue();
-                Map.Entry<String, String> message = FORBIDDEN_SHAPE_PREDICATE_MESSAGES.get(key);
-                throw new InputError(key, message.getKey(), message.getValue());
+        for (ForbiddenShapePredicate forbidden : FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER) {
+            if (used.contains(forbidden.name())) {
+                throw new InputError(forbidden.key(), forbidden.cause(), forbidden.fix());
             }
         }
     }
