@@ -65,4 +65,9 @@ class MessagesTest {
     void activityUndeclaredAgentsLabelIsPresentAndMatchesTheSpecText() {
         assertEquals("Agents", Messages.catalogue("en").get("report.activity_undeclared_agents_label"));
     }
+
+    @Test
+    void catalogueWithNullLanguageFallsBackToEnWithoutThrowing() {
+        assertEquals(Messages.catalogue("en"), Messages.catalogue(null));
+    }
 }

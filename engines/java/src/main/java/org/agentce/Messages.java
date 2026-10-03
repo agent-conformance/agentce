@@ -62,6 +62,11 @@ public final class Messages {
     private static final Map<String, Map<String, String>> REPORT_KEY_CACHE = new ConcurrentHashMap<>();
 
     private static Map<String, String> reportKeys(String language) {
+        // ConcurrentHashMap refuses a null key; a null language (falls back to en, same as an
+        // unrecognised one) is rare enough to skip the cache rather than normalise it into one.
+        if (language == null) {
+            return filterReportKeys(null);
+        }
         return REPORT_KEY_CACHE.computeIfAbsent(language, Messages::filterReportKeys);
     }
 
