@@ -2041,29 +2041,40 @@ def _tamper_problems(
     quickstart: Path,
     untampered_digest: str | None,
 ) -> list[str]:
-    """`--catalog-dir` pointed at a modified catalog produces a manifest digest that is a live
-    recomputation of the tampered content -- never the untampered run's digest, and never the
-    tampered catalog's own (now-stale) `catalog.yaml` value, which this never touches."""
+    """`--catalog-dir` pointed at a modified catalog is refused as `input.catalog_unverified` (its
+    signature no longer covers the content); with `--allow-unverified-catalog` it produces a
+    manifest digest that is a live recomputation of the tampered content -- never the untampered
+    run's digest, and never the tampered catalog's own (now-stale) `catalog.yaml` value, which this
+    never touches."""
     tampered = _tamper_catalog(tmp)
     out = tmp / f"{label}-tampered-out"
-    proc = runner.run(
-        [
-            *exe,
-            "assess",
-            "--bundle",
-            str(quickstart / "evidence"),
-            "--profile",
-            str(quickstart / "applicability.yaml"),
-            "--domain",
-            str(quickstart / "domain.linkml.yaml"),
-            "--catalog-dir",
-            str(tampered),
-            "--out",
-            str(out),
-        ],
-        tmp,
-        offline=True,
-    )
+    cmd = [
+        *exe,
+        "assess",
+        "--bundle",
+        str(quickstart / "evidence"),
+        "--profile",
+        str(quickstart / "applicability.yaml"),
+        "--domain",
+        str(quickstart / "domain.linkml.yaml"),
+        "--catalog-dir",
+        str(tampered),
+        "--out",
+        str(out),
+    ]
+    proc = runner.run(cmd, tmp, offline=True)
+    if (
+        proc.returncode != 3
+        or "input.catalog_unverified" not in proc.stdout + proc.stderr
+    ):
+        return [
+            _fail(
+                f"TEETH: {label}: a tampered --catalog-dir was not refused as "
+                "input.catalog_unverified",
+                proc,
+            )
+        ]
+    proc = runner.run([*cmd, "--allow-unverified-catalog"], tmp, offline=True)
     if proc.returncode not in (0, 1):
         return [_fail(f"{label}: assess against a tampered --catalog-dir", proc)]
     expected = catalog_digest_check.digest_tree(tampered)
