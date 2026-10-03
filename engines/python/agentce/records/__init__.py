@@ -374,8 +374,9 @@ def scan(
         if len(real_ids) >= 2:
             # Two or more distinct agents: one subject per id, plus a DEFAULT_SUBJECT catch-all only
             # if some event carries no id at all -- never guess an id-less event into a named agent.
-            # A real id that happens to equal the DEFAULT_SUBJECT constant itself (18.14b C2 probe
-            # b') is already in real_ids, so skip the catch-all rather than list it twice.
+            # The catch-all is always appended last (never sorted in among the real ids), so a real id
+            # that happens to equal the DEFAULT_SUBJECT constant itself (18.14b C2 probe b') must be
+            # excluded from this check, or it would be listed twice.
             resulting_subjects = sorted(real_ids)
             if DEFAULT_SUBJECT not in real_ids and any(
                 _real_id(e) is None for e in by_id.values()

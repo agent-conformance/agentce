@@ -770,8 +770,6 @@ def test_a_real_agent_id_equal_to_the_default_subject_constant_is_not_listed_twi
     code, env = _run(["assess", str(folder), "--out", str(out)], capsys)
 
     assert code == 0
-    import yaml
-
     profile = yaml.safe_load((out / "applicability.yaml").read_text(encoding="utf-8"))
     subject_ids = [s["id"] for s in profile["subjects"]]
     assert subject_ids == sorted(set(subject_ids)), subject_ids
@@ -779,7 +777,7 @@ def test_a_real_agent_id_equal_to_the_default_subject_constant_is_not_listed_twi
         "agentce:subject/local",
         "spiffe://corp/agents/fraud-detection-agent",
     }
-    assert _activity(out)["undeclared"]["agents"] == sorted(subject_ids)
+    assert _activity(out)["undeclared"]["agents"] == subject_ids
 
 
 def test_renamed_and_reordered_files_give_the_same_result_with_multiple_agents(
