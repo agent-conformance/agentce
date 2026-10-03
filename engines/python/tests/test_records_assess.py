@@ -746,6 +746,42 @@ def test_a_new_agent_under_a_re_fed_single_agent_profile_is_undeclared(
     ]
 
 
+def test_a_real_agent_id_equal_to_the_default_subject_constant_is_not_listed_twice(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """18.14b C2 probe b': a real `gen_ai.agent.id` that happens to equal the synthetic
+    `agentce:subject/local` catch-all, alongside a second real agent and id-less events, must not
+    make the derived profile declare the same subject id twice (`scan()`'s catch-all is skipped when
+    it already matches a real id). The id-less events still merge into that agent's bucket -- an
+    accepted limitation of this exact textual collision, not a design error, since there is no other
+    named subject to attribute them to."""
+    folder = tmp_path / "records"
+    folder.mkdir()
+    collided = (
+        (_FIXTURES / "otel-genai-agent-session" / "input.json")
+        .read_text(encoding="utf-8")
+        .replace("spiffe://corp/agents/credit-underwriter", "agentce:subject/local")
+    )
+    (folder / "collided.json").write_text(collided, encoding="utf-8")
+    shutil.copy(_FIXTURES / "datadog" / "input.json", folder / "fraud.json")
+    shutil.copy(_FIXTURES / "openinference-rag" / "input.json", folder / "rag.json")
+    out = tmp_path / "out"
+
+    code, env = _run(["assess", str(folder), "--out", str(out)], capsys)
+
+    assert code == 0
+    import yaml
+
+    profile = yaml.safe_load((out / "applicability.yaml").read_text(encoding="utf-8"))
+    subject_ids = [s["id"] for s in profile["subjects"]]
+    assert subject_ids == sorted(set(subject_ids)), subject_ids
+    assert set(subject_ids) == {
+        "agentce:subject/local",
+        "spiffe://corp/agents/fraud-detection-agent",
+    }
+    assert _activity(out)["undeclared"]["agents"] == sorted(subject_ids)
+
+
 def test_renamed_and_reordered_files_give_the_same_result_with_multiple_agents(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
