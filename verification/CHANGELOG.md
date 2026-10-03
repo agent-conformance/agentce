@@ -3,6 +3,21 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.30.0
+
+- Added `VG-BYO-CATALOG-PARITY`: an operator's own `--catalog-dir` is untrusted input in all three engines
+  (18.36, SPEC §8.7). TypeScript and Java now verify each catalog directory against the effective trust
+  root (`--trust-root`, else `AGENTCE_TRUST_ROOT`, else the vendored root), as Python already did. The gate
+  builds an untrusted, an unsigned, a trusted and a rebranded catalog with the real `agentce catalog sign`
+  under a temporary directory, then runs 12 scenarios through each engine's real CLI and requires
+  TypeScript and Java to match Python's exit code, error key, cause, fix and recorded limitation (envelope
+  and `manifest.json`). A malformed trust root's cause is compared up to the JSON parser's own message.
+  Six seeded faults: the signature check bypassed, the identity cross-check removed, and the trust root's
+  top-level object check removed, each in TypeScript and in Java.
+- Changed `VG-BLIND-SPOTS`, `VG-PROJECT-VIEW` and `VG-I18N-ONE-CATALOGUE`: every engine now gets
+  `--allow-unverified-catalog` for the gates' deliberately unsigned fixture catalogs, since TypeScript and
+  Java verify `--catalog-dir` signatures too.
+
 ## 0.29.0
 
 - Added `VG-I18N-ONE-CATALOGUE`: TypeScript and Java load the vendored `spec/i18n/` message catalogue

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.29.0",
+  "suite_version": "0.30.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1101,6 +1101,67 @@
         }
       ],
       "fix_hint": "Run verification/gates/i18n_one_catalogue.sh and read which engine's test or CLI leg failed; the loader lives in engines/typescript/src/messages.ts and engines/java/src/main/java/org/agentce/Messages.java, both reading engines/<lang>/.../i18n/, vendored from spec/i18n/."
+    },
+    {
+      "id": "VG-BYO-CATALOG-PARITY",
+      "title": "An operator's own --catalog-dir is checked against the trust root the same way in all three engines: refused when unsigned, untrusted or rebranded, recorded as a limitation under --allow-unverified-catalog, with Python's exit code, error key, cause and fix",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/byo_catalog_parity.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 900,
+      "invariant": "An attestation is reported as verified only after its signature verifies against a trusted key.",
+      "rubric": {
+        "pass": "for each of 12 scenarios (untrusted, unsigned, unsigned with the override, trusted with --trust-root, missing/malformed/non-object --trust-root, a bad --trust-root with no --catalog-dir, a rebranded catalog with and without the override, an ordinary run, quickstart under AGENTCE_TRUST_ROOT) Python gives the expected exit code and key, and TypeScript and Java give the same exit code, error key, cause (up to the JSON parser's own message for a malformed trust root), fix, envelope limitations and manifest.json limitations",
+        "fail": "any engine assesses a catalog Python refuses, refuses one Python assesses, or differs from Python in exit code, error key, cause, fix or the recorded limitation"
+      },
+      "faults": [
+        {
+          "description": "the signature check in TypeScript's verifyCatalogDirs is bypassed, so an untrusted or unsigned --catalog-dir is assessed as if verified",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "    const outcome = verifyCatalog(catalog.directory, trust);\n    if (outcome.verified) {",
+          "replace": "    const outcome = verifyCatalog(catalog.directory, trust);\n    if (true) {"
+        },
+        {
+          "description": "the signature check in Java's verifyCatalogDirs is bypassed, so an untrusted or unsigned --catalog-dir is assessed as if verified",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "            if (outcome.get(\"verified\").booleanValue()) {",
+          "replace": "            if (true) {"
+        },
+        {
+          "description": "TypeScript's identity cross-check is removed, so a validly signed but rebranded catalog is assessed",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "    if (unrequested.length > 0) {\n      throw new InputError(\n        \"input.catalog_mismatch\",",
+          "replace": "    if (false) {\n      throw new InputError(\n        \"input.catalog_mismatch\","
+        },
+        {
+          "description": "Java's identity cross-check is removed, so a validly signed but rebranded catalog is assessed",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "            if (!unrequested.isEmpty()) {\n                List<String> requestedQuoted",
+          "replace": "            if (false) {\n                List<String> requestedQuoted"
+        },
+        {
+          "description": "TypeScript's loadTrustRoot accepts a trust root whose top level is not an object, reading it as an empty trust root",
+          "file": "engines/typescript/src/verify.ts",
+          "search": "  if (!isRecord(data)) {\n    throw new Error(`${path} does not hold a trust-root object`);",
+          "replace": "  if (data === null) {\n    throw new Error(`${path} does not hold a trust-root object`);"
+        },
+        {
+          "description": "Java's loadTrustRoot accepts a trust root whose top level is not an object, reading it as an empty trust root",
+          "file": "engines/java/src/main/java/org/agentce/Verify.java",
+          "search": "        if (data == null || !data.isObject()) {",
+          "replace": "        if (data == null) {"
+        }
+      ],
+      "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/commands/__init__.py's _effective_trust_root, _verify_catalog_dirs and _resolve_catalogs plus signing.load_trust_root, ported in engines/typescript/src/cli.ts + verify.ts and engines/java/src/main/java/org/agentce/Cli.java + Verify.java."
     }
   ]
 }
