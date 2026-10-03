@@ -345,12 +345,16 @@ def test_claim_check_exits_3_as_a_subprocess_on_a_stale_pinned_skill_copy(
         ),
     )
     skill_md = copy / "SKILL.md"
-    skill_md.write_text(
-        skill_md.read_text(encoding="utf-8").replace(
-            'cli_version: ">=0.1.0,<0.2"', 'cli_version: ">=0.0.1,<0.1"'
-        ),
-        encoding="utf-8",
+    original = skill_md.read_text(encoding="utf-8")
+    stale = original.replace(
+        'cli_version: ">=0.1.0,<0.2"', 'cli_version: ">=0.0.1,<0.1"'
     )
+    assert stale != original, (
+        "the frontmatter's cli_version pin text no longer matches the literal this"
+        " test replaces -- update the replaced string, or this test silently stops"
+        " planting a stale pin"
+    )
+    skill_md.write_text(stale, encoding="utf-8")
     result = subprocess.run(
         [sys.executable, "scripts/claim_check.py", "--json"],
         cwd=copy,
@@ -383,7 +387,10 @@ def test_the_named_for_presets_exist_in_the_engine() -> None:
     named = set(re.findall(r"`--for (\w[\w-]*)`", skill))
     assert named == set(PRESET_EMIT)
     normalized = " ".join(skill.split())
-    assert "hand-over to someone outside the team" in normalized
+    assert (
+        "`--for auditor` and `--for buyer` are the two presets built for a"
+        " hand-over to someone outside the team"
+    ) in normalized
 
 
 def test_skill_is_for_the_coding_assistant_and_never_signs() -> None:
