@@ -1,35 +1,48 @@
 ---
 title: Trace-Store Connectors
-description: Langfuse, Phoenix/Arize, Datadog LLM Observability, and LangSmith telemetry round-trips into AgentCE through the existing otel-genai adapter — no vendor-specific code.
+description: Where Langfuse, Arize Phoenix, Datadog LLM Observability and LangSmith telemetry stands in the ingest support matrix, and how to fan OTel GenAI or OpenInference spans out to AgentCE before any of them ingest it.
 ---
 
-If your agent's telemetry already lives in a trace store — Langfuse, Phoenix/Arize, Datadog LLM
-Observability, or LangSmith — you do not need a new adapter to get it into AgentCE. All four already
-export OpenTelemetry GenAI semantic-convention (`gen_ai.*`) or OpenInference-convention spans, and
-[`adapters/otel-genai`](/reference/adapters/otel-genai/) is convention-based, not vendor-based (SPEC 12): it detects
-the convention per span, from the OTLP schema URL or the OpenInference instrumentation scope, and maps
-it to canonical AgentCE evidence events. It does not know the name of the product that produced the
-export.
+Four of the seven trace stores in the ingest support matrix's [Trace backends](/reference/ingest-support-matrix/#trace-backends)
+group have a fan-out path documented here: Langfuse, Arize Phoenix, Datadog LLM Observability and
+LangSmith (the other three — Braintrust, Helicone and W&B Weave — are in the matrix but have no
+fan-out recipe yet). Each grades on its own definition — the producer's export reference or API,
+read exactly as published:
 
-## What each vendor actually emits
+| Backend | Tier | Reader follows | Build item |
+|---|---|---|---|
+| Langfuse | Supported | [Langfuse export reference and code](https://langfuse.com/docs/api-and-data-platform/features/export-to-blob-storage), v4.47.0 | 19.29 |
+| Arize Phoenix | Supported | [Phoenix REST API (OpenAPI)](https://github.com/Arize-ai/phoenix/blob/arize-phoenix-v20.16.0/schemas/openapi.json), v20.16.0 | 19.29 |
+| Datadog LLM Observability | Experimental | [Datadog API v2 (OpenAPI), LLM Observability spans](https://github.com/DataDog/datadog-api-client-python/blob/2.61.0/.generator/schemas/v2/openapi.yaml), client 2.61.0 | 19.34 |
+| LangSmith | Supported | [LangSmith API (OpenAPI), v2 runs](https://api.smith.langchain.com/openapi.json), 0.1.0 | 19.34 |
 
-- **Langfuse** runs its own OTel backend at `https://cloud.langfuse.com/api/public/otel` and documents
-  that it renders `gen_ai.*`-convention spans as "generations" — the same convention family the base
-  `otel-genai-chat` fixture exercises, not OpenInference.
-- **Phoenix/Arize** is built directly on OpenInference: `openinference.span.kind`, `llm.*`, and
-  `input.value`/`output.value` are its own attribute family, the one `openinference-rag` already
-  demonstrates.
-- **Datadog LLM Observability** supports the OTel GenAI semantic convention natively: its Agent runs an
-  OTLP receiver (ports 4317/4318) and forwards through its own `datadog` exporter.
-- **LangSmith** exposes an OTLP endpoint at `https://api.smith.langchain.com/otel`, documented as
-  consuming the OpenLLMetry/`gen_ai.*` convention.
+Datadog grades Experimental, not Supported: its LLM Observability endpoints are marked preview, and span
+kind, environment and service live only in prose and tags, not the schema. The other three are Supported,
+but each still has a real risk the matrix names — Langfuse writes two export layouts until 16 November
+2026 and casts nulls as empty strings; Phoenix's API is unversioned and its OTLP-shaped endpoint uses
+snake_case keys, which the OTLP specification does not allow; LangSmith's v2 enums are upper case where
+older paths and docs show lower case. Readers built to each one land in 19.29 (Langfuse, Phoenix) and
+19.34 (Datadog, LangSmith); until then, AgentCE does not read any of the four vendors' own export APIs.
 
-Each claim is proved, not just documented: `adapters/otel-genai/fixtures/{langfuse,phoenix,datadog,
-langsmith}/` are real, committed OTLP/JSON exports shaped the way each vendor's own backend would
-render them, with `expected.jsonl` generated directly from the adapter's real output — never
-hand-written — so the mapping is correct by construction.
+## What works today: fan OTel out before any vendor touches it
 
-## Prove the round trip yourself
+All four vendors also run an OTLP receiver you can point a [Collector](https://opentelemetry.io/docs/collector/)
+at directly, ahead of the vendor's own ingestion. At that point the data is plain OTel GenAI semantic-
+convention (`gen_ai.*`) or OpenInference-convention spans — the same two conventions
+[`adapters/otel-genai`](/reference/adapters/otel-genai/) already maps (SPEC 12), convention-based rather
+than vendor-based: it detects the convention per span, from the OTLP schema URL or the OpenInference
+instrumentation scope, and does not know or need to know which product produced the export. This path
+needs no vendor-specific code, now, because it never goes near the vendor's own schema — it is a second,
+independent way to reach these four backends' telemetry, not a substitute for the matrix's own-schema
+readers above.
+
+`adapters/otel-genai/fixtures/{langfuse,phoenix,datadog,langsmith}/` are OTLP/JSON exports shaped as a
+generic `gen_ai.*`- or OpenInference-convention Collector export would be — **not** a capture of any
+vendor's own export API, which the matrix rows above cover instead. `expected.jsonl` is generated
+directly from the adapter's real output, never hand-written, so the convention mapping is correct by
+construction.
+
+## Run the round trip yourself
 
 Each fixture ingests into a bundle `agentce validate` accepts with zero quarantines, exactly like any
 other otel-genai export. This resolves the repository root portably (the same trick works whether
@@ -66,8 +79,8 @@ uv run --project engines/python python tools/trace_store_ingest_check.py
 
 ## Wire the fan-out for real
 
-A committed fixture proves the *mapping*; a live deployment still needs telemetry to reach AgentCE.
-[`adapters/otel-genai/otel-collector/config.yaml`](https://github.com/agent-conformance/agentce/blob/main/adapters/otel-genai/otel-collector/config.yaml)
+A committed fixture exercises the convention *mapping*; a live deployment still needs telemetry to reach
+AgentCE. [`adapters/otel-genai/otel-collector/config.yaml`](https://github.com/agent-conformance/agentce/blob/main/adapters/otel-genai/otel-collector/config.yaml)
 is the base Collector recipe (ADR 0017): a stock `otelcol-contrib` receiving OTLP and writing a local
 `file` AgentCE reads. `adapters/otel-genai/otel-collector/recipes/{langfuse,phoenix,datadog,
 langsmith}.yaml` extend it: the same shared `otlp` receiver, fanned out to both the vendor's own real
@@ -102,6 +115,8 @@ LangSmith.
 
 ## Read next
 
+- [Supported sources](/reference/ingest-support-matrix/) — every source AgentCE supports, and the
+  definition each one follows.
 - [Running Assessments](/docs/running-assessments/) — what happens to these events once they're in a
   bundle.
 - [CI Integration](/docs/ci-integration/) — running the same ingest-and-validate round trip on every

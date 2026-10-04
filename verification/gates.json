@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.32.0",
+  "suite_version": "0.33.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -980,7 +980,7 @@
     },
     {
       "id": "VG-QUICK-PATH",
-      "title": "The records-folder quick path (`agentce assess <folder>`, SPEC §12, §13.4 AX-1) proves the records-vs-bundle divergence, checks_unlocked on a real scan, and the derived profile's pilot_window still passing the skill's own lint",
+      "title": "The records-folder quick path (`agentce assess <folder>`, SPEC \u00a712, \u00a713.4 AX-1) proves the records-vs-bundle divergence, checks_unlocked on a real scan, and the derived profile's pilot_window still passing the skill's own lint",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -1231,6 +1231,52 @@
         }
       ],
       "fix_hint": "Run verification/gates/ci_fast_checks.sh; it names which package's check failed, or which CI step/MANIFEST entry is unmatched (ci_fast_checks_check.py's MANIFEST, compared against .github/workflows/*.yml)."
+    },
+    {
+      "id": "VG-INGEST-SUPPORT-MATRIX",
+      "title": "README.md's tier lines and the trace-store connectors docs page name ingest sources only from spec/ingest/support-matrix.yaml, under the tier the matrix grades them, and a wrong name or tier fails",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/ingest_support_matrix.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 60,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every name in README.md's Supported/Experimental/Roadmap tier lines, and every backend named in trace-store-connectors.md's table, is a real spec/ingest/support-matrix.yaml row under the tier the matrix grades it, each tier line's stated count matches the matrix and (for a truncated line) its own \"and N more\" arithmetic, and the self-test proves each failure mode its own message key",
+        "fail": "a name is absent from the matrix, a name is listed under a tier the matrix disagrees with, a stated or truncated count disagrees with the real matrix, a required tier line or the docs table is missing, or the self-test does not discriminate"
+      },
+      "faults": [
+        {
+          "description": "README's Roadmap line names a source ('Zephyr') that is not a matrix row at all, keeping the line's stated count unchanged",
+          "file": "README.md",
+          "search": "Cedar",
+          "replace": "Zephyr"
+        },
+        {
+          "description": "README swaps one Experimental name for one Roadmap name between the two tier lines (AuthZEN decisions <-> Cedar); both lines keep their real stated count, so only the per-name tier check can catch it",
+          "file": "README.md",
+          "search": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, AuthZEN decisions.\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, Cedar \u2014 help wanted.\n",
+          "replace": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, Cedar.\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, AuthZEN decisions \u2014 help wanted.\n"
+        },
+        {
+          "description": "the trace-store connectors page's table claims Datadog LLM Observability is Supported, reviving the old overstated claim the matrix (Experimental) disagrees with",
+          "file": "website/src/content/docs/docs/trace-store-connectors.md",
+          "search": "| Datadog LLM Observability | Experimental | [Datadog API v2 (OpenAPI), LLM Observability spans](https://github.com/DataDog/datadog-api-client-python/blob/2.61.0/.generator/schemas/v2/openapi.yaml), client 2.61.0 | 19.34 |",
+          "replace": "| Datadog LLM Observability | Supported | [Datadog API v2 (OpenAPI), LLM Observability spans](https://github.com/DataDog/datadog-api-client-python/blob/2.61.0/.generator/schemas/v2/openapi.yaml), client 2.61.0 | 19.34 |"
+        },
+        {
+          "description": "the trace-store connectors page's table names a backend ('Honeycomb') that is not a matrix row at all, keeping the table's row count unchanged at four",
+          "file": "website/src/content/docs/docs/trace-store-connectors.md",
+          "search": "| LangSmith | Supported |",
+          "replace": "| Honeycomb | Supported |"
+        }
+      ],
+      "fix_hint": "Run verification/gates/ingest_support_matrix.sh; it names the exact message key (ingest.matrix.unknown_source, .wrong_tier, .count_mismatch, .count_arithmetic, .missing_tier_line, .docs_wrong_tier, .docs_unknown_source, .docs_definition_drift or .docs_table_missing) and the offending name."
     }
   ]
 }

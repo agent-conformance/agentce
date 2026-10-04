@@ -30,6 +30,7 @@ HERE = Path(__file__).resolve().parent
 DEFAULT_ROOT = HERE.parent
 TIERS = ("quick", "full")
 GATE_ID = re.compile(r"^VG-[A-Z0-9]+(-[A-Z0-9]+)*(@[0-9A-Za-z.]+)?$")
+CHANGELOG_VERSION = re.compile(r"^## ([0-9]+\.[0-9]+\.[0-9]+)", re.MULTILINE)
 TAIL_LINES = 20
 CLAIMS_REGISTER = Path("tools/claims/register.yaml")
 
@@ -61,6 +62,13 @@ def lint_registry(registry: dict[str, Any], root: Path) -> list[str]:
     claims = read_or_empty(root / CLAIMS_REGISTER)
     agents = read_or_empty(root / "AGENTS.md")
     changelog = read_or_empty(root / "verification" / "CHANGELOG.md")
+    changelog_version = next(iter(CHANGELOG_VERSION.findall(changelog)), None)
+    if registry.get("suite_version") != changelog_version:
+        problems.append(
+            f"registry.suite_version_mismatch: gates.json suite_version is "
+            f"{registry.get('suite_version')!r} but CHANGELOG.md's newest heading is "
+            f"{changelog_version!r}"
+        )
     seen: set[str] = set()
     for gate in gates:
         gid = str(gate.get("id", ""))
@@ -225,8 +233,16 @@ def describe(entry: dict[str, Any]) -> list[str]:
     return lines
 
 
-def bad_registries() -> dict[str, tuple[dict[str, Any], str]]:
+def bad_registries(root: Path) -> dict[str, tuple[dict[str, Any], str]]:
     """Deliberately bad registries, each with the message key the lint must raise for it."""
+    real_changelog_version = next(
+        iter(
+            CHANGELOG_VERSION.findall(
+                read_or_empty(root / "verification" / "CHANGELOG.md")
+            )
+        ),
+        None,
+    )
     base: dict[str, Any] = {
         "id": "VG-DEMO-BAD",
         "title": "A demonstration gate",
@@ -249,6 +265,7 @@ def bad_registries() -> dict[str, tuple[dict[str, Any], str]]:
         gate = {**base, **changes}
         return {
             "version": 1,
+            "suite_version": real_changelog_version,
             "gates": [{k: v for k, v in gate.items() if v is not None}],
         }
 
@@ -267,6 +284,10 @@ def bad_registries() -> dict[str, tuple[dict[str, Any], str]]:
                 faults=[{**base["faults"][0], "search": "text that is not in the file"}]
             ),
             "registry.fault_not_applicable",
+        ),
+        "a suite_version that disagrees with CHANGELOG.md's newest heading": (
+            {**variant(), "suite_version": "0.0.1"},
+            "registry.suite_version_mismatch",
         ),
     }
 
@@ -309,7 +330,7 @@ def main(argv: list[str]) -> int:
     root = args.root.resolve()
     if args.lint_registry and args.demo_reject:
         caught = True
-        for name, (bad, key) in bad_registries().items():
+        for name, (bad, key) in bad_registries(root).items():
             hit = any(line.startswith(key) for line in lint_registry(bad, root))
             caught = caught and hit
             print(

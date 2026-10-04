@@ -3,6 +3,25 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.33.0
+
+- Added `VG-INGEST-SUPPORT-MATRIX`: a quick-tier gate checking that README.md's `**Supported**`/
+  `**Experimental**`/`**Roadmap**` tier lines and the backend table in
+  `website/src/content/docs/docs/trace-store-connectors.md` name ingest sources only from
+  `spec/ingest/support-matrix.yaml`, under the tier the matrix grades them (18.39, MAINTAINER-NOTES
+  2026-09-29 "web copy names sources only from the matrix"). `ingest_support_matrix_check.py` scans
+  both copy surfaces (not just README, after the trace-store page was found still claiming Datadog
+  LLM Observability "round-trips" at Supported confidence when the matrix grades it Experimental) and
+  fails with one of seven distinct message keys (`ingest.matrix.unknown_source`, `.wrong_tier`,
+  `.count_mismatch`, `.count_arithmetic`, `.missing_tier_line`, `.docs_wrong_tier`,
+  `.docs_table_missing`), each proven by its own `--self-test` case against synthetic fixtures. Three
+  seeded faults, each isolated to the one rule it tests (a name outside the matrix; an
+  Experimental/Roadmap name swap that keeps both tiers' stated counts unchanged, so a count check
+  alone cannot catch it; the trace-store page's old overstated Datadog claim).
+- Added a registry-lint check: `gates.json`'s `suite_version` must equal the newest `## X.Y.Z` heading
+  in this file. `VG-CI-FAST-CHECKS` shipped in 791ecf3 with the two already out of step (18.37i's own
+  gate), caught only by hand; this closes that class for good.
+
 ## 0.32.0
 
 - Added `VG-CI-FAST-CHECKS`: a quick-tier gate running every package's `ruff check`, `ruff format

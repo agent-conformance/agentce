@@ -153,6 +153,12 @@ allow:
     class: legitimate
     justification: "A committed golden capture of a real assess run over verification/gates/fixtures/auditor_view/deviations.yaml, whose owner/approver fields use the reserved example.com domain (RFC 2606); the golden file itself sits outside a fixtures/ path so the example-domain exemption does not match it by path alone."
 
+  - path: verification/gates/ingest_support_matrix_check.py
+    pattern: example-domain
+    count: 3
+    class: legitimate
+    justification: "The self-test's seeded-fault fixtures use the reserved example.com domain (RFC 2606) as a stand-in URL for a non-matrix docs-table row (Honeycomb) and a definition-drift probe; a named test double in the checker's own self-test, never an unfinished part of the gate."
+
   - path: engines/python/agentce/report.py
     pattern: placeholder
     count: 28
@@ -266,6 +272,18 @@ allow:
     count: 6
     class: legitimate
     justification: "Honest status: placeholder rows for prEN 18229-1 (draft; no clause identifiers exist to cite yet)."
+
+  - path: spec/ingest/support-matrix.yaml
+    pattern: placeholder
+    count: 1
+    class: legitimate
+    justification: "The header comment describes the Roadmap tier's own behaviour (a catalog placeholder that names a source when found, never reads its contents, per INGEST-ARCHITECTURE.md G8) -- a design term, not an unfinished row in this file."
+
+  - path: spec/ingest/support-matrix.yaml
+    pattern: todo
+    count: 17
+    class: legitimate
+    justification: "17 AuthZEN decision-log rows cite real upstream URLs under github.com/openid/authzen's own interop/.../scenarios/todo-1.1/ and .../todo/ directory names -- the literal string 'todo' is part of the AuthZEN project's own path, not an unfinished part of this matrix."
 
   - path: tools/code_of_conduct_check.py
     pattern: placeholder

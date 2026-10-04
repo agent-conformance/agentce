@@ -66,7 +66,7 @@ def gate(gid: str, cmd: list[str], **more: Any) -> dict[str, Any]:
 
 def run(root: Path, gates: list[dict[str, Any]], *args: str) -> tuple[int, str]:
     (root / "gates.json").write_text(
-        json.dumps({"version": 1, "suite_version": "test", "gates": gates}),
+        json.dumps({"version": 1, "suite_version": "0.0.0", "gates": gates}),
         encoding="utf-8",
     )
     proc = subprocess.run(
@@ -99,7 +99,8 @@ def main() -> int:
         (root / "AGENTS.md").write_text("the sandbox invariant\n", encoding="utf-8")
         (root / "verification").mkdir()
         (root / "verification" / "CHANGELOG.md").write_text(
-            "VG-PASS VG-FAIL VG-SLOW VG-MISSING VG-TEETH VG-BLIND\n", encoding="utf-8"
+            "## 0.0.0\n\nVG-PASS VG-FAIL VG-SLOW VG-MISSING VG-TEETH VG-BLIND\n",
+            encoding="utf-8",
         )
         target = root / "target.txt"
         target.write_text("good\n", encoding="utf-8")

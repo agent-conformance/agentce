@@ -10,3 +10,4 @@ Generated from the sources by `docs/build.py`.
 - [Report schemas](report-schemas/index.md)
 - [Canonical IRIs](iris/index.md)
 - [Glossary](glossary.md)
+- [Supported sources](ingest-support-matrix.md)

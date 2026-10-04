@@ -704,6 +704,105 @@ def _glossary_pages() -> dict[Path, str]:
     return {REFERENCE / "glossary.md": "# Glossary\n\n" + _glossary_body_text()}
 
 
+_INGEST_TIER_LABEL = {
+    "supported": "Supported",
+    "experimental": "Experimental",
+    "roadmap": "Roadmap",
+}
+_INGEST_SHOW_LABEL = {
+    "did": "what the agents did",
+    "blocked": "what was allowed or blocked",
+    "approved": "who approved it",
+    "who": "who the agent is and who it acted for",
+    "integrity": "whether the records can be trusted",
+    "declares": "what an agent says it can do",
+}
+
+
+def _ingest_matrix() -> dict:
+    """The ingest support matrix (18.39), from ``spec/ingest/support-matrix.yaml``."""
+    import yaml
+
+    data = yaml.safe_load(
+        (REPO_ROOT / "spec" / "ingest" / "support-matrix.yaml").read_text("utf-8")
+    )
+    return data or {}
+
+
+def _ingest_shows(shows: list[str]) -> str:
+    if not shows:
+        return "—"
+    out = []
+    for s in shows:
+        key = s.rstrip("~?")
+        note = (
+            " (in part)"
+            if s.endswith("~")
+            else (" (expected, not checked)" if s.endswith("?") else "")
+        )
+        out.append(_INGEST_SHOW_LABEL.get(key, key) + note)
+    return "; ".join(out)
+
+
+def _ingest_body_text() -> str:
+    rows = _ingest_matrix().get("rows", [])
+    supported = [r for r in rows if r["tier"] == "supported"]
+    experimental = [r for r in rows if r["tier"] == "experimental"]
+    roadmap = [r for r in rows if r["tier"] == "roadmap"]
+    intro = (
+        "Generated from `spec/ingest/support-matrix.yaml`, so this page and the matrix never "
+        f"disagree. **{len(supported)} of {len(rows)} sources are supported**: AgentCE reads each "
+        "one exactly as its published definition says — the producer's code first, then its "
+        f"machine-readable schema, then its prose. **{len(experimental)} are experimental**, where "
+        "the producer calls the interface a preview or beta, or a field AgentCE reads is defined "
+        f"nowhere. **{len(roadmap)} are on the roadmap**, where we'd welcome help.\n\n"
+    )
+    sections = []
+    for tier, trows in (("supported", supported), ("experimental", experimental)):
+        if not trows:
+            continue
+        lines = [
+            f"## {_INGEST_TIER_LABEL[tier]} ({len(trows)})\n",
+            "| Source | Format | Definition | Version | Risk | What it shows | Hill verification |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        for r in trows:
+            d = r["definition"]
+            defn = (
+                f"[{_md_cell(d['name'])}]({d['url']})"
+                if d.get("url")
+                else _md_cell(d["name"])
+            )
+            lines.append(
+                f"| {_md_cell(r['name'])} | {_md_cell(r['format'])} | {defn} | "
+                f"{_md_cell(d.get('version') or '—')} | {_md_cell(r['risk'])} | "
+                f"{_md_cell(_ingest_shows(r['shows']))} | "
+                f"{_md_cell(r.get('hill_verification') or '—')} |"
+            )
+        sections.append("\n".join(lines) + "\n")
+    if roadmap:
+        lines = [
+            f"## Roadmap ({len(roadmap)})\n",
+            "No published definition yet, or nothing safe to read. We'd welcome help.\n",
+            "| Source | Format | Why it's not supported yet | Help wanted |",
+            "|---|---|---|---|",
+        ]
+        for r in roadmap:
+            lines.append(
+                f"| {_md_cell(r['name'])} | {_md_cell(r['format'])} | {_md_cell(r['risk'])} | "
+                f"{_md_cell(r.get('roadmap_help_wanted') or '—')} |"
+            )
+        sections.append("\n".join(lines) + "\n")
+    return intro + "\n".join(sections)
+
+
+def _ingest_pages() -> dict[Path, str]:
+    return {
+        REFERENCE / "ingest-support-matrix.md": "# Supported sources\n\n"
+        + _ingest_body_text()
+    }
+
+
 def _reference_index() -> dict[Path, str]:
     return {
         REFERENCE / "index.md": (
@@ -717,6 +816,7 @@ def _reference_index() -> dict[Path, str]:
             "- [Report schemas](report-schemas/index.md)\n"
             "- [Canonical IRIs](iris/index.md)\n"
             "- [Glossary](glossary.md)\n"
+            "- [Supported sources](ingest-support-matrix.md)\n"
         )
     }
 
@@ -1000,12 +1100,23 @@ def _site_glossary_pages() -> dict[Path, str]:
     }
 
 
+def _site_ingest_pages() -> dict[Path, str]:
+    return {
+        SITE_REFERENCE / "ingest-support-matrix.md": _frontmatter(
+            "Supported sources",
+            "Sources AgentCE supports, and the published definition each one follows — generated "
+            "from the ingest support matrix.",
+        )
+        + _ingest_body_text()
+    }
+
+
 def _site_reference_index() -> dict[Path, str]:
     return {
         SITE_REFERENCE / "index.md": _frontmatter(
             "Reference",
             "Generated from the sources: CLI commands, adapters, control families, controls, the "
-            "evidence model, report schemas, canonical IRIs, and the glossary.",
+            "evidence model, report schemas, canonical IRIs, the glossary, and the ingest support matrix.",
         )
         + (
             "Generated from the sources, so the documentation and the code never disagree.\n\n"
@@ -1017,6 +1128,7 @@ def _site_reference_index() -> dict[Path, str]:
             "- [Report schemas](/reference/report-schemas/) — one page per JSON Schema an output validates against.\n"
             "- [Canonical IRIs](/reference/iris/) — every canonical IRI the specification defines, linked to a human page.\n"
             "- [Glossary](/reference/glossary/) — canonical AgentCE terminology.\n"
+            "- [Supported sources](/reference/ingest-support-matrix/) — what AgentCE supports, and the definition each one follows.\n"
         )
     }
 
@@ -1074,6 +1186,7 @@ def generate_site() -> dict[Path, str]:
         _site_report_schema_pages(),
         _site_iri_pages(),
         _site_glossary_pages(),
+        _site_ingest_pages(),
         _site_reference_index(),
         _site_explanation_pages(),
     ):
@@ -1142,6 +1255,7 @@ def generate() -> dict[Path, str]:
         _report_schema_pages(),
         _iri_pages(),
         _glossary_pages(),
+        _ingest_pages(),
         _reference_index(),
         _example_report(),
     ):
