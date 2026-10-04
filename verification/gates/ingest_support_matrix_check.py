@@ -35,32 +35,25 @@ _FOLLOWS_RE = re.compile(r"\]\(([^)]+)\),\s*(.+)$")
 
 
 def _extract_table_rows(text: str) -> list[list[str]]:
-    """Every row of the trace-store table, as its raw cells, with no shape assumed.
-
-    Locates the table by its fixed header (skipping the header and its ``---`` separator), then
-    takes every following non-blank line containing a ``|`` up to the first blank line, splitting
-    on ``|`` rather than matching a regex against a presumed-good shape. GFM renders a table row
-    whether or not it carries its outer pipes, so a leading or trailing ``|`` is stripped only when
-    present, never required — a row missing one (or both) still reaches the caller as a row, the
-    same as a row with an unexpected column count or an unrecognized tier word, instead of silently
-    falling out of scrutiny the way a row lacking both outer pipes used to.
-    """
-    lines = text.splitlines()
-    try:
-        start = lines.index(_TABLE_HEADER) + 2
-    except ValueError:
-        return []
+    """Every line from each table header to the next blank line (spaces and tabs only), as raw
+    cells. Outer pipes are optional; a line that is not a row comes back as it is, for the caller
+    to report, so the page has to end the table with a blank line."""
     rows: list[list[str]] = []
-    for line in lines[start:]:
-        stripped = line.strip()
-        if not stripped or "|" not in stripped:
-            break
-        cells = re.split(r"(?<!\\)\|", stripped)
-        if stripped.startswith("|"):
-            cells = cells[1:]
-        if stripped.endswith("|"):
-            cells = cells[:-1]
-        rows.append([cell.strip() for cell in cells])
+    lines = iter(text.splitlines())
+    for line in lines:
+        if line.strip() != _TABLE_HEADER:
+            continue
+        next(lines, None)  # the --- separator
+        for row in lines:
+            if not row.strip(" \t"):
+                break
+            stripped = row.strip()
+            cells = re.split(r"(?<!\\)\|", stripped)
+            if stripped.startswith("|"):
+                cells = cells[1:]
+            if stripped.endswith("|"):
+                cells = cells[:-1]
+            rows.append([cell.strip() for cell in cells])
     return rows
 
 
@@ -136,7 +129,8 @@ def check_trace_store_docs(rows_by_name: dict[str, dict], text: str) -> list[str
         if len(cells) != 4:
             problems.append(
                 f"ingest.matrix.docs_malformed_row: trace-store-connectors.md's table has a row "
-                f"with {len(cells)} column(s), not 4: {cells!r}"
+                f"with {len(cells)} column(s), not 4: {cells!r}. If that line is not meant to be a "
+                "row, put a blank line between the table and it"
             )
             continue
         rows_seen += 1
@@ -541,6 +535,74 @@ def self_test() -> int:
             any(
                 "ingest.matrix.docs_wrong_tier" in p and "Datadog" in p
                 for p in check_trace_store_docs(rows, duplicate_overclaim_no_pipe_table)
+            ),
+        )
+    )
+
+    # 18.39 verifier round 3 and the census against the site's renderer: a plain-text line under
+    # a table becomes a one-cell row and the rows after it still render, while a heading, quote,
+    # list, fence or HTML line ends the table. The gate reads to the first blank line and refuses
+    # anything in between that is not a row, instead of copying the renderer's rule.
+    rows_after_text_line = good_table + (
+        "More backends:\n"
+        "| Honeycomb | Supported | x | y |\n"
+        "| Datadog LLM Observability | Supported | x | y |\n"
+    )
+
+    def has(found: list[str], key: str, text: str = "") -> bool:
+        return any(f"ingest.matrix.{key}" in p and text in p for p in found)
+
+    found = check_trace_store_docs(rows, rows_after_text_line)
+    cases.append(
+        (
+            "a plain-text line inside the table is refused, and the rows after it are still read",
+            has(found, "docs_malformed_row", "More backends:")
+            and has(found, "docs_unknown_source", "Honeycomb")
+            and has(found, "docs_wrong_tier", "Datadog"),
+        )
+    )
+
+    for opener in (
+        "### More",
+        "> note",
+        "- item",
+        "```",
+        "<div>",
+        "***",
+        "===",
+        "\u00a0",
+    ):
+        cases.append(
+            (
+                f"a {opener!r} line right under the table, with no blank line, is refused",
+                has(
+                    check_trace_store_docs(rows, good_table + opener + "\n"),
+                    "docs_malformed_row",
+                ),
+            )
+        )
+
+    closed_table = (
+        good_table + " \t\n### Elsewhere\n| Honeycomb | Supported | x | y |\n"
+    )
+    cases.append(
+        (
+            "a spaces-and-tabs line closes the table, and nothing after it is read as a row",
+            check_trace_store_docs(rows, closed_table) == [],
+        )
+    )
+
+    second_table = good_table + (
+        "\nMore backends:\n\n"
+        "| Backend | Tier | Reader follows | Build item |\n"
+        "|---|---|---|---|\n"
+        "| Datadog LLM Observability | Supported | x | y |\n"
+    )
+    cases.append(
+        (
+            "a second table under the same header is read too",
+            has(
+                check_trace_store_docs(rows, second_table), "docs_wrong_tier", "Datadog"
             ),
         )
     )
