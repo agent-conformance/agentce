@@ -3,7 +3,7 @@
     {
       "id": "baseline",
       "version": "2026.09",
-      "digest": "sha256:ea629ad76d8945b36c3c87b1c68ccffb6df16171f80467ac6d36c1fa6758c041",
+      "digest": "sha256:27d78d6fc44952edd05f9c7cd095bf2dbc7c5b9a1e1f1904bf2b02e50aeb73b6",
       "source_path": "spec/catalogs/base/baseline",
       "signing": {
         "signature_file": "catalog.sig.json",
@@ -14,7 +14,7 @@
     {
       "id": "eu-ai-act",
       "version": "2026.09",
-      "digest": "sha256:c02daa4fd868eadbb921517c45469ac978eccde00531150b2f716ac4b825bbe5",
+      "digest": "sha256:fc9d47b2ca03ad4fe5ee14a314bbc374996da8da5e261c726e6a97619582e6e0",
       "source_path": "spec/catalogs/base/eu-ai-act",
       "signing": {
         "signature_file": "catalog.sig.json",
@@ -25,7 +25,7 @@
     {
       "id": "nist-ai-rmf",
       "version": "2026.09",
-      "digest": "sha256:510fd44b9e5b3245c0d301ecbbb2a6ab2f857fda97e313afcd832e4dac393ed2",
+      "digest": "sha256:f14c4bb6e30c887e7c507a0015a1442b132c2fccd748bc42960a1a8774b390cb",
       "source_path": "spec/catalogs/base/nist-ai-rmf",
       "signing": {
         "signature_file": "catalog.sig.json",

@@ -126,6 +126,26 @@ def test_committed_eu_ai_act_signature_verifies() -> None:
     assert signed == recomputed
 
 
+def test_sign_catalog_updates_the_registry_digest(tmp_path: Path) -> None:
+    """A re-signed catalog's registry entry must carry its new digest, or the catalog registry
+    check refuses it (CI red after 18.16a and 18.37 re-signed eu-ai-act by hand)."""
+    source = dev_trust.REPO_ROOT / "spec" / "catalogs" / "base" / "eu-ai-act"
+    registry = json.loads(dev_trust.REGISTRY_FILE.read_text("utf-8"))
+    entry = next(e for e in registry["catalogs"] if e["id"] == "eu-ai-act")
+    entry["digest"] = "sha256:" + "ab" * 32
+    registry_file = tmp_path / "catalogs.json"
+    registry_file.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8")
+    signature = source / dev_trust.SIGNATURE_NAME
+    before = signature.read_bytes()
+    try:
+        assert dev_trust._sign_catalog(source, registry_file) == 0
+    finally:
+        signature.write_bytes(before)
+    updated = json.loads(registry_file.read_text("utf-8"))
+    digest = signing.digest_tree(source, exclude=frozenset({dev_trust.SIGNATURE_NAME}))
+    assert {e["id"]: e["digest"] for e in updated["catalogs"]}["eu-ai-act"] == digest
+
+
 def test_cli_dry_run_prints_sentinels(capsys: pytest.CaptureFixture[str]) -> None:
     assert release.main(["--dry-run"]) == 0
     out = capsys.readouterr().out

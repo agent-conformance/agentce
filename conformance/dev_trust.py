@@ -12,7 +12,8 @@ The engine never holds this seed. It vendors only the *public* root (:func:`publ
 test asserts the two never drift. The dry-run release tooling (:mod:`release`) imports the derived
 signers to exercise the three signing profiles.
 
-Run the maintenance commands after changing the seed or a signed catalog::
+Run the maintenance commands after changing the seed or a signed catalog (``sign-catalog`` also
+updates the catalog's digest in ``conformance/registry/catalogs.json`` when the registry lists it)::
 
     uv run python dev_trust.py emit-root
     uv run python dev_trust.py sign-catalog ../spec/catalogs/base/eu-ai-act
@@ -40,6 +41,7 @@ from agentce.signing import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+REGISTRY_FILE = REPO_ROOT / "conformance" / "registry" / "catalogs.json"
 VENDORED_ROOT = (
     REPO_ROOT / "engines" / "python" / "agentce" / "data" / "trust" / "dev-root.json"
 )
@@ -200,7 +202,26 @@ def _emit_root() -> int:
     return 0
 
 
-def _sign_catalog(catalog_dir: Path) -> int:
+def _sync_registry_digest(catalog_dir: Path, registry_file: Path) -> None:
+    """Record the re-signed catalog's digest in the catalog registry, whose check recomputes it
+    independently; a re-sign that left the registry behind turned CI red twice (18.16a, 18.37)."""
+    if not registry_file.is_file():
+        return
+    registry = json.loads(registry_file.read_text(encoding="utf-8"))
+    digest = signing.digest_tree(catalog_dir, exclude=frozenset({SIGNATURE_NAME}))
+    for entry in registry["catalogs"]:
+        if (REPO_ROOT / entry["source_path"]).resolve() == catalog_dir and entry[
+            "digest"
+        ] != digest:
+            entry["digest"] = digest
+            registry_file.write_text(
+                json.dumps(registry, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            print(f"updated {entry['id']}'s digest in {registry_file.name}")
+
+
+def _sign_catalog(catalog_dir: Path, registry_file: Path = REGISTRY_FILE) -> int:
     catalog_dir = catalog_dir.resolve()
     if not (catalog_dir / "catalog.yaml").is_file():
         print(f"not a catalog directory: {catalog_dir}", file=sys.stderr)
@@ -211,6 +232,7 @@ def _sign_catalog(catalog_dir: Path) -> int:
         json.dumps(envelope, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     print(f"wrote {out.relative_to(REPO_ROOT)}")
+    _sync_registry_digest(catalog_dir, registry_file)
     return 0
 
 
