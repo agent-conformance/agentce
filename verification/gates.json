@@ -1311,7 +1311,7 @@
       "timeout_s": 120,
       "invariant": "Every error, warning, and skipped-evaluation reason carries a stable message key.",
       "rubric": {
-        "pass": "the AST scan over every literal-key, literal-fix InputError/AgentceError call site in engines/python/agentce finds every key registered in spec/i18n/messages.en.json with a non-empty fix, byte-identical to the one real call site's text when every literal-fix site for that key agrees, and the fixed 10-key actor table names an actor other than the terminal user; docs/errors.md and its published website copy are exactly what agentce doctor --write-errors writes today and name every key the scan found raised",
+        "pass": "the AST scan over every literal-key, literal-fix InputError/AgentceError call site in engines/python/agentce finds every key registered in spec/i18n/messages.en.json with a non-empty fix, byte-identical to the one real call site's text when every literal-fix site for that key agrees, and every key in the gate's actor table names an actor other than the terminal user; docs/errors.md is exactly what agentce doctor --write-errors writes today and name every key the scan found raised",
         "fail": "the scan reports a never-registered key, a stale single-voice fix, or a missing actor phrase, or docs/errors.md is stale relative to a real doctor --write-errors run"
       },
       "faults": [

@@ -115,8 +115,7 @@ _KINDS: dict[str, str] = {
     "verify.report_output_tampered": "error",
     "verify.report_evidence_tampered": "error",
     "verify.report_reproduction_mismatch": "error",
-    # R4 part 1 (18.40, VG-UX-NEXT-STEP): keys the engine already raises but that had no catalogue
-    # entry until this item.
+    # Further raised refusals (VG-UX-NEXT-STEP checks every literal-key raise is registered).
     "report.missing_evidence_pointer": "error",
     "input.bundle_manifest_path": "error",
     "input.bundle_manifest_files": "error",

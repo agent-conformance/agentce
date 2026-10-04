@@ -1,8 +1,9 @@
 """VG-UX-NEXT-STEP (18.40, USER_EXPERIENCE.md R4): every message key the Python engine raises with a
 literal key and a literal fix string is registered in the catalogue with a non-empty fix, and -- when
 every one of its literal-fix call sites agrees on the exact text -- registered with that exact text
-(so the generated reference never drifts from what the code actually says). A fixed set of 10 keys
-whose fix needs an actor other than the person at the terminal (R4 part 2) must name that actor.
+(so the generated reference never drifts from what the code actually says). The keys in
+``_ACTOR_KEYS``, whose fix needs an actor other than the person at the terminal (R4 part 2), must name
+that actor. With ``--errors-md``, every raised key must also have a row in that error reference.
 
 Scope (decision recorded in harness/decisions/phase-18.tsv, round 2 of 18.40's contract-critic): this
 scan only considers an ``InputError(...)``/``AgentceError(...)`` call site whose ``key`` argument is a
@@ -10,8 +11,7 @@ literal string. A call reached only through a shared forwarder that composes its
 (``_require_dir``, ``_require_file``, ``load_untrusted_yaml``, ...) has a non-literal ``key`` at the
 call site and is out of scope here -- tracked by item 18.40f, not this one. Within a literal-key call,
 only a literal-string ``fix`` argument counts as a "voice"; a key whose only fix text is built with an
-f-string, a variable reference, or a concatenation (``input.collect_config``, ``input.emit_format``,
-``input.report_format``, ``input.fail_on_invalid_expression``) is also out of scope here for the same
+f-string, a variable reference, or a concatenation is also out of scope here for the same
 reason -- the gate cannot know what text a non-literal expression will produce without running it, and
 is not asked to.
 """
@@ -26,6 +26,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(ROOT / "tools"))
+
+from errors_check import _ROW  # noqa: E402  -- the one parser of docs/errors.md rows
+
 DEFAULT_SCAN_ROOT = ROOT / "engines" / "python" / "agentce"
 DEFAULT_CATALOGUE = ROOT / "spec" / "i18n" / "messages.en.json"
 
@@ -80,8 +84,10 @@ def _scan_file(
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
-        func = node.func
-        if isinstance(func, ast.Name) and func.id in _RAISERS:
+        if not isinstance(node.func, ast.Name):
+            continue
+        name = node.func.id
+        if name in _RAISERS:
             key = _literal_str(_call_arg(node, 0, "key"))
             if key is None:
                 continue  # key composed at runtime by a shared forwarder -- out of scope (18.40f)
@@ -93,13 +99,13 @@ def _scan_file(
                 has_other_voice.add(key)
                 continue
             voices.setdefault(key, []).append(fix)
-        elif isinstance(func, ast.Name) and func.id == "load_untrusted_yaml":
+        elif name == "load_untrusted_yaml":
             # always renders its own, non-literal, exception-specific text for the caller's key --
             # a genuine second voice distinct from whatever the direct call sites say (finding 5).
             key = _literal_str(_call_arg(node, 2, "key"))
             if key is not None:
                 has_other_voice.add(key)
-        elif isinstance(func, ast.Name) and func.id == "_doctor_problem":
+        elif name == "_doctor_problem":
             # only counts as a second voice when this call passes its own fix override -- a bare
             # ``_doctor_problem(key, problem)`` just echoes the catalogue and is not a second voice.
             key = _literal_str(_call_arg(node, 0, "key"))
@@ -145,9 +151,14 @@ def check(
     return problems
 
 
-def _load_catalogue(path: Path) -> dict[str, str]:
-    data: dict[str, str] = json.loads(path.read_text(encoding="utf-8"))
-    return data
+def check_documented(raised: list[str], errors_md: str) -> list[str]:
+    """Every raised key has its own row in the doctor-written error reference."""
+    rows = {m.group(1) for line in errors_md.splitlines() if (m := _ROW.match(line))}
+    return [
+        f"{key}: raised but has no row in the error reference"
+        for key in raised
+        if key not in rows
+    ]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -159,6 +170,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="print every key this scan finds raised with a literal key and fix, one per line, and exit 0",
     )
+    parser.add_argument(
+        "--errors-md",
+        type=Path,
+        help="also require every raised key to have a row in this error reference",
+    )
     args = parser.parse_args(argv)
 
     voices, has_other_voice = scan(args.scan_root)
@@ -168,8 +184,12 @@ def main(argv: list[str] | None = None) -> int:
             print(key)
         return 0
 
-    catalogue = _load_catalogue(args.catalog)
+    catalogue: dict[str, str] = json.loads(args.catalog.read_text(encoding="utf-8"))
     problems = check(voices, has_other_voice, catalogue)
+    if args.errors_md is not None:
+        problems += check_documented(
+            sorted(voices), args.errors_md.read_text(encoding="utf-8")
+        )
     if problems:
         for problem in problems:
             print(problem, file=sys.stderr)
