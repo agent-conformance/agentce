@@ -1,0 +1,14 @@
+# Deviation register for the VG-BUYER-VIEW gate fixture (verification/gates/buyer_view.sh), the
+# AUV-01 idiom (verification/gates/fixtures/auditor_view/deviations.yaml): BUY-06's entry is
+# unexpired at the fixture's window end (2026-02-01) and flips its non-conformant outcome to
+# partial (apply_deviations, assess.py) -- 18.18b's N1(a) partial answer wording.
+deviation_register_version: 1
+deviations:
+  - control: BUY-06
+    rationale: "Accepted pending remediation. Fixture-only; not a real requirement."
+    compensating_control: "Manual quarterly review of BUY-06 subjects."
+    owner: "user:ops-lead@example.com"
+    approver: "user:ciso@example.com"
+    granted: "2026-01-01T00:00:00.000Z"
+    expiry: "2026-06-01T00:00:00.000Z"
+    evidence_refs: ["reference/buy-06-remediation-plan.md"]

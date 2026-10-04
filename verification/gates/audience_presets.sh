@@ -5,17 +5,17 @@
 # legacy default when neither `--for` nor `--emit` is given (contracts/P18-18.7.md; auditor added by
 # contracts/P18-18.17.md's blast_radius; buyer added by contracts/P18-18.18.md's blast_radius).
 #
-# Eight real CLI invocations over one dedicated fixture catalog (AUD-01, verification/gates/fixtures/
+# Nine real CLI invocations over one dedicated fixture catalog (AUD-01, verification/gates/fixtures/
 # audience_presets/ -- one control the fixture's evidence bundle never satisfies, so every run reaches
 # a non-passing outcome and the `engineering` preset's skill/<subject>/findings/ is never empty):
-#   1-6. `assess --for <preset>` for each of the six presets -> the written file set under `--out`
+#   1-7. `assess --for <preset>` for each of the seven presets -> the written file set under `--out`
 #        equals exactly the hand-written expected table below (never imported from the package under
 #        test, so editing PRESET_EMIT cannot also edit what this gate expects).
-#   7.   `env CI=true assess` with no `--for`/`--emit` -> the legacy default's files PLUS
+#   8.   `env CI=true assess` with no `--for`/`--emit` -> the legacy default's files PLUS
 #        report.junit.xml (additive, not the minimal `ci` preset's files).
-#   8.   `env -u CI assess` with no `--for`/`--emit` -> exactly the legacy default (no junit) -- the
-#        control run that an "always extend" regression would fail even though it might pass 7.
-# `agentce report --validate` is run over each of the six presets (exit 0 required); `engineering`'s
+#   9.   `env -u CI assess` with no `--for`/`--emit` -> exactly the legacy default (no junit) -- the
+#        control run that an "always extend" regression would fail even though it might pass 8.
+# `agentce report --validate` is run over each of the seven presets (exit 0 required); `engineering`'s
 # remediation-package.json is additionally validated against the vendored schema directly (that
 # schema already exists but `validate_report` never applies it to this file).
 #

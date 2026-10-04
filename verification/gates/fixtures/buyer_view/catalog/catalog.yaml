@@ -1,10 +1,14 @@
-# A small, dedicated catalog for VG-BUYER-VIEW (18.18): four controls that exercise every section of
-# the buyer view over one shared Decision event (carries both `agent` and `time`, unlike the
-# auditor_view fixture's event) -- BUY-01 conformant with a caiq answer and a hostile evidence-event
-# id; BUY-02 insufficient_evidence with a caiq answer whose own clause id carries a second, distinct
-# hostile fragment; BUY-03 conformant but mapped only to eu-ai-act (absent from buyer.json's answers);
-# BUY-04 conformant with no crosswalk entry at all (also absent). Not a base or third-party catalog;
-# loaded only via --catalog-dir --allow-unverified-catalog by this gate's own script.
+# A small, dedicated catalog for VG-BUYER-VIEW (18.18, minors closed in 18.18b): eight controls that
+# exercise every section and every answer wording of the buyer view over one shared Decision event
+# (carries both `agent` and `time`, unlike the auditor_view fixture's event) -- BUY-01 conformant with
+# a caiq answer and a hostile evidence-event id; BUY-02 insufficient_evidence with a caiq answer whose
+# own clause id carries a second, distinct hostile fragment; BUY-03 conformant but mapped only to
+# eu-ai-act (absent from buyer.json's answers); BUY-04 conformant with no crosswalk entry at all (also
+# absent); BUY-05 non-conformant (missing prov:used); BUY-06 the same shape as BUY-05, flipped to
+# partial by an unexpired deviations.yaml entry; BUY-07 not_applicable (applies_to_roles: [provider]
+# only, against a deployer-only subject, no shape file); BUY-08 not_assessed (manual/rung 0, the
+# AUV-03 idiom). Not a base or third-party catalog; loaded only via --catalog-dir
+# --allow-unverified-catalog by this gate's own script.
 id: buyer-view-fixture
 version: "2026.09"
 title: "VG-BUYER-VIEW gate fixture"

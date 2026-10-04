@@ -1,0 +1,24 @@
+id: BUY-05
+version: "2026.09"
+title: "Fixture control the buyer view's caiq question answers non-conformant"
+description: >
+  Gate fixture only (verification/gates/buyer_view.sh): this control's shape requires prov:used,
+  which the shared event does not carry (graph.py only emits that edge from an event's own `data.used`
+  list) -- non-conformant, exercising the buyer view's non-conformant answer wording (18.18b N1(a)).
+crosswalk:
+  - {framework: caiq, clause: "IAM-14.1", relation: maps, verified_against_text: true}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: any
+  minimum_evidence:
+    - {event: Decision, class: any}
+  shape: shapes/BUY-05.ttl
+expectations:
+  - {id: F1, text: "Fixture-only; not a real requirement."}
+severity: high
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+test_cases: []

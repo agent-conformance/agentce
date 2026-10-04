@@ -1,0 +1,25 @@
+id: BUY-06
+version: "2026.09"
+title: "Fixture control the buyer view's caiq question answers partial"
+description: >
+  Gate fixture only (verification/gates/buyer_view.sh): the identical shape requirement as BUY-05
+  (prov:used, unmet by the shared event) -- non-conformant before deviation application, then flipped
+  to partial by deviations.yaml's unexpired BUY-06 entry (apply_deviations, the AUV-01/PVD-01 idiom) --
+  exercising the buyer view's partial answer wording (18.18b N1(a)).
+crosswalk:
+  - {framework: caiq, clause: "IAM-14.2", relation: maps, verified_against_text: true}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: any
+  minimum_evidence:
+    - {event: Decision, class: any}
+  shape: shapes/BUY-06.ttl
+expectations:
+  - {id: F1, text: "Fixture-only; not a real requirement."}
+severity: high
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+test_cases: []

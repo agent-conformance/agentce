@@ -1,5 +1,9 @@
 # Applicability profile for the VG-BUYER-VIEW gate fixture (verification/gates/buyer_view.sh).
-# One subject, the fixture-only BUY-01..04 catalog loaded via --catalog-dir.
+# One subject, the fixture-only BUY-01..08 catalog loaded via --catalog-dir. The subject's role is
+# `deployer` (not `both`): BUY-01..04/08's own `applies_to_roles: [both]` still resolves against it
+# (the "both" literal in a control's own list expands the target set regardless of the subject's
+# declared role, applicability.py:_role_applies), but BUY-07's `applies_to_roles: [provider]` does
+# not -- not_applicable, 18.18b's N1(a).
 profile_version: 1
 observation_window:
   start: "2026-01-01T00:00:00Z"
@@ -10,6 +14,6 @@ catalogs: []
 subjects:
   - id: "spiffe://corp/agents/buyer-view-fixture"
     name: "Buyer-view gate fixture subject"
-    role: "both"
+    role: "deployer"
     declared_decision_types:
       - "dom:BuyerFixtureDecision"

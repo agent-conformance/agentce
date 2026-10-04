@@ -3,6 +3,29 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.34.0
+
+- Changed `VG-BUYER-VIEW`: closed the five round-2 verifier minors on the buyer view (18.18b,
+  `verdicts/P18-18.18-verifier-833b132.md` N1-N5). Four new fixture controls (BUY-05 non-conformant,
+  BUY-06 partial via an unexpired `deviations.yaml` entry, BUY-07 not_applicable, BUY-08 not_assessed)
+  close N1(a): the gate now asserts the exact per-outcome answer sentence for all six outcomes, not
+  only conformant/insufficient_evidence. N1(b): a packaged run that writes no `buyer.md` now fails
+  loudly instead of passing through a vacuously-true `elif`. N2: the buyer view's own
+  `report.buyer_how_to_check_heading` ("How to check this report") replaces the shared auditor-view
+  heading, and the evaluated catalog's id@version is now its own line, not only inside the reproduce
+  command. N4: check (j)'s `grep | wc -l` pipeline no longer aborts the whole script silently under
+  `set -euo pipefail` when it finds zero matches, and a new unconditional end-of-run marker line lets
+  CI tell a graceful all-checks-ran failure from a silent abort. N5: a redundant second
+  `sanitize_for_markdown` pass over the gap-step line no longer substitutes its own literal backticks
+  into single quotes. The committed golden and the summary-table counts row both change accordingly
+  (`| 3 | 1 | 1 | 1 | 1 | 1 |`), which is expected, not a regression. `rubric.pass` now names checks
+  (i) through (n) explicitly, which this entry itself was the gap 18.17's own 0.15.0 entry warned
+  about repeating.
+- Changed `VG-AUDIENCE-PRESETS`: `title`/`rubric` text named only the six presets that predate the
+  `buyer` preset (added alongside `VG-BUYER-VIEW` in 0.16.0, wired into
+  `verification/gates/audience_presets.sh`'s own loop and fixture assertions at the time, same drift
+  class as 0.15.0's) -- now names all seven.
+
 ## 0.33.0
 
 - Added `VG-INGEST-SUPPORT-MATRIX`: a quick-tier gate checking that README.md's `**Supported**`/

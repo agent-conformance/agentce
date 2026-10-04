@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import random
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -332,3 +333,35 @@ def test_buyer_view_over_the_bundled_default_lens_shows_the_real_caiq_answers(
     assertions_json = json.loads((out / "assertions.json").read_text(encoding="utf-8"))
     assertions = [Assertion.from_json(a) for a in assertions_json]
     assert buyer["counts"] == aggregate(assertions)
+
+
+def test_gate_reaches_its_end_of_checks_marker_even_under_a_reintroduced_f1_mutation() -> (
+    None
+):
+    """18.18b N4's permanent CI guard: `--demo-fault` cannot distinguish a silent early abort (the
+    original defect: a `grep | wc -l` pipeline under `set -euo pipefail` dies before printing
+    anything when it finds zero matches) from an intentional non-zero exit, since both are just
+    "the gate went RED". This test plants the verifier's own F1 mutation directly on `report.py`
+    (``_buyer_unverified_suffix`` returns ``""``) and runs the real gate script as a subprocess,
+    asserting its own unconditional end-of-run marker line is still in stderr -- proving every later
+    check still ran to completion rather than the script dying mid-way with no diagnostic."""
+    report_path = _REPO_ROOT / "engines" / "python" / "agentce" / "report.py"
+    gate_path = _REPO_ROOT / "verification" / "gates" / "buyer_view.sh"
+    original = report_path.read_text(encoding="utf-8")
+    old = "def _buyer_unverified_suffix(entry: dict[str, Any], cat: dict[str, str]) -> str:"
+    assert old in original, "_buyer_unverified_suffix definition not found"
+    mutated = original.replace(
+        old, old + '\n    return ""  # noqa: contract-fault-probe', 1
+    )
+    try:
+        report_path.write_text(mutated, encoding="utf-8")
+        result = subprocess.run(
+            ["bash", str(gate_path)],
+            capture_output=True,
+            text=True,
+            cwd=_REPO_ROOT,
+        )
+    finally:
+        report_path.write_text(original, encoding="utf-8")
+    assert "buyer-view: reached end of checks" in result.stderr
+    assert result.returncode != 0

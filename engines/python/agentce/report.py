@@ -1290,9 +1290,10 @@ def _buyer_answer_md(entry: dict[str, Any], cat: dict[str, str]) -> list[str]:
         refs = ", ".join(f"`{_sanitize_field(e['ref'])}`" for e in entry["evidence"])
         lines.append(f"  - {cat['report.evidence_label']}: {refs}")
     if entry["outcome"] == "insufficient_evidence":
-        lines += [
-            f"  - {sanitize_for_markdown(g)}" for g in _buyer_gap_lines(entry, cat)
-        ]
+        # `_buyer_gap_lines` already returns lines built from `_sanitize_field`-sanitised fields
+        # plus literal, deliberately-added backticks (the `_blind_spots_md` idiom) -- re-sanitising
+        # here would substitute those literal backticks away into single quotes (N5).
+        lines += [f"  - {g}" for g in _buyer_gap_lines(entry, cat)]
     if "manual_checklist_note" in entry:
         # Fixed catalogue text (`auditor_view.py`'s own idiom), never sanitised -- sanitising would
         # truncate it at `_SANITIZE_CAP`, corrupting a real catalogue message.
@@ -1348,21 +1349,39 @@ def _buyer_counts_table_html(counts: dict[str, int], cat: dict[str, str]) -> str
 
 
 def _buyer_how_to_check_md(
-    cat: dict[str, str], *, packaged: bool | None, folder: str, argv: list[str]
+    cat: dict[str, str],
+    *,
+    packaged: bool | None,
+    folder: str,
+    argv: list[str],
+    catalogs: list[str],
 ) -> list[str]:
-    lines = [f"## {cat['report.auditor_rerun_heading']}", ""]
+    lines = [f"## {cat['report.buyer_how_to_check_heading']}", ""]
     if packaged:
         lines.append(
             i18n_format.format_message(cat["report.buyer_how_to_check"], folder=folder)
         )
     else:
         lines.append(cat["report.buyer_how_to_check_unpackaged"])
+    lines.append(
+        "- Catalog: "
+        + (
+            ", ".join(sanitize_for_markdown(c) for c in catalogs)
+            if catalogs
+            else "(none)"
+        )
+    )
     lines.append(f"- Reproduce: `{_reproduce_command(argv)}`")
     return lines
 
 
 def _buyer_how_to_check_html(
-    cat: dict[str, str], *, packaged: bool | None, folder: str, argv: list[str]
+    cat: dict[str, str],
+    *,
+    packaged: bool | None,
+    folder: str,
+    argv: list[str],
+    catalogs: list[str],
 ) -> str:
     if packaged:
         line = html.escape(
@@ -1370,8 +1389,14 @@ def _buyer_how_to_check_html(
         )
     else:
         line = html.escape(cat["report.buyer_how_to_check_unpackaged"])
+    catalog_text = (
+        ", ".join(sanitize_for_html(c) for c in catalogs) if catalogs else "(none)"
+    )
     reproduce = html.escape(_reproduce_command(argv))
-    return f"<p>{line}</p><p>Reproduce: <code>{reproduce}</code></p>"
+    return (
+        f"<p>{line}</p><p>Catalog: {catalog_text}</p>"
+        f"<p>Reproduce: <code>{reproduce}</code></p>"
+    )
 
 
 def render_buyer_md(
@@ -1382,12 +1407,14 @@ def render_buyer_md(
     reverify_command: list[str] | None = None,
     packaged: bool | None = None,
     report_folder: str = ".",
+    catalogs: list[Catalog] | None = None,
 ) -> str:
     """The buyer view (18.18): generated questionnaire answers grouped by question, a one-page
     summary, and how to check this report. Adds no new outcome and no new rollup (SPEC §9.2):
     ``buyer`` is :func:`agentce.buyer_view.compute_buyer_view`'s own output, rendered as-is."""
     cat = messages.catalogue(language)
     argv = list(reverify_command) if reverify_command else list(invocation or [])
+    catalog_labels = [f"{c.id}@{c.version}" for c in (catalogs or [])]
     answers = buyer["answers"]
     by_question = buyer["by_question"]
     lines = [
@@ -1397,7 +1424,7 @@ def render_buyer_md(
         "",
     ]
     lines += _buyer_how_to_check_md(
-        cat, packaged=packaged, folder=report_folder, argv=argv
+        cat, packaged=packaged, folder=report_folder, argv=argv, catalogs=catalog_labels
     )
     lines += [
         "",
@@ -1436,19 +1463,25 @@ def render_buyer_html(
     reverify_command: list[str] | None = None,
     packaged: bool | None = None,
     report_folder: str = ".",
+    catalogs: list[Catalog] | None = None,
 ) -> str:
     """As :func:`render_buyer_md`, the same self-contained, escaped, WCAG 2.2 AA page shape as
     :func:`render_report_html`."""
     cat = messages.catalogue(language)
     argv = list(reverify_command) if reverify_command else list(invocation or [])
+    catalog_labels = [f"{c.id}@{c.version}" for c in (catalogs or [])]
     answers = buyer["answers"]
     by_question = buyer["by_question"]
     title = html.escape(cat["report.buyer_title"])
     sections = [
         '<section aria-labelledby="buyer-rerun"><h2 id="buyer-rerun">'
-        f"{html.escape(cat['report.auditor_rerun_heading'])}</h2>"
+        f"{html.escape(cat['report.buyer_how_to_check_heading'])}</h2>"
         + _buyer_how_to_check_html(
-            cat, packaged=packaged, folder=report_folder, argv=argv
+            cat,
+            packaged=packaged,
+            folder=report_folder,
+            argv=argv,
+            catalogs=catalog_labels,
         )
         + "</section>",
         '<section aria-labelledby="buyer-summary"><h2 id="buyer-summary">'
@@ -3386,6 +3419,7 @@ def write_report(
                 reverify_command=rerun_argv,
                 packaged=buyer_packaged,
                 report_folder=str(out_dir),
+                catalogs=catalogs,
             ),
         )
         write_text(
@@ -3396,6 +3430,7 @@ def write_report(
                 reverify_command=rerun_argv,
                 packaged=buyer_packaged,
                 report_folder=str(out_dir),
+                catalogs=catalogs,
             ),
         )
 

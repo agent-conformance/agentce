@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.33.0",
+  "suite_version": "0.34.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -463,7 +463,7 @@
     },
     {
       "id": "VG-AUDIENCE-PRESETS",
-      "title": "agentce assess --for {engineering,compliance,security,ci,share,auditor} resolves to the documented --emit set; CI is detected automatically and only ever extends the legacy default, never replaces it",
+      "title": "agentce assess --for {engineering,compliance,security,ci,share,auditor,buyer} resolves to the documented --emit set; CI is detected automatically and only ever extends the legacy default, never replaces it",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -476,7 +476,7 @@
       "timeout_s": 180,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
-        "pass": "over the dedicated AUD-01 fixture catalog, `assess --for <preset>` for each of engineering/compliance/security/ci/share/auditor writes exactly the hand-written expected file set for that preset (never extra, never missing); `agentce report --validate` exits 0 for every preset's output, and engineering's remediation-package.json validates against spec/report/remediation-package.schema.json directly; `env CI=true assess` with neither --for nor --emit writes the legacy default's files plus report.junit.xml (additive); `env -u CI assess` with neither flag writes exactly the legacy default (no junit)",
+        "pass": "over the dedicated AUD-01 fixture catalog, `assess --for <preset>` for each of engineering/compliance/security/ci/share/auditor/buyer writes exactly the hand-written expected file set for that preset (never extra, never missing); `agentce report --validate` exits 0 for every preset's output, and engineering's remediation-package.json validates against spec/report/remediation-package.schema.json directly; `env CI=true assess` with neither --for nor --emit writes the legacy default's files plus report.junit.xml (additive); `env -u CI assess` with neither flag writes exactly the legacy default (no junit)",
         "fail": "any preset's written file set differs from its hand-written expectation, report --validate fails for any preset, the remediation-package.json fails schema validation, the CI=true run does not gain report.junit.xml on top of the legacy default, or the CI-unset run gains it when it should not"
       },
       "faults": [
@@ -636,7 +636,7 @@
       "timeout_s": 300,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
-        "pass": "a real `assess --for buyer` run writes buyer.json/.md/.html (never report.md/.html) matching the committed golden byte-for-byte, exit code 2 (BUY-02 is severity: high insufficient_evidence, SPEC.md:1076); BUY-01 (caiq/IAM-13.1) answers conformant with its evidence ref present and HTML-escaped; BUY-02 (caiq, a hostile clause id) answers insufficient_evidence with the exact catalogue answer text, a non-null gap_step, and its hostile clause id HTML-escaped; BUY-03 (eu-ai-act only) and BUY-04 (no crosswalk) are both absent from answers; the ai-controls-matrix section shows the disclosed empty-framework text; the caiq section's heading names caiq/4.0.2 verbatim, next to it; buyer.json's counts equal a fresh aggregate() over the run's own assertions.json; `agentce report --validate` exits 0",
+        "pass": "a real `assess --for buyer` run writes buyer.json/.md/.html (never report.md/.html) matching the committed golden byte-for-byte, exit code 2 (BUY-02 is severity: high insufficient_evidence, SPEC.md:1076); BUY-01 (caiq/IAM-13.1) answers conformant with its evidence ref present and HTML-escaped; BUY-02 (caiq, a hostile clause id) answers insufficient_evidence with the exact catalogue answer text, a non-null gap_step, and its hostile clause id HTML-escaped; BUY-03 (eu-ai-act only) and BUY-04 (no crosswalk) are both absent from answers; BUY-05/06/07/08 exercise the non-conformant/partial/not_applicable/not_assessed answer wordings; buyer.json's counts equal a fresh aggregate() over the run's own assertions.json; `agentce report --validate` exits 0; check (i) the caiq section's heading names caiq/4.0.2 verbatim, 'not a certification'; check (j) the 'clause reference unverified' unverified-clause label appears on BUY-01/BUY-02's rows; check (k) BUY-02's gap step text (Decision/enforcement_point) renders in both pages; check (l) the summary counts table shows the run's real counts; check (m) BUY-01's evidence ref renders in buyer.md too, not only buyer.html; check (n) a packaged run's buyer.md carries the packaged how to check line",
         "fail": "any of the above fact, file, or golden-match check fails, a stray report.md/.html appears, a hostile fragment renders unescaped, or an out-of-scope control leaks into answers"
       },
       "faults": [
@@ -651,6 +651,24 @@
           "file": "engines/python/agentce/data/i18n/messages.en.json",
           "search": "  \"report.buyer_answer_insufficient_evidence\": \"The records don't show enough evidence yet for {control} to answer this question.\",\n",
           "replace": ""
+        },
+        {
+          "description": "18.18b N1(a): the per-outcome answer template lookup collapses to the single 'conformant' key, so every answer (including BUY-05/06/07/08's non-conformant/partial/not_applicable/not_assessed rows) renders the conformant sentence instead of its own outcome's wording",
+          "file": "engines/python/agentce/report.py",
+          "search": "    return i18n_format.format_message(\n        cat[f\"report.buyer_answer_{entry['outcome']}\"], control=control\n    )",
+          "replace": "    return i18n_format.format_message(\n        cat[\"report.buyer_answer_conformant\"], control=control\n    )"
+        },
+        {
+          "description": "18.18b N1(b): the packaged run's buyer.md write is skipped, so a packaged --for buyer run writes no buyer.md at all",
+          "file": "engines/python/agentce/report.py",
+          "search": "        write_text(\n            \"buyer.md\",\n            render_buyer_md(",
+          "replace": "        if not buyer_packaged:\n          write_text(\n            \"buyer.md\",\n            render_buyer_md("
+        },
+        {
+          "description": "18.18b N5: the buyer markdown gap-step line is re-sanitised a second time over its own already-safe text, substituting its deliberately-added literal backticks away into single quotes",
+          "file": "engines/python/agentce/report.py",
+          "search": "        # `_buyer_gap_lines` already returns lines built from `_sanitize_field`-sanitised fields\n        # plus literal, deliberately-added backticks (the `_blind_spots_md` idiom) -- re-sanitising\n        # here would substitute those literal backticks away into single quotes (N5).\n        lines += [f\"  - {g}\" for g in _buyer_gap_lines(entry, cat)]",
+          "replace": "        lines += [\n            f\"  - {sanitize_for_markdown(g)}\" for g in _buyer_gap_lines(entry, cat)\n        ]"
         }
       ],
       "fix_hint": "run verification/gates/buyer_view.sh and read the FAIL lines; the reference implementation is engines/python/agentce/buyer_view.py (compute_buyer_view) and engines/python/agentce/report.py (render_buyer_md/render_buyer_html)."

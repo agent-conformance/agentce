@@ -18,11 +18,22 @@
 #   BUY-03: eu-ai-act crosswalk only (no caiq/ai-controls-matrix entry), conformant -- must be absent
 #           from buyer.json's answers ("maps to nothing in scope, not nothing").
 #   BUY-04: no crosswalk entry at all, conformant -- also absent from answers, by a different route.
+#   BUY-05: caiq crosswalk `IAM-14.1`, non-conformant (shape requires prov:used, which the shared
+#           event lacks) -- 18.18b's N1(a): the buyer view's non-conformant answer wording.
+#   BUY-06: the same shape as BUY-05 (non-conformant on its own), but an unexpired
+#           `deviations.yaml` entry (applied via `--deviations`) flips it to partial -- 18.18b's N1(a)
+#           partial answer wording.
+#   BUY-07: caiq crosswalk, `applies_to_roles: [provider]` only, against a subject role narrowed to
+#           `deployer` -- not_applicable, no shape file needed (the role check short-circuits before
+#           any shape is loaded) -- 18.18b's N1(a) not_applicable answer wording.
+#   BUY-08: caiq crosswalk, mode manual / rung 0 / no shape (the AUV-03 idiom) -- not_assessed,
+#           18.18b's N1(a) not_assessed answer wording.
 #
-# `agentce assess` returns exit code 2 for this fixture: no non-conformant outcome and no --fail-on
-# (assess only adds FINDINGS for those), but BUY-02 is severity: high and insufficient_evidence, which
-# SPEC.md:1076 (item 18.30) requires to add INSUFFICIENT_EVIDENCE -- so the exit code is asserted
-# explicitly.
+# `agentce assess` returns exit code 2 for this fixture: BUY-05's non-conformant outcome adds FINDINGS
+# (1) (BUY-06 is non-conformant pre-deviation but `--deviations` flips it to partial before the exit
+# code is computed), and BUY-02 is severity: high and insufficient_evidence, which SPEC.md:1076 (item
+# 18.30) requires to add INSUFFICIENT_EVIDENCE (2) -- the highest code wins (SPEC §8.5), so the run's
+# exit code is 2 either way -- asserted explicitly below.
 #
 # The golden (buyer_view_golden.json) is always a capture of the Python engine's own canonicalized
 # `buyer.json`. Regenerate with: verification/gates/buyer_view.sh --write
@@ -39,6 +50,7 @@ run_assess() {
   (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce assess \
     --bundle "$fixture/evidence" --profile "$fixture/applicability.yaml" \
     --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" \
+    --deviations "$fixture/deviations.yaml" \
     --allow-unverified-catalog --for buyer --out "$out" >/dev/null 2>&1)
   local code=$?
   set -e
@@ -91,6 +103,24 @@ if "BUY-03" in controls_present:
     problems.append("BUY-03: must be absent from answers (maps only to eu-ai-act, out of buyer scope)")
 if "BUY-04" in controls_present:
     problems.append("BUY-04: must be absent from answers (no crosswalk entry at all)")
+
+buy05 = by_control.get(("caiq", "BUY-05"))
+if buy05 is None or buy05["outcome"] != "non-conformant":
+    problems.append("BUY-05: expected a caiq answer with outcome non-conformant")
+
+buy06 = by_control.get(("caiq", "BUY-06"))
+if buy06 is None or buy06["outcome"] != "partial":
+    problems.append("BUY-06: expected a caiq answer with outcome partial (deviation applied)")
+
+buy07 = by_control.get(("caiq", "BUY-07"))
+if buy07 is None or buy07["outcome"] != "not_applicable":
+    problems.append("BUY-07: expected a caiq answer with outcome not_applicable")
+
+buy08 = by_control.get(("caiq", "BUY-08"))
+if buy08 is None or buy08["outcome"] != "not_assessed":
+    problems.append("BUY-08: expected a caiq answer with outcome not_assessed")
+elif "manual_checklist_note" not in buy08:
+    problems.append("BUY-08: expected the manual-checklist disclosure note")
 
 if by_control.get(("ai-controls-matrix", "BUY-01")) is not None:
     problems.append("unexpected ai-controls-matrix answer for BUY-01")
@@ -186,6 +216,42 @@ print(i18n_format.format_message(cat['report.buyer_answer_insufficient_evidence'
   fi
 fi
 
+# checks (o): N1(a) -- every other rendered outcome's exact per-outcome sentence (verifier N1a:
+# only conformant/insufficient_evidence were ever checked), HTML-escaped for buyer.html.
+if [ -f "$py_out/buyer.md" ] && [ -f "$py_out/buyer.html" ]; then
+  outcome_out="$(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen python3 - "$py_out/buyer.md" "$py_out/buyer.html" <<'PY'
+import html
+import sys
+
+from agentce import i18n_format, messages
+
+cat = messages.catalogue()
+md = open(sys.argv[1], encoding="utf-8").read()
+html_doc = open(sys.argv[2], encoding="utf-8").read()
+pairs = [
+    ("BUY-01", "conformant"),
+    ("BUY-05", "non-conformant"),
+    ("BUY-06", "partial"),
+    ("BUY-07", "not_applicable"),
+    ("BUY-08", "not_assessed"),
+]
+problems = []
+for control, outcome in pairs:
+    text = i18n_format.format_message(
+        cat[f"report.buyer_answer_{outcome}"], control=control
+    )
+    if text not in md:
+        problems.append(f"buyer.md missing {control}'s exact {outcome} answer text")
+    if html.escape(text) not in html_doc:
+        problems.append(
+            f"buyer.html missing {control}'s exact {outcome} answer text (escaped)"
+        )
+print("\n".join(problems))
+sys.exit(1 if problems else 0)
+PY
+  )" || { echo "buyer-view: $outcome_out" >&2; status=1; }
+fi
+
 # check (h): agentce report --validate exits 0.
 if ! (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce report --validate "$py_out" >/dev/null 2>&1); then
   echo "buyer-view: agentce report --validate refused the python engine's own output" >&2
@@ -197,7 +263,9 @@ fi
 # verified_against_text: false (verifier round-1 F1: this label was computed but never rendered).
 for f in "$py_out/buyer.md" "$py_out/buyer.html"; do
   if [ -f "$f" ]; then
-    hits="$(grep -o 'clause reference unverified' "$f" | wc -l | tr -d ' ')"
+    # `|| true`: under `set -euo pipefail`, grep's exit 1 on zero matches would otherwise abort the
+    # whole script right here (silently, before any later check or FAIL line runs) -- N4.
+    hits="$(grep -o 'clause reference unverified' "$f" | wc -l | tr -d ' ')" || true
     if [ "$hits" -lt 2 ]; then
       echo "buyer-view: $f shows the unverified-clause label $hits time(s), expected at least 2 (BUY-01 and BUY-02)" >&2
       status=1
@@ -215,14 +283,50 @@ for f in "$py_out/buyer.md" "$py_out/buyer.html"; do
   fi
 done
 
-# check (l): the summary counts table renders this run's real counts (3 conformant, 1 insufficient
-# evidence, the rest zero) -- the table itself was never checked before (verifier round-1 F2).
-if [ -f "$py_out/buyer.md" ] && ! grep -qF '| 3 | 0 | 0 | 0 | 0 | 1 |' "$py_out/buyer.md"; then
+# check (l): the summary counts table renders this run's real counts (3 conformant, 1 non-conformant,
+# 1 partial, 1 not_applicable, 1 not_assessed, 1 insufficient evidence) -- the table itself was never
+# checked before (verifier round-1 F2); the non-conformant/partial/not_applicable/not_assessed columns
+# moved from 0 to 1 each when BUY-05..08 (N1(a)) were added.
+if [ -f "$py_out/buyer.md" ] && ! grep -qF '| 3 | 1 | 1 | 1 | 1 | 1 |' "$py_out/buyer.md"; then
   echo "buyer-view: buyer.md's summary table is missing or does not show this run's real counts" >&2
   status=1
 fi
-if [ -f "$py_out/buyer.html" ] && ! grep -qF '<td>3</td><td>0</td><td>0</td><td>0</td><td>0</td><td>1</td>' "$py_out/buyer.html"; then
+if [ -f "$py_out/buyer.html" ] && ! grep -qF '<td>3</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td>' "$py_out/buyer.html"; then
   echo "buyer-view: buyer.html's summary table is missing or does not show this run's real counts" >&2
+  status=1
+fi
+
+# check (o): N2 -- the buyer-specific "how to check this report" heading (report.buyer_how_to_check_
+# heading), not the auditor view's shared "How to re-run" heading.
+for f in "$py_out/buyer.md" "$py_out/buyer.html"; do
+  if [ -f "$f" ]; then
+    name="$(basename "$f")"
+    if [ "$name" = "buyer.md" ]; then
+      pattern='## How to check this report'
+    else
+      pattern='>How to check this report<'
+    fi
+    if ! grep -qF "$pattern" "$f"; then
+      echo "buyer-view: $name is missing the 'How to check this report' heading" >&2
+      status=1
+    fi
+  fi
+done
+
+# check (p): N2 -- the evaluated catalog's id@version is cited as its own line, not only inside
+# Reproduce: (round-1 critic m8).
+for f in "$py_out/buyer.md" "$py_out/buyer.html"; do
+  if [ -f "$f" ] && ! grep -qF 'Catalog: buyer-view-fixture@2026.09' "$f"; then
+    name="$(basename "$f")"
+    echo "buyer-view: $name is missing the evaluated catalog's id@version citation" >&2
+    status=1
+  fi
+done
+
+# check (q): N5 -- buyer.md's gap-step line keeps its literal backticks (an inline code span), not
+# single quotes from a second, redundant sanitize_for_markdown pass over an already-safe line.
+if [ -f "$py_out/buyer.md" ] && ! grep -qF '`Decision` (`enforcement_point`)' "$py_out/buyer.md"; then
+  echo "buyer-view: buyer.md's gap-step line lost its backticks" >&2
   status=1
 fi
 
@@ -240,16 +344,26 @@ set +e
 (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce assess \
   --bundle "$fixture/evidence" --profile "$fixture/applicability.yaml" \
   --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" \
+  --deviations "$fixture/deviations.yaml" \
   --allow-unverified-catalog --for buyer --package-for-sharing --out "$pkg_out" >/dev/null 2>&1)
 pkg_code=$?
 set -e
 if [ "$pkg_code" -ne 2 ]; then
   echo "buyer-view: packaged assess exited $pkg_code, expected 2 (BUY-02 is severity: high insufficient_evidence, SPEC.md:1076)" >&2
   status=1
-elif [ -f "$pkg_out/buyer.md" ] && ! grep -q 'agentce verify --report' "$pkg_out/buyer.md"; then
+elif [ ! -f "$pkg_out/buyer.md" ]; then
+  # N1(b): a missing file must FAIL loudly, checked before (never folded into) the content grep below
+  # -- the old `[ -f ... ] && ! grep ...` form was vacuously true when the file did not exist.
+  echo "buyer-view: packaged run did not write buyer.md" >&2
+  status=1
+elif ! grep -q 'agentce verify --report' "$pkg_out/buyer.md"; then
   echo "buyer-view: packaged buyer.md missing the packaged how-to-check line (agentce verify --report ...)" >&2
   status=1
 fi
 
-[ "$status" -eq 0 ] && echo "buyer-view: python's real assess --for buyer run matches the golden, every answer's facts (conformant/insufficient_evidence, hostile escaping, out-of-scope absence, unverified-clause label, gap step, counts table, packaged how-to-check) hold, and report --validate accepts the output"
+# N4: this unconditional line always runs when the script reaches here, distinguishing "every check
+# ran to completion, one or more failed" from the silent early abort N4 was about.
+echo "buyer-view: reached end of checks" >&2
+
+[ "$status" -eq 0 ] && echo "buyer-view: python's real assess --for buyer run matches the golden, every answer's facts (all six outcomes, hostile escaping, out-of-scope absence, unverified-clause label, gap step, counts table, how-to-check heading, catalog citation, packaged how-to-check) hold, and report --validate accepts the output"
 exit "$status"
