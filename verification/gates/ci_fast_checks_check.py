@@ -36,14 +36,13 @@ CHECKERS: tuple[str, ...] = (
 
 # A checker name as a real command/filename token, not a substring of something else (".mypy_cache"
 # contains "mypy" but is not an invocation of it).
-_CHECKER_PATTERNS = {
-    checker: re.compile(r"(?<![\w.])" + re.escape(checker) + r"(?!\w)")
-    for checker in CHECKERS
-}
+_CHECKER_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
+    re.compile(r"(?<![\w.])" + re.escape(checker) + r"(?!\w)") for checker in CHECKERS
+)
 
 
 def _matches_a_checker(line: str) -> bool:
-    return any(pattern.search(line) for pattern in _CHECKER_PATTERNS.values())
+    return any(pattern.search(line) for pattern in _CHECKER_PATTERNS)
 
 
 # The four files verification.yml's own lint/type-check job covers, named once.
