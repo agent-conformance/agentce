@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.31.0",
+  "suite_version": "0.32.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
