@@ -112,9 +112,10 @@ test("OSCAL methods falls back to [TEST] for an unrecognised mode, including Obj
   // report --from does not validate `mode` against the catalog's enum (only catalog-authoring time
   // does), so a hand-edited assertions file can carry any string here. A mode of "constructor" (or
   // any other Object.prototype member) must still produce a real ["TEST"] array, never the
-  // prototype's own function value -- plain `OSCAL_METHODS[a.mode]` indexing resolved "constructor"
-  // to Object's constructor function, which JSON.stringify then silently drops, leaving the
-  // observation with no `methods` key at all (schema-invalid). Fixed with an own-property lookup.
+  // prototype's own function value -- plain `OSCAL_METHODS[a.mode]` indexing on a Record resolved
+  // "constructor" to Object's constructor function, which JSON.stringify then silently drops,
+  // leaving the observation with no `methods` key at all (schema-invalid). Fixed by keying
+  // OSCAL_METHODS as a Map, which has no prototype chain to fall through to.
   const base = {
     control: "OVS-01",
     controlVersion: "2026.09",

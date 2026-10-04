@@ -59,6 +59,10 @@ public final class Report {
      * ({@code report.py}'s {@code _OSCAL_METHODS}); see its comment for the full reasoning. */
     private static final Map<String, List<String>> OSCAL_METHODS = Map.of(
             "manual", List.of("EXAMINE"));
+    /** Default passed to {@code OSCAL_METHODS.getOrDefault} below, hoisted so the per-assertion
+     * render_oscal loop does not construct a fresh list on every call just to discard it when
+     * {@code manual} matches. */
+    private static final List<String> DEFAULT_METHODS = List.of("TEST");
 
     private static final String NON_DETERMINATION =
             "This statement reports conformance to the named catalog as evaluated by the Agent Conformance "
@@ -1015,7 +1019,7 @@ public final class Report {
             observation.put("uuid", obsUuid);
             observation.put("description", "Assessment activity for " + a.control + " on " + a.subject + ".");
             ArrayNode methods = observation.putArray("methods");
-            for (String m : OSCAL_METHODS.getOrDefault(a.mode, List.of("TEST"))) {
+            for (String m : OSCAL_METHODS.getOrDefault(a.mode, DEFAULT_METHODS)) {
                 methods.add(m);
             }
             observation.put("collected", when);

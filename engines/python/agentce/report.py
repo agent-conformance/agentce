@@ -116,6 +116,9 @@ _OSCAL_STATE = {
 _OSCAL_METHODS = {
     "manual": ["EXAMINE"],
 }
+#: Default passed to ``_OSCAL_METHODS.get`` below, hoisted so the per-assertion render_oscal loop
+#: does not allocate a fresh list literal on every call just to discard it when ``manual`` matches.
+_DEFAULT_METHODS = ["TEST"]
 
 
 def _digest_bytes(data: bytes) -> str:
@@ -1770,7 +1773,7 @@ def render_oscal(
         observation: dict[str, Any] = {
             "uuid": obs_uuid,
             "description": f"Assessment activity for {a.control} on {a.subject}.",
-            "methods": list(_OSCAL_METHODS.get(a.mode, ["TEST"])),
+            "methods": list(_OSCAL_METHODS.get(a.mode, _DEFAULT_METHODS)),
             "collected": when,
         }
         if a.evidence:

@@ -18,6 +18,7 @@ not invented: 33 automated + 11 semi-automated = 44 observations get ``["TEST"]`
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -32,29 +33,29 @@ def main() -> int:
     golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
     assertions = golden["assertions"]
 
-    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
-        json.dump(assertions, f)
-        assertions_path = f.name
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        assertions_path = Path(tmp_dir) / "assertions.json"
+        assertions_path.write_text(json.dumps(assertions), encoding="utf-8")
 
-    result = subprocess.run(
-        [
-            "uv",
-            "run",
-            "--project",
-            str(REPO_ROOT / "engines" / "python"),
-            "--frozen",
-            "agentce",
-            "report",
-            "--from",
-            assertions_path,
-            "--format",
-            "oscal",
-        ],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        env={"PATH": __import__("os").environ["PATH"]},
-    )
+        result = subprocess.run(
+            [
+                "uv",
+                "run",
+                "--project",
+                str(REPO_ROOT / "engines" / "python"),
+                "--frozen",
+                "agentce",
+                "report",
+                "--from",
+                str(assertions_path),
+                "--format",
+                "oscal",
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            env={"PATH": os.environ["PATH"]},
+        )
     if result.returncode != 0:
         print(result.stderr, file=sys.stderr)
         return result.returncode
