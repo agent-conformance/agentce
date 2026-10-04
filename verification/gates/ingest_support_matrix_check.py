@@ -38,11 +38,12 @@ def _extract_table_rows(text: str) -> list[list[str]]:
     """Every row of the trace-store table, as its raw cells, with no shape assumed.
 
     Locates the table by its fixed header (skipping the header and its ``---`` separator), then
-    takes every following ``|``-delimited line up to the first line that is not one, splitting on
-    ``|`` rather than matching a regex against a presumed-good shape. This way a row that doesn't
-    look like the others — wrong column count, markdown emphasis around the tier cell, a tier word
-    that isn't one of the three real ones — still reaches the caller as a row, instead of simply
-    failing to match and vanishing from scrutiny.
+    takes every following non-blank line containing a ``|`` up to the first blank line, splitting
+    on ``|`` rather than matching a regex against a presumed-good shape. GFM renders a table row
+    whether or not it carries its outer pipes, so a leading or trailing ``|`` is stripped only when
+    present, never required — a row missing one (or both) still reaches the caller as a row, the
+    same as a row with an unexpected column count or an unrecognized tier word, instead of silently
+    falling out of scrutiny the way a row lacking both outer pipes used to.
     """
     lines = text.splitlines()
     try:
@@ -52,9 +53,14 @@ def _extract_table_rows(text: str) -> list[list[str]]:
     rows: list[list[str]] = []
     for line in lines[start:]:
         stripped = line.strip()
-        if not (stripped.startswith("|") and stripped.endswith("|")):
+        if not stripped or "|" not in stripped:
             break
-        rows.append([cell.strip() for cell in stripped[1:-1].split("|")])
+        cells = stripped.split("|")
+        if stripped.startswith("|"):
+            cells = cells[1:]
+        if stripped.endswith("|"):
+            cells = cells[:-1]
+        rows.append([cell.strip() for cell in cells])
     return rows
 
 
@@ -487,6 +493,54 @@ def self_test() -> int:
                 and "Datadog" in p
                 and "'GA'" in p
                 for p in check_trace_store_docs(rows, unrecognized_tier_table)
+            ),
+        )
+    )
+
+    # The verifier's adversarial probes (18.39 verifier round 2): GFM renders a table row whether
+    # or not it carries its outer pipes, so a row missing one or both must still be scrutinised.
+    no_leading_pipe_table = good_table + "Honeycomb | Supported | x | y |\n"
+    cases.append(
+        (
+            "a row missing its leading pipe is still read as a row, not dropped",
+            any(
+                "ingest.matrix.docs_unknown_source" in p and "Honeycomb" in p
+                for p in check_trace_store_docs(rows, no_leading_pipe_table)
+            ),
+        )
+    )
+
+    no_trailing_pipe_table = good_table + "| Honeycomb | Supported | x | y\n"
+    cases.append(
+        (
+            "a row missing its trailing pipe is still read as a row, not dropped",
+            any(
+                "ingest.matrix.docs_unknown_source" in p and "Honeycomb" in p
+                for p in check_trace_store_docs(rows, no_trailing_pipe_table)
+            ),
+        )
+    )
+
+    no_outer_pipes_table = good_table + "Honeycomb | Supported | x | y\n"
+    cases.append(
+        (
+            "a row missing both outer pipes is still read as a row, not dropped",
+            any(
+                "ingest.matrix.docs_unknown_source" in p and "Honeycomb" in p
+                for p in check_trace_store_docs(rows, no_outer_pipes_table)
+            ),
+        )
+    )
+
+    duplicate_overclaim_no_pipe_table = good_table + (
+        "Datadog LLM Observability | Supported | x | y\n"
+    )
+    cases.append(
+        (
+            "a second, pipe-less Datadog row claiming Supported is still caught as docs_wrong_tier",
+            any(
+                "ingest.matrix.docs_wrong_tier" in p and "Datadog" in p
+                for p in check_trace_store_docs(rows, duplicate_overclaim_no_pipe_table)
             ),
         )
     )

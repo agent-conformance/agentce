@@ -12,12 +12,15 @@ fails if a gate in `gates.json` is not named in this file.
   2026-09-29 "web copy names sources only from the matrix"). `ingest_support_matrix_check.py` scans
   both copy surfaces (not just README, after the trace-store page was found still claiming Datadog
   LLM Observability "round-trips" at Supported confidence when the matrix grades it Experimental) and
-  fails with one of seven distinct message keys (`ingest.matrix.unknown_source`, `.wrong_tier`,
+  fails with one of eleven distinct message keys (`ingest.matrix.unknown_source`, `.wrong_tier`,
   `.count_mismatch`, `.count_arithmetic`, `.missing_tier_line`, `.docs_wrong_tier`,
-  `.docs_table_missing`), each proven by its own `--self-test` case against synthetic fixtures. Three
-  seeded faults, each isolated to the one rule it tests (a name outside the matrix; an
-  Experimental/Roadmap name swap that keeps both tiers' stated counts unchanged, so a count check
-  alone cannot catch it; the trace-store page's old overstated Datadog claim).
+  `.docs_unknown_source`, `.docs_table_missing`, `.docs_malformed_row`, `.docs_unrecognized_tier`,
+  `.docs_definition_drift`), each proven by its own `--self-test` case against synthetic fixtures.
+  Four seeded faults, each isolated to the one rule it tests (a README Roadmap name outside the
+  matrix; an Experimental/Roadmap name swap that keeps both tiers' stated counts unchanged, so a
+  count check alone cannot catch it; the trace-store page's old overstated Datadog claim; a
+  trace-store table row naming a backend outside the matrix). The table row scan treats a row's
+  leading and trailing `|` as optional, since GFM renders a table row whether or not it carries them.
 - Added a registry-lint check: `gates.json`'s `suite_version` must equal the newest `## X.Y.Z` heading
   in this file. `VG-CI-FAST-CHECKS` shipped in 791ecf3 with the two already out of step (18.37i's own
   gate), caught only by hand; this closes that class for good.

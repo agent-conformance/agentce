@@ -3,11 +3,11 @@ title: Trace-Store Connectors
 description: Where Langfuse, Arize Phoenix, Datadog LLM Observability and LangSmith telemetry stands in the ingest support matrix, and how to fan OTel GenAI or OpenInference spans out to AgentCE before any of them ingest it.
 ---
 
-Four of the seven trace stores in the [ingest support matrix](/reference/ingest-support-matrix/)'s
-Trace backends group have a fan-out path documented here: Langfuse, Arize Phoenix, Datadog LLM
-Observability and LangSmith (the other three — Braintrust, Helicone and W&B Weave — are in the
-matrix but have no fan-out recipe yet). Each grades on its own definition — the producer's export
-reference or API, read exactly as published:
+Four of the seven trace stores in the [ingest support matrix](/reference/ingest-support-matrix/)
+have a fan-out path documented here: Langfuse, Arize Phoenix, Datadog LLM Observability and
+LangSmith (the other three — Braintrust, Helicone and W&B Weave — are in the matrix but have no
+fan-out recipe yet). Each grades on its own definition — the producer's export reference or API,
+read exactly as published:
 
 | Backend | Tier | Reader follows | Build item |
 |---|---|---|---|

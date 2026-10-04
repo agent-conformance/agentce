@@ -11,7 +11,9 @@ Point AgentCE at the records you already keep. It shows where your agents meet t
 ## Ingest sources AgentCE supports
 
 **Supported** (46): Claude Code session files, OpenTelemetry GenAI traces, MCP tools/list, A2A Agent Cards, AWS CloudTrail, CycloneDX, and 40 more — see the full matrix.
+
 **Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, AuthZEN decisions.
+
 **Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, Cedar — help wanted.
 
 See the [full support matrix](https://agent-conformance.org/reference/ingest-support-matrix/) for each source's definition, version and risk.

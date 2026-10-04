@@ -1260,8 +1260,8 @@
         {
           "description": "README swaps one Experimental name for one Roadmap name between the two tier lines (AuthZEN decisions <-> Cedar); both lines keep their real stated count, so only the per-name tier check can catch it",
           "file": "README.md",
-          "search": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, AuthZEN decisions.\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, Cedar \u2014 help wanted.\n",
-          "replace": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, Cedar.\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, AuthZEN decisions \u2014 help wanted.\n"
+          "search": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, AuthZEN decisions.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, Cedar \u2014 help wanted.\n",
+          "replace": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, Cedar.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, AuthZEN decisions \u2014 help wanted.\n"
         },
         {
           "description": "the trace-store connectors page's table claims Datadog LLM Observability is Supported, reviving the old overstated claim the matrix (Experimental) disagrees with",
@@ -1276,7 +1276,7 @@
           "replace": "| Honeycomb | Supported |"
         }
       ],
-      "fix_hint": "Run verification/gates/ingest_support_matrix.sh; it names the exact message key (ingest.matrix.unknown_source, .wrong_tier, .count_mismatch, .count_arithmetic, .missing_tier_line, .docs_wrong_tier, .docs_unknown_source, .docs_definition_drift or .docs_table_missing) and the offending name."
+      "fix_hint": "Run verification/gates/ingest_support_matrix.sh; it names the exact message key (ingest.matrix.unknown_source, .wrong_tier, .count_mismatch, .count_arithmetic, .missing_tier_line, .docs_wrong_tier, .docs_unknown_source, .docs_malformed_row, .docs_unrecognized_tier, .docs_definition_drift or .docs_table_missing) and the offending name."
     }
   ]
 }
