@@ -18,8 +18,10 @@ fails if a gate in `gates.json` is not named in this file.
   (a stale baseline entry) or on a catalog's disclosed-pair count exceeding its pinned `ceilings` entry
   in the same file (shrink-only enforced, not just asserted: quietly adding a new duplicate to `pairs`
   without also raising the matching ceiling now fails on the ceiling, rather than passing as
-  "already disclosed"). Seeded fault:
-  baseline's INC-01 edited to point at REC-01's shape and fixture files verbatim.
+  "already disclosed"). The count must equal the ceiling, not just stay under it: a pair paid down
+  without lowering its ceiling would leave a slot for a later duplicate. Seeded faults: baseline's
+  INC-01 edited to point at REC-01's shape and fixture files verbatim, and the baseline catalog's
+  ceiling raised from 1 to 2 with no new pair.
 
 ## 0.30.0
 

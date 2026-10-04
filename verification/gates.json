@@ -1178,8 +1178,8 @@
       "timeout_s": 120,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every rung-2 control in every catalog under spec/catalogs/{base,overlays} tests something its own shape and fixtures do not share with any other control, except the pairs already named in verification/gates/fixtures/rule_uniqueness/baseline.json (disclosed pre-existing debt owned by 18.37a, 18.37b and 18.37c), and that baseline's own per-catalog pair count has not grown past its pinned `ceilings` entry",
-        "fail": "any rung-2 control shares an identical shape and fixture set with another control through a pair NOT already in the committed baseline file (a new, undisclosed duplicate), a baseline entry that is no longer a real duplicate (stale), or a catalog's disclosed-pair count exceeding its pinned ceiling (shrink-only violation)"
+        "pass": "every rung-2 control in every catalog under spec/catalogs/{base,overlays} tests something its own shape and fixtures do not share with any other control, except the pairs already named in verification/gates/fixtures/rule_uniqueness/baseline.json (disclosed pre-existing debt owned by 18.37a, 18.37b and 18.37c), and that baseline's own per-catalog pair count equals its pinned `ceilings` entry",
+        "fail": "any rung-2 control shares an identical shape and fixture set with another control through a pair NOT already in the committed baseline file (a new, undisclosed duplicate), a baseline entry that is no longer a real duplicate (stale), or a catalog's disclosed-pair count differing from its pinned ceiling (above it: a shrink-only violation; below it: a paid-down pair whose ceiling was not lowered with it)"
       },
       "faults": [
         {
@@ -1187,6 +1187,12 @@
           "file": "spec/catalogs/base/baseline/controls/INC-01.yaml",
           "search": "  shape: shapes/INC-01.ttl\nexpectations:\n  - {id: S1, text: \"Adverse outcomes are linked to their consequential decision.\"}\nseverity: medium\nevidence_strength: strong\ntolerance: {kind: count, max: 0}\ntolerance_rationale: \"INC-01 is a structural expectation with no tolerated exceptions.\"\nfalse_positive_modes:\n  - \"A condition declared as an accepted deviation in the applicability profile.\"\ntechniques:\n  - \"techniques/inc-evidence-at-source\"\ntest_cases:\n  - {id: pass, expected: passed, fixture: test/INC-01/passed.jsonl}\n  - {id: fail, expected: failed, fixture: test/INC-01/failed.jsonl}\n  - {id: na, expected: inapplicable, fixture: test/INC-01/inapplicable.jsonl}\n",
           "replace": "  shape: shapes/REC-01.ttl\nexpectations:\n  - {id: S1, text: \"Adverse outcomes are linked to their consequential decision.\"}\nseverity: medium\nevidence_strength: strong\ntolerance: {kind: count, max: 0}\ntolerance_rationale: \"INC-01 is a structural expectation with no tolerated exceptions.\"\nfalse_positive_modes:\n  - \"A condition declared as an accepted deviation in the applicability profile.\"\ntechniques:\n  - \"techniques/inc-evidence-at-source\"\ntest_cases:\n  - {id: pass, expected: passed, fixture: test/REC-01/passed.jsonl}\n  - {id: fail, expected: failed, fixture: test/REC-01/failed.jsonl}\n  - {id: na, expected: inapplicable, fixture: test/REC-01/inapplicable.jsonl}\n"
+        },
+        {
+          "description": "the baseline catalog's ceiling is raised from 1 to 2 with no new pair: the free slot a paid-down pair leaves when its ceiling is not lowered with it",
+          "file": "verification/gates/fixtures/rule_uniqueness/baseline.json",
+          "search": "  \"ceilings\": {\n    \"baseline\": 1,\n",
+          "replace": "  \"ceilings\": {\n    \"baseline\": 2,\n"
         }
       ],
       "fix_hint": "Run verification/gates/catalog_rule_uniqueness.sh and read which catalog/pair it names; the check is engines/python/agentce/catalog.py's new_rule_uniqueness_problems against verification/gates/fixtures/rule_uniqueness/baseline.json."

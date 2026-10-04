@@ -4,8 +4,10 @@ tree (``spec/catalogs/base/*`` and ``spec/catalogs/overlays/*``) rather than fro
 file's own keys, so a new catalog is scanned even before anyone adds it to the baseline. Prints each
 catalog's new (unbaselined) duplicate pairs, if any, and fails on a baseline entry that is no longer
 a real duplicate (the baseline file is meant to shrink, never to grow by staying stale) or on a
-baseline whose pair count exceeds its pinned ``ceilings`` entry (the shrink-only check: without it,
-quietly adding a new duplicate to ``pairs`` without also raising the matching ceiling would pass; the
+baseline whose pair count differs from its pinned ``ceilings`` entry (the shrink-only check: without
+it, quietly adding a new duplicate to ``pairs`` without also raising the matching ceiling would pass.
+The check is equality, not "at most": paying a pair down must lower the ceiling in the same change,
+or the slot it leaves would let a later change add a new duplicate to ``pairs`` alone and pass. The
 ceiling does not stop a change that deliberately edits both fields together in one diff -- that is a
 reviewable, visible edit, not a silent one, and is the residual risk this mechanism accepts). Exits
 non-zero on any of the three kinds of problem.
@@ -54,6 +56,14 @@ def main(argv: list[str]) -> int:
                 f"catalog-rule-uniqueness: {name} has {len(baseline_pairs)} baselined pairs, above "
                 f"its pinned ceiling of {ceiling} -- the baseline file is shrink-only; raising a "
                 f"ceiling needs its own harness/decisions/phase-18.tsv row, not a silent bump"
+            )
+        elif len(baseline_pairs) < ceiling:
+            status = 1
+            problem_found = True
+            print(
+                f"catalog-rule-uniqueness: {name} has {len(baseline_pairs)} baselined pairs, below "
+                f"its pinned ceiling of {ceiling} -- lower the ceiling to {len(baseline_pairs)} in the "
+                f"same change that paid the pair down, so the freed slot can't hide a new duplicate"
             )
         stale, problems = rule_uniqueness_report(catalog, baseline_pairs)
         if stale:

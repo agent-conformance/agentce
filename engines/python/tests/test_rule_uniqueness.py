@@ -268,6 +268,24 @@ def test_a_baseline_at_its_pinned_ceiling_is_not_caught(tmp_path: Path) -> None:
     assert status == 0
 
 
+def test_a_baseline_below_its_pinned_ceiling_is_caught(tmp_path: Path) -> None:
+    """Paying a pair down without lowering its ceiling leaves a free slot: a later change could
+    add a new duplicate to `pairs` alone and stay within the ceiling. So the count must equal the
+    ceiling, and a ceiling left above it fails."""
+    catalogs_root = tmp_path / "catalogs"
+    (catalogs_root / "base").mkdir(parents=True)
+    shutil.copytree(_BASE_CATALOGS / "baseline", catalogs_root / "base" / "baseline")
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_text(
+        json.dumps(
+            {"ceilings": {"baseline": 2}, "pairs": {"baseline": [["DOC-01", "REC-01"]]}}
+        ),
+        encoding="utf-8",
+    )
+    status = _load_check_driver().main(["prog", str(catalogs_root), str(baseline_path)])
+    assert status == 1
+
+
 @pytest.mark.parametrize("name", sorted(_ALL_CATALOGS))
 def test_rule_uniqueness_report_matches_the_two_separate_calls(name: str) -> None:
     """`rule_uniqueness_report` exists so the check driver computes `_rule_uniqueness_pairs` (which
