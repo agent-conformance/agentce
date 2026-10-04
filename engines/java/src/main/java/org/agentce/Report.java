@@ -48,6 +48,18 @@ public final class Report {
             "not_assessed", "not-satisfied",
             "insufficient_evidence", "not-satisfied");
 
+    /** An observation's OSCAL {@code methods} (SPEC.md:1166): {@code automated} -> TEST,
+     * {@code manual} -> EXAMINE; every other mode (today, only {@code semi-automated}) keeps the base
+     * behaviour, {@code ["TEST"]}, via {@code getOrDefault} below. {@code semi-automated} is not
+     * raised to {@code ["TEST", "EXAMINE"]} even though DC-6 (SPEC.md:246) defines the mode as
+     * "automated evidence, human judgment": this engine does not yet consume a completed manual
+     * checklist to confirm that judgment happened for any given assertion, so claiming
+     * {@code EXAMINE} for every semi-automated finding would assert a human examination that, for an
+     * assertion with no such record, did not happen. Ported field-for-field from the Python reference
+     * ({@code report.py}'s {@code _OSCAL_METHODS}); see its comment for the full reasoning. */
+    private static final Map<String, List<String>> OSCAL_METHODS = Map.of(
+            "manual", List.of("EXAMINE"));
+
     private static final String NON_DETERMINATION =
             "This statement reports conformance to the named catalog as evaluated by the Agent Conformance "
                     + "Engine over the named evidence and observation window. It is not a legal compliance "
@@ -1002,7 +1014,10 @@ public final class Report {
             ObjectNode observation = observations.addObject();
             observation.put("uuid", obsUuid);
             observation.put("description", "Assessment activity for " + a.control + " on " + a.subject + ".");
-            observation.putArray("methods").add("TEST");
+            ArrayNode methods = observation.putArray("methods");
+            for (String m : OSCAL_METHODS.getOrDefault(a.mode, List.of("TEST"))) {
+                methods.add(m);
+            }
             observation.put("collected", when);
             if (!a.evidence.isEmpty()) {
                 ArrayNode relevantEvidence = observation.putArray("relevant-evidence");

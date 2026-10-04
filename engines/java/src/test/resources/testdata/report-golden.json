@@ -55,7 +55,7 @@
               "uuid": "31922f18-a499-57a1-b72f-01c899a51a8e",
               "description": "Assessment activity for DAT-04 on spiffe://corp/agents/a.",
               "methods": [
-                "TEST"
+                "EXAMINE"
               ],
               "collected": "2026-01-01T00:00:00Z"
             },
@@ -119,7 +119,7 @@
               "uuid": "cb71e6ae-ddd7-58c2-b0b0-5ec16f6ce6b4",
               "description": "Assessment activity for DOC-05 on spiffe://corp/agents/a.",
               "methods": [
-                "TEST"
+                "EXAMINE"
               ],
               "collected": "2026-01-01T00:00:00Z"
             },
@@ -309,7 +309,7 @@
               "uuid": "4e99270e-852c-5069-be5d-ae23ebf07fdc",
               "description": "Assessment activity for OVS-09 on spiffe://corp/agents/a.",
               "methods": [
-                "TEST"
+                "EXAMINE"
               ],
               "collected": "2026-01-01T00:00:00Z"
             },
@@ -499,7 +499,7 @@
               "uuid": "62c6f4b3-04cb-52b4-aca9-bad039597715",
               "description": "Assessment activity for RSK-04 on spiffe://corp/agents/a.",
               "methods": [
-                "TEST"
+                "EXAMINE"
               ],
               "collected": "2026-01-01T00:00:00Z"
             },
@@ -507,7 +507,7 @@
               "uuid": "efb8c1bc-3b97-50ba-b931-d78f5407d426",
               "description": "Assessment activity for RSK-05 on spiffe://corp/agents/a.",
               "methods": [
-                "TEST"
+                "EXAMINE"
               ],
               "collected": "2026-01-01T00:00:00Z"
             },

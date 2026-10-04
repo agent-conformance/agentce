@@ -65,6 +65,64 @@ class ReportTest {
         assertEquals(Canonical.canonicalString(golden.get("assertions")), Canonical.canonicalString(myAssertions));
     }
 
+    private static Assertions.Assertion assertionOf(String control, String mode) {
+        Assertions.Assertion a = new Assertions.Assertion();
+        a.control = control;
+        a.controlVersion = "2026.09";
+        a.subject = "spiffe://corp/agents/a";
+        a.outcome = "conformant";
+        a.rung = 2;
+        a.mode = mode;
+        a.window = new String[] {"2026-01-01T00:00:00Z", "2026-04-01T00:00:00Z"};
+        a.population = new int[] {1, 0};
+        a.severity = "high";
+        a.family = "OVS";
+        return a;
+    }
+
+    /** SPEC.md:1166: methods: [TEST] (automated) or [EXAMINE] (manual) (18.17b; base_sha cc5d4da
+     * hard-coded ["TEST"] for every mode, including manual). semi-automated is pinned at ["TEST"],
+     * unchanged from base: this engine has no per-assertion record of a completed manual checklist,
+     * so claiming EXAMINE happened for every semi-automated finding would assert an examination with
+     * no evidence behind it (see OSCAL_METHODS's own comment in Report.java). */
+    @Test
+    void oscalObservationMethodsFollowAssertionMode() {
+        List<Assertions.Assertion> assertions = List.of(
+                assertionOf("OVS-01", "automated"),
+                assertionOf("OVS-02", "semi-automated"),
+                assertionOf("OVS-03", "manual"));
+        JsonNode oscal = Report.renderOscal(assertions);
+        ArrayNode observations = (ArrayNode) oscal.get("assessment-results").get("results").get(0).get("observations");
+        List<List<String>> methods = new ArrayList<>();
+        for (JsonNode o : observations) {
+            List<String> m = new ArrayList<>();
+            for (JsonNode method : o.get("methods")) {
+                m.add(method.asText());
+            }
+            methods.add(m);
+        }
+        assertEquals(List.of(List.of("TEST"), List.of("TEST"), List.of("EXAMINE")), methods);
+    }
+
+    /** {@code report --from} does not validate {@code mode} against the catalog's enum (only
+     * catalog-authoring time does), so a hand-edited assertions file can carry any string here
+     * (18.17b critic round 2: the TypeScript port's plain-object indexing resolved an
+     * {@code Object.prototype} member name like {@code "constructor"} to that function instead of
+     * falling back -- a schema-invalidating bug this engine's real {@code Map} does not share;
+     * pinned here for parity). */
+    @Test
+    void oscalMethodsFallsBackToTestForAnUnrecognisedMode() {
+        for (String mode : List.of("constructor", "toString", "hasOwnProperty", "__proto__", "Manual", "semi_automated")) {
+            JsonNode oscal = Report.renderOscal(List.of(assertionOf("OVS-01", mode)));
+            JsonNode observation = oscal.get("assessment-results").get("results").get(0).get("observations").get(0);
+            List<String> methods = new ArrayList<>();
+            for (JsonNode m : observation.get("methods")) {
+                methods.add(m.asText());
+            }
+            assertEquals(List.of("TEST"), methods, mode);
+        }
+    }
+
     /** From the {@code ## Verdict} heading through the end of {@code ## Outcome summary}, before
      * {@code ## Assertions} -- the part of the human report contract P18-18.22 C1(h)/C2(f) requires
      * byte-equal to the Python reference. The per-assertion listing beyond it is the documented,
