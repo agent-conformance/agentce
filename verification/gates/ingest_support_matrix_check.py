@@ -55,7 +55,7 @@ def _extract_table_rows(text: str) -> list[list[str]]:
         stripped = line.strip()
         if not stripped or "|" not in stripped:
             break
-        cells = stripped.split("|")
+        cells = re.split(r"(?<!\\)\|", stripped)
         if stripped.startswith("|"):
             cells = cells[1:]
         if stripped.endswith("|"):
