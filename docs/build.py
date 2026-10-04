@@ -744,20 +744,20 @@ def _ingest_shows(shows: list[str]) -> str:
     return "; ".join(out)
 
 
-def _reach_table_text() -> str:
+def _reach_table_text(matrix: dict) -> str:
     """The Reach table (18.41), rendered by the same module VG-REACH-TABLE checks against."""
     import sys
 
     sys.path.insert(0, str(REPO_ROOT / "verification" / "gates"))
     import reach_table_check as reach  # type: ignore[import-not-found]  # noqa: E402
 
-    matrix = reach.load_matrix(REPO_ROOT / "spec" / "ingest" / "support-matrix.yaml")
     numbers = reach.reach_numbers(matrix)
     return reach.render_good_section(matrix, numbers) + "\n"
 
 
 def _ingest_body_text() -> str:
-    rows = _ingest_matrix().get("rows", [])
+    matrix = _ingest_matrix()
+    rows = matrix.get("rows", [])
     supported = [r for r in rows if r["tier"] == "supported"]
     experimental = [r for r in rows if r["tier"] == "experimental"]
     roadmap = [r for r in rows if r["tier"] == "roadmap"]
@@ -768,7 +768,7 @@ def _ingest_body_text() -> str:
         f"machine-readable schema, then its prose. **{len(experimental)} are experimental**, where "
         "the producer calls the interface a preview or beta, or a field AgentCE reads is defined "
         f"nowhere. **{len(roadmap)} are on the roadmap**, where we'd welcome help.\n\n"
-        + _reach_table_text()
+        + _reach_table_text(matrix)
     )
     sections = []
     for tier, trows in (("supported", supported), ("experimental", experimental)):

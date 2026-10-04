@@ -86,20 +86,14 @@ def reach_numbers(matrix: dict[str, Any]) -> dict[str, int]:
     mcp = meta["agents"]["mcp"]
     return {
         "agents_total": agents_total,
-        "security_total": security_total,
         "tools_total": agents_total + security_total,
         "tools_total_strict": agents_total + security_total_strict,
         "k8s_count": producers["k8s-audit"]["count"],
-        "k8s_count_strict": producers["k8s-audit"]["count_strict"],
         "cyclonedx_count": producers["cyclonedx"]["count"],
         "spdx_count": producers["spdx"]["count"],
         "ocsf_count": producers["ocsf"]["count"],
         "sigstore_count": producers["sigstore-intoto"]["count"],
-        "cloud_cloudtrail": cloud_by_id["cloudtrail"],
-        "cloud_gcp": cloud_by_id["gcp-audit-logs"],
-        "cloud_azure": cloud_by_id["azure-activity-log"],
         "cloud_total": sum(cloud_by_id.values()),
-        "mcp_registry_latest": mcp["registry_latest"],
         "mcp_active_excluding_bulk": mcp["active_excluding_bulk"],
     }
 
@@ -276,13 +270,15 @@ def check_landing_page(text: str) -> list[str]:
 
 
 def run_check(
+    matrix: dict[str, Any] | None = None,
     matrix_path: Path = MATRIX_PATH,
     readme_path: Path = README_PATH,
     docs_page_path: Path = DOCS_PAGE_PATH,
     site_page_path: Path = SITE_PAGE_PATH,
     landing_page_path: Path = LANDING_PAGE_PATH,
 ) -> Counter:
-    matrix = load_matrix(matrix_path)
+    if matrix is None:
+        matrix = load_matrix(matrix_path)
     numbers = reach_numbers(matrix)
     problems = check_floors(numbers)
     problems += check_reach_section(
@@ -328,12 +324,21 @@ def render_good_section(matrix: dict[str, Any], numbers: dict[str, int]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _mutate_first_int(text: str, label: str, new_value: str) -> str:
-    """Replace a row's primary count cell value, whatever else that cell contains."""
-    pattern = re.compile(rf"(\|\s*{re.escape(label)}\s*\|\s*)\d[\d,]*")
-    mutated, n = pattern.subn(lambda m: m.group(1) + new_value, text, count=1)
-    assert n == 1, (label, "row not found to mutate")
-    return mutated
+def _mutate_int(text: str, label: str, occurrence: int, new_value: str) -> str:
+    """Replace the `occurrence`-th integer (0-indexed) in a labeled row's line, whatever else
+    that row's cells contain -- the primary count (0) or a secondary one like the dedup row's
+    parenthetical self-managed-only count (1)."""
+    row = re.compile(
+        rf"^\|\s*\*{{0,2}}{re.escape(label)}\*{{0,2}}\s*\|.*$", re.MULTILINE
+    )
+    m = row.search(text)
+    assert m, (label, "row not found to mutate")
+    line = m.group(0)
+    ints = list(re.finditer(r"\d[\d,]*", line))
+    assert len(ints) > occurrence, (label, occurrence, "not enough integers in row")
+    start, end = ints[occurrence].span()
+    mutated_line = line[:start] + new_value + line[end:]
+    return text[: m.start()] + mutated_line + text[m.end() :]
 
 
 def self_test() -> None:
@@ -351,7 +356,7 @@ def self_test() -> None:
         docs_text: str = good_table,
         site_text: str = good_table,
         landing_text: str = HEADLINE,
-        matrix_path: Path = MATRIX_PATH,
+        matrix: dict[str, Any] = matrix,
     ) -> Counter:
         with tempfile.TemporaryDirectory() as d:
             p = Path(d)
@@ -360,7 +365,7 @@ def self_test() -> None:
             (p / "site.md").write_text(site_text, encoding="utf-8")
             (p / "index.astro").write_text(landing_text, encoding="utf-8")
             return run_check(
-                matrix_path=matrix_path,
+                matrix=matrix,
                 readme_path=p / "README.md",
                 docs_page_path=p / "docs.md",
                 site_page_path=p / "site.md",
@@ -371,7 +376,7 @@ def self_test() -> None:
     assert good == Counter(), ("a fully consistent set reports nothing", good)
     cases.append("a fully consistent set reports nothing")
 
-    bad_count = _mutate_first_int(good_table, dedup_label, "500")
+    bad_count = _mutate_int(good_table, dedup_label, 0, "500")
     got = run_with(bad_count)
     assert got == Counter({"reach.table.count_mismatch": 1}), (
         "a hand-edited count fails",
@@ -413,15 +418,12 @@ def self_test() -> None:
     low_matrix["producers_meta"]["security"]["dedup"]["total_strict"] = 240
     low_numbers = reach_numbers(low_matrix)
     low_table = render_good_section(low_matrix, low_numbers)
-    with tempfile.TemporaryDirectory() as d:
-        low_matrix_path = Path(d) / "matrix.yaml"
-        low_matrix_path.write_text(yaml.safe_dump(low_matrix), encoding="utf-8")
-        got = run_with(
-            low_table,
-            docs_text=low_table,
-            site_text=low_table,
-            matrix_path=low_matrix_path,
-        )
+    got = run_with(
+        low_table,
+        docs_text=low_table,
+        site_text=low_table,
+        matrix=low_matrix,
+    )
     assert got == Counter({"reach.table.floor_violated": 1}), (
         "a real count under the floor fails",
         got,
@@ -430,14 +432,7 @@ def self_test() -> None:
         "a real count that has fallen under the 400-tool floor fails with exactly floor_violated"
     )
 
-    bad_aux = re.sub(
-        rf"(\|\s*{re.escape(dedup_label)}\s*\|[^|]*?)\d[\d,]*(?=\s*counting only self-managed)",
-        lambda m: m.group(1) + "999",
-        good_table,
-    )
-    assert bad_aux != good_table, (
-        "the dedup row's secondary (348) count was not found to mutate"
-    )
+    bad_aux = _mutate_int(good_table, dedup_label, 1, "999")
     got = run_with(bad_aux)
     assert got == Counter({"reach.table.count_mismatch": 1}), (
         "a wrong secondary count fails",
@@ -472,7 +467,7 @@ def self_test() -> None:
 
     lines = good_table.splitlines()
     dedup_line = next(line for line in lines if line.startswith(f"| {dedup_label} |"))
-    duplicate_row = good_table + dedup_line.replace("408", "999") + "\n"
+    duplicate_row = good_table + _mutate_int(dedup_line, dedup_label, 0, "999") + "\n"
     got = run_with(duplicate_row)
     assert got == Counter({"reach.table.duplicate_section": 1}), (
         "a duplicate row fails",
