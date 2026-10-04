@@ -117,6 +117,23 @@ const OSCAL_STATE: Record<string, string> = {
   not_assessed: "not-satisfied",
   insufficient_evidence: "not-satisfied",
 };
+/** An observation's OSCAL `methods` (SPEC.md:1166): `automated` -> TEST, `manual` -> EXAMINE; every
+ * other mode (today, only `semi-automated`, and any unrecognised string -- `report --from` does not
+ * validate `mode` against the catalog's enum, so a hand-edited assertions file can carry one) keeps
+ * the base behaviour, `["TEST"]`, via the own-property lookup below (never plain `[a.mode]` indexing
+ * or `??`: a mode string that names an `Object.prototype` member, e.g. `"constructor"`, would
+ * otherwise resolve to that function instead of `undefined`, making `methods` a function and
+ * silently dropping the key from the JSON output -- schema-invalid, caught by this item's own
+ * critic review and pinned by a unit test below). `semi-automated` is not raised to
+ * `["TEST", "EXAMINE"]` even though DC-6 (SPEC.md:246) defines the mode as "automated evidence,
+ * human judgment": this engine does not yet consume a completed manual checklist to confirm that
+ * judgment happened for any given assertion, so claiming `EXAMINE` for every semi-automated finding
+ * would assert a human examination that, for an assertion with no such record, did not happen.
+ * Ported field-for-field from the Python reference (`report.py`'s `_OSCAL_METHODS`); see its comment
+ * for the full reasoning. */
+const OSCAL_METHODS: Record<string, string[]> = {
+  manual: ["EXAMINE"],
+};
 
 function digestBytes(data: Buffer): string {
   return `sha256:${createHash("sha256").update(data).digest("hex")}`;
@@ -852,7 +869,7 @@ export function renderOscal(assertions: Assertion[]): Record<string, unknown> {
     const observation: Record<string, unknown> = {
       uuid: obsUuid,
       description: `Assessment activity for ${a.control} on ${a.subject}.`,
-      methods: ["TEST"],
+      methods: Object.hasOwn(OSCAL_METHODS, a.mode) ? OSCAL_METHODS[a.mode] : ["TEST"],
       collected: when,
     };
     if (a.evidence.length > 0) {

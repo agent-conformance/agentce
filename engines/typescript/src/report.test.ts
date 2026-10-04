@@ -77,6 +77,76 @@ test("report canonical machine outputs match the Python reference golden", () =>
   );
 });
 
+test("OSCAL observation methods follow the assertion's mode", () => {
+  // SPEC.md:1166: methods: [TEST] (automated) or [EXAMINE] (manual) (18.17b; base_sha cc5d4da
+  // hard-coded ["TEST"] for every mode, including manual). semi-automated is pinned at ["TEST"],
+  // unchanged from base: this engine has no per-assertion record of a completed manual checklist, so
+  // claiming EXAMINE happened for every semi-automated finding would assert an examination with no
+  // evidence behind it (see OSCAL_METHODS's own comment in report.ts).
+  const base = {
+    controlVersion: "2026.09",
+    subject: SUBJECT,
+    outcome: "conformant" as const,
+    rung: 2,
+    window: ["2026-01-01T00:00:00Z", "2026-04-01T00:00:00Z"] as [string, string],
+    population: [1, 0] as [number, number],
+    severity: "high" as const,
+    family: "OVS",
+  };
+  const assertions = [
+    makeAssertion({ ...base, control: "OVS-01", mode: "automated" }),
+    makeAssertion({ ...base, control: "OVS-02", mode: "semi-automated" }),
+    makeAssertion({ ...base, control: "OVS-03", mode: "manual" }),
+  ];
+  const oscal = renderOscal(assertions) as {
+    "assessment-results": { results: [{ observations: { uuid: string; methods: string[] }[] }] };
+  };
+  const observations = oscal["assessment-results"].results[0].observations;
+  assert.deepEqual(
+    observations.map((o) => o.methods),
+    [["TEST"], ["TEST"], ["EXAMINE"]],
+  );
+});
+
+test("OSCAL methods falls back to [TEST] for an unrecognised mode, including Object.prototype member names (18.17b critic round 2)", () => {
+  // report --from does not validate `mode` against the catalog's enum (only catalog-authoring time
+  // does), so a hand-edited assertions file can carry any string here. A mode of "constructor" (or
+  // any other Object.prototype member) must still produce a real ["TEST"] array, never the
+  // prototype's own function value -- plain `OSCAL_METHODS[a.mode]` indexing resolved "constructor"
+  // to Object's constructor function, which JSON.stringify then silently drops, leaving the
+  // observation with no `methods` key at all (schema-invalid). Fixed with an own-property lookup.
+  const base = {
+    control: "OVS-01",
+    controlVersion: "2026.09",
+    subject: SUBJECT,
+    outcome: "conformant" as const,
+    rung: 2,
+    window: ["2026-01-01T00:00:00Z", "2026-04-01T00:00:00Z"] as [string, string],
+    population: [1, 0] as [number, number],
+    severity: "high" as const,
+    family: "OVS",
+  };
+  for (const mode of [
+    "constructor",
+    "toString",
+    "hasOwnProperty",
+    "__proto__",
+    "Manual",
+    "semi_automated",
+  ]) {
+    const oscal = renderOscal([makeAssertion({ ...base, mode })]) as {
+      "assessment-results": { results: [{ observations: [{ methods: unknown }] }] };
+    };
+    const methods = oscal["assessment-results"].results[0].observations[0].methods;
+    assert.deepEqual(
+      methods,
+      ["TEST"],
+      `mode ${JSON.stringify(mode)} should fall back to ["TEST"]`,
+    );
+    assert.equal(JSON.stringify(methods), '["TEST"]');
+  }
+});
+
 test("evidence pack matches the Python reference golden, per-assertion evidence included", () => {
   const golden = JSON.parse(readFileSync(join(TESTDATA, "report-golden.json"), "utf-8"));
   const pack = renderEvidencePack(SUBJECT, ovsFailedAssertions());
