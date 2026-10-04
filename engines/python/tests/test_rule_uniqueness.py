@@ -231,59 +231,30 @@ def _load_check_driver():
     return module
 
 
-def test_a_baseline_above_its_pinned_ceiling_is_caught(tmp_path: Path) -> None:
-    """The shrink-only check `baseline.json`'s own `ceilings` entry exists for: without it, a
-    change could declare a brand-new duplicate "already disclosed" by adding it to `pairs` in the
-    same change, and `new_rule_uniqueness_problems` alone would not catch it (the pair IS in the
-    baseline it's compared against). The ceiling caps the disclosed-pair count itself, so a baseline
-    that grew past its pinned floor fails even though every pair it lists is a real duplicate."""
+@pytest.mark.parametrize(("ceiling", "expected"), [(0, 1), (1, 0), (2, 1)])
+def test_a_baseline_pair_count_must_equal_its_pinned_ceiling(
+    tmp_path: Path, ceiling: int, expected: int
+) -> None:
+    """The shrink-only check `baseline.json`'s own `ceilings` entry exists for. Above the ceiling
+    (0): a change declared a brand-new duplicate "already disclosed" by adding it to `pairs`, which
+    `new_rule_uniqueness_problems` alone would not catch. Below it (2): a pair was paid down without
+    lowering the ceiling, leaving a free slot a later duplicate could take by editing `pairs` alone.
+    At it (1, today's committed state): no failure."""
     catalogs_root = tmp_path / "catalogs"
     (catalogs_root / "base").mkdir(parents=True)
     shutil.copytree(_BASE_CATALOGS / "baseline", catalogs_root / "base" / "baseline")
     baseline_path = tmp_path / "baseline.json"
     baseline_path.write_text(
         json.dumps(
-            {"ceilings": {"baseline": 0}, "pairs": {"baseline": [["DOC-01", "REC-01"]]}}
+            {
+                "ceilings": {"baseline": ceiling},
+                "pairs": {"baseline": [["DOC-01", "REC-01"]]},
+            }
         ),
         encoding="utf-8",
     )
     status = _load_check_driver().main(["prog", str(catalogs_root), str(baseline_path)])
-    assert status == 1
-
-
-def test_a_baseline_at_its_pinned_ceiling_is_not_caught(tmp_path: Path) -> None:
-    """The positive case: a baseline whose disclosed-pair count sits exactly at its pinned ceiling
-    (today's real, committed state) must not fail on the ceiling check alone."""
-    catalogs_root = tmp_path / "catalogs"
-    (catalogs_root / "base").mkdir(parents=True)
-    shutil.copytree(_BASE_CATALOGS / "baseline", catalogs_root / "base" / "baseline")
-    baseline_path = tmp_path / "baseline.json"
-    baseline_path.write_text(
-        json.dumps(
-            {"ceilings": {"baseline": 1}, "pairs": {"baseline": [["DOC-01", "REC-01"]]}}
-        ),
-        encoding="utf-8",
-    )
-    status = _load_check_driver().main(["prog", str(catalogs_root), str(baseline_path)])
-    assert status == 0
-
-
-def test_a_baseline_below_its_pinned_ceiling_is_caught(tmp_path: Path) -> None:
-    """Paying a pair down without lowering its ceiling leaves a free slot: a later change could
-    add a new duplicate to `pairs` alone and stay within the ceiling. So the count must equal the
-    ceiling, and a ceiling left above it fails."""
-    catalogs_root = tmp_path / "catalogs"
-    (catalogs_root / "base").mkdir(parents=True)
-    shutil.copytree(_BASE_CATALOGS / "baseline", catalogs_root / "base" / "baseline")
-    baseline_path = tmp_path / "baseline.json"
-    baseline_path.write_text(
-        json.dumps(
-            {"ceilings": {"baseline": 2}, "pairs": {"baseline": [["DOC-01", "REC-01"]]}}
-        ),
-        encoding="utf-8",
-    )
-    status = _load_check_driver().main(["prog", str(catalogs_root), str(baseline_path)])
-    assert status == 1
+    assert status == expected
 
 
 @pytest.mark.parametrize("name", sorted(_ALL_CATALOGS))

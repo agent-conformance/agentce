@@ -41,7 +41,6 @@ from agentce.signing import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-REGISTRY_FILE = REPO_ROOT / "conformance" / "registry" / "catalogs.json"
 VENDORED_ROOT = (
     REPO_ROOT / "engines" / "python" / "agentce" / "data" / "trust" / "dev-root.json"
 )
@@ -181,9 +180,14 @@ def deterministic_keyless_signer(label: str, profile: str) -> signing.Signer:
 SIGNATURE_NAME = signing.CATALOG_SIGNATURE_NAME
 
 
-def catalog_signature(catalog_dir: Path) -> dict[str, Any]:
+def catalog_digest(catalog_dir: Path) -> str:
+    """The content digest a catalog's signature and its registry entry both record."""
+    return signing.digest_tree(catalog_dir, exclude=frozenset({SIGNATURE_NAME}))
+
+
+def catalog_signature(catalog_dir: Path, digest: str | None = None) -> dict[str, Any]:
     """Sign a catalog directory's content digest; return the DSSE envelope (deterministic)."""
-    digest = signing.digest_tree(catalog_dir, exclude=frozenset({SIGNATURE_NAME}))
+    digest = digest or catalog_digest(catalog_dir)
     statement = signing.intoto_statement(
         subject_name=catalog_dir.name,
         digest=digest,
@@ -202,37 +206,49 @@ def _emit_root() -> int:
     return 0
 
 
-def _sync_registry_digest(catalog_dir: Path, registry_file: Path) -> None:
+def _sync_registry_digest(
+    catalog_dir: Path, digest: str, registry_file: Path | None
+) -> None:
     """Record the re-signed catalog's digest in the catalog registry, whose check recomputes it
     independently; a re-sign that left the registry behind turned CI red twice (18.16a, 18.37)."""
+    # Imported here, not at the top: tools/ imports this module as `conformance.dev_trust`, where
+    # the sibling module is not on the path; sign-catalog runs as a script from conformance/.
+    import catalog_registry_check
+
+    registry_file = registry_file or catalog_registry_check.REGISTRY_FILE
     if not registry_file.is_file():
         return
-    registry = json.loads(registry_file.read_text(encoding="utf-8"))
-    digest = signing.digest_tree(catalog_dir, exclude=frozenset({SIGNATURE_NAME}))
-    for entry in registry["catalogs"]:
-        if (REPO_ROOT / entry["source_path"]).resolve() == catalog_dir and entry[
-            "digest"
-        ] != digest:
-            entry["digest"] = digest
-            registry_file.write_text(
-                json.dumps(registry, indent=2, ensure_ascii=False) + "\n",
-                encoding="utf-8",
-            )
-            print(f"updated {entry['id']}'s digest in {registry_file.name}")
+    registry = catalog_registry_check.load_registry(registry_file)
+    entry = next(
+        (
+            e
+            for e in registry["catalogs"]
+            if (REPO_ROOT / e["source_path"]).resolve() == catalog_dir
+        ),
+        None,
+    )
+    if entry is None or entry["digest"] == digest:
+        return
+    entry["digest"] = digest
+    registry_file.write_text(
+        json.dumps(registry, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    print(f"updated {entry['id']}'s digest in {registry_file.name}")
 
 
-def _sign_catalog(catalog_dir: Path, registry_file: Path = REGISTRY_FILE) -> int:
+def _sign_catalog(catalog_dir: Path, registry_file: Path | None = None) -> int:
     catalog_dir = catalog_dir.resolve()
     if not (catalog_dir / "catalog.yaml").is_file():
         print(f"not a catalog directory: {catalog_dir}", file=sys.stderr)
         return 1
-    envelope = catalog_signature(catalog_dir)
+    digest = catalog_digest(catalog_dir)
+    envelope = catalog_signature(catalog_dir, digest)
     out = catalog_dir / SIGNATURE_NAME
     out.write_text(
         json.dumps(envelope, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     print(f"wrote {out.relative_to(REPO_ROOT)}")
-    _sync_registry_digest(catalog_dir, registry_file)
+    _sync_registry_digest(catalog_dir, digest, registry_file)
     return 0
 
 

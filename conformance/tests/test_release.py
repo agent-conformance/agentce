@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+import catalog_registry_check
 import dev_trust
 import release
 from agentce import signing
@@ -130,7 +131,7 @@ def test_sign_catalog_updates_the_registry_digest(tmp_path: Path) -> None:
     """A re-signed catalog's registry entry must carry its new digest, or the catalog registry
     check refuses it (CI red after 18.16a and 18.37 re-signed eu-ai-act by hand)."""
     source = dev_trust.REPO_ROOT / "spec" / "catalogs" / "base" / "eu-ai-act"
-    registry = json.loads(dev_trust.REGISTRY_FILE.read_text("utf-8"))
+    registry = catalog_registry_check.load_registry()
     entry = next(e for e in registry["catalogs"] if e["id"] == "eu-ai-act")
     entry["digest"] = "sha256:" + "ab" * 32
     registry_file = tmp_path / "catalogs.json"
@@ -141,9 +142,11 @@ def test_sign_catalog_updates_the_registry_digest(tmp_path: Path) -> None:
         assert dev_trust._sign_catalog(source, registry_file) == 0
     finally:
         signature.write_bytes(before)
-    updated = json.loads(registry_file.read_text("utf-8"))
-    digest = signing.digest_tree(source, exclude=frozenset({dev_trust.SIGNATURE_NAME}))
-    assert {e["id"]: e["digest"] for e in updated["catalogs"]}["eu-ai-act"] == digest
+    updated = catalog_registry_check.load_registry(registry_file)
+    entry = next(e for e in updated["catalogs"] if e["id"] == "eu-ai-act")
+    assert entry["digest"] == signing.digest_tree(
+        source, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME})
+    )
 
 
 def test_cli_dry_run_prints_sentinels(capsys: pytest.CaptureFixture[str]) -> None:

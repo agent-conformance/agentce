@@ -49,21 +49,19 @@ def main(argv: list[str]) -> int:
         baseline_pairs = frozenset(frozenset(pair) for pair in baseline.get(name, []))
         problem_found = False
         ceiling = ceilings.get(name, 0)
-        if len(baseline_pairs) > ceiling:
+        if len(baseline_pairs) != ceiling:
             status = 1
             problem_found = True
-            print(
-                f"catalog-rule-uniqueness: {name} has {len(baseline_pairs)} baselined pairs, above "
-                f"its pinned ceiling of {ceiling} -- the baseline file is shrink-only; raising a "
-                f"ceiling needs its own harness/decisions/phase-18.tsv row, not a silent bump"
+            fix = (
+                "the baseline file is shrink-only; raising a ceiling needs its own "
+                "harness/decisions/phase-18.tsv row, not a silent bump"
+                if len(baseline_pairs) > ceiling
+                else f"lower the ceiling to {len(baseline_pairs)} in the same change that paid the "
+                "pair down, so the freed slot can't hide a new duplicate"
             )
-        elif len(baseline_pairs) < ceiling:
-            status = 1
-            problem_found = True
             print(
-                f"catalog-rule-uniqueness: {name} has {len(baseline_pairs)} baselined pairs, below "
-                f"its pinned ceiling of {ceiling} -- lower the ceiling to {len(baseline_pairs)} in the "
-                f"same change that paid the pair down, so the freed slot can't hide a new duplicate"
+                f"catalog-rule-uniqueness: {name} has {len(baseline_pairs)} baselined pairs, not "
+                f"its pinned ceiling of {ceiling} -- {fix}"
             )
         stale, problems = rule_uniqueness_report(catalog, baseline_pairs)
         if stale:
