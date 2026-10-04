@@ -867,7 +867,7 @@ export function renderOscal(assertions: Assertion[]): Record<string, unknown> {
     const observation: Record<string, unknown> = {
       uuid: obsUuid,
       description: `Assessment activity for ${a.control} on ${a.subject}.`,
-      methods: OSCAL_METHODS.get(a.mode) ?? ["TEST"],
+      methods: [...(OSCAL_METHODS.get(a.mode) ?? ["TEST"])],
       collected: when,
     };
     if (a.evidence.length > 0) {
