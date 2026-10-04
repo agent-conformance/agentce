@@ -15,8 +15,8 @@ fails if a gate in `gates.json` is not named in this file.
   through `load_untrusted_yaml` or a `_doctor_problem` override) is exempt from the byte-match rule, not
   only required to be non-empty. A fixed 10-key table (the 8 quarantine reasons minus `unknown_source`,
   `internal.unexpected`, `input.records_no_genai_spans`, `insufficient_evidence`) must name an actor
-  other than the person at the terminal. `docs/errors.md` and its published website copy are checked
-  against a real `agentce doctor --write-errors` run, naming every key the scan found raised. Closed 23
+  other than the person at the terminal. `docs/errors.md` is checked against a
+  real `agentce doctor --write-errors` run, and must have a row for every key the scan found raised. Closed 23
   previously-undocumented keys, 11 stale single-voice fix texts, and 10 missing actor phrases found this
   way. TypeScript and Java do not get an equivalent static scanner in this item (tracked as item 18.40e);
   `_require_dir`/`_require_file` and the other runtime-composed-key forwarders are tracked as item 18.40f.
