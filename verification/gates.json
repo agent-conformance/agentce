@@ -653,10 +653,10 @@
           "replace": ""
         },
         {
-          "description": "18.18b N1(a): the per-outcome answer template lookup collapses to the single 'conformant' key, so every answer (including BUY-05/06/07/08's non-conformant/partial/not_applicable/not_assessed rows) renders the conformant sentence instead of its own outcome's wording",
+          "description": "18.18b N1(a): the per-outcome answer template lookup collapses BUY-05/06/07/08's non-conformant/partial/not_applicable/not_assessed rows to the conformant sentence, leaving BUY-01's conformant and BUY-02's insufficient_evidence rows (already covered by check (c)) unchanged -- so only the new check (o) can catch it",
           "file": "engines/python/agentce/report.py",
           "search": "    return i18n_format.format_message(\n        cat[f\"report.buyer_answer_{entry['outcome']}\"], control=control\n    )",
-          "replace": "    return i18n_format.format_message(\n        cat[\"report.buyer_answer_conformant\"], control=control\n    )"
+          "replace": "    key = (\n        f\"report.buyer_answer_{entry['outcome']}\"\n        if entry[\"outcome\"] in (\"conformant\", \"insufficient_evidence\")\n        else \"report.buyer_answer_conformant\"\n    )\n    return i18n_format.format_message(cat[key], control=control)"
         },
         {
           "description": "18.18b N1(b): the packaged run's buyer.md write is skipped, so a packaged --for buyer run writes no buyer.md at all",
