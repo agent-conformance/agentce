@@ -296,7 +296,7 @@ if [ -f "$py_out/buyer.html" ] && ! grep -qF '<td>3</td><td>1</td><td>1</td><td>
   status=1
 fi
 
-# check (o): N2 -- the buyer-specific "how to check this report" heading (report.buyer_how_to_check_
+# check (r): N2 -- the buyer-specific "how to check this report" heading (report.buyer_how_to_check_
 # heading), not the auditor view's shared "How to re-run" heading.
 for f in "$py_out/buyer.md" "$py_out/buyer.html"; do
   if [ -f "$f" ]; then

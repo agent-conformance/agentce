@@ -1348,6 +1348,22 @@ def _buyer_counts_table_html(counts: dict[str, int], cat: dict[str, str]) -> str
     return f"<table><thead><tr>{head}</tr></thead><tbody><tr>{row}</tr></tbody></table>"
 
 
+def _catalog_labels(catalogs: list[Catalog] | None) -> list[str]:
+    """``id@version`` for each evaluated catalog, shared by every renderer that cites the catalog
+    (the full report's Provenance section, the buyer view's how-to-check section)."""
+    return [f"{c.id}@{c.version}" for c in (catalogs or [])]
+
+
+def _catalog_citation_md(catalogs: list[str]) -> str:
+    return (
+        ", ".join(sanitize_for_markdown(c) for c in catalogs) if catalogs else "(none)"
+    )
+
+
+def _catalog_citation_html(catalogs: list[str]) -> str:
+    return ", ".join(sanitize_for_html(c) for c in catalogs) if catalogs else "(none)"
+
+
 def _buyer_how_to_check_md(
     cat: dict[str, str],
     *,
@@ -1363,14 +1379,7 @@ def _buyer_how_to_check_md(
         )
     else:
         lines.append(cat["report.buyer_how_to_check_unpackaged"])
-    lines.append(
-        "- Catalog: "
-        + (
-            ", ".join(sanitize_for_markdown(c) for c in catalogs)
-            if catalogs
-            else "(none)"
-        )
-    )
+    lines.append(f"- Catalog: {_catalog_citation_md(catalogs)}")
     lines.append(f"- Reproduce: `{_reproduce_command(argv)}`")
     return lines
 
@@ -1389,12 +1398,9 @@ def _buyer_how_to_check_html(
         )
     else:
         line = html.escape(cat["report.buyer_how_to_check_unpackaged"])
-    catalog_text = (
-        ", ".join(sanitize_for_html(c) for c in catalogs) if catalogs else "(none)"
-    )
     reproduce = html.escape(_reproduce_command(argv))
     return (
-        f"<p>{line}</p><p>Catalog: {catalog_text}</p>"
+        f"<p>{line}</p><p>Catalog: {_catalog_citation_html(catalogs)}</p>"
         f"<p>Reproduce: <code>{reproduce}</code></p>"
     )
 
@@ -1414,7 +1420,7 @@ def render_buyer_md(
     ``buyer`` is :func:`agentce.buyer_view.compute_buyer_view`'s own output, rendered as-is."""
     cat = messages.catalogue(language)
     argv = list(reverify_command) if reverify_command else list(invocation or [])
-    catalog_labels = [f"{c.id}@{c.version}" for c in (catalogs or [])]
+    catalog_labels = _catalog_labels(catalogs)
     answers = buyer["answers"]
     by_question = buyer["by_question"]
     lines = [
@@ -1469,7 +1475,7 @@ def render_buyer_html(
     :func:`render_report_html`."""
     cat = messages.catalogue(language)
     argv = list(reverify_command) if reverify_command else list(invocation or [])
-    catalog_labels = [f"{c.id}@{c.version}" for c in (catalogs or [])]
+    catalog_labels = _catalog_labels(catalogs)
     answers = buyer["answers"]
     by_question = buyer["by_question"]
     title = html.escape(cat["report.buyer_title"])
@@ -1552,12 +1558,7 @@ def _provenance_md(catalogs: list[str], invocation: list[str] | None) -> list[st
         "## Provenance",
         "",
         f"- Engine: {ENGINE_NAME} {__version__}",
-        "- Catalog: "
-        + (
-            ", ".join(sanitize_for_markdown(c) for c in catalogs)
-            if catalogs
-            else "(none)"
-        ),
+        f"- Catalog: {_catalog_citation_md(catalogs)}",
         f"- Lenses available: {_lenses_text()}",
         f"- Reproduce: `{_reproduce_command(invocation)}`",
         "",
@@ -1610,7 +1611,7 @@ def render_report_md(
 ) -> str:
     cat = messages.catalogue(language)
     by_control = _control_index(catalogs or [])
-    labels = [f"{c.id}@{c.version}" for c in (catalogs or [])]
+    labels = _catalog_labels(catalogs)
     summary = verdict.summarize(assertions)
     lines = [f"# {cat['report.title']}", ""]
     # The records lead the report (SPEC's evidence-first framing, 18.4): what happened, before how
@@ -1651,13 +1652,10 @@ _HTML_STYLE = (
 
 
 def _provenance_html(catalogs: list[str], invocation: list[str] | None) -> str:
-    catalog_text = (
-        ", ".join(sanitize_for_html(c) for c in catalogs) if catalogs else "(none)"
-    )
     return (
         '<section aria-labelledby="provenance"><h2 id="provenance">Provenance</h2><ul>'
         f"<li>Engine: {html.escape(ENGINE_NAME)} {html.escape(__version__)}</li>"
-        f"<li>Catalog: {catalog_text}</li>"
+        f"<li>Catalog: {_catalog_citation_html(catalogs)}</li>"
         f"<li>Lenses available: {html.escape(_lenses_text())}</li>"
         f"<li>Reproduce: <code>{html.escape(_reproduce_command(invocation))}</code></li>"
         "</ul></section>"
@@ -1713,7 +1711,7 @@ def render_report_html(
     originates in evidence or declarations rendered as escaped text, never as markup."""
     cat = messages.catalogue(language)
     by_control = _control_index(catalogs or [])
-    labels = [f"{c.id}@{c.version}" for c in (catalogs or [])]
+    labels = _catalog_labels(catalogs)
     title = html.escape(cat["report.title"])
     summary = "".join(
         f"<li>{sanitize_for_html(_outcome_label(cat, o))}: {c}</li>"
