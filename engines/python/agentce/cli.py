@@ -699,7 +699,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         internal = AgentceError(
             key="internal.unexpected",
             cause=f"an unexpected error occurred: {type(exc).__name__}.",
-            fix="re-run with --debug to see the stack trace, then file an issue.",
+            fix="re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate.",
             exit_code=int(ExitCode.INPUT_ERROR),
         )
         return _emit_error(internal, command=command, want_json=want_json)

@@ -3,6 +3,24 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.35.0
+
+- Added `VG-UX-NEXT-STEP` (18.40, USER_EXPERIENCE.md R4): an AST scan over every
+  `InputError(...)`/`AgentceError(...)` call site in `engines/python/agentce` with a literal key and a
+  literal fix. A key is registered in `spec/i18n/messages.en.json` with a non-empty fix; when every one
+  of its literal-fix call sites agrees on the text, the registered fix is byte-identical to it. A call
+  site reached only through a shared forwarder that composes its own key at runtime
+  (`_require_dir`/`_require_file` and similar) has a non-literal key and is out of scope here (item
+  18.40f); a key that also has a real non-literal second voice elsewhere (an f-string site, or a call
+  through `load_untrusted_yaml` or a `_doctor_problem` override) is exempt from the byte-match rule, not
+  only required to be non-empty. A fixed 10-key table (the 8 quarantine reasons minus `unknown_source`,
+  `internal.unexpected`, `input.records_no_genai_spans`, `insufficient_evidence`) must name an actor
+  other than the person at the terminal. `docs/errors.md` and its published website copy are checked
+  against a real `agentce doctor --write-errors` run, naming every key the scan found raised. Closed 23
+  previously-undocumented keys, 11 stale single-voice fix texts, and 10 missing actor phrases found this
+  way. TypeScript and Java do not get an equivalent static scanner in this item (tracked as item 18.40e);
+  `_require_dir`/`_require_file` and the other runtime-composed-key forwarders are tracked as item 18.40f.
+
 ## 0.34.0
 
 - Changed `VG-BUYER-VIEW`: closed the five round-2 verifier minors on the buyer view (18.18b,

@@ -16,51 +16,74 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `catalog.sign_key_inside_catalog` | the --key or --new-key path resolves inside the catalog directory being signed. | write the signing key outside the catalog directory. |
 | `catalog.sign_key_missing` | catalog sign signs with an operator-held key, and neither --key nor --new-key was given. | pass --key <ed25519-private-key.pem> or --new-key <path>. |
 | `catalog.sign_key_unreadable` | the signing key file given to catalog sign could not be parsed as an unencrypted PEM private key. | supply an unencrypted Ed25519 private key PEM, or generate one with --new-key. |
-| `catalog.sign_lint_failed` | the catalog fails agentce catalog lint. | fix the lint problems (agentce catalog lint <dir>) before signing. |
+| `catalog.sign_lint_failed` | the catalog fails agentce catalog lint. | fix the lint problems (`agentce catalog lint <dir>`) before signing. |
 | `catalog.sign_new_key_exists` | the path given to --new-key already exists. | pass a path that does not exist yet, or reuse it with --key instead. |
-| `catalog.sign_not_a_catalog` | the directory given to catalog sign has no catalog.yaml. | pass a catalog directory, or scaffold one first with agentce catalog init <dir>. |
+| `catalog.sign_not_a_catalog` | the directory given to catalog sign has no catalog.yaml. | pass a catalog directory, or scaffold one first: `agentce catalog init <dir>`. |
 | `catalog.sign_trust_root_inside_catalog` | the --write-trust-root path resolves inside the catalog directory being signed. | write the trust root outside the catalog directory. |
 | `catalog.support_matrix_inside_catalog` | the --support-matrix path resolves inside the catalog directory being linted. | write the support matrix outside the catalog directory. |
 | `catalog.support_matrix_multi` | --support-matrix was given while linting a directory that holds more than one catalog. | pass the single catalog's own directory, not a directory holding several. |
 | `environment.cryptography_unavailable` | the cryptography package the engine signs and verifies with is missing or does not import. | install the engine's dependencies with `uv sync`; where no prebuilt wheel exists, install Rust and OpenSSL 3 first. |
 | `environment.python_unsupported` | the running Python is older than the interpreter the engine supports. | run the engine under Python 3.12 or newer (`uv python install 3.12`). |
+| `input.adapter_missing` | ingest needs an adapter. | pass --adapter, e.g. --adapter otel-genai. |
+| `input.adapter_not_found` | no adapter directory exists at the given adapters-root and adapter name. | pass --adapters-root pointing at the adapters checkout, or check the adapter name. |
+| `input.bundle_manifest_entry` | a 'files' entry in the manifest is missing 'path' or 'sha256'. | each entry needs {"path": ..., "sha256": ...}. |
 | `input.bundle_manifest_file_too_large` | a manifest-listed file is over the per-file size limit. | split large evidence into more, smaller files, or reference bulk content by an opaque locator instead of inlining it (SPEC R12). |
-| `input.bundle_manifest_mismatch` | a stream file's digest does not match the manifest. | regenerate the manifest after any change to the stream files. |
+| `input.bundle_manifest_files` | manifest.json has no non-empty 'files' array. | the manifest must list every file with its path and sha256. |
+| `input.bundle_manifest_invalid` | manifest.json is not valid JSON, or is not an object. | regenerate the bundle so its manifest.json is well-formed. |
+| `input.bundle_manifest_mismatch` | a stream file's digest does not match the manifest. | regenerate the bundle so its files match the manifest. |
 | `input.bundle_manifest_missing` | the evidence bundle has no manifest.json. | an agent writes a bundle by running with the agentce_emit emitter on: set `AGENTCE_EMIT=1 AGENTCE_EMIT_OUT=<dir>` and see docs/integrate.md; to watch one built, run `examples/custom-loop/run.sh <dir>` from a checkout, then `agentce validate --bundle <dir>`. |
+| `input.bundle_manifest_path` | a bundle manifest entry's path is absolute, contains '..', or escapes the bundle root through a symlink. | the manifest must list only paths that stay inside the bundle after symlinks resolve. |
+| `input.catalog_action` | the catalog actions are `lint`, `coverage-matrix`, `init`, and `sign`. | run `agentce catalog lint <dir>`, `agentce catalog coverage-matrix <dir>`, `agentce catalog init <dir>`, or `agentce catalog sign <dir>`. |
 | `input.catalog_mismatch` | a --catalog-dir carries an id@version the --catalog request did not name. | pass --catalog-dir for the catalog you named, or name the id@version the directory carries. |
 | `input.catalog_missing` | --catalog was given but names no catalog. | pass --catalog <id@version>, or leave --catalog out to assess against the baseline. |
 | `input.catalog_not_found` | no base catalog was found under the expected path. | run from the repository root or pass --catalog-dir to a catalog directory. |
+| `input.catalog_unreadable` | a file in the catalog directory could not be read (permissions, or a non-UTF-8 file name). | make every file in the catalog directory readable, then re-run. |
 | `input.catalog_unresolved` | a requested catalog id@version does not resolve to any catalog directory. | use an available <id>@<version>, or pass --catalog-dir <dir> for a catalog on disk. |
-| `input.catalog_unverified` | a --catalog-dir catalog is unsigned, or its signature does not verify against the effective trust root. | point --catalog-dir at a catalog whose catalog.sig.json verifies, or pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) for the root that signed it. |
+| `input.catalog_unverified` | a --catalog-dir catalog is unsigned, or its signature does not verify against the effective trust root. | point --catalog-dir at a catalog whose catalog.sig.json verifies, or pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) for the root that signed it; --allow-unverified-catalog assesses it anyway and records the override as a limitation. |
+| `input.config_action` | the only config action is `show`. | run `agentce config show`. |
+| `input.conformance_action` | the only conformance action is `run`. | run `agentce conformance run ...`. |
+| `input.corpus_generate_failed` | the corpus generator did not produce a corpus-manifest.json. | check that the corpus generator runs: python corpus/generator/generate.py --out <dir>. |
+| `input.corpus_not_found` | the given directory has neither a corpus-manifest.json nor a generator/generate.py. | pass a generated corpus directory or the corpus source tree. |
 | `input.coverage_denominator_manifest_invalid` | a coverage denominator's manifest file is nested too deeply to parse safely. | flatten the denominator manifest's structure; it exceeds the engine's safe nesting depth. |
 | `input.deviation_invalid` | the deviation register is not a well-formed mapping with a `deviations:` list of mapping entries, or fails a rule of SPEC §13.3.4 (control not in the catalog, wrong outcome, missing field, same approver as owner, or lifetime over the maximum). | correct the deviation register and re-run. |
 | `input.deviations_not_yet_supported` | this engine does not yet apply a deviation register on assess. | drop --deviations, or run this assessment with the Python engine. |
 | `input.diff_extra_argument` | diff was given more than the two positional arguments it takes. | pass exactly two files: `agentce diff <report-a> <report-b>`. |
 | `input.diff_field_not_string` | diff was given an assertion whose control, subject, or outcome field is present but is not a JSON string. | emit control/subject/outcome as JSON strings. |
+| `input.diff_format` | --format must be one of text, json, or md. | pass --format text|json|md. |
 | `input.diff_unrecognized_flag` | diff was given a flag it does not recognize. | pass --format text|json|md, or drop the flag. |
 | `input.domain_binding_invalid` | the domain binding is not safe YAML: a disallowed construct, or a structure nested too deeply to parse safely. | remove custom YAML tags and flatten deep nesting in the domain binding file. |
 | `input.event_structure_too_deep` | an evidence event line is nested too deeply to parse safely. | flatten the event's structure; reference deeply nested content by an opaque locator instead (SPEC R12). |
 | `input.for_emit_ambiguous` | both --for and --emit were given. | pass --for <preset> or --emit <formats>, not both. |
 | `input.for_preset` | --for names a preset assess does not know. | choose one of: ci, compliance, engineering, security, share. |
+| `input.ingest_empty` | the adapter produced no events from the given export file. | check the export file actually contains records the adapter recognizes. |
+| `input.ingest_failed` | the adapter could not adapt the export, or printed something other than the expected JSON result. | check the export file matches the adapter's expected shape. |
 | `input.init_exists` | init would overwrite a profile or domain binding that already exists. | pass --force to overwrite, or --out <dir> to write somewhere else. |
-| `input.nothing_evaluated` | no control reached conformant, non-conformant, or insufficient_evidence, so the run judged nothing. | emit under the subject and source the profile declares, and record the evidence the catalog's controls apply to. |
+| `input.init_role` | --role must be one of deployer, provider, or both. | pass --role deployer|provider|both. |
+| `input.nothing_evaluated` | no control reached conformant, non-conformant, or insufficient_evidence, so the run judged nothing. | emit under the subject and source the profile declares (agentce-emit reads AGENTCE_EMIT_SUBJECT and AGENTCE_EMIT_SOURCE), and record the evidence the catalog's controls apply to. |
+| `input.out_missing` | the command needs an output bundle path. | pass --out <bundle>. |
 | `input.package_path_overlap` | --out overlaps --bundle, --profile, --domain, or a --catalog-dir: packaging would read from or write into the tree it is producing. | point --out somewhere outside every input path, then re-run. |
 | `input.package_requires_bundle` | --package-for-sharing works only with --bundle/--profile; a records-folder run cannot be reproduced from a --bundle re-run. | pass --bundle and --profile instead of a records folder, or drop --package-for-sharing. |
 | `input.profile_invalid` | the applicability profile is not safe YAML: a disallowed construct, or a structure nested too deeply to parse safely. | remove custom YAML tags and flatten deep nesting; regenerate the profile from `agentce init`. |
 | `input.profile_missing` | the applicability profile was not supplied. | pass --profile agentce/applicability.yaml (start from agentce init). |
+| `input.quickstart_missing` | the bundled quickstart project is missing from the installed package. | reinstall the engine: the quickstart project ships inside the package. |
 | `input.readiness_unrecognized_flag` | readiness was given a flag it does not recognize. | pass --gaps, --deviations, or --catalog-dir, or drop the flag. |
-| `input.records_no_genai_spans` | the folder holds OpenTelemetry traces, but none of their spans is a GenAI operation the engine maps. | instrument the agent with OpenTelemetry GenAI or OpenInference, then export its traces. |
-| `input.records_none_recognised` | the records folder holds no OpenTelemetry GenAI or OpenInference trace export the engine can read. | point assess at a folder of OTLP/JSON trace exports (.json, .jsonl or .ndjson). |
+| `input.records_no_genai_spans` | the folder holds OpenTelemetry traces, but none of their spans is a GenAI operation the engine maps. | ask the agent's developer to instrument it with OpenTelemetry GenAI or OpenInference, then export its traces. |
+| `input.records_none_recognised` | the records folder holds no OpenTelemetry GenAI or OpenInference trace export the engine can read. | point assess at a folder of OTLP/JSON trace exports (.json, .jsonl or .ndjson); compressed files are not read, so decompress them first. |
 | `input.records_not_a_directory` | the records folder does not exist or is not a directory. | pass a folder of OpenTelemetry GenAI or OpenInference trace exports. |
 | `input.records_out_collides` | the output folder would overwrite records: it is the records folder, holds them, or lies inside that folder with files that are not a previous run's output. | choose an output folder outside the records folder with --out, or an empty one. |
 | `input.records_source_ambiguous` | both a records folder and --bundle were given. | pass either a folder of trace exports or --bundle <dir>, not both. |
 | `input.records_subject_ambiguous` | the profile declares several subjects, and a records folder is assessed as one. | declare one subject in the profile, or assess each agent's records folder separately. |
+| `input.release_bundle` | the given directory has no release-manifest.json or signatures.json, so it is not a release bundle. | pass the --out directory produced by the release tooling. |
+| `input.release_missing` | the release artifact named on the command line does not exist. | pass --release <bundle-dir-or-envelope>. |
 | `input.sign_profile` | unknown signing profile. | choose one of: sigstore-public, sigstore-private, kms. |
 | `input.sign_role` | --as must be `claimant` or `assessor`. | pass --as claimant|assessor. |
 | `input.sign_unrecognized_flag` | sign was given a flag it does not recognize. | pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag. |
+| `input.state_version_incompatible` | the state directory was written by an incompatible state_version. | there is no migration command: move or delete the state directory and re-run with --state pointing at a fresh, empty directory (this discards the prior bundle/outcome history recorded there, so late-arriving evidence and drift are tracked only from that point forward). |
 | `input.trust_root_invalid` | the trust root supplied by --trust-root or AGENTCE_TRUST_ROOT could not be loaded. | pass --trust-root <file> pointing at a trust root in the form of the engine's vendored data/trust/dev-root.json. |
+| `input.verify_target` | verify's target flags were given more than once, none at all, or in a combination that isn't valid. | pass exactly one target, e.g. `agentce verify --bundle <dir>`. |
 | `input.verify_unrecognized_flag` | verify was given a flag it does not recognize. | pass --bundle, --catalog, --release, or --report (with --signer-trust-root or --expect-keyid for --report), or drop the flag. |
-| `internal.unexpected` | an unexpected internal error occurred. | re-run with --debug to see the stack trace, then file an issue. |
+| `internal.unexpected` | an unexpected internal error occurred. | re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate. |
+| `report.missing_evidence_pointer` | an assertion reached a conformant, non-conformant, or partial outcome with no evidence pointer. | every conformant, non-conformant, or partial outcome must cite evidence (DC-5). |
 | `sign.key_algorithm` | the signing key is not an Ed25519 private key. | supply an Ed25519 key (the algorithm the engine signs with, SPEC §8.7). |
 | `sign.key_unreadable` | the signing key file could not be parsed as an unencrypted PEM private key. | supply an unencrypted Ed25519 private key PEM (`openssl genpkey -algorithm ed25519 -out key.pem`, or `agentce catalog sign --new-key <path>`). |
 | `sign.keyless_offline` | the profile is keyless and obtains a certificate from a Fulcio instance (network); the engine does not sign it offline. | use --profile kms --key <file> offline, or run keyless signing where the Fulcio and Rekor endpoints are reachable. |
@@ -74,13 +97,13 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `verify.report_evidence_tampered` | the packaged bundle, applicability profile, domain binding, or a catalog no longer matches the digest the manifest recorded. | the packaged evidence was altered after signing; regenerate and re-sign the report. |
 | `verify.report_keyid_mismatch` | no claimant signature carries the keyid --expect-keyid named. | confirm the keyid with the sender, or drop --expect-keyid. |
 | `verify.report_manifest_tampered` | manifest.json does not match the digest the signature covers. | the manifest was altered after signing; regenerate and re-sign the report. |
-| `verify.report_no_claim` | the report directory has no claim.json: it was never signed, or the wrong directory was given. | pass the directory agentce assess wrote and agentce sign signed. |
-| `verify.report_no_trust_root` | the report has no embedded trust-root.json, and --signer-trust-root was not given. | pass --signer-trust-root <file>, or ask the sender to re-sign with sign --write-trust-root. |
+| `verify.report_no_claim` | the report directory has no claim.json: it was never signed, or the wrong directory was given. | pass the directory `agentce assess` wrote and `agentce sign` signed. |
+| `verify.report_no_trust_root` | the report has no embedded trust-root.json, and --signer-trust-root was not given. | pass --signer-trust-root <file>, or ask the sender to re-sign with `sign --write-trust-root`. |
 | `verify.report_output_tampered` | a manifest-tracked output file is missing, or its bytes no longer match the manifest. | the report was altered after signing; regenerate and re-sign it. |
-| `verify.report_reproduction_mismatch` | an offline re-run from the packaged evidence does not reproduce a canonical output byte for byte. | run agentce diff between the shipped and re-run outputs for the full picture. |
+| `verify.report_reproduction_mismatch` | an offline re-run from the packaged evidence does not reproduce a canonical output byte for byte. | run `agentce diff` between the shipped and re-run outputs for the full picture. |
 | `verify.report_signature_invalid` | no claimant signature verifies against the trust root. | confirm the trust root holds the signer's real key, or re-sign the report. |
-| `verify.report_subject_missing` | the signed statement is missing a required subject (manifest.json or claim.json). | re-sign the report: agentce sign <report-dir> --as claimant. |
-| `verify.report_unsigned` | claim.json carries no signatures. | sign the report first: agentce sign <report-dir> --as claimant. |
+| `verify.report_subject_missing` | the signed statement is missing a required subject (manifest.json or claim.json). | re-sign the report: `agentce sign <report-dir> --as claimant`. |
+| `verify.report_unsigned` | claim.json carries no signatures. | sign the report first: `agentce sign <report-dir> --as claimant`. |
 
 ## Warnings
 
@@ -94,17 +117,17 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 
 | Key | Cause | Fix |
 |---|---|---|
-| `class_mismatch` | the event's source class differs from the class declared for its source. | align the emitted agentcesourceclass with the profile's declared class. |
-| `context_mismatch` | the event's JSON-LD @context is not the canonical evidence context. | set @context to https://agent-conformance.org/contexts/evidence/v1. |
-| `duplicate_id` | two events share the same id; the later one was quarantined. | give every event a stable, unique id at the source. |
-| `oversize` | the event exceeds the size limit and was refused. | reference bulk content by an opaque locator instead of inlining it (SPEC R12). |
-| `schema_invalid` | an event failed schema validation and was not ingested. | fix the emitter or adapter so the event matches agentce-evidence.schema.json. |
-| `time_order` | an event's timestamp is out of order within its stream. | emit events in time order, or correct the source clock. |
+| `class_mismatch` | the event's source class differs from the class declared for its source. | ask whoever wrote the source adapter to align the emitted agentceSourceClass with the profile's declared class. |
+| `context_mismatch` | the event's JSON-LD @context is not the canonical evidence context. | ask whoever wrote the source adapter to set @context to https://agent-conformance.org/contexts/evidence/v1. |
+| `duplicate_id` | two events share the same id; the later one was quarantined. | ask whoever instruments the source to give every event a stable, unique id. |
+| `oversize` | the event exceeds the size limit and was refused. | ask whoever wrote the source adapter to reference bulk content by an opaque locator instead of inlining it (SPEC R12). |
+| `schema_invalid` | an event failed schema validation and was not ingested. | ask whoever wrote the emitter or adapter to fix it so the event matches agentce-evidence.schema.json. |
+| `time_order` | an event's timestamp is out of order within its stream. | ask whoever instruments the source to emit events in time order, or correct the source clock. |
 | `unknown_source` | the event's source is not declared in the applicability profile. | declare the source under the subject's evidence_sources with its trust class. |
-| `unknown_type` | the event's @type is not a recognised evidence type. | map the event to a canonical evidence type in the adapter (SPEC §12). |
+| `unknown_type` | the event's @type is not a recognised evidence type. | ask whoever wrote the adapter to map the event to a canonical evidence type (SPEC §12). |
 
 ## Outcome explanations
 
 | Key | Cause | Fix |
 |---|---|---|
-| `insufficient_evidence` | the minimum evidence to judge the control was not present in the window. | instrument the missing corroborating stream (see the control's techniques). |
+| `insufficient_evidence` | the minimum evidence to judge the control was not present in the window. | ask the agent's developer to instrument the missing corroborating stream (see the control's techniques). |

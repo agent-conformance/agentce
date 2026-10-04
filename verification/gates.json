@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.34.0",
+  "suite_version": "0.35.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1295,6 +1295,46 @@
         }
       ],
       "fix_hint": "Run verification/gates/ingest_support_matrix.sh; it names the exact message key (ingest.matrix.unknown_source, .wrong_tier, .count_mismatch, .count_arithmetic, .missing_tier_line, .docs_wrong_tier, .docs_unknown_source, .docs_malformed_row, .docs_unrecognized_tier, .docs_definition_drift or .docs_table_missing) and the offending name."
+    },
+    {
+      "id": "VG-UX-NEXT-STEP",
+      "title": "Every non-happy message key the Python engine raises with a literal key and a literal fix carries a cause and a next step, naming who can act when it isn't the person at the terminal",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/ux_next_step.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 120,
+      "invariant": "Every error, warning, and skipped-evaluation reason carries a stable message key.",
+      "rubric": {
+        "pass": "the AST scan over every literal-key, literal-fix InputError/AgentceError call site in engines/python/agentce finds every key registered in spec/i18n/messages.en.json with a non-empty fix, byte-identical to the one real call site's text when every literal-fix site for that key agrees, and the fixed 10-key actor table names an actor other than the terminal user; docs/errors.md and its published website copy are exactly what agentce doctor --write-errors writes today and name every key the scan found raised",
+        "fail": "the scan reports a never-registered key, a stale single-voice fix, or a missing actor phrase, or docs/errors.md is stale relative to a real doctor --write-errors run"
+      },
+      "faults": [
+        {
+          "description": "A single-voice key's registered fix reverts to stale text that no longer matches its one real call site, caught by the AST scan's byte-match check",
+          "file": "spec/i18n/messages.en.json",
+          "search": "  \"errors.verify.report_unsigned.fix\": \"sign the report first: `agentce sign <report-dir> --as claimant`.\",",
+          "replace": "  \"errors.verify.report_unsigned.fix\": \"sign the report first.\","
+        },
+        {
+          "description": "An actor-naming key's fix is stripped back to addressing only the person at the terminal, caught by the actor-marker check",
+          "file": "spec/i18n/messages.en.json",
+          "search": "  \"errors.duplicate_id.fix\": \"ask whoever instruments the source to give every event a stable, unique id.\",",
+          "replace": "  \"errors.duplicate_id.fix\": \"give every event a stable, unique id.\","
+        },
+        {
+          "description": "A new literal-key, literal-fix refusal (one InputError positional call, one AgentceError keyword-argument call) is added with no catalogue entry, caught by the AST scan's unregistered-key check for both call shapes",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "def _flag(ns: argparse.Namespace, name: str) -> bool:\n    return bool(getattr(ns, name, False))",
+          "replace": "def _flag(ns: argparse.Namespace, name: str) -> bool:\n    return bool(getattr(ns, name, False))\n\n\ndef _demo_fault_unregistered_key() -> None:\n    raise InputError(\n        \"input.__demo_fault_unregistered__\",\n        \"demo fault for VG-UX-NEXT-STEP (finding 6): a literal-key, literal-fix call with no catalogue entry.\",\n        \"this key is deliberately never registered; the gate must flag it.\",\n    )\n\n\ndef _demo_fault_unregistered_key_keyword_form() -> None:\n    raise AgentceError(\n        key=\"input.__demo_fault_unregistered_kw__\",\n        cause=\"demo fault for VG-UX-NEXT-STEP (finding 6): the keyword-argument call shape.\",\n        fix=\"this key is deliberately never registered; the gate must flag it too.\",\n    )"
+        }
+      ],
+      "fix_hint": "Run verification/gates/ux_next_step.sh; verification/gates/ux_next_step.py --list-raised-keys names every key it expects documented, and its stderr names exactly which key is unregistered, stale, or missing an actor phrase."
     }
   ]
 }

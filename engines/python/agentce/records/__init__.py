@@ -398,7 +398,7 @@ def scan(
             "input.records_no_genai_spans",
             "the folder holds OpenTelemetry traces, but none of their spans is a GenAI operation "
             f"({len(unrecognised)} file(s) not recognised).",
-            "instrument the agent with OpenTelemetry GenAI or OpenInference, then export its traces.",
+            "ask the agent's developer to instrument it with OpenTelemetry GenAI or OpenInference, then export its traces.",
         )
     if not read:
         raise InputError(

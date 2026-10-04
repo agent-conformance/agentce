@@ -522,7 +522,7 @@ class CliTest {
         assertEquals(3, env.get("exit_code").asInt());
         assertEquals("internal.unexpected", env.get("error").get("message_key").asText());
         assertEquals(
-                "re-run with --debug to see the stack trace, then file an issue.",
+                "re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate.",
                 env.get("error").get("fix").asText());
     }
 

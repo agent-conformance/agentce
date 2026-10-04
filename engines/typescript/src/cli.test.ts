@@ -643,7 +643,10 @@ test("diff: a malformed (not-JSON) input file gives a keyed internal.unexpected 
     assert.equal(exitCode, 3);
     const error = envelope.error as { message_key: string; fix: string };
     assert.equal(error.message_key, "internal.unexpected");
-    assert.equal(error.fix, "re-run with --debug to see the stack trace, then file an issue.");
+    assert.equal(
+      error.fix,
+      "re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate.",
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

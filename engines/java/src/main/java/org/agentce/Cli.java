@@ -194,7 +194,7 @@ public final class Cli {
                     new AgentceError(
                             "internal.unexpected",
                             message,
-                            "re-run with --debug to see the stack trace, then file an issue."));
+                            "re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate."));
         }
         emit(result, json);
         return result.exitCode();
