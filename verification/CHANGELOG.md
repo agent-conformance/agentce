@@ -3,6 +3,25 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.32.0
+
+- Added `VG-CI-FAST-CHECKS`: a quick-tier gate running every package's `ruff check`, `ruff format
+  --check`, `mypy`, `pnpm lint` and `pnpm typecheck`, and both `conformance/` registry self-tests
+  (`catalog_registry_check.py --self-test`, `registry_check.py --self-test`), in the same directory
+  and with the same command CI uses (18.37i, AGENTS.md: "These mirror the CI workflows; keep them in
+  sync"). 18.37's circuit breaker found two of its three failures were checks CI runs that
+  `--quick` did not (a verifier round's ruff/mypy/biome findings; a red CI run from a stale catalog
+  registry digest). `verification/gates/ci_fast_checks_check.py` scans every `.github/workflows/
+  *.yml` file for each real invocation of one of those checkers, pairs it with its step's
+  `working-directory`, and fails if a discovered CI step has no entry in its committed `MANIFEST`
+  or a `MANIFEST` entry matches no real CI step, so this gate and CI cannot silently drift apart;
+  only once that comparison is clean does `verification/gates/ci_fast_checks.sh` run the real
+  commands. `offline_bundle`, `integration_breadth_check` and the docs build stay out of scope
+  (too slow for the quick tier). Two seeded faults: `MANIFEST` drops its `engines/python` `mypy`
+  entry while the real CI step stays (the drift this gate exists to catch), and an unused import in
+  `verification/shard.py` trips `ruff check` for real (proving the gate's commands actually run, not
+  only the drift comparison).
+
 ## 0.31.0
 
 - Added `VG-CATALOG-RULE-UNIQUE`: no two rung-2 controls in any shipped catalog (the three base catalogs

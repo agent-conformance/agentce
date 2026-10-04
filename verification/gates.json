@@ -1196,6 +1196,41 @@
         }
       ],
       "fix_hint": "Run verification/gates/catalog_rule_uniqueness.sh and read which catalog/pair it names; the check is engines/python/agentce/catalog.py's new_rule_uniqueness_problems against verification/gates/fixtures/rule_uniqueness/baseline.json."
+    },
+    {
+      "id": "VG-CI-FAST-CHECKS",
+      "title": "A quick-tier gate runs every package's ruff check, ruff format --check, mypy, pnpm lint and pnpm typecheck, and both registry self-tests, in the same directory and with the same command as the CI workflows, and fails when a workflow lint, type-check or registry step has no matching entry here",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/ci_fast_checks.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm"
+      ],
+      "timeout_s": 120,
+      "invariant": "These mirror the CI workflows; keep them in sync.",
+      "rubric": {
+        "pass": "every real CI invocation of ruff check, ruff format --check, mypy, pnpm lint, pnpm typecheck, catalog_registry_check.py or registry_check.py (as discovered from .github/workflows/*.yml) has a matching MANIFEST entry in ci_fast_checks_check.py, every MANIFEST entry matches a real CI step (no stale entries), and every one of those commands, re-run for real in the same directory with the same command text, is clean",
+        "fail": "a real CI lint/type-check/registry step has no MANIFEST entry, a MANIFEST entry matches no real CI step, or any of the real commands itself fails (a ruff, mypy or pnpm finding, or a failed registry self-test)"
+      },
+      "faults": [
+        {
+          "description": "MANIFEST drops the engines/python mypy entry while the tests.yml CI step that runs it is untouched, the exact drift (a real CI check with no matching entry here) this gate exists to catch",
+          "file": "verification/gates/ci_fast_checks_check.py",
+          "search": "    (\"engines/python\", \"uv run --frozen mypy .\"),\n",
+          "replace": ""
+        },
+        {
+          "description": "an unused import (ruff F401) in one of the real MANIFEST-checked tools files turns the gate red through its actual ruff run, not only through the drift check",
+          "file": "verification/shard.py",
+          "search": "import subprocess\nimport sys\n",
+          "replace": "import os\nimport subprocess\nimport sys\n"
+        }
+      ],
+      "fix_hint": "Run verification/gates/ci_fast_checks.sh; it names which package's check failed, or which CI step/MANIFEST entry is unmatched (ci_fast_checks_check.py's MANIFEST, compared against .github/workflows/*.yml)."
     }
   ]
 }
