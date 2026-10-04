@@ -517,11 +517,13 @@ claims:
         used, not merely named in prose.
   - id: integrations.trace-store-connectors
     text: >-
-      A realistic export shaped exactly as Langfuse, Phoenix/Arize, Datadog LLM Observability, and
-      LangSmith each actually produce it round-trips into canonical AgentCE events through the existing
+      For Langfuse, Arize Phoenix, Datadog LLM Observability and LangSmith, a fixture shaped as a
+      generic OTel GenAI- or OpenInference-convention Collector export — not a capture of any
+      vendor's own export API — round-trips into canonical AgentCE events through the existing
       otel-genai adapter, zero quarantines, proven per vendor by a committed fixture; a documented
       OpenTelemetry Collector recipe wires the fan-out that carries such an export into AgentCE's
-      ingest path in a real deployment.
+      ingest path in a real deployment. Each vendor's own export API is graded separately in the
+      ingest support matrix.
     status: built
     pages:
       - website/src/content/docs/docs/trace-store-connectors.md
@@ -634,3 +636,23 @@ claims:
         Runs registry_check.py --self-test: a well-formed report is listed, a report with an
         unverifiable golden digest is refused, and a report missing the schema-required claim field is
         refused with a distinct schema-invalid status before signature verification is attempted.
+  - id: ingest.support-matrix-counts
+    text: >-
+      46 of the 54 sources in the ingest support matrix are supported (AgentCE reads each one
+      exactly as its published definition says), 4 are experimental, and 4 are on the roadmap; the
+      generated Supported-sources page and README.md's tier lines always agree with
+      spec/ingest/support-matrix.yaml's own row count and tier for every row.
+    status: built
+    pages:
+      - website/src/content/docs/reference/ingest-support-matrix.md
+      - docs/reference/ingest-support-matrix.md
+      - README.md
+    check:
+      workflow: .github/workflows/verification.yml
+      job: build
+      description: >-
+        The "Quick tier" step runs VG-INGEST-SUPPORT-MATRIX, which recomputes the matrix's real
+        per-tier counts from spec/ingest/support-matrix.yaml and fails if README.md's tier lines or
+        the trace-store-connectors.md table name a source outside the matrix or under the wrong
+        tier; docs/build.py --check-links and --check-publish (run in the same build) fail if the
+        generated Supported-sources page is stale against the matrix.

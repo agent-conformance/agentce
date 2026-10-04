@@ -23,22 +23,39 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-MATRIX = ROOT / "spec" / "ingest" / "support-matrix.yaml"
-README = ROOT / "README.md"
-TRACE_STORE_DOCS = (
-    ROOT / "website" / "src" / "content" / "docs" / "docs" / "trace-store-connectors.md"
-)
 
+_KNOWN_TIERS = ("Supported", "Experimental", "Roadmap")
 _TIER_LINE_RE = re.compile(
-    r"^\*\*(Supported|Experimental|Roadmap)\*\* \((\d+)\): (.+)$", re.MULTILINE
+    r"^\*\*(" + "|".join(_KNOWN_TIERS) + r")\*\* \((\d+)\): (.+)$", re.MULTILINE
 )
 _MORE_RE = re.compile(r"^and (\d+) more$")
 _TRAILER_RE = re.compile(r"\s*—\s*(?:see the full matrix|help wanted)\s*$")
-_TABLE_ROW_RE = re.compile(
-    r"^\| ([^|]+?) \| (Supported|Experimental|Roadmap) \| ([^|]+?) \| [^|]+? \|$",
-    re.MULTILINE,
-)
+_TABLE_HEADER = "| Backend | Tier | Reader follows | Build item |"
 _FOLLOWS_RE = re.compile(r"\]\(([^)]+)\),\s*(.+)$")
+
+
+def _extract_table_rows(text: str) -> list[list[str]]:
+    """Every row of the trace-store table, as its raw cells, with no shape assumed.
+
+    Locates the table by its fixed header (skipping the header and its ``---`` separator), then
+    takes every following ``|``-delimited line up to the first line that is not one, splitting on
+    ``|`` rather than matching a regex against a presumed-good shape. This way a row that doesn't
+    look like the others — wrong column count, markdown emphasis around the tier cell, a tier word
+    that isn't one of the three real ones — still reaches the caller as a row, instead of simply
+    failing to match and vanishing from scrutiny.
+    """
+    lines = text.splitlines()
+    try:
+        start = lines.index(_TABLE_HEADER) + 2
+    except ValueError:
+        return []
+    rows: list[list[str]] = []
+    for line in lines[start:]:
+        stripped = line.strip()
+        if not (stripped.startswith("|") and stripped.endswith("|")):
+            break
+        rows.append([cell.strip() for cell in stripped[1:-1].split("|")])
+    return rows
 
 
 def load_matrix_rows(path: Path) -> dict[str, dict]:
@@ -98,7 +115,7 @@ def check_tier_lines(
                     f"ingest.matrix.wrong_tier: {source} names {name!r} under {tier_label}, but "
                     f"the matrix grades it {row['tier']}"
                 )
-    for tier in ("Supported", "Experimental", "Roadmap"):
+    for tier in _KNOWN_TIERS:
         if tier.lower() not in seen_tiers:
             problems.append(
                 f"ingest.matrix.missing_tier_line: {source} has no {tier} line"
@@ -109,9 +126,23 @@ def check_tier_lines(
 def check_trace_store_docs(rows_by_name: dict[str, dict], text: str) -> list[str]:
     problems: list[str] = []
     rows_seen = 0
-    for name, tier_label, follows in _TABLE_ROW_RE.findall(text):
-        name = name.strip()
+    for cells in _extract_table_rows(text):
+        if len(cells) != 4:
+            problems.append(
+                f"ingest.matrix.docs_malformed_row: trace-store-connectors.md's table has a row "
+                f"with {len(cells)} column(s), not 4: {cells!r}"
+            )
+            continue
         rows_seen += 1
+        name = cells[0].strip("*").strip()
+        tier_text = cells[1].strip("*").strip()
+        follows = cells[2]
+        if tier_text not in _KNOWN_TIERS:
+            problems.append(
+                f"ingest.matrix.docs_unrecognized_tier: trace-store-connectors.md names {name!r} "
+                f"with tier {tier_text!r}, not one of {', '.join(_KNOWN_TIERS)}"
+            )
+            continue
         row = rows_by_name.get(name)
         if row is None:
             problems.append(
@@ -119,10 +150,10 @@ def check_trace_store_docs(rows_by_name: dict[str, dict], text: str) -> list[str
                 f"{name!r}, which is not a matrix row"
             )
             continue
-        if row["tier"] != tier_label.lower():
+        if row["tier"] != tier_text.lower():
             problems.append(
                 f"ingest.matrix.docs_wrong_tier: trace-store-connectors.md's table says "
-                f"{name!r} is {tier_label}, but the matrix grades it {row['tier']}"
+                f"{name!r} is {tier_text}, but the matrix grades it {row['tier']}"
             )
         m = _FOLLOWS_RE.search(follows.strip())
         definition = row.get("definition") or {}
@@ -143,19 +174,25 @@ def check_trace_store_docs(rows_by_name: dict[str, dict], text: str) -> list[str
     if rows_seen < 4:
         problems.append(
             f"ingest.matrix.docs_table_missing: trace-store-connectors.md's backend table has "
-            f"only {rows_seen} row(s) (expected at least 4: Langfuse, Phoenix, Datadog LLM "
-            "Observability, LangSmith)"
+            f"only {rows_seen} well-formed row(s) (expected at least 4: Langfuse, Phoenix, Datadog "
+            "LLM Observability, LangSmith)"
         )
     return problems
 
 
-def check() -> list[str]:
-    rows_by_name = load_matrix_rows(MATRIX)
+def check(root: Path | None = None) -> list[str]:
+    """Run the real check. ``root`` defaults to the repository root; pass a different root (for
+    example a temporary copy with one file mutated) to check that copy instead."""
+    base = root if root is not None else ROOT
+    matrix = base / "spec/ingest/support-matrix.yaml"
+    readme = base / "README.md"
+    trace_store_docs = base / "website/src/content/docs/docs/trace-store-connectors.md"
+    rows_by_name = load_matrix_rows(matrix)
     problems = check_tier_lines(
-        rows_by_name, README.read_text(encoding="utf-8"), "README.md"
+        rows_by_name, readme.read_text(encoding="utf-8"), "README.md"
     )
     problems += check_trace_store_docs(
-        rows_by_name, TRACE_STORE_DOCS.read_text(encoding="utf-8")
+        rows_by_name, trace_store_docs.read_text(encoding="utf-8")
     )
     return problems
 
@@ -395,6 +432,62 @@ def self_test() -> int:
         (
             "a table row whose link and version both agree with the matrix reports nothing",
             check_trace_store_docs(rows, agreeing_table) == [],
+        )
+    )
+
+    # The verifier's adversarial probes (18.39 verifier round 1): a row shaped differently from
+    # the four well-formed ones must still be scrutinised, never silently dropped because it did
+    # not match an assumed regex shape.
+    too_few_cells_table = good_table + "| Honeycomb | GA |\n"
+    cases.append(
+        (
+            "a 2-column row is docs_malformed_row, not silently dropped",
+            any(
+                "ingest.matrix.docs_malformed_row" in p and "Honeycomb" in p
+                for p in check_trace_store_docs(rows, too_few_cells_table)
+            ),
+        )
+    )
+
+    three_cell_table = good_table + "| Honeycomb | Supported | x |\n"
+    cases.append(
+        (
+            "a 3-column row is docs_malformed_row, not silently dropped",
+            any(
+                "ingest.matrix.docs_malformed_row" in p
+                for p in check_trace_store_docs(rows, three_cell_table)
+            ),
+        )
+    )
+
+    bold_tier_overclaim_table = good_table.replace(
+        "| Datadog LLM Observability | Experimental | x | y |\n",
+        "| Datadog LLM Observability | **Supported** | x | y |\n",
+    )
+    cases.append(
+        (
+            "a bold-markdown tier cell is read through the markup, not treated as an unrecognised "
+            "shape that lets the Supported overclaim through",
+            any(
+                "ingest.matrix.docs_wrong_tier" in p and "Datadog" in p
+                for p in check_trace_store_docs(rows, bold_tier_overclaim_table)
+            ),
+        )
+    )
+
+    unrecognized_tier_table = good_table.replace(
+        "| Datadog LLM Observability | Experimental | x | y |\n",
+        "| Datadog LLM Observability | GA | x | y |\n",
+    )
+    cases.append(
+        (
+            "a tier word outside Supported/Experimental/Roadmap is docs_unrecognized_tier, not dropped",
+            any(
+                "ingest.matrix.docs_unrecognized_tier" in p
+                and "Datadog" in p
+                and "'GA'" in p
+                for p in check_trace_store_docs(rows, unrecognized_tier_table)
+            ),
         )
     )
 
