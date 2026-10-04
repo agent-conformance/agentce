@@ -3,6 +3,25 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.36.0
+
+- Added `VG-REACH-TABLE` (18.41, VALUE-PROP.md "Reach", USER_EXPERIENCE.md R8): the locked reach
+  headline ("Reads records from 400+ tools and 600+ cloud services, and the tool declarations of
+  25,000+ MCP servers...") and a one-reader-per-standard table, generated from
+  `spec/ingest/support-matrix.yaml`'s `producers`/`producers_meta` data, now appear on README.md, the
+  docs and website Supported-sources page (`docs/build.py`'s `_reach_table_text`, spliced into
+  `_ingest_body_text`), and the landing page's proof strip. `reach_numbers(matrix)` is a pure function
+  computing every count directly from the matrix; the gate compares every surface's stated count,
+  check date and source link (per row, via a typed `ReachRow` spec) against it, by row label. A count
+  mismatch (primary or the deduplicated-total row's self-managed-only secondary count) raises
+  `reach.table.count_mismatch`; a missing or wrong date/source raises `reach.table.missing_provenance`;
+  a missing section raises `reach.table.missing_section`; a duplicated heading or row raises
+  `reach.table.duplicate_section`; a section missing the locked headline raises
+  `reach.table.missing_headline`; and a real count that has fallen under the headline's own floor
+  (400 tools, 600 cloud services, 25,000 MCP servers) raises `reach.table.floor_violated`
+  independently of what any surface currently states, so the gate still catches honesty drift even if
+  every surface agrees with every other surface. The 10-case self-test proves each key fires alone.
+
 ## 0.35.0
 
 - Added `VG-UX-NEXT-STEP` (18.40, USER_EXPERIENCE.md R4): an AST scan over every

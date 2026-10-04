@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.35.0",
+  "suite_version": "0.36.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1335,6 +1335,34 @@
         }
       ],
       "fix_hint": "Run verification/gates/ux_next_step.sh; verification/gates/ux_next_step.py --list-raised-keys names every key it expects documented, and its stderr names exactly which key is unregistered, stale, or missing an actor phrase."
+    },
+    {
+      "id": "VG-REACH-TABLE",
+      "title": "The reach headline and table on README.md, the website's Supported-sources page, and the landing page state the counts, check dates, and source links computed from spec/ingest/support-matrix.yaml, never a hand-typed value",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/reach_table.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 60,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "README.md, the docs and website copies of the Supported-sources page, and the landing page's proof strip each carry the locked reach headline and a table whose every row's stated count (including the deduplicated-total row's self-managed-only parenthetical), check date, and source link equal reach_numbers(matrix) and the matrix's own fields, every real count clears its locked-headline floor, and the self-test proves each failure mode its own message key",
+        "fail": "a surface's stated count, date, or source disagrees with the matrix, a surface is missing the section or the headline, a section or row is duplicated, a real count has fallen under its floor, or the self-test does not discriminate"
+      },
+      "faults": [
+        {
+          "description": "README's \"Distinct products, deduplicated\" row is hand-edited to a number the matrix disagrees with, caught by the count-mismatch check",
+          "file": "README.md",
+          "search": "| Distinct products, deduplicated | 408 (348 counting only self-managed Kubernetes) | 2026-09-29 | — |",
+          "replace": "| Distinct products, deduplicated | 409 (348 counting only self-managed Kubernetes) | 2026-09-29 | — |"
+        }
+      ],
+      "fix_hint": "Run verification/gates/reach_table.sh; it names the exact message key (reach.table.count_mismatch, .missing_provenance, .missing_section, .missing_headline, .duplicate_section or .floor_violated) and the offending row or surface."
     }
   ]
 }

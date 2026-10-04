@@ -2,6 +2,22 @@
 
 Generated from `spec/ingest/support-matrix.yaml`, so this page and the matrix never disagree. **46 of 54 sources are supported**: AgentCE reads each one exactly as its published definition says — the producer's code first, then its machine-readable schema, then its prose. **4 are experimental**, where the producer calls the interface a preview or beta, or a field AgentCE reads is defined nowhere. **4 are on the roadmap**, where we'd welcome help.
 
+## Reach: one reader per standard
+
+Reads records from 400+ tools and 600+ cloud services, and the tool declarations of 25,000+ MCP servers, through the open standards they already write. One reader per standard, not one integration per product.
+
+| Standard | Products confirmed to write it | Checked | Source |
+|---|---|---|---|
+| OpenTelemetry GenAI and OpenInference traces | 71 | 2026-09-29 | https://github.com/open-telemetry/opentelemetry-python-genai |
+| Kubernetes audit events | 146 | 2026-09-29 | https://github.com/cncf/k8s-conformance |
+| CycloneDX | 108 | 2026-09-29 | https://cyclonedx.org/tool-center/ |
+| SPDX | 43 | 2026-09-29 | https://spdx.dev/use/spdx-tools/ |
+| OCSF | 39 | 2026-09-29 | https://docs.aws.amazon.com/security-lake/latest/userguide/integrations-third-party.html |
+| Sigstore and in-toto | 8 | 2026-09-29 | https://docs.npmjs.com/generating-provenance-statements/ |
+| Distinct products, deduplicated | 408 (348 counting only self-managed Kubernetes) | 2026-09-29 | — |
+| Cloud audit logs | 633 | 2026-09-29 | https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-aws-service-specific-topics.html, https://docs.cloud.google.com/logging/docs/audit/services, https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/azure-services-resource-providers |
+| MCP tool declarations | 27,992 | 2026-09-29 | https://registry.modelcontextprotocol.io/v0/servers?version=latest&limit=100 |
+
 ## Supported (46)
 
 | Source | Format | Definition | Version | Risk | What it shows | Hill verification |
