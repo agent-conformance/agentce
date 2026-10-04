@@ -789,6 +789,66 @@ def test_oscal_maps_outcomes() -> None:
     assert finding["target"]["status"]["state"] == "satisfied"
 
 
+def test_oscal_observation_methods_follow_assertion_mode() -> None:
+    """SPEC.md:1166: methods: [TEST] (automated) or [EXAMINE] (manual) (18.17b; base_sha cc5d4da
+    hard-coded ["TEST"] for every mode, including manual). `semi-automated` is pinned at ["TEST"],
+    unchanged from base: this engine has no per-assertion record of a completed manual checklist
+    (`_OSCAL_METHODS`'s own comment), so claiming `EXAMINE` happened for every semi-automated finding
+    would assert an examination with no evidence behind it -- a regression of this item's own fix,
+    not an extension of it."""
+    by_mode = {
+        a.mode: a
+        for a in (
+            dataclasses.replace(
+                _assertion("conformant"), control="OVS-01", mode="automated"
+            ),
+            dataclasses.replace(
+                _assertion("conformant"), control="OVS-02", mode="semi-automated"
+            ),
+            dataclasses.replace(
+                _assertion("conformant"), control="OVS-03", mode="manual"
+            ),
+        )
+    }
+    oscal = render_oscal(list(by_mode.values()))
+    observations = {
+        o["uuid"]: o for o in oscal["assessment-results"]["results"][0]["observations"]
+    }
+    findings = {
+        f["title"]: observations[f["related-observations"][0]["observation-uuid"]]
+        for f in oscal["assessment-results"]["results"][0]["findings"]
+    }
+    methods_by_mode = {
+        a.mode: findings[f"{a.control} for {a.subject}"]["methods"]
+        for a in by_mode.values()
+    }
+    assert methods_by_mode == {
+        "automated": ["TEST"],
+        "semi-automated": ["TEST"],
+        "manual": ["EXAMINE"],
+    }
+
+
+def test_oscal_methods_falls_back_to_test_for_an_unrecognised_mode() -> None:
+    """`report --from` does not validate `mode` against the catalog's enum (only catalog-authoring
+    time does), so a hand-edited assertions file can carry any string here (18.17b critic round 2: the
+    TypeScript port's plain-object `[a.mode]` indexing resolved an `Object.prototype` member name like
+    `"constructor"` to that function instead of falling back, a schema-invalidating bug this dict's
+    `.get` default does not share -- pinned here for parity so a future Python port of that mistake
+    would be caught)."""
+    for mode in (
+        "constructor",
+        "toString",
+        "hasOwnProperty",
+        "__proto__",
+        "Manual",
+        "semi_automated",
+    ):
+        oscal = render_oscal([dataclasses.replace(_assertion("conformant"), mode=mode)])
+        observation = oscal["assessment-results"]["results"][0]["observations"][0]
+        assert observation["methods"] == ["TEST"], mode
+
+
 def test_oscal_finding_resolves_to_an_observation_with_its_evidence() -> None:
     oscal = render_oscal([_assertion("conformant")])
     result = oscal["assessment-results"]["results"][0]

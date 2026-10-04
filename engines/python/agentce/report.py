@@ -101,6 +101,21 @@ _OSCAL_STATE = {
     "not_assessed": "not-satisfied",
     "insufficient_evidence": "not-satisfied",
 }
+#: An observation's OSCAL `methods` (SPEC.md:1166): `automated` -> TEST, `manual` -> EXAMINE; every
+#: other mode (today, only `semi-automated`) keeps the base behaviour, `["TEST"]`, via `.get`'s
+#: default below. `semi-automated` is not raised to `["TEST", "EXAMINE"]` even though DC-6
+#: (SPEC.md:246) defines the mode as "automated evidence, human judgment": this engine does not yet
+#: consume a completed manual checklist to confirm that judgment happened for any given assertion
+#: (`auditor_view.py`'s own "rung-2-only boundary" docstring; `checklist.schema.json` ties `EXAMINE`-
+#: grade evidence to a *completed* checklist record, which nothing here reads). Claiming `EXAMINE` for
+#: every semi-automated finding regardless would assert a human examination that, for an assertion
+#: with no such record, did not happen -- the same misrepresentation this item exists to remove from
+#: `manual`, not a fix for it. 18.17b therefore narrows to the literal SPEC.md:1166 sentence; raising
+#: `semi-automated` is deferred to a future item that can cite a real completed-checklist record per
+#: assertion (`decisions/phase-18.tsv`, this item).
+_OSCAL_METHODS = {
+    "manual": ["EXAMINE"],
+}
 
 
 def _digest_bytes(data: bytes) -> str:
@@ -1723,6 +1738,13 @@ def render_oscal(
     needed here -- the control id alone is the traceable token (SPEC §7.3's control ids are globally
     unique).
 
+    Each observation's ``methods`` (18.17b, SPEC.md:1166) reflects the assertion's own ``mode`` via
+    ``_OSCAL_METHODS``, instead of a hard-coded ``["TEST"]`` for every finding: a manual finding gets
+    ``["EXAMINE"]``, the evaluation method SPEC.md:1166 requires for that mode, never ``["TEST"]``.
+    ``semi-automated`` keeps ``["TEST"]`` (the base behaviour, via the dict's ``.get`` default) --
+    see ``_OSCAL_METHODS``'s own comment for why raising it to include ``EXAMINE`` would claim a
+    human examination this engine has no record of.
+
     ``deviations`` (18.17, SPEC.md:1166): the same already-linted register ``assess.apply_deviations``
     applied, so every finding whose assertion carries a ``deviation`` gets one ``risks[]`` entry citing
     its finding uuid, with ``mitigating-factors`` from the matching register entry's
@@ -1748,7 +1770,7 @@ def render_oscal(
         observation: dict[str, Any] = {
             "uuid": obs_uuid,
             "description": f"Assessment activity for {a.control} on {a.subject}.",
-            "methods": ["TEST"],
+            "methods": list(_OSCAL_METHODS.get(a.mode, ["TEST"])),
             "collected": when,
         }
         if a.evidence:
