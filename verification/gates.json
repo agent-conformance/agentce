@@ -1189,7 +1189,7 @@
           "replace": "  shape: shapes/REC-01.ttl\nexpectations:\n  - {id: S1, text: \"Adverse outcomes are linked to their consequential decision.\"}\nseverity: medium\nevidence_strength: strong\ntolerance: {kind: count, max: 0}\ntolerance_rationale: \"INC-01 is a structural expectation with no tolerated exceptions.\"\nfalse_positive_modes:\n  - \"A condition declared as an accepted deviation in the applicability profile.\"\ntechniques:\n  - \"techniques/inc-evidence-at-source\"\ntest_cases:\n  - {id: pass, expected: passed, fixture: test/REC-01/passed.jsonl}\n  - {id: fail, expected: failed, fixture: test/REC-01/failed.jsonl}\n  - {id: na, expected: inapplicable, fixture: test/REC-01/inapplicable.jsonl}\n"
         },
         {
-          "description": "the baseline catalog's ceiling is raised from 1 to 2 with no new pair: the free slot a paid-down pair leaves when its ceiling is not lowered with it",
+          "description": "the baseline catalog's ceiling is raised from 1 to 2 with no new pair, which is the free slot a paid-down pair leaves when nobody lowers its ceiling",
           "file": "verification/gates/fixtures/rule_uniqueness/baseline.json",
           "search": "  \"ceilings\": {\n    \"baseline\": 1,\n",
           "replace": "  \"ceilings\": {\n    \"baseline\": 2,\n"
