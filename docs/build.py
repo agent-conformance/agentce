@@ -782,7 +782,7 @@ def _ingest_body_text() -> str:
         sections.append("\n".join(lines) + "\n")
     if roadmap:
         lines = [
-            f"## Roadmap ({len(roadmap)})\n",
+            f"## {_INGEST_TIER_LABEL['roadmap']} ({len(roadmap)})\n",
             "No published definition yet, or nothing safe to read. We'd welcome help.\n",
             "| Source | Format | Why it's not supported yet | Help wanted |",
             "|---|---|---|---|",

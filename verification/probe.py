@@ -50,7 +50,7 @@ def main() -> int:
             "- Tests run with no network\n", encoding="utf-8"
         )
         (root / "verification" / "CHANGELOG.md").write_text(
-            "VG-FAILS VG-MISSING VG-BLIND VG-SENSITIVE\n", encoding="utf-8"
+            "## 0.0.0\n\nVG-FAILS VG-MISSING VG-BLIND VG-SENSITIVE\n", encoding="utf-8"
         )
         (root / "marker.txt").write_text("good\n", encoding="utf-8")
         sensitive = [
@@ -62,7 +62,7 @@ def main() -> int:
 
         def write(gates: list[dict[str, Any]]) -> None:
             registry.write_text(
-                json.dumps({"version": 1, "suite_version": "0", "gates": gates}),
+                json.dumps({"version": 1, "suite_version": "0.0.0", "gates": gates}),
                 encoding="utf-8",
             )
 

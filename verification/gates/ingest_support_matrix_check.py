@@ -149,22 +149,13 @@ def check_trace_store_docs(rows_by_name: dict[str, dict], text: str) -> list[str
     return problems
 
 
-def check(root: Path = ROOT) -> list[str]:
-    rows_by_name = load_matrix_rows(root / "spec" / "ingest" / "support-matrix.yaml")
+def check() -> list[str]:
+    rows_by_name = load_matrix_rows(MATRIX)
     problems = check_tier_lines(
-        rows_by_name, (root / "README.md").read_text(encoding="utf-8"), "README.md"
+        rows_by_name, README.read_text(encoding="utf-8"), "README.md"
     )
     problems += check_trace_store_docs(
-        rows_by_name,
-        (
-            root
-            / "website"
-            / "src"
-            / "content"
-            / "docs"
-            / "docs"
-            / "trace-store-connectors.md"
-        ).read_text(encoding="utf-8"),
+        rows_by_name, TRACE_STORE_DOCS.read_text(encoding="utf-8")
     )
     return problems
 
@@ -222,16 +213,15 @@ def self_test() -> int:
     )
 
     unknown = "**Experimental** (3): Cursor CLI output, AuthZEN decisions, Zephyr.\n"
+    unknown_problems = check_tier_lines(rows, unknown, "README.md")
     cases.append(
         (
             "a name outside the matrix is unknown_source, not wrong_tier",
             any(
                 "ingest.matrix.unknown_source" in p and "Zephyr" in p
-                for p in check_tier_lines(rows, unknown, "README.md")
+                for p in unknown_problems
             )
-            and not any(
-                "wrong_tier" in p for p in check_tier_lines(rows, unknown, "README.md")
-            ),
+            and not any("wrong_tier" in p for p in unknown_problems),
         )
     )
 

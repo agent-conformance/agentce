@@ -52,6 +52,18 @@ def read_or_empty(path: Path) -> str:
     return path.read_text(encoding="utf-8") if path.is_file() else ""
 
 
+def changelog_version(root: Path) -> str | None:
+    """CHANGELOG.md's newest ``## x.y.z`` heading, or None if it has none."""
+    return next(
+        iter(
+            CHANGELOG_VERSION.findall(
+                read_or_empty(root / "verification" / "CHANGELOG.md")
+            )
+        ),
+        None,
+    )
+
+
 def lint_registry(registry: dict[str, Any], root: Path) -> list[str]:
     """Return one ``<key>: <detail>`` line per problem; an empty list means the registry is accepted."""
     problems: list[str] = []
@@ -62,12 +74,12 @@ def lint_registry(registry: dict[str, Any], root: Path) -> list[str]:
     claims = read_or_empty(root / CLAIMS_REGISTER)
     agents = read_or_empty(root / "AGENTS.md")
     changelog = read_or_empty(root / "verification" / "CHANGELOG.md")
-    changelog_version = next(iter(CHANGELOG_VERSION.findall(changelog)), None)
-    if registry.get("suite_version") != changelog_version:
+    changelog_v = next(iter(CHANGELOG_VERSION.findall(changelog)), None)
+    if registry.get("suite_version") != changelog_v:
         problems.append(
             f"registry.suite_version_mismatch: gates.json suite_version is "
             f"{registry.get('suite_version')!r} but CHANGELOG.md's newest heading is "
-            f"{changelog_version!r}"
+            f"{changelog_v!r}"
         )
     seen: set[str] = set()
     for gate in gates:
@@ -235,14 +247,7 @@ def describe(entry: dict[str, Any]) -> list[str]:
 
 def bad_registries(root: Path) -> dict[str, tuple[dict[str, Any], str]]:
     """Deliberately bad registries, each with the message key the lint must raise for it."""
-    real_changelog_version = next(
-        iter(
-            CHANGELOG_VERSION.findall(
-                read_or_empty(root / "verification" / "CHANGELOG.md")
-            )
-        ),
-        None,
-    )
+    real_changelog_version = changelog_version(root)
     base: dict[str, Any] = {
         "id": "VG-DEMO-BAD",
         "title": "A demonstration gate",
