@@ -63,6 +63,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.init_exists` | init would overwrite a profile or domain binding that already exists. | pass --force to overwrite, or --out <dir> to write somewhere else. |
 | `input.init_role` | --role must be one of deployer, provider, or both. | pass --role deployer|provider|both. |
 | `input.nothing_evaluated` | no control reached conformant, non-conformant, or insufficient_evidence, so the run judged nothing. | emit under the subject and source the profile declares (agentce-emit reads AGENTCE_EMIT_SUBJECT and AGENTCE_EMIT_SOURCE), and record the evidence the catalog's controls apply to. |
+| `input.out_dir_unwritable` | the --out directory could not be created or written to. | choose a writable --out directory. |
 | `input.out_missing` | the command needs an output bundle path. | pass --out <bundle>. |
 | `input.package_path_overlap` | --out overlaps --bundle, --profile, --domain, or a --catalog-dir: packaging would read from or write into the tree it is producing. | point --out somewhere outside every input path, then re-run. |
 | `input.package_requires_bundle` | --package-for-sharing works only with --bundle/--profile; a records-folder run cannot be reproduced from a --bundle re-run. | pass --bundle and --profile instead of a records folder, or drop --package-for-sharing. |
@@ -81,6 +82,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.sign_profile` | unknown signing profile. | choose one of: sigstore-public, sigstore-private, kms. |
 | `input.sign_role` | --as must be `claimant` or `assessor`. | pass --as claimant|assessor. |
 | `input.sign_unrecognized_flag` | sign was given a flag it does not recognize. | pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag. |
+| `input.state_dir_unwritable` | the --state directory could not be created or written to. | choose a writable --state directory. |
 | `input.state_version_incompatible` | the state directory was written by an incompatible state_version. | there is no migration command: move or delete the state directory and re-run with --state pointing at a fresh, empty directory (this discards the prior bundle/outcome history recorded there, so late-arriving evidence and drift are tracked only from that point forward). |
 | `input.trust_root_invalid` | the trust root supplied by --trust-root or AGENTCE_TRUST_ROOT could not be loaded. | pass --trust-root <file> pointing at a trust root in the form of the engine's vendored data/trust/dev-root.json. |
 | `input.verify_target` | verify's target flags were given more than once, none at all, or in a combination that isn't valid. | pass exactly one target, e.g. `agentce verify --bundle <dir>`. |
