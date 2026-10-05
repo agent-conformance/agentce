@@ -26,20 +26,20 @@ mkdir -p "$regs" "$regs/s12dir" "$regs/o'brien"
 entry() { # entry <control> <owner> <approver> <granted> <expiry>
   printf '  - control: %s\n    rationale: "r"\n    compensating_control: "c"\n    owner: "%s"\n    approver: "%s"\n    granted: %s\n    expiry: %s\n' "$@"
 }
-header='deviation_register_version: 1\ndeviations:\n'
+header() { printf 'deviation_register_version: 1\ndeviations:\n'; }
 a=user:a@example.com # owner and approver: reserved example identities (RFC 2606)
 b=user:b@example.com
-{ printf "$header"; entry XYZ-99 "$a" "$b" '"2026-01-01T00:00:00Z"' '"2026-03-01T00:00:00Z"'; } > "$regs/s2.yaml"
-{ printf "$header"; entry AUV-04 "$a" "$b" '"2026-01-01T00:00:00Z"' '"2026-03-01T00:00:00Z"'; } > "$regs/s3.yaml"
-{ printf "$header"; entry AUV-01 "$a" "$b" '"2026-01-01T00:00:00Z"' '"2026-03-01T00:00:00Z"'
+{ header; entry XYZ-99 "$a" "$b" '"2026-01-01T00:00:00Z"' '"2026-03-01T00:00:00Z"'; } > "$regs/s2.yaml"
+{ header; entry AUV-04 "$a" "$b" '"2026-01-01T00:00:00Z"' '"2026-03-01T00:00:00Z"'; } > "$regs/s3.yaml"
+{ header; entry AUV-01 "$a" "$b" '"2026-01-01T00:00:00Z"' '"2026-03-01T00:00:00Z"'
   entry AUV-01 "$a" "$a" '"2026-01-01T00:00:00Z"' '"2026-03-01T00:00:00Z"'; } > "$regs/s4.yaml"
 printf -- '- control: AUV-01\n' > "$regs/s5.yaml"
 printf 'deviations: 3\n' > "$regs/s6.yaml"
 printf 'deviations:\n  - AUV-01\n' > "$regs/s7.yaml"
 printf 'deviations: [\n' > "$regs/s9.yaml"
-{ printf "$header"; entry AUV-01 "$a" "$b" 2026-01-01 2026-06-01; } > "$regs/s10.yaml"
+{ header; entry AUV-01 "$a" "$b" 2026-01-01 2026-06-01; } > "$regs/s10.yaml"
 printf 'deviation_register_version: 1\ndeviations: []\n' > "$regs/s11.yaml"
-{ printf "$header"; entry AUV-02 "$a" "$b" '"2025-06-01T00:00:00Z"' '"2025-11-01T00:00:00Z"'; } > "$regs/s13.yaml"
+{ header; entry AUV-02 "$a" "$b" '"2025-06-01T00:00:00Z"' '"2025-11-01T00:00:00Z"'; } > "$regs/s13.yaml"
 printf 'deviation_register_version: 1\ndeviations:\n  - control: AUV-\xff\n' > "$regs/s17.yaml"
 printf 'deviations:\n  - !!python/object:os.system {control: AUV-01}\n' > "$regs/s18.yaml"
 { printf 'deviation_register_version: 1\ndeviations:\n  - &e\n'
