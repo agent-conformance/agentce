@@ -714,10 +714,10 @@
           "replace": "    key = (\n        f\"report.buyer_answer_{entry['outcome']}\"\n        if entry[\"outcome\"] in (\"conformant\", \"insufficient_evidence\")\n        else \"report.buyer_answer_conformant\"\n    )\n    return i18n_format.format_message(cat[key], control=control)"
         },
         {
-          "description": "18.18b N1(b): the packaged run's buyer.md write is skipped, so a packaged --for buyer run writes no buyer.md at all",
+          "description": "18.18b N1(b), re-pointed at the 18.49 audience-view registry dispatch's md/html loop: the packaged run's buyer.md write is skipped, so a packaged --for buyer run writes no buyer.md at all",
           "file": "engines/python/agentce/report.py",
-          "search": "        write_text(\n            \"buyer.md\",\n            render_buyer_md(",
-          "replace": "        if not buyer_packaged:\n          write_text(\n            \"buyer.md\",\n            render_buyer_md("
+          "search": "            if renderer is not None and (ext in view_spec.always_write or wants(ext)):\n                write_text(f\"{for_preset}.{ext}\", renderer(view_data, view_ctx))",
+          "replace": "            if (\n                renderer is not None\n                and (ext in view_spec.always_write or wants(ext))\n                and not (for_preset == \"buyer\" and ext == \"md\" and buyer_packaged)\n            ):\n                write_text(f\"{for_preset}.{ext}\", renderer(view_data, view_ctx))"
         },
         {
           "description": "18.18b N5: the buyer markdown gap-step line is re-sanitised a second time over its own already-safe text, substituting its deliberately-added literal backticks away into single quotes",

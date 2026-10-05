@@ -24,8 +24,10 @@ from agentce.errors import AgentceError
 from agentce.profile import Profile, Subject
 from agentce.project import compute_project_view
 from agentce.report import (
+    AUDIENCE_VIEWS,
     CSV_COLUMNS,
     EMIT_FORMATS,
+    AudienceViewSpec,
     activity_cli_lines,
     blind_spots_cli_lines,
     render_csv,
@@ -1998,3 +2000,60 @@ def test_validate_report_follows_the_reference_problem_model(
     assert _locations(problems, label) == expected, problems
     if len(expected) == 2:  # one location, two keywords: `enum` sorts before `pattern`
         assert "is not one of" in problems[0] and "does not match" in problems[1]
+
+
+def test_audience_view_registry_adds_a_preset_without_touching_write_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """P18-18.49 (loophole L18.8): proves the registry's own claim -- a fourth preset is one
+    ``AUDIENCE_VIEWS`` entry, not a new branch in ``write_report``. Registered at test time only; no
+    change to ``write_report``'s body is needed for it to work."""
+    monkeypatch.setitem(
+        AUDIENCE_VIEWS,
+        "throwaway",
+        AudienceViewSpec(
+            compute=lambda ctx: {"n": len(ctx.assertions)},
+            render_md=lambda data, ctx: f"# throwaway\n\n{data['n']} assertions\n",
+            render_html=lambda data, ctx: f"<p>{data['n']}</p>",
+            always_write=frozenset({"md", "html"}),
+        ),
+    )
+    out = tmp_path / "o"
+    write_report(
+        out,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+        for_preset="throwaway",
+    )
+    assert json.loads((out / "throwaway.json").read_text()) == {"n": 1}
+    assert (out / "throwaway.md").read_text() == "# throwaway\n\n1 assertions\n"
+    assert (out / "throwaway.html").read_text() == "<p>1</p>"
+
+
+def test_audience_view_registry_names_exactly_the_three_real_presets() -> None:
+    """P18-18.49: the registry's own keys are the dispatch, not a parallel list a reviewer must
+    cross-check by hand -- security/auditor/buyer are each one ``AUDIENCE_VIEWS`` entry, no more, no
+    fewer, matching ``PRESET_EMIT``'s own three view-preset keys (commands/__init__.py)."""
+    assert set(AUDIENCE_VIEWS) == {"security", "auditor", "buyer"}
+
+
+def test_audience_view_registry_removing_a_preset_stops_write_report_rendering_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """P18-18.49: proves ``write_report`` genuinely dispatches through ``AUDIENCE_VIEWS`` for the three
+    real presets, not merely that a fourth key happens to work -- deleting ``"security"`` from the
+    registry (zero change to ``write_report``'s body) must stop ``security.json``/``.md``/``.html`` from
+    being written at all, the same outcome as an unregistered preset today."""
+    monkeypatch.delitem(AUDIENCE_VIEWS, "security")
+    out = tmp_path / "o"
+    write_report(
+        out,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+        for_preset="security",
+    )
+    assert not (out / "security.json").exists()
+    assert not (out / "security.md").exists()
+    assert not (out / "security.html").exists()

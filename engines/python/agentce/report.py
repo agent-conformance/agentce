@@ -20,7 +20,8 @@ import platform
 import unicodedata
 import uuid
 import xml.etree.ElementTree as ET
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -3076,6 +3077,89 @@ _LEGACY_EMIT = frozenset({"md", "html", "oscal", "sarif", "pack"})
 ASSESS_DEFAULT_EMIT = _LEGACY_EMIT | frozenset({"skill"})
 
 
+@dataclass(frozen=True)
+class ReportViewContext:
+    """Everything an audience view's ``compute``/``render_md``/``render_html`` might need, built once
+    per ``write_report`` dispatch from its own locals (18.49, loophole L18.8). A view reads only the
+    fields it needs; a view built only from values ``write_report`` already computes for other reasons
+    (the common case -- every existing view only ever needed a subset of its own locals) adds no
+    parameter to ``write_report`` itself. A view needing a genuinely new input still costs one field
+    here, the same cost a hand-written branch would have paid for a new parameter."""
+
+    activity: dict[str, Any]
+    assertions: list[Assertion]
+    deviations: list[dict[str, Any]] | None
+    counts: dict[str, Any]
+    blind_spots: dict[str, Any]
+    language: str
+    reverify_command: list[str]
+    buyer_packaged: bool
+    report_folder: str
+    catalogs: list[Catalog]
+
+
+@dataclass(frozen=True)
+class AudienceViewSpec:
+    """One registered audience-view preset: ``compute`` turns a :class:`ReportViewContext` into the
+    view's own JSON-serialisable shape; ``render_md``/``render_html`` turn that shape (plus the same
+    context, for the few views that also need e.g. ``reverify_command``) into a document. ``<preset>.json``
+    is always written when a preset is registered, matching every existing view's own behaviour.
+    ``always_write`` names which of ``{"md", "html"}`` are written unconditionally, regardless of
+    ``wants()`` -- empty for a preset whose docs still follow the ordinary ``--emit`` flags."""
+
+    compute: Callable[[ReportViewContext], dict[str, Any]]
+    render_md: Callable[[dict[str, Any], ReportViewContext], str] | None = None
+    render_html: Callable[[dict[str, Any], ReportViewContext], str] | None = None
+    always_write: frozenset[str] = frozenset()
+
+
+#: The audience-view registry (18.49, loophole L18.8): adding a preset here, naming its own
+#: ``compute_*_view``/``render_*_md``/``render_*_html`` functions (the pattern every view below already
+#: follows), is the whole change -- no new branch in `write_report`'s body. Replaces the three
+#: hand-written per-preset `elif` blocks a prior version of this function had.
+AUDIENCE_VIEWS: dict[str, AudienceViewSpec] = {
+    "security": AudienceViewSpec(
+        compute=lambda ctx: compute_security_view(ctx.activity, ctx.assertions),
+        render_md=lambda data, ctx: render_security_md(data, language=ctx.language),
+        render_html=lambda data, ctx: render_security_html(data, language=ctx.language),
+    ),
+    "auditor": AudienceViewSpec(
+        compute=lambda ctx: compute_auditor_view(
+            ctx.assertions, deviations=ctx.deviations, counts=ctx.counts
+        ),
+        render_md=lambda data, ctx: render_auditor_md(
+            data, language=ctx.language, reverify_command=ctx.reverify_command
+        ),
+        render_html=lambda data, ctx: render_auditor_html(
+            data, language=ctx.language, reverify_command=ctx.reverify_command
+        ),
+        always_write=frozenset({"md", "html"}),
+    ),
+    "buyer": AudienceViewSpec(
+        compute=lambda ctx: compute_buyer_view(
+            ctx.assertions, ctx.blind_spots, counts=ctx.counts
+        ),
+        render_md=lambda data, ctx: render_buyer_md(
+            data,
+            language=ctx.language,
+            reverify_command=ctx.reverify_command,
+            packaged=ctx.buyer_packaged,
+            report_folder=ctx.report_folder,
+            catalogs=ctx.catalogs,
+        ),
+        render_html=lambda data, ctx: render_buyer_html(
+            data,
+            language=ctx.language,
+            reverify_command=ctx.reverify_command,
+            packaged=ctx.buyer_packaged,
+            report_folder=ctx.report_folder,
+            catalogs=ctx.catalogs,
+        ),
+        always_write=frozenset({"md", "html"}),
+    ),
+}
+
+
 def write_report(
     out_dir: Path,
     assertions: list[Assertion],
@@ -3155,18 +3239,12 @@ def write_report(
     mirrors :func:`agentce.activity.summarize_activity`'s own parameter and default (every subject in
     ``profile`` counts as declared when omitted).
 
-    ``for_preset`` (18.16): ``"security"`` additionally writes ``security.md``/``.html``/``.json`` (the
-    security view, :func:`agentce.security_view.compute_security_view`) -- a genuinely new mechanism,
-    not a reuse of the project view's subject-count gate. ``security.json`` is written whenever
-    ``for_preset == "security"``, the same "always written regardless of ``wants``" treatment
-    ``project.json`` gets; ``security.md``/``.html`` still respect ``wants("md")``/``wants("html")``
-    since the ``security`` preset's own emit set already selects both. ``"auditor"`` always writes
-    ``auditor.json``/``.md``/``.html`` (the auditor view, 18.17,
-    :func:`agentce.auditor_view.compute_auditor_view`), unconditionally like ``project.json``/
-    ``security.json`` above -- unlike ``security``, never gated by ``wants("md")``/``wants("html")``,
-    since ``PRESET_EMIT["auditor"]`` deliberately excludes those shared tokens (they already mean
-    "also render the ordinary ``report.md``/``.html``"). Any other value, including ``None``, writes
-    nothing new here."""
+    ``for_preset`` (18.49): looked up in :data:`AUDIENCE_VIEWS`; a registered preset's
+    ``<name>.json`` is always written, and its ``.md``/``.html`` follow the spec's own
+    ``always_write`` or fall back to ``wants("md")``/``wants("html")`` -- see
+    :class:`AudienceViewSpec`. Any other value, including ``None``, writes nothing new here.
+    (``security``: 18.16; ``auditor``: 18.17; ``buyer``: 18.18 -- see each entry's own lambdas in
+    :data:`AUDIENCE_VIEWS` for which view function backs it.)"""
     check_dc5(
         assertions
     )  # DC-5: refuse a supporting verdict without an evidence pointer
@@ -3353,84 +3431,37 @@ def write_report(
                 ),
             )
 
-    # 18.16: the security view is gated on `for_preset`, not `emit` -- a genuinely new mechanism
-    # (foundational_thinking, contracts/P18-18.16.md), independent of the project view's subject-count
-    # gate above. `security.json` is always written for this preset, like `project.json` is always
-    # written for a multi-subject profile; `.md`/`.html` still follow `wants()` since the `security`
-    # preset's own emit set already selects both.
-    if for_preset == "security":
-        security_view = compute_security_view(activity, assertions)
-        write_json("security.json", security_view)
-        if wants("md"):
-            write_text(
-                "security.md",
-                render_security_md(security_view, language=report_language),
-            )
-        if wants("html"):
-            write_text(
-                "security.html",
-                render_security_html(security_view, language=report_language),
-            )
-
-    # 18.17: the auditor view is gated on `for_preset`, like `security` above, but `auditor.md`/`.html`
-    # are always written for this preset, the same as `auditor.json` -- unlike `security`, `"md"`/
-    # `"html"` are not in `PRESET_EMIT["auditor"]` (blast_radius, altitude review: those tokens already
-    # have a fixed, shared meaning at the `wants("md")`/`wants("html")` branches above -- "also render
-    # the ordinary report.md/.html" -- and reusing them here would silently write those too, which the
-    # auditor preset's own build gate (VG-AUDITOR-VIEW) does not expect).
-    if for_preset == "auditor":
-        auditor_view = compute_auditor_view(
-            assertions, deviations=deviations, counts=counts
-        )
-        write_json("auditor.json", auditor_view)
+    # 18.49 (loophole L18.8): one registration point, not a branch per preset -- `security` (18.16),
+    # `auditor` (18.17) and `buyer` (18.18) are all `AUDIENCE_VIEWS` entries now; adding a fourth preset
+    # needs no change here, only a new entry naming its own compute/render functions. `<preset>.json` is
+    # always written when a preset is registered (matching every view's own prior behaviour);
+    # `.md`/`.html` follow `wants()` unless the preset's own `always_write` says otherwise (the `auditor`/
+    # `buyer` asymmetry documented on `AudienceViewSpec` above).
+    view_spec = AUDIENCE_VIEWS.get(for_preset) if for_preset is not None else None
+    if view_spec is not None:
         rerun_argv = (
             list(reverify_command) if reverify_command else list(invocation or [])
         )
-        write_text(
-            "auditor.md",
-            render_auditor_md(
-                auditor_view, language=report_language, reverify_command=rerun_argv
-            ),
+        view_ctx = ReportViewContext(
+            activity=activity,
+            assertions=assertions,
+            deviations=deviations,
+            counts=counts,
+            blind_spots=blind_spots,
+            language=report_language,
+            reverify_command=rerun_argv,
+            buyer_packaged=buyer_packaged,
+            report_folder=str(out_dir),
+            catalogs=catalogs,
         )
-        write_text(
-            "auditor.html",
-            render_auditor_html(
-                auditor_view, language=report_language, reverify_command=rerun_argv
-            ),
-        )
-
-    # 18.18: the buyer view is gated on `for_preset`, like `auditor` above; `buyer.md`/`.html` are
-    # always written for this preset, the same "always written" idiom. `blind_spots` is the already-
-    # computed sibling artifact `compute_project_view` already threads the same way (foundational_
-    # thinking) -- never `None` at this point (normalized above).
-    if for_preset == "buyer":
-        buyer_view = compute_buyer_view(assertions, blind_spots, counts=counts)
-        write_json("buyer.json", buyer_view)
-        rerun_argv = (
-            list(reverify_command) if reverify_command else list(invocation or [])
-        )
-        write_text(
-            "buyer.md",
-            render_buyer_md(
-                buyer_view,
-                language=report_language,
-                reverify_command=rerun_argv,
-                packaged=buyer_packaged,
-                report_folder=str(out_dir),
-                catalogs=catalogs,
-            ),
-        )
-        write_text(
-            "buyer.html",
-            render_buyer_html(
-                buyer_view,
-                language=report_language,
-                reverify_command=rerun_argv,
-                packaged=buyer_packaged,
-                report_folder=str(out_dir),
-                catalogs=catalogs,
-            ),
-        )
+        view_data = view_spec.compute(view_ctx)
+        write_json(f"{for_preset}.json", view_data)
+        for ext, renderer in (
+            ("md", view_spec.render_md),
+            ("html", view_spec.render_html),
+        ):
+            if renderer is not None and (ext in view_spec.always_write or wants(ext)):
+                write_text(f"{for_preset}.{ext}", renderer(view_data, view_ctx))
 
     oscal_doc: dict[str, Any] | None = None
     if wants("oscal") or wants("oscal_xml"):
