@@ -10,6 +10,7 @@ import pytest
 from agentce.assertions import Assertion, EvidencePointer
 from agentce.errors import InputError
 from agentce.state import STATE_VERSION, StateDir, window_end
+from conftest import unwritable_dir
 
 
 def _assertion(
@@ -106,6 +107,35 @@ def test_incompatible_state_version_refuses(tmp_path: Path) -> None:
     assert exc.value.key == "input.state_version_incompatible"
     assert "no migration command" in exc.value.fix
     assert "move or delete the state directory" in exc.value.fix
+
+
+def test_ensure_writable_raises_a_keyed_error_on_an_unwritable_state_dir(
+    tmp_path: Path,
+) -> None:
+    with unwritable_dir(tmp_path / "ro") as ro:
+        with pytest.raises(InputError) as exc:
+            StateDir.ensure_writable(ro / "state")
+    assert exc.value.key == "input.state_dir_unwritable"
+    assert exc.value.fix == "choose a writable --state directory."
+
+
+def test_ensure_writable_raises_on_a_pre_existing_unwritable_state_dir(
+    tmp_path: Path,
+) -> None:
+    """A directory that already exists but lost its write bit after creation must raise the same
+    keyed error, not only a missing parent (matches 18.44's negative case for --out)."""
+    with unwritable_dir(tmp_path / "s") as state_dir:
+        with pytest.raises(InputError) as exc:
+            StateDir.ensure_writable(state_dir)
+    assert exc.value.key == "input.state_dir_unwritable"
+
+
+def test_save_raises_a_keyed_error_on_an_unwritable_state_dir(tmp_path: Path) -> None:
+    with unwritable_dir(tmp_path / "s") as state_dir:
+        state = StateDir.load(state_dir)
+        with pytest.raises(InputError) as exc:
+            state.save()
+    assert exc.value.key == "input.state_dir_unwritable"
 
 
 def test_drift_reports_nothing_for_a_first_tracked_pair(tmp_path: Path) -> None:

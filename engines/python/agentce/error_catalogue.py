@@ -137,8 +137,10 @@ _KINDS: dict[str, str] = {
     "input.corpus_generate_failed": "error",
     "input.corpus_not_found": "error",
     "input.state_version_incompatible": "error",
+    "input.state_dir_unwritable": "error",
     "input.verify_target": "error",
     "input.out_missing": "error",
+    "input.out_dir_unwritable": "error",
     # Warnings.
     "environment.cryptography_source_build": "warning",
     "warning.pilot_window": "warning",

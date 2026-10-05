@@ -1209,6 +1209,12 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     out_dir = Path(out)
     domain_path_early = _opt_str(ns, "domain")
     deviations_path = _opt_str(ns, "deviations")
+    # --state's writability is proved here, before any --out write (scanned.write/write_quarantine,
+    # below), not only when state.record() finally writes at the end of this function: a run refused
+    # for an unwritable --state must leave nothing in --out that looks like a result either.
+    state_arg = _opt_str(ns, "state")
+    if state_arg is not None:
+        StateDir.ensure_writable(Path(state_arg))
     if package_for_sharing:
         _check_package_path_overlap(
             out_dir,
@@ -1293,7 +1299,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         raise _nothing_evaluated(profile_obj, ingested.accepted, len(evaluated))
     # Stage 6a: incremental state (SPEC §5.4 B7, HR-10). With --state the engine detects a changed
     # bundle (late-arriving evidence lands here), supersedes the prior report, and counts late events.
-    state_arg = _opt_str(ns, "state")
+    # (state_arg was already resolved, and its writability already proved, above.)
     state: StateDir | None = None
     supersedes: list[str] = []
     late_events: dict[str, int] = {}
@@ -3392,9 +3398,16 @@ def cmd_init(ns: argparse.Namespace) -> CommandResult:
             f"init would overwrite {', '.join(existing)}.",
             "pass --force to overwrite, or --out <dir> to write somewhere else.",
         )
-    profile_path.parent.mkdir(parents=True, exist_ok=True)
-    profile_path.write_text(profile, encoding="utf-8")
-    domain_path.write_text(_STARTER_DOMAIN_BINDING, encoding="utf-8")
+    try:
+        profile_path.parent.mkdir(parents=True, exist_ok=True)
+        profile_path.write_text(profile, encoding="utf-8")
+        domain_path.write_text(_STARTER_DOMAIN_BINDING, encoding="utf-8")
+    except OSError as exc:
+        raise InputError(
+            "input.out_dir_unwritable",
+            exc.strerror or str(exc),
+            "choose a writable --out directory.",
+        ) from exc
     result.data.update(
         {
             "out": out,

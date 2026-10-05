@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from .errors import InputError
+
 
 class QuarantineReason(str, Enum):
     """The stable quarantine reason codes (SPEC Appendix F / quarantine.schema.json)."""
@@ -57,12 +59,19 @@ def counts_by_reason(records: Iterable[QuarantineRecord]) -> dict[str, int]:
 def write_quarantine(records: Iterable[QuarantineRecord], path: Path) -> int:
     """Write ``records`` to ``path`` as one JSON object per line (input order). Return the count."""
     written = 0
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        for record in records:
-            handle.write(
-                json.dumps(record.to_json(), sort_keys=True, separators=(",", ":"))
-            )
-            handle.write("\n")
-            written += 1
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8") as handle:
+            for record in records:
+                handle.write(
+                    json.dumps(record.to_json(), sort_keys=True, separators=(",", ":"))
+                )
+                handle.write("\n")
+                written += 1
+    except OSError as exc:
+        raise InputError(
+            "input.out_dir_unwritable",
+            exc.strerror or str(exc),
+            "choose a writable --out directory.",
+        ) from exc
     return written

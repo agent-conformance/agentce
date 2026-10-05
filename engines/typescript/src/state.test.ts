@@ -13,7 +13,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { canonicalString } from "./canonical";
+import { InputError } from "./errors";
 import { STATE_VERSION, StateDir, windowEnd } from "./state";
+import { withUnwritableDir } from "./testSupport";
 
 const TESTDATA = join(__dirname, "..", "testdata");
 
@@ -42,4 +44,32 @@ test("STATE_VERSION matches the reference and windowEnd prefers the declared end
     windowEnd({}, [{ time: "2026-02-01T00:00:00.000Z" }, { time: "2026-01-01T00:00:00.000Z" }]),
     "2026-02-01T00:00:00.000Z",
   );
+});
+
+test("StateDir.ensureWritable raises a keyed error on an unwritable --state directory", () => {
+  withUnwritableDir("agentce-state-", (ro) => {
+    assert.throws(
+      () => StateDir.ensureWritable(join(ro, "state")),
+      (err: unknown) => err instanceof InputError && err.key === "input.state_dir_unwritable",
+    );
+  });
+});
+
+test("StateDir.ensureWritable raises on a pre-existing unwritable --state directory, not only a missing parent", () => {
+  withUnwritableDir("agentce-state-", (stateDir) => {
+    assert.throws(
+      () => StateDir.ensureWritable(stateDir),
+      (err: unknown) => err instanceof InputError && err.key === "input.state_dir_unwritable",
+    );
+  });
+});
+
+test("StateDir.save raises a keyed error on an unwritable --state directory", () => {
+  withUnwritableDir("agentce-state-", (stateDir) => {
+    const state = StateDir.load(stateDir);
+    assert.throws(
+      () => state.save(),
+      (err: unknown) => err instanceof InputError && err.key === "input.state_dir_unwritable",
+    );
+  });
 });

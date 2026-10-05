@@ -122,35 +122,40 @@ class ScannedRecords:
         ``write_profile``, the default profile beside it; return the bundle directory. An adopter's own
         ``--profile`` is never written over."""
         root = out_dir / BUNDLE_DIR
-        shutil.rmtree(root, ignore_errors=True)
-        (root / "events").mkdir(parents=True)
-        files: list[dict[str, str]] = []
-        for source in sorted(self._streams):
-            stem = re.sub(r"[^A-Za-z0-9]+", "-", source).strip("-")[:60]
-            name = (
-                f"events/{stem}-{hashlib.sha256(source.encode()).hexdigest()[:8]}.jsonl"
+        try:
+            shutil.rmtree(root, ignore_errors=True)
+            (root / "events").mkdir(parents=True)
+            files: list[dict[str, str]] = []
+            for source in sorted(self._streams):
+                stem = re.sub(r"[^A-Za-z0-9]+", "-", source).strip("-")[:60]
+                name = f"events/{stem}-{hashlib.sha256(source.encode()).hexdigest()[:8]}.jsonl"
+                data = self._streams[source]
+                (root / name).write_bytes(data)
+                files.append({"path": name, "sha256": hashlib.sha256(data).hexdigest()})
+            manifest = {
+                "agentce_bundle_version": 1,
+                "files": files,
+                "sources": [
+                    {"id": source, "class": self._sources[source]}
+                    for source in sorted(self._sources)
+                ],
+            }
+            (root / "manifest.json").write_text(
+                json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8"
             )
-            data = self._streams[source]
-            (root / name).write_bytes(data)
-            files.append({"path": name, "sha256": hashlib.sha256(data).hexdigest()})
-        manifest = {
-            "agentce_bundle_version": 1,
-            "files": files,
-            "sources": [
-                {"id": source, "class": self._sources[source]}
-                for source in sorted(self._sources)
-            ],
-        }
-        (root / "manifest.json").write_text(
-            json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8"
-        )
-        if write_profile:
-            (out_dir / DERIVED_PROFILE_FILE).write_text(
-                "# The default profile `agentce assess <folder>` derived from the records it found.\n"
-                "# Edit it (declare your agents, oversight and catalogs) and pass it back with --profile.\n"
-                + yaml.safe_dump(self.profile, sort_keys=False),
-                encoding="utf-8",
-            )
+            if write_profile:
+                (out_dir / DERIVED_PROFILE_FILE).write_text(
+                    "# The default profile `agentce assess <folder>` derived from the records it found.\n"
+                    "# Edit it (declare your agents, oversight and catalogs) and pass it back with --profile.\n"
+                    + yaml.safe_dump(self.profile, sort_keys=False),
+                    encoding="utf-8",
+                )
+        except OSError as exc:
+            raise InputError(
+                "input.out_dir_unwritable",
+                exc.strerror or str(exc),
+                "choose a writable --out directory.",
+            ) from exc
         return root
 
 

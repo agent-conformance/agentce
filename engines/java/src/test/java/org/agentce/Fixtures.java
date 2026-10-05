@@ -3,10 +3,13 @@ package org.agentce;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.security.KeyFactory;
 import java.security.PublicKey;
 import java.security.Signature;
@@ -15,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
+import org.junit.jupiter.api.Assertions;
 
 /** Shared fixture helpers for the golden tests. */
 final class Fixtures {
@@ -22,6 +26,36 @@ final class Fixtures {
 
     static final Path BASE = TestPaths.repoRoot().resolve("spec/catalogs/base/eu-ai-act");
     static final Path CONDUCT = TestPaths.repoRoot().resolve("spec/catalogs/overlays/conduct");
+
+    /** Runs the real CLI dispatcher ({@link Cli#run}) with {@code --json} appended, captures
+     * stdout, and parses the envelope -- asserting the process exit code matches the envelope's own
+     * {@code exit_code}. */
+    static JsonNode runJson(String... args) {
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        PrintStream original = System.out;
+        System.setOut(new PrintStream(buf, true, StandardCharsets.UTF_8));
+        int exit;
+        try {
+            String[] withJson = new String[args.length + 1];
+            System.arraycopy(args, 0, withJson, 0, args.length);
+            withJson[args.length] = "--json";
+            exit = Cli.run(withJson);
+        } finally {
+            System.setOut(original);
+        }
+        JsonNode envelope = Json.parse(buf.toString(StandardCharsets.UTF_8));
+        Assertions.assertEquals(
+                exit, envelope.get("exit_code").asInt(), "process exit code must match the envelope");
+        return envelope;
+    }
+
+    /** Chmods {@code dir} to {@code r-xr-xr-x} and reports whether that actually removed this JVM's
+     * write access (it does not when running as root, where a mode-555 directory is still
+     * writable -- nothing to prove there). */
+    static boolean makeUnwritable(Path dir) throws IOException {
+        Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("r-xr-xr-x"));
+        return !Files.isWritable(dir);
+    }
 
     // --- Ed25519 PEM/PAE test helpers, shared between SignTest and CliTest's sign section
     // (item 18.26): both build and PEM-armor Ed25519/RSA/EC test keys and verify a DSSE signature

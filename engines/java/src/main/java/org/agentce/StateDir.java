@@ -106,7 +106,28 @@ public final class StateDir {
             }
             Files.write(path.resolve(STATE_FILE), (Json.pretty(payload) + "\n").getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
-            throw new IllegalStateException("cannot write state to " + path + ": " + e.getMessage(), e);
+            throw new InputError(
+                    "input.state_dir_unwritable",
+                    e.getClass().getSimpleName() + ": " + e.getMessage(),
+                    "choose a writable --state directory.");
+        }
+    }
+
+    /** Prove {@code path} is writable before any {@code --out} write begins (a refused run must leave
+     * nothing behind), by actually creating and removing a probe file rather than only creating the
+     * directory: a directory that exists but lost its write bit after creation would pass
+     * {@code createDirectories} and only fail on a real write. */
+    public static void ensureWritable(Path path) {
+        Path probe = path.resolve(".agentce-write-test-" + ProcessHandle.current().pid());
+        try {
+            Files.createDirectories(path);
+            Files.write(probe, new byte[0]);
+            Files.delete(probe);
+        } catch (IOException e) {
+            throw new InputError(
+                    "input.state_dir_unwritable",
+                    e.getClass().getSimpleName() + ": " + e.getMessage(),
+                    "choose a writable --state directory.");
         }
     }
 

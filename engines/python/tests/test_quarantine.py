@@ -6,13 +6,17 @@ import json
 from pathlib import Path
 
 import jsonschema
+import pytest
 
+from agentce.errors import InputError
 from agentce.quarantine import (
     QuarantineReason,
     QuarantineRecord,
     counts_by_reason,
     write_quarantine,
 )
+
+from conftest import unwritable_dir
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _QUARANTINE_SCHEMA = json.loads(
@@ -60,3 +64,24 @@ def test_write_quarantine(tmp_path: Path) -> None:
     assert write_quarantine(records, path) == 1
     lines = path.read_text(encoding="utf-8").splitlines()
     assert json.loads(lines[0]) == {"event_id": "x", "reason": "duplicate_id"}
+
+
+def test_write_quarantine_raises_a_keyed_error_on_an_unwritable_out_dir(
+    tmp_path: Path,
+) -> None:
+    with unwritable_dir(tmp_path / "ro") as ro:
+        with pytest.raises(InputError) as excinfo:
+            write_quarantine([], ro / "out" / "quarantine.jsonl")
+    assert excinfo.value.key == "input.out_dir_unwritable"
+
+
+def test_write_quarantine_raises_a_keyed_error_on_a_pre_existing_unwritable_out_dir(
+    tmp_path: Path,
+) -> None:
+    """A directory that already exists but lost its write bit after creation must raise the same
+    keyed error on the actual write, not only on a failed `mkdir` (SPEC: matches every other
+    input-path failure's pattern, never the internal.unexpected catch-all)."""
+    with unwritable_dir(tmp_path / "out") as out:
+        with pytest.raises(InputError) as excinfo:
+            write_quarantine([], out / "quarantine.jsonl")
+    assert excinfo.value.key == "input.out_dir_unwritable"

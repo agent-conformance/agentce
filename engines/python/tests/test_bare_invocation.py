@@ -20,6 +20,7 @@ import pytest
 
 from agentce import cli
 
+from conftest import unwritable_dir
 from test_installed_wheel import _build_dists, _clean_env
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -72,6 +73,15 @@ def test_init_refuses_to_overwrite_an_edited_profile_unless_forced(
 
     assert _run(["init", "--force", "--out", str(tmp_path)], capsys)[0] == 0
     assert profile.read_text(encoding="utf-8") != "# my edits\n"
+
+
+def test_init_raises_a_keyed_error_on_an_unwritable_out(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with unwritable_dir(tmp_path / "ro") as ro:
+        code, env = _run(["init", "--out", str(ro / "proj")], capsys)
+    assert code == 3
+    assert env["error"]["key"] == "input.out_dir_unwritable"
 
 
 def test_bare_doctor_diagnoses_the_current_directory(

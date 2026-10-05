@@ -38,21 +38,7 @@ class CliTest {
     private static final Path CATALOG_DIR = REPO.resolve("spec/catalogs/base/eu-ai-act");
 
     private static JsonNode runJson(String... args) {
-        ByteArrayOutputStream buf = new ByteArrayOutputStream();
-        PrintStream original = System.out;
-        System.setOut(new PrintStream(buf, true, StandardCharsets.UTF_8));
-        int exit;
-        try {
-            String[] withJson = new String[args.length + 1];
-            System.arraycopy(args, 0, withJson, 0, args.length);
-            withJson[args.length] = "--json";
-            exit = Cli.run(withJson);
-        } finally {
-            System.setOut(original);
-        }
-        JsonNode envelope = Json.parse(buf.toString(StandardCharsets.UTF_8));
-        assertEquals(exit, envelope.get("exit_code").asInt(), "process exit code must match the envelope");
-        return envelope;
+        return Fixtures.runJson(args);
     }
 
     @Test

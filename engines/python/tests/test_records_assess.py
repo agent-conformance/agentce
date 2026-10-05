@@ -21,6 +21,7 @@ import yaml
 
 from agentce import bundle, cli
 from agentce.tools.validate_profile import validate_profile
+from conftest import unwritable_dir
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _LINT_PROFILE = (
@@ -237,6 +238,19 @@ def test_a_folder_with_no_recognised_record_is_refused_and_writes_nothing(
 
     assert code == 3 and env["error"]["key"] == "input.records_none_recognised"
     assert not out.exists()
+
+
+def test_a_records_folder_run_with_an_unwritable_out_raises_a_keyed_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The records-folder ("come as you are") form's first write is `ScannedRecords.write`, a
+    different call site from `--bundle`'s `write_quarantine`; 18.44 (loophole L18.6) must cover both,
+    never only the one the loophole's own probe happened to reproduce."""
+    folder = _records(tmp_path / "records")
+    with unwritable_dir(tmp_path / "out") as out:
+        code, env = _run(["assess", str(folder), "--out", str(out)], capsys)
+    assert code == 3
+    assert env["error"]["key"] == "input.out_dir_unwritable"
 
 
 def test_an_empty_folder_is_refused(

@@ -626,6 +626,12 @@ function runAssess(options: AssessOptions): CommandResult {
   const bundleDir = requireDir(options.bundle, "bundle", "the evidence bundle");
   const profilePath = requireFile(options.profile, "profile", "the applicability profile");
   const out = options.out;
+  // --state's writability is proved here, before any --out write below (writeQuarantine etc.), not
+  // only when state.record() finally writes at the end of this function: a run refused for an
+  // unwritable --state must leave nothing in --out that looks like a result either.
+  if (options.state !== undefined) {
+    StateDir.ensureWritable(options.state);
+  }
   const profileObj = loadProfile(profilePath);
   // The effective trust root resolves on every run, unconditionally -- even with zero
   // `--catalog-dir`s (python-reference.md §9) -- before `resolveCatalogs` ever inspects one.

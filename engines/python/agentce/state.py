@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -95,17 +96,42 @@ class StateDir:
         )
 
     def save(self) -> None:
-        self.path.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "state_version": STATE_VERSION,
-            "bundle_digests": sorted(set(self.bundle_digests)),
-            "last_report_digest": self.last_report_digest,
-            "last_window_end": self.last_window_end,
-            "last_outcomes": dict(sorted(self.last_outcomes.items())),
-        }
-        (self.path / STATE_FILE).write_text(
-            json.dumps(payload, sort_keys=True, indent=2) + "\n", encoding="utf-8"
-        )
+        try:
+            self.path.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "state_version": STATE_VERSION,
+                "bundle_digests": sorted(set(self.bundle_digests)),
+                "last_report_digest": self.last_report_digest,
+                "last_window_end": self.last_window_end,
+                "last_outcomes": dict(sorted(self.last_outcomes.items())),
+            }
+            (self.path / STATE_FILE).write_text(
+                json.dumps(payload, sort_keys=True, indent=2) + "\n", encoding="utf-8"
+            )
+        except OSError as exc:
+            raise InputError(
+                "input.state_dir_unwritable",
+                exc.strerror or str(exc),
+                "choose a writable --state directory.",
+            ) from exc
+
+    @staticmethod
+    def ensure_writable(path: Path) -> None:
+        """Prove ``path`` is writable before any ``--out`` write begins (a refused run must leave
+        nothing behind), by actually creating and removing a probe file rather than only `mkdir`ing:
+        a directory that exists but lost its write bit after creation would pass `mkdir(exist_ok=True)`
+        and only fail on a real write."""
+        probe = path / f".agentce-write-test-{os.getpid()}"
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            probe.write_bytes(b"")
+            probe.unlink()
+        except OSError as exc:
+            raise InputError(
+                "input.state_dir_unwritable",
+                exc.strerror or str(exc),
+                "choose a writable --state directory.",
+            ) from exc
 
     def plan(
         self, bundle_digest: str, accepted: list[dict[str, Any]], new_window_end: str

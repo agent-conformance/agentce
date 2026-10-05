@@ -11,7 +11,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { InputError } from "./errors";
 import { byteCompare, sortKeysDeep } from "./util";
@@ -94,17 +94,46 @@ export class StateDir {
   }
 
   save(): void {
-    mkdirSync(this.path, { recursive: true });
-    const payload = {
-      state_version: STATE_VERSION,
-      bundle_digests: [...new Set(this.bundleDigests)].sort(byteCompare),
-      last_report_digest: this.lastReportDigest,
-      last_window_end: this.lastWindowEnd,
-    };
-    writeFileSync(
-      join(this.path, STATE_FILE),
-      `${JSON.stringify(sortKeysDeep(payload), null, 2)}\n`,
-    );
+    try {
+      mkdirSync(this.path, { recursive: true });
+      const payload = {
+        state_version: STATE_VERSION,
+        bundle_digests: [...new Set(this.bundleDigests)].sort(byteCompare),
+        last_report_digest: this.lastReportDigest,
+        last_window_end: this.lastWindowEnd,
+      };
+      writeFileSync(
+        join(this.path, STATE_FILE),
+        `${JSON.stringify(sortKeysDeep(payload), null, 2)}\n`,
+      );
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException;
+      throw new InputError(
+        "input.state_dir_unwritable",
+        e.message,
+        "choose a writable --state directory.",
+      );
+    }
+  }
+
+  /** Prove `path` is writable before any `--out` write begins (a refused run must leave nothing
+   * behind), by actually creating and removing a probe file rather than only `mkdir`ing: a directory
+   * that exists but lost its write bit after creation would pass a recursive `mkdir` and only fail on
+   * a real write. */
+  static ensureWritable(path: string): void {
+    const probe = join(path, `.agentce-write-test-${process.pid}`);
+    try {
+      mkdirSync(path, { recursive: true });
+      writeFileSync(probe, "");
+      unlinkSync(probe);
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException;
+      throw new InputError(
+        "input.state_dir_unwritable",
+        e.message,
+        "choose a writable --state directory.",
+      );
+    }
   }
 
   /** Return [supersedes, lateEventsByStream] for a new assessment against this state (HR-10). */

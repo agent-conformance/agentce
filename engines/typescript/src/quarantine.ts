@@ -5,6 +5,7 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { InputError } from "./errors";
 
 export enum QuarantineReason {
   SCHEMA_INVALID = "schema_invalid",
@@ -61,13 +62,22 @@ export function countsByReason(records: Iterable<QuarantineRecord>): Record<stri
 
 /** Write `records` to `path` as one JSON object per line, in input order. Return the count written. */
 export function writeQuarantine(records: Iterable<QuarantineRecord>, path: string): number {
-  mkdirSync(dirname(path), { recursive: true });
   let written = 0;
   const lines: string[] = [];
   for (const record of records) {
     lines.push(JSON.stringify(quarantineToJson(record)));
     written += 1;
   }
-  writeFileSync(path, lines.length > 0 ? `${lines.join("\n")}\n` : "");
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, lines.length > 0 ? `${lines.join("\n")}\n` : "");
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    throw new InputError(
+      "input.out_dir_unwritable",
+      e.message,
+      "choose a writable --out directory.",
+    );
+  }
   return written;
 }

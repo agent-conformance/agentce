@@ -426,12 +426,32 @@ public final class Cli {
         }
     }
 
+    /** Does not delegate to {@link #writeJsonl}: that helper's own {@code IOException} ->
+     * {@code IllegalStateException} wrap is correct for its many other, already-created-directory
+     * callers, but here the directory itself may not exist or be writable yet, which the keyed
+     * {@code input.out_dir_unwritable} error (not an internal one) must cover -- including a
+     * pre-existing, separately unwritable directory where {@code createDirectories} is a no-op and
+     * only the write itself fails. */
     private static void writeQuarantineJsonl(List<Quarantine.Record> records, Path path) {
         List<ObjectNode> nodes = new ArrayList<>();
         for (Quarantine.Record r : records) {
             nodes.add(r.toJson());
         }
-        writeJsonl(nodes, path);
+        try {
+            if (path.getParent() != null) {
+                Files.createDirectories(path.getParent());
+            }
+            StringBuilder out = new StringBuilder();
+            for (ObjectNode record : nodes) {
+                out.append(Canonical.canonicalString(record)).append('\n');
+            }
+            Files.write(path, out.toString().getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw new InputError(
+                    "input.out_dir_unwritable",
+                    e.getClass().getSimpleName() + ": " + e.getMessage(),
+                    "choose a writable --out directory.");
+        }
     }
 
     /** Every catalog the engine ships (base and sector overlays), keyed {@code id@version}. */
@@ -767,6 +787,12 @@ public final class Cli {
         String bundleDir = requireDir(options.bundle(), "bundle", "the evidence bundle");
         String profilePath = requireFile(options.profile(), "profile", "the applicability profile");
         Path out = Paths.get(options.out());
+        // --state's writability is proved here, before any --out write below (writeQuarantineJsonl
+        // etc.), not only when state.save() finally writes at the end of this method: a run refused
+        // for an unwritable --state must leave nothing in --out that looks like a result either.
+        if (options.state() != null) {
+            StateDir.ensureWritable(Paths.get(options.state()));
+        }
         Profile profileObj = Profile.load(Paths.get(profilePath));
         // Resolved on every run, even with no --catalog-dir (python-reference.md §9).
         Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());

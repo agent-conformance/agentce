@@ -5,7 +5,9 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-from collections.abc import Callable, Mapping, Sequence
+import os
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -56,6 +58,20 @@ def write_bundle(
             manifest["sources"] = entries
         (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     return root
+
+
+@contextmanager
+def unwritable_dir(path: Path) -> Iterator[Path]:
+    """Creates ``path`` mode 0o555 and yields it; skips the test if this user can still write to a
+    mode-555 directory (e.g. running as root, where there is nothing to prove). Always restores
+    0o755 afterward so `tmp_path`'s own cleanup can remove it."""
+    path.mkdir(mode=0o555)
+    if os.access(path, os.W_OK):
+        pytest.skip("this user can write to a mode-555 directory")
+    try:
+        yield path
+    finally:
+        path.chmod(0o755)
 
 
 @pytest.fixture(autouse=True)
