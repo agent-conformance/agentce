@@ -196,16 +196,11 @@ relabelled attestation as `verified` and let it pass a supply-chain control.
 
 - **Verification against a trusted key, not field-reading.** `_verify`
   (`adapters/supply-chain/src/agentce_adapters/supply_chain.py`) marks an `Attestation` event
-  `verified` only when a DSSE signature in the record's `dsse` envelope cryptographically verifies --
-  over the DSSE pre-authentication encoding (`_pae`; Ed25519 or ECDSA P-256/SHA-256, classified by
-  `_signature_outcome`) against a trusted key -- **and** the signed Statement's subject digests
-  (`_subject_digests`) equal the `observed_digests` recorded when the record was loaded, binding the
-  signed claim to what was actually observed. Unsigned record fields never establish trust on their
-  own.
-- **Every negative case is a named, non-`verified` status, not a crash or a silent pass.** A signature
-  that fails to verify, a signer outside the trusted key set, an `observed_digests` mismatch, a
-  malformed or missing DSSE envelope, and an all-zero forged signature each resolve to `failed` or
-  `unverified` with `signer: null` -- never `verified`, and never an uncaught exception.
+  `verified` only on signature and digest binding, never on unsigned record fields; see
+  `adapters/supply-chain/README.md` ("Verification at adapt time") for the full `verified`/`failed`/
+  `unverified` mechanism (the DSSE pre-authentication encoding, the trusted key table, and the
+  `observed_digests` binding). Every negative case resolves to a named `failed` or `unverified` status
+  with `signer: null` -- never `verified`, and never an uncaught exception.
 - **`BundleLoaded` carries no signature of its own -- a named residual risk, not yet closed.** Unlike
   `Attestation`, a `BundleLoaded` record (a bundle-load log line or CycloneDX AIBOM) has no `dsse`
   envelope and no `verification` field; its trust rests on the adapter run's declared source class
@@ -238,9 +233,8 @@ relabelled attestation as `verified` and let it pass a supply-chain control.
 - Offline signature verification depends on a **vendored trust root**; a stale root is a warning recorded
   in the manifest, never a silent network call (SPEC §8.7). The [verification procedure](verification.md)
   gives the trust roots and the per-profile checks.
-- `BundleLoaded` events are not DSSE-verified (see "Supply-chain attestation input" above); a forged
-  or relabelled bundle-load record, or an unresolved `attestation_refs` entry, is residual risk today,
-  tracked as follow-up work, not a standing invariant.
+- `BundleLoaded` events are not DSSE-verified; see "Supply-chain attestation input" above for the
+  residual risk this leaves open.
 - The engine treats evidence content as data, never code (no template expansion, no native
   deserialisation, path confinement, structural depth limits, per-event and per-file size limits — see
   "Untrusted evidence-bundle input hardening" above), so a crafted payload cannot execute; this is a
