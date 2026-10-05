@@ -591,7 +591,8 @@ public final class Readiness {
      * defaults to an empty list); every {@code granted}/{@code expiry} value YAML resolved as a
      * timestamp is normalized via {@link #normalizeDeviationDates} before use. */
     public static List<JsonNode> loadDeviationRegister(Path path) {
-        String where = "the deviation register at " + pyRepr(path.toString());
+        // Python passes the loader a Path, so its errors name ./r.yaml as r.yaml.
+        String where = "the deviation register at " + pyRepr(Diff.normalizePosixPath(path.toString()));
         String text;
         try {
             // A fatal decode, as Python's `read_text(encoding="utf-8")`: a lossy one would turn a 0xff

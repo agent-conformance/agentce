@@ -9,6 +9,8 @@
 import { InputError } from "./errors";
 import { sanitizeForMarkdown } from "./report";
 import { byteCompare } from "./util";
+
+export { normalizePosixPath } from "./util";
 import { GAP_OUTCOMES } from "./verdict";
 
 export interface Change {
@@ -143,24 +145,6 @@ export function diffChangeLine(change: Change): string {
   const control = sanitizeForMarkdown(change.control);
   const subject = sanitizeForMarkdown(change.subject);
   return `${control} @ ${subject}: ${diffField(change.from)} -> ${diffField(change.to)}`;
-}
-
-/**
- * The echoed `report_a`/`report_b` path, normalized the way Python's `pathlib.Path.__str__` renders a
- * pure path: split on `/`, drop empty and `.` segments, keep every `..` unchanged, keep a leading `/`
- * if the input had one, and render an all-dropped result as `.`. Deliberately **not** Node's
- * `path.normalize()` (or Java's `Paths.get().normalize()`), both of which wrongly collapse `..`
- * segments and so disagree with Python's own rendering: Python echoes `sub/../a.json` unchanged,
- * while `path.normalize("sub/../a.json")` gives the different byte string `a.json`.
- */
-export function normalizePosixPath(raw: string): string {
-  const absolute = raw.startsWith("/");
-  const segments = raw.split("/").filter((s) => s !== "" && s !== ".");
-  const joined = segments.join("/");
-  if (absolute) {
-    return `/${joined}`;
-  }
-  return joined === "" ? "." : joined;
 }
 
 /** The `--format md` "## What changed" section as a list of lines: one `### <Label> (<n>)`

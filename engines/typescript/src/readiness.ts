@@ -10,7 +10,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_SCHEMA, FAILSAFE_SCHEMA, Type as YamlType, load as yamlLoad } from "js-yaml";
 import { InputError } from "./errors";
-import { byteCompare, decodeUtf8Strict, pyRepr, pyStr } from "./util";
+import { byteCompare, decodeUtf8Strict, normalizePosixPath, pyRepr, pyStr } from "./util";
 
 export const READY = "READY";
 export const READY_WITH_LIMITATIONS = "READY WITH LIMITATIONS";
@@ -344,7 +344,8 @@ export function normalizeDeviationDates(
  * normalized via {@link normalizeDeviationDates} before use, mirroring Python's call-before-use
  * discipline. */
 export function loadDeviationRegister(path: string): Record<string, unknown>[] {
-  const where = `the deviation register at ${pyRepr(path)}`;
+  // Python passes the loader a `Path`, so its errors name `./r.yaml` as `r.yaml`.
+  const where = `the deviation register at ${pyRepr(normalizePosixPath(path))}`;
   let text: string;
   try {
     // A fatal decode, as Python's `read_text(encoding="utf-8")`: a lossy one would turn a 0xff byte

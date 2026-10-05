@@ -191,3 +191,22 @@ export function sortKeysDeep(value: unknown): unknown {
   }
   return value;
 }
+
+/**
+ * A path the way Python's `pathlib.Path.__str__` renders a pure path (the echoed `report_a`/`report_b`
+ * of `diff`, a deviation register's path in its errors): split on `/`, drop empty and `.` segments,
+ * keep every `..` unchanged, keep a leading `/` if the input had one, and render an all-dropped result
+ * as `.`. Deliberately **not** Node's
+ * `path.normalize()` (or Java's `Paths.get().normalize()`), both of which wrongly collapse `..`
+ * segments and so disagree with Python's own rendering: Python echoes `sub/../a.json` unchanged,
+ * while `path.normalize("sub/../a.json")` gives the different byte string `a.json`.
+ */
+export function normalizePosixPath(raw: string): string {
+  const absolute = raw.startsWith("/");
+  const segments = raw.split("/").filter((s) => s !== "" && s !== ".");
+  const joined = segments.join("/");
+  if (absolute) {
+    return `/${joined}`;
+  }
+  return joined === "" ? "." : joined;
+}
