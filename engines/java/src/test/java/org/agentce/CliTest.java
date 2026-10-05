@@ -81,6 +81,35 @@ class CliTest {
     }
 
     @Test
+    void assessManifestCarriesTheRealProfileAndDomainDigestsThroughTheRealCli(@TempDir Path out) throws IOException {
+        Path profile = QUICKSTART.resolve("applicability.yaml");
+        Path domain = QUICKSTART.resolve("domain.linkml.yaml");
+        runJson(
+                "assess",
+                "--bundle", QUICKSTART.resolve("evidence").toString(),
+                "--profile", profile.toString(),
+                "--domain", domain.toString(),
+                "--catalog-dir", CATALOG_DIR.toString(),
+                "--out", out.toString());
+        JsonNode inputs = Json.parseFile(out.resolve("manifest.json")).get("inputs");
+        assertEquals(Report.digestBytes(Files.readAllBytes(profile)), inputs.get("applicability_profile_digest").asText());
+        assertEquals(Report.digestBytes(Files.readAllBytes(domain)), inputs.get("domain_binding_digest").asText());
+    }
+
+    @Test
+    void assessManifestHasNoDomainBindingDigestWhenDomainIsOmitted(@TempDir Path out) {
+        runJson(
+                "assess",
+                "--bundle", QUICKSTART.resolve("evidence").toString(),
+                "--profile", QUICKSTART.resolve("applicability.yaml").toString(),
+                "--catalog-dir", CATALOG_DIR.toString(),
+                "--out", out.toString());
+        JsonNode inputs = Json.parseFile(out.resolve("manifest.json")).get("inputs");
+        assertTrue(inputs.has("applicability_profile_digest"));
+        assertFalse(inputs.has("domain_binding_digest"));
+    }
+
+    @Test
     void assessExitsTwoOnASeverityHighInsufficientEvidenceControl(@TempDir Path out) {
         // verification/gates/fixtures/audience_presets: one control (AUD-01, severity: high) the
         // fixture's evidence bundle never satisfies -- shared with the Python engine's own 18.30 tests

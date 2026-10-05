@@ -26,7 +26,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { quickstartDir } from "./bundled";
 import { main } from "./cli";
-import { digestTree } from "./report";
+import { digestBytes, digestTree } from "./report";
 import { keyidFor, signStatement } from "./sign";
 
 function runJson(argv: string[]): { exitCode: number; envelope: Record<string, unknown> } {
@@ -131,6 +131,63 @@ test("assess on the vendored quickstart bundle matches quickstart's own output",
     assert.ok([0, 1].includes(exitCode), `unexpected exit code ${exitCode}`);
     assert.ok((envelope.assertions as number) > 0);
     assert.equal((envelope.summary as { verdict: string }).verdict, "incomplete");
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("assess --profile and --domain: manifest.json carries their real sha256 digests through the real CLI (18.42, loophole L18.2)", () => {
+  const out = mkdtempSync(join(tmpdir(), "agentce-cli-manifest-digest-"));
+  try {
+    const quickstart = quickstartDir();
+    const profilePath = join(quickstart, "applicability.yaml");
+    const domainPath = join(quickstart, "domain.linkml.yaml");
+    runJson([
+      "assess",
+      "--bundle",
+      join(quickstart, "evidence"),
+      "--profile",
+      profilePath,
+      "--domain",
+      domainPath,
+      "--catalog",
+      "eu-ai-act@2026.09",
+      "--out",
+      out,
+    ]);
+    const manifest = JSON.parse(readFileSync(join(out, "manifest.json"), "utf-8")) as {
+      inputs: Record<string, unknown>;
+    };
+    assert.equal(
+      manifest.inputs.applicability_profile_digest,
+      digestBytes(readFileSync(profilePath)),
+    );
+    assert.equal(manifest.inputs.domain_binding_digest, digestBytes(readFileSync(domainPath)));
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("assess with no --domain: manifest.json has no domain_binding_digest (18.42, loophole L18.2)", () => {
+  const out = mkdtempSync(join(tmpdir(), "agentce-cli-manifest-no-domain-"));
+  try {
+    const quickstart = quickstartDir();
+    runJson([
+      "assess",
+      "--bundle",
+      join(quickstart, "evidence"),
+      "--profile",
+      join(quickstart, "applicability.yaml"),
+      "--catalog",
+      "eu-ai-act@2026.09",
+      "--out",
+      out,
+    ]);
+    const manifest = JSON.parse(readFileSync(join(out, "manifest.json"), "utf-8")) as {
+      inputs: Record<string, unknown>;
+    };
+    assert.ok("applicability_profile_digest" in manifest.inputs);
+    assert.ok(!("domain_binding_digest" in manifest.inputs));
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
