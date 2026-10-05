@@ -621,11 +621,13 @@ def run_census(canonical: Path, tmp: Path, failures: list[str], shard: Shard) ->
     mutations = census_mutations(canonical)
     failures.extend(verify_flow_census.coverage_problems(mutations))
     positions = select_shard(len(mutations), shard)
+    selected = [mutations[p] for p in positions]
     with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:
         results = list(
             pool.map(
-                lambda p: _run_mutation(mutations[p], tmp / "census" / str(p)),
+                lambda p, m: _run_mutation(m, tmp / "census" / str(p)),
                 positions,
+                selected,
             )
         )
     print(
@@ -635,7 +637,7 @@ def run_census(canonical: Path, tmp: Path, failures: list[str], shard: Shard) ->
     if floor is not None:
         failures.append(floor)
     verified = []
-    for mutation, runs in zip((mutations[p] for p in positions), results, strict=True):
+    for mutation, runs in zip(selected, results, strict=True):
         label = f"census {mutation.name}"
         for engine, (out, code) in runs.items():
             _assert(

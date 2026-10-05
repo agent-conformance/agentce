@@ -37,11 +37,18 @@ import argparse
 import re
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
 import yaml
-from ci_demo_coverage_check import _unknown_keys, workflow_level_problems
+from ci_demo_coverage_check import (
+    _misjudged,
+    _shape_violation_cases,
+    _step_wiring_problems,
+    _unknown_keys,
+    workflow_level_problems,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "quickstart.yml"
@@ -49,17 +56,15 @@ CENSUS_JOB = "verify-census"
 ARTIFACTS_JOB = "installed-artifacts-offline"
 CENSUS_SCRIPT = "tools/verify_parity_check.py"
 CENSUS_SHARDS = 4
-CANONICAL_RUN = (
-    "uv run --project tools --frozen python tools/verify_parity_check.py "
-    '--shard "${{ strategy.job-index }}/${{ strategy.job-total }}"'
-)
-SCENARIOS_RUN = "uv run --project tools --frozen python tools/verify_parity_check.py --scenarios-only"
-STEP_ALLOWED_KEYS = {"name", "run"}
+UV_PYTHON = "uv run --project tools --frozen python"
+CENSUS_CMD = f"{UV_PYTHON} {CENSUS_SCRIPT}"
+CANONICAL_RUN = f'{CENSUS_CMD} --shard "${{{{ strategy.job-index }}}}/${{{{ strategy.job-total }}}}"'
+SCENARIOS_RUN = f"{CENSUS_CMD} --scenarios-only"
 JOB_ALLOWED_KEYS = {"name", "runs-on", "steps", "strategy", "timeout-minutes"}
 STRATEGY_ALLOWED_KEYS = {"fail-fast", "matrix"}
 SELF_TEST_RUNS = (
-    "uv run --project tools --frozen python tools/verify_flow_census.py --self-test",
-    "uv run --project tools --frozen python tools/verify_parity_check.py --self-test",
+    f"{UV_PYTHON} tools/verify_flow_census.py --self-test",
+    f"{CENSUS_CMD} --self-test",
 )
 # Outside the census job, the only lines allowed to mention the census script; any other spelling
 # (no flag, `--shard 0/1`, a pipe, a copied shard line) could run the full census again.
@@ -88,6 +93,16 @@ def _run_lines(job: Any) -> list[str]:
     return [line.strip() for s in steps for line in str(s.get("run", "")).splitlines()]
 
 
+def _stray_lines(name: str, job: Any, allowed: set[str]) -> list[str]:
+    """Every run line of `job` that names the census script but is not one of `allowed`."""
+    return [
+        f"jobs.{name} runs {line!r}; there a line naming {CENSUS_SCRIPT} may only be one of "
+        f"{sorted(allowed)}"
+        for line in _run_lines(job)
+        if Path(CENSUS_SCRIPT).name in line and line not in allowed
+    ]
+
+
 def census_job_problems(job: Any) -> list[str]:
     if not isinstance(job, dict):
         return [f"jobs.{CENSUS_JOB} is missing or not a mapping"]
@@ -103,37 +118,24 @@ def census_job_problems(job: Any) -> list[str]:
             f"jobs.{CENSUS_JOB}'s matrix must be one list of exactly {CENSUS_SHARDS} values "
             f"(no include/exclude); it creates {size if size is not None else 'an unknown number of'} job(s)"
         )
-    problems += [
-        f"jobs.{CENSUS_JOB} runs {line!r}; there a line naming {CENSUS_SCRIPT} may only be the "
-        "canonical shard invocation"
-        for line in _run_lines(job)
-        if "verify_parity_check.py" in line and line != CANONICAL_RUN
-    ]
+    problems += _stray_lines(CENSUS_JOB, job, {CANONICAL_RUN})
     census_steps = [s for s in _steps(job) if "--shard" in str(s.get("run", ""))]
     if len(census_steps) != 1:
         return problems + [
             f"jobs.{CENSUS_JOB} has {len(census_steps)} step(s) running {CENSUS_SCRIPT} --shard "
             "(expected exactly 1)"
         ]
-    step = census_steps[0]
-    problems += _unknown_keys(step, STEP_ALLOWED_KEYS, "the census shard step")
-    run_text = str(step.get("run", "")).strip()
-    if run_text != CANONICAL_RUN:
-        problems.append(
-            "the census shard step's run: is not exactly the canonical invocation keyed off "
-            f"strategy.job-index/strategy.job-total: {run_text!r}"
-        )
-    return problems
+    return problems + _step_wiring_problems(
+        census_steps[0], "census shard", CANONICAL_RUN
+    )
 
 
 def scenario_problems(jobs: dict[str, Any]) -> list[str]:
     problems = [
-        f"jobs.{name} runs {line!r}; outside jobs.{CENSUS_JOB} a line naming {CENSUS_SCRIPT} may "
-        f"only be the --self-test or the --scenarios-only run"
+        problem
         for name, job in jobs.items()
         if name != CENSUS_JOB
-        for line in _run_lines(job)
-        if "verify_parity_check.py" in line and line not in ALLOWED_OUTSIDE_CENSUS
+        for problem in _stray_lines(name, job, ALLOWED_OUTSIDE_CENSUS)
     ]
     lines = _run_lines(jobs.get(ARTIFACTS_JOB))
     for expected in (*SELF_TEST_RUNS, SCENARIOS_RUN):
@@ -218,7 +220,13 @@ def check_workflow(
         return problems + [
             f"{CENSUS_SCRIPT} --list-shard 0/1 printed no mutations or no size"
         ]
-    shards = [list_shard(i, CENSUS_SHARDS, root)[0] for i in range(CENSUS_SHARDS)]
+    # Each call rebuilds the signed fixtures (about 3.5 s); they are independent, so run them at once.
+    with ThreadPoolExecutor(max_workers=CENSUS_SHARDS) as pool:
+        shards = list(
+            pool.map(
+                lambda i: list_shard(i, CENSUS_SHARDS, root)[0], range(CENSUS_SHARDS)
+            )
+        )
     return problems + full_list_problems(full, size) + partition_problems(full, shards)
 
 
@@ -267,22 +275,12 @@ def self_test() -> int:
             False,
         ),
         (
-            "step with a shell override",
-            {**good_job, "steps": [{**good_step, "shell": "true {0}"}]},
-            False,
-        ),
-        (
             "step with a trailing || true",
             {**good_job, "steps": [{"run": CANONICAL_RUN + " || true"}]},
             False,
         ),
         ("job with continue-on-error", {**good_job, "continue-on-error": True}, False),
         ("job with an if:", {**good_job, "if": "false"}, False),
-        (
-            "job with defaults.run.shell",
-            {**good_job, "defaults": {"run": {"shell": "true {0}"}}},
-            False,
-        ),
         (
             "matrix of 3",
             {**good_job, "strategy": {"matrix": {"shard": [0, 1, 2]}}},
@@ -310,13 +308,14 @@ def self_test() -> int:
         ),
         ("no census step", {**good_job, "steps": [{"run": "pnpm build"}]}, False),
         ("two census steps", {**good_job, "steps": [good_step, good_step]}, False),
+        *_shape_violation_cases("census", good_step, good_job),
         (
             "full census added beside the shard step",
             {
                 **good_job,
                 "steps": [
                     good_step,
-                    {"run": SCENARIOS_RUN.replace(" --scenarios-only", "")},
+                    {"run": CENSUS_CMD},
                 ],
             },
             False,
@@ -328,7 +327,6 @@ def self_test() -> int:
         ),
     ]
     artifacts = {"steps": [{"run": "\n".join((*SELF_TEST_RUNS, SCENARIOS_RUN))}]}
-    census_cmd = "uv run --project tools --frozen python tools/verify_parity_check.py"
 
     def artifacts_plus(line: str) -> dict[str, Any]:
         return {ARTIFACTS_JOB: {"steps": [*artifacts["steps"], {"run": line}]}}
@@ -341,20 +339,20 @@ def self_test() -> int:
         ),
         (
             "bare full census left in the artifacts job",
-            artifacts_plus(census_cmd),
+            artifacts_plus(CENSUS_CMD),
             False,
         ),
         (
             "whole census as one shard",
-            artifacts_plus(f"{census_cmd} --shard 0/1"),
+            artifacts_plus(f"{CENSUS_CMD} --shard 0/1"),
             False,
         ),
         (
             "full census piped to tee",
-            artifacts_plus(f"{census_cmd} 2>&1 | tee x.log"),
+            artifacts_plus(f"{CENSUS_CMD} 2>&1 | tee x.log"),
             False,
         ),
-        ("full census then echo", artifacts_plus(f"{census_cmd} && echo done"), False),
+        ("full census then echo", artifacts_plus(f"{CENSUS_CMD} && echo done"), False),
         (
             "canonical shard line copied outside the matrix",
             artifacts_plus(CANONICAL_RUN),
@@ -362,7 +360,7 @@ def self_test() -> int:
         ),
         (
             "full census in a third job",
-            {**artifacts_plus("true"), "other": {"steps": [{"run": census_cmd}]}},
+            {**artifacts_plus("true"), "other": {"steps": [{"run": CENSUS_CMD}]}},
             False,
         ),
         (
@@ -411,19 +409,18 @@ def self_test() -> int:
         ("full list truncated by the selection it checks", (full[:3], 5), False),
         ("full list with a gap", ([full[0], full[2]], 2), False),
     ]
-    misjudged = (
-        [n for n, a, ok in job_cases if bool(census_job_problems(a)) == ok]
-        + [n for n, a, ok in scenario_cases if bool(scenario_problems(a)) == ok]
-        + [n for n, a, ok in partition_cases if bool(partition_problems(full, a)) == ok]
-        + [n for n, a, ok in full_cases if bool(full_list_problems(*a)) == ok]
-    )
+    judged: list[tuple[list[tuple[str, Any, bool]], Any]] = [
+        (job_cases, census_job_problems),
+        (scenario_cases, scenario_problems),
+        (partition_cases, lambda shards: partition_problems(full, shards)),
+        (full_cases, lambda args: full_list_problems(*args)),
+    ]
+    misjudged = [name for cases, check in judged for name in _misjudged(cases, check)]
     for name in misjudged:
         print(f"SELF-TEST FAIL: misjudged {name!r}", file=sys.stderr)
     if misjudged:
         return 1
-    total = (
-        len(job_cases) + len(scenario_cases) + len(partition_cases) + len(full_cases)
-    )
+    total = sum(len(cases) for cases, _ in judged)
     print(f"self-test PASS: {total} cases judged correctly")
     return 0
 
