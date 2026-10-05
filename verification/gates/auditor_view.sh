@@ -104,6 +104,18 @@ PY
   )
 }
 
+#: check (k)/18.17c: the auditor view's own OSCAL-section text (auditor.md/.html) names that a
+#: deviated finding's OSCAL entry carries a matching risk -- a real fact the engine already renders
+#: (render_oscal, check_oscal_risk above) but, before 18.17c, never stated in the auditor's own prose.
+check_oscal_text_mentions_risk() {
+  local section
+  section="$(sed -n '/## OSCAL and evidence bundle/,/## How to re-run/p' "$1")"
+  if ! printf '%s' "$section" | grep -qi 'risk'; then
+    return 1
+  fi
+  return 0
+}
+
 #: check (f)/OSCAL: the deviated finding's target.status.reason is "partial" (never .state, which
 #: cannot distinguish partial from non-conformant), and its risk entry cites the matching
 #: mitigating-factors (round 2 N3/B2), verbatim from the register -- never a retyped literal.
@@ -191,6 +203,13 @@ fi
 # not just reverify_argv in isolation).
 if [ -f "$py_out/auditor.md" ] && ! grep -q -- '--deviations' "$py_out/auditor.md"; then
   echo "auditor-view: auditor.md's own re-run command omits --deviations" >&2
+  status=1
+fi
+
+# check (k)/18.17c: the OSCAL-section text itself names that a deviated finding's OSCAL entry
+# carries a matching risk.
+if [ -f "$py_out/auditor.md" ] && ! check_oscal_text_mentions_risk "$py_out/auditor.md"; then
+  echo "auditor-view: auditor.md's OSCAL-section text never mentions a deviated finding's risk entry" >&2
   status=1
 fi
 

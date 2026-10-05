@@ -11,7 +11,6 @@ import json
 import sys
 from pathlib import Path
 
-import yaml
 from _common import (
     FINDINGS,
     INPUT_ERROR,
@@ -24,6 +23,8 @@ from _common import (
 
 from agentce import readiness
 from agentce.catalog import load_catalog
+from agentce.commands import _load_deviation_register
+from agentce.errors import AgentceError
 
 
 def _control_ids(argv: list[str]) -> set[str]:
@@ -54,13 +55,15 @@ def body(argv: list[str]) -> int:
             human="INPUT ERROR: pass --deviations <file> --report <report-dir>",
         )
         return INPUT_ERROR
-    deviations = readiness.normalize_deviation_dates(
-        list(
-            (yaml.safe_load(Path(dev_file).read_text("utf-8")) or {}).get(
-                "deviations", []
-            )
+    try:
+        deviations = _load_deviation_register(Path(dev_file))
+    except AgentceError as exc:
+        emit(
+            {"status": "input_error", "message": str(exc)},
+            want_json=want_json,
+            human=f"INPUT ERROR: {exc}",
         )
-    )
+        return INPUT_ERROR
     assertions = json.loads((Path(report) / "assertions.json").read_text("utf-8"))
     outcomes_by_control: dict[str, set[str]] = {}
     applied_controls: set[str] = set()

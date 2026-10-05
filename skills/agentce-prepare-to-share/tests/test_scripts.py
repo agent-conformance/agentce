@@ -19,6 +19,7 @@ import yaml
 from _common import (
     _SKILL_MD,
     FINDINGS,
+    INPUT_ERROR,
     OK,
     VERSION_MISMATCH,
     Finding,
@@ -207,6 +208,111 @@ def test_deviation_lint_accepts_an_unquoted_yaml_date_the_same_way_the_engine_do
     )
     assert code == OK
     assert json.loads(capsys.readouterr().out)["problems"] == []
+
+
+def _calendar_invalid_deviations(tmp_path: Path, name: str = "dev.yaml") -> Path:
+    """A deviation register whose unquoted `expiry` is YAML-shape-valid but calendar-invalid
+    (`2026-02-30`) -- previously an uncaught `ValueError` on both scripts' bare `yaml.safe_load`
+    (18.17c)."""
+    dev = tmp_path / name
+    dev.write_text(
+        "deviations:\n"
+        "  - control: OVS-03\n"
+        '    rationale: "x"\n'
+        '    compensating_control: "y"\n'
+        '    owner: "a"\n'
+        '    approver: "b"\n'
+        '    granted: "2026-01-01"\n'
+        "    expiry: 2026-02-30\n",
+        encoding="utf-8",
+    )
+    return dev
+
+
+def _shape_malformed_deviations(tmp_path: Path, name: str, body: str) -> Path:
+    dev = tmp_path / name
+    dev.write_text(body, encoding="utf-8")
+    return dev
+
+
+def test_deviation_lint_flags_a_calendar_invalid_unquoted_expiry_as_a_problem(
+    tmp_path: Path, capsys
+) -> None:
+    """A calendar-invalid unquoted expiry (`2026-02-30`) no longer crashes the YAML load (18.17c's
+    permissive timestamp loader); it reaches `readiness.deviation_lint`'s own not-a-valid-RFC-3339-
+    date check exactly like an already-string-typed garbage value does, reported as a problem
+    (FINDINGS, exit 1), never a raw exception."""
+    report = _report(
+        tmp_path,
+        [{"control": "OVS-03", "outcome": "non-conformant", "subject": "s"}],
+    )
+    dev = _calendar_invalid_deviations(tmp_path)
+    code = deviation_lint.body(
+        ["--deviations", str(dev), "--report", str(report), "--json"]
+    )
+    assert code == FINDINGS
+    problems = json.loads(capsys.readouterr().out)["problems"]
+    assert any("not a valid RFC 3339 date" in p and "2026-02-30" in p for p in problems)
+
+
+def test_report_readiness_gives_not_ready_for_a_calendar_invalid_unquoted_expiry(
+    tmp_path: Path, capsys
+) -> None:
+    """Mirrors `deviation_lint`'s own handling: `compute_readiness` calls `deviation_lint` too, so
+    the same calendar-invalid expiry gives NOT READY (exit 1, a verdict), never a crash or an
+    input_error (18.17c)."""
+    report = _report(
+        tmp_path,
+        [{"control": "OVS-03", "outcome": "conformant", "subject": "s"}],
+    )
+    dev = _calendar_invalid_deviations(tmp_path)
+    code = report_readiness.body(
+        ["--report", str(report), "--deviations", str(dev), "--json"]
+    )
+    assert code == FINDINGS
+    verdict = json.loads(capsys.readouterr().out)
+    assert verdict["verdict"] == "NOT READY"
+
+
+def test_deviation_lint_refuses_a_shape_malformed_register_as_input_error(
+    tmp_path: Path, capsys
+) -> None:
+    """A shape-malformed register (`deviations` a scalar, or a list of scalars) used to crash
+    both scripts with a raw `AttributeError`/`TypeError` -- neither script validated the register's
+    shape before indexing into it (18.17c)."""
+    report = _report(
+        tmp_path,
+        [{"control": "OVS-03", "outcome": "non-conformant", "subject": "s"}],
+    )
+    for name, body in [
+        ("a.yaml", "deviations: ['a']\n"),
+        ("b.yaml", "deviations: 5\n"),
+    ]:
+        dev = _shape_malformed_deviations(tmp_path, name, body)
+        code = deviation_lint.body(
+            ["--deviations", str(dev), "--report", str(report), "--json"]
+        )
+        assert code == INPUT_ERROR
+        assert json.loads(capsys.readouterr().out)["status"] == "input_error"
+
+
+def test_report_readiness_refuses_a_shape_malformed_register_as_input_error(
+    tmp_path: Path, capsys
+) -> None:
+    report = _report(
+        tmp_path,
+        [{"control": "OVS-03", "outcome": "conformant", "subject": "s"}],
+    )
+    for name, body in [
+        ("a.yaml", "deviations: ['a']\n"),
+        ("b.yaml", "deviations: 5\n"),
+    ]:
+        dev = _shape_malformed_deviations(tmp_path, name, body)
+        code = report_readiness.body(
+            ["--report", str(report), "--deviations", str(dev), "--json"]
+        )
+        assert code == INPUT_ERROR
+        assert json.loads(capsys.readouterr().out)["status"] == "input_error"
 
 
 def test_checklist_lint_valid(tmp_path: Path, capsys) -> None:

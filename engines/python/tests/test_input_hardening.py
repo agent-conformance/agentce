@@ -164,6 +164,44 @@ def test_domain_binding_with_pathologically_deep_yaml_is_refused(
     assert excinfo.value.key == "input.domain_binding_invalid"
 
 
+# --- Calendar-invalid unquoted YAML timestamp (shape-valid, e.g. 2026-02-30) ---------------------
+
+
+def test_profile_with_calendar_invalid_unquoted_date_does_not_crash(
+    tmp_path: Path,
+) -> None:
+    """PyYAML's timestamp constructor always attempts ``datetime.date`` construction once its
+    resolver decides a plain scalar is timestamp-shaped, and that construction can raise
+    ``ValueError`` for a calendar-invalid value (``2026-02-30``) even though the shape matched --
+    confirmed live, previously an uncaught ``ValueError`` reaching the CLI's top-level
+    ``internal.unexpected`` catch-all. The loader now falls back to a text rendering instead of
+    raising, so a load through any real call site succeeds rather than crashing, regardless of
+    whether the application code that follows ever reads the date-shaped field."""
+    path = tmp_path / "profile.yaml"
+    path.write_text("observation_window: {start: 2026-02-30}\n", encoding="utf-8")
+
+    profile = Profile.load(path)
+    assert profile.observation_window["start"] == "2026-02-30"
+
+
+def test_domain_binding_with_calendar_invalid_unquoted_date_does_not_crash(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "domain.yaml"
+    path.write_text("expiry: 2026-02-30\n", encoding="utf-8")
+
+    DomainBinding.load(path)  # must not raise
+
+
+def test_profile_with_non_utf8_bytes_is_refused(tmp_path: Path) -> None:
+    path = tmp_path / "profile.yaml"
+    path.write_bytes(b"observation_window: {start: \xff\xfe}\n")
+
+    with pytest.raises(InputError) as excinfo:
+        Profile.load(path)
+    assert excinfo.value.key == "input.profile_invalid"
+
+
 # --- JSON structural-depth hazard in a single evidence-event line -------------------------------
 
 

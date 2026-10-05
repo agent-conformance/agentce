@@ -79,6 +79,21 @@ def test_load_config_refuses_a_too_deeply_nested_config(tmp_path: Path) -> None:
         load_config(_write_config(tmp_path / "deep.yaml", nested))
 
 
+def test_load_config_with_calendar_invalid_unquoted_date_does_not_crash(
+    tmp_path: Path,
+) -> None:
+    """The same hardened loader's calendar-invalid-timestamp fallback (18.17c) applies here too: an
+    unquoted, calendar-invalid date anywhere in the config (shape-valid, like ``2026-02-30``) must
+    not crash the YAML load itself with a bare ``ValueError``, regardless of whether the field is one
+    ``load_config`` reads."""
+    body = _MINIMAL.replace(
+        'window: {start: "2026-05-01T00:00:00.000Z", end: "2026-05-02T00:00:00.000Z"}',
+        'window: {start: 2026-02-30, end: "2026-05-02T00:00:00.000Z"}',
+    )
+    config = load_config(_write_config(tmp_path / "c.yaml", body))
+    assert config.job.window["start"] == "2026-02-30"
+
+
 def test_plan_shows_credential_reference_never_resolved() -> None:
     config = load_config(_DRY_RUN_CONFIG)
     p = plan(config)

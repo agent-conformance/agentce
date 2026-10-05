@@ -3,6 +3,13 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.37.0
+
+- Extended `VG-AUDITOR-VIEW` (18.17c): the auditor view's own OSCAL-section text now names that a deviated
+  finding's OSCAL entry carries a matching `risk` -- a fact the engine already rendered (`render_oscal`,
+  the gate's own `check_oscal_risk`) but never stated in the auditor's own prose. A new seeded fault
+  reverts the catalogue text to its prior wording and is caught.
+
 ## 0.36.0
 
 - Added `VG-REACH-TABLE` (18.41, VALUE-PROP.md "Reach", USER_EXPERIENCE.md R8): the locked reach

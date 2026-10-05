@@ -12,7 +12,6 @@ import re
 import sys
 from pathlib import Path
 
-import yaml
 from _common import (
     FINDINGS,
     INPUT_ERROR,
@@ -25,6 +24,8 @@ from _common import (
 
 from agentce import readiness
 from agentce.catalog import load_catalog
+from agentce.commands import _load_deviation_register
+from agentce.errors import AgentceError
 
 
 def _catalog_dirs(argv: list[str]) -> list[Path]:
@@ -63,10 +64,15 @@ def body(argv: list[str]) -> int:
     deviations: list[dict] = []
     dev_file = arg_value(argv, "--deviations")
     if dev_file:
-        loaded = yaml.safe_load(Path(dev_file).read_text("utf-8")) or {}
-        deviations = readiness.normalize_deviation_dates(
-            list(loaded.get("deviations", []))
-        )
+        try:
+            deviations = _load_deviation_register(Path(dev_file))
+        except AgentceError as exc:
+            emit(
+                {"status": "input_error", "message": str(exc)},
+                want_json=want_json,
+                human=f"INPUT ERROR: {exc}",
+            )
+            return INPUT_ERROR
     verdict = readiness.compute_readiness(
         Path(report), severities=_severities(argv), deviations=deviations, gaps=gaps
     )

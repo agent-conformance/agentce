@@ -267,7 +267,7 @@
   "report.auditor_manual_heading": "Manual checklists",
   "report.auditor_manual_none": "no manual or semi-automated control on this run",
   "report.auditor_oscal_heading": "OSCAL and evidence bundle",
-  "report.auditor_oscal_text": "The same findings are also available as an OSCAL 1.1.2 Assessment Results document (`oscal-ar.json`/`oscal-ar.xml`) and as one evidence pack per subject (`packs/<subject>/pack.json`).",
+  "report.auditor_oscal_text": "The same findings are also available as an OSCAL 1.1.2 Assessment Results document (`oscal-ar.json`/`oscal-ar.xml` -- a deviated finding's entry there carries a matching `risk`) and as one evidence pack per subject (`packs/<subject>/pack.json`).",
   "report.auditor_rerun_heading": "How to re-run",
   "report.auditor_title": "AgentCE auditor view",
   "report.blind_spots_heading": "Where your records can't show it yet",

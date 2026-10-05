@@ -2504,6 +2504,69 @@ def test_assess_refuses_a_deviation_whose_expiry_is_not_a_valid_date_rather_than
     assert envelope["error"]["key"] == "input.deviation_invalid"
 
 
+def test_assess_a_calendar_invalid_unquoted_yaml_expiry_date_is_refused_as_input_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A YAML-syntax-valid but calendar-invalid unquoted expiry (``2026-02-30``) used to crash
+    ``load_untrusted_yaml`` with a bare ``ValueError`` -- uncaught, it reached the CLI's top-level
+    catch-all as ``internal.unexpected`` (exit 3), never this control's own ``input.deviation_invalid``
+    key (18.17c). Exit code alone cannot discriminate the fix: both keys are exit 3 today, so the
+    assertion is the error key, not the exit code alone."""
+    dev = tmp_path / "deviations.yaml"
+    dev.write_text(
+        "deviations:\n"
+        f"  - control: {_DEV_CONTROL}\n"
+        '    rationale: "r"\n'
+        '    compensating_control: "c"\n'
+        '    owner: "user:owner@example.com"\n'
+        '    approver: "user:approver@example.com"\n'
+        '    granted: "2025-08-01T00:00:00.000Z"\n'
+        "    expiry: 2026-02-30\n",  # unquoted, calendar-invalid -- shape-valid, not a real date
+        encoding="utf-8",
+    )
+    out = tmp_path / "o"
+    code = cli.main(_dev_argv(out, dev, "--json"))
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "input.deviation_invalid"
+
+
+def test_readiness_a_calendar_invalid_unquoted_yaml_expiry_date_gives_not_ready_not_a_crash(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``agentce readiness`` shares ``_load_deviation_register`` with ``assess`` -- the same
+    calendar-invalid expiry must reach ``readiness.deviation_lint``'s own not-a-valid-RFC-3339-date
+    refusal (NOT READY, exit 1), never ``internal.unexpected`` (exit 3), matching what TypeScript's
+    and Java's own calendar-invalid-timestamp handling already give today (18.17c; cross-engine
+    parity is pinned by ``tools/readiness_parity_check.py`` scenario 7)."""
+    report = tmp_path / "report"
+    report.mkdir()
+    (report / "assertions.json").write_text(
+        json.dumps(
+            [{"control": _DEV_CONTROL, "outcome": "conformant", "subject": "s"}]
+        ),
+        encoding="utf-8",
+    )
+    (report / "integrity.jsonl").write_text("", encoding="utf-8")
+    dev = tmp_path / "deviations.yaml"
+    dev.write_text(
+        "deviations:\n"
+        f"  - control: {_DEV_CONTROL}\n"
+        '    rationale: "r"\n'
+        '    compensating_control: "c"\n'
+        '    owner: "user:owner@example.com"\n'
+        '    approver: "user:approver@example.com"\n'
+        '    granted: "2026-01-01T00:00:00.000Z"\n'
+        "    expiry: 2026-02-30\n",
+        encoding="utf-8",
+    )
+    code = cli.main(["readiness", str(report), "--deviations", str(dev), "--json"])
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 1
+    assert envelope["verdict"] == "NOT READY"
+    assert "error" not in envelope
+
+
 def test_assess_ignores_and_reports_an_expired_deviation(tmp_path: Path) -> None:
     dev = _deviations_yaml(
         tmp_path, granted="2025-08-01T00:00:00.000Z", expiry="2025-12-01T00:00:00.000Z"

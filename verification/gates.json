@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.36.0",
+  "suite_version": "0.37.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -602,8 +602,8 @@
       "timeout_s": 300,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
-        "pass": "a real `assess --deviations <fixture>/deviations.yaml --for auditor` run writes auditor.json/.md/.html (never report.md/.html) matching the committed golden byte-for-byte; AUV-01's unexpired deviation applies (outcome partial, full owner/approver/rationale verbatim, an OSCAL risk entry with matching mitigating-factors, target.status.reason == partial); AUV-02's expired deviation is ignored (stays non-conformant, no deviation field, reported as a limitation); AUV-03 (manual) stays not_assessed with the disclosed note; AUV-04's crosswalk entry appears under by_clause; auditor.json's counts equal a fresh aggregate() over the run's own assertions.json; manifest.json carries deviation_register_digest; the re-run command in auditor.md/.html itself includes --deviations; the hostile evidence ref and deviation rationale render escaped in both .md and .html; `agentce report --validate` exits 0",
-        "fail": "any of the above fact, file, or golden-match check fails, a stray report.md/.html appears, or hostile text renders unescaped"
+        "pass": "a real `assess --deviations <fixture>/deviations.yaml --for auditor` run writes auditor.json/.md/.html (never report.md/.html) matching the committed golden byte-for-byte; AUV-01's unexpired deviation applies (outcome partial, full owner/approver/rationale verbatim, an OSCAL risk entry with matching mitigating-factors, target.status.reason == partial); AUV-02's expired deviation is ignored (stays non-conformant, no deviation field, reported as a limitation); AUV-03 (manual) stays not_assessed with the disclosed note; AUV-04's crosswalk entry appears under by_clause; auditor.json's counts equal a fresh aggregate() over the run's own assertions.json; manifest.json carries deviation_register_digest; the re-run command in auditor.md/.html itself includes --deviations; the OSCAL-section text (auditor.md) itself names that a deviated finding's OSCAL entry carries a matching risk; the hostile evidence ref and deviation rationale render escaped in both .md and .html; `agentce report --validate` exits 0",
+        "fail": "any of the above fact, file, or golden-match check fails, a stray report.md/.html appears, hostile text renders unescaped, or the OSCAL-section text never mentions a deviated finding's risk entry"
       },
       "faults": [
         {
@@ -617,6 +617,12 @@
           "file": "engines/python/agentce/auditor_view.py",
           "search": "_DEVIATION_FIELDS = (\n    \"rationale\",\n    \"compensating_control\",\n    \"owner\",\n    \"approver\",\n    \"granted\",\n    \"expiry\",\n)\n",
           "replace": "_DEVIATION_FIELDS = (\n    \"rationale\",\n    \"compensating_control\",\n    \"owner\",\n    \"granted\",\n    \"expiry\",\n)\n"
+        },
+        {
+          "description": "report.auditor_oscal_text reverts to its pre-18.17c wording (drops the \"a deviated finding's entry there carries a matching risk\" clause), so the OSCAL-section text no longer mentions a deviated finding's risk entry",
+          "file": "engines/python/agentce/data/i18n/messages.en.json",
+          "search": "\"report.auditor_oscal_text\": \"The same findings are also available as an OSCAL 1.1.2 Assessment Results document (`oscal-ar.json`/`oscal-ar.xml` -- a deviated finding's entry there carries a matching `risk`) and as one evidence pack per subject (`packs/<subject>/pack.json`).\",",
+          "replace": "\"report.auditor_oscal_text\": \"The same findings are also available as an OSCAL 1.1.2 Assessment Results document (`oscal-ar.json`/`oscal-ar.xml`) and as one evidence pack per subject (`packs/<subject>/pack.json`).\","
         }
       ],
       "fix_hint": "run verification/gates/auditor_view.sh and read the FAIL lines; the reference implementation is engines/python/agentce/auditor_view.py (compute_auditor_view) and engines/python/agentce/report.py (render_auditor_md/render_auditor_html, and render_oscal's deviation risks[])."

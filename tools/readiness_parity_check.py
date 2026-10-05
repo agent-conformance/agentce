@@ -252,6 +252,23 @@ def _scenario_6_date_grammar(directory: Path) -> tuple[Path, list[str]]:
     return report, ["--deviations", str(register)]
 
 
+def _scenario_7_calendar_invalid_date(directory: Path) -> tuple[Path, list[str]]:
+    """(7) 18.17c: an unquoted `expiry` that is RFC-3339-*shaped* but calendar-invalid (a bare date,
+    and a date-time) -- `2026-02-30`/`2026-02-30T10:00:00Z` -- is refused with the same reason text in
+    every engine, NOT READY. Before 18.17c, Python's own `load_untrusted_yaml` crashed on this input
+    (`internal.unexpected`) while TypeScript's and Java's own calendar-timestamp handling already gave
+    NOT READY; the fix makes Python agree rather than crash."""
+    report = _report_dir(
+        directory,
+        "s7",
+        assertions=[{"control": "OVS-03", "outcome": "conformant", "subject": "s"}],
+    )
+    register = _deviation_register(
+        directory, "s7-deviations.yaml", ["2026-02-30", "2026-02-30T10:00:00Z"]
+    )
+    return report, ["--deviations", str(register)]
+
+
 SCENARIOS: list[Scenario] = [
     Scenario("1-clean", _scenario_1_clean, READY, 0),
     Scenario("2-regression", _scenario_2_regression, NOT_READY, 1),
@@ -261,6 +278,7 @@ SCENARIOS: list[Scenario] = [
     ),
     Scenario("5-deviations", _scenario_5_deviations, NOT_READY, 1),
     Scenario("6-date-grammar", _scenario_6_date_grammar, NOT_READY, 1),
+    Scenario("7-calendar-invalid-date", _scenario_7_calendar_invalid_date, NOT_READY, 1),
 ]
 
 
