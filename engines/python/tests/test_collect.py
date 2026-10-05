@@ -94,6 +94,13 @@ def test_load_config_with_calendar_invalid_unquoted_date_does_not_crash(
     assert config.job.window["start"] == "2026-02-30"
 
 
+def test_load_config_reports_an_unreadable_path_as_unreadable(tmp_path: Path) -> None:
+    """A file-system error reading the config stays ``load_config``'s own "cannot read" refusal: the
+    hardened loader's construction-time catch never swallows an ``OSError`` into a YAML message."""
+    with pytest.raises(InputError, match="cannot read"):
+        load_config(tmp_path / "missing.yaml")
+
+
 def test_plan_shows_credential_reference_never_resolved() -> None:
     config = load_config(_DRY_RUN_CONFIG)
     p = plan(config)

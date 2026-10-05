@@ -24,16 +24,14 @@ as it is today.
 
 A fourth, broader hazard subsumes the explicit-tag cases above: an explicit tag (``!!int 0xZZ``,
 ``!!bool maybe``, ``!!int ''``, ``!!timestamp foo``, ...) bypasses the resolver's own shape gate
-entirely, so it can reach any of PyYAML's built-in scalar constructors with a value that constructor
-was never designed to validate -- and each one, left to its own devices, leaks whatever stdlib
-exception its own implementation happens to raise on malformed input (confirmed live: ``ValueError``
-from ``!!int``/``!!float``, ``KeyError`` from ``!!bool``, ``IndexError`` from ``!!int``/``!!float`` on
-an empty string, ``AttributeError`` from ``!!timestamp``'s own regex path). Enumerating each type as
-it surfaces is a losing game -- a different PyYAML version, or a built-in constructor not yet probed,
-can always leak one more. Both constructors below instead catch *any* exception that is not already
-one of the three deliberately-handled hazards above (a disallowed tag or alias, excessive nesting, or
-invalid UTF-8) and treat it as this same fourth hazard, since by construction nothing else can reach
-that point once ``_PermissiveTimestampSafeLoader`` is in use for genuinely untrusted input.
+entirely, so it can reach any of PyYAML's built-in constructors with a value that constructor was
+never designed to validate -- and each one leaks whatever stdlib exception its own implementation
+happens to raise (confirmed live: ``ValueError``, ``KeyError``, ``IndexError``, ``AttributeError``).
+That set is not enumerable in advance, so the loader does not try: its ``construct_object`` and
+``construct_document`` re-raise *any* exception other than a ``yaml.YAMLError`` or a
+``RecursionError`` as a ``yaml.constructor.ConstructorError`` naming the node, which
+:func:`load_untrusted_yaml`'s existing ``yaml.YAMLError`` refusal then reports. The catch is scoped to
+construction only, so reading the file (an ``OSError`` a caller handles itself) is unaffected.
 """
 
 from __future__ import annotations
@@ -47,12 +45,37 @@ from .errors import InputError
 
 
 class _PermissiveTimestampSafeLoader(yaml.SafeLoader):
-    """``yaml.SafeLoader`` whose timestamp construction never raises: a calendar-invalid value
-    (shape-valid, like ``2026-02-30``) or an explicit, non-timestamp-shaped ``!!timestamp`` tag
-    (``!!timestamp foo``) both fall back to :func:`_pythonize_timestamp` instead of letting
-    construction's exception (``ValueError`` for the former, ``AttributeError`` -- ``None``'s own
-    ``.groupdict()`` -- for the latter, and potentially others; see the module docstring's fourth
-    hazard) escape."""
+    """``yaml.SafeLoader`` whose construction never leaks a non-YAML exception: a calendar-invalid
+    timestamp falls back to :func:`_pythonize_timestamp`, and any other exception raised while
+    constructing a value becomes a ``ConstructorError`` (the module docstring's fourth hazard)."""
+
+    def construct_object(self, node: yaml.Node, deep: bool = False) -> Any:
+        try:
+            return super().construct_object(node, deep)
+        except (yaml.YAMLError, RecursionError):
+            raise
+        except Exception as exc:
+            raise _construction_error(node, exc) from exc
+
+    def construct_document(self, node: yaml.Node) -> Any:
+        try:
+            return super().construct_document(node)
+        except (yaml.YAMLError, RecursionError):
+            raise
+        except Exception as exc:
+            raise _construction_error(node, exc) from exc
+
+
+def _construction_error(
+    node: yaml.Node, exc: Exception
+) -> yaml.constructor.ConstructorError:
+    shown = f" {node.value!r}" if isinstance(node, yaml.ScalarNode) else ""
+    return yaml.constructor.ConstructorError(
+        None,
+        None,
+        f"cannot construct {node.tag}{shown} ({type(exc).__name__}: {exc})",
+        node.start_mark,
+    )
 
 
 def _construct_yaml_timestamp_permissive(
@@ -122,18 +145,4 @@ def load_untrusted_yaml(path: Path, *, key: str, what: str) -> Any:
             key,
             f"{what} at {str(path)!r} is not valid UTF-8: {exc}.",
             f"save {what} as UTF-8 text.",
-        ) from exc
-    except Exception as exc:
-        # Anything else reaching here is the module docstring's fourth hazard: an explicit tag
-        # bypassed the resolver's shape gate and reached a built-in constructor with a value it
-        # was never designed to validate, which can leak any stdlib exception (confirmed live:
-        # `ValueError`/`IndexError` from `!!int`/`!!float`, `KeyError` from `!!bool`). The
-        # timestamp case is handled by the permissive loader's own fallback and never reaches
-        # here. Deliberately not narrowed to a list of exception types: that list has already
-        # grown twice (ValueError, then +AttributeError, then +IndexError) as new explicit-tag
-        # inputs were tried, and nothing bounds it to the types probed so far.
-        raise InputError(
-            key,
-            f"{what} at {str(path)!r} carries a YAML scalar the engine refuses to construct: {exc}.",
-            f"remove the explicit YAML tag from {what}; only plain, untagged scalars are accepted.",
         ) from exc

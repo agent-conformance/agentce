@@ -18,6 +18,7 @@ from typing import Any
 
 import pytest
 
+from agentce import safe_yaml
 from agentce.bundle import confine_to_root, load_bundle
 from agentce.coverage import _denominator_counts
 from agentce.domain import DomainBinding
@@ -242,6 +243,34 @@ def test_domain_binding_with_any_explicit_tag_hazard_is_refused_not_a_crash(
     with pytest.raises(InputError) as excinfo:
         DomainBinding.load(path)
     assert excinfo.value.key == "input.domain_binding_invalid"
+
+
+class _NovelConstructorFailure(Exception):
+    """An exception type no ``except`` list in ``safe_yaml`` could name in advance."""
+
+
+def test_any_exception_a_constructor_raises_is_refused_not_a_crash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The refusal covers the mechanism, not a list of tag values: whatever a scalar constructor
+    raises, the load is an ``input.*`` refusal naming the offending value."""
+
+    def explode(loader: Any, node: Any) -> Any:
+        raise _NovelConstructorFailure("boom")
+
+    monkeypatch.setitem(
+        safe_yaml._PermissiveTimestampSafeLoader.yaml_constructors,
+        "tag:yaml.org,2002:int",
+        explode,
+    )
+    path = tmp_path / "domain.yaml"
+    path.write_text("expiry: 42\n", encoding="utf-8")
+
+    with pytest.raises(InputError) as excinfo:
+        DomainBinding.load(path)
+    assert excinfo.value.key == "input.domain_binding_invalid"
+    assert "'42'" in str(excinfo.value)
+    assert "_NovelConstructorFailure" in str(excinfo.value)
 
 
 def test_profile_with_non_utf8_bytes_is_refused(tmp_path: Path) -> None:
