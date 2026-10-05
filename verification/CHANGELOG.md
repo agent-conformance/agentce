@@ -8,13 +8,15 @@ fails if a gate in `gates.json` is not named in this file.
 - Added `VG-DEVIATIONS-PARITY` (18.17a): TypeScript and Java now apply a deviation register on `assess
   --deviations` (shape check, lint, expired entries reported as limitations, the register digest in the
   manifest, OSCAL risk entries) and compute the auditor view, where both used to refuse the flag with
-  `input.deviations_not_yet_supported`. The gate runs 25 scenarios through all three engines' real CLIs
+  `input.deviations_not_yet_supported`. The gate runs 27 scenarios through all three engines' real CLIs
   and requires Python's exit code, error key, cause and fix for every refusal, and byte-identical
   assertions, OSCAL, activity and blind-spot files with the same limitations and digest for every run
   that succeeds. Each engine's test-only `auditor-view` seam must print the bytes of Python's
-  `compute_auditor_view` over three fixtures in either input order. Eight seeded faults: expiry ignored,
-  the OSCAL risk dropped, `by_clause` control ids in reverse order, the lint skipped, the `--deviations=<path>` spelling
-  ignored, a lossy UTF-8 decode, the auditor view's sort skipped, and the first of two registers kept.
+  `compute_auditor_view` over three fixtures in either input order. Nine seeded faults: expiry ignored,
+  the OSCAL risk dropped, `by_clause` control ids in reverse order, the lint skipped, the
+  `--deviations=<path>` spelling ignored, a lossy UTF-8 decode, the auditor view's sort skipped, the
+  first of two registers kept, and a register path with a `.` segment named as typed rather than as
+  Python's `pathlib` renders it.
 - `VG-PROJECT-VIEW`'s rubric no longer calls its deviations scenario Python-only: the new gate holds
   TypeScript's and Java's `project.json` for that fixture to Python's bytes.
 

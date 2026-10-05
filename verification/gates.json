@@ -693,7 +693,7 @@
       "timeout_s": 900,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
-        "pass": "over 25 scenarios run through each engine's real CLI (no register, the auditor-view fixture's register, lint and shape refusals, a missing path and a directory, malformed YAML, unquoted dates, an empty register, only an expired entry, two subjects, --deviations=<path>, a bare or mid-argv --deviations, non-UTF-8 bytes, a custom tag, an alias that expands to a duplicate, 5000-deep nesting, a quoted path, and the flag given twice in both orders) TypeScript and Java give Python's exit code, error key, cause (up to the parser's own text for malformed YAML, a custom tag and non-UTF-8) and fix, or write assertions.json, oscal-ar.json, activity.json and blind-spots.json (and the two-subject run's project.json) byte-identical to Python's with the same manifest limitations and deviation_register_digest; a run with no register carries no digest and no OSCAL risks; the last of two registers wins; a --deviations with no value exits 3 with argparse's sentence (key input.assess_flag_needs_value in TypeScript and Java); and each engine's auditor-view seam prints the bytes of Python's compute_auditor_view over three fixtures in run order and reversed, which also equal the auditor.json Python's assess --for auditor writes",
+        "pass": "over 27 scenarios run through each engine's real CLI (no register, the auditor-view fixture's register, lint and shape refusals, a missing path and a directory, malformed YAML, unquoted dates, an empty register, only an expired entry, two subjects, --deviations=<path>, a bare or mid-argv --deviations, non-UTF-8 bytes, a custom tag, an alias that expands to a duplicate, 5000-deep nesting, a quoted path, a `.` segment in the register path, and the flag given twice in both orders) TypeScript and Java give Python's exit code, error key, cause (up to the parser's own text for malformed YAML, a custom tag and non-UTF-8) and fix, or write assertions.json, oscal-ar.json, activity.json and blind-spots.json (and the two-subject run's project.json) byte-identical to Python's with the same manifest limitations and deviation_register_digest; a run with no register carries no digest and no OSCAL risks; the last of two registers wins; a --deviations with no value exits 3 with argparse's sentence (key input.assess_flag_needs_value in TypeScript and Java); and each engine's auditor-view seam prints the bytes of Python's compute_auditor_view over three fixtures in run order and reversed, which also equal the auditor.json Python's assess --for auditor writes",
         "fail": "any engine applies, ignores or refuses a register differently from Python, differs in exit code, key, cause, fix, an output file's bytes, the limitations or the digest, writes assertions.json for a refused run, or computes a different auditor view"
       },
       "faults": [
@@ -744,6 +744,12 @@
           "file": "engines/java/src/main/java/org/agentce/Cli.java",
           "search": "                            \"pass --deviations <file>.\");\n                }\n                value = args[++i];\n",
           "replace": "                            \"pass --deviations <file>.\");\n                }\n                value = value == null ? args[i + 1] : value;\n                i++;\n"
+        },
+        {
+          "description": "TypeScript's loadDeviationRegister names the register by the path as typed, not as Python's pathlib renders it, so a `.` segment (S6D) changes the cause",
+          "file": "engines/typescript/src/readiness.ts",
+          "search": "  const where = `the deviation register at ${pyRepr(normalizePosixPath(path))}`;\n",
+          "replace": "  const where = `the deviation register at ${pyRepr(path)}`;\n"
         }
       ],
       "fix_hint": "run verification/gates/deviations_parity.sh and read the FAIL lines; the reference is engines/python/agentce/commands/__init__.py (cmd_assess's deviation block and _load_deviation_register), assess.py (apply_deviations), auditor_view.py (compute_auditor_view) and report.py (render_oscal's risks[]), ported in engines/typescript/src/{assess,auditorView,cli,readiness,report}.ts and engines/java/src/main/java/org/agentce/{Assess,AuditorView,Cli,Readiness,Report}.java."

@@ -4,7 +4,7 @@
 # register (S0), the auditor-view fixture's register (S1), lint and shape refusals (S2-S9, S12),
 # unquoted dates (S10), an empty register (S11), only an expired entry (S13), two subjects (S14), the
 # `--deviations=<path>` spelling (S15), a missing value (S16, S23), hostile and mistaken register bytes
-# (S17-S21) and the flag given twice (S22, S22b) -- and must give Python's exit code, error key, cause
+# (S17-S21), a `.` segment in the register path (S2D, S6D) and the flag given twice (S22, S22b) -- and must give Python's exit code, error key, cause
 # and fix, or write byte-identical assertions, OSCAL, activity and blind-spot files with the same
 # limitations and register digest. Each engine's test-only `auditor-view` seam must also print the
 # bytes Python's compute_auditor_view gives over the same assertions and register, in either order.
@@ -90,6 +90,10 @@ scenario S14 "${two[@]}" --deviations "$P/deviations.yaml"
 scenario S15 "${base[@]}" "--deviations=$F/deviations.yaml"
 scenario S16 "${base[@]}" --deviations
 scenario S21 "${base[@]}" --deviations "$regs/o'brien/reg.yaml"
+# A `.` segment in the path: Python names the file as pathlib renders it in a shape error (S6D) and as
+# typed in a lint error (S2D).
+scenario S6D "${base[@]}" --deviations "$regs/./s6.yaml"
+scenario S2D "${base[@]}" --deviations "$regs/./s2.yaml"
 scenario S22 "${base[@]}" --deviations "$F/deviations.yaml" --deviations "$regs/s11.yaml"
 scenario S22b "${base[@]}" --deviations "$regs/s11.yaml" --deviations "$F/deviations.yaml"
 scenario S23 --bundle "$F/evidence" --deviations --profile "$F/applicability.yaml" \
@@ -160,7 +164,7 @@ PREFIX = {
     "S17": "is not valid UTF-8",
     "S18": "carries a YAML construct the engine refuses to load",
 }
-REFUSALS = ["S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S12", "S17", "S18", "S19", "S20", "S21"]
+REFUSALS = ["S2", "S2D", "S3", "S4", "S5", "S6", "S6D", "S7", "S8", "S9", "S12", "S17", "S18", "S19", "S20", "S21"]
 SUCCESSES = ["S0", "S1", "S10", "S11", "S13", "S14", "S15", "S22", "S22b"]
 FILES = ("assertions.json", "oscal-ar.json", "activity.json", "blind-spots.json")
 DIGEST = {"S22": "sha256:1c8bd1ab", "S22b": "sha256:ec70a21e"}
