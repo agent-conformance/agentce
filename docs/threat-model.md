@@ -184,6 +184,52 @@ reading assistant treat it as part of the trusted prompt rather than as inert da
   zero-width character survives, driven over every named adversarial vector in the committed
   `spec/report/test-vectors/sanitize-vectors.json` (item 18.20).
 
+## Supply-chain attestation input (DSSE verification)
+
+The `supply-chain` adapter (SPEC §12) turns admission-controller and registry records into
+`Attestation` and `BundleLoaded` events. An adversary who controls the agent, or a colluding source,
+can submit an attestation record whose `dsse` envelope is missing, malformed, unsigned, signed by an
+untrusted key, or signed over a different subject than what was actually loaded; a fake or superficial
+verification check that only reads the record's own claimed `statement_type`/`subject_digests` fields,
+rather than cryptographically verifying the signature, would report such a forged, unsigned, or
+relabelled attestation as `verified` and let it pass a supply-chain control.
+
+- **Verification against a trusted key, not field-reading.** `_verify`
+  (`adapters/supply-chain/src/agentce_adapters/supply_chain.py`) marks an `Attestation` event
+  `verified` only when a DSSE signature in the record's `dsse` envelope cryptographically verifies --
+  over the DSSE pre-authentication encoding (`_pae`; Ed25519 or ECDSA P-256/SHA-256, classified by
+  `_signature_outcome`) against a trusted key -- **and** the signed Statement's subject digests
+  (`_subject_digests`) equal the `observed_digests` recorded when the record was loaded, binding the
+  signed claim to what was actually observed. Unsigned record fields never establish trust on their
+  own.
+- **Every negative case is a named, non-`verified` status, not a crash or a silent pass.** A signature
+  that fails to verify, a signer outside the trusted key set, an `observed_digests` mismatch, a
+  malformed or missing DSSE envelope, and an all-zero forged signature each resolve to `failed` or
+  `unverified` with `signer: null` -- never `verified`, and never an uncaught exception.
+- **`BundleLoaded` carries no signature of its own -- a named residual risk, not yet closed.** Unlike
+  `Attestation`, a `BundleLoaded` record (a bundle-load log line or CycloneDX AIBOM) has no `dsse`
+  envelope and no `verification` field; its trust rests on the adapter run's declared source class
+  (`enforcement_point` by default -- `event_producers.json` -- not the lower `self_report` class the
+  general trust-class mitigations above (rows 1, 8) gate on) and the evidence stream's hash-chain and
+  anchoring (rows 2, 6), never on cryptographic signature verification. A record can name
+  `attestation_refs`, but no engine resolves or cross-checks those ids against a verified `Attestation`
+  event today -- `attestation_refs` appears only in schema/type-generation code and the adapter's own
+  pass-through, confirmed absent from every engine's logic -- and the undeclared-component
+  applicability check (`applicability.py`) reads its unsigned `components` field directly. A forged or
+  relabelled `BundleLoaded` record is today's residual risk, tracked as follow-up work, not covered by
+  the DSSE mitigation above.
+- **Proved by hostile and interoperability fixtures, enforced by a seeded-fault gate.** The public
+  verification suite's `VG-ATTESTATION-SIGNATURES` gate (`verification/gates.json`) runs
+  `adapters/supply-chain/tests/test_signatures.py` and seeds two faults directly against `_verify` --
+  an always-succeeding signature check, and a dropped `observed_digests` comparison -- each
+  demonstrated red by `./verification/run --demo-fault VG-ATTESTATION-SIGNATURES` and green again once
+  restored. The adapter's own hostile fixtures (`adapters/supply-chain/fixtures/attestations-hostile/`:
+  a non-verifying signature, an all-zero forged signature, an untrusted signer, a digest mismatch, a
+  malformed payload type) and a cross-signed interoperability fixture
+  (`adapters/supply-chain/fixtures/attestations-interop/`) run in
+  `adapters/supply-chain/tests/seeded_fault_demo.py` and the `adapter-supply-chain` job in
+  `.github/workflows/ci.yml`, on every push and pull request (item 18.43).
+
 ## Assumptions and residual risk
 
 - The integrity guarantees rest on at least one **independent system** and one **independent coverage
@@ -192,6 +238,9 @@ reading assistant treat it as part of the trusted prompt rather than as inert da
 - Offline signature verification depends on a **vendored trust root**; a stale root is a warning recorded
   in the manifest, never a silent network call (SPEC §8.7). The [verification procedure](verification.md)
   gives the trust roots and the per-profile checks.
+- `BundleLoaded` events are not DSSE-verified (see "Supply-chain attestation input" above); a forged
+  or relabelled bundle-load record, or an unresolved `attestation_refs` entry, is residual risk today,
+  tracked as follow-up work, not a standing invariant.
 - The engine treats evidence content as data, never code (no template expansion, no native
   deserialisation, path confinement, structural depth limits, per-event and per-file size limits — see
   "Untrusted evidence-bundle input hardening" above), so a crafted payload cannot execute; this is a
