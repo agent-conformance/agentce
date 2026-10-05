@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.38.0",
+  "suite_version": "0.39.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1418,6 +1418,52 @@
         }
       ],
       "fix_hint": "Run verification/gates/reach_table.sh; it names the exact message key (reach.table.count_mismatch, .missing_provenance, .missing_section, .missing_headline, .duplicate_section or .floor_violated) and the offending row or surface."
+    },
+    {
+      "id": "VG-VERIFY-CENSUS-SHARD-COVERAGE",
+      "title": "The CI verify-census matrix (18.93) is wired to strategy.job-index/strategy.job-total with exactly four shards, the named scenarios run once, and the shards cover every agentce verify census mutation exactly once",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/verify_census_shard_coverage.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 180,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "tools/verify_census_shard_coverage_check.py's --self-test judges every good and bad wiring, matrix, scenario-placement and partition case correctly, then the real run finds .github/workflows/quickstart.yml's verify-census job running exactly the canonical --shard \"${{ strategy.job-index }}/${{ strategy.job-total }}\" step over a 4-value matrix with no extra job, strategy or step keys and no other line in that job naming tools/verify_parity_check.py, no line outside verify-census naming tools/verify_parity_check.py other than its --self-test or --scenarios-only, installed-artifacts-offline running both census self-tests and --scenarios-only exactly once each, and the real --list-shard i/4 output for every i covering --list-shard 0/1 with every position exactly once under the same name",
+        "fail": "the self-test misjudges a case, or the real run finds the census step not exactly the canonical invocation, a matrix that does not create exactly 4 jobs, an extra key (if:, continue-on-error, shell:) on the job, strategy or step, another job naming tools/verify_parity_check.py in any other way (the full census, --shard 0/1, a pipe, a copied shard line), a census self-test or the --scenarios-only run missing or doubled in installed-artifacts-offline, or a census position in no shard, in two shards, or under a different name"
+      },
+      "faults": [
+        {
+          "description": "a matrix entry is dropped: with job-total wiring three shards still cover every mutation, but each runs a third longer than the 8-minute budget the split exists for",
+          "file": ".github/workflows/quickstart.yml",
+          "search": "shard: [0, 1, 2, 3]",
+          "replace": "shard: [0, 1, 2]"
+        },
+        {
+          "description": "the census step is rewired to a literal shard total instead of strategy.job-total, which stops being a complete partition the moment the matrix size changes",
+          "file": ".github/workflows/quickstart.yml",
+          "search": "--shard \"${{ strategy.job-index }}/${{ strategy.job-total }}\"",
+          "replace": "--shard \"${{ strategy.job-index }}/4\""
+        },
+        {
+          "description": "the shard selection is truncated, so census mutations past position 2000 land in no shard and never run in CI again",
+          "file": "tools/verify_parity_check.py",
+          "search": "return [position for position in range(count) if position % total == index]",
+          "replace": "return [position for position in range(count) if position % total == index and position < 2000]"
+        },
+        {
+          "description": "the full census comes back in the artifacts job as one whole shard, the 15-minute long pole the split removed",
+          "file": ".github/workflows/quickstart.yml",
+          "search": "tools/verify_parity_check.py --scenarios-only",
+          "replace": "tools/verify_parity_check.py --scenarios-only\n          uv run --project tools --frozen python tools/verify_parity_check.py --shard 0/1"
+        }
+      ],
+      "fix_hint": "run verification/gates/verify_census_shard_coverage.sh and read which problem it found; the step is .github/workflows/quickstart.yml's jobs.verify-census, the selection is tools/verify_parity_check.py's select_shard, checked by tools/verify_census_shard_coverage_check.py."
     }
   ]
 }

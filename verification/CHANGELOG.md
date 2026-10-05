@@ -3,6 +3,19 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.39.0
+
+- Added `VG-VERIFY-CENSUS-SHARD-COVERAGE` (18.93): the cross-engine `agentce verify` census (2,312
+  mutations through all three engines) moved out of quickstart's `installed-artifacts-offline` job, where
+  it took 15 of 21 minutes, into a four-way `verify-census` matrix job. Each shard runs
+  `tools/verify_parity_check.py --shard "<job-index>/<job-total>"`; the artifacts job runs the named
+  scenarios once with `--scenarios-only`. The gate checks the shard step's wiring, the matrix size, that
+  outside the census job the script is named only by its `--self-test` and `--scenarios-only` lines, that
+  both census self-tests still run in the artifacts job, and that the real `--list-shard i/4` output covers
+  the full list with every position exactly once. Four seeded faults: a matrix entry dropped, the step
+  rewired to a literal shard total, the shard selection truncated, and the full census brought back into
+  the artifacts job as `--shard 0/1`.
+
 ## 0.38.0
 
 - Added `VG-BASELINE-LENS-ENGINES` (18.46, loophole L18.9): `verification/gates/baseline_lens_engines.sh`
