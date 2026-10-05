@@ -46,7 +46,6 @@ public final class Assertions {
         }
     }
 
-    /** One (control, subject) verdict. Optional collections default empty; nullable fields default null. */
     /** A field-by-field shallow copy of {@code a}: the collections are new lists over the same
      * (immutable in practice) elements, so changing the copy's own fields never touches {@code a}. */
     static Assertion copyOf(Assertion a) {
@@ -71,6 +70,7 @@ public final class Assertions {
         return c;
     }
 
+    /** One (control, subject) verdict. Optional collections default empty; nullable fields default null. */
     public static final class Assertion {
         public String control;
         public String controlVersion;

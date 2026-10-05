@@ -678,7 +678,7 @@ function agentDirname(subjectId: string): string {
  * templates that need it -- `formatPlural` (verdict.ts) already covers the catalogue's one ICU
  * plural template, so this is deliberately narrower than a general formatter (mirrors the Python
  * reference's `i18n_format.format_message` for this non-plural case). */
-function formatTemplate(template: string, vars: Record<string, string>): string {
+export function formatTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (whole, key: string) => vars[key] ?? whole);
 }
 
@@ -853,8 +853,9 @@ function oscalTimestamp(assertions: Assertion[]): string {
  * §9.4): every result carries real `observations[]` built from the assertion's own evidence
  * pointers, every finding resolves to the observation that backs it and links to its real control id
  * so a GRC platform can trace the finding to the requirement it assesses. A faithful port of the
- * Python reference; no catalog object is needed since the control id alone is the traceable token. */
-/** `deviations` (18.17a): the same already-linted register `applyDeviations` applied, so every finding
+ * Python reference; no catalog object is needed since the control id alone is the traceable token.
+ *
+ * `deviations` (18.17a): the same already-linted register `applyDeviations` applied, so every finding
  * whose assertion carries a `deviation` gets one `risks[]` entry and a `related-risks` link, as Python's
  * `render_oscal(..., deviations=)` does. Without a register (re-rendering from `assertions.json` alone)
  * no risk entry is written: no fact the records do not support. */

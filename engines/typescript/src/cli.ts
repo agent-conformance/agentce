@@ -53,6 +53,7 @@ import {
   blindSpotsCliLines,
   catalogProvenanceDigest,
   digestBytes,
+  formatTemplate,
   renderEvidencePack,
   renderOscal,
   renderReportHtml,
@@ -734,12 +735,8 @@ function runAssess(options: AssessOptions): CommandResult {
     const byControl = deviationsByControl(deviations);
     const template = catalogue(DEFAULT_LANGUAGE)["readiness.deviation_expired_ignored"] as string;
     for (const control of applied.expired) {
-      const vars: Record<string, string> = {
-        control,
-        expiry: pyStr(byControl.get(control)?.expiry ?? ""),
-      };
       limitations.push(
-        template.replace(/\{(control|expiry)\}/g, (_, name: string) => vars[name] as string),
+        formatTemplate(template, { control, expiry: pyStr(byControl.get(control)?.expiry ?? "") }),
       );
     }
     deviationRegisterDigest = digestBytes(readFileSync(deviationFile));
