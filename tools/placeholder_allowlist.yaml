@@ -676,3 +676,21 @@ allow:
     count: 1
     class: legitimate
     justification: "A code comment on the gate's third leg explains that a stub which never checks the signature must not pass the validly-signed leg either; describes the seeded-fault test double named above, not an unfinished part of this gate."
+
+  - path: engines/typescript/src/assess.test.ts
+    pattern: example-domain
+    count: 2
+    class: legitimate
+    justification: "Deviation-register test entries (18.17a) name their owner and approver with the reserved example.com domain (RFC 2606); a named test identity, never an unfinished part of the engine."
+
+  - path: engines/typescript/src/auditorView.test.ts
+    pattern: example-domain
+    count: 2
+    class: legitimate
+    justification: "Deviation-register test entries (18.17a) name their owner and approver with the reserved example.com domain (RFC 2606); a named test identity, never an unfinished part of the engine."
+
+  - path: engines/typescript/src/cli.test.ts
+    pattern: example-domain
+    count: 2
+    class: legitimate
+    justification: "Deviation-register test entries (18.17a) name their owner and approver with the reserved example.com domain (RFC 2606); a named test identity, never an unfinished part of the engine."

@@ -1336,3 +1336,43 @@ test("assertions table sanitises control and subject fields (HTML)", () => {
   assert.equal(html.includes("<script>"), false);
   assert.equal(hasInvisibleCodepoint(unescapeHtmlEntities(html)), false);
 });
+
+test("renderOscal deviations: a deviated finding gets one risks[] entry and a related-risks link", () => {
+  const deviated = { ...projectAssertion(SUBJECT, "partial"), deviation: "REC-01" };
+  const register = [
+    {
+      control: "REC-01",
+      rationale: "Accepted. <script>alert(1)</script>",
+      compensating_control: "Manual review.",
+    },
+  ];
+  const result = (
+    renderOscal([deviated], register)["assessment-results"] as Record<string, unknown>
+  ).results as Record<string, unknown>[];
+  const [run] = result;
+  const risks = run?.risks as Record<string, unknown>[];
+  assert.equal(risks.length, 1);
+  assert.equal(risks[0]?.status, "deviation-approved");
+  assert.equal(risks[0]?.statement, "Accepted. <script>alert(1)</script>");
+  assert.deepEqual(
+    (risks[0]?.["mitigating-factors"] as Record<string, unknown>[]).map((f) => f.description),
+    ["Manual review."],
+  );
+  const [finding] = run?.findings as Record<string, unknown>[];
+  assert.deepEqual(finding?.["related-risks"], [{ "risk-uuid": risks[0]?.uuid }]);
+});
+
+test("renderOscal deviations: no register, or no deviated finding, writes no risks", () => {
+  const deviated = { ...projectAssertion(SUBJECT, "partial"), deviation: "REC-01" };
+  for (const oscal of [
+    renderOscal([deviated]),
+    renderOscal([projectAssertion(SUBJECT, "non-conformant")], [{ control: "REC-01" }]),
+  ]) {
+    const [run] = (oscal["assessment-results"] as Record<string, unknown>).results as Record<
+      string,
+      unknown
+    >[];
+    assert.equal(run?.risks, undefined);
+    assert.ok((run?.findings as Record<string, unknown>[]).every((f) => !("related-risks" in f)));
+  }
+});

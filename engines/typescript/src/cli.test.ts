@@ -328,57 +328,171 @@ test("assess refuses an unresolvable catalog with a named input error, not a gue
   }
 });
 
-test("assess --deviations <path> is refused outright (18.14a C5: not yet applied here)", () => {
-  const out = mkdtempSync(join(tmpdir(), "agentce-cli-assess-deviations-"));
+const AUDITOR_FIXTURE = join(REPO, "verification", "gates", "fixtures", "auditor_view");
+const AUDITOR_REGISTER = join(AUDITOR_FIXTURE, "deviations.yaml");
+/** The fixture register's digest, as Python records it (python-reference.md S1). */
+const AUDITOR_REGISTER_DIGEST =
+  "sha256:ec70a21ea9da1881e0c7737a2c760ef7fcee3aed71e92944499871f8f2f7b439";
+
+function auditorAssessArgs(out: string): string[] {
+  return [
+    "assess",
+    "--json",
+    "--out",
+    out,
+    "--bundle",
+    join(AUDITOR_FIXTURE, "evidence"),
+    "--profile",
+    join(AUDITOR_FIXTURE, "applicability.yaml"),
+    "--domain",
+    join(AUDITOR_FIXTURE, "domain.linkml.yaml"),
+    "--catalog-dir",
+    join(AUDITOR_FIXTURE, "catalog"),
+    "--allow-unverified-catalog",
+  ];
+}
+
+/** Run `main` on `argv` as given (no `--json` appended, so a flag can stay last) and parse the envelope. */
+function runEnvelope(argv: string[]): { exitCode: number; envelope: Record<string, unknown> } {
+  const lines: string[] = [];
+  const original = console.log;
+  console.log = (line: string) => {
+    lines.push(line);
+  };
+  let exitCode: number;
   try {
-    const quickstart = quickstartDir();
-    const { exitCode, envelope } = runJson([
-      "assess",
-      "--bundle",
-      join(quickstart, "evidence"),
-      "--profile",
-      join(quickstart, "applicability.yaml"),
-      "--domain",
-      join(quickstart, "domain.linkml.yaml"),
-      "--deviations",
-      "/tmp/does-not-exist.yaml",
-      "--out",
-      out,
-    ]);
-    assert.equal(exitCode, 3);
-    assert.equal(
-      (envelope.error as { message_key: string }).message_key,
-      "input.deviations_not_yet_supported",
-    );
+    exitCode = main(argv);
+  } finally {
+    console.log = original;
+  }
+  return { exitCode, envelope: JSON.parse(lines.join("\n")) };
+}
+
+function deviationFacts(out: string): {
+  outcomes: Record<string, [string, string | null]>;
+  digest: unknown;
+  limitations: string[];
+  risks: unknown;
+} {
+  const assertions = JSON.parse(readFileSync(join(out, "assertions.json"), "utf-8")) as Array<
+    Record<string, unknown>
+  >;
+  const manifest = JSON.parse(readFileSync(join(out, "manifest.json"), "utf-8"));
+  const oscal = JSON.parse(readFileSync(join(out, "oscal-ar.json"), "utf-8"));
+  return {
+    outcomes: Object.fromEntries(
+      assertions.map((a) => [a.control, [a.outcome, (a.deviation as string | undefined) ?? null]]),
+    ),
+    digest: manifest.inputs.deviation_register_digest,
+    limitations: manifest.limitations,
+    risks: oscal["assessment-results"].results[0].risks,
+  };
+}
+
+function withOut(name: string, body: (out: string) => void): void {
+  const out = mkdtempSync(join(tmpdir(), `agentce-cli-${name}-`));
+  try {
+    body(out);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
+}
+
+test("runAssess --deviations applies the register: unexpired flipped, expired reported, digest and risks written", () => {
+  withOut("assess-deviations", (out) => {
+    const { exitCode } = runEnvelope([...auditorAssessArgs(out), "--deviations", AUDITOR_REGISTER]);
+    assert.equal(exitCode, 1); // AUV-02's expired entry leaves it non-conformant
+    const facts = deviationFacts(out);
+    assert.deepEqual(facts.outcomes["AUV-01"], ["partial", "AUV-01"]);
+    assert.deepEqual(facts.outcomes["AUV-02"], ["non-conformant", null]);
+    assert.equal(facts.digest, AUDITOR_REGISTER_DIGEST);
+    assert.ok(
+      facts.limitations.includes(
+        "AUV-02: deviation expired 2025-11-01T00:00:00.000Z; ignored and reported, the control remains non-conformant",
+      ),
+    );
+    assert.equal((facts.risks as unknown[]).length, 1);
+  });
 });
 
-test("assess --deviations=<path> (the =-joined form) is refused too", () => {
-  const out = mkdtempSync(join(tmpdir(), "agentce-cli-assess-deviations-eq-"));
-  try {
-    const quickstart = quickstartDir();
-    const { exitCode, envelope } = runJson([
-      "assess",
-      "--bundle",
-      join(quickstart, "evidence"),
-      "--profile",
-      join(quickstart, "applicability.yaml"),
-      "--domain",
-      join(quickstart, "domain.linkml.yaml"),
-      "--deviations=/tmp/does-not-exist.yaml",
-      "--out",
-      out,
+test("runAssess --deviations refuses a register that names a control outside the catalog", () => {
+  withOut("assess-deviations-lint", (out) => {
+    const register = join(out, "reg.yaml");
+    writeFileSync(
+      register,
+      "deviation_register_version: 1\ndeviations:\n  - control: XYZ-99\n    rationale: r\n" +
+        "    compensating_control: c\n    owner: user:a@example.com\n    approver: user:b@example.com\n" +
+        '    granted: "2026-01-01T00:00:00Z"\n    expiry: "2026-03-01T00:00:00Z"\n',
+    );
+    const { exitCode, envelope } = runEnvelope([
+      ...auditorAssessArgs(join(out, "report")),
+      "--deviations",
+      register,
+    ]);
+    assert.equal(exitCode, 3);
+    const error = envelope.error as Record<string, string>;
+    assert.equal(error.message_key, "input.deviation_invalid");
+    assert.ok(!existsSync(join(out, "report", "assertions.json")));
+  });
+});
+
+test("assess --deviations=<path> applies exactly like the two-token form", () => {
+  withOut("assess-deviations-eq", (out) => {
+    const { exitCode } = runEnvelope([
+      ...auditorAssessArgs(out),
+      `--deviations=${AUDITOR_REGISTER}`,
+    ]);
+    assert.equal(exitCode, 1);
+    const facts = deviationFacts(out);
+    assert.deepEqual(facts.outcomes["AUV-01"], ["partial", "AUV-01"]);
+    assert.equal(facts.digest, AUDITOR_REGISTER_DIGEST);
+  });
+});
+
+test("assess bare --deviations is refused with input.assess_flag_needs_value", () => {
+  withOut("assess-deviations-bare", (out) => {
+    const { exitCode, envelope } = runEnvelope([...auditorAssessArgs(out), "--deviations"]);
+    assert.equal(exitCode, 3);
+    const error = envelope.error as Record<string, string>;
+    assert.equal(error.message_key, "input.assess_flag_needs_value");
+    assert.ok(!existsSync(join(out, "assertions.json")));
+  });
+});
+
+test("assess --deviations before another option is refused, never read as the path", () => {
+  withOut("assess-deviations-mid", (out) => {
+    const args = auditorAssessArgs(out);
+    const { exitCode, envelope } = runEnvelope([
+      ...args.slice(0, 6),
+      "--deviations",
+      ...args.slice(6),
     ]);
     assert.equal(exitCode, 3);
     assert.equal(
-      (envelope.error as { message_key: string }).message_key,
-      "input.deviations_not_yet_supported",
+      (envelope.error as Record<string, string>).message_key,
+      "input.assess_flag_needs_value",
     );
-  } finally {
-    rmSync(out, { recursive: true, force: true });
-  }
+    assert.ok(!existsSync(join(out, "assertions.json")));
+  });
+});
+
+test("assess repeated --deviations: the last register wins, in either order", () => {
+  withOut("assess-deviations-last", (out) => {
+    const empty = join(out, "empty.yaml");
+    writeFileSync(empty, "deviation_register_version: 1\ndeviations: []\n");
+    const emptyDigest = digestBytes(readFileSync(empty));
+    for (const [first, last, digest, auv01] of [
+      [AUDITOR_REGISTER, empty, emptyDigest, "non-conformant"],
+      [empty, AUDITOR_REGISTER, AUDITOR_REGISTER_DIGEST, "partial"],
+    ] as const) {
+      const report = join(out, "report");
+      rmSync(report, { recursive: true, force: true });
+      runEnvelope([...auditorAssessArgs(report), "--deviations", first, "--deviations", last]);
+      const facts = deviationFacts(report);
+      assert.equal(facts.digest, digest);
+      assert.equal(facts.outcomes["AUV-01"]?.[0], auv01);
+    }
+  });
 });
 
 test("validate quarantines the vendored quickstart bundle's known-bad events", () => {
