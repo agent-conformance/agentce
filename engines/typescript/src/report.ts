@@ -16,7 +16,7 @@ import { dirname, join } from "node:path";
 import type { Activity } from "./activity";
 import { DENIED_KINDS, RECORDER_CLASSES, summarizeActivity } from "./activity";
 import { type Assertion, aggregate, assertionToJson, checkDc5 } from "./assertions";
-import { indexBySubject } from "./assess";
+import { deviationsByControl, indexBySubject } from "./assess";
 import type { BlindSpot, BlindSpots, CheckRef } from "./blindSpots";
 import { canonicalize } from "./canonical";
 import type { Catalog, ControlSpec } from "./catalog";
@@ -29,7 +29,7 @@ import {
   computeProjectView,
   noPopulationBySubject,
 } from "./project";
-import { byteCompare, sortKeysDeep } from "./util";
+import { byteCompare, pyStr, sortKeysDeep } from "./util";
 import { gapText, summarize as summarizeVerdict } from "./verdict";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
@@ -854,9 +854,17 @@ function oscalTimestamp(assertions: Assertion[]): string {
  * pointers, every finding resolves to the observation that backs it and links to its real control id
  * so a GRC platform can trace the finding to the requirement it assesses. A faithful port of the
  * Python reference; no catalog object is needed since the control id alone is the traceable token. */
-export function renderOscal(assertions: Assertion[]): Record<string, unknown> {
+/** `deviations` (18.17a): the same already-linted register `applyDeviations` applied, so every finding
+ * whose assertion carries a `deviation` gets one `risks[]` entry and a `related-risks` link, as Python's
+ * `render_oscal(..., deviations=)` does. Without a register (re-rendering from `assertions.json` alone)
+ * no risk entry is written: no fact the records do not support. */
+export function renderOscal(
+  assertions: Assertion[],
+  deviations?: Record<string, unknown>[],
+): Record<string, unknown> {
   const ordered = [...assertions].sort(bySubjectControl);
   const when = oscalTimestamp(assertions);
+  const byControlDeviation = deviationsByControl(deviations);
 
   const observationUuid = new Map<string, string>();
   const observations: Record<string, unknown>[] = [];
@@ -879,9 +887,10 @@ export function renderOscal(assertions: Assertion[]): Record<string, unknown> {
     observations.push(observation);
   }
 
+  const risks: Record<string, unknown>[] = [];
   const findings = ordered.map((a) => {
     const key = `${a.control}\0${a.subject}`;
-    return {
+    const finding = {
       uuid: uuid5("finding", a.control, a.subject),
       title: `${a.control} for ${a.subject}`,
       description: `${a.control} assessed for ${a.subject}: ${a.outcome}.`,
@@ -893,6 +902,25 @@ export function renderOscal(assertions: Assertion[]): Record<string, unknown> {
       links: [{ href: `urn:agentce:control:${a.control}`, rel: "control" }],
       "related-observations": [{ "observation-uuid": observationUuid.get(key) }],
     };
+    const entry = a.deviation ? byControlDeviation.get(a.deviation) : undefined;
+    if (entry !== undefined) {
+      const riskUuid = uuid5("risk", a.control, a.subject);
+      risks.push({
+        uuid: riskUuid,
+        title: `Accepted deviation for ${a.control} on ${a.subject}.`,
+        description: `${a.control} is non-conformant for ${a.subject}; a deviation was reviewed and accepted (SPEC §13.3.4).`,
+        statement: pyStr(entry.rationale ?? ""),
+        status: "deviation-approved",
+        "mitigating-factors": [
+          {
+            uuid: uuid5("mitigating-factor", a.control, a.subject),
+            description: pyStr(entry.compensating_control ?? ""),
+          },
+        ],
+      });
+      return { ...finding, "related-risks": [{ "risk-uuid": riskUuid }] };
+    }
+    return finding;
   });
 
   const result: Record<string, unknown> = {
@@ -906,6 +934,7 @@ export function renderOscal(assertions: Assertion[]): Record<string, unknown> {
   };
   if (observations.length > 0) result.observations = observations;
   if (findings.length > 0) result.findings = findings;
+  if (risks.length > 0) result.risks = risks;
 
   return {
     "assessment-results": {
@@ -1048,6 +1077,8 @@ export interface ManifestOptions {
   /** `sha256:<hex>` of the exact `--domain` file's bytes; present only when `--domain` was given,
    * matching Python's own conditional field (18.42, loophole L18.2). */
   domainBindingDigest?: string;
+  /** `sha256:<hex>` of the `--deviations` register's bytes; absent when no register was given. */
+  deviationRegisterDigest?: string;
 }
 
 export function buildManifest(options: ManifestOptions): Record<string, unknown> {
@@ -1071,6 +1102,9 @@ export function buildManifest(options: ManifestOptions): Record<string, unknown>
   }
   if (options.domainBindingDigest !== undefined) {
     inputs.domain_binding_digest = options.domainBindingDigest;
+  }
+  if (options.deviationRegisterDigest !== undefined) {
+    inputs.deviation_register_digest = options.deviationRegisterDigest;
   }
   const manifest: Record<string, unknown> = {
     agentce_manifest_version: 1,
@@ -1137,6 +1171,12 @@ export interface WriteReportOptions {
   applicabilityProfileDigest?: string;
   /** Forwarded to `buildManifest` (18.42). */
   domainBindingDigest?: string;
+  /** `sha256:<hex>` of the `--deviations` register's bytes; set only when a register is given, so a
+   * run without one keeps a byte-identical manifest. */
+  deviationRegisterDigest?: string;
+  /** The already-linted register `applyDeviations` used (18.17a): OSCAL risks and the project view's
+   * per-agent deviations read it. */
+  deviations?: Record<string, unknown>[];
 }
 
 function bareSubject(id: string): Subject {
@@ -1217,6 +1257,7 @@ export function writeReport(
       resolvedDeclared,
       projectActivityBySubject,
       blindSpots,
+      options.deviations,
     );
     writeJson("project.json", projectView);
     const gapsBySubject = blindSpotsBySubject(blindSpots);
@@ -1280,7 +1321,7 @@ export function writeReport(
       renderReportHtml(assertions, counts, language, activity, blindSpots),
     );
   }
-  writeJson("oscal-ar.json", renderOscal(assertions));
+  writeJson("oscal-ar.json", renderOscal(assertions, options.deviations));
   writeJson("results.sarif", renderSarif(assertions, options.catalogObjects ?? []));
 
   const subjects = [...new Set(assertions.map((a) => a.subject))].sort(byteCompare);
@@ -1309,6 +1350,7 @@ export function writeReport(
     limitations: options.limitations,
     applicabilityProfileDigest: options.applicabilityProfileDigest,
     domainBindingDigest: options.domainBindingDigest,
+    deviationRegisterDigest: options.deviationRegisterDigest,
   });
   writeFileSync(join(outDir, "manifest.json"), JSON.stringify(sortKeysDeep(manifest), null, 2));
   return manifest;

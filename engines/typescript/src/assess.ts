@@ -17,9 +17,10 @@ import type { DomainBinding } from "./domain";
 import { buildGraph } from "./graph";
 import { eventIri } from "./iri";
 import type { Profile, Subject } from "./profile";
+import { compareDate, parseDate } from "./readiness";
 import type { GraphStore } from "./store";
 import { evaluateShape, violationToJson, withinTolerance } from "./structural";
-import { byteCompare } from "./util";
+import { byteCompare, pyStr } from "./util";
 
 type Event = Record<string, unknown>;
 
@@ -241,4 +242,48 @@ const VERDICT_OUTCOMES = new Set(["conformant", "non-conformant", "insufficient_
 /** True when no assertion reached a verdict (see {@link VERDICT_OUTCOMES}). */
 export function evaluatedNothing(assertions: Assertion[]): boolean {
   return !assertions.some((a) => VERDICT_OUTCOMES.has(a.outcome));
+}
+
+/** Index a deviation register by its `control` field (`assess.deviations_by_control`). Shared by every
+ * reader of an already-loaded register (`applyDeviations`, the expired-entry limitation text,
+ * `renderOscal`, `computeAuditorView`) so the keying rule lives in one place; a later entry for the
+ * same control replaces an earlier one, as a Python dict comprehension does. */
+export function deviationsByControl(
+  deviations: Record<string, unknown>[] | null | undefined,
+): Map<string, Record<string, unknown>> {
+  const byControl = new Map<string, Record<string, unknown>>();
+  for (const entry of deviations ?? []) {
+    byControl.set(pyStr(entry.control ?? null), entry);
+  }
+  return byControl;
+}
+
+/** Apply an already-linted deviation register to `assertions` (SPEC §13.3.4 Stage 2; a port of
+ * `assess.apply_deviations`): every `non-conformant` assertion whose control has a matching, unexpired
+ * entry becomes `partial` and carries that control's id as `deviation`. Pure: never mutates its inputs
+ * and never reads a clock (`asOf` is the caller's window end). An entry whose `expiry` is before
+ * `asOf` is never applied; its control id is returned in `expired` so the caller reports it as a
+ * limitation. */
+export function applyDeviations(
+  assertions: Assertion[],
+  deviations: Record<string, unknown>[],
+  asOf: string,
+): { assertions: Assertion[]; expired: string[] } {
+  const byControl = deviationsByControl(deviations);
+  const asOfDate = parseDate(asOf);
+  const expired: string[] = [];
+  const applied = assertions.map((assertion) => {
+    const entry =
+      assertion.outcome === "non-conformant" ? byControl.get(assertion.control) : undefined;
+    if (entry === undefined) {
+      return assertion;
+    }
+    const expiry = typeof entry.expiry === "string" ? parseDate(entry.expiry) : null;
+    if (expiry !== null && asOfDate !== null && compareDate(expiry, asOfDate) < 0) {
+      expired.push(assertion.control);
+      return assertion;
+    }
+    return { ...assertion, outcome: "partial", deviation: assertion.control };
+  });
+  return { assertions: applied, expired };
 }

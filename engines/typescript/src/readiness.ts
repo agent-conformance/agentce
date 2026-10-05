@@ -10,7 +10,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_SCHEMA, FAILSAFE_SCHEMA, Type as YamlType, load as yamlLoad } from "js-yaml";
 import { InputError } from "./errors";
-import { byteCompare, pyRepr, pyStr } from "./util";
+import { byteCompare, decodeUtf8Strict, pyRepr, pyStr } from "./util";
 
 export const READY = "READY";
 export const READY_WITH_LIMITATIONS = "READY WITH LIMITATIONS";
@@ -344,19 +344,37 @@ export function normalizeDeviationDates(
  * normalized via {@link normalizeDeviationDates} before use, mirroring Python's call-before-use
  * discipline. */
 export function loadDeviationRegister(path: string): Record<string, unknown>[] {
+  const where = `the deviation register at ${pyRepr(path)}`;
+  let text: string;
+  try {
+    // A fatal decode, as Python's `read_text(encoding="utf-8")`: a lossy one would turn a 0xff byte
+    // into U+FFFD and lint the mangled control id instead of refusing the file.
+    text = decodeUtf8Strict(readFileSync(path));
+  } catch (error) {
+    throw new InputError(
+      "input.deviation_invalid",
+      `${where} is not valid UTF-8: ${(error as Error).message}.`,
+      "save the deviation register as UTF-8 text.",
+    );
+  }
   let parsed: unknown;
   try {
     // `json: true` disables js-yaml's own duplicate-mapping-key error (PyYAML's `SafeLoader` never
     // rejects a duplicate key -- `BaseConstructor.construct_mapping` just does `dict[key] = value` in
     // document order, so the last occurrence wins, confirmed this item).
-    parsed = yamlLoad(readFileSync(path, "utf-8"), {
-      schema: DEVIATION_REGISTER_SCHEMA,
-      json: true,
-    });
-  } catch {
+    parsed = yamlLoad(text, { schema: DEVIATION_REGISTER_SCHEMA, json: true });
+  } catch (error) {
+    if (error instanceof RangeError || /exceeded maxDepth/.test((error as Error).message)) {
+      // js-yaml caps nesting (and recurses per level), as PyYAML's composer hits its RecursionError.
+      throw new InputError(
+        "input.deviation_invalid",
+        `${where} is nested too deeply to parse safely.`,
+        "flatten the deviation register's structure; it exceeds the engine's safe nesting depth.",
+      );
+    }
     throw new InputError(
       "input.deviation_invalid",
-      `the deviation register at '${path}' carries a YAML construct the engine refuses to load.`,
+      `${where} carries a YAML construct the engine refuses to load: ${(error as Error).message}.`,
       "remove custom tags and aliases from the deviation register; only plain YAML scalars, " +
         "mappings, and sequences are accepted.",
     );
@@ -365,7 +383,7 @@ export function loadDeviationRegister(path: string): Record<string, unknown>[] {
   if (!isRecord(data)) {
     throw new InputError(
       "input.deviation_invalid",
-      `the deviation register at '${path}' is not a mapping.`,
+      `${where} is not a mapping.`,
       "the register must be a mapping with a top-level `deviations:` list.",
     );
   }
@@ -373,7 +391,7 @@ export function loadDeviationRegister(path: string): Record<string, unknown>[] {
   if (!Array.isArray(raw)) {
     throw new InputError(
       "input.deviation_invalid",
-      `the deviation register at '${path}''s \`deviations\` key is not a list.`,
+      `${where}'s \`deviations\` key is not a list.`,
       "`deviations:` must be a list of deviation entries.",
     );
   }
@@ -382,7 +400,7 @@ export function loadDeviationRegister(path: string): Record<string, unknown>[] {
     if (!isRecord(entry)) {
       throw new InputError(
         "input.deviation_invalid",
-        `the deviation register at '${path}' has a deviation entry that is not a mapping.`,
+        `${where} has a deviation entry that is not a mapping.`,
         "each entry under `deviations:` must be a mapping of the register's own fields.",
       );
     }
@@ -526,7 +544,7 @@ function daysBetween(from: CalendarDate, to: CalendarDate): number {
 }
 
 /** Negative when `a`'s calendar date is before `b`'s, matching Python's `date.__lt__`. */
-function compareDate(a: CalendarDate, b: CalendarDate): number {
+export function compareDate(a: CalendarDate, b: CalendarDate): number {
   return julianDayNumber(a) - julianDayNumber(b);
 }
 

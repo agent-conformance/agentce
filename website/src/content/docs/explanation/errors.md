@@ -29,6 +29,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `environment.python_unsupported` | the running Python is older than the interpreter the engine supports. | run the engine under Python 3.12 or newer (`uv python install 3.12`). |
 | `input.adapter_missing` | ingest needs an adapter. | pass --adapter, e.g. --adapter otel-genai. |
 | `input.adapter_not_found` | no adapter directory exists at the given adapters-root and adapter name. | pass --adapters-root pointing at the adapters checkout, or check the adapter name. |
+| `input.assess_flag_needs_value` | argument --deviations: expected one argument | pass --deviations <file>. |
 | `input.bundle_manifest_entry` | a 'files' entry in the manifest is missing 'path' or 'sha256'. | each entry needs {"path": ..., "sha256": ...}. |
 | `input.bundle_manifest_file_too_large` | a manifest-listed file is over the per-file size limit. | split large evidence into more, smaller files, or reference bulk content by an opaque locator instead of inlining it (SPEC R12). |
 | `input.bundle_manifest_files` | manifest.json has no non-empty 'files' array. | the manifest must list every file with its path and sha256. |
@@ -49,7 +50,6 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.corpus_not_found` | the given directory has neither a corpus-manifest.json nor a generator/generate.py. | pass a generated corpus directory or the corpus source tree. |
 | `input.coverage_denominator_manifest_invalid` | a coverage denominator's manifest file is nested too deeply to parse safely. | flatten the denominator manifest's structure; it exceeds the engine's safe nesting depth. |
 | `input.deviation_invalid` | the deviation register is not a well-formed mapping with a `deviations:` list of mapping entries, or fails a rule of SPEC §13.3.4 (control not in the catalog, wrong outcome, missing field, same approver as owner, or lifetime over the maximum). | correct the deviation register and re-run. |
-| `input.deviations_not_yet_supported` | this engine does not yet apply a deviation register on assess. | drop --deviations, or run this assessment with the Python engine. |
 | `input.diff_extra_argument` | diff was given more than the two positional arguments it takes. | pass exactly two files: `agentce diff <report-a> <report-b>`. |
 | `input.diff_field_not_string` | diff was given an assertion whose control, subject, or outcome field is present but is not a JSON string. | emit control/subject/outcome as JSON strings. |
 | `input.diff_format` | --format must be one of text, json, or md. | pass --format text|json|md. |

@@ -12,7 +12,8 @@ import { load } from "js-yaml";
 import { type Activity, summarizeActivity } from "./activity";
 import { resolve as resolveApplicability } from "./applicability";
 import { type Assertion, aggregate, assertionFromJson, assertionToJson } from "./assertions";
-import { assessSubjects, evaluatedNothing } from "./assess";
+import { applyDeviations, assessSubjects, deviationsByControl, evaluatedNothing } from "./assess";
+import { computeAuditorView } from "./auditorView";
 import { computeBlindSpots } from "./blindSpots";
 import { loadBundle } from "./bundle";
 import { catalogsDir as bundledCatalogsDir, quickstartDir } from "./bundled";
@@ -40,7 +41,13 @@ import { computeVectorFile } from "./numerics";
 import { OtelGenaiAdapterError, adapt as adaptOtelGenai } from "./otelGenai";
 import { type Profile, loadProfile } from "./profile";
 import { writeQuarantine } from "./quarantine";
-import { NOT_READY, computeReadiness, loadDeviationRegister, parseGapsFile } from "./readiness";
+import {
+  NOT_READY,
+  computeReadiness,
+  deviationLint,
+  loadDeviationRegister,
+  parseGapsFile,
+} from "./readiness";
 import {
   activityCliLines,
   blindSpotsCliLines,
@@ -63,6 +70,7 @@ import {
   byteCompare,
   jsonStringifyAscii,
   pyRepr,
+  pyStr,
   readJsonFileStrict,
   sortKeysDeep,
   writeJsonl,
@@ -258,7 +266,7 @@ function requireFile(
   if (!isFile) {
     throw new InputError(
       `input.${key}_not_a_file`,
-      `${what} '${raw}' is not an existing file.`,
+      `${what} ${pyRepr(raw)} is not an existing file.`,
       fix,
     );
   }
@@ -617,6 +625,8 @@ interface AssessOptions {
   trustRootFlag?: string;
   /** `--allow-unverified-catalog`. */
   allowUnverified: boolean;
+  /** `--deviations`' register path; `quickstart` has no such flag. */
+  deviations?: string;
 }
 
 /** Run a full assessment (ingest, integrity, graph, coverage, applicability, evaluate, report) — the
@@ -681,7 +691,7 @@ function runAssess(options: AssessOptions): CommandResult {
   );
 
   // Stage 6: catalog evaluation and report artifacts.
-  const evaluated = assessSubjects(ingested.accepted, profileObj, catalogs, domain);
+  let evaluated = assessSubjects(ingested.accepted, profileObj, catalogs, domain);
 
   // Stage 6a: incremental state (SPEC §5.4 B7, HR-10).
   const newWindowEnd = windowEnd(profileObj.observationWindow, ingested.accepted);
@@ -690,6 +700,49 @@ function runAssess(options: AssessOptions): CommandResult {
   if (options.state !== undefined) {
     state = StateDir.load(options.state); // incompatible state_version aborts with exit 3
     [supersedes] = state.plan(bundle.digest, ingested.accepted, newWindowEnd);
+  }
+
+  // Deviation application (SPEC §13.3.4 Stage 2), in Python's order: after evaluation and before the
+  // blind spots, the report and every rendering, so all of them see the flipped outcomes and the
+  // expired-and-ignored limitations.
+  let deviations: Record<string, unknown>[] | undefined;
+  let deviationRegisterDigest: string | undefined;
+  if (options.deviations !== undefined) {
+    const deviationFile = requireFile(options.deviations, "deviations", "the deviation register");
+    deviations = loadDeviationRegister(deviationFile);
+    const outcomesByControl = new Map<string, Set<string>>();
+    for (const a of evaluated) {
+      const outcomes = outcomesByControl.get(a.control) ?? new Set<string>();
+      outcomes.add(a.outcome);
+      outcomesByControl.set(a.control, outcomes);
+    }
+    const problems = deviationLint(deviations, {
+      controlIds: new Set(catalogs.flatMap((c) => c.controls.map((control) => control.id))),
+      outcomesByControl,
+      appliedControls: new Set<string>(),
+      asOf: newWindowEnd,
+    });
+    if (problems.length > 0) {
+      throw new InputError(
+        "input.deviation_invalid",
+        `the deviation register at ${pyRepr(options.deviations)} is invalid: ${problems.join("; ")}`,
+        "correct the deviation register and re-run.",
+      );
+    }
+    const applied = applyDeviations(evaluated, deviations, newWindowEnd);
+    evaluated = applied.assertions;
+    const byControl = deviationsByControl(deviations);
+    const template = catalogue(DEFAULT_LANGUAGE)["readiness.deviation_expired_ignored"] as string;
+    for (const control of applied.expired) {
+      const vars: Record<string, string> = {
+        control,
+        expiry: pyStr(byControl.get(control)?.expiry ?? ""),
+      };
+      limitations.push(
+        template.replace(/\{(control|expiry)\}/g, (_, name: string) => vars[name] as string),
+      );
+    }
+    deviationRegisterDigest = digestBytes(readFileSync(deviationFile));
   }
 
   const activity = summarizeActivity(ingested.accepted, profileObj);
@@ -711,6 +764,8 @@ function runAssess(options: AssessOptions): CommandResult {
     limitations,
     applicabilityProfileDigest,
     domainBindingDigest,
+    deviationRegisterDigest,
+    deviations,
   });
   if (state !== null) {
     state.record(bundle.digest, join(out, "manifest.json"), newWindowEnd);
@@ -785,25 +840,35 @@ function runAssess(options: AssessOptions): CommandResult {
   return result;
 }
 
-/** This engine does not yet apply a deviation register on `assess` (18.14a C5, 18.17a/18.38 pending):
- * refuse `--deviations <path>`, `--deviations=<path>`, and a bare trailing `--deviations` outright
- * rather than silently ignore a register a user believed was applied. */
-function checkDeviationsNotYetSupported(argv: string[]): void {
-  const hasDeviationsFlag = argv.some(
-    (token) => token === "--deviations" || token.startsWith("--deviations="),
-  );
-  if (hasDeviationsFlag) {
-    throw new InputError(
-      "input.deviations_not_yet_supported",
-      "this engine does not yet apply a deviation register on assess.",
-      "drop --deviations, or run this assessment with the Python engine.",
-    );
+/** `--deviations`' value read the way Python's argparse reads a `store` option: `--deviations <path>`
+ * or `--deviations=<path>`, the last occurrence wins, and a `--deviations` with no value (trailing,
+ * or followed by another option) is refused at once with argparse's own sentence rather than
+ * silently taking the next flag as the path or ignoring the register. */
+function deviationsFlag(argv: string[]): string | undefined {
+  let value: string | undefined;
+  for (let i = 1; i < argv.length; i++) {
+    const token = argv[i] as string;
+    if (token.startsWith("--deviations=")) {
+      value = token.slice("--deviations=".length);
+    } else if (token === "--deviations") {
+      const next = argv[i + 1];
+      if (next === undefined || looksLikeOption(next)) {
+        throw new InputError(
+          "input.assess_flag_needs_value",
+          "argument --deviations: expected one argument",
+          "pass --deviations <file>.",
+        );
+      }
+      value = next;
+      i++;
+    }
   }
+  return value;
 }
 
 function cmdAssess(argv: string[]): CommandResult {
-  checkDeviationsNotYetSupported(argv);
   return runAssess({
+    deviations: deviationsFlag(argv),
     bundle: flagValue(argv, "bundle") as string,
     profile: flagValue(argv, "profile") as string,
     catalog: flagValue(argv, "catalog"),
@@ -1609,6 +1674,21 @@ export function main(argv: string[]): number {
     const activity = data.activity as Activity;
     const assertions = (data.assertions as unknown[]).map(assertionFromJson);
     console.log(JSON.stringify(computeSecurityView(activity, assertions)));
+    return 0;
+  }
+
+  // auditor-view is the same kind of test-only seam (18.17a, VG-DEVIATIONS-PARITY): it reads a fixture
+  // file with `{assertions, deviations}`, runs `computeAuditorView`, and prints canonical JSON, the
+  // bytes Python's `auditor.json` holds -- not part of the public command surface.
+  if (command === "auditor-view") {
+    const fixturePath = argv[1];
+    if (fixturePath === undefined) {
+      console.error("auditor-view: a fixture file path is required");
+      return ExitCode.INPUT_ERROR;
+    }
+    const data = JSON.parse(readFileSync(fixturePath, "utf-8"));
+    const assertions = (data.assertions as unknown[]).map(assertionFromJson);
+    console.log(canonicalString(computeAuditorView(assertions, data.deviations ?? null)));
     return 0;
   }
 
