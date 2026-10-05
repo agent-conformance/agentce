@@ -694,3 +694,9 @@ allow:
     count: 2
     class: legitimate
     justification: "Deviation-register test entries (18.17a) name their owner and approver with the reserved example.com domain (RFC 2606); a named test identity, never an unfinished part of the engine."
+
+  - path: verification/gates/deviations_parity.sh
+    pattern: example-domain
+    count: 2
+    class: legitimate
+    justification: "The gate's deviation-register scenarios (18.17a) name their owner and approver with the reserved example.com domain (RFC 2606); a named test identity, never an unfinished part of the gate."

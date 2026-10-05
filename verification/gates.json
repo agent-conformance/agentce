@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.39.0",
+  "suite_version": "0.40.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -367,7 +367,7 @@
       "timeout_s": 900,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
-        "pass": "the 1-subject fixture (verification/gates/fixtures/blind_spots/) writes no project.json/project.md/project.html/agents/ on any engine; each engine's 3-subject fixture (verification/gates/fixtures/project_view/) project.json is byte-identical to the committed golden (project_view_golden.json), undeclared_agents correctly names the one agent no subject declares, top_gaps names a real cross-agent blind spot naming both fixture subjects, each engine's rendered project.md matches its own committed golden (project_view_golden_<engine>.md), and the Python-only deviations scenario (verification/gates/fixtures/project_view_deviations/) surfaces subject A's applied PVD-01 deviation with its real expiry, in both project.json and the rendered project.md, without leaking onto subject B",
+        "pass": "the 1-subject fixture (verification/gates/fixtures/blind_spots/) writes no project.json/project.md/project.html/agents/ on any engine; each engine's 3-subject fixture (verification/gates/fixtures/project_view/) project.json is byte-identical to the committed golden (project_view_golden.json), undeclared_agents correctly names the one agent no subject declares, top_gaps names a real cross-agent blind spot naming both fixture subjects, each engine's rendered project.md matches its own committed golden (project_view_golden_<engine>.md), and the deviations scenario (verification/gates/fixtures/project_view_deviations/, run through Python here; VG-DEVIATIONS-PARITY holds TypeScript's and Java's project.json to Python's bytes) surfaces subject A's applied PVD-01 deviation with its real expiry, in both project.json and the rendered project.md, without leaking onto subject B",
         "fail": "the 1-subject fixture gains a spurious project view on any engine, a 3-subject engine's project.json differs from the golden, the undeclared agent is missing, top_gaps is empty or does not name both subjects, an engine's project.md differs from its own golden, or the deviations scenario's subject A is missing its deviation/expiry, subject B wrongly carries one, or project.md omits the control id or expiry text"
       },
       "faults": [
@@ -675,6 +675,78 @@
         }
       ],
       "fix_hint": "run verification/gates/auditor_view.sh and read the FAIL lines; the reference implementation is engines/python/agentce/auditor_view.py (compute_auditor_view) and engines/python/agentce/report.py (render_auditor_md/render_auditor_html, and render_oscal's deviation risks[])."
+    },
+    {
+      "id": "VG-DEVIATIONS-PARITY",
+      "title": "A deviation register given to assess (--deviations) is applied, linted and refused the same way in all three engines, with byte-identical assertions and OSCAL risk entries, the same limitations and register digest, and the same auditor view",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/deviations_parity.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 900,
+      "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
+      "rubric": {
+        "pass": "over 25 scenarios run through each engine's real CLI (no register, the auditor-view fixture's register, lint and shape refusals, a missing path and a directory, malformed YAML, unquoted dates, an empty register, only an expired entry, two subjects, --deviations=<path>, a bare or mid-argv --deviations, non-UTF-8 bytes, a custom tag, an alias that expands to a duplicate, 5000-deep nesting, a quoted path, and the flag given twice in both orders) TypeScript and Java give Python's exit code, error key, cause (up to the parser's own text for malformed YAML, a custom tag and non-UTF-8) and fix, or write assertions.json, oscal-ar.json, activity.json and blind-spots.json (and the two-subject run's project.json) byte-identical to Python's with the same manifest limitations and deviation_register_digest; a run with no register carries no digest and no OSCAL risks; the last of two registers wins; a --deviations with no value exits 3 with argparse's sentence (key input.assess_flag_needs_value in TypeScript and Java); and each engine's auditor-view seam prints the bytes of Python's compute_auditor_view over three fixtures in run order and reversed, which also equal the auditor.json Python's assess --for auditor writes",
+        "fail": "any engine applies, ignores or refuses a register differently from Python, differs in exit code, key, cause, fix, an output file's bytes, the limitations or the digest, writes assertions.json for a refused run, or computes a different auditor view"
+      },
+      "faults": [
+        {
+          "description": "TypeScript's applyDeviations ignores an entry's expiry, so AUV-02's expired deviation is applied instead of reported as a limitation",
+          "file": "engines/typescript/src/assess.ts",
+          "search": "    if (expiry !== null && asOfDate !== null && compareDate(expiry, asOfDate) < 0) {\n",
+          "replace": "    if (false) {\n"
+        },
+        {
+          "description": "Java's renderOscal drops the risks[] entry of a deviated finding",
+          "file": "engines/java/src/main/java/org/agentce/Report.java",
+          "search": "        if (risks.size() > 0) {\n            result.set(\"risks\", risks);\n",
+          "replace": "        if (false) {\n            result.set(\"risks\", risks);\n"
+        },
+        {
+          "description": "Java's computeAuditorView sorts each by_clause entry's control ids in reverse instead of ascending",
+          "file": "engines/java/src/main/java/org/agentce/AuditorView.java",
+          "search": "k -> new TreeSet<>(bytes))\n",
+          "replace": "k -> new TreeSet<>(bytes.reversed()))\n"
+        },
+        {
+          "description": "TypeScript's assess skips the register lint, so a deviation for a conformant control (S3) is accepted",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "    if (problems.length > 0) {\n      throw new InputError(\n        \"input.deviation_invalid\",",
+          "replace": "    if (false) {\n      throw new InputError(\n        \"input.deviation_invalid\","
+        },
+        {
+          "description": "Java's assess reads only the two-token --deviations <path> spelling, so --deviations=<path> (S15) silently applies nothing",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "            if (token.startsWith(\"--deviations=\")) {\n",
+          "replace": "            if (false) {\n"
+        },
+        {
+          "description": "TypeScript's loadDeviationRegister decodes the register lossily instead of refusing non-UTF-8 bytes (S17)",
+          "file": "engines/typescript/src/readiness.ts",
+          "search": "    text = decodeUtf8Strict(readFileSync(path));\n",
+          "replace": "    text = readFileSync(path, \"utf-8\");\n"
+        },
+        {
+          "description": "TypeScript's computeAuditorView skips its (control, subject) sort, so the reversed seam input gives a different view",
+          "file": "engines/typescript/src/auditorView.ts",
+          "search": "  const ordered = [...assertions].sort(\n    (a, b) => byteCompare(a.control, b.control) || byteCompare(a.subject, b.subject),\n  );\n",
+          "replace": "  const ordered = [...assertions];\n"
+        },
+        {
+          "description": "Java's --deviations lookup keeps the first value when the flag is given twice (S22, S22b)",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "                            \"pass --deviations <file>.\");\n                }\n                value = args[++i];\n",
+          "replace": "                            \"pass --deviations <file>.\");\n                }\n                value = value == null ? args[i + 1] : value;\n                i++;\n"
+        }
+      ],
+      "fix_hint": "run verification/gates/deviations_parity.sh and read the FAIL lines; the reference is engines/python/agentce/commands/__init__.py (cmd_assess's deviation block and _load_deviation_register), assess.py (apply_deviations), auditor_view.py (compute_auditor_view) and report.py (render_oscal's risks[]), ported in engines/typescript/src/{assess,auditorView,cli,readiness,report}.ts and engines/java/src/main/java/org/agentce/{Assess,AuditorView,Cli,Readiness,Report}.java."
     },
     {
       "id": "VG-BUYER-VIEW",
