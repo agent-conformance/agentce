@@ -36,7 +36,11 @@ from .errors import InputError
 class _PermissiveTimestampSafeLoader(yaml.SafeLoader):
     """``yaml.SafeLoader`` whose timestamp construction never raises: a calendar-invalid value
     (shape-valid, like ``2026-02-30``) falls back to :func:`_pythonize_timestamp` instead of letting
-    ``datetime.date``/``datetime.datetime`` construction's ``ValueError`` escape."""
+    ``datetime.date``/``datetime.datetime`` construction's ``ValueError`` escape. An explicit
+    ``!!timestamp`` tag on a value that is not timestamp-shaped at all (e.g. ``!!timestamp foo``)
+    bypasses the resolver's own shape gate and reaches ``construct_yaml_timestamp`` with no regex
+    match, which raises ``AttributeError`` (``None.groupdict()``) rather than ``ValueError`` --
+    caught here too, for the same fallback."""
 
 
 def _construct_yaml_timestamp_permissive(
@@ -44,7 +48,7 @@ def _construct_yaml_timestamp_permissive(
 ) -> Any:
     try:
         return yaml.SafeLoader.construct_yaml_timestamp(loader, node)
-    except ValueError:
+    except (ValueError, AttributeError):
         return _pythonize_timestamp(node.value)
 
 

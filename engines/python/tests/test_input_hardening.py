@@ -193,6 +193,28 @@ def test_domain_binding_with_calendar_invalid_unquoted_date_does_not_crash(
     DomainBinding.load(path)  # must not raise
 
 
+def test_profile_with_explicit_non_timestamp_tag_does_not_crash(tmp_path: Path) -> None:
+    """An explicit ``!!timestamp`` tag on a value that is not timestamp-shaped at all (``!!timestamp
+    foo``) bypasses the resolver's own shape gate and reaches ``construct_yaml_timestamp`` with no
+    regex match, which raises ``AttributeError`` rather than ``ValueError`` -- a second, narrower
+    crash the calendar-invalid fallback's first ``except ValueError`` alone did not catch (18.17c
+    verifier round 1)."""
+    path = tmp_path / "profile.yaml"
+    path.write_text("observation_window: {start: !!timestamp foo}\n", encoding="utf-8")
+
+    profile = Profile.load(path)
+    assert profile.observation_window["start"] == "foo"
+
+
+def test_domain_binding_with_explicit_non_timestamp_tag_does_not_crash(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "domain.yaml"
+    path.write_text("expiry: !!timestamp foo\n", encoding="utf-8")
+
+    DomainBinding.load(path)  # must not raise
+
+
 def test_profile_with_non_utf8_bytes_is_refused(tmp_path: Path) -> None:
     path = tmp_path / "profile.yaml"
     path.write_bytes(b"observation_window: {start: \xff\xfe}\n")

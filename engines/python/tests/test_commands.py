@@ -2531,6 +2531,33 @@ def test_assess_a_calendar_invalid_unquoted_yaml_expiry_date_is_refused_as_input
     assert envelope["error"]["key"] == "input.deviation_invalid"
 
 
+def test_assess_an_explicit_non_timestamp_tagged_expiry_is_refused_as_input_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An explicit ``!!timestamp`` tag on a value that is not timestamp-shaped at all (``!!timestamp
+    foo``) bypasses the resolver's own shape gate and reaches ``construct_yaml_timestamp`` with no
+    regex match, which raises ``AttributeError`` rather than ``ValueError`` -- a second, narrower
+    crash the calendar-invalid fallback's first ``except ValueError`` alone did not catch (18.17c
+    verifier round 1)."""
+    dev = tmp_path / "deviations.yaml"
+    dev.write_text(
+        "deviations:\n"
+        f"  - control: {_DEV_CONTROL}\n"
+        '    rationale: "r"\n'
+        '    compensating_control: "c"\n'
+        '    owner: "user:owner@example.com"\n'
+        '    approver: "user:approver@example.com"\n'
+        '    granted: "2025-08-01T00:00:00.000Z"\n'
+        "    expiry: !!timestamp foo\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "o"
+    code = cli.main(_dev_argv(out, dev, "--json"))
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "input.deviation_invalid"
+
+
 def test_readiness_a_calendar_invalid_unquoted_yaml_expiry_date_gives_not_ready_not_a_crash(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

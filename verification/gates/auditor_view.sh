@@ -104,9 +104,10 @@ PY
   )
 }
 
-#: check (k)/18.17c: the auditor view's own OSCAL-section text (auditor.md/.html) names that a
-#: deviated finding's OSCAL entry carries a matching risk -- a real fact the engine already renders
-#: (render_oscal, check_oscal_risk above) but, before 18.17c, never stated in the auditor's own prose.
+#: check (k)/18.17c: the auditor view's own OSCAL-section text (auditor.md only; the gate does not
+#: check auditor.html for this) names that a deviated finding's OSCAL entry carries a matching risk
+#: -- a real fact the engine already renders (render_oscal, check_oscal_risk above) but, before
+#: 18.17c, never stated in the auditor's own prose.
 check_oscal_text_mentions_risk() {
   local section
   section="$(sed -n '/## OSCAL and evidence bundle/,/## How to re-run/p' "$1")"
