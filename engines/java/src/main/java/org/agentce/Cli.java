@@ -94,6 +94,29 @@ public final class Cli {
             return 0;
         }
 
+        // auditor-view is the same kind of test-only seam (18.17a, VG-DEVIATIONS-PARITY): it reads a
+        // fixture file with {assertions, deviations}, runs AuditorView.computeAuditorView, and prints
+        // canonical JSON, the bytes Python's auditor.json holds -- not part of the public command surface.
+        if ("auditor-view".equals(command)) {
+            if (args.length < 2) {
+                System.err.println("auditor-view: a fixture file path is required");
+                return ExitCode.INPUT_ERROR.code;
+            }
+            JsonNode data = Json.parseFile(Paths.get(args[1]));
+            List<Assertions.Assertion> assertions = new ArrayList<>();
+            for (JsonNode a : data.get("assertions")) {
+                assertions.add(Assertions.fromJson(a));
+            }
+            JsonNode deviationsNode = data.get("deviations");
+            List<JsonNode> deviations = null;
+            if (deviationsNode != null && !deviationsNode.isNull()) {
+                deviations = new ArrayList<>();
+                deviationsNode.forEach(deviations::add);
+            }
+            System.out.println(Canonical.canonicalString(AuditorView.computeAuditorView(assertions, deviations)));
+            return 0;
+        }
+
         // otel-genai-fixture is a plain computation seam (the same pattern as `security-view`
         // above), driven by the otel-genai adapter's cross-engine parity check (18.29, C3/C4): it
         // reads `<dir>/input.json` and `<dir>/adapt.json` the same way the Python reference's
@@ -354,7 +377,7 @@ public final class Cli {
         Path path = Paths.get(raw);
         if (!Files.isRegularFile(path)) {
             throw new InputError(
-                    "input." + key + "_not_a_file", what + " '" + raw + "' is not an existing file.", fix);
+                    "input." + key + "_not_a_file", what + " " + Readiness.pyRepr(raw) + " is not an existing file.", fix);
         }
         return raw;
     }
@@ -777,7 +800,9 @@ public final class Cli {
             String state,
             String invocationCommand,
             String trustRootFlag,
-            boolean allowUnverified) {}
+            boolean allowUnverified,
+            /** {@code --deviations}' register path; {@code quickstart} has no such flag. */
+            String deviations) {}
 
     /** Run a full assessment (ingest, integrity, graph, coverage, applicability, evaluate, report) — the
      * same pipeline {@code conformance run} exercises per corpus project, generalised to an arbitrary
@@ -858,6 +883,51 @@ public final class Cli {
             supersedes = state.plan(bundle.digest(), ingested.accepted, newWindowEnd);
         }
 
+        // Deviation application (SPEC §13.3.4 Stage 2), in Python's order: after evaluation and before the
+        // blind spots, the report and every rendering, so all of them see the flipped outcomes and the
+        // expired-and-ignored limitations.
+        List<String> limitations = new ArrayList<>(resolved.limitations());
+        List<JsonNode> deviations = null;
+        String deviationRegisterDigest = null;
+        if (options.deviations() != null) {
+            Path deviationFile = Paths.get(requireFile(options.deviations(), "deviations", "the deviation register"));
+            deviations = Readiness.loadDeviationRegister(deviationFile);
+            Map<String, Set<String>> outcomesByControl = new LinkedHashMap<>();
+            for (Assertions.Assertion a : evaluated) {
+                outcomesByControl.computeIfAbsent(a.control, k -> new LinkedHashSet<>()).add(a.outcome);
+            }
+            Set<String> controlIds = new LinkedHashSet<>();
+            for (Catalog catalog : resolved.catalogs()) {
+                for (Catalog.ControlSpec control : catalog.controls) {
+                    controlIds.add(control.id);
+                }
+            }
+            List<String> problems = Readiness.deviationLint(
+                    deviations, controlIds, outcomesByControl, Set.of(), newWindowEnd,
+                    Readiness.DEFAULT_MAX_DEVIATION_DAYS);
+            if (!problems.isEmpty()) {
+                throw new InputError(
+                        "input.deviation_invalid",
+                        "the deviation register at " + Readiness.pyRepr(options.deviations()) + " is invalid: "
+                                + String.join("; ", problems),
+                        "correct the deviation register and re-run.");
+            }
+            Assess.Applied applied = Assess.applyDeviations(evaluated, deviations, newWindowEnd);
+            evaluated = applied.assertions();
+            Map<String, JsonNode> byControl = Assess.deviationsByControl(deviations);
+            String template = Messages.catalogue(Messages.DEFAULT_LANGUAGE).get("readiness.deviation_expired_ignored");
+            for (String control : applied.expired()) {
+                limitations.add(template
+                        .replace("{control}", control)
+                        .replace("{expiry}", Assess.fieldStr(byControl.get(control), "expiry")));
+            }
+            try {
+                deviationRegisterDigest = Report.digestBytes(Files.readAllBytes(deviationFile));
+            } catch (IOException e) {
+                throw new IllegalStateException("cannot read the deviation register for digest: " + e.getMessage(), e);
+            }
+        }
+
         String operatorEnv = System.getenv("AGENTCE_OPERATOR");
         List<String> invocation = List.of(options.invocationCommand(), scrubPath(bundleDir), scrubPath(profilePath));
         ObjectNode activity = Activity.summarizeActivity(ingested.accepted, profileObj);
@@ -874,8 +944,8 @@ public final class Cli {
                 out, evaluated, bundle.digest(), resolved.labels(),
                 operatorEnv != null ? operatorEnv : "unknown",
                 invocation, supersedes, Messages.DEFAULT_LANGUAGE, resolved.catalogs(), activity, blindSpots,
-                profileObj, null, ingested.accepted, resolved.limitations(),
-                applicabilityProfileDigest, domainBindingDigest);
+                profileObj, null, ingested.accepted, limitations,
+                applicabilityProfileDigest, domainBindingDigest, deviationRegisterDigest, deviations);
         if (state != null) {
             state.record(bundle.digest(), out.resolve("manifest.json"), newWindowEnd);
         }
@@ -920,10 +990,10 @@ public final class Cli {
             ArrayNode supersedesArr = result.data.putArray("supersedes");
             supersedes.forEach(supersedesArr::add);
         }
-        if (!resolved.limitations().isEmpty()) {
+        if (!limitations.isEmpty()) {
             // The override is never silent: on stderr for the operator and in the manifest (SPEC §8.7).
             ArrayNode limitationsArr = result.data.putArray("limitations");
-            for (String limitation : resolved.limitations()) {
+            for (String limitation : limitations) {
                 limitationsArr.add(limitation);
                 result.note(limitation);
             }
@@ -961,23 +1031,32 @@ public final class Cli {
         return result;
     }
 
-    /** This engine does not yet apply a deviation register on {@code assess} (18.14a C5,
-     * 18.17a/18.38 pending): refuse {@code --deviations <path>}, {@code --deviations=<path>}, and a
-     * bare trailing {@code --deviations} outright rather than silently ignore a register a user
-     * believed was applied. */
-    private static void checkDeviationsNotYetSupported(String[] args) {
-        for (String token : args) {
-            if (token.equals("--deviations") || token.startsWith("--deviations=")) {
-                throw new InputError(
-                        "input.deviations_not_yet_supported",
-                        "this engine does not yet apply a deviation register on assess.",
-                        "drop --deviations, or run this assessment with the Python engine.");
+    /** {@code --deviations}' value read the way Python's argparse reads a {@code store} option:
+     * {@code --deviations <path>} or {@code --deviations=<path>}, the last occurrence wins, and a
+     * {@code --deviations} with no value (trailing, or followed by another option) is refused at once
+     * with argparse's own sentence rather than silently taking the next flag as the path or ignoring
+     * the register. */
+    private static String deviationsFlag(String[] args) {
+        String value = null;
+        for (int i = 1; i < args.length; i++) {
+            String token = args[i];
+            if (token.startsWith("--deviations=")) {
+                value = token.substring("--deviations=".length());
+            } else if (token.equals("--deviations")) {
+                if (i + 1 >= args.length || looksLikeOption(args[i + 1])) {
+                    throw new InputError(
+                            "input.assess_flag_needs_value",
+                            "argument --deviations: expected one argument",
+                            "pass --deviations <file>.");
+                }
+                value = args[++i];
             }
         }
+        return value;
     }
 
     private static CommandResult cmdAssess(String[] args) {
-        checkDeviationsNotYetSupported(args);
+        String deviations = deviationsFlag(args);
         String outArg = flagValue(args, "out");
         return runAssess(new AssessOptions(
                 flagValue(args, "bundle"),
@@ -989,7 +1068,8 @@ public final class Cli {
                 flagValue(args, "state"),
                 "assess",
                 flagValue(args, "trust-root"),
-                Arrays.asList(args).contains("--allow-unverified-catalog")));
+                Arrays.asList(args).contains("--allow-unverified-catalog"),
+                deviations));
     }
 
     /** Assess the bundled quickstart project end to end — one command, offline (SPEC §13.4 AX-1). */
@@ -1015,7 +1095,8 @@ public final class Cli {
                 null,
                 "quickstart",
                 null,
-                false));
+                false,
+                null));
         result.data.setAll(assess.data);
         result.data.put("quickstart", "ok");
         for (int code : assess.applicableCodes()) {

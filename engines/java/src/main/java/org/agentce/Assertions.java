@@ -47,6 +47,30 @@ public final class Assertions {
     }
 
     /** One (control, subject) verdict. Optional collections default empty; nullable fields default null. */
+    /** A field-by-field shallow copy of {@code a}: the collections are new lists over the same
+     * (immutable in practice) elements, so changing the copy's own fields never touches {@code a}. */
+    static Assertion copyOf(Assertion a) {
+        Assertion c = new Assertion();
+        c.control = a.control;
+        c.controlVersion = a.controlVersion;
+        c.subject = a.subject;
+        c.outcome = a.outcome;
+        c.rung = a.rung;
+        c.mode = a.mode;
+        c.window = a.window;
+        c.population = a.population;
+        c.severity = a.severity;
+        c.family = a.family;
+        c.expectations = new ArrayList<>(a.expectations);
+        c.violations = new ArrayList<>(a.violations);
+        c.evidence = new ArrayList<>(a.evidence);
+        c.sourceClassSatisfied = a.sourceClassSatisfied;
+        c.evidenceStrength = a.evidenceStrength;
+        c.deviation = a.deviation;
+        c.crosswalk = new ArrayList<>(a.crosswalk);
+        return c;
+    }
+
     public static final class Assertion {
         public String control;
         public String controlVersion;

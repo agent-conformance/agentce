@@ -4,10 +4,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.Reader;
+import java.io.StringReader;
+import java.io.UncheckedIOException;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,6 +21,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.nodes.MappingNode;
 import org.yaml.snakeyaml.nodes.Node;
@@ -328,6 +332,17 @@ public final class Readiness {
         return sign * Double.parseDouble(value);
     }
 
+    /** The deepest nesting the register loader composes, the same cap TypeScript's js-yaml applies by
+     * default; PyYAML's own limit is the interpreter's recursion depth, so a deeper register is refused
+     * as nested too deeply in every engine, only at a different depth. */
+    private static final int DEVIATION_REGISTER_MAX_DEPTH = 100;
+
+    /** The tags PyYAML's {@code SafeLoader} constructs (scalars resolve implicitly to these; a mapping
+     * or sequence carries its default tag). Any other tag, such as {@code !!python/object:os.system},
+     * is refused, as {@code SafeLoader} refuses it. */
+    private static final Set<Tag> SAFE_TAGS = Set.of(
+            Tag.STR, Tag.NULL, Tag.BOOL, Tag.INT, Tag.FLOAT, Tag.TIMESTAMP, Tag.MERGE, Tag.MAP, Tag.SEQ);
+
     /** Composes {@code node}'s raw YAML value tree. SnakeYAML's own {@code compose()} resolves each
      * scalar's tag with regexes byte-identical to PyYAML's own resolver for {@code null}/{@code
      * bool}/{@code timestamp} -- confirmed against SnakeYAML 2.3 -- so those three trust SnakeYAML's
@@ -339,6 +354,10 @@ public final class Readiness {
      * PyYAML's "implicit resolution applies only to the plain scalar style" rule). Never touches
      * Jackson's own YAML reader ({@link Yaml}, this engine's other loader) for this file. */
     private static Object composeValue(Node node) {
+        if (!SAFE_TAGS.contains(node.getTag())) {
+            throw new IllegalArgumentException(
+                    "could not determine a constructor for the tag '" + node.getTag().getValue() + "'");
+        }
         if (node instanceof ScalarNode scalar) {
             String text = scalar.getValue();
             if (!scalar.isPlain()) {
@@ -574,14 +593,42 @@ public final class Readiness {
      * defaults to an empty list); every {@code granted}/{@code expiry} value YAML resolved as a
      * timestamp is normalized via {@link #normalizeDeviationDates} before use. */
     public static List<JsonNode> loadDeviationRegister(Path path) {
-        Object parsed;
-        try (Reader reader = new BufferedReader(Files.newBufferedReader(path, StandardCharsets.UTF_8))) {
-            Node root = new Yaml().compose(reader);
-            parsed = root == null ? null : composeValue(root);
-        } catch (IOException | RuntimeException e) {
+        String where = "the deviation register at " + pyRepr(path.toString());
+        String text;
+        try {
+            // A fatal decode, as Python's `read_text(encoding="utf-8")`: a lossy one would turn a 0xff
+            // byte into U+FFFD and lint the mangled control id instead of refusing the file.
+            text = StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(Files.readAllBytes(path)))
+                    .toString();
+        } catch (CharacterCodingException e) {
             throw new InputError(
                     "input.deviation_invalid",
-                    "the deviation register at '" + path + "' carries a YAML construct the engine refuses to load.",
+                    where + " is not valid UTF-8: " + e + ".",
+                    "save the deviation register as UTF-8 text.");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        Object parsed;
+        try {
+            LoaderOptions options = new LoaderOptions();
+            options.setNestingDepthLimit(DEVIATION_REGISTER_MAX_DEPTH);
+            Node root = new Yaml(options).compose(new StringReader(text));
+            parsed = root == null ? null : composeValue(root);
+        } catch (StackOverflowError | RuntimeException e) {
+            if (e instanceof StackOverflowError || String.valueOf(e.getMessage()).contains("Nesting Depth exceeded")) {
+                // SnakeYAML caps nesting (and composeValue recurses per level), as PyYAML's composer
+                // hits its RecursionError.
+                throw new InputError(
+                        "input.deviation_invalid",
+                        where + " is nested too deeply to parse safely.",
+                        "flatten the deviation register's structure; it exceeds the engine's safe nesting depth.");
+            }
+            throw new InputError(
+                    "input.deviation_invalid",
+                    where + " carries a YAML construct the engine refuses to load: " + e.getMessage() + ".",
                     "remove custom tags and aliases from the deviation register; only plain YAML scalars, "
                             + "mappings, and sequences are accepted.");
         }
@@ -589,7 +636,7 @@ public final class Readiness {
         if (!(data instanceof Map<?, ?> dataMap)) {
             throw new InputError(
                     "input.deviation_invalid",
-                    "the deviation register at '" + path + "' is not a mapping.",
+                    where + " is not a mapping.",
                     "the register must be a mapping with a top-level `deviations:` list.");
         }
         List<Object> raw;
@@ -600,7 +647,7 @@ public final class Readiness {
             if (!(devs instanceof List<?> list)) {
                 throw new InputError(
                         "input.deviation_invalid",
-                        "the deviation register at '" + path + "'s `deviations` key is not a list.",
+                        where + "'s `deviations` key is not a list.",
                         "`deviations:` must be a list of deviation entries.");
             }
             raw = new ArrayList<>(list);
@@ -610,7 +657,7 @@ public final class Readiness {
             if (!(entry instanceof Map<?, ?> entryMap)) {
                 throw new InputError(
                         "input.deviation_invalid",
-                        "the deviation register at '" + path + "' has a deviation entry that is not a mapping.",
+                        where + " has a deviation entry that is not a mapping.",
                         "each entry under `deviations:` must be a mapping of the register's own fields.");
             }
             Map<String, Object> copy = new LinkedHashMap<>();
@@ -651,7 +698,7 @@ public final class Readiness {
      * before ever returning, so only the calendar date is retained here; every comparison this module
      * makes ({@code deviationLint}'s {@code > maxDays}, {@code < asOfDate}) is calendar-day arithmetic,
      * never an instant on a shared timeline. */
-    private record CalendarDate(int year, int month, int day) {}
+    record CalendarDate(int year, int month, int day) {}
 
     /** RFC 3339 only, the one grammar all three engines accept (2026-09-30 maintainer decision,
      * {@code TRADEOFFS.md}/inbox row 19): only the forms the deviation-register schema's own
@@ -731,7 +778,7 @@ public final class Readiness {
 
     /** Negative when {@code a}'s calendar date is before {@code b}'s, matching Python's {@code
      * date.__lt__}. */
-    private static long compareDate(CalendarDate a, CalendarDate b) {
+    static long compareDate(CalendarDate a, CalendarDate b) {
         return julianDayNumber(a) - julianDayNumber(b);
     }
 

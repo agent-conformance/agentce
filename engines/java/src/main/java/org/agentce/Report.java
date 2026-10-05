@@ -982,6 +982,16 @@ public final class Report {
      * faithful port of the Python reference; no catalog object is needed since the control id alone is
      * the traceable token. */
     public static ObjectNode renderOscal(List<Assertions.Assertion> assertions) {
+        return renderOscal(assertions, null);
+    }
+
+    /** As the one-argument {@link #renderOscal}, with {@code deviations} (18.17a): the same
+     * already-linted register {@link Assess#applyDeviations} applied, so every finding whose assertion
+     * carries a {@code deviation} gets one {@code risks[]} entry and a {@code related-risks} link, as
+     * Python's {@code render_oscal(..., deviations=)} does. Without a register (re-rendering from
+     * {@code assertions.json} alone) no risk entry is written: no fact the records do not support. */
+    public static ObjectNode renderOscal(List<Assertions.Assertion> assertions, List<JsonNode> deviations) {
+        Map<String, JsonNode> byControlDeviation = Assess.deviationsByControl(deviations);
         String when = oscalTimestamp(assertions);
         List<Assertions.Assertion> ordered = sortedBySubjectControl(assertions);
 
@@ -1038,6 +1048,7 @@ public final class Report {
         }
 
         ArrayNode findings = Json.nodes().arrayNode();
+        ArrayNode risks = Json.nodes().arrayNode();
         for (Assertions.Assertion a : ordered) {
             String key = a.control + "\0" + a.subject;
             ObjectNode finding = findings.addObject();
@@ -1057,9 +1068,30 @@ public final class Report {
             finding.putArray("related-observations")
                     .addObject()
                     .put("observation-uuid", observationUuid.get(key));
+            JsonNode entry = a.deviation != null && !a.deviation.isEmpty() ? byControlDeviation.get(a.deviation) : null;
+            if (entry != null) {
+                String riskUuid = uuid("risk", a.control, a.subject);
+                ObjectNode risk = risks.addObject();
+                risk.put("uuid", riskUuid);
+                risk.put("title", "Accepted deviation for " + a.control + " on " + a.subject + ".");
+                risk.put(
+                        "description",
+                        a.control + " is non-conformant for " + a.subject
+                                + "; a deviation was reviewed and accepted (SPEC \u00a713.3.4).");
+                risk.put("statement", Assess.fieldStr(entry, "rationale"));
+                risk.put("status", "deviation-approved");
+                risk.putArray("mitigating-factors")
+                        .addObject()
+                        .put("uuid", uuid("mitigating-factor", a.control, a.subject))
+                        .put("description", Assess.fieldStr(entry, "compensating_control"));
+                finding.putArray("related-risks").addObject().put("risk-uuid", riskUuid);
+            }
         }
         if (findings.size() > 0) {
             result.set("findings", findings);
+        }
+        if (risks.size() > 0) {
+            result.set("risks", risks);
         }
 
         return root;
@@ -1184,6 +1216,18 @@ public final class Report {
             String bundleDigest, List<String> catalogs, Map<String, String> outputs, String operator,
             List<String> invocation, List<String> supersedes, String reportLanguage, List<Catalog> catalogObjects,
             List<String> limitations, String applicabilityProfileDigest, String domainBindingDigest) {
+        return buildManifest(
+                bundleDigest, catalogs, outputs, operator, invocation, supersedes, reportLanguage, catalogObjects,
+                limitations, applicabilityProfileDigest, domainBindingDigest, null);
+    }
+
+    /** As the eleven-argument {@link #buildManifest}, plus the {@code sha256:<hex>} of the
+     * {@code --deviations} register's bytes (18.17a), recorded in {@code inputs} only when non-null. */
+    public static ObjectNode buildManifest(
+            String bundleDigest, List<String> catalogs, Map<String, String> outputs, String operator,
+            List<String> invocation, List<String> supersedes, String reportLanguage, List<Catalog> catalogObjects,
+            List<String> limitations, String applicabilityProfileDigest, String domainBindingDigest,
+            String deviationRegisterDigest) {
         Map<String, Catalog> byLabel = new LinkedHashMap<>();
         if (catalogObjects != null) {
             for (Catalog c : catalogObjects) {
@@ -1208,6 +1252,9 @@ public final class Report {
         }
         if (domainBindingDigest != null) {
             inputs.put("domain_binding_digest", domainBindingDigest);
+        }
+        if (deviationRegisterDigest != null) {
+            inputs.put("deviation_register_digest", deviationRegisterDigest);
         }
         ArrayNode catalogRefs = inputs.putArray("catalogs");
         for (String entry : catalogs) {
@@ -1312,6 +1359,23 @@ public final class Report {
             List<Catalog> catalogObjects, ObjectNode activity, ObjectNode blindSpots,
             Profile profile, Set<String> declaredSubjectIds, List<JsonNode> events, List<String> limitations,
             String applicabilityProfileDigest, String domainBindingDigest) {
+        return writeReport(
+                outDir, assertions, bundleDigest, catalogs, operator, invocation, supersedes, reportLanguage,
+                catalogObjects, activity, blindSpots, profile, declaredSubjectIds, events, limitations,
+                applicabilityProfileDigest, domainBindingDigest, null, null);
+    }
+
+    /** As the seventeen-argument {@link #writeReport}, plus the {@code --deviations} register (18.17a):
+     * its digest goes to the manifest, and the already-linted entries {@link Assess#applyDeviations}
+     * used feed the OSCAL risks and the project view's per-agent deviations. Both are {@code null} when
+     * no register was given, so such a run's outputs stay byte-identical. */
+    public static ObjectNode writeReport(
+            Path outDir, List<Assertions.Assertion> assertions, String bundleDigest, List<String> catalogs,
+            String operator, List<String> invocation, List<String> supersedes, String reportLanguage,
+            List<Catalog> catalogObjects, ObjectNode activity, ObjectNode blindSpots,
+            Profile profile, Set<String> declaredSubjectIds, List<JsonNode> events, List<String> limitations,
+            String applicabilityProfileDigest, String domainBindingDigest, String deviationRegisterDigest,
+            List<JsonNode> deviations) {
         Assertions.checkDc5(assertions);
         try {
             Files.createDirectories(outDir);
@@ -1366,8 +1430,16 @@ public final class Report {
                                     eventsBySubject.getOrDefault(subjectId, List.of()), subjectProfile,
                                     subjectDeclaredIds));
                 }
+                List<ObjectNode> projectDeviations = null;
+                if (deviations != null) {
+                    projectDeviations = new ArrayList<>();
+                    for (JsonNode d : deviations) {
+                        projectDeviations.add((ObjectNode) d);
+                    }
+                }
                 projectView = Project.computeProjectView(
-                        assertions, profile, resolvedDeclared, projectActivityBySubject, blindSpotsNode);
+                        assertions, profile, resolvedDeclared, projectActivityBySubject, blindSpotsNode,
+                        projectDeviations);
                 outputs.put("project.json", writeJson(outDir, "project.json", projectView));
                 Map<String, List<ObjectNode>> gapsBySubject = Project.blindSpotsBySubject(blindSpotsNode);
                 Map<String, List<ObjectNode>> noPopBySubject =
@@ -1426,7 +1498,7 @@ public final class Report {
                         writeText(outDir, "report.html",
                                 renderReportHtml(assertions, counts, reportLanguage, activityNode, blindSpotsNode)));
             }
-            outputs.put("oscal-ar.json", writeJson(outDir, "oscal-ar.json", renderOscal(assertions)));
+            outputs.put("oscal-ar.json", writeJson(outDir, "oscal-ar.json", renderOscal(assertions, deviations)));
             outputs.put("results.sarif", writeJson(outDir, "results.sarif", renderSarif(assertions, catalogObjects)));
 
             TreeSet<String> subjects = new TreeSet<>(Json::byteCompare);
@@ -1451,7 +1523,7 @@ public final class Report {
 
             ObjectNode manifest = buildManifest(
                     bundleDigest, catalogs, outputs, operator, invocation, supersedes, reportLanguage, catalogObjects,
-                    limitations, applicabilityProfileDigest, domainBindingDigest);
+                    limitations, applicabilityProfileDigest, domainBindingDigest, deviationRegisterDigest);
             Files.write(outDir.resolve("manifest.json"), Json.pretty(manifest).getBytes(StandardCharsets.UTF_8));
             return manifest;
         } catch (IOException e) {

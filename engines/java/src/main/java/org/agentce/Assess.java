@@ -3,6 +3,7 @@ package org.agentce;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -245,5 +246,64 @@ public final class Assess {
             }
         }
         return assertions;
+    }
+
+    /** Index a deviation register by its {@code control} field ({@code assess.deviations_by_control}).
+     * Shared by every reader of an already-loaded register ({@link #applyDeviations}, the expired-entry
+     * limitation text, {@link Report#renderOscal}, {@link AuditorView#computeAuditorView}) so the keying
+     * rule lives in one place; a later entry for the same control replaces an earlier one, as a Python
+     * dict comprehension does. */
+    static Map<String, JsonNode> deviationsByControl(List<JsonNode> deviations) {
+        Map<String, JsonNode> byControl = new LinkedHashMap<>();
+        if (deviations != null) {
+            for (JsonNode entry : deviations) {
+                byControl.put(Readiness.pyStr(entry.get("control")), entry);
+            }
+        }
+        return byControl;
+    }
+
+    /** {@link #applyDeviations}' result: the new assertion list and the control ids whose entry had
+     * expired by {@code asOf}, in assertion order. */
+    record Applied(List<Assertions.Assertion> assertions, List<String> expired) {}
+
+    /** Apply an already-linted deviation register to {@code assertions} (SPEC §13.3.4 Stage 2; a port of
+     * {@code assess.apply_deviations}): every {@code non-conformant} assertion whose control has a
+     * matching, unexpired entry becomes {@code partial} and carries that control's id as {@code
+     * deviation}. Pure: never mutates its inputs and never reads a clock ({@code asOf} is the caller's
+     * window end). An entry whose {@code expiry} is before {@code asOf} is never applied; its control id
+     * is returned in {@code expired} so the caller reports it as a limitation. */
+    static Applied applyDeviations(List<Assertions.Assertion> assertions, List<JsonNode> deviations, String asOf) {
+        Map<String, JsonNode> byControl = deviationsByControl(deviations);
+        Readiness.CalendarDate asOfDate = Readiness.parseDate(asOf);
+        List<Assertions.Assertion> applied = new ArrayList<>();
+        List<String> expired = new ArrayList<>();
+        for (Assertions.Assertion a : assertions) {
+            JsonNode entry = "non-conformant".equals(a.outcome) ? byControl.get(a.control) : null;
+            if (entry == null) {
+                applied.add(a);
+                continue;
+            }
+            JsonNode expiryNode = entry.get("expiry");
+            Readiness.CalendarDate expiry =
+                    expiryNode != null && expiryNode.isTextual() ? Readiness.parseDate(expiryNode.textValue()) : null;
+            if (expiry != null && asOfDate != null && Readiness.compareDate(expiry, asOfDate) < 0) {
+                expired.add(a.control);
+                applied.add(a);
+                continue;
+            }
+            Assertions.Assertion copy = Assertions.copyOf(a);
+            copy.outcome = "partial";
+            copy.deviation = a.control;
+            applied.add(copy);
+        }
+        return new Applied(applied, expired);
+    }
+
+    /** Python's {@code str(entry.get(field, ""))}: an absent field is the empty string, any present
+     * value (an explicit null too) is spelled as Python's {@code str()} spells it. */
+    static String fieldStr(JsonNode entry, String field) {
+        JsonNode value = entry.get(field);
+        return value == null ? "" : Readiness.pyStr(value);
     }
 }

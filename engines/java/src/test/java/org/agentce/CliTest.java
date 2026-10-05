@@ -234,30 +234,113 @@ class CliTest {
         assertEquals("input.catalog_unresolved", env.get("error").get("message_key").asText());
     }
 
-    @Test
-    void assessDeviationsFlagIsRefusedOutright(@TempDir Path out) {
-        JsonNode env = runJson(
+    private static final Path AUDITOR_FIXTURE = REPO.resolve("verification/gates/fixtures/auditor_view");
+    private static final Path AUDITOR_REGISTER = AUDITOR_FIXTURE.resolve("deviations.yaml");
+    /** The fixture register's digest, as Python records it (python-reference.md S1). */
+    private static final String AUDITOR_REGISTER_DIGEST =
+            "sha256:ec70a21ea9da1881e0c7737a2c760ef7fcee3aed71e92944499871f8f2f7b439";
+
+    private static List<String> auditorAssessArgs(Path out) {
+        return new ArrayList<>(List.of(
                 "assess",
-                "--bundle", QUICKSTART.resolve("evidence").toString(),
-                "--profile", QUICKSTART.resolve("applicability.yaml").toString(),
-                "--domain", QUICKSTART.resolve("domain.linkml.yaml").toString(),
-                "--deviations", "/tmp/does-not-exist.yaml",
-                "--out", out.toString());
-        assertEquals(3, env.get("exit_code").asInt());
-        assertEquals("input.deviations_not_yet_supported", env.get("error").get("message_key").asText());
+                "--out", out.toString(),
+                "--bundle", AUDITOR_FIXTURE.resolve("evidence").toString(),
+                "--profile", AUDITOR_FIXTURE.resolve("applicability.yaml").toString(),
+                "--domain", AUDITOR_FIXTURE.resolve("domain.linkml.yaml").toString(),
+                "--catalog-dir", AUDITOR_FIXTURE.resolve("catalog").toString(),
+                "--allow-unverified-catalog"));
+    }
+
+    private static JsonNode runAssess(List<String> args, String... extra) {
+        List<String> all = new ArrayList<>(args);
+        all.addAll(Arrays.asList(extra));
+        return runJson(all.toArray(String[]::new));
+    }
+
+    private static String outcomeOf(Path out, String control) {
+        for (JsonNode a : Json.parseFile(out.resolve("assertions.json"))) {
+            if (control.equals(a.get("control").asText())) {
+                return a.get("outcome").asText() + (a.hasNonNull("deviation") ? " " + a.get("deviation").asText() : "");
+            }
+        }
+        return null;
+    }
+
+    private static String registerDigest(Path out) {
+        JsonNode digest = Json.parseFile(out.resolve("manifest.json")).get("inputs").get("deviation_register_digest");
+        return digest == null ? null : digest.asText();
     }
 
     @Test
-    void assessDeviationsEqualsFormIsRefusedToo(@TempDir Path out) {
-        JsonNode env = runJson(
-                "assess",
-                "--bundle", QUICKSTART.resolve("evidence").toString(),
-                "--profile", QUICKSTART.resolve("applicability.yaml").toString(),
-                "--domain", QUICKSTART.resolve("domain.linkml.yaml").toString(),
-                "--deviations=/tmp/does-not-exist.yaml",
-                "--out", out.toString());
+    void assessDeviationsAppliesTheRegister(@TempDir Path out) {
+        JsonNode env = runAssess(auditorAssessArgs(out), "--deviations", AUDITOR_REGISTER.toString());
+        assertEquals(1, env.get("exit_code").asInt()); // AUV-02's expired entry leaves it non-conformant
+        assertEquals("partial AUV-01", outcomeOf(out, "AUV-01"));
+        assertEquals("non-conformant", outcomeOf(out, "AUV-02"));
+        assertEquals(AUDITOR_REGISTER_DIGEST, registerDigest(out));
+        JsonNode limitations = Json.parseFile(out.resolve("manifest.json")).get("limitations");
+        assertTrue(limitations.toString().contains(
+                "AUV-02: deviation expired 2025-11-01T00:00:00.000Z; ignored and reported, the control remains non-conformant"));
+        JsonNode risks = Json.parseFile(out.resolve("oscal-ar.json"))
+                .get("assessment-results").get("results").get(0).get("risks");
+        assertEquals(1, risks.size());
+        assertEquals("Accepted pending remediation. <script>alert(1)</script>", risks.get(0).get("statement").asText());
+    }
+
+    @Test
+    void assessDeviationsLintRefusesAControlOutsideTheCatalog(@TempDir Path dir) throws IOException {
+        Path register = dir.resolve("reg.yaml");
+        Files.writeString(register, "deviation_register_version: 1\ndeviations:\n  - control: XYZ-99\n"
+                + "    rationale: r\n    compensating_control: c\n    owner: user:a@example.com\n"
+                + "    approver: user:b@example.com\n    granted: \"2026-01-01T00:00:00Z\"\n"
+                + "    expiry: \"2026-03-01T00:00:00Z\"\n");
+        Path out = dir.resolve("report");
+        JsonNode env = runAssess(auditorAssessArgs(out), "--deviations", register.toString());
         assertEquals(3, env.get("exit_code").asInt());
-        assertEquals("input.deviations_not_yet_supported", env.get("error").get("message_key").asText());
+        assertEquals("input.deviation_invalid", env.get("error").get("message_key").asText());
+        assertFalse(Files.exists(out.resolve("assertions.json")));
+    }
+
+    @Test
+    void assessDeviationsEqualsFormAppliesLikeTheTwoTokenForm(@TempDir Path out) {
+        JsonNode env = runAssess(auditorAssessArgs(out), "--deviations=" + AUDITOR_REGISTER);
+        assertEquals(1, env.get("exit_code").asInt());
+        assertEquals("partial AUV-01", outcomeOf(out, "AUV-01"));
+        assertEquals(AUDITOR_REGISTER_DIGEST, registerDigest(out));
+    }
+
+    @Test
+    void assessDeviationsBareRefused(@TempDir Path out) {
+        JsonNode env = runAssess(auditorAssessArgs(out), "--deviations");
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.assess_flag_needs_value", env.get("error").get("message_key").asText());
+        assertEquals("argument --deviations: expected one argument", env.get("error").get("detail").asText());
+        assertFalse(Files.exists(out.resolve("assertions.json")));
+    }
+
+    @Test
+    void assessDeviationsMissingValueMidArgv(@TempDir Path out) {
+        List<String> args = auditorAssessArgs(out);
+        args.add(3, "--deviations"); // directly before --bundle
+        JsonNode env = runJson(args.toArray(String[]::new));
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.assess_flag_needs_value", env.get("error").get("message_key").asText());
+        assertFalse(Files.exists(out.resolve("assertions.json")));
+    }
+
+    @Test
+    void assessDeviationsLastWins(@TempDir Path dir) throws IOException {
+        Path empty = dir.resolve("empty.yaml");
+        Files.writeString(empty, "deviation_register_version: 1\ndeviations: []\n");
+        String emptyDigest = Report.digestBytes(Files.readAllBytes(empty));
+        Path first = dir.resolve("first");
+        runAssess(auditorAssessArgs(first), "--deviations", AUDITOR_REGISTER.toString(), "--deviations", empty.toString());
+        assertEquals(emptyDigest, registerDigest(first));
+        assertEquals("non-conformant", outcomeOf(first, "AUV-01"));
+        Path second = dir.resolve("second");
+        runAssess(auditorAssessArgs(second), "--deviations", empty.toString(), "--deviations", AUDITOR_REGISTER.toString());
+        assertEquals(AUDITOR_REGISTER_DIGEST, registerDigest(second));
+        assertEquals("partial AUV-01", outcomeOf(second, "AUV-01"));
     }
 
     /** The quickstart profile with its {@code catalogs:} list removed, written into {@code dir}. */
