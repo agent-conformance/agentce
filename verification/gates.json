@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.37.0",
+  "suite_version": "0.38.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -135,6 +135,43 @@
         }
       ],
       "fix_hint": "Run the gate's command from engines/python and read the failing test; the catalog is spec/catalogs/base/baseline and its vendored copies are re-made and re-signed with conformance/dev_trust.py."
+    },
+    {
+      "id": "VG-BASELINE-LENS-ENGINES",
+      "title": "All three built engines resolve to the baseline when nothing names a catalog, and write byte-identical assertions.json",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/baseline_lens_engines.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 900,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "run over the quickstart bundle with its catalogs: list stripped, each of the three built engines (Python, TypeScript, Java) resolves the run to baseline@2026.09 alone, named in its own manifest.json, and TypeScript's and Java's assertions.json are byte-identical to Python's",
+        "fail": "any engine resolves to a different or empty set of catalogs, or either other engine's assertions.json differs from Python's"
+      },
+      "faults": [
+        {
+          "description": "an assessment that names no catalog is refused instead of evaluating the baseline, through the real built engines this time, not only Python's pytest suite",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "            ids = [bundled.DEFAULT_LENS]",
+          "replace": "            ids = []"
+        },
+        {
+          "description": "TypeScript's assertion rendering drops the real severity, breaking byte-identity with Python's assertions.json",
+          "file": "engines/typescript/src/assertions.ts",
+          "search": "    severity: assertion.severity,\n",
+          "replace": "    severity: \"fault\",\n"
+        }
+      ],
+      "fix_hint": "Run the gate's command and read the FAIL lines; it builds and runs all three engines over corpus/quickstart with no catalog named -- the reference resolution is engines/python/agentce/commands/__init__.py's assess command, ported field-for-field in engines/typescript/src/assertions.ts and engines/java/src/main/java/org/agentce/Assertions.java."
     },
     {
       "id": "VG-FIRST-REPORT-TIME",

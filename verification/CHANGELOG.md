@@ -3,6 +3,17 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.38.0
+
+- Added `VG-BASELINE-LENS-ENGINES` (18.46, loophole L18.9): `verification/gates/baseline_lens_engines.sh`
+  already built and ran all three engines for real over the quickstart bundle with its `catalogs:` list
+  stripped, asserting each resolves to `baseline@2026.09` and that TypeScript's and Java's `assertions.json`
+  are byte-identical to Python's -- but it was referenced nowhere in this registry, so nothing ever ran it.
+  Matches the shape of its 6 already-wired `*_engines.sh` siblings (`VG-BLIND-SPOTS`, `VG-PROJECT-VIEW`,
+  `VG-REPORT-VALIDATE`, `VG-SIGN`, `VG-VERIFY`, `VG-WHAT-THEY-DID`). Two seeded faults: the default-lens
+  resolution refused instead of evaluating the baseline, and TypeScript's rendered `severity` field broken,
+  breaking byte-identity with Python's `assertions.json`.
+
 ## 0.37.0
 
 - Extended `VG-AUDITOR-VIEW` (18.17c): the auditor view's own OSCAL-section text now names that a deviated

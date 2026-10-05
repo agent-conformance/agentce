@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build gate helper for VG-BASELINE-LENS: the three engines evaluate the same baseline when nothing
-# names a catalog, and write byte-identical assertions.json for the same input.
+# Build gate helper for VG-BASELINE-LENS-ENGINES: the three engines evaluate the same baseline when
+# nothing names a catalog, and write byte-identical assertions.json for the same input.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 work="$(mktemp -d)"
