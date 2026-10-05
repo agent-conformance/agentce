@@ -215,6 +215,35 @@ def test_domain_binding_with_explicit_non_timestamp_tag_does_not_crash(
     DomainBinding.load(path)  # must not raise
 
 
+# An explicit tag bypasses the resolver's own shape gate entirely, so it can reach any of PyYAML's
+# built-in scalar constructors with a value that constructor was never designed to validate -- each
+# leaking whatever stdlib exception its own implementation happens to raise (18.17c verifier round 2:
+# `!!int ''`/`!!int '_'`/`!!float ''` raise `IndexError`, not `ValueError`/`KeyError`, which the
+# round-1 fix alone did not catch). One parametrized case per distinct exception type confirmed live,
+# proving the fix closes the whole class rather than one more enumerated type: every one of these
+# must raise `InputError` under the caller's own key, never the raw stdlib exception.
+_EXPLICIT_TAG_HAZARDS = [
+    "!!bool maybe",  # KeyError
+    "!!int '0xZZ'",  # ValueError
+    "!!int ''",  # IndexError
+    "!!int '_'",  # IndexError
+    "!!float ''",  # IndexError
+    "!!float abc",  # ValueError
+]
+
+
+@pytest.mark.parametrize("tagged_value", _EXPLICIT_TAG_HAZARDS)
+def test_domain_binding_with_any_explicit_tag_hazard_is_refused_not_a_crash(
+    tmp_path: Path, tagged_value: str
+) -> None:
+    path = tmp_path / "domain.yaml"
+    path.write_text(f"expiry: {tagged_value}\n", encoding="utf-8")
+
+    with pytest.raises(InputError) as excinfo:
+        DomainBinding.load(path)
+    assert excinfo.value.key == "input.domain_binding_invalid"
+
+
 def test_profile_with_non_utf8_bytes_is_refused(tmp_path: Path) -> None:
     path = tmp_path / "profile.yaml"
     path.write_bytes(b"observation_window: {start: \xff\xfe}\n")

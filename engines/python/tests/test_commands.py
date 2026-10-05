@@ -2558,6 +2558,33 @@ def test_assess_an_explicit_non_timestamp_tagged_expiry_is_refused_as_input_erro
     assert envelope["error"]["key"] == "input.deviation_invalid"
 
 
+def test_assess_an_explicit_int_tagged_empty_expiry_is_refused_as_input_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``!!int ''`` bypasses the resolver's own shape gate the same way ``!!timestamp foo`` does, but
+    PyYAML's ``construct_yaml_int`` raises ``IndexError`` (``value[0]`` on an empty string), a third
+    distinct exception type the round-1 fix's narrower ``except (ValueError, AttributeError)`` did
+    not catch (18.17c verifier round 2) -- closed generally by catching any construction exception,
+    not one more enumerated type."""
+    dev = tmp_path / "deviations.yaml"
+    dev.write_text(
+        "deviations:\n"
+        f"  - control: {_DEV_CONTROL}\n"
+        '    rationale: "r"\n'
+        '    compensating_control: "c"\n'
+        '    owner: "user:owner@example.com"\n'
+        '    approver: "user:approver@example.com"\n'
+        '    granted: "2025-08-01T00:00:00.000Z"\n'
+        "    expiry: !!int ''\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "o"
+    code = cli.main(_dev_argv(out, dev, "--json"))
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "input.deviation_invalid"
+
+
 def test_readiness_a_calendar_invalid_unquoted_yaml_expiry_date_gives_not_ready_not_a_crash(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
