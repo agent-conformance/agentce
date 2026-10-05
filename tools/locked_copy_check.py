@@ -5,9 +5,12 @@ Reads the *built* site (``website/dist``), not the templates that produce it. On
 approved tagline, headline and subline must be the visible eyebrow, heading and lead paragraph of the
 first section, in that order. Nothing in the built site, in any file or tag attribute, may carry the wording
 they replaced. In the README the three strings must follow the title directly, before the status line.
-Stdlib only.
+``--also`` sweeps any further plain-text file (an engine README, for example) for the same retired
+wording, without the hero/README structural checks. Stdlib only.
 
-    locked_copy_check.py [--dist website/dist] [--readme README.md]   check the built site and the README
+    locked_copy_check.py [--dist website/dist] [--readme README.md] [--also PATH ...]
+                                                                       check the built site, the README,
+                                                                       and any extra files for retired wording
     locked_copy_check.py --self-test                                   show the check fails on old or altered copy
 """
 
@@ -30,11 +33,15 @@ SUBLINE = (
 DISCLAIMER = "A conformant result is not a certification."
 QUICKSTART = "$ agentce quickstart --out ./out"
 
-#: The wording the approved copy replaced; it must not come back anywhere in the built site or the README.
+#: The wording the approved copy replaced; it must not come back anywhere in the built site, the README,
+#: or an extra ``--also`` file. "conforming engine" is the defined CP-1 term
+#: (``governance/CONFORMANCE-PROGRAM.md``): no implementation meets it until a signed report is registered
+#: and a release is tagged, so consumer-facing copy may not call an engine "conforming" (loophole L18.10).
 RETIRED = (
     "The open conformance standard for AI agents",
     "Assess any AI agent against the same standard.",
     "an engine that turns evidence into a verdict anyone can reproduce",
+    "conforming engine",
 )
 
 #: The landing page's hero elements, in reading order, and the approved string each carries.
@@ -152,8 +159,10 @@ def check_landing(html: str) -> list[str]:
 
 
 def check_retired(name: str, text: str) -> list[str]:
-    squashed = _squash(text)
-    return [f"{name} still carries {old!r}" for old in RETIRED if old in squashed]
+    lowered = _squash(text).lower()
+    return [
+        f"{name} still carries {old!r}" for old in RETIRED if old.lower() in lowered
+    ]
 
 
 def check_dist(dist: Path) -> list[str]:
@@ -315,6 +324,14 @@ def self_test() -> list[str]:
             ),
             True,
         ),
+        "an extra file calling an engine 'conforming' fails": (
+            check_retired("engines/go/README.md", "proven by three conforming engines"),
+            True,
+        ),
+        "a capitalised 'Conforming Engines' still fails": (
+            check_retired("engines/README.md", "Our Conforming Engines ship today."),
+            True,
+        ),
         "the approved README passes": (check_readme(readme()), False),
         "a README without the subline fails": (
             check_readme(readme((TAGLINE, HEADLINE))),
@@ -340,6 +357,13 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     ap.add_argument("--dist", type=Path, default=Path("website/dist"))
     ap.add_argument("--readme", type=Path, default=Path("README.md"))
+    ap.add_argument(
+        "--also",
+        type=Path,
+        nargs="*",
+        default=(),
+        help="extra plain-text files to sweep for retired wording (no structural checks)",
+    )
     ap.add_argument("--self-test", action="store_true")
     ns = ap.parse_args(argv)
     if ns.self_test:
@@ -347,9 +371,11 @@ def main(argv: list[str] | None = None) -> int:
         for name in wrong:
             print(f"SELF-TEST FAIL: {name}")
         if not wrong:
-            print("locked_copy_check self-test: 22 cases discriminate")
+            print("locked_copy_check self-test: 24 cases discriminate")
         return 1 if wrong else 0
     problems = check_dist(ns.dist) + check_readme(ns.readme.read_text(encoding="utf-8"))
+    for extra in ns.also:
+        problems += check_retired(str(extra), extra.read_text(encoding="utf-8"))
     for problem in problems:
         print(f"FAIL: {problem}")
     if not problems:

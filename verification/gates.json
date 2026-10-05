@@ -229,8 +229,8 @@
       "timeout_s": 900,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "the website builds, and the built landing page shows the approved tagline as its eyebrow, the approved headline as its heading and the approved subline as its lead paragraph, word for word; the README states the tagline, headline and subline in that order directly under its title and keeps its status and licence lines; the disclaimer and the quickstart command stay in the hero; none of the retired wording appears anywhere in the built site or in the README",
-        "fail": "the site does not build, a hero element carries other words, the retired wording is still on the page or in the README, or the README loses its status or licence line"
+        "pass": "the website builds, and the built landing page shows the approved tagline as its eyebrow, the approved headline as its heading and the approved subline as its lead paragraph, word for word; the README states the tagline, headline and subline in that order directly under its title and keeps its status and licence lines; the disclaimer and the quickstart command stay in the hero; none of the retired wording, including calling any engine 'conforming' (the undefined-today CP-1 term), appears anywhere in the built site, the README, or any engines/*/README.md",
+        "fail": "the site does not build, a hero element carries other words, the retired wording is still on the page, the README, or an engine README, or the README loses its status or licence line"
       },
       "faults": [
         {
@@ -262,9 +262,21 @@
           "file": "README.md",
           "search": "**Open, repeatable checks of AI agent behavior against AI rules and standards.**\n",
           "replace": ""
+        },
+        {
+          "description": "the FAQ calls an engine 'conforming' again, a defined CP-1 term no engine meets yet (loophole L18.10)",
+          "file": "website/src/pages/index.astro",
+          "search": "the three engines runs it",
+          "replace": "the three conforming engines runs it"
+        },
+        {
+          "description": "the Go engine README calls the three engines 'conforming' again, in capitals this time (loophole L18.10; also proves the case-insensitive match)",
+          "file": "engines/go/README.md",
+          "search": "shown by three engines",
+          "replace": "shown by three Conforming Engines"
         }
       ],
-      "fix_hint": "Run the gate's command and read the FAIL lines; the approved strings are the constants in tools/locked_copy_check.py, and the landing page is website/src/pages/index.astro."
+      "fix_hint": "Run the gate's command and read the FAIL lines; the approved strings are the constants in tools/locked_copy_check.py, the landing page is website/src/pages/index.astro, and --also sweeps every engines/*/README.md for the same retired wording."
     },
     {
       "id": "VG-WHAT-THEY-DID",
