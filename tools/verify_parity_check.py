@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 import os
 import shutil
@@ -614,6 +615,13 @@ def census_mutations(canonical: Path) -> list[verify_flow_census.Mutation]:
     return verify_flow_census.generate(canonical, EU_AI_ACT, EVIDENCE_BUNDLE)
 
 
+def census_list_digest(mutations: list[verify_flow_census.Mutation]) -> str:
+    """sha256 of the full census list as `--list-shard 0/1` prints it (`<index>\t<name>` lines), so
+    the CI shards, each regenerating the list on its own runner, can be shown to split one list."""
+    lines = "".join(f"{i}\t{m.name}\n" for i, m in enumerate(mutations))
+    return hashlib.sha256(lines.encode("utf-8")).hexdigest()
+
+
 def run_census(canonical: Path, tmp: Path, failures: list[str], shard: Shard) -> None:
     """Shard `I/N` of the mutations `verify_flow_census.generate` derives from the census (`0/1` is
     all of them), through all three engines: byte-identical output and exit code, a JSON envelope,
@@ -633,6 +641,7 @@ def run_census(canonical: Path, tmp: Path, failures: list[str], shard: Shard) ->
     print(
         f"census shard {shard[0]}/{shard[1]}: ran {len(results)} of {len(mutations)} mutations"
     )
+    print(f"census list sha256: {census_list_digest(mutations)}")
     floor = shard_floor_problem(len(results), len(mutations), shard)
     if floor is not None:
         failures.append(floor)
