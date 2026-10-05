@@ -5,7 +5,7 @@ fails if a gate in `gates.json` is not named in this file.
 
 ## 0.39.0
 
-- Added `VG-VERIFY-CENSUS-SHARD-COVERAGE` (18.93): the cross-engine `agentce verify` census (2,312
+- Added `VG-VERIFY-CENSUS-SHARD-COVERAGE` (18.93): the cross-engine `agentce verify` census (2,320
   mutations through all three engines) moved out of quickstart's `installed-artifacts-offline` job, where
   it took 15 of 21 minutes, into a four-way `verify-census` matrix job. Each shard runs
   `tools/verify_parity_check.py --shard "<job-index>/<job-total>"`; the artifacts job runs the named
