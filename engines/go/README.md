@@ -7,7 +7,7 @@ records the decision so the deferral is explicit rather than an omission.
 ## Why deferred
 
 - **The cross-language contract is already demonstrated.** Determinism across implementations is
-  proven by three conforming engines — Python (reference), TypeScript, and Java — whose outputs are
+  shown by three engines — Python (reference), TypeScript, and Java — whose outputs are
   byte-identical over the full corpus after RFC 8785 canonicalisation (SPEC §5.3, §11.5). A fourth
   engine adds maintenance surface without adding a new conformance signal at this stage.
 - **The specification schedules Go for later.** SPEC §5.3 lists the Go engine as a later engine, and
