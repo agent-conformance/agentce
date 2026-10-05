@@ -632,6 +632,34 @@ test("buildManifest keeps the all-zero digest for a label with no matching catal
   assert.equal(catalogRefs[0]?.digest, `sha256:${"0".repeat(64)}`);
 });
 
+test("buildManifest sets applicability_profile_digest and domain_binding_digest only when given (18.42, loophole L18.2)", () => {
+  const withBoth = buildManifest({
+    bundleDigest: "sha256:abc",
+    catalogs: [],
+    outputs: {},
+    operator: "test",
+    invocation: [],
+    supersedes: [],
+    applicabilityProfileDigest: "sha256:profile",
+    domainBindingDigest: "sha256:domain",
+  });
+  const inputsBoth = withBoth.inputs as Record<string, unknown>;
+  assert.equal(inputsBoth.applicability_profile_digest, "sha256:profile");
+  assert.equal(inputsBoth.domain_binding_digest, "sha256:domain");
+
+  const withNeither = buildManifest({
+    bundleDigest: "sha256:abc",
+    catalogs: [],
+    outputs: {},
+    operator: "test",
+    invocation: [],
+    supersedes: [],
+  });
+  const inputsNeither = withNeither.inputs as Record<string, unknown>;
+  assert.equal("applicability_profile_digest" in inputsNeither, false);
+  assert.equal("domain_binding_digest" in inputsNeither, false);
+});
+
 // --- The Verdict section (item 18.22: TypeScript gains parity with Python/Java) and the
 // outcome-label fix (the summary tally and assertions rows showed the raw enum) ---
 

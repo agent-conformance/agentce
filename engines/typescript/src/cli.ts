@@ -45,6 +45,7 @@ import {
   activityCliLines,
   blindSpotsCliLines,
   catalogProvenanceDigest,
+  digestBytes,
   renderEvidencePack,
   renderOscal,
   renderReportHtml,
@@ -651,10 +652,11 @@ function runAssess(options: AssessOptions): CommandResult {
   writeJsonl(integrityResults.map(integrityResultToJson), join(out, "integrity.jsonl"));
 
   // Stage 3: build the provenance graph (in-memory store; ADR-0001's TypeScript variant).
-  const domain =
+  const domainPath =
     options.domain !== undefined
-      ? DomainBinding.load(requireFile(options.domain, "domain", "the domain binding"))
-      : DomainBinding.empty();
+      ? requireFile(options.domain, "domain", "the domain binding")
+      : undefined;
+  const domain = domainPath !== undefined ? DomainBinding.load(domainPath) : DomainBinding.empty();
   const store = new GraphStore();
   buildGraph(ingested.accepted, { domain, store });
   const graphTriples = store.tripleCount();
@@ -686,6 +688,9 @@ function runAssess(options: AssessOptions): CommandResult {
 
   const activity = summarizeActivity(ingested.accepted, profileObj);
   const blindSpots = computeBlindSpots(evaluated, profileObj, catalogs, ingested.accepted);
+  const applicabilityProfileDigest = digestBytes(readFileSync(profilePath));
+  const domainBindingDigest =
+    domainPath !== undefined ? digestBytes(readFileSync(domainPath)) : undefined;
   writeReport(out, evaluated, {
     bundleDigest: bundle.digest,
     catalogs: catalogLabels,
@@ -698,6 +703,8 @@ function runAssess(options: AssessOptions): CommandResult {
     events: ingested.accepted,
     profile: profileObj,
     limitations,
+    applicabilityProfileDigest,
+    domainBindingDigest,
   });
   if (state !== null) {
     state.record(bundle.digest, join(out, "manifest.json"), newWindowEnd);

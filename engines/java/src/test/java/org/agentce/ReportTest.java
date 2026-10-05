@@ -472,6 +472,22 @@ class ReportTest {
         assertEquals("sha256:" + "0".repeat(64), ref.get("digest").textValue());
     }
 
+    @Test
+    void buildManifestSetsApplicabilityProfileDigestAndDomainBindingDigestOnlyWhenGiven() {
+        ObjectNode withBoth = Report.buildManifest(
+                "sha256:abc", List.of(), Map.of(), "test", List.of(), List.of(), "en", List.of(), List.of(),
+                "sha256:profile", "sha256:domain");
+        ObjectNode inputsBoth = (ObjectNode) withBoth.get("inputs");
+        assertEquals("sha256:profile", inputsBoth.get("applicability_profile_digest").textValue());
+        assertEquals("sha256:domain", inputsBoth.get("domain_binding_digest").textValue());
+
+        ObjectNode withNeither = Report.buildManifest(
+                "sha256:abc", List.of(), Map.of(), "test", List.of(), List.of(), "en", List.of());
+        ObjectNode inputsNeither = (ObjectNode) withNeither.get("inputs");
+        assertFalse(inputsNeither.has("applicability_profile_digest"));
+        assertFalse(inputsNeither.has("domain_binding_digest"));
+    }
+
     // --- Verdict.gapText's report.gaps_more plural fix (item 18.22): Java previously hardcoded
     // "+{n} more" instead of the message catalogue's real ICU-plural string. ---
 

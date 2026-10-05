@@ -788,9 +788,10 @@ public final class Cli {
         writeJsonl(integrityNodes, out.resolve("integrity.jsonl"));
 
         // Stage 3: build the provenance graph (in-memory store).
-        DomainBinding domain = options.domain() != null
-                ? DomainBinding.load(Paths.get(requireFile(options.domain(), "domain", "the domain binding")))
-                : DomainBinding.empty();
+        String domainPath = options.domain() != null
+                ? requireFile(options.domain(), "domain", "the domain binding")
+                : null;
+        DomainBinding domain = domainPath != null ? DomainBinding.load(Paths.get(domainPath)) : DomainBinding.empty();
         GraphStore store = Graph.buildGraph(ingested.accepted, domain);
         int graphTriples = store.tripleCount();
 
@@ -835,11 +836,20 @@ public final class Cli {
         List<String> invocation = List.of(options.invocationCommand(), scrubPath(bundleDir), scrubPath(profilePath));
         ObjectNode activity = Activity.summarizeActivity(ingested.accepted, profileObj);
         ObjectNode blindSpots = BlindSpots.computeBlindSpots(evaluated, profileObj, resolved.catalogs(), ingested.accepted);
+        String applicabilityProfileDigest;
+        String domainBindingDigest;
+        try {
+            applicabilityProfileDigest = Report.digestBytes(Files.readAllBytes(Paths.get(profilePath)));
+            domainBindingDigest = domainPath != null ? Report.digestBytes(Files.readAllBytes(Paths.get(domainPath))) : null;
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot read profile/domain for digest: " + e.getMessage(), e);
+        }
         Report.writeReport(
                 out, evaluated, bundle.digest(), resolved.labels(),
                 operatorEnv != null ? operatorEnv : "unknown",
                 invocation, supersedes, Messages.DEFAULT_LANGUAGE, resolved.catalogs(), activity, blindSpots,
-                profileObj, null, ingested.accepted, resolved.limitations());
+                profileObj, null, ingested.accepted, resolved.limitations(),
+                applicabilityProfileDigest, domainBindingDigest);
         if (state != null) {
             state.record(bundle.digest(), out.resolve("manifest.json"), newWindowEnd);
         }

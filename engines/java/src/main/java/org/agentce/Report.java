@@ -103,7 +103,7 @@ public final class Report {
         return uuid5("agentce:" + String.join(":", parts));
     }
 
-    private static String digestBytes(byte[] data) {
+    static String digestBytes(byte[] data) {
         return "sha256:" + Canonical.sha256Hex(data);
     }
 
@@ -1171,6 +1171,19 @@ public final class Report {
             String bundleDigest, List<String> catalogs, Map<String, String> outputs, String operator,
             List<String> invocation, List<String> supersedes, String reportLanguage, List<Catalog> catalogObjects,
             List<String> limitations) {
+        return buildManifest(
+                bundleDigest, catalogs, outputs, operator, invocation, supersedes, reportLanguage, catalogObjects,
+                limitations, null, null);
+    }
+
+    /** As the nine-argument {@link #buildManifest}, plus {@code sha256:<hex>} digests of the exact
+     * {@code --profile}/{@code --domain} file bytes (SPEC §8.4, 18.42, loophole L18.2): each recorded
+     * in {@code inputs} only when non-null, matching Python's own conditional fields
+     * (`report.py`'s {@code build_manifest}). */
+    public static ObjectNode buildManifest(
+            String bundleDigest, List<String> catalogs, Map<String, String> outputs, String operator,
+            List<String> invocation, List<String> supersedes, String reportLanguage, List<Catalog> catalogObjects,
+            List<String> limitations, String applicabilityProfileDigest, String domainBindingDigest) {
         Map<String, Catalog> byLabel = new LinkedHashMap<>();
         if (catalogObjects != null) {
             for (Catalog c : catalogObjects) {
@@ -1190,6 +1203,12 @@ public final class Report {
         engine.put("package_digest", packageDigest);
         ObjectNode inputs = manifest.putObject("inputs");
         inputs.put("bundle_digest", bundleDigest);
+        if (applicabilityProfileDigest != null) {
+            inputs.put("applicability_profile_digest", applicabilityProfileDigest);
+        }
+        if (domainBindingDigest != null) {
+            inputs.put("domain_binding_digest", domainBindingDigest);
+        }
         ArrayNode catalogRefs = inputs.putArray("catalogs");
         for (String entry : catalogs) {
             int at = entry.indexOf('@');
@@ -1279,6 +1298,20 @@ public final class Report {
             String operator, List<String> invocation, List<String> supersedes, String reportLanguage,
             List<Catalog> catalogObjects, ObjectNode activity, ObjectNode blindSpots,
             Profile profile, Set<String> declaredSubjectIds, List<JsonNode> events, List<String> limitations) {
+        return writeReport(
+                outDir, assertions, bundleDigest, catalogs, operator, invocation, supersedes, reportLanguage,
+                catalogObjects, activity, blindSpots, profile, declaredSubjectIds, events, limitations, null, null);
+    }
+
+    /** As the fifteen-argument {@link #writeReport}, plus {@code sha256:<hex>} digests of the exact
+     * {@code --profile}/{@code --domain} file bytes, forwarded to {@link #buildManifest} (18.42,
+     * loophole L18.2). */
+    public static ObjectNode writeReport(
+            Path outDir, List<Assertions.Assertion> assertions, String bundleDigest, List<String> catalogs,
+            String operator, List<String> invocation, List<String> supersedes, String reportLanguage,
+            List<Catalog> catalogObjects, ObjectNode activity, ObjectNode blindSpots,
+            Profile profile, Set<String> declaredSubjectIds, List<JsonNode> events, List<String> limitations,
+            String applicabilityProfileDigest, String domainBindingDigest) {
         Assertions.checkDc5(assertions);
         try {
             Files.createDirectories(outDir);
@@ -1418,7 +1451,7 @@ public final class Report {
 
             ObjectNode manifest = buildManifest(
                     bundleDigest, catalogs, outputs, operator, invocation, supersedes, reportLanguage, catalogObjects,
-                    limitations);
+                    limitations, applicabilityProfileDigest, domainBindingDigest);
             Files.write(outDir.resolve("manifest.json"), Json.pretty(manifest).getBytes(StandardCharsets.UTF_8));
             return manifest;
         } catch (IOException e) {

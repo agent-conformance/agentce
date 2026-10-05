@@ -133,7 +133,7 @@ const OSCAL_STATE: Record<string, string> = {
  * see its comment for the full reasoning. */
 const OSCAL_METHODS = new Map<string, string[]>([["manual", ["EXAMINE"]]]);
 
-function digestBytes(data: Buffer): string {
+export function digestBytes(data: Buffer): string {
   return `sha256:${createHash("sha256").update(data).digest("hex")}`;
 }
 
@@ -1042,6 +1042,12 @@ export interface ManifestOptions {
   /** What `--allow-unverified-catalog` waived (SPEC §8.7): absent from an ordinary run's manifest,
    * never an empty array (18.36). */
   limitations?: string[];
+  /** `sha256:<hex>` of the exact `--profile` file's bytes (SPEC §8.4, 18.8); `assess`/`quickstart`
+   * always supply one, matching Python's own unconditional field (18.42, loophole L18.2). */
+  applicabilityProfileDigest?: string;
+  /** `sha256:<hex>` of the exact `--domain` file's bytes; present only when `--domain` was given,
+   * matching Python's own conditional field (18.42, loophole L18.2). */
+  domainBindingDigest?: string;
 }
 
 export function buildManifest(options: ManifestOptions): Record<string, unknown> {
@@ -1056,6 +1062,16 @@ export function buildManifest(options: ManifestOptions): Record<string, unknown>
     const digest = catalog !== undefined ? catalogProvenanceDigest(catalog.directory) : ZERO_DIGEST;
     return { id: cid, version: version || "0", digest };
   });
+  const inputs: Record<string, unknown> = {
+    bundle_digest: options.bundleDigest,
+    catalogs: catalogRefs,
+  };
+  if (options.applicabilityProfileDigest !== undefined) {
+    inputs.applicability_profile_digest = options.applicabilityProfileDigest;
+  }
+  if (options.domainBindingDigest !== undefined) {
+    inputs.domain_binding_digest = options.domainBindingDigest;
+  }
   const manifest: Record<string, unknown> = {
     agentce_manifest_version: 1,
     engine: {
@@ -1064,7 +1080,7 @@ export function buildManifest(options: ManifestOptions): Record<string, unknown>
       spec_version: SPEC_VERSION,
       package_digest: pkgDigest,
     },
-    inputs: { bundle_digest: options.bundleDigest, catalogs: catalogRefs },
+    inputs,
     outputs: options.outputs,
     run: {
       started_at: now(),
@@ -1117,6 +1133,10 @@ export interface WriteReportOptions {
   declaredSubjectIds?: ReadonlySet<string>;
   /** What `--allow-unverified-catalog` waived (SPEC §8.7, 18.36); forwarded to `buildManifest`. */
   limitations?: string[];
+  /** Forwarded to `buildManifest` (18.42). */
+  applicabilityProfileDigest?: string;
+  /** Forwarded to `buildManifest` (18.42). */
+  domainBindingDigest?: string;
 }
 
 function bareSubject(id: string): Subject {
@@ -1287,6 +1307,8 @@ export function writeReport(
     supersedes: options.supersedes ?? [],
     reportLanguage: language,
     limitations: options.limitations,
+    applicabilityProfileDigest: options.applicabilityProfileDigest,
+    domainBindingDigest: options.domainBindingDigest,
   });
   writeFileSync(join(outDir, "manifest.json"), JSON.stringify(sortKeysDeep(manifest), null, 2));
   return manifest;
