@@ -156,6 +156,21 @@ def test_fail_on_rejects_hostile_expressions_without_executing_them(
     )
 
 
+def test_fail_on_long_chain_evaluates_without_recursion(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # A 3000-clause or-chain once built a 3000-deep tree and crashed evaluation with RecursionError
+    # (internal.unexpected) after assertions.json was written; the flat OR-of-AND groups evaluate it.
+    chain = " or ".join(['severity=="none"'] * 3000)
+    code, data = _assess(tmp_path, capsys, "--fail-on", chain)
+    assert (code, data["fail_on"]["matched"]) == (0, 0), data
+    code, data = _assess(
+        tmp_path, capsys, "--fail-on", chain + ' or outcome=="conformant"'
+    )
+    assert code == 1, data
+    assert data["fail_on"]["matched"] >= 1, data
+
+
 def test_policy_examples_exist_and_are_scoped_to_severity_and_family() -> None:
     rego = _REPO_ROOT / "spec/report/examples/policy/conftest/agentce.rego"
     content = rego.read_text(encoding="utf-8")

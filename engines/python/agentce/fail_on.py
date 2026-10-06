@@ -2,18 +2,21 @@
 
 The grammar is comparisons of the form ``field=="literal"`` joined by ``and``/``or``, over a fixed
 field allow-list. There is no ``eval``/``exec`` anywhere in this module, and no call, attribute-access,
-or grouping syntax exists in the grammar at all: a hand-written tokenizer and a recursive-descent
+or grouping syntax exists in the grammar at all: a hand-written tokenizer and an iterative
 parser only ever recognize a quoted string, the ``==`` operator, and a bare identifier, so an
 injection payload (a dunder-import call, a backtick-embedded shell command, ``os.system(...)``, or a
 syntactically valid-looking clause with an evaluable tail appended after ``or``) is refused as an
 unexpected token at parse time, before any assertion is evaluated against the expression.
+
+With no grouping, every expression is already a disjunction of conjunctions, so the parser returns a flat
+list of OR-groups of AND-ed comparisons and evaluation is ``any``/``all`` over it: no tree, no recursion, and
+a chain of thousands of clauses evaluates like a short one.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Union
 
 from .assertions import Assertion
 from .errors import InputError
@@ -25,8 +28,8 @@ ALLOWED_FIELDS = frozenset(
 
 _KEYWORDS = frozenset({"and", "or"})
 
-#: A predicate's evaluation tree: ("cmp", field, literal) | ("and", node, node) | ("or", node, node).
-_Node = tuple[str, Union[str, "_Node"], Union[str, "_Node"]]
+#: A parsed expression: OR-groups, each a list of AND-ed ``(field, literal)`` comparisons.
+_Groups = list[list[tuple[str, str]]]
 
 
 class _ExprError(Exception):
@@ -99,36 +102,30 @@ class _Parser:
         self._pos += 1
         return tok
 
-    def parse(self) -> _Node:
-        node = self._or_expr()
+    def parse(self) -> _Groups:
+        groups = [self._and_expr()]
+        while self._at_keyword("or"):
+            self._advance()
+            groups.append(self._and_expr())
         trailing = self._peek()
         if trailing is not None:
             raise _ExprError(
                 f"unexpected token {trailing.value!r} after a complete expression"
             )
-        return node
+        return groups
 
-    def _or_expr(self) -> _Node:
-        left = self._and_expr()
-        while True:
-            tok = self._peek()
-            if tok is not None and tok.kind == "ident" and tok.value == "or":
-                self._advance()
-                left = ("or", left, self._and_expr())
-            else:
-                return left
+    def _at_keyword(self, word: str) -> bool:
+        tok = self._peek()
+        return tok is not None and tok.kind == "ident" and tok.value == word
 
-    def _and_expr(self) -> _Node:
-        left = self._comparison()
-        while True:
-            tok = self._peek()
-            if tok is not None and tok.kind == "ident" and tok.value == "and":
-                self._advance()
-                left = ("and", left, self._comparison())
-            else:
-                return left
+    def _and_expr(self) -> list[tuple[str, str]]:
+        group = [self._comparison()]
+        while self._at_keyword("and"):
+            self._advance()
+            group.append(self._comparison())
+        return group
 
-    def _comparison(self) -> _Node:
+    def _comparison(self) -> tuple[str, str]:
         field_tok = self._advance()
         if field_tok is None or field_tok.kind != "ident":
             raise _ExprError("expected a field name")
@@ -147,7 +144,7 @@ class _Parser:
         val_tok = self._advance()
         if val_tok is None or val_tok.kind != "string":
             raise _ExprError("expected a quoted string literal after '=='")
-        return ("cmp", field_tok.value, val_tok.value)
+        return field_tok.value, val_tok.value
 
 
 _FIELD_GETTERS: dict[str, Callable[[Assertion], str]] = {
@@ -159,25 +156,6 @@ _FIELD_GETTERS: dict[str, Callable[[Assertion], str]] = {
     "rung": lambda a: str(a.rung),
     "mode": lambda a: a.mode,
 }
-
-
-def _eval_node(node: _Node, assertion: Assertion) -> bool:
-    kind = node[0]
-    if kind == "cmp":
-        field, literal = node[1], node[2]
-        assert isinstance(field, str) and isinstance(
-            literal, str
-        )  # narrows for mypy; always true
-        return _FIELD_GETTERS[field](assertion) == literal
-    if kind == "and":
-        left, right = node[1], node[2]
-        assert isinstance(left, tuple) and isinstance(right, tuple)
-        return _eval_node(left, assertion) and _eval_node(right, assertion)
-    if kind == "or":
-        left, right = node[1], node[2]
-        assert isinstance(left, tuple) and isinstance(right, tuple)
-        return _eval_node(left, assertion) or _eval_node(right, assertion)
-    raise AssertionError(f"unreachable: unknown node kind {kind!r}")  # pragma: no cover
 
 
 def parse_fail_on(expr: str) -> Callable[[Assertion], bool]:
@@ -195,7 +173,7 @@ def parse_fail_on(expr: str) -> Callable[[Assertion], bool]:
         tokens = _tokenize(expr)
         if not tokens:
             raise _ExprError("the --fail-on expression is empty")
-        node = _Parser(tokens).parse()
+        groups = _Parser(tokens).parse()
     except _ExprError as exc:
         raise InputError(
             "input.fail_on_invalid_expression",
@@ -206,6 +184,9 @@ def parse_fail_on(expr: str) -> Callable[[Assertion], bool]:
         ) from exc
 
     def predicate(assertion: Assertion) -> bool:
-        return _eval_node(node, assertion)
+        return any(
+            all(_FIELD_GETTERS[field](assertion) == literal for field, literal in group)
+            for group in groups
+        )
 
     return predicate
