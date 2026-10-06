@@ -44,6 +44,7 @@ from .. import (
     verdict,
 )
 from ..activity import summarize_activity
+from ..safe_json import JSONError, load_json
 from ..applicability import resolve as resolve_applicability
 from ..assertions import Assertion, aggregate
 from ..assess import (
@@ -2098,8 +2099,8 @@ def _adapt_export(
             "check the export file matches the adapter's expected shape.",
         )
     try:
-        payload = json.loads(proc.stdout)
-    except json.JSONDecodeError as exc:
+        payload = load_json(proc.stdout)
+    except JSONError as exc:
         raise InputError(
             "input.ingest_failed",
             f"adapter {adapter!r} printed a non-JSON result for {export_path}: {exc}.",

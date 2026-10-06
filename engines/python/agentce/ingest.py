@@ -19,7 +19,6 @@ must hash what was actually signed, not the engine's trust-corrected copy.
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -27,6 +26,7 @@ from typing import Any
 from .bundle import Bundle
 from .errors import InputError
 from .quarantine import QuarantineReason, QuarantineRecord
+from .safe_json import JSONError, load_json
 from .schema import event_types, validate_event
 from .signing import MAX_JSON_DEPTH
 
@@ -111,8 +111,8 @@ def ingest(
             ):
                 raise _too_deep()
             try:
-                event = json.loads(line)
-            except json.JSONDecodeError as exc:
+                event = load_json(line)
+            except JSONError as exc:
                 result.quarantined.append(
                     QuarantineRecord(
                         QuarantineReason.SCHEMA_INVALID,

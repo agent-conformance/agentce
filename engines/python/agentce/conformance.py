@@ -40,6 +40,7 @@ from .ingest import ingest
 from .integrity import verify_bundle
 from .profile import Profile
 from .report import write_report
+from .safe_json import JSONError, load_json
 
 #: Stable provenance for ECS assessments, so per-project manifests are identical across machines
 #: except for the timestamp and host fingerprint (SPEC §11.5 determinism, P1.2).
@@ -144,8 +145,8 @@ def _adapter_conformance(adapters_dir: Path, out_dir: Path | None) -> dict[str, 
         cmd, capture_output=True, text=True, cwd=str(adapters_dir), check=False
     )
     try:
-        parsed: dict[str, Any] = json.loads(proc.stdout)
-    except json.JSONDecodeError:
+        parsed: dict[str, Any] = load_json(proc.stdout)
+    except JSONError:
         return {
             "adapters": [],
             "total": 0,

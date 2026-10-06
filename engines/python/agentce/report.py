@@ -53,6 +53,7 @@ from .buyer_view import (
 )
 from .catalog import Catalog, ControlSpec, catalog_provenance_digest
 from .profile import Profile, Subject
+from .safe_json import JSONError, load_json
 from .project import (
     blind_spots_by_subject,
     compute_project_view,
@@ -3721,8 +3722,8 @@ def _validate_jsonl(path: Path) -> list[str]:
         if not line.strip():
             continue
         try:
-            json.loads(line)
-        except json.JSONDecodeError as exc:
+            load_json(line)
+        except JSONError as exc:
             problems.append(f"{path.name}: line {i} is not valid JSON ({exc.msg})")
     return problems
 
@@ -3773,8 +3774,8 @@ def _recorded_outputs(out_dir: Path) -> dict[str, str]:
     if not manifest_path.is_file():
         return {}
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        manifest = load_json(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, JSONError):
         return {}
     outputs = manifest.get("outputs") if isinstance(manifest, dict) else None
     return outputs if isinstance(outputs, dict) else {}
@@ -3815,8 +3816,8 @@ def validate_report(out_dir: Path) -> list[str]:
             problems.append(f"{filename}: cannot read ({exc})")
             continue
         try:
-            instance = json.loads(text)
-        except json.JSONDecodeError as exc:
+            instance = load_json(text)
+        except JSONError as exc:
             problems.append(f"{filename}: invalid JSON ({exc.msg})")
             continue
         local_errors = jsonschema.Draft202012Validator(
