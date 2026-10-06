@@ -495,6 +495,142 @@ test("assess repeated --deviations: the last register wins, in either order", ()
   });
 });
 
+/** An assess run's `fail_on` data and exit facts, and whether it wrote assertions.json. */
+function failOnRun(argv: string[], out: string) {
+  rmSync(out, { recursive: true, force: true });
+  const { exitCode, envelope } = runEnvelope(argv);
+  return {
+    exitCode,
+    exitStatus: envelope.exit_status,
+    failOn: envelope.fail_on,
+    error: envelope.error as Record<string, string> | undefined,
+    written: existsSync(join(out, "assertions.json")),
+  };
+}
+
+test("assess --fail-on gates the exit code", () => {
+  withOut("assess-fail-on", (out) => {
+    // No flag: any non-conformant assertion fails the run, as before.
+    let run = failOnRun(auditorAssessArgs(out), out);
+    assert.equal(run.exitCode, 1);
+    assert.equal(run.failOn, undefined);
+    // A match fails the run; no match passes it even with non-conformant assertions present.
+    const hit = 'outcome=="non-conformant" and severity=="high"';
+    run = failOnRun([...auditorAssessArgs(out), "--fail-on", hit], out);
+    assert.equal(run.exitCode, 1);
+    assert.deepEqual(run.exitStatus, ["findings"]);
+    assert.deepEqual(run.failOn, { expression: hit, matched: 2 });
+    run = failOnRun([...auditorAssessArgs(out), "--fail-on", 'severity=="critical"'], out);
+    assert.equal(run.exitCode, 0);
+    assert.deepEqual(run.exitStatus, ["ok"]);
+    assert.deepEqual(run.failOn, { expression: 'severity=="critical"', matched: 0 });
+    // rung compares as its decimal string; the deviation register applies before the match.
+    run = failOnRun(
+      [...auditorAssessArgs(out), "--fail-on", 'rung=="0" and mode=="manual" and family=="AUV"'],
+      out,
+    );
+    assert.equal((run.failOn as { matched: number }).matched, 1);
+    run = failOnRun(
+      [
+        ...auditorAssessArgs(out),
+        "--deviations",
+        AUDITOR_REGISTER,
+        "--fail-on",
+        'control=="AUV-01" and outcome=="non-conformant"',
+      ],
+      out,
+    );
+    assert.equal(run.exitCode, 0);
+    // A bad expression is refused before anything is written, and before an unknown --catalog or a
+    // missing --deviations register.
+    for (const extra of [[], ["--catalog", "nope@1"], ["--deviations", join(out, "nope.yaml")]]) {
+      run = failOnRun([...auditorAssessArgs(out), ...extra, "--fail-on", "foo"], out);
+      assert.equal(run.exitCode, 3);
+      assert.equal(run.error?.message_key, "input.fail_on_invalid_expression");
+      assert.equal(
+        run.error?.detail,
+        "--fail-on 'foo' is not a valid expression: unknown field 'foo'; choose from: control, family, mode, outcome, rung, severity, subject",
+      );
+      assert.equal(run.written, false);
+    }
+    // A missing bundle is refused first.
+    const args = auditorAssessArgs(out);
+    args[args.indexOf("--bundle") + 1] = join(out, "nope");
+    run = failOnRun([...args, "--fail-on", "foo"], out);
+    assert.equal(run.error?.message_key, "input.bundle_not_a_directory");
+  });
+});
+
+test("assess --fail-on=<expr> and the last --fail-on wins", () => {
+  withOut("assess-fail-on-last", (out) => {
+    let run = failOnRun([...auditorAssessArgs(out), '--fail-on=severity=="critical"'], out);
+    assert.deepEqual(run.failOn, { expression: 'severity=="critical"', matched: 0 });
+    run = failOnRun(
+      [...auditorAssessArgs(out), "--fail-on", 'control=="AUV-01"', "--fail-on", 'control=="none"'],
+      out,
+    );
+    assert.equal(run.exitCode, 0);
+    assert.deepEqual(run.failOn, { expression: 'control=="none"', matched: 0 });
+    run = failOnRun(
+      [...auditorAssessArgs(out), "--fail-on", 'control=="none"', '--fail-on=control=="AUV-01"'],
+      out,
+    );
+    assert.equal(run.exitCode, 1);
+    assert.deepEqual(run.failOn, { expression: 'control=="AUV-01"', matched: 1 });
+    // An empty value is a value, refused by the parser, not by the argv scan.
+    run = failOnRun([...auditorAssessArgs(out), "--fail-on="], out);
+    assert.equal(run.error?.message_key, "input.fail_on_invalid_expression");
+    // Values that start with '-' which argparse still reads as values (M4, M7, M8, M9).
+    for (const argv of [
+      ["--fail-on=-x"],
+      ["--fail-on", "-1"],
+      ["--fail-on", "-a b"],
+      ["--fail-on", "-\u0661"],
+    ]) {
+      run = failOnRun([...auditorAssessArgs(out), ...argv], out);
+      assert.equal(run.error?.message_key, "input.fail_on_invalid_expression", argv.join(" "));
+      assert.match(run.error?.detail ?? "", /unexpected character '-' at position 0$/);
+    }
+  });
+});
+
+test("assess --fail-on with no value is refused", () => {
+  withOut("assess-fail-on-bare", (out) => {
+    const args = auditorAssessArgs(out);
+    for (const argv of [
+      [...args, "--fail-on"],
+      [...args.slice(0, 6), "--fail-on", ...args.slice(6)],
+      [...args, "--fail-on", "-x"],
+    ]) {
+      const run = failOnRun(argv, out);
+      assert.equal(run.exitCode, 3);
+      assert.deepEqual(run.error, {
+        message_key: "input.assess_flag_needs_value",
+        detail: "argument --fail-on: expected one argument",
+        fix: "pass --fail-on <expression>.",
+      });
+      assert.equal(run.written, false);
+    }
+  });
+});
+
+test("assess value flags name the first missing value", () => {
+  withOut("assess-value-flags", (out) => {
+    let run = failOnRun(
+      [...auditorAssessArgs(out), "--fail-on", "--deviations", AUDITOR_REGISTER],
+      out,
+    );
+    assert.equal(run.error?.detail, "argument --fail-on: expected one argument");
+    run = failOnRun([...auditorAssessArgs(out), "--deviations", "--fail-on", 'control=="x"'], out);
+    assert.deepEqual(run.error, {
+      message_key: "input.assess_flag_needs_value",
+      detail: "argument --deviations: expected one argument",
+      fix: "pass --deviations <file>.",
+    });
+    assert.equal(run.written, false);
+  });
+});
+
 test("validate quarantines the vendored quickstart bundle's known-bad events", () => {
   const out = mkdtempSync(join(tmpdir(), "agentce-cli-validate-"));
   try {

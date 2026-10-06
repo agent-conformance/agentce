@@ -32,6 +32,7 @@ import {
 import { DomainBinding } from "./domain";
 import { AgentceError, InputError } from "./errors";
 import { ExitCode } from "./exitCodes";
+import { parseFailOn } from "./failOn";
 import { buildGraph } from "./graph";
 import { ingest } from "./ingest";
 import { integrityResultToJson, verifyBundle } from "./integrity";
@@ -621,6 +622,8 @@ interface AssessOptions {
   allowUnverified: boolean;
   /** `--deviations`' register path; `quickstart` has no such flag. */
   deviations?: string;
+  /** `--fail-on`'s expression; `quickstart` never sets it. */
+  failOn?: string;
 }
 
 /** Run a full assessment (ingest, integrity, graph, coverage, applicability, evaluate, report) — the
@@ -630,13 +633,17 @@ function runAssess(options: AssessOptions): CommandResult {
   const bundleDir = requireDir(options.bundle, "bundle", "the evidence bundle");
   const profilePath = requireFile(options.profile, "profile", "the applicability profile");
   const out = options.out;
+  const profileObj = loadProfile(profilePath);
+  // --fail-on is parsed (never eval'd) before any output is written: a hostile or malformed expression
+  // is refused at exit 3 before any assertion is evaluated against it (SPEC §7), and before the
+  // catalogs, --state or --deviations are looked at, in Python's order.
+  const failOnPredicate = options.failOn !== undefined ? parseFailOn(options.failOn) : undefined;
   // --state's writability is proved here, before any --out write below (writeQuarantine etc.), not
   // only when state.record() finally writes at the end of this function: a run refused for an
   // unwritable --state must leave nothing in --out that looks like a result either.
   if (options.state !== undefined) {
     StateDir.ensureWritable(options.state);
   }
-  const profileObj = loadProfile(profilePath);
   // The effective trust root resolves on every run, unconditionally -- even with zero
   // `--catalog-dir`s (python-reference.md §9) -- before `resolveCatalogs` ever inspects one.
   const trust = effectiveTrustRoot(options.trustRootFlag);
@@ -794,7 +801,15 @@ function runAssess(options: AssessOptions): CommandResult {
       result.note(limitation);
     }
   }
-  if (nonConformant > 0) {
+  if (failOnPredicate !== undefined) {
+    // A policy-scoped gate replaces the default any-non-conformant rule: the exit code reflects only
+    // the assertions the expression names, never the whole run (SPEC §8.5, finding #29).
+    const matched = evaluated.filter(failOnPredicate).length;
+    result.data.fail_on = { expression: options.failOn, matched };
+    if (matched > 0) {
+      result.addCode(ExitCode.FINDINGS);
+    }
+  } else if (nonConformant > 0) {
     result.addCode(ExitCode.FINDINGS);
   }
   // SPEC.md:1076 (SPEC Sec.8.5): exit 2 whenever any assertion is both insufficient_evidence and
@@ -831,35 +846,49 @@ function runAssess(options: AssessOptions): CommandResult {
   return result;
 }
 
-/** `--deviations`' value read the way Python's argparse reads a `store` option: `--deviations <path>`
- * or `--deviations=<path>`, the last occurrence wins, and a `--deviations` with no value (trailing,
- * or followed by another option) is refused at once with argparse's own sentence rather than
- * silently taking the next flag as the path or ignoring the register. */
-function deviationsFlag(argv: string[]): string | undefined {
-  let value: string | undefined;
+/** The fix each assess value flag names when it is given with no value. */
+const ASSESS_VALUE_FLAGS: Record<string, string> = {
+  deviations: "pass --deviations <file>.",
+  "fail-on": "pass --fail-on <expression>.",
+};
+
+/** `--deviations` and `--fail-on` read in one left-to-right pass, the way Python's argparse reads a
+ * `store` option: `--x <v>` or `--x=<v>`, the last occurrence wins, and a flag with no value
+ * (trailing, or followed by another option) is refused at once with argparse's own sentence rather
+ * than silently taking the next flag as the value. The first value-less flag in argv order is the one
+ * named, as argparse names it. */
+function assessValueFlags(argv: string[]): Record<string, string | undefined> {
+  const values: Record<string, string | undefined> = {};
   for (let i = 1; i < argv.length; i++) {
     const token = argv[i] as string;
-    if (token.startsWith("--deviations=")) {
-      value = token.slice("--deviations=".length);
-    } else if (token === "--deviations") {
-      const next = argv[i + 1];
-      if (next === undefined || looksLikeOption(next)) {
-        throw new InputError(
-          "input.assess_flag_needs_value",
-          "argument --deviations: expected one argument",
-          "pass --deviations <file>.",
-        );
+    for (const [name, fix] of Object.entries(ASSESS_VALUE_FLAGS)) {
+      if (token.startsWith(`--${name}=`)) {
+        values[name] = token.slice(`--${name}=`.length);
+        break;
       }
-      value = next;
-      i++;
+      if (token === `--${name}`) {
+        const next = argv[i + 1];
+        if (next === undefined || looksLikeOption(next)) {
+          throw new InputError(
+            "input.assess_flag_needs_value",
+            `argument --${name}: expected one argument`,
+            fix,
+          );
+        }
+        values[name] = next;
+        i++;
+        break;
+      }
     }
   }
-  return value;
+  return values;
 }
 
 function cmdAssess(argv: string[]): CommandResult {
+  const values = assessValueFlags(argv);
   return runAssess({
-    deviations: deviationsFlag(argv),
+    deviations: values.deviations,
+    failOn: values["fail-on"],
     bundle: flagValue(argv, "bundle") as string,
     profile: flagValue(argv, "profile") as string,
     catalog: flagValue(argv, "catalog"),
@@ -1084,12 +1113,14 @@ interface ReadinessArgs {
 }
 
 /** A token argparse classifies as an option rather than a value: it starts with `-`, is not a bare
- * `-`, does not look like a negative number and holds no space (`argparse._parse_optional`). */
+ * `-`, does not look like a negative number and holds no space (`argparse._parse_optional`). The
+ * negative-number pattern is argparse's own str regex, so `\d` is any Unicode decimal digit (`-١` is a
+ * number) and `$` also matches before one trailing newline. */
 function looksLikeOption(token: string): boolean {
   return (
     token.startsWith("-") &&
     token !== "-" &&
-    !/^-\d+$|^-\d*\.\d+$/.test(token) &&
+    !/^-\p{Nd}+\n?$|^-\p{Nd}*\.\p{Nd}+\n?$/u.test(token) &&
     !token.includes(" ")
   );
 }
@@ -1686,6 +1717,33 @@ export function main(argv: string[]): number {
     const data = JSON.parse(readFileSync(fixturePath, "utf-8"));
     const assertions = (data.assertions as unknown[]).map(assertionFromJson);
     console.log(canonicalString(computeAuditorView(assertions, data.deviations ?? null)));
+    return 0;
+  }
+
+  // fail-on-check is the same kind of test-only seam (18.73): it reads a fixture file with
+  // `{assertions, expressions}` and, per expression in order, prints one canonical JSON line -- the
+  // refusal's `{error: {key, cause, fix}}`, or `{matched: [...]}` with one boolean per assertion --
+  // the objects Python's `parse_fail_on` gives. Not part of the public command surface.
+  if (command === "fail-on-check") {
+    const fixturePath = argv[1];
+    if (fixturePath === undefined) {
+      console.error("fail-on-check: a fixture file path is required");
+      return ExitCode.INPUT_ERROR;
+    }
+    const data = JSON.parse(readFileSync(fixturePath, "utf-8"));
+    const assertions = (data.assertions as unknown[]).map(assertionFromJson);
+    for (const expression of data.expressions as string[]) {
+      let line: Record<string, unknown>;
+      try {
+        line = { matched: assertions.map(parseFailOn(expression)) };
+      } catch (exc) {
+        if (!(exc instanceof InputError)) {
+          throw exc;
+        }
+        line = { error: { key: exc.key, cause: exc.cause, fix: exc.fix } };
+      }
+      console.log(canonicalString(line));
+    }
     return 0;
   }
 
