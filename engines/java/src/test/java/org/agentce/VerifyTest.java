@@ -967,7 +967,6 @@ class VerifyTest {
     }
 
     /** Runs {@code action} with {@code path} made unreadable (chmod 000), restoring it after. */
-    /** Runs {@code action} with {@code path} made unreadable (chmod 000), restoring it after. */
     private static <T> T withUnreadable(Path path, java.util.concurrent.Callable<T> action) throws Exception {
         Set<PosixFilePermission> mode = Files.getPosixFilePermissions(path);
         Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("---------"));
