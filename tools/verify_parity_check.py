@@ -746,8 +746,13 @@ def run_census(
             skipped_as_root += 1
         elif key is not None:
             out, code = runs["python"]
+            reached = (
+                key in (_reason(out) or "")
+                if key.startswith("missing artifact")
+                else _error_key(out) == key
+            )
             _assert(
-                code == 3 and _error_key(out) == key,
+                code == 3 and reached,
                 failures,
                 f"{label}: Python did not reach {key} ({out.strip()[:300]!r})",
             )

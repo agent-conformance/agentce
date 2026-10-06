@@ -329,10 +329,14 @@ UNREADABLE_EXPECTED = {
     "manifest-file:unreadable": "input.release_unreadable",
     "artifact-path:artifact-unreadable": "input.release_unreadable",
     "artifact-path:artifact-folder-unreadable": "input.release_unreadable",
+    # A release escape is a failed verification, not a keyed refusal: the reason names it.
+    "artifact-path:link-out-into-unreadable-folder": "missing artifact link-sec",
     "signatures-file:unreadable": "input.release_unreadable",
     "bundle-manifest:unreadable": "input.bundle_unreadable",
     "bundle-files:unreadable-file": "input.bundle_unreadable",
     "bundle-files:unreadable-events-directory": "input.bundle_unreadable",
+    # A link out of the target into an unreadable folder is an escape, not an unreadable member.
+    "bundle-files:link-out-into-unreadable-folder": "input.bundle_manifest_path",
     "bundle-streams:unreadable-stream": "input.bundle_unreadable",
     "target-argument:catalog-unreadable": "input.catalog_unreadable",
     "target-argument:release-unreadable": "input.release_unreadable",
@@ -420,8 +424,8 @@ STRING_TOKENS = (
 def path_names_for(base_name: str) -> tuple[tuple[str, str], ...]:
     """Path values for a manifest entry that names a real file `base_name` inside the fixture
     directory built by `bundle_with`/`bundle_evidence_with` (which also provides `outside.txt` one
-    level up, a `subdir`, and `link-out`/`link-in`): escapes, links, odd spellings of the real name,
-    and a directory."""
+    level up, a `subdir`, and `link-out`/`link-in`/`link-gone`): escapes, links, odd spellings of the
+    real name, and a directory."""
     return (
         ("absolute", "/etc/hosts"),
         ("dotdot", "../outside.txt"),
@@ -436,6 +440,11 @@ def path_names_for(base_name: str) -> tuple[tuple[str, str], ...]:
         ("link-out", "link-out"),
         ("link-in", "link-in"),
         ("non-ascii", "artifact-é.txt"),
+        # Names TypeScript and Java's strict realpath once refused as unsafe where Python's resolve,
+        # which keeps what it cannot look at as written, finds them inside and missing (18.68).
+        ("under-a-file", f"{base_name}/x"),
+        ("name-too-long", "subdir/" + "n" * 300),
+        ("link-dangling-out", "link-gone"),
     )
 
 
@@ -683,6 +692,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
             (dest / "subdir").mkdir()
             os.symlink(d / "outside.txt", dest / "link-out")
             os.symlink("artifact-a.txt", dest / "link-in")
+            os.symlink(d / "gone" / "x", dest / "link-gone")
             edit(dest)
             return dest
 
@@ -697,6 +707,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
             (dest / "subdir").mkdir()
             os.symlink(d / "outside.txt", dest / "link-out")
             os.symlink("events/_benign-quarantine.jsonl", dest / "link-in")
+            os.symlink(d / "gone" / "x", dest / "link-gone")
             edit(dest)
             return dest
 
@@ -707,6 +718,21 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
 
     def make_unreadable(name: str) -> Callable[[Path], None]:
         return lambda dest: (dest / name).chmod(0)
+
+    def link_out_into_unreadable_folder(
+        manifest_name: str, field: tuple[str | int, ...], doc: Any
+    ) -> Callable[[Path], None]:
+        """The manifest's first entry names `link-sec`, a link to `../sec/x` beside the target, and
+        `sec` cannot be listed."""
+
+        def edit(dest: Path) -> None:
+            (dest.parent / "sec").mkdir()
+            (dest.parent / "sec" / "x").write_bytes(b"outside\n")
+            os.symlink("../sec/x", dest / "link-sec")
+            _write(dest / manifest_name, replaced(doc, field, "link-sec"))
+            (dest.parent / "sec").chmod(0)
+
+        return edit
 
     def replace_with_directory(name: str) -> Callable[[Path], None]:
         def edit(dest: Path) -> None:
@@ -902,6 +928,20 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         "unreadable",
         bundle_with(artifact_in_unreadable_folder),
     )
+
+    # A listed artifact that is a link leaving the release, into a folder that cannot be listed: the
+    # link is judged by where it points, so it is missing from the release, not unreadable in it
+    # (18.68 verifier r2: TypeScript and Java followed it with stat and blamed the outside folder).
+    add(
+        "link-out-into-unreadable-folder",
+        "artifact-path",
+        "unreadable",
+        bundle_with(
+            link_out_into_unreadable_folder(
+                "release-manifest.json", ("artifacts", 0, "name"), manifest
+            )
+        ),
+    )
     add(
         "unreadable-file",
         "catalog-tree",
@@ -1057,6 +1097,17 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         "bundle-files",
         "unreadable",
         bundle_evidence_with(make_unreadable("events")),
+        target="bundle",
+    )
+    add(
+        "link-out-into-unreadable-folder",
+        "bundle-files",
+        "unreadable",
+        bundle_evidence_with(
+            link_out_into_unreadable_folder(
+                "manifest.json", ("files", 0, "path"), bundle_manifest
+            )
+        ),
         target="bundle",
     )
     add(
