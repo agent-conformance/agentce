@@ -25,6 +25,9 @@ than naming bad edits one at a time:
    every position exactly once and the same name per position, catching a truncated or duplicated
    shard selection that a wiring check alone cannot see. Positions, not names, are the key: two
    different census mutations share a name.
+5. ``--list-shard 0/1`` with ``CI=true`` and with ``CI`` unset must print the same list (18.96), so a
+   developer's local list is the one CI's shards run. The fixture report's ``assess`` once read the
+   variable and added ``report.junit.xml`` under CI, eight mutations a laptop never listed.
 
 Usage:
     verify_census_shard_coverage_check.py              # the real workflow and the real --list-shard
@@ -34,6 +37,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -174,14 +178,23 @@ def partition_problems(full: Listing, shards: list[Listing]) -> list[str]:
     return problems
 
 
-def list_shard(index: int, total: int, root: Path = REPO_ROOT) -> tuple[Listing, int]:
-    """The real `--list-shard index/total` output, and the census size it reports on stderr."""
+def list_shard(
+    index: int, total: int, root: Path = REPO_ROOT, *, ci: bool | None = None
+) -> tuple[Listing, int]:
+    """The real `--list-shard index/total` output, and the census size it reports on stderr; `ci`
+    sets (`True`) or removes (`False`) the `CI` variable for the run, `None` keeps the caller's."""
+    env = dict(os.environ)
+    if ci is not None:
+        env.pop("CI", None)
+        if ci:
+            env["CI"] = "true"
     result = subprocess.run(
         [sys.executable, str(root / CENSUS_SCRIPT), "--list-shard", f"{index}/{total}"],
         capture_output=True,
         text=True,
         check=True,
         cwd=root,
+        env=env,
     )
     listing = []
     for line in result.stdout.splitlines():
@@ -199,6 +212,20 @@ def full_list_problems(full: Listing, size: int) -> list[str]:
             f"{size} census mutations the generator reports"
         ]
     return []
+
+
+def ci_env_problems(with_ci: Listing, without_ci: Listing) -> list[str]:
+    """The full list must not depend on the `CI` variable: CI's shards and a local run list the same."""
+    if with_ci == without_ci:
+        return []
+    differ = next(
+        (i for i, (a, b) in enumerate(zip(with_ci, without_ci)) if a != b),
+        min(len(with_ci), len(without_ci)),
+    )
+    return [
+        f"the census list depends on the CI variable: {len(with_ci)} mutation(s) with CI=true, "
+        f"{len(without_ci)} without; first difference at position {differ}"
+    ]
 
 
 def check_workflow(
@@ -221,13 +248,22 @@ def check_workflow(
             f"{CENSUS_SCRIPT} --list-shard 0/1 printed no mutations or no size"
         ]
     # Each call rebuilds the signed fixtures (about 3.5 s); they are independent, so run them at once.
-    with ThreadPoolExecutor(max_workers=CENSUS_SHARDS) as pool:
+    with ThreadPoolExecutor(max_workers=CENSUS_SHARDS + 2) as pool:
+        with_ci, without_ci = (
+            pool.submit(list_shard, 0, 1, root, ci=ci) for ci in (True, False)
+        )
         shards = list(
             pool.map(
                 lambda i: list_shard(i, CENSUS_SHARDS, root)[0], range(CENSUS_SHARDS)
             )
         )
-    return problems + full_list_problems(full, size) + partition_problems(full, shards)
+        env_problems = ci_env_problems(with_ci.result()[0], without_ci.result()[0])
+    return (
+        problems
+        + full_list_problems(full, size)
+        + partition_problems(full, shards)
+        + env_problems
+    )
 
 
 def self_test() -> int:
@@ -409,11 +445,17 @@ def self_test() -> int:
         ("full list truncated by the selection it checks", (full[:3], 5), False),
         ("full list with a gap", ([full[0], full[2]], 2), False),
     ]
+    env_cases: list[tuple[str, Any, bool]] = [
+        ("same list with and without CI", (full, list(full)), True),
+        ("an extra mutation under CI", (full + [(5, "junit")], full), False),
+        ("a renamed mutation under CI", ([*full[:4], (4, "zz")], full), False),
+    ]
     judged: list[tuple[list[tuple[str, Any, bool]], Any]] = [
         (job_cases, census_job_problems),
         (scenario_cases, scenario_problems),
         (partition_cases, lambda shards: partition_problems(full, shards)),
         (full_cases, lambda args: full_list_problems(*args)),
+        (env_cases, lambda args: ci_env_problems(*args)),
     ]
     misjudged = [name for cases, check in judged for name in _misjudged(cases, check)]
     for name in misjudged:
@@ -442,7 +484,8 @@ def main() -> int:
     print(
         f"PASS: jobs.{CENSUS_JOB} runs {CENSUS_SHARDS} shards keyed off "
         "strategy.job-index/strategy.job-total, the named scenarios run once in "
-        f"jobs.{ARTIFACTS_JOB}, and the shards cover every census mutation exactly once"
+        f"jobs.{ARTIFACTS_JOB}, the shards cover every census mutation exactly once, and the "
+        "list is the same with and without CI"
     )
     return 0
 

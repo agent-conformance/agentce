@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.40.0",
+  "suite_version": "0.41.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1499,7 +1499,7 @@
     },
     {
       "id": "VG-VERIFY-CENSUS-SHARD-COVERAGE",
-      "title": "The CI verify-census matrix (18.93) is wired to strategy.job-index/strategy.job-total with exactly four shards, the named scenarios run once, and the shards cover every agentce verify census mutation exactly once",
+      "title": "The CI verify-census matrix (18.93) is wired to strategy.job-index/strategy.job-total with exactly four shards, the named scenarios run once, and the shards cover every agentce verify census mutation exactly once, and the list is the same with and without the CI variable (18.96)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -1512,8 +1512,8 @@
       "timeout_s": 180,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "tools/verify_census_shard_coverage_check.py's --self-test judges every good and bad wiring, matrix, scenario-placement and partition case correctly, then the real run finds .github/workflows/quickstart.yml's verify-census job running exactly the canonical --shard \"${{ strategy.job-index }}/${{ strategy.job-total }}\" step over a 4-value matrix with no extra job, strategy or step keys and no other line in that job naming tools/verify_parity_check.py, no line outside verify-census naming tools/verify_parity_check.py other than its --self-test or --scenarios-only, installed-artifacts-offline running both census self-tests and --scenarios-only exactly once each, and the real --list-shard i/4 output for every i covering --list-shard 0/1 with every position exactly once under the same name",
-        "fail": "the self-test misjudges a case, or the real run finds the census step not exactly the canonical invocation, a matrix that does not create exactly 4 jobs, an extra key (if:, continue-on-error, shell:) on the job, strategy or step, another job naming tools/verify_parity_check.py in any other way (the full census, --shard 0/1, a pipe, a copied shard line), a census self-test or the --scenarios-only run missing or doubled in installed-artifacts-offline, or a census position in no shard, in two shards, or under a different name"
+        "pass": "tools/verify_census_shard_coverage_check.py's --self-test judges every good and bad wiring, matrix, scenario-placement and partition case correctly, then the real run finds .github/workflows/quickstart.yml's verify-census job running exactly the canonical --shard \"${{ strategy.job-index }}/${{ strategy.job-total }}\" step over a 4-value matrix with no extra job, strategy or step keys and no other line in that job naming tools/verify_parity_check.py, no line outside verify-census naming tools/verify_parity_check.py other than its --self-test or --scenarios-only, installed-artifacts-offline running both census self-tests and --scenarios-only exactly once each, and the real --list-shard i/4 output for every i covering --list-shard 0/1 with every position exactly once under the same name, and the real --list-shard 0/1 output identical with CI=true and with CI unset",
+        "fail": "the self-test misjudges a case, or the real run finds the census step not exactly the canonical invocation, a matrix that does not create exactly 4 jobs, an extra key (if:, continue-on-error, shell:) on the job, strategy or step, another job naming tools/verify_parity_check.py in any other way (the full census, --shard 0/1, a pipe, a copied shard line), a census self-test or the --scenarios-only run missing or doubled in installed-artifacts-offline, or a census position in no shard, in two shards, or under a different name, or a --list-shard 0/1 list that differs between CI=true and CI unset"
       },
       "faults": [
         {
@@ -1539,9 +1539,15 @@
           "file": ".github/workflows/quickstart.yml",
           "search": "tools/verify_parity_check.py --scenarios-only",
           "replace": "tools/verify_parity_check.py --scenarios-only\n          uv run --project tools --frozen python tools/verify_parity_check.py --shard 0/1"
+        },
+        {
+          "description": "the fixture report's assess loses its explicit format list, so the CI environment variable decides its formats again: under CI it adds report.junit.xml and the census lists 2,320 mutations, on a laptop 2,312",
+          "file": "tools/verify_parity_check.py",
+          "search": "\"--emit\", \",\".join(sorted(ASSESS_DEFAULT_EMIT | {{\"junit\"}})),",
+          "replace": ""
         }
       ],
-      "fix_hint": "run verification/gates/verify_census_shard_coverage.sh and read which problem it found; the step is .github/workflows/quickstart.yml's jobs.verify-census, the selection is tools/verify_parity_check.py's select_shard, checked by tools/verify_census_shard_coverage_check.py."
+      "fix_hint": "run verification/gates/verify_census_shard_coverage.sh and read which problem it found; the step is .github/workflows/quickstart.yml's jobs.verify-census, the selection is tools/verify_parity_check.py's select_shard, checked by tools/verify_census_shard_coverage_check.py; a list that differs with CI means something in build_canonical_fixtures reads the CI environment (its assess call must name its formats with --emit)."
     }
   ]
 }
