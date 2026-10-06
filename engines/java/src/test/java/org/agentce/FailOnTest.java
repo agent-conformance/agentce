@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 /**
  * The {@code --fail-on} expression language (18.73) is a port of {@code agentce/fail_on.py}: these
  * tests pin what it accepts and how it matches, and every refusal's cause, copied from the real Python
- * output (python-capture.txt, R1-R31, of item 18.73).
+ * output of {@code parse_fail_on} for the same expression.
  */
 class FailOnTest {
     private static final String FIX = "use comparisons of the form field==\"literal\" joined by and/or, over: "

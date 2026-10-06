@@ -1,6 +1,6 @@
 /**
  * `parseFailOn` against the Python reference (`agentce/fail_on.py`): every expected cause below is
- * copied from Python's own output (SPECS evidence P18-18.73, python-capture.txt R1-R31).
+ * copied from the output of Python's `parse_fail_on` for the same expression.
  */
 
 import assert from "node:assert/strict";
