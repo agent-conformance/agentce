@@ -24,7 +24,9 @@ from __future__ import annotations
 
 import argparse
 import ast
+import functools
 import json
+import operator
 import re
 import subprocess
 import sys
@@ -54,13 +56,20 @@ INTEL_MACOS = {
     "platform_python_implementation": "CPython",
 }
 
-#: Interpreter versions tried against a lock entry's markers: an entry admits Intel macOS when any of
-#: them satisfies one of its markers.
-PYTHON_VERSIONS = [
-    f"3.{minor}.{patch}" for minor in range(8, 21) for patch in range(31)
-]
+#: Interpreter versions tried against every marker, on top of the versions the marker itself names
+#: (``_candidate_versions``): an entry admits Intel macOS when any of them satisfies one of its markers.
+PYTHON_VERSIONS = [(3, minor, patch) for minor in range(8, 21) for patch in range(31)]
 
 _VERSION_VARIABLES = {"python_version", "python_full_version"}
+
+_COMPARE = {
+    ast.Eq: operator.eq,
+    ast.NotEq: operator.ne,
+    ast.Lt: operator.lt,
+    ast.LtE: operator.le,
+    ast.Gt: operator.gt,
+    ast.GtE: operator.ge,
+}
 
 
 def tracked_uv_locks() -> list[Path]:
@@ -81,7 +90,8 @@ def _cpython_intel_wheel(wheel_url: str) -> bool:
     interpreter tag or ``abi3`` ABI tag, as in ``.../cryptography-48.0.1-cp311-abi3-
     macosx_10_9_universal2.whl``. A ``pp*`` wheel is PyPy-only."""
     filename = wheel_url.rsplit("/", 1)[-1].removesuffix(".whl")
-    python, abi, platform = (filename.split("-") + ["", "", ""])[2:5]
+    # The three tags are always the last three fields; an optional build tag sits before them.
+    python, abi, platform = (["", "", ""] + filename.split("-"))[-3:]
     return bool(INTEL_TAG.match(platform)) and (
         python.startswith("cp") or abi == "abi3"
     )
@@ -110,33 +120,46 @@ def _marker_true(node: ast.expr, env: dict[str, str]) -> bool:
         return all(results) if isinstance(node.op, ast.And) else any(results)
     if not (isinstance(node, ast.Compare) and len(node.ops) == 1):
         raise ValueError(f"unsupported marker {ast.unparse(node)!r}")
-    op, right_node = node.ops[0], node.comparators[0]
+    op, right_node = type(node.ops[0]), node.comparators[0]
     left, right = _marker_value(node.left, env), _marker_value(right_node, env)
     names = {n.id for n in (node.left, right_node) if isinstance(n, ast.Name)}
-    if names & _VERSION_VARIABLES and right.endswith(".*"):
-        prefix = tuple(int(p) for p in right.removesuffix(".*").split("."))
-        matches = _version(left)[: len(prefix)] == prefix
-        compare = {ast.Eq: matches, ast.NotEq: not matches}
-    elif names & _VERSION_VARIABLES and not isinstance(op, (ast.In, ast.NotIn)):
-        a, b = _version(left), _version(right)
-        compare = {
-            ast.Eq: a == b,
-            ast.NotEq: a != b,
-            ast.Lt: a < b,
-            ast.LtE: a <= b,
-            ast.Gt: a > b,
-            ast.GtE: a >= b,
-        }
-    else:
-        compare = {
-            ast.Eq: left == right,
-            ast.NotEq: left != right,
-            ast.In: left in right,
-            ast.NotIn: left not in right,
-        }
-    if type(op) not in compare:
+    if op in (ast.In, ast.NotIn):
+        return (left in right) == (op is ast.In)
+    if op not in _COMPARE or (
+        not names & _VERSION_VARIABLES and op not in (ast.Eq, ast.NotEq)
+    ):
         raise ValueError(f"unsupported marker operator in {ast.unparse(node)!r}")
-    return compare[type(op)]
+    if names & _VERSION_VARIABLES and right.endswith(".*"):
+        if op not in (ast.Eq, ast.NotEq):
+            raise ValueError(f"unsupported marker operator in {ast.unparse(node)!r}")
+        prefix = _version(right.removesuffix(".*"))[: right.count(".")]
+        return _COMPARE[op](_version(left)[: len(prefix)], prefix)
+    if names & _VERSION_VARIABLES:
+        return _COMPARE[op](_version(left), _version(right))
+    return _COMPARE[op](left, right)
+
+
+def _candidate_versions(marker: str) -> list[tuple[int, ...]]:
+    """``PYTHON_VERSIONS`` plus each version the marker names and the patch release after it, so a
+    bound outside the fixed grid (``>= '3.21'``) is still reached."""
+    named = [_version(v) for v in re.findall(r"'(\d+(?:\.\d+)*)(?:\.\*)?'", marker)]
+    return PYTHON_VERSIONS + named + [v[:2] + (v[2] + 1,) for v in named]
+
+
+@functools.cache
+def _marker_admits_intel_macos(marker: str) -> bool:
+    tree = ast.parse(marker, mode="eval").body
+    return any(
+        _marker_true(
+            tree,
+            {
+                **INTEL_MACOS,
+                "python_version": f"{v[0]}.{v[1]}",
+                "python_full_version": ".".join(map(str, v)),
+            },
+        )
+        for v in _candidate_versions(marker)
+    )
 
 
 def _admits_intel_macos(markers: list[str]) -> bool:
@@ -144,19 +167,7 @@ def _admits_intel_macos(markers: list[str]) -> bool:
     installs, for some interpreter version; an entry with no markers applies everywhere."""
     if not markers:
         return True
-    trees = [ast.parse(marker, mode="eval").body for marker in markers]
-    return any(
-        _marker_true(
-            tree,
-            {
-                **INTEL_MACOS,
-                "python_version": v.rsplit(".", 1)[0],
-                "python_full_version": v,
-            },
-        )
-        for tree in trees
-        for v in PYTHON_VERSIONS
-    )
+    return any(_marker_admits_intel_macos(marker) for marker in markers)
 
 
 def lacks_intel_wheel(lock_text: str) -> bool:
