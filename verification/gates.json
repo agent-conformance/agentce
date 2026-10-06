@@ -1683,7 +1683,7 @@
     },
     {
       "id": "VG-DIFF-READINESS-PARITY",
-      "title": "Python, TypeScript and Java give byte-identical agentce diff and agentce readiness output and exit codes",
+      "title": "Python, TypeScript and Java give byte-identical agentce diff output and agentce readiness --json envelopes and report files, with the same exit codes",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -1699,7 +1699,7 @@
       "timeout_s": 900,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "with the TypeScript dist and the Java jar rebuilt from source, both checkers' self-tests pass and both real runs print MATCH: every diff and readiness case gives the same stdout, report file and exit code in all three engines",
+        "pass": "with the TypeScript dist and the Java jar rebuilt from source, both checkers' self-tests pass and both real runs print MATCH: diff stdout in every --format and --json form, and readiness --json verdict, reasons and limitations plus the date-stripped report-readiness file, are the same in all three engines, with the same exit codes. Readiness human-mode stdout is not compared",
         "fail": "either self-test fails, or any engine's diff or readiness stdout, report file or exit code differs from Python's"
       },
       "faults": [
