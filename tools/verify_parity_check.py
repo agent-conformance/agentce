@@ -252,7 +252,6 @@ verify_flow_census.build_signed_variants(
 import contextlib
 import io
 import os
-import re
 from agentce import cli
 from agentce.report import ASSESS_DEFAULT_EMIT
 from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat

@@ -409,15 +409,17 @@ def check_workflow(
             return problems + [
                 f"{CENSUS_SCRIPT} --list-shard 0/1 printed no mutations or no size"
             ]
+        refusal = pool.submit(probe_refusal, listing_sha256(full), root)
         env_problems = ci_env_problems(with_ci.result()[0], full)
         digest_problems = reference_problems(reference.result(), full)
+        refusal_found = refusal.result()
     return (
         problems
         + full_list_problems(full, size)
         + partition_problems(full, shards)
         + env_problems
         + digest_problems
-        + probe_refusal(listing_sha256(full), root)
+        + refusal_found
     )
 
 
