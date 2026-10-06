@@ -340,6 +340,10 @@ def test_keyless_cert_window_must_not_be_reversed(
             "not_before": "2026-01-01T00:00:00.5Z",
             "not_after": "2026-01-01T00:00:00.50Z",
         },
+        {
+            "not_before": "2026-01-01T00:00:00.50Z",
+            "not_after": "2026-01-01T00:00:00.5Z",
+        },
     ],
 )
 def test_keyless_cert_well_formed_windows_verify(fields: dict) -> None:

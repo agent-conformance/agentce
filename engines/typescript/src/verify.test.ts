@@ -961,6 +961,7 @@ test("keyless certificate: well-formed windows verify, the algorithm is checked 
     { not_after: "2026-12-31T23:59:60Z" },
     { not_before: "2024-02-29T00:00:00Z" },
     { not_before: "2026-01-01T00:00:00.5Z", not_after: "2026-01-01T00:00:00.50Z" },
+    { not_before: "2026-01-01T00:00:00.50Z", not_after: "2026-01-01T00:00:00.5Z" },
   ]) {
     const { trust, envelope } = keylessWith(changes);
     assert.equal(verifyEnvelope(envelope, trust).keyless, true);
