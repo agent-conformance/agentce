@@ -3,6 +3,16 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.44.0
+
+- `VG-NO-ML-SKILL-LOCKS` (18.56) is new. The two skills' `uv.lock` files are gitignored, so a fresh
+  checkout has none and the no-ml scan skipped both skills' dependency trees. The no-ml job now runs
+  `python3 tools/vendor_skill_engine.py --write` before the scan, and `no_ml_check.py
+  --require-skill-locks` fails when a skill's lock is missing or does not list the skill and
+  `agent-conformance`. The gate runs the self-test, checks the step order in `no-ml.yml`, generates the
+  locks and runs the real scan with them required. Four seeded faults: the workflow drops the vendor
+  step, a missing skill lock passes, `skills/` is left out of the scan, and an empty skill lock passes.
+
 ## 0.43.0
 
 - `VG-CLAIM-PARITY` (18.53) is new. The TypeScript and Java engines now write `claim.json` when they

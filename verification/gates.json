@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.43.0",
+  "suite_version": "0.44.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1633,6 +1633,53 @@
         }
       ],
       "fix_hint": "run verification/gates/claim_parity.sh and read the MISMATCH lines; the reference is engines/python/agentce/report.py's _build_claim and commands/__init__.py's _read_sign_claim, ported as buildClaim in engines/typescript/src/report.ts and engines/java/src/main/java/org/agentce/Report.java and readSignClaim in cli.ts and Cli.java; the check is tools/claim_parity_check.py"
+    },
+    {
+      "id": "VG-NO-ML-SKILL-LOCKS",
+      "title": "The no-ml job scans both agent skills' dependency trees: it generates their gitignored uv.lock files before the scan, and the scan fails on a missing or empty skill lock instead of skipping it",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/no_ml_skill_locks.sh"
+      ],
+      "requires": [
+        "python3",
+        "uv"
+      ],
+      "timeout_s": 600,
+      "invariant": "No learned components in any engine or script dependency tree; a dependency-denylist job enforces it.",
+      "rubric": {
+        "pass": "no_ml_check.py's self-test proves --require-skill-locks fails on a missing, empty or unrelated skill lock and on a lock without the skill's own project, passes on a real one and catches a denylisted package in it; .github/workflows/no-ml.yml runs `python3 tools/vendor_skill_engine.py --write` in a step before the step running `no_ml_check.py --require-skill-locks`; after generating the locks, the real scan with the locks required passes and names both skill locks",
+        "fail": "no-ml.yml scans before (or without) generating the skill locks, the scan skips a missing skill lock, accepts an empty or unrelated lock, or leaves skills/ out of the walk, or the real scan finds a denylisted package"
+      },
+      "faults": [
+        {
+          "description": "workflow drops the vendor step: no-ml.yml scans without generating the skills' gitignored locks first, so a fresh checkout's scan would skip both skills' trees",
+          "file": ".github/workflows/no-ml.yml",
+          "search": "      - name: Generate the skills' gitignored locks (18.54 keeps them out of phase commits)\n        run: python3 tools/vendor_skill_engine.py --write\n",
+          "replace": ""
+        },
+        {
+          "description": "missing skill lock passes: --require-skill-locks skips a skill whose uv.lock does not exist instead of failing",
+          "file": "tools/no_ml_check.py",
+          "search": "            problems.append(f\"{rel} is missing: run `{VENDOR_HINT}` before the scan\")\n            continue\n",
+          "replace": "            continue\n"
+        },
+        {
+          "description": "skills excluded from the scan: the lockfile walk leaves out everything under skills/, so a denylisted package in a skill's tree is never read",
+          "file": "tools/no_ml_check.py",
+          "search": "EXCLUDE_DIRS = frozenset({\".venv\", \"node_modules\", \".gradle\"})",
+          "replace": "EXCLUDE_DIRS = frozenset({\".venv\", \"node_modules\", \".gradle\", \"skills\"})"
+        },
+        {
+          "description": "empty skill lock passes: a skill lock that lists neither the skill nor agent-conformance (an empty or unrelated file) is accepted",
+          "file": "tools/no_ml_check.py",
+          "search": "        missing = {normalize(project), SKILL_ENGINE} - locked\n",
+          "replace": "        missing: set[str] = set()\n"
+        }
+      ],
+      "fix_hint": "Run verification/gates/no_ml_skill_locks.sh and read the first failing line: a self-test assertion in tools/no_ml_check.py (_selftest_skill_locks, skill_lock_problems), the step-order message for .github/workflows/no-ml.yml, or a NO-ML FAILED line naming the lock. Generating the locks needs uv and the package index (tools/vendor_skill_engine.py --write)."
     }
   ]
 }
