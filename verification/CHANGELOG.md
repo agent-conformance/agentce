@@ -17,7 +17,7 @@ fails if a gate in `gates.json` is not named in this file.
   `--deviations=<path>` spelling ignored, a lossy UTF-8 decode, the auditor view's sort skipped, the
   first of two registers kept, and a register path with a `.` segment named as typed rather than as
   Python's `pathlib` renders it.
-- `VG-PROJECT-VIEW`'s rubric no longer calls its deviations scenario Python-only: the new gate holds
+- `VG-PROJECT-VIEW`'s rubric no longer calls its deviations scenario Python-only. The new gate holds
   TypeScript's and Java's `project.json` for that fixture to Python's bytes.
 
 ## 0.39.0
