@@ -28,6 +28,7 @@ from agentce.errors import InputError
 from agentce.ingest import ingest
 from agentce.quarantine import QuarantineReason
 from agentce.report import _recorded_outputs, validate_report, write_report
+from agentce.safe_json import JSONError, load_json
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _PACKAGE = Path(__file__).resolve().parents[1] / "agentce"
@@ -47,8 +48,6 @@ def int_digits(request: pytest.FixtureRequest) -> Iterator[int]:
 
 
 def test_load_json_reads_up_to_4300_digits(int_digits: int) -> None:
-    from agentce.safe_json import load_json
-
     assert load_json('{"n": %s}' % ("7" * 4300))["n"] == _big("7" * 4300)
     assert load_json("-" + "8" * 4300) == -_big("8" * 4300)
     assert load_json("[-0, 0, 12, -34]") == [0, 0, 12, -34]
@@ -56,8 +55,6 @@ def test_load_json_reads_up_to_4300_digits(int_digits: int) -> None:
 
 
 def test_load_json_refuses_4301_digits(int_digits: int) -> None:
-    from agentce.safe_json import JSONError, load_json
-
     for text in ("9" * 4301, "-" + "9" * 4301, '{"a": [1, %s]}' % BIG):
         with pytest.raises(JSONError) as caught:
             load_json(text)
@@ -66,16 +63,12 @@ def test_load_json_refuses_4301_digits(int_digits: int) -> None:
 
 
 def test_load_json_leaves_strings_and_floats_alone(int_digits: int) -> None:
-    from agentce.safe_json import load_json
-
     assert load_json('"%s"' % BIG) == BIG
     assert load_json("1.5e" + "0" * 5000) == 1.5
     assert load_json("0.%s" % BIG) == pytest.approx(1.0)
 
 
 def test_load_json_keeps_the_decoder_message_for_syntax_errors(int_digits: int) -> None:
-    from agentce.safe_json import JSONError, load_json
-
     with pytest.raises(JSONError) as caught:
         load_json('{"n": }')
     assert caught.value.msg == "Expecting value"
@@ -90,8 +83,6 @@ def test_load_json_keeps_the_decoder_message_for_syntax_errors(int_digits: int) 
 
 
 def test_load_json_lets_invalid_utf8_through() -> None:
-    from agentce.safe_json import load_json
-
     with pytest.raises(UnicodeDecodeError):
         load_json(b'{"n": "\xff"}')
 

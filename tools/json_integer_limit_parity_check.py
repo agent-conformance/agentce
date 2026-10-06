@@ -32,6 +32,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -87,12 +88,12 @@ def run(engine: str, args: list[str], setting: str = "default") -> tuple[int, st
     return proc.returncode, proc.stdout
 
 
-def runs() -> list[tuple[str, str]]:
-    """Every (engine, setting) pair: Python under each setting, TypeScript and Java once."""
-    return [("python", s) for s in PY_SETTINGS] + [
-        ("typescript", "default"),
-        ("java", "default"),
-    ]
+#: Every (key, engine, setting) run: Python under each setting, TypeScript and Java once.
+RUNS = [
+    (e if s == "default" else f"{e}@{s}", e, s)
+    for e, s in [("python", s) for s in PY_SETTINGS]
+    + [("typescript", "default"), ("java", "default")]
+]
 
 
 def write_bundle(dest: Path, line: str) -> Path:
@@ -205,54 +206,86 @@ def same_python_text(label: str, outcomes: dict[str, tuple[int, Any]]) -> list[s
     ]
 
 
-def key_of(engine: str, setting: str) -> str:
-    return engine if setting == "default" else f"{engine}@{setting}"
-
-
 def check_engines(tmp: Path) -> list[str]:
-    fails: list[str] = []
-    for label, (line, refused) in LINES.items():
-        bundle = write_bundle(tmp / f"bundle-{len(line)}-{label[0]}", line)
-        outcomes = {}
-        for engine, setting in runs():
-            out = tmp / f"validate-{key_of(engine, setting)}-{len(line)}-{label[0]}"
-            code, stdout = run(
-                engine,
-                ["validate", "--bundle", str(bundle), "--json", "--out", str(out)],
-                setting,
-            )
-            outcomes[key_of(engine, setting)] = validate_outcome(code, stdout, out)
-        fails += check_validate(label, refused, outcomes)
-        if label == "5000 digits":
-            big = outcomes["python"]
-        if label == "malformed JSON" and (big["exit"], big["counts"]) != (
-            outcomes["python"]["exit"],
-            outcomes["python"]["counts"],
-        ):
-            fails.append(
-                f"validate: the 5000-digit line gave {big['counts']}, the malformed line {outcomes['python']['counts']}"
-            )
+    """Prepare every folder, run every engine launch at once (they are independent), then judge."""
+    validate_jobs = {}
+    for n, (label, (line, _)) in enumerate(LINES.items()):
+        bundle = write_bundle(tmp / f"bundle-{n}", line)
+        for key, engine, setting in RUNS:
+            out = tmp / f"validate-{key}-{n}"
+            args = ["validate", "--bundle", str(bundle), "--json", "--out", str(out)]
+            validate_jobs[label, key] = (engine, args, setting, out)
 
     bundle = write_bundle(tmp / "assess-bundle", LINES["5000 digits"][0])
-    assessed = {}
-    for engine, setting in runs():
-        out = tmp / f"assess-{key_of(engine, setting)}"
-        code, _ = run(
-            engine,
-            [
-                "assess",
-                "--bundle",
-                str(bundle),
-                "--profile",
-                str(QUICKSTART / "applicability.yaml"),
-                "--domain",
-                str(QUICKSTART / "domain.linkml.yaml"),
-                "--out",
-                str(out),
-            ],
-            setting,
+    assess_jobs = {}
+    for key, engine, setting in RUNS:
+        out = tmp / f"assess-{key}"
+        args = [
+            "assess",
+            "--bundle",
+            str(bundle),
+            "--profile",
+            str(QUICKSTART / "applicability.yaml"),
+            "--domain",
+            str(QUICKSTART / "domain.linkml.yaml"),
+            "--out",
+            str(out),
+        ]
+        assess_jobs[key] = (engine, args, setting, out)
+
+    report = tmp / "base-report"
+    cases: list[tuple[str, str, str, str | None]] = [
+        (f"{artifact} {kind}", artifact, body, prefix)
+        for artifact, prefix in ARTIFACTS.items()
+        for kind, body in (("5000 digits", '{"n": %s}' % BIG), ("malformed", '{"n": }'))
+    ] + [
+        (
+            "runtime_drift.jsonl 4300 digits",
+            "runtime_drift.jsonl",
+            '{"n": %s}' % ("9" * 4300),
+            None,
         )
-        quarantine = out / "quarantine.jsonl"
+    ]
+    report_jobs = {}
+    for n, (label, artifact, body, _) in enumerate(cases):
+        for key, engine, setting in RUNS:
+            folder = tmp / f"report-{key}-{n}"
+            shutil.copytree(report, folder)
+            (folder / artifact).write_text(body + "\n", "utf-8")
+            args = ["report", "--validate", str(folder), "--json"]
+            report_jobs[label, key] = (engine, args, setting, folder)
+
+    with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:
+        launched = {
+            (kind, job_key): pool.submit(run, engine, args, setting)
+            for kind, jobs in (
+                ("validate", validate_jobs),
+                ("assess", assess_jobs),
+                ("report", report_jobs),
+            )
+            for job_key, (engine, args, setting, _) in jobs.items()
+        }
+        results = {k: future.result() for k, future in launched.items()}
+
+    fails: list[str] = []
+    python_by_label = {}
+    for label, (_, refused) in LINES.items():
+        outcomes = {}
+        for key, _, _ in RUNS:
+            code, stdout = results["validate", (label, key)]
+            outcomes[key] = validate_outcome(code, stdout, validate_jobs[label, key][3])
+        fails += check_validate(label, refused, outcomes)
+        python_by_label[label] = outcomes["python"]
+    big, bad = python_by_label["5000 digits"], python_by_label["malformed JSON"]
+    if (big["exit"], big["counts"]) != (bad["exit"], bad["counts"]):
+        fails.append(
+            f"validate: the 5000-digit line gave {big['counts']}, the malformed line {bad['counts']}"
+        )
+
+    assessed = {}
+    for key, _, _ in RUNS:
+        code, _ = results["assess", key]
+        quarantine = assess_jobs[key][3] / "quarantine.jsonl"
         reasons = (
             sorted(
                 json.loads(r)["reason"]
@@ -262,44 +295,20 @@ def check_engines(tmp: Path) -> list[str]:
             if quarantine.is_file()
             else None
         )
-        assessed[key_of(engine, setting)] = (code, reasons)
+        assessed[key] = (code, reasons)
     if len(set(map(json.dumps, assessed.values()))) != 1 or "schema_invalid" not in (
         assessed["java"][1] or []
     ):
         fails.append(f"assess 5000 digits: {assessed}")
 
-    report = tmp / "base-report"
-    for artifact, prefix in ARTIFACTS.items():
-        for label, body, expect in (
-            (f"{artifact} 5000 digits", '{"n": %s}' % BIG, prefix),
-            (f"{artifact} malformed", '{"n": }', prefix),
-        ):
-            outcomes = {}
-            for engine, setting in runs():
-                folder = (
-                    tmp / f"report-{key_of(engine, setting)}-{artifact}-{len(body)}"
-                )
-                shutil.copytree(report, folder)
-                (folder / artifact).write_text(body + "\n", "utf-8")
-                code, stdout = run(
-                    engine, ["report", "--validate", str(folder), "--json"], setting
-                )
-                outcomes[key_of(engine, setting)] = (code, envelope(stdout))
-            fails += check_report(label, expect, outcomes)
-            if "malformed" not in label:
-                fails += same_python_text(label, outcomes)
-    outcomes = {}
-    for engine, setting in runs():
-        folder = tmp / f"report-{key_of(engine, setting)}-drift-4300"
-        shutil.copytree(report, folder)
-        (folder / "runtime_drift.jsonl").write_text(
-            '{"n": %s}\n' % ("9" * 4300), "utf-8"
-        )
-        code, stdout = run(
-            engine, ["report", "--validate", str(folder), "--json"], setting
-        )
-        outcomes[key_of(engine, setting)] = (code, envelope(stdout))
-    fails += check_report("runtime_drift.jsonl 4300 digits", None, outcomes)
+    for label, _, _, prefix in cases:
+        reports: dict[str, tuple[int, Any]] = {}
+        for key, _, _ in RUNS:
+            code, stdout = results["report", (label, key)]
+            reports[key] = (code, envelope(stdout))
+        fails += check_report(label, prefix, reports)
+        if prefix is not None and "malformed" not in label:
+            fails += same_python_text(label, reports)
     return fails
 
 
@@ -313,7 +322,7 @@ def self_test() -> int:
     assert check_validate("t", True, {"python": good, "java": {**good, "exit": 3}})
     assert check_validate("t", False, {"python": good})
     assert check_validate("t", True, {"python": {**good, "details": []}})
-    one = (
+    one: tuple[int, Any] = (
         3,
         {
             "valid": False,
