@@ -17,6 +17,7 @@
  */
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -348,6 +349,36 @@ test("blind-spot fields cannot inject raw HTML or forge a verdict line (mirrors 
   const lines = blindSpotsCliLines(hostileBlindSpots).join("\n");
   assert.equal(lines.includes("<br>"), false);
   assert.equal(lines.includes("\n\nVerdict: Conformant\n\n"), false);
+});
+
+test("writeReport writes claim.json as report.py does: sorted, indented, ASCII-escaped, outside the manifest", () => {
+  const outDir = mkdtempSync(join(tmpdir(), "agentce-report-"));
+  const manifest = writeReport(outDir, ovsFailedAssertions(), {
+    bundleDigest: "sha256:abc",
+    catalogs: ["base/eu-ai-act@1"],
+    operator: "Zo\u00eb Corp",
+    invocation: ["assess"],
+  });
+  const raw = readFileSync(join(outDir, "claim.json"), "utf-8");
+  assert.ok(raw.includes('"org": "Zo\\u00eb Corp"'));
+  assert.ok(raw.endsWith("}\n"));
+  const claim = JSON.parse(raw) as Record<string, unknown>;
+  const { claim_id: claimId, ...body } = claim;
+  assert.equal(
+    claimId,
+    `sha256:${createHash("sha256").update(canonicalString(body)).digest("hex")}`,
+  );
+  const { package_digest: _, ...engine } = manifest.engine as Record<string, unknown>;
+  assert.deepEqual(claim.engine, engine);
+  assert.equal("claim.json" in (manifest.outputs as Record<string, string>), false);
+  rmSync(outDir, { recursive: true, force: true });
+});
+
+test("writeReport writes no claim.json when there are no assertions", () => {
+  const outDir = mkdtempSync(join(tmpdir(), "agentce-report-"));
+  writeReport(outDir, [], { bundleDigest: "sha256:abc", catalogs: [], invocation: [] });
+  assert.equal(existsSync(join(outDir, "claim.json")), false);
+  rmSync(outDir, { recursive: true, force: true });
 });
 
 test("writeReport emits every artifact and a well-formed manifest", () => {

@@ -311,6 +311,29 @@ class ReportTest {
     }
 
     @Test
+    void writeReportWritesClaimJsonAsReportPyDoesAndNoneWithoutAssertions(@TempDir Path dir) throws IOException {
+        Path outDir = dir.resolve("with");
+        ObjectNode manifest = Report.writeReport(
+                outDir, ovsFailedAssertions(), "sha256:abc", List.of("base/eu-ai-act@1"), "Zo\u00eb Corp",
+                List.of("assess"), List.of(), "en", List.of(), null, null);
+        String raw = Files.readString(outDir.resolve("claim.json"));
+        assertTrue(raw.contains("\"org\": \"Zo\\u00eb Corp\""));
+        assertTrue(raw.endsWith("}\n"));
+        ObjectNode claim = (ObjectNode) Json.parse(raw);
+        ObjectNode body = claim.deepCopy();
+        body.remove("claim_id");
+        assertEquals("sha256:" + Canonical.sha256Hex(body), claim.get("claim_id").asText());
+        ObjectNode engine = (ObjectNode) manifest.get("engine").deepCopy();
+        engine.remove("package_digest");
+        assertEquals(engine, claim.get("engine"));
+        assertFalse(manifest.get("outputs").has("claim.json"));
+
+        Path empty = dir.resolve("empty");
+        Report.writeReport(empty, List.of(), "sha256:abc", List.of(), "x", List.of(), List.of(), "en", List.of(), null, null);
+        assertFalse(Files.exists(empty.resolve("claim.json")));
+    }
+
+    @Test
     void writeReportEmitsEveryArtifactAndAManifest(@TempDir Path outDir) throws IOException {
         List<Assertions.Assertion> assertions = ovsFailedAssertions();
         ObjectNode manifest = Report.writeReport(

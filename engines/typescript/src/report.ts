@@ -29,7 +29,7 @@ import {
   computeProjectView,
   noPopulationBySubject,
 } from "./project";
-import { byteCompare, pyStr, sortKeysDeep } from "./util";
+import { byteCompare, jsonStringifyAscii, pyStr, sortKeysDeep } from "./util";
 import { gapText, summarize as summarizeVerdict } from "./verdict";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
@@ -1354,5 +1354,62 @@ export function writeReport(
     deviationRegisterDigest: options.deviationRegisterDigest,
   });
   writeFileSync(join(outDir, "manifest.json"), JSON.stringify(sortKeysDeep(manifest), null, 2));
+  if (assertions.length > 0) {
+    // claim.json is unsigned here (SPEC §9.1: the engine never signs its own claim) and is not one
+    // of the manifest's outputs, as in report.py; it exists so `agentce sign` can sign a real run.
+    const claim = buildClaim(
+      assertions,
+      manifest,
+      options.operator ?? "unknown",
+      options.limitations,
+    );
+    writeFileSync(join(outDir, "claim.json"), `${jsonStringifyAscii(sortKeysDeep(claim), 2)}\n`);
+  }
   return manifest;
+}
+
+/** The fixed statement text every claim carries (SPEC §9.1; `claim.schema.json`'s `statement` const). */
+const CLAIM_STATEMENT =
+  "This report states conformance to the named catalogs as evaluated by the named engine over " +
+  "the named evidence. It is not a legal compliance determination.";
+
+/**
+ * The conformance claim body (SPEC §9.1, `claim.schema.json`), as report.py's `_build_claim`: the
+ * catalogs are the manifest's own refs and the engine block is the manifest's minus its
+ * `package_digest`; `claim_id` is the sha256 of the canonical body.
+ */
+export function buildClaim(
+  assertions: Assertion[],
+  manifest: Record<string, unknown>,
+  operator: string,
+  limitations?: string[],
+): Record<string, unknown> {
+  const minBy = (values: string[]): string =>
+    values.reduce((a, b) => (byteCompare(b, a) < 0 ? b : a));
+  const maxBy = (values: string[]): string =>
+    values.reduce((a, b) => (byteCompare(b, a) > 0 ? b : a));
+  const subjects = [...new Set(assertions.map((a) => a.subject))].sort(byteCompare);
+  const { package_digest: _, ...engine } = manifest.engine as Record<string, unknown>;
+  const body: Record<string, unknown> = {
+    subjects: subjects.map((id) => ({ id, role: "both" })),
+    observation_window: {
+      start: minBy(assertions.map((a) => a.window[0])),
+      end: maxBy(assertions.map((a) => a.window[1])),
+    },
+    catalogs: (manifest.inputs as Record<string, unknown>).catalogs,
+    engine,
+    claimant: { org: operator },
+    statement: CLAIM_STATEMENT,
+  };
+  if (limitations?.length) {
+    body.limitations = limitations;
+  }
+  const deviations = [
+    ...new Set(assertions.flatMap((a) => (a.deviation ? [a.deviation] : []))),
+  ].sort(byteCompare);
+  if (deviations.length > 0) {
+    body.deviations = deviations;
+  }
+  const claimId = `sha256:${createHash("sha256").update(canonicalize(body)).digest("hex")}`;
+  return { claim_id: claimId, ...body };
 }

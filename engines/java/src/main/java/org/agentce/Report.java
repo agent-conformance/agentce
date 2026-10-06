@@ -1525,10 +1525,63 @@ public final class Report {
                     bundleDigest, catalogs, outputs, operator, invocation, supersedes, reportLanguage, catalogObjects,
                     limitations, applicabilityProfileDigest, domainBindingDigest, deviationRegisterDigest);
             Files.write(outDir.resolve("manifest.json"), Json.pretty(manifest).getBytes(StandardCharsets.UTF_8));
+            if (!assertions.isEmpty()) {
+                // claim.json is unsigned here (SPEC §9.1: the engine never signs its own claim) and is not
+                // one of the manifest's outputs, as in report.py; it exists so `agentce sign` can sign a real run.
+                ObjectNode claim = buildClaim(assertions, manifest, limitations);
+                Files.write(outDir.resolve("claim.json"), (Json.pretty(claim) + "\n").getBytes(StandardCharsets.UTF_8));
+            }
             return manifest;
         } catch (IOException e) {
             throw new IllegalStateException("cannot write report to " + outDir + ": " + e.getMessage(), e);
         }
+    }
+
+    /** The fixed statement text every claim carries (SPEC §9.1; {@code claim.schema.json}'s {@code statement} const). */
+    static final String CLAIM_STATEMENT =
+            "This report states conformance to the named catalogs as evaluated by the named engine over "
+                    + "the named evidence. It is not a legal compliance determination.";
+
+    /** The conformance claim body (SPEC §9.1, {@code claim.schema.json}), as report.py's {@code _build_claim}:
+     * the catalogs and operator are the manifest's own, the engine block is the manifest's minus its
+     * {@code package_digest}, and {@code claim_id} is the sha256 of the canonical body. */
+    static ObjectNode buildClaim(List<Assertions.Assertion> assertions, ObjectNode manifest, List<String> limitations) {
+        TreeSet<String> subjects = new TreeSet<>(Json::byteCompare);
+        TreeSet<String> starts = new TreeSet<>(Json::byteCompare);
+        TreeSet<String> ends = new TreeSet<>(Json::byteCompare);
+        TreeSet<String> deviations = new TreeSet<>(Json::byteCompare);
+        for (Assertions.Assertion a : assertions) {
+            subjects.add(a.subject);
+            starts.add(a.window[0]);
+            ends.add(a.window[1]);
+            if (a.deviation != null && !a.deviation.isEmpty()) {
+                deviations.add(a.deviation);
+            }
+        }
+        ObjectNode body = Json.nodes().objectNode();
+        ArrayNode subjectNodes = body.putArray("subjects");
+        for (String s : subjects) {
+            subjectNodes.addObject().put("id", s).put("role", "both");
+        }
+        body.putObject("observation_window").put("start", starts.first()).put("end", ends.last());
+        body.set("catalogs", manifest.get("inputs").get("catalogs").deepCopy());
+        ObjectNode engine = (ObjectNode) manifest.get("engine").deepCopy();
+        engine.remove("package_digest");
+        body.set("engine", engine);
+        body.putObject("claimant").put("org", manifest.get("run").get("operator").asText());
+        body.put("statement", CLAIM_STATEMENT);
+        if (limitations != null && !limitations.isEmpty()) {
+            ArrayNode lim = body.putArray("limitations");
+            limitations.forEach(lim::add);
+        }
+        if (!deviations.isEmpty()) {
+            ArrayNode dev = body.putArray("deviations");
+            deviations.forEach(dev::add);
+        }
+        ObjectNode claim = Json.nodes().objectNode();
+        claim.put("claim_id", "sha256:" + Canonical.sha256Hex(body));
+        claim.setAll(body);
+        return claim;
     }
 
     /** The honest empty answer for a caller with no assertions to explain (never recomputed from an
