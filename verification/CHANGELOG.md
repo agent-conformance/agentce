@@ -3,6 +3,16 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.48.0
+
+- `VG-VERIFY` (18.68) now checks what its title says. Its legs were all key-signed, though the title
+  says "key-based or certificate-based". Three new legs, in all three engines: the valid keyless
+  certificate release verifies with `keyless: true`; a kms entry carrying `"cert": null` verifies with
+  `keyless: false`; and an evidence bundle with a stream file nobody can read is refused with
+  `input.bundle_unreadable` (skipped as root, where a mode-000 file still reads). Three new seeded
+  faults: `keyless` back to `"cert" in signature` (Python), the unreadable classification removed from
+  `loadBundle` (TypeScript), and `verifyCertificate` always refusing (Java).
+
 ## 0.47.0
 
 - `VG-VERIFY` (18.63) also checks keyless certificates. Three certificates the development authority

@@ -12,7 +12,7 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+trap 'chmod -R u+rwX "$work" 2>/dev/null; rm -rf "$work"' EXIT
 
 fixture_json="$work/fixture.json"
 (cd "$root/tools" && env -u VIRTUAL_ENV uv run --frozen python - "$work" > "$fixture_json" <<'PY'
@@ -29,6 +29,18 @@ vpc.build_canonical_fixtures(canonical)
 
 kms_release = work / "release-kms.json"
 kms_release.write_bytes((canonical / "release-kms.json").read_bytes())
+
+# A kms entry that carries "cert": null is key-signed, not keyless (keyless follows TrustRoot.resolve's
+# own test: a certificate is present).
+cert_null = json.loads(kms_release.read_text(encoding="utf-8"))
+cert_null["signatures"][0]["cert"] = None
+cert_null_release = work / "release-kms-cert-null.json"
+cert_null_release.write_text(json.dumps(cert_null), encoding="utf-8")
+
+# The quickstart evidence bundle with one stream file the engine cannot read (chmod 000).
+unreadable_bundle = work / "bundle-unreadable-stream"
+shutil.copytree(vpc.EVIDENCE_BUNDLE, unreadable_bundle)
+(unreadable_bundle / vpc.verify_flow_census.STREAM_FILE).chmod(0)
 
 tampered = json.loads((canonical / "release-kms.json").read_text(encoding="utf-8"))
 tampered["signatures"][0]["sig"] = vpc._flip_b64_byte(tampered["signatures"][0]["sig"])
@@ -60,6 +72,9 @@ print(
     json.dumps(
         {
             "certificate_legs": certificate_legs,
+            "cert_release": str(canonical / "release-cert.json"),
+            "cert_null_release": str(cert_null_release),
+            "unreadable_bundle": str(unreadable_bundle),
             "kms_release": str(kms_release),
             "tampered_release": str(tampered_release),
             "unsigned_catalog": str(unsigned_catalog),
@@ -77,6 +92,9 @@ unsigned_catalog="$(jq -r .unsigned_catalog "$fixture_json")"
 unsigned_sentence="$(jq -r .unsigned_sentence "$fixture_json")"
 unsigned_bundle="$(jq -r .unsigned_bundle "$fixture_json")"
 unsigned_bundle_sentence="$(jq -r .unsigned_bundle_sentence "$fixture_json")"
+cert_release="$(jq -r .cert_release "$fixture_json")"
+cert_null_release="$(jq -r .cert_null_release "$fixture_json")"
+unreadable_bundle="$(jq -r .unreadable_bundle "$fixture_json")"
 
 (cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist)
 
@@ -166,5 +184,37 @@ for leg in 0 1 2; do
   done
 done
 
-[ "$status" -eq 0 ] && echo "verify: all three engines refuse the tampered release, the unsigned catalog, the unsigned bundle and three bad keyless certificates without crashing, and verify the validly kms-signed release"
+# Legs 8-9 (item 18.68): the validly certificate-signed release verifies as keyless, and a kms entry
+# carrying "cert": null verifies as key-signed (keyless false), so the title's "key-based or
+# certificate-based" holds for both.
+for leg in "$cert_release:true" "$cert_null_release:false"; do
+  release="${leg%:*}"
+  want_keyless="${leg##*:}"
+  for engine in python typescript java; do
+    out="$(run_verify "$engine" --release "$release")" && code=0 || code=$?
+    verified="$(printf '%s' "$out" | jq -r '.verified | tostring')"
+    keyless="$(printf '%s' "$out" | jq -r '.keyless | tostring')"
+    if [ "$code" -ne 0 ] || [ "$verified" != "true" ] || [ "$keyless" != "$want_keyless" ]; then
+      echo "verify: $engine did not verify $(basename "$release") with keyless=$want_keyless (exit $code, verified=${verified:-none}, keyless=${keyless:-none}; expected exit 0, verified=true, keyless=$want_keyless)" >&2
+      status=1
+    fi
+  done
+done
+
+# Leg 10 (item 18.68): a bundle whose stream file cannot be read is refused with input.bundle_unreadable.
+# As root a mode-000 file still reads, so the leg cannot run there.
+if [ "$(id -u)" -eq 0 ]; then
+  echo "verify: unreadable bundle leg skipped as root"
+else
+  for engine in python typescript java; do
+    out="$(run_verify "$engine" --bundle "$unreadable_bundle")" && code=0 || code=$?
+    key="$(printf '%s' "$out" | jq -r '.error.key // .error.message_key // empty')"
+    if [ "$code" -ne 3 ] || [ "$key" != "input.bundle_unreadable" ]; then
+      echo "verify: $engine did not refuse the bundle with an unreadable stream file as input.bundle_unreadable (exit $code, key=${key:-none}; expected exit 3, key=input.bundle_unreadable)" >&2
+      status=1
+    fi
+  done
+fi
+
+[ "$status" -eq 0 ] && echo "verify: all three engines refuse the tampered release, the unsigned catalog, the unsigned bundle, three bad keyless certificates and an unreadable bundle stream without crashing, and verify the validly kms-signed, certificate-signed and cert-null releases"
 exit "$status"

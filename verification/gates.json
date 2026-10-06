@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.47.0",
+  "suite_version": "0.48.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -960,7 +960,7 @@
     },
     {
       "id": "VG-VERIFY",
-      "title": "A tampered or unsigned catalog or release artifact is refused with a stable, non-crashing result in all three engines; a validly-signed one -- key-based or certificate-based -- verifies offline; a keyless certificate naming another algorithm, with a malformed timestamp or a reversed window is refused with its message key",
+      "title": "A tampered or unsigned catalog or release artifact is refused with a stable, non-crashing result in all three engines; a validly-signed one -- key-based or certificate-based -- verifies offline; a keyless certificate naming another algorithm, with a malformed timestamp or a reversed window is refused with its message key; a validly certificate-signed release verifies as keyless, a kms entry carrying \"cert\": null as key-signed, and a bundle with an unreadable stream file is refused with input.bundle_unreadable",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -976,8 +976,8 @@
       "timeout_s": 900,
       "invariant": "An attestation is reported as verified only after its signature verifies against a trusted key.",
       "rubric": {
-        "pass": "each engine refuses the kms-signed release whose signature byte was flipped (exit 3, verified:false, a reason, never a crash) and the real vendored eu-ai-act catalog with its signature deleted (exit 3, verified:false, the exact unsigned sentence), and each engine verifies the validly kms-signed release (exit 0, verified:true), and each engine refuses three CA-re-signed keyless certificates (algorithm ecdsa-p256, a not_before with a space separator, a swapped window) with exit 3, verified:false and the exact reason naming verify.certificate_algorithm, verify.certificate_validity_malformed or verify.certificate_validity_inverted",
-        "fail": "any engine crashes (an error field) on the tampered release, fails to refuse the unsigned catalog with the exact sentence, or fails to verify the validly kms-signed release, or does not refuse one of the three bad keyless certificates with its exact keyed reason"
+        "pass": "each engine refuses the kms-signed release whose signature byte was flipped (exit 3, verified:false, a reason, never a crash) and the real vendored eu-ai-act catalog with its signature deleted (exit 3, verified:false, the exact unsigned sentence), and each engine verifies the validly kms-signed release (exit 0, verified:true), and each engine refuses three CA-re-signed keyless certificates (algorithm ecdsa-p256, a not_before with a space separator, a swapped window) with exit 3, verified:false and the exact reason naming verify.certificate_algorithm, verify.certificate_validity_malformed or verify.certificate_validity_inverted, and each engine verifies the valid keyless-certificate release (exit 0, verified:true, keyless:true) and the kms release whose entry carries \"cert\": null (exit 0, verified:true, keyless:false), and refuses a bundle with an unreadable stream file with exit 3 and input.bundle_unreadable (that leg is skipped as root, where a mode-000 file still reads)",
+        "fail": "any engine crashes (an error field) on the tampered release, fails to refuse the unsigned catalog with the exact sentence, or fails to verify the validly kms-signed release, or does not refuse one of the three bad keyless certificates with its exact keyed reason, or does not verify the keyless-certificate or cert-null release with the right keyless value, or does not refuse the unreadable-stream bundle with input.bundle_unreadable"
       },
       "faults": [
         {
@@ -1015,6 +1015,24 @@
           "file": "engines/java/src/main/java/org/agentce/Verify.java",
           "search": "        if (!m.matches()) {\n            return null;\n        }\n",
           "replace": "        if (!m.matches()) {\n            return \"\";\n        }\n"
+        },
+        {
+          "description": "Python: keyless back to \"cert\" in signature, so a kms entry carrying \"cert\": null reports keyless true",
+          "file": "engines/python/agentce/signing.py",
+          "search": "                keyless=signature.get(\"cert\") is not None,\n",
+          "replace": "                keyless=\"cert\" in signature,\n"
+        },
+        {
+          "description": "TypeScript: the unreadable classification removed from loadBundle's member hash read, so an unreadable stream file crashes as internal.unexpected",
+          "file": "engines/typescript/src/bundle.ts",
+          "search": "      actual = fileSha256Hex(member);\n    } catch (err) {\n      if (isPermissionError(err)) {\n        throw bundleUnreadable(bundleDir, rel);\n      }\n      throw err;\n",
+          "replace": "      actual = fileSha256Hex(member);\n    } catch (err) {\n      throw err;\n"
+        },
+        {
+          "description": "Java: verifyCertificate always refuses, so a validly certificate-signed release does not verify",
+          "file": "engines/java/src/main/java/org/agentce/Verify.java",
+          "search": "    private static KeyEntry verifyCertificate(JsonNode cert, Map<String, AuthorityEntry> authorities) {\n        if (cert == null || !cert.isObject()) {\n",
+          "replace": "    private static KeyEntry verifyCertificate(JsonNode cert, Map<String, AuthorityEntry> authorities) {\n        if (cert != null) {\n            throw new IllegalArgumentException(\"certificate signature does not verify\");\n        }\n        if (cert == null || !cert.isObject()) {\n"
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines, each naming the engine whose leg failed; the reference implementation is engines/python/agentce/commands/__init__.py's _verify_release, ported in engines/typescript/src/verify.ts's verifyRelease and engines/java/src/main/java/org/agentce/Verify.java's verifyRelease."
@@ -1161,7 +1179,7 @@
     },
     {
       "id": "VG-QUICK-PATH",
-      "title": "The records-folder quick path (`agentce assess <folder>`, SPEC \u00a712, \u00a713.4 AX-1) proves the records-vs-bundle divergence, checks_unlocked on a real scan, and the derived profile's pilot_window still passing the skill's own lint",
+      "title": "The records-folder quick path (`agentce assess <folder>`, SPEC §12, §13.4 AX-1) proves the records-vs-bundle divergence, checks_unlocked on a real scan, and the derived profile's pilot_window still passing the skill's own lint",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -1441,8 +1459,8 @@
         {
           "description": "README swaps one Experimental name for one Roadmap name between the two tier lines (AuthZEN decisions <-> Cedar); both lines keep their real stated count, so only the per-name tier check can catch it",
           "file": "README.md",
-          "search": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, AuthZEN decisions.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, Cedar \u2014 help wanted.\n",
-          "replace": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, Cedar.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, AuthZEN decisions \u2014 help wanted.\n"
+          "search": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, AuthZEN decisions.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, Cedar — help wanted.\n",
+          "replace": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, Cedar.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, AuthZEN decisions — help wanted.\n"
         },
         {
           "description": "the trace-store connectors page's table claims Datadog LLM Observability is Supported, reviving the old overstated claim the matrix (Experimental) disagrees with",
