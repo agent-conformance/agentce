@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.46.0",
+  "suite_version": "0.47.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -960,7 +960,7 @@
     },
     {
       "id": "VG-VERIFY",
-      "title": "A tampered or unsigned catalog or release artifact is refused with a stable, non-crashing result in all three engines; a validly-signed one -- key-based or certificate-based -- verifies offline",
+      "title": "A tampered or unsigned catalog or release artifact is refused with a stable, non-crashing result in all three engines; a validly-signed one -- key-based or certificate-based -- verifies offline; a keyless certificate naming another algorithm, with a malformed timestamp or a reversed window is refused with its message key",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -976,8 +976,8 @@
       "timeout_s": 900,
       "invariant": "An attestation is reported as verified only after its signature verifies against a trusted key.",
       "rubric": {
-        "pass": "each engine refuses the kms-signed release whose signature byte was flipped (exit 3, verified:false, a reason, never a crash) and the real vendored eu-ai-act catalog with its signature deleted (exit 3, verified:false, the exact unsigned sentence), and each engine verifies the validly kms-signed release (exit 0, verified:true)",
-        "fail": "any engine crashes (an error field) on the tampered release, fails to refuse the unsigned catalog with the exact sentence, or fails to verify the validly kms-signed release"
+        "pass": "each engine refuses the kms-signed release whose signature byte was flipped (exit 3, verified:false, a reason, never a crash) and the real vendored eu-ai-act catalog with its signature deleted (exit 3, verified:false, the exact unsigned sentence), and each engine verifies the validly kms-signed release (exit 0, verified:true), and each engine refuses three CA-re-signed keyless certificates (algorithm ecdsa-p256, a not_before with a space separator, a swapped window) with exit 3, verified:false and the exact reason naming verify.certificate_algorithm, verify.certificate_validity_malformed or verify.certificate_validity_inverted",
+        "fail": "any engine crashes (an error field) on the tampered release, fails to refuse the unsigned catalog with the exact sentence, or fails to verify the validly kms-signed release, or does not refuse one of the three bad keyless certificates with its exact keyed reason"
       },
       "faults": [
         {
@@ -997,6 +997,24 @@
           "file": "engines/java/src/main/java/org/agentce/Verify.java",
           "search": "    public static ObjectNode verifyRelease(Path releasePath, TrustRoot trust) {\n        if (Files.isRegularFile(releasePath)) {\n",
           "replace": "    public static ObjectNode verifyRelease(Path releasePath, TrustRoot trust) {\n        if (true) {\n            ObjectNode stub = Json.nodes().objectNode();\n            stub.put(\"release\", releasePath.toString());\n            stub.put(\"verified\", true);\n            stub.put(\"signer\", \"stub\");\n            return stub;\n        }\n        if (Files.isRegularFile(releasePath)) {\n"
+        },
+        {
+          "description": "Python: the keyless certificate algorithm check removed, so a CA-signed certificate naming ecdsa-p256 verifies",
+          "file": "engines/python/agentce/signing.py",
+          "search": "    if cert.get(\"algorithm\") != \"ed25519\":\n        raise _certificate_refusal(\"verify.certificate_algorithm\")\n",
+          "replace": ""
+        },
+        {
+          "description": "TypeScript: the not_before <= not_after comparison removed, so a swapped window verifies",
+          "file": "engines/typescript/src/verify.ts",
+          "search": "  if (notBefore > notAfter) {\n    throw certificateRefusal(\"verify.certificate_validity_inverted\");\n  }\n",
+          "replace": ""
+        },
+        {
+          "description": "Java: the RFC 3339 check accepts anything, so a not_before with a space separator verifies",
+          "file": "engines/java/src/main/java/org/agentce/Verify.java",
+          "search": "        if (!m.matches()) {\n            return null;\n        }\n",
+          "replace": "        if (!m.matches()) {\n            return \"\";\n        }\n"
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines, each naming the engine whose leg failed; the reference implementation is engines/python/agentce/commands/__init__.py's _verify_release, ported in engines/typescript/src/verify.ts's verifyRelease and engines/java/src/main/java/org/agentce/Verify.java's verifyRelease."

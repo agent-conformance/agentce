@@ -42,9 +42,27 @@ shutil.copytree(vpc.EU_AI_ACT, unsigned_catalog)
 unsigned_bundle = work / "bundle-unsigned"
 vpc.write_bundle_with_manifest(unsigned_bundle, {"artifacts": []})
 
+# Three keyless certificates the development authority re-signed after one field change (the census's
+# certificate-field rows), each with the exact refusal Python, the reference, gives.
+causes = json.loads((Path("..") / "spec/i18n/messages.en.json").read_text(encoding="utf-8"))
+certificate_legs = []
+for name, key in (
+    (".algorithm=ecdsa-p256", "verify.certificate_algorithm"),
+    (".not_before=space-separator", "verify.certificate_validity_malformed"),
+    ("window=swapped", "verify.certificate_validity_inverted"),
+):
+    cause = causes[f"errors.{key}.cause"].removesuffix(".")
+    certificate_legs.append(
+        {
+            "release": str(canonical / "signed" / f"certificate__{name}.json"),
+            "reason": f"no signature verified against the trust root: {key}: {cause}",
+        }
+    )
+
 print(
     json.dumps(
         {
+            "certificate_legs": certificate_legs,
             "kms_release": str(kms_release),
             "tampered_release": str(tampered_release),
             "unsigned_catalog": str(unsigned_catalog),
@@ -135,5 +153,21 @@ for engine in python typescript java; do
   fi
 done
 
-[ "$status" -eq 0 ] && echo "verify: all three engines refuse the tampered release, the unsigned catalog and the unsigned bundle without crashing, and verify the validly kms-signed release"
+# Legs 5-7 (item 18.63): a keyless certificate the authority signed but that names ecdsa-p256, has a
+# not_before with a space separator, or has its window swapped is refused with the exact keyed reason.
+for leg in 0 1 2; do
+  release="$(jq -r ".certificate_legs[$leg].release" "$fixture_json")"
+  expected="$(jq -r ".certificate_legs[$leg].reason" "$fixture_json")"
+  for engine in python typescript java; do
+    out="$(run_verify "$engine" --release "$release")" && code=0 || code=$?
+    verified="$(printf '%s' "$out" | jq -r '.verified | tostring')"
+    reason="$(printf '%s' "$out" | jq -r '.reason // empty')"
+    if [ "$code" -ne 3 ] || [ "$verified" != "false" ] || [ "$reason" != "$expected" ]; then
+      echo "verify: $engine did not refuse $(basename "$release") with the keyed certificate reason (exit $code, verified=${verified:-none}, reason=${reason:-none}; expected exit 3, verified=false, reason=$expected)" >&2
+      status=1
+    fi
+  done
+done
+
+[ "$status" -eq 0 ] && echo "verify: all three engines refuse the tampered release, the unsigned catalog, the unsigned bundle and three bad keyless certificates without crashing, and verify the validly kms-signed release"
 exit "$status"

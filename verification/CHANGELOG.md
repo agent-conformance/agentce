@@ -3,6 +3,16 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.47.0
+
+- `VG-VERIFY` (18.63) also checks keyless certificates. Three certificates the development authority
+  re-signed after one field change (an `ecdsa-p256` algorithm, a `not_before` with a space instead of
+  `T`, a swapped window) must be refused in all three engines with the exact reason naming
+  `verify.certificate_algorithm`, `verify.certificate_validity_malformed` or
+  `verify.certificate_validity_inverted`. Three new seeded faults: the algorithm check removed
+  (Python), the `not_before <= not_after` comparison removed (TypeScript), and the RFC 3339 check made
+  to accept anything (Java).
+
 ## 0.46.0
 
 - `VG-CRYPTO-INTEL-WHEEL` (18.62) is stricter. It accepted any Intel-macOS `cryptography` wheel anywhere
