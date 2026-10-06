@@ -707,8 +707,8 @@ public final class Verify {
             }
             String name = nameNode.textValue();
             Path artifactFile = Bundle.confineToRoot(releasePath, name);
-            if (artifactFile != null) {
-                requireReleaseReadable(releasePath, artifactFile);
+            if (artifactFile != null || Bundle.deniedMember(releasePath, name)) {
+                requireReleaseReadable(releasePath, artifactFile != null ? artifactFile : releasePath.resolve(name));
             }
             byte[] content;
             try {

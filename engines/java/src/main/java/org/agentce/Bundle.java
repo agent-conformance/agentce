@@ -155,15 +155,20 @@ public final class Bundle {
         }
     }
 
+    /** True when {@code confineToRoot} refused a lexically safe {@code rel} because a permission error
+     * stopped it resolving. Python resolves an unlistable folder's member without error and then
+     * finds it unreadable; toRealPath fails here instead, so such a member is unreadable, not unsafe
+     * or missing (18.68; the bundle and release readers share it). */
+    static boolean deniedMember(Path root, String rel) {
+        boolean lexicallySafe = !rel.isEmpty() && !rel.startsWith("/")
+                && !Arrays.asList(rel.split("/")).contains("..");
+        return lexicallySafe && permissionDenied(root, rel);
+    }
+
     private static Path safeMember(Path root, String rel) {
         Path member = confineToRoot(root, rel);
         if (member == null) {
-            // Python resolves an unlistable folder's member without error and then finds it
-            // unreadable; toRealPath fails here instead, so a lexically safe path that is denied is
-            // unreadable too.
-            boolean lexicallySafe = !rel.isEmpty() && !rel.startsWith("/")
-                    && !Arrays.asList(rel.split("/")).contains("..");
-            if (lexicallySafe && permissionDenied(root, rel)) {
+            if (deniedMember(root, rel)) {
                 throw bundleUnreadable(root, rel);
             }
             throw new InputError(

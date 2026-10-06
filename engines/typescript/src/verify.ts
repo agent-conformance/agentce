@@ -12,7 +12,7 @@
 import { type KeyObject, createHash, createPublicKey, verify as cryptoVerify } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { confineToRoot } from "./bundle";
+import { confineToRoot, deniedMember } from "./bundle";
 import { CanonicalizationError, canonicalize, sha256Hex } from "./canonical";
 import {
   InputError,
@@ -639,8 +639,8 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
       continue;
     }
     const artifactFile = confineToRoot(releasePath, name);
-    if (artifactFile !== null) {
-      requireReleaseReadable(releasePath, artifactFile);
+    if (artifactFile !== null || deniedMember(releasePath, name)) {
+      requireReleaseReadable(releasePath, artifactFile ?? join(releasePath, name));
     }
     let content: Buffer | null = null;
     try {

@@ -104,13 +104,19 @@ export function permissionDenied(path: string): boolean {
   return false;
 }
 
+/** True when `confineToRoot` refused a lexically safe `rel` because a permission error stopped it
+ * resolving. Python resolves an unlistable folder's member without error and then finds it
+ * unreadable; realpath fails here instead, so such a member is unreadable, not unsafe or missing
+ * (18.68; the bundle and release readers share it). */
+export function deniedMember(root: string, rel: string): boolean {
+  const lexicallySafe = rel !== "" && !rel.startsWith("/") && !rel.split("/").includes("..");
+  return lexicallySafe && permissionDenied(join(root, rel));
+}
+
 function safeMember(root: string, rel: string): string {
   const member = confineToRoot(root, rel);
   if (member === null) {
-    // Python resolves an unlistable folder's member without error and then finds it unreadable;
-    // realpath fails here instead, so a lexically safe path that is denied is unreadable too.
-    const lexicallySafe = rel !== "" && !rel.startsWith("/") && !rel.split("/").includes("..");
-    if (lexicallySafe && permissionDenied(join(root, rel))) {
+    if (deniedMember(root, rel)) {
       throw bundleUnreadable(root, rel);
     }
     throw new InputError(
