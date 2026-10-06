@@ -72,13 +72,13 @@ A keyless signature carries its certificate in the DSSE signature entry (`cert`)
 the certificate against the pinned authority, then checks the signature with the certified key. A
 `kms` signature carries a `keyid` that must resolve to a pinned key.
 
-Once the authority's signature on a certificate checks out, the engines also check three of its fields,
+Once the authority's signature on a certificate verifies, the engines also check three of its fields,
 in this order, and refuse the signature if one fails:
 
 | Check | Message key |
 |---|---|
 | `algorithm` is exactly `ed25519` (no other value, no other case, no spaces) | `verify.certificate_algorithm` |
-| `not_before` and `not_after` are RFC 3339 UTC timestamps ending in `Z` or `z`, such as `2026-01-01T00:00:00Z`, with a date that exists. A numeric offset, even `+00:00`, is refused | `verify.certificate_validity_malformed` |
+| `not_before` and `not_after` are RFC 3339 UTC timestamps ending in `Z` or `z`, such as `2026-01-01T00:00:00Z`, with a date that exists. The engines refuse a numeric offset, even `+00:00` | `verify.certificate_validity_malformed` |
 | `not_before` is no later than `not_after` | `verify.certificate_validity_inverted` |
 
 The refusal reads `<key>: <cause>` inside the usual `no signature verified against the trust root: ...`
