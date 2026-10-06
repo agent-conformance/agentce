@@ -1800,10 +1800,10 @@
       },
       "faults": [
         {
-          "description": "Python always takes json.loads' fast path, so the interpreter's own limit decides: under PYTHONINTMAXSTRDIGITS=0 the 5000-digit line parses",
-          "file": "engines/python/agentce/safe_json.py",
-          "search": "    if sys.get_int_max_str_digits() == MAX_INT_STR_DIGITS:\n",
-          "replace": "    if True:\n"
+          "description": "Python's CLI leaves the interpreter's own digit limit in place, so under PYTHONINTMAXSTRDIGITS=640 a 4300-digit literal the schema error quotes crashes validate with internal.unexpected",
+          "file": "engines/python/agentce/cli.py",
+          "search": "    sys.set_int_max_str_digits(MAX_INT_STR_DIGITS)\n",
+          "replace": "    pass\n"
         },
         {
           "description": "Python lets json.loads' bare ValueError for an over-limit literal escape, so ingest and report --validate crash with internal.unexpected",

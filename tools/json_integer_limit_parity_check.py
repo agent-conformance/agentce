@@ -48,6 +48,8 @@ LINES = {
     "4300 digits": ('{"n": %s}' % ("9" * 4300), False),
     "-4300 digits": ('{"n": -%s}' % ("9" * 4300), False),
     "malformed JSON": ('{"n": }', True),
+    # Parseable, and the schema error quotes the value: Python must turn it back into text (18.71 r1).
+    "quoted 4300 digits": ('{"type": %s}' % ("9" * 4300), False),
 }
 ARTIFACTS = {
     "assertions.json": "assertions.json: invalid JSON (",
