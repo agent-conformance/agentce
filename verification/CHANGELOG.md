@@ -3,6 +3,16 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.45.0
+
+- `VG-DIFF-READINESS-PARITY` (18.59) is new. `tools/diff_parity_check.py` and
+  `tools/readiness_parity_check.py` compare the TypeScript and Java ports of `agentce diff` and
+  `agentce readiness` with Python byte for byte, but only `quickstart.yml` ran them; `VG-DIFF` checks
+  Python's diff alone. The gate rebuilds the TypeScript dist and the Java jar, then runs both
+  checkers' self-tests and real runs. Four seeded faults, all in the ports: TypeScript diff misses a
+  closed gap, Java diff misses an opened gap, TypeScript readiness rewords a limitation, and Java
+  readiness ignores limitations.
+
 ## 0.44.0
 
 - `VG-NO-ML-SKILL-LOCKS` (18.56) is new. The two skills' `uv.lock` files are gitignored, so a fresh

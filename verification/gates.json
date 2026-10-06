@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.44.0",
+  "suite_version": "0.45.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1491,8 +1491,8 @@
         {
           "description": "README's \"Distinct products, deduplicated\" row is hand-edited to a number the matrix disagrees with, caught by the count-mismatch check",
           "file": "README.md",
-          "search": "| Distinct products, deduplicated | 408 (348 counting only self-managed Kubernetes) | 2026-09-29 | — |",
-          "replace": "| Distinct products, deduplicated | 409 (348 counting only self-managed Kubernetes) | 2026-09-29 | — |"
+          "search": "| Distinct products, deduplicated | 408 (348 counting only self-managed Kubernetes) | 2026-09-29 | \u2014 |",
+          "replace": "| Distinct products, deduplicated | 409 (348 counting only self-managed Kubernetes) | 2026-09-29 | \u2014 |"
         }
       ],
       "fix_hint": "Run verification/gates/reach_table.sh; it names the exact message key (reach.table.count_mismatch, .missing_provenance, .missing_section, .missing_headline, .duplicate_section or .floor_violated) and the offending row or surface."
@@ -1680,6 +1680,55 @@
         }
       ],
       "fix_hint": "Run verification/gates/no_ml_skill_locks.sh and read the first failing line: a self-test assertion in tools/no_ml_check.py (_selftest_skill_locks, skill_lock_problems), the step-order message for .github/workflows/no-ml.yml, or a NO-ML FAILED line naming the lock. Generating the locks needs uv and the package index (tools/vendor_skill_engine.py --write)."
+    },
+    {
+      "id": "VG-DIFF-READINESS-PARITY",
+      "title": "Python, TypeScript and Java give byte-identical agentce diff and agentce readiness output and exit codes",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/diff_readiness_parity.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "java",
+        "node"
+      ],
+      "timeout_s": 900,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "with the TypeScript dist and the Java jar rebuilt from source, both checkers' self-tests pass and both real runs print MATCH: diff_parity_check.py over its shared fixture (closed, opened, other, added, removed, hostile, non-ASCII and duplicate entries) in six --format/--json forms, the identical-input text and md cases and the missing-file error (input.report_b_missing, exit 3); readiness_parity_check.py over its seven scenarios (READY, READY WITH LIMITATIONS, NOT READY, deviation registers, date grammar), its argv shapes and its float dates, comparing the --json envelope and the date-stripped report-readiness file",
+        "fail": "either self-test fails, or any engine's diff or readiness stdout, report file or exit code differs from Python's"
+      },
+      "faults": [
+        {
+          "description": "typescript diff misses a closed gap",
+          "file": "engines/typescript/src/diff.ts",
+          "search": "if (before !== null && GAP_OUTCOMES.includes(before) && after === \"conformant\") {",
+          "replace": "if (before !== null && GAP_OUTCOMES.includes(before) && after !== \"conformant\") {"
+        },
+        {
+          "description": "java diff misses an opened gap",
+          "file": "engines/java/src/main/java/org/agentce/Diff.java",
+          "search": "if (\"conformant\".equals(before) && after != null && Verdict.GAP_OUTCOMES.contains(after)) {",
+          "replace": "if (\"partial\".equals(before) && after != null && Verdict.GAP_OUTCOMES.contains(after)) {"
+        },
+        {
+          "description": "typescript readiness rewords a limitation",
+          "file": "engines/typescript/src/readiness.ts",
+          "search": "limitations.push(`${control}: high-severity evidence gap recorded`);",
+          "replace": "limitations.push(`${control}: high-severity evidence gap noted`);"
+        },
+        {
+          "description": "java readiness ignores limitations",
+          "file": "engines/java/src/main/java/org/agentce/Readiness.java",
+          "search": "!limitations.isEmpty() ? READY_WITH_LIMITATIONS : READY;",
+          "replace": "false ? READY_WITH_LIMITATIONS : READY;"
+        }
+      ],
+      "fix_hint": "run verification/gates/diff_readiness_parity.sh and read the MISMATCH lines; the checks are tools/diff_parity_check.py and tools/readiness_parity_check.py, and the reference is engines/python/agentce/commands/__init__.py's cmd_diff and engines/python/agentce/readiness.py, ported in engines/typescript/src/diff.ts and readiness.ts and engines/java/src/main/java/org/agentce/Diff.java and Readiness.java"
     }
   ]
 }
