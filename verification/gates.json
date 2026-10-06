@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.41.0",
+  "suite_version": "0.42.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1499,7 +1499,7 @@
     },
     {
       "id": "VG-VERIFY-CENSUS-SHARD-COVERAGE",
-      "title": "The CI verify-census matrix (18.93) is wired to strategy.job-index/strategy.job-total with exactly four shards, the named scenarios run once, and the shards cover every agentce verify census mutation exactly once, and the list is the same with and without the CI variable (18.96)",
+      "title": "The CI verify-census matrix (18.93) is wired to strategy.job-index/strategy.job-total with exactly four shards, the named scenarios run once, and the shards cover every agentce verify census mutation exactly once, and the list is the same with and without the CI variable (18.96), and every shard compares its census list with the census-list job's reference digest before running an engine, over unfiltered triggers (18.97)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -1509,11 +1509,11 @@
       "requires": [
         "uv"
       ],
-      "timeout_s": 180,
+      "timeout_s": 240,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "tools/verify_census_shard_coverage_check.py's --self-test judges every good and bad wiring, matrix, scenario-placement and partition case correctly, then the real run finds .github/workflows/quickstart.yml's verify-census job running exactly the canonical --shard \"${{ strategy.job-index }}/${{ strategy.job-total }}\" step over a 4-value matrix with no extra job, strategy or step keys and no other line in that job naming tools/verify_parity_check.py, no line outside verify-census naming tools/verify_parity_check.py other than its --self-test or --scenarios-only, installed-artifacts-offline running both census self-tests and --scenarios-only exactly once each, and the real --list-shard i/4 output for every i covering --list-shard 0/1 with every position exactly once under the same name, and the real --list-shard 0/1 output identical with CI=true and with CI unset",
-        "fail": "the self-test misjudges a case, or the real run finds the census step not exactly the canonical invocation, a matrix that does not create exactly 4 jobs, an extra key (if:, continue-on-error, shell:) on the job, strategy or step, another job naming tools/verify_parity_check.py in any other way (the full census, --shard 0/1, a pipe, a copied shard line), a census self-test or the --scenarios-only run missing or doubled in installed-artifacts-offline, or a census position in no shard, in two shards, or under a different name, or a --list-shard 0/1 list that differs between CI=true and CI unset"
+        "pass": "tools/verify_census_shard_coverage_check.py's --self-test judges every good and bad wiring, matrix, scenario-placement and partition case correctly, then the real run finds .github/workflows/quickstart.yml's verify-census job running exactly the canonical --shard \"${{ strategy.job-index }}/${{ strategy.job-total }}\" step over a 4-value matrix with no extra job, strategy or step keys and no other line in that job naming verify_parity (any spelling: .py, python -m, cd tools), no line outside verify-census naming verify_parity (any spelling: .py, python -m, cd tools) other than its --self-test or --scenarios-only, installed-artifacts-offline running both census self-tests and --scenarios-only exactly once each, and the real --list-shard i/4 output for every i covering --list-shard 0/1 with every position exactly once under the same name, and the real --list-shard 0/1 output identical with CI=true and with CI unset, and the workflow's on: exactly push (main, phase/**), pull_request and workflow_dispatch, a census-list job named 'verify census list' running exactly the canonical --list-sha256 step into outputs.sha256, verify-census with needs: census-list passing --expect-list-sha256 \"${{ needs.census-list.outputs.sha256 }}\", the real --list-sha256 equal to the sha256 of the real --list-shard 0/1 output, and a real --shard 0/4 given that digest with its last hex digit flipped exiting 1 within 60 s with a MISMATCH line naming both digests and no mutation run",
+        "fail": "the self-test misjudges a case, or the real run finds the census step not exactly the canonical invocation, a matrix that does not create exactly 4 jobs, an extra key (if:, continue-on-error, shell:) on the job, strategy or step, another job naming verify_parity in any other way (the full census, --shard 0/1, a pipe, a copied shard line), a census self-test or the --scenarios-only run missing or doubled in installed-artifacts-offline, or a census position in no shard, in two shards, or under a different name, or a --list-shard 0/1 list that differs between CI=true and CI unset, or the triggers filtered (paths, paths-ignore, branches) or one dropped, the census-list job missing or changed, verify-census without needs: census-list or without --expect-list-sha256, a --list-sha256 that does not hash the full list, or a shard that runs, crashes or times out instead of refusing a wrong digest"
       },
       "faults": [
         {
@@ -1545,9 +1545,39 @@
           "file": "tools/verify_parity_check.py",
           "search": "\"--emit\", \",\".join(sorted(ASSESS_DEFAULT_EMIT | {{\"junit\"}})),",
           "replace": ""
+        },
+        {
+          "description": "the shard step no longer compares its census list with the census-list job's digest, so shards built on different runner images could split different lists while CI stays green",
+          "file": ".github/workflows/quickstart.yml",
+          "search": " --expect-list-sha256 \"${{ needs.census-list.outputs.sha256 }}\"",
+          "replace": ""
+        },
+        {
+          "description": "a paths-ignore on the push trigger stops quickstart, and with it the census, running on pushes that touch only the ignored paths",
+          "file": ".github/workflows/quickstart.yml",
+          "search": "    branches: [main, \"phase/**\"]\n",
+          "replace": "    branches: [main, \"phase/**\"]\n    paths-ignore: [\"docs/**\"]\n"
+        },
+        {
+          "description": "the full census comes back in the artifacts job spelled python -m verify_parity_check, which a match on the script's .py name would miss",
+          "file": ".github/workflows/quickstart.yml",
+          "search": "tools/verify_parity_check.py --scenarios-only",
+          "replace": "tools/verify_parity_check.py --scenarios-only\n          (cd tools && uv run --frozen python -m verify_parity_check)"
+        },
+        {
+          "description": "--list-sha256 hashes a list one mutation short, so the reference digest every shard compares with is not the list the shards split",
+          "file": "tools/verify_parity_check.py",
+          "search": "digest = census_list_digest(mutations)\n    print(digest)",
+          "replace": "digest = census_list_digest(mutations[:-1])\n    print(digest)"
+        },
+        {
+          "description": "run_census ignores the expected digest, so a shard whose list differs from the reference runs its engines anyway",
+          "file": "tools/verify_parity_check.py",
+          "search": "mismatch = list_digest_problem(digest, expected_digest)",
+          "replace": "mismatch = None"
         }
       ],
-      "fix_hint": "run verification/gates/verify_census_shard_coverage.sh and read which problem it found; the step is .github/workflows/quickstart.yml's jobs.verify-census, the selection is tools/verify_parity_check.py's select_shard, checked by tools/verify_census_shard_coverage_check.py; a list that differs with CI means something in build_canonical_fixtures reads the CI environment (its assess call must name its formats with --emit)."
+      "fix_hint": "run verification/gates/verify_census_shard_coverage.sh and read which problem it found; the step is .github/workflows/quickstart.yml's jobs.verify-census, the selection is tools/verify_parity_check.py's select_shard, checked by tools/verify_census_shard_coverage_check.py; a list that differs with CI means something in build_canonical_fixtures reads the CI environment (its assess call must name its formats with --emit). The reference digest is quickstart.yml's jobs.census-list (--list-sha256) and each shard's --expect-list-sha256, compared in tools/verify_parity_check.py's run_census; the triggers are EXPECTED_TRIGGERS in the check."
     }
   ]
 }

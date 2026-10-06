@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.42.0
+
+- `VG-VERIFY-CENSUS-SHARD-COVERAGE` (18.97) now checks that the four census shards split one list. A new
+  quickstart job, `census-list`, prints the census list's sha256 with `verify_parity_check.py --list-sha256`.
+  Each shard needs that job and passes the digest as `--expect-list-sha256`. A shard whose own list hashes
+  differently stops before it runs an engine, so shards that land on different runner images can no longer
+  split different lists while CI stays green. The gate requires that wiring, and it runs a real shard with a
+  digest one hex digit off, which must refuse within 60 seconds. It finds the census script by its
+  module name, so a full census spelled `python -m verify_parity_check` now fails it. It also requires quickstart's
+  triggers to be exactly push (main, `phase/**`), pull request and manual dispatch, so a `paths-ignore` is
+  caught. Five new seeded faults: the shard's digest argument removed, a `paths-ignore` added, a full census
+  spelled `python -m`, a reference digest over a list one mutation short, and a shard that ignores its
+  expected digest.
+
 ## 0.41.0
 
 - `VG-VERIFY-CENSUS-SHARD-COVERAGE` (18.96) now also builds the census list with `CI=true` and with `CI`

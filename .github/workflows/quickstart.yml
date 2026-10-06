@@ -153,8 +153,31 @@ jobs:
             'test -z "$(ls -A /work)" && test -z "$(find /src /app /agentce /home /opt /srv /tmp /work -maxdepth 3 \( -name .git -o -name engines -o -name "SPEC[S]" \) 2>/dev/null)"' \
             || { echo "::error::the image holds repository files" >&2; exit 1; }
 
+  census-list:
+    name: verify census list
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha256: ${{ steps.list.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Prepare the Python toolchain
+        run: uv sync --frozen --project engines/python
+      - name: The census list every shard must split
+        id: list
+        run: |
+          digest=$(uv run --project tools --frozen python tools/verify_parity_check.py --list-sha256)
+          echo "sha256=$digest" >> "$GITHUB_OUTPUT"
+
   verify-census:
     name: verify census (shard ${{ matrix.shard }})
+    # Each shard compares the sha256 of the census list it builds with census-list's before running
+    # any engine, so shards on different runner images can never split different lists.
+    needs: census-list
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -185,7 +208,7 @@ jobs:
           (cd engines/typescript && pnpm install --frozen-lockfile && pnpm build)
           (cd engines/java && ./gradlew :assemble -q)
       - name: This shard of the cross-engine agentce verify census must agree
-        run: uv run --project tools --frozen python tools/verify_parity_check.py --shard "${{ strategy.job-index }}/${{ strategy.job-total }}"
+        run: uv run --project tools --frozen python tools/verify_parity_check.py --shard "${{ strategy.job-index }}/${{ strategy.job-total }}" --expect-list-sha256 "${{ needs.census-list.outputs.sha256 }}"
 
   installed-artifacts-offline:
     name: installed artifacts run offline

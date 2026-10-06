@@ -37,6 +37,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -251,6 +252,7 @@ verify_flow_census.build_signed_variants(
 import contextlib
 import io
 import os
+import re
 from agentce import cli
 from agentce.report import ASSESS_DEFAULT_EMIT
 from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat
@@ -329,6 +331,24 @@ def select_shard(count: int, shard: Shard) -> list[int]:
     of one list cover each position exactly once whatever the list's length."""
     index, total = shard
     return [position for position in range(count) if position % total == index]
+
+
+def parse_list_sha256(text: str) -> str:
+    """A census list digest as `--list-sha256` prints it: exactly 64 lower-case hex digits. Anything
+    else, an empty CI job output or a stray newline included, is refused (argparse exits 2)."""
+    if not re.fullmatch(r"[0-9a-f]{64}", text):
+        raise argparse.ArgumentTypeError(
+            f"{text!r} is not a census list sha256 (64 lower-case hex digits)"
+        )
+    return text
+
+
+def list_digest_problem(own: str, expected: str | None) -> str | None:
+    """A shard whose own census list hashes differently from the reference would split another list
+    than the other shards, so it must not run (`--expect-list-sha256`)."""
+    if expected is None or own == expected:
+        return None
+    return f"census list sha256 {own} differs from the expected {expected}"
 
 
 def shard_floor_problem(ran: int, count: int, shard: Shard) -> str | None:
@@ -419,6 +439,28 @@ def self_test() -> int:
         except argparse.ArgumentTypeError:
             continue
         failures.append(f"parse_shard accepted {bad!r}")
+    digest = "0123456789abcdef" * 4
+    if parse_list_sha256(digest) != digest:
+        failures.append("parse_list_sha256 refused a well-formed digest")
+    for bad in (
+        "",
+        digest[:-1],
+        digest + "0",
+        digest.upper(),
+        f" {digest}",
+        f"{digest}\n",
+    ):
+        try:
+            parse_list_sha256(bad)
+        except argparse.ArgumentTypeError:
+            continue
+        failures.append(f"parse_list_sha256 accepted {bad!r}")
+    if list_digest_problem(digest, None) or list_digest_problem(digest, digest):
+        failures.append(
+            "list_digest_problem refused a matching or absent expected digest"
+        )
+    if list_digest_problem(digest, digest[:-1] + "0") is None:
+        failures.append("list_digest_problem accepted a digest one hex digit off")
 
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
@@ -629,11 +671,23 @@ def census_list_digest(mutations: list[verify_flow_census.Mutation]) -> str:
     return hashlib.sha256(lines.encode("utf-8")).hexdigest()
 
 
-def run_census(canonical: Path, tmp: Path, failures: list[str], shard: Shard) -> None:
+def run_census(
+    canonical: Path,
+    tmp: Path,
+    failures: list[str],
+    shard: Shard,
+    expected_digest: str | None = None,
+) -> None:
     """Shard `I/N` of the mutations `verify_flow_census.generate` derives from the census (`0/1` is
     all of them), through all three engines: byte-identical output and exit code, a JSON envelope,
-    never `internal.unexpected`. Coverage is checked over the full list, whatever the shard."""
+    never `internal.unexpected`. Coverage is checked over the full list, whatever the shard. With
+    `expected_digest` (CI's census-list job), a list that hashes differently runs no engine."""
     mutations = census_mutations(canonical)
+    digest = census_list_digest(mutations)
+    mismatch = list_digest_problem(digest, expected_digest)
+    if mismatch is not None:
+        failures.append(mismatch)
+        return
     failures.extend(verify_flow_census.coverage_problems(mutations))
     positions = select_shard(len(mutations), shard)
     selected = [mutations[p] for p in positions]
@@ -648,7 +702,8 @@ def run_census(canonical: Path, tmp: Path, failures: list[str], shard: Shard) ->
     print(
         f"census shard {shard[0]}/{shard[1]}: ran {len(results)} of {len(mutations)} mutations"
     )
-    print(f"census list sha256: {census_list_digest(mutations)}")
+    matches = " matches the expected digest" if expected_digest else ""
+    print(f"census list sha256: {digest}{matches}")
     floor = shard_floor_problem(len(results), len(mutations), shard)
     if floor is not None:
         failures.append(floor)
@@ -1338,7 +1393,9 @@ def run_scenarios(canonical: Path, tmp: Path, failures: list[str]) -> None:
     )
 
 
-def run_real_check(*, scenarios: bool, census: Shard | None) -> int:
+def run_real_check(
+    *, scenarios: bool, census: Shard | None, expected_digest: str | None = None
+) -> int:
     failures: list[str] = []
 
     with tempfile.TemporaryDirectory(prefix="verify-parity-") as raw:
@@ -1349,7 +1406,7 @@ def run_real_check(*, scenarios: bool, census: Shard | None) -> int:
         if scenarios:
             run_scenarios(canonical, tmp, failures)
         if census is not None:
-            run_census(canonical, tmp, failures, census)
+            run_census(canonical, tmp, failures, census, expected_digest)
 
     for failure in failures:
         print(f"MISMATCH: {failure}", file=sys.stderr)
@@ -1368,15 +1425,32 @@ def run_real_check(*, scenarios: bool, census: Shard | None) -> int:
     return 0
 
 
+def _full_census_list() -> list[verify_flow_census.Mutation]:
+    with tempfile.TemporaryDirectory(prefix="verify-parity-list-") as raw:
+        canonical = Path(raw) / "canonical"
+        build_canonical_fixtures(canonical)
+        return census_mutations(canonical)
+
+
+def list_sha256() -> int:
+    """Print the full census list's digest, the reference CI's shards compare theirs with, running
+    no engine; the census size goes to stderr for the job log."""
+    mutations = _full_census_list()
+    digest = census_list_digest(mutations)
+    print(digest)
+    print(
+        f"census list reference sha256: {digest} ({len(mutations)} mutations)",
+        file=sys.stderr,
+    )
+    return 0
+
+
 def list_shard(shard: Shard) -> int:
     """Print shard `I/N`'s census positions and names (`<index>\t<name>`), and the census size on
     stderr, running no engine: the input `VG-VERIFY-CENSUS-SHARD-COVERAGE` checks the CI partition
     against. The size comes from `generate`, not from the selection, so a truncated selection
     cannot shrink the list it is checked against."""
-    with tempfile.TemporaryDirectory(prefix="verify-parity-list-") as raw:
-        canonical = Path(raw) / "canonical"
-        build_canonical_fixtures(canonical)
-        mutations = census_mutations(canonical)
+    mutations = _full_census_list()
     positions = select_shard(len(mutations), shard)
     for position in positions:
         print(f"{position}\t{mutations[position].name}")
@@ -1410,13 +1484,30 @@ def main(argv: list[str] | None = None) -> int:
         metavar="I/N",
         help="print census shard I of N as '<index>\\t<name>' lines; runs no engine",
     )
+    mode.add_argument(
+        "--list-sha256",
+        action="store_true",
+        help="print the sha256 of the full census list (--list-shard 0/1's output); runs no engine",
+    )
+    parser.add_argument(
+        "--expect-list-sha256",
+        type=parse_list_sha256,
+        metavar="HEX",
+        help="with --shard: fail before running any engine unless the census list hashes to HEX",
+    )
     args = parser.parse_args(argv)
+    if args.expect_list_sha256 is not None and args.shard is None:
+        parser.error("--expect-list-sha256 is only valid with --shard")
     if args.self_test:
         return self_test()
     if args.list_shard is not None:
         return list_shard(args.list_shard)
+    if args.list_sha256:
+        return list_sha256()
     if args.shard is not None:
-        return run_real_check(scenarios=False, census=args.shard)
+        return run_real_check(
+            scenarios=False, census=args.shard, expected_digest=args.expect_list_sha256
+        )
     if args.scenarios_only:
         return run_real_check(scenarios=True, census=None)
     return run_real_check(scenarios=True, census=(0, 1))
