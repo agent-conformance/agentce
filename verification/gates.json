@@ -1491,8 +1491,8 @@
         {
           "description": "README's \"Distinct products, deduplicated\" row is hand-edited to a number the matrix disagrees with, caught by the count-mismatch check",
           "file": "README.md",
-          "search": "| Distinct products, deduplicated | 408 (348 counting only self-managed Kubernetes) | 2026-09-29 | \u2014 |",
-          "replace": "| Distinct products, deduplicated | 409 (348 counting only self-managed Kubernetes) | 2026-09-29 | \u2014 |"
+          "search": "| Distinct products, deduplicated | 408 (348 counting only self-managed Kubernetes) | 2026-09-29 | — |",
+          "replace": "| Distinct products, deduplicated | 409 (348 counting only self-managed Kubernetes) | 2026-09-29 | — |"
         }
       ],
       "fix_hint": "Run verification/gates/reach_table.sh; it names the exact message key (reach.table.count_mismatch, .missing_provenance, .missing_section, .missing_headline, .duplicate_section or .floor_violated) and the offending row or surface."
@@ -1699,7 +1699,7 @@
       "timeout_s": 900,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "with the TypeScript dist and the Java jar rebuilt from source, both checkers' self-tests pass and both real runs print MATCH: diff_parity_check.py over its shared fixture (closed, opened, other, added, removed, hostile, non-ASCII and duplicate entries) in six --format/--json forms, the identical-input text and md cases and the missing-file error (input.report_b_missing, exit 3); readiness_parity_check.py over its seven scenarios (READY, READY WITH LIMITATIONS, NOT READY, deviation registers, date grammar), its argv shapes and its float dates, comparing the --json envelope and the date-stripped report-readiness file",
+        "pass": "with the TypeScript dist and the Java jar rebuilt from source, both checkers' self-tests pass and both real runs print MATCH: every diff and readiness case gives the same stdout, report file and exit code in all three engines",
         "fail": "either self-test fails, or any engine's diff or readiness stdout, report file or exit code differs from Python's"
       },
       "faults": [
@@ -1728,7 +1728,7 @@
           "replace": "false ? READY_WITH_LIMITATIONS : READY;"
         }
       ],
-      "fix_hint": "run verification/gates/diff_readiness_parity.sh and read the MISMATCH lines; the checks are tools/diff_parity_check.py and tools/readiness_parity_check.py, and the reference is engines/python/agentce/commands/__init__.py's cmd_diff and engines/python/agentce/readiness.py, ported in engines/typescript/src/diff.ts and readiness.ts and engines/java/src/main/java/org/agentce/Diff.java and Readiness.java"
+      "fix_hint": "Run verification/gates/diff_readiness_parity.sh and read the MISMATCH lines; the checks are tools/diff_parity_check.py and tools/readiness_parity_check.py, and the reference is engines/python/agentce/commands/__init__.py's cmd_diff and engines/python/agentce/readiness.py, ported in engines/typescript/src/diff.ts and readiness.ts and engines/java/src/main/java/org/agentce/Diff.java and Readiness.java"
     }
   ]
 }
