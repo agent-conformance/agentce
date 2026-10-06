@@ -847,38 +847,36 @@ function runAssess(options: AssessOptions): CommandResult {
 }
 
 /** The fix each assess value flag names when it is given with no value. */
-const ASSESS_VALUE_FLAGS: Record<string, string> = {
-  deviations: "pass --deviations <file>.",
-  "fail-on": "pass --fail-on <expression>.",
-};
+const ASSESS_VALUE_FLAGS = new Map([
+  ["--deviations", "pass --deviations <file>."],
+  ["--fail-on", "pass --fail-on <expression>."],
+]);
 
 /** `--deviations` and `--fail-on` read in one left-to-right pass, the way Python's argparse reads a
  * `store` option: `--x <v>` or `--x=<v>`, the last occurrence wins, and a flag with no value
  * (trailing, or followed by another option) is refused at once with argparse's own sentence rather
  * than silently taking the next flag as the value. The first value-less flag in argv order is the one
  * named, as argparse names it. */
-function assessValueFlags(argv: string[]): Record<string, string | undefined> {
-  const values: Record<string, string | undefined> = {};
+function assessValueFlags(argv: string[]): Map<string, string> {
+  const values = new Map<string, string>();
   for (let i = 1; i < argv.length; i++) {
     const token = argv[i] as string;
-    for (const [name, fix] of Object.entries(ASSESS_VALUE_FLAGS)) {
-      if (token.startsWith(`--${name}=`)) {
-        values[name] = token.slice(`--${name}=`.length);
-        break;
-      }
-      if (token === `--${name}`) {
-        const next = argv[i + 1];
-        if (next === undefined || looksLikeOption(next)) {
-          throw new InputError(
-            "input.assess_flag_needs_value",
-            `argument --${name}: expected one argument`,
-            fix,
-          );
-        }
-        values[name] = next;
-        i++;
-        break;
-      }
+    const eq = token.indexOf("=");
+    const name = eq >= 0 ? token.slice(0, eq) : token;
+    const fix = ASSESS_VALUE_FLAGS.get(name);
+    if (fix === undefined) {
+      continue;
+    }
+    if (eq >= 0) {
+      values.set(name, token.slice(eq + 1));
+    } else if (i + 1 >= argv.length || looksLikeOption(argv[i + 1] as string)) {
+      throw new InputError(
+        "input.assess_flag_needs_value",
+        `argument ${name}: expected one argument`,
+        fix,
+      );
+    } else {
+      values.set(name, argv[++i] as string);
     }
   }
   return values;
@@ -887,8 +885,8 @@ function assessValueFlags(argv: string[]): Record<string, string | undefined> {
 function cmdAssess(argv: string[]): CommandResult {
   const values = assessValueFlags(argv);
   return runAssess({
-    deviations: values.deviations,
-    failOn: values["fail-on"],
+    deviations: values.get("--deviations"),
+    failOn: values.get("--fail-on"),
     bundle: flagValue(argv, "bundle") as string,
     profile: flagValue(argv, "profile") as string,
     catalog: flagValue(argv, "catalog"),

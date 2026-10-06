@@ -36,19 +36,8 @@ public final class FailOn {
     public record Expression(List<List<Comparison>> groups) {
         /** Whether {@code assertion} satisfies the expression: any group whose comparisons all hold. */
         public boolean matches(Assertions.Assertion assertion) {
-            for (List<Comparison> group : groups) {
-                boolean all = true;
-                for (Comparison comparison : group) {
-                    if (!Objects.equals(field(assertion, comparison.field()), comparison.literal())) {
-                        all = false;
-                        break;
-                    }
-                }
-                if (all) {
-                    return true;
-                }
-            }
-            return false;
+            return groups.stream().anyMatch(group -> group.stream().allMatch(
+                    c -> Objects.equals(field(assertion, c.field()), c.literal())));
         }
     }
 
@@ -241,7 +230,7 @@ public final class FailOn {
             if (tokens.isEmpty()) {
                 throw new ExprError("the --fail-on expression is empty");
             }
-            return new Expression(List.copyOf(new Parser(tokens).parse()));
+            return new Expression(new Parser(tokens).parse());
         } catch (ExprError exc) {
             throw new InputError(
                     "input.fail_on_invalid_expression",
