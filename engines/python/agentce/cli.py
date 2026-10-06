@@ -20,6 +20,7 @@ from . import __version__, commands, exit_codes, logsetup
 from .errors import AgentceError, InputError
 from .exit_codes import ExitCode
 from .result import CommandResult
+from .safe_json import MAX_INT_STR_DIGITS
 
 _log = logsetup.get_logger()
 
@@ -661,6 +662,9 @@ _UNKNOWN_ARGV_ERRORS: dict[str, Callable[[str], InputError]] = {
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse ``argv`` (default ``sys.argv``), run the command, and return the process exit code."""
+    # One integer rule for the whole run, whatever PYTHONINTMAXSTRDIGITS says: a literal JSON may hold
+    # (up to MAX_INT_STR_DIGITS digits) can also be turned back into text, e.g. in a schema error.
+    sys.set_int_max_str_digits(MAX_INT_STR_DIGITS)
     parser = build_parser()
     args = list(sys.argv[1:] if argv is None else argv)
     try:

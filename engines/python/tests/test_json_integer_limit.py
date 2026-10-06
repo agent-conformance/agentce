@@ -19,7 +19,7 @@ from typing import Any
 
 import pytest
 
-from agentce import conformance
+from agentce import cli, conformance
 from agentce.assertions import Assertion, EvidencePointer
 from agentce.bundle import load_bundle
 from agentce.catalog import Catalog
@@ -100,6 +100,29 @@ def test_ingest_quarantines_an_over_limit_line(
     assert result.quarantined[0].detail == f"invalid JSON: {TOO_LONG}"
     # 4300 digits parse: that line is refused for its shape, not as invalid JSON.
     assert not (result.quarantined[1].detail or "").startswith("invalid JSON")
+
+
+@pytest.mark.parametrize("digits", [700, 4300])
+def test_cli_quarantines_a_quoted_literal_under_any_setting(
+    make_bundle: Callable[..., Any],
+    example_event: dict[str, Any],
+    int_digits: int,
+    tmp_path: Path,
+    digits: int,
+) -> None:
+    """A parseable literal where the schema error quotes the value: the CLI reads it under the 4300-digit
+    rule even when the interpreter was started with a lower limit (verifier probe, 18.71)."""
+    lines = [json.dumps(example_event), '{"type": %s}' % ("9" * digits)]
+    out = tmp_path / "out"
+    code = cli.main(
+        ["validate", "--bundle", str(make_bundle(lines)), "--json", "--out", str(out)]
+    )
+    assert code == 1
+    records = [
+        json.loads(r)
+        for r in (out / "quarantine.jsonl").read_text("utf-8").splitlines()
+    ]
+    assert [r["reason"] for r in records] == ["schema_invalid"]
 
 
 def _report(directory: Path) -> Path:
