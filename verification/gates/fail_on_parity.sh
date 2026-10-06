@@ -28,10 +28,13 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/argv" "$work/python" "$work/typescript" "$work/java"
 
-(cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist)
-(cd "$root/engines/typescript" && pnpm install --frozen-lockfile > /dev/null)
+# The three setup steps are independent; each is waited on by PID so set -e still sees a failure.
+(cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist) & gradle_pid=$!
 env -u VIRTUAL_ENV uv run --project "$root/corpus/generator" --frozen python \
-  "$root/corpus/generator/generate.py" --set v1 --out "$work/corpus" > /dev/null
+  "$root/corpus/generator/generate.py" --set v1 --out "$work/corpus" > /dev/null & generate_pid=$!
+(cd "$root/engines/typescript" && pnpm install --frozen-lockfile > /dev/null)
+wait "$gradle_pid"
+wait "$generate_pid"
 IE="$work/corpus/projects/credit/langgraph/insufficient-evidence"
 
 # The scenarios (one NUL-separated argv file each, plus the job list) and the parser corpus's
@@ -115,7 +118,8 @@ with open(f"{work}/jobs", "w", encoding="utf-8") as f:
     f.write("\n".join(jobs) + "\n")
 
 # The fuzz corpus: 3,000 expressions of random pieces and 3,000 mutated well-formed ones, from a fixed
-# seed. Every character is assigned in Unicode 15.0 (contract 18.73, Dispositions).
+# seed. Every character is assigned in Unicode 15.0, the tables Python 3.12 and Java 21 share, so a
+# newer Node table cannot change a cause's wording.
 rng = random.Random(18073)
 WS = [chr(c) for c in (0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x85, 0xA0,
                        0x1680, *range(0x2000, 0x200B), 0x2028, 0x2029, 0x202F, 0x205F, 0x3000)]
@@ -192,7 +196,7 @@ fuzz = ["".join(piece() + (separator() if rng.random() < 0.3 else "") for _ in r
 fuzz += [mutated() for _ in range(3000)]
 named = [EXPR[k] for k in EXPR if k[0] in "RFD"]
 with open(f"{work}/expressions.json", "w", encoding="utf-8") as f:
-    json.dump({"named": len(named), "expressions": named + fuzz}, f)
+    json.dump({"named": len(named), "expressions": named + fuzz, "expr": EXPR}, f)
 PY
 
 # run_one <engine> <scenario>: the engine's envelope in <engine>/<name>.json, its stderr in .err, its
@@ -314,13 +318,8 @@ REFUSALS = {
     "O4": ("input.fail_on_invalid_expression", UNKNOWN_FOO),
 }
 # A value flag with no value: argparse's sentence and the TypeScript/Java fix.
-NEEDS_VALUE = {
-    "M1": ("--fail-on", "pass --fail-on <expression>."),
-    "M2": ("--fail-on", "pass --fail-on <expression>."),
-    "M3": ("--fail-on", "pass --fail-on <expression>."),
-    "M5": ("--fail-on", "pass --fail-on <expression>."),
-    "M6": ("--deviations", "pass --deviations <file>."),
-}
+FLAG_FIX = {"--fail-on": "pass --fail-on <expression>.", "--deviations": "pass --deviations <file>."}
+NEEDS_VALUE = {"M1": "--fail-on", "M2": "--fail-on", "M3": "--fail-on", "M5": "--fail-on", "M6": "--deviations"}
 failures = []
 
 
@@ -360,9 +359,9 @@ for s, (exit_code, status, matched) in SUCCESSES.items():
     for engine in ENGINES[1:]:
         got = run(engine, s)
         check(got == ref, f"{s}: {engine} {got} != python {ref}")
-for s, given in (("F2", 'severity=="critical"'), ("F7", 'severity=="critical"'), ("F8", 'control=="none"'),
-                 ("F8b", 'control=="AUV-01"')):
-    check((run("python", s)[2] or {}).get("expression") == given, f"{s}: python's fail_on.expression is not {given!r}")
+EXPR = json.load(open(f"{work}/expressions.json", encoding="utf-8"))["expr"]
+for s in ("F2", "F7", "F8", "F8b"):  # the last --fail-on of each is EXPR[s]
+    check((run("python", s)[2] or {}).get("expression") == EXPR[s], f"{s}: python's fail_on.expression is not {EXPR[s]!r}")
 
 for s, (key, tail) in REFUSALS.items():
     ref = run("python", s)
@@ -376,12 +375,14 @@ for s, (key, tail) in REFUSALS.items():
         got = run(engine, s)
         check(got == ref, f"{s}: {engine} {got} != python {ref}")
 
-for s, (flag, fix) in NEEDS_VALUE.items():
+for s, flag in NEEDS_VALUE.items():
+    fix = FLAG_FIX[flag]
     sentence = f"argument {flag}: expected one argument"
     check(read(f"{work}/python/{s}.err").rstrip().endswith(sentence),
           f"{s}: python's usage error does not end {sentence!r}")
     for engine in ENGINES:
-        check(run(engine, s)[0] == 3, f"{s}: {engine} exited {run(engine, s)[0]}, not 3")
+        code = run(engine, s)[0]
+        check(code == 3, f"{s}: {engine} exited {code}, not 3")
         check(not wrote(engine, s), f"{s}: {engine} wrote assertions.json")
     for engine in ENGINES[1:]:
         e = run(engine, s)[3]

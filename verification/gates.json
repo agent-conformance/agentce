@@ -1904,8 +1904,8 @@
         {
           "description": "TypeScript's assess reads only the two-token --fail-on <expression> spelling, so --fail-on=<expression> is ignored (F7)",
           "file": "engines/typescript/src/cli.ts",
-          "search": "      if (token.startsWith(`--${name}=`)) {\n",
-          "replace": "      if (false) {\n"
+          "search": "      values.set(name, token.slice(eq + 1));\n",
+          "replace": "      if (name !== \"--fail-on\") values.set(name, token.slice(eq + 1));\n"
         }
       ],
       "fix_hint": "run verification/gates/fail_on_parity.sh and read the FAIL lines; the reference is engines/python/agentce/fail_on.py (parse_fail_on) and cmd_assess's --fail-on handling in engines/python/agentce/commands/__init__.py, ported in engines/typescript/src/failOn.ts and cli.ts (runAssess, assessValueFlags) and engines/java/src/main/java/org/agentce/FailOn.java and Cli.java (runAssess, assessValueFlags)."
