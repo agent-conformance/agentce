@@ -328,6 +328,7 @@ UNREADABLE_EXPECTED = {
     "release-file:release-cert:unreadable": "input.release_unreadable",
     "manifest-file:unreadable": "input.release_unreadable",
     "artifact-path:artifact-unreadable": "input.release_unreadable",
+    "artifact-path:artifact-folder-unreadable": "input.release_unreadable",
     "signatures-file:unreadable": "input.release_unreadable",
     "bundle-manifest:unreadable": "input.bundle_unreadable",
     "bundle-files:unreadable-file": "input.bundle_unreadable",
@@ -884,6 +885,22 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         "artifact-path",
         "unreadable",
         bundle_with(make_unreadable("artifact-a.txt")),
+    )
+
+    # A listed artifact inside a folder that cannot be listed (release.py writes artifacts/<name>):
+    # TypeScript and Java's realpath fails there, so it must still read as unreadable, not missing.
+    def artifact_in_unreadable_folder(dest: Path) -> None:
+        (dest / "sub").mkdir()
+        (dest / "artifact-a.txt").rename(dest / "sub" / "artifact-a.txt")
+        doc = replaced(manifest, ("artifacts", 0, "name"), "sub/artifact-a.txt")
+        _write(dest / "release-manifest.json", doc)
+        (dest / "sub").chmod(0)
+
+    add(
+        "artifact-folder-unreadable",
+        "artifact-path",
+        "unreadable",
+        bundle_with(artifact_in_unreadable_folder),
     )
     add(
         "unreadable-file",
