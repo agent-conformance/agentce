@@ -57,7 +57,8 @@ scenario() {
   # scenario <name> <assess args...>: each engine's envelope in <engine>/<name>.json, its stderr in
   # .err, its exit code in .code and its output directory at <engine>/<name>/. --out and --json go
   # first so a trailing `--deviations` with no value stays last. The three engines run at once; each
-  # writes only under its own directory.
+  # writes only under its own directory, and each runs from its own engines/<name>, so a path an engine
+  # reports relative to its working directory reads the same in all three.
   local name="$1" engine
   shift
   for engine in python typescript java; do
@@ -71,7 +72,7 @@ scenario() {
         typescript)
           (cd "$root/engines/typescript" && pnpm --silent agentce assess --out "$out" --json "$@") ;;
         java)
-          "$root/engines/java/build/install/agentce/bin/agentce" assess --out "$out" --json "$@" ;;
+          (cd "$root/engines/java" && ./build/install/agentce/bin/agentce assess --out "$out" --json "$@") ;;
       esac > "$out.json" 2> "$out.err" || code=$?
       echo "$code" > "$out.code"
     ) &
@@ -145,7 +146,7 @@ PY
     fixture="$work/seam-$name-$order.fixture.json"
     (cd "$root/engines/typescript" && pnpm --silent agentce auditor-view "$fixture") \
       > "$work/seam-$name-$order.typescript" || true
-    "$root/engines/java/build/install/agentce/bin/agentce" auditor-view "$fixture" \
+    (cd "$root/engines/java" && ./build/install/agentce/bin/agentce auditor-view "$fixture") \
       > "$work/seam-$name-$order.java" || true
   done
 done
