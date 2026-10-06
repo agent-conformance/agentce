@@ -26,8 +26,7 @@ than naming bad edits one at a time:
    shard selection that a wiring check alone cannot see. Positions, not names, are the key: two
    different census mutations share a name.
 5. ``--list-shard 0/1`` with ``CI=true`` and with ``CI`` unset must print the same list (18.96), so a
-   developer's local list is the one CI's shards run. The fixture report's ``assess`` once read the
-   variable and added ``report.junit.xml`` under CI, eight mutations a laptop never listed.
+   developer's local list is the one CI's shards run.
 
 Usage:
     verify_census_shard_coverage_check.py              # the real workflow and the real --list-shard
@@ -242,22 +241,22 @@ def check_workflow(
         + census_job_problems(jobs.get(CENSUS_JOB))
         + scenario_problems(jobs)
     )
-    full, size = list_shard(0, 1, root)
-    if not full or size < 1:
-        return problems + [
-            f"{CENSUS_SCRIPT} --list-shard 0/1 printed no mutations or no size"
-        ]
     # Each call rebuilds the signed fixtures (about 3.5 s); they are independent, so run them at once.
     with ThreadPoolExecutor(max_workers=CENSUS_SHARDS + 2) as pool:
-        with_ci, without_ci = (
-            pool.submit(list_shard, 0, 1, root, ci=ci) for ci in (True, False)
+        without_ci, with_ci = (
+            pool.submit(list_shard, 0, 1, root, ci=ci) for ci in (False, True)
         )
         shards = list(
             pool.map(
                 lambda i: list_shard(i, CENSUS_SHARDS, root)[0], range(CENSUS_SHARDS)
             )
         )
-        env_problems = ci_env_problems(with_ci.result()[0], without_ci.result()[0])
+        full, size = without_ci.result()
+        if not full or size < 1:
+            return problems + [
+                f"{CENSUS_SCRIPT} --list-shard 0/1 printed no mutations or no size"
+            ]
+        env_problems = ci_env_problems(with_ci.result()[0], full)
     return (
         problems
         + full_list_problems(full, size)

@@ -556,12 +556,10 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
     `verify_parity_check.build_canonical_fixtures`), the real signed catalog at `catalog`, and the
     real signed evidence bundle at `evidence_bundle` (`corpus/quickstart/evidence`).
 
-    The result is a platform-independent mutation list: it depends on those three inputs only, so a
-    `--list-shard` run on a laptop lists what CI's shards run. The 2,312 (macOS) vs 2,320 (Linux CI)
-    gap once taken for a platform difference was the `CI` variable: the fixture report's `assess`
-    had no `--emit`, so under CI it added `report.junit.xml` and its eight manifest mutations. The
-    builder now names the formats, and VG-VERIFY-CENSUS-SHARD-COVERAGE compares the list built with
-    and without `CI`."""
+    The result is a platform-independent mutation list: it depends on those three inputs only, never
+    on the machine or its environment, so a `--list-shard` run on a laptop lists what CI's shards
+    run. The fixture builder names the report's formats rather than letting the `CI` variable pick
+    them, and VG-VERIFY-CENSUS-SHARD-COVERAGE compares the list built with and without `CI`."""
     mutations: list[Mutation] = []
 
     def add(
