@@ -751,7 +751,8 @@ function runAssess(options: AssessOptions): CommandResult {
     bundleDigest: bundle.digest,
     catalogs: catalogLabels,
     catalogObjects: catalogs,
-    operator: process.env.AGENTCE_OPERATOR ?? "unknown",
+    // config.py's `operator` default (SPEC §8.4); agentce.toml is not read here (Python only).
+    operator: process.env.AGENTCE_OPERATOR ?? "unset",
     invocation: [options.invocationCommand, scrubPath(bundleDir), scrubPath(profilePath)],
     supersedes,
     activity,

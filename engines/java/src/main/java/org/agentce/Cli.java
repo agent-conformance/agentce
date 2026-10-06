@@ -942,7 +942,8 @@ public final class Cli {
         }
         Report.writeReport(
                 out, evaluated, bundle.digest(), resolved.labels(),
-                operatorEnv != null ? operatorEnv : "unknown",
+                // config.py's operator default (SPEC §8.4); agentce.toml is not read here (Python only).
+                operatorEnv != null ? operatorEnv : "unset",
                 invocation, supersedes, Messages.DEFAULT_LANGUAGE, resolved.catalogs(), activity, blindSpots,
                 profileObj, null, ingested.accepted, limitations,
                 applicabilityProfileDigest, domainBindingDigest, deviationRegisterDigest, deviations);
