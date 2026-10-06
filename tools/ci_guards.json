@@ -73,7 +73,7 @@
   },
   {
     "name": "no-ml-scan",
-    "description": "Scans every lockfile (uv, pnpm, gradle) in the tree for a denylisted ML/LLM dependency.",
+    "description": "Scans every lockfile (uv, pnpm, gradle) in the tree for a denylisted ML/LLM dependency; the no-ml job first generates the skills' gitignored locks and scans with --require-skill-locks so neither skill's tree is skipped.",
     "roles": ["no-ml"],
     "workflow": ".github/workflows/no-ml.yml",
     "command": "python tools/no_ml_check.py",

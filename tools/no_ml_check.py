@@ -20,14 +20,21 @@ glob -- a new example is scanned like everything else until it earns its own nam
 the ADR.
 
     no_ml_check.py             scan every lockfile in the repository; exit 1 if any is denylisted
-                               (the invocation the required CI job uses)
     no_ml_check.py ROOT        scan every lockfile under ROOT instead, against the same one denylist;
                                exit 2 if ROOT is not a directory
+    no_ml_check.py --require-skill-locks [ROOT]
+                               also require each skills/<name>/ with a pyproject.toml to carry a real
+                               uv.lock (one that lists the skill's own project and agent-conformance);
+                               a missing, empty or unrelated lock fails (exit 1) instead of being skipped
+                               (the invocation the required CI job uses)
     no_ml_check.py --self-test prove the matcher and every lockfile parser catch a denylisted name
                                and clear a clean set
 
-Uses only the standard library (no PyYAML): the no-ml CI job runs it with a bare Python and no
-install step. No network, no learned component.
+The skills' uv.lock files are gitignored (18.54): a fresh checkout has none until
+`python3 tools/vendor_skill_engine.py --write` generates them, which needs uv and the package index.
+The no-ml CI job runs that step first and scans with --require-skill-locks, so the skills' trees are
+never silently left out. The scan itself uses only the standard library (no PyYAML), no network and
+no learned component.
 """
 
 from __future__ import annotations
@@ -103,13 +110,17 @@ def packages_in_pnpm_lock(lock_path: Path) -> set[str]:
             continue
         if not in_packages:
             continue
-        if raw and not raw[0].isspace():  # a new top-level section (snapshots:, etc.) ends packages:
+        if (
+            raw and not raw[0].isspace()
+        ):  # a new top-level section (snapshots:, etc.) ends packages:
             break
         m = _PNPM_KEY.match(raw)
         if not m:
             continue
         key = m.group("key").split("(", 1)[0]  # drop any (peer@dep) suffix
-        at = key.rfind("@")  # split off @version; rfind skips a leading scope '@' at index 0
+        at = key.rfind(
+            "@"
+        )  # split off @version; rfind skips a leading scope '@' at index 0
         name = key[:at] if at > 0 else key
         names.add(normalize(name))
     return names
@@ -129,6 +140,51 @@ def packages_in_gradle_lock(lock_path: Path) -> set[str]:
         if len(parts) >= 3:
             names.add(normalize(parts[1]))
     return names
+
+
+# A skill's uv.lock is real only if it lists the skill's own project and the engine it vendors.
+SKILL_ENGINE = "agent-conformance"
+VENDOR_HINT = "python3 tools/vendor_skill_engine.py --write"
+
+
+def skill_lock_problems(root: Path) -> tuple[list[str], list[str]]:
+    """Return (problems, scanned skill locks) for every skills/<name>/pyproject.toml under ``root``.
+
+    The skill locks are gitignored, so a fresh checkout has none; without this check the scan would
+    pass having read neither skill's dependency tree. An empty or unrelated file at the lock's path
+    is refused as well, so `touch skills/*/uv.lock` cannot stand in for the real lock."""
+    problems: list[str] = []
+    scanned: list[str] = []
+    for pyproject in sorted((root / "skills").glob("*/pyproject.toml")):
+        lock = pyproject.parent / "uv.lock"
+        rel = lock.relative_to(root).as_posix()
+        if not lock.is_file():
+            problems.append(f"{rel} is missing: run `{VENDOR_HINT}` before the scan")
+            continue
+        try:
+            project = tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"][
+                "name"
+            ]
+            locked = packages_in_uv_lock(lock)
+        except (
+            tomllib.TOMLDecodeError,
+            UnicodeDecodeError,
+            KeyError,
+            TypeError,
+        ) as exc:
+            problems.append(
+                f"{rel} cannot be read ({type(exc).__name__}): run `{VENDOR_HINT}`"
+            )
+            continue
+        missing = {normalize(project), SKILL_ENGINE} - locked
+        if missing:
+            problems.append(
+                f"{rel} is not a real lock of the skill (lists no {', '.join(sorted(missing))}): "
+                f"run `{VENDOR_HINT}`"
+            )
+            continue
+        scanned.append(rel)
+    return problems, scanned
 
 
 # One parser per lockfile kind; the filename selects it, and all three feed the one denylist.
@@ -156,7 +212,8 @@ def find_locks(root: Path) -> list[Path]:
         out.extend(
             p
             for p in root.rglob(name)
-            if EXCLUDE_DIRS.isdisjoint(p.parts) and not _is_framework_example_lock(p, root)
+            if EXCLUDE_DIRS.isdisjoint(p.parts)
+            and not _is_framework_example_lock(p, root)
         )
     return sorted(out)
 
@@ -191,13 +248,63 @@ def _selftest_lockfile(name: str, body: str, denylisted: str, clean: str) -> Non
         assert violations == [f"{name}: {normalize(denylisted)}"], (name, violations)
 
 
+def _selftest_skill_locks() -> None:
+    """--require-skill-locks on a temporary skills/foo tree: a missing, empty or unrelated lock fails,
+    a lock without the skill's own project fails, a real one passes and is scanned, and a denylisted
+    package inside it is caught. Without the flag a missing lock is not an error."""
+
+    def run(*args: str) -> tuple[int, str]:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = main(list(args))
+        return code, out.getvalue()
+
+    pkg = '[[package]]\nname = "{}"\nversion = "0.1.0"\nsource = {{ registry = "https://pypi.org/simple" }}\n\n'
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        skill = root / "skills" / "foo"
+        skill.mkdir(parents=True)
+        (skill / "pyproject.toml").write_text(
+            '[project]\nname = "foo-skill"\nversion = "0.1.0"\n', encoding="utf-8"
+        )
+        lock = skill / "uv.lock"
+        code, out = run("--require-skill-locks", td)
+        assert (
+            code == 1 and "skills/foo/uv.lock is missing" in out and VENDOR_HINT in out
+        ), (code, out)
+        assert run(td)[0] == 0
+        lock.write_text("", encoding="utf-8")
+        code, out = run("--require-skill-locks", td)
+        assert code == 1 and "skills/foo/uv.lock is not a real lock" in out, (code, out)
+        lock.write_text(
+            "version = 1\n\n" + pkg.format("pyyaml") + pkg.format(SKILL_ENGINE),
+            encoding="utf-8",
+        )
+        code, out = run("--require-skill-locks", td)
+        assert code == 1 and "lists no foo-skill" in out, (code, out)
+        lock.write_text(
+            lock.read_text(encoding="utf-8") + pkg.format("foo-skill"), encoding="utf-8"
+        )
+        code, out = run("--require-skill-locks", td)
+        assert code == 0 and "skills/foo/uv.lock" in out, (code, out)
+        lock.write_text(
+            lock.read_text(encoding="utf-8") + pkg.format("torch"), encoding="utf-8"
+        )
+        code, out = run("--require-skill-locks", td)
+        assert code == 1 and "skills/foo/uv.lock: torch" in out, (code, out)
+
+
 def self_test() -> int:
     deny = {normalize(n) for n in ("torch", "openai", "scikit-learn")}
     # A denylisted package is caught.
     caught = {p for p in map(normalize, ["torch", "rdflib", "jsonschema"]) if p in deny}
     assert caught == {"torch"}, caught
     # A clean set, including names that merely contain "ml", is cleared.
-    clean = {p for p in map(normalize, ["linkml", "pyyaml", "html5lib", "referencing"]) if p in deny}
+    clean = {
+        p
+        for p in map(normalize, ["linkml", "pyyaml", "html5lib", "referencing"])
+        if p in deny
+    }
     assert clean == set(), clean
     # Normalisation makes scikit_learn and scikit.learn match scikit-learn.
     assert normalize("scikit_learn") in deny and normalize("scikit.learn") in deny
@@ -236,7 +343,10 @@ def self_test() -> int:
         with contextlib.redirect_stdout(captured):
             hit = main([str(root)])
         assert hit == 1 and "torch" in captured.getvalue(), (hit, captured.getvalue())
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        with (
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
             usage = main([str(root / "absent")])
         assert usage == 2, usage
     # The named framework-example exemption (docs/adr/0016) is exact-path, not a directory match: a
@@ -246,7 +356,7 @@ def self_test() -> int:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         deny_lock = (
-            "version = 1\nrevision = 2\nrequires-python = \">=3.12\"\n\n"
+            'version = 1\nrevision = 2\nrequires-python = ">=3.12"\n\n'
             '[[package]]\nname = "openai"\nversion = "2.0.0"\nsource = { registry = "https://pypi.org/simple" }\n'
         )
         exempt = root / "examples" / "langgraph" / "uv.lock"
@@ -258,7 +368,11 @@ def self_test() -> int:
         violations, n_locks, _ = scan(root, deny)
         assert n_locks == 1, n_locks  # only the shared (non-exempt) lockfile is scanned
         assert violations == ["examples/uv.lock: openai"], violations
-    print("NO-ML SELF-TEST PASSED (uv.lock, pnpm-lock.yaml, gradle.lockfile detection, exemption scoping proven)")
+    _selftest_skill_locks()
+    print(
+        "NO-ML SELF-TEST PASSED (uv.lock, pnpm-lock.yaml, gradle.lockfile detection, exemption scoping, "
+        "skill locks proven)"
+    )
     return 0
 
 
@@ -270,6 +384,7 @@ def main(argv: list[str] | None = None) -> int:
     # the required CI job does. The denylist is always the one repo-level list, so an out-of-tree scan
     # is judged against the same rules; a missing or unreadable root is a usage error (exit 2), kept
     # distinct from a denylist hit (exit 1) and a clean tree (exit 0).
+    require_skill_locks = "--require-skill-locks" in argv
     roots = [a for a in argv if not a.startswith("-")]
     if len(roots) > 1:
         print(f"NO-ML USAGE: at most one root path, got {len(roots)}", file=sys.stderr)
@@ -280,6 +395,14 @@ def main(argv: list[str] | None = None) -> int:
         if not root.is_dir():
             print(f"NO-ML USAGE: not a directory: {root}", file=sys.stderr)
             return 2
+    scanned_skills: list[str] = []
+    if require_skill_locks:
+        problems, scanned_skills = skill_lock_problems(root)
+        if problems:
+            print("NO-ML FAILED: a skill's dependency lock cannot be scanned:")
+            for problem in problems:
+                print(f"  {problem}")
+            return 1
     denylist = load_denylist(DENYLIST)
     violations, n_locks, n_pkgs = scan(root, denylist)
     if violations:
@@ -288,6 +411,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {v}")
         return 1
     print(f"NO-ML OK ({n_locks} lockfiles, {n_pkgs} packages, 0 denylisted)")
+    if scanned_skills:
+        print(f"  skill locks scanned: {', '.join(scanned_skills)}")
     return 0
 
 

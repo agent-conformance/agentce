@@ -1,5 +1,8 @@
 # No learned components: fail if any dependency tree resolves a machine-learning framework or LLM
-# client (SPEC 8.7, HR-1/HR-2). The check uses only the standard library, so it runs offline.
+# client (SPEC 8.7, HR-1/HR-2). The scan uses only the standard library. The two skills' uv.lock files
+# are gitignored (built fresh, tracked only on a release commit), so the job first installs uv and
+# generates them from the package index, then scans with --require-skill-locks, which fails if a
+# skill's lock is missing or is not a real lock rather than skipping that skill's tree.
 name: no-ml
 
 on:
@@ -18,7 +21,13 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: no_ml self-test
         run: python tools/no_ml_check.py --self-test
-      - name: no_ml denylist scan of every lockfile (uv, pnpm, gradle)
-        run: python tools/no_ml_check.py
+      - name: Generate the skills' gitignored locks (18.54 keeps them out of phase commits)
+        run: python3 tools/vendor_skill_engine.py --write
+      - name: no_ml denylist scan of every lockfile (uv, pnpm, gradle), the skills' locks required
+        run: python tools/no_ml_check.py --require-skill-locks
