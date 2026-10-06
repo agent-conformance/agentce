@@ -53,7 +53,7 @@ from ..assess import (
     evaluated_nothing,
 )
 from ..blind_spots import catalog_support_view, compute_blind_spots
-from ..bundle import confine_to_root, copy_bundle, load_bundle, permission_denied
+from ..bundle import confine_to_root, copy_bundle, load_bundle
 from ..canonical import CanonicalizationError, canonical_string, canonicalize
 from ..catalog import Catalog, lint_catalog, load_catalog
 from ..collect import EnvSecretManager, SourceSpec, load_config, run_collect
@@ -576,8 +576,6 @@ def _verify_report(
     )  # an unlistable report folder is unreadable, not a report with no claim
     claim_path = report_dir / "claim.json"
     if not claim_path.is_file():
-        if permission_denied(claim_path):
-            claim_path.stat()  # raises the PermissionError naming it
         raise InputError(
             "verify.report_no_claim",
             f"{report_dir} has no claim.json.",
@@ -1062,9 +1060,6 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
     manifest_path = release_path / "release-manifest.json"
     signatures_path = release_path / "signatures.json"
     if not manifest_path.is_file() or not signatures_path.is_file():
-        for path in (manifest_path, signatures_path):
-            if permission_denied(path):
-                path.stat()  # raises the PermissionError naming it
         raise InputError(
             "input.release_bundle",
             f"{release_path} is not a release bundle (release-manifest.json/signatures.json).",

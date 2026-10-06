@@ -1205,6 +1205,28 @@ def test_verify_report_claim_unreadable(
     assert envelope["error"]["key"] == "verify.report_claim_malformed"
 
 
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads a mode-000 file anyway")
+@pytest.mark.parametrize(
+    "rel", ["claim.json", "bundle/evidence/events"], ids=["claim", "evidence"]
+)
+def test_verify_report_permission_denied_is_unreadable(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], rel: str
+) -> None:
+    """An unreadable claim.json, or an unreadable folder in the packaged evidence, is
+    verify.report_unreadable naming the path, not a malformed claim or tampered evidence (18.68)."""
+    out, _key = _packaged_and_signed(tmp_path)
+    target = out / rel
+    mode = target.stat().st_mode
+    target.chmod(0)
+    try:
+        code, envelope = _verify_report_json(capsys, str(out))
+    finally:
+        target.chmod(mode)
+    assert code == 3
+    assert envelope["error"]["key"] == "verify.report_unreadable"
+    assert f"cannot be read: {rel}" in envelope["error"]["cause"]
+
+
 def test_verify_report_signature_shaped_wrong_falls_through(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

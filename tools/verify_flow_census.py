@@ -1982,10 +1982,6 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.commands._require_dir: path.is_dir()": ("target-argument",),
     "agentce.commands._verify_release: artifact_file.read_bytes()": ("artifact-path",),
     "agentce.commands._verify_release: manifest_path.is_file()": ("manifest-file",),
-    "agentce.commands._verify_release: path.stat()": (
-        "manifest-file",
-        "signatures-file",
-    ),
     "agentce.commands._verify_release: release_path.is_file()": ("release-file",),
     "agentce.commands._verify_release: signatures_path.is_file()": ("signatures-file",),
     "agentce.commands._verify_report: candidate_path.is_file()": ("report-manifest",),
@@ -1993,7 +1989,6 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.commands._verify_report: catalog_path.is_dir()": ("report-packaging",),
     "agentce.commands._verify_report: claim_path.is_file()": ("report-claim",),
     "agentce.commands._verify_report: claim_path.read_bytes()": ("report-claim",),
-    "agentce.commands._verify_report: claim_path.stat()": ("report-claim",),
     "agentce.commands._verify_report: deviations_path.is_file()": ("report-packaging",),
     "agentce.commands._verify_report: deviations_path.read_bytes()": _HASHED_ONLY,
     "agentce.commands._verify_report: domain_path.is_file()": ("report-packaging",),
