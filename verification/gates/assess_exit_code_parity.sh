@@ -12,6 +12,6 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 env -u VIRTUAL_ENV uv run --project "$root/engines/python" --frozen python "$root/tools/assess_exit_code_parity_check.py" --self-test
 uv run --project "$root/corpus/generator" --frozen python "$root/corpus/generator/generate.py" --set v1 --out /tmp/vg-exit-code-corpus >/dev/null
-(cd "$root/engines/typescript" && pnpm build)
-(cd "$root/engines/java" && ./gradlew :assemble --offline -q)
+(cd "$root/engines/typescript" && pnpm install --frozen-lockfile >/dev/null && pnpm build)
+(cd "$root/engines/java" && ./gradlew --no-daemon :assemble -q)
 env -u VIRTUAL_ENV uv run --project "$root/engines/python" --frozen python "$root/tools/assess_exit_code_parity_check.py"

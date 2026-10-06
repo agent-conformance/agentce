@@ -9,6 +9,6 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 env -u VIRTUAL_ENV uv run --project "$root/engines/python" --frozen python "$root/tools/otel_genai_adapter_check.py" --self-test
-(cd "$root/engines/typescript" && pnpm build)
-(cd "$root/engines/java" && ./gradlew :assemble --offline -q)
+(cd "$root/engines/typescript" && pnpm install --frozen-lockfile >/dev/null && pnpm build)
+(cd "$root/engines/java" && ./gradlew --no-daemon :assemble -q)
 env -u VIRTUAL_ENV uv run --project "$root/engines/python" --frozen python "$root/tools/otel_genai_adapter_check.py"
