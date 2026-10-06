@@ -167,6 +167,11 @@ public final class Sign {
                 if (rewrapped != null) {
                     der = rewrapped;
                 }
+            } else if ("DSA PRIVATE KEY".equals(label)) {
+                byte[] rewrapped = rewrapLegacyDsaAsPkcs8(der);
+                if (rewrapped != null) {
+                    der = rewrapped;
+                }
             }
             PrivateKey found = null;
             boolean isEd25519 = false;
@@ -382,6 +387,41 @@ public final class Sign {
         byte[] algorithmIdentifier = seq(concat(EC_OID_TLV, curveOidTlv));
         byte[] version = tlv(0x02, new byte[] {0});
         byte[] privateKeyOctet = tlv(0x04, sec1Der);
+        return seq(concat(version, algorithmIdentifier, privateKeyOctet));
+    }
+
+    /** id-dsa, OID 1.2.840.10040.4.1. */
+    private static final byte[] DSA_OID_TLV = tlv(0x06, hex("2a8648ce380401"));
+
+    /** Re-wraps OpenSSL's legacy {@code DSA PRIVATE KEY} body, {@code SEQUENCE(INTEGER 0, p, q, g, y, x)},
+     * as a PKCS8 {@code PrivateKeyInfo}: {@code SEQUENCE(INTEGER 0, AlgorithmIdentifier(id-dsa,
+     * SEQUENCE(p, q, g)), OCTET STRING(INTEGER x))}, so {@code KeyFactory.getInstance("DSA")} accepts it
+     * and the key is classified {@code sign.key_algorithm}, as Python and TypeScript do. Returns
+     * {@code null} for a body of any other shape (left to fail as {@code sign.key_unreadable}). */
+    private static byte[] rewrapLegacyDsaAsPkcs8(byte[] dsaDer) {
+        List<byte[]> ints = new java.util.ArrayList<>();
+        try {
+            Tlv outer = readTlv(dsaDer, 0);
+            byte[] content = outer.content();
+            int pos = 0;
+            while (pos < content.length) {
+                Tlv element = readTlv(content, pos);
+                if (element.tag() != 0x02) {
+                    return null;
+                }
+                ints.add(Arrays.copyOfRange(content, pos, pos + element.totalLen()));
+                pos += element.totalLen();
+            }
+            if (outer.tag() != 0x30 || ints.size() != 6) {
+                return null;
+            }
+        } catch (RuntimeException e) {
+            return null;
+        }
+        byte[] params = seq(concat(ints.get(1), ints.get(2), ints.get(3)));
+        byte[] algorithmIdentifier = seq(concat(DSA_OID_TLV, params));
+        byte[] version = tlv(0x02, new byte[] {0});
+        byte[] privateKeyOctet = tlv(0x04, ints.get(5));
         return seq(concat(version, algorithmIdentifier, privateKeyOctet));
     }
 
