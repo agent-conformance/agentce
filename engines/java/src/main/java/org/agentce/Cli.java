@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -114,6 +115,39 @@ public final class Cli {
                 deviationsNode.forEach(deviations::add);
             }
             System.out.println(Canonical.canonicalString(AuditorView.computeAuditorView(assertions, deviations)));
+            return 0;
+        }
+
+        // fail-on-check is the same kind of test-only seam (18.73): it reads a fixture file with
+        // {assertions, expressions} and, per expression in order, prints one canonical JSON line:
+        // {"error": {key, cause, fix}} on refusal, else {"matched": [one boolean per assertion]} --
+        // not part of the public command surface.
+        if ("fail-on-check".equals(command)) {
+            if (args.length < 2) {
+                System.err.println("fail-on-check: a fixture file path is required");
+                return ExitCode.INPUT_ERROR.code;
+            }
+            JsonNode data = Json.parseFile(Paths.get(args[1]));
+            List<Assertions.Assertion> assertions = new ArrayList<>();
+            for (JsonNode a : data.get("assertions")) {
+                assertions.add(Assertions.fromJson(a));
+            }
+            for (JsonNode expression : data.get("expressions")) {
+                ObjectNode line = Json.nodes().objectNode();
+                try {
+                    FailOn.Expression parsed = FailOn.parse(expression.textValue());
+                    ArrayNode matched = line.putArray("matched");
+                    for (Assertions.Assertion a : assertions) {
+                        matched.add(parsed.matches(a));
+                    }
+                } catch (AgentceError exc) {
+                    ObjectNode error = line.putObject("error");
+                    error.put("key", exc.key);
+                    error.put("cause", exc.reason);
+                    error.put("fix", exc.fix);
+                }
+                System.out.println(Canonical.canonicalString(line));
+            }
             return 0;
         }
 
@@ -802,7 +836,9 @@ public final class Cli {
             String trustRootFlag,
             boolean allowUnverified,
             /** {@code --deviations}' register path; {@code quickstart} has no such flag. */
-            String deviations) {}
+            String deviations,
+            /** {@code --fail-on}'s expression as given; {@code quickstart} never sets it. */
+            String failOn) {}
 
     /** Run a full assessment (ingest, integrity, graph, coverage, applicability, evaluate, report) — the
      * same pipeline {@code conformance run} exercises per corpus project, generalised to an arbitrary
@@ -811,6 +847,11 @@ public final class Cli {
         CommandResult result = new CommandResult("assess");
         String bundleDir = requireDir(options.bundle(), "bundle", "the evidence bundle");
         String profilePath = requireFile(options.profile(), "profile", "the applicability profile");
+        Profile profileObj = Profile.load(Paths.get(profilePath));
+        // --fail-on is parsed (never eval'd) right after the bundle and profile, as Python does: a
+        // hostile or malformed expression is refused at exit 3 before the catalogs resolve, before
+        // --state and --deviations are read, and before any output is written (SPEC §7).
+        FailOn.Expression failOn = options.failOn() != null ? FailOn.parse(options.failOn()) : null;
         Path out = Paths.get(options.out());
         // --state's writability is proved here, before any --out write below (writeQuarantineJsonl
         // etc.), not only when state.save() finally writes at the end of this method: a run refused
@@ -818,7 +859,6 @@ public final class Cli {
         if (options.state() != null) {
             StateDir.ensureWritable(Paths.get(options.state()));
         }
-        Profile profileObj = Profile.load(Paths.get(profilePath));
         // Resolved on every run, even with no --catalog-dir (python-reference.md §9).
         Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());
         Resolved resolved = resolveCatalogs(
@@ -999,7 +1039,22 @@ public final class Cli {
                 result.note(limitation);
             }
         }
-        if (nonConformant > 0) {
+        if (failOn != null) {
+            // A policy-scoped gate replaces the default any-non-conformant rule: the exit code reflects
+            // only the assertions the expression names, never the whole run (SPEC §8.5).
+            int failOnMatches = 0;
+            for (Assertions.Assertion a : evaluated) {
+                if (failOn.matches(a)) {
+                    failOnMatches++;
+                }
+            }
+            ObjectNode failOnNode = result.data.putObject("fail_on");
+            failOnNode.put("expression", options.failOn());
+            failOnNode.put("matched", failOnMatches);
+            if (failOnMatches > 0) {
+                result.addCode(ExitCode.FINDINGS.code);
+            }
+        } else if (nonConformant > 0) {
             result.addCode(ExitCode.FINDINGS.code);
         }
         // SPEC.md:1076 (SPEC Sec.8.5): exit 2 whenever any assertion is both insufficient_evidence and
@@ -1032,32 +1087,40 @@ public final class Cli {
         return result;
     }
 
-    /** {@code --deviations}' value read the way Python's argparse reads a {@code store} option:
-     * {@code --deviations <path>} or {@code --deviations=<path>}, the last occurrence wins, and a
-     * {@code --deviations} with no value (trailing, or followed by another option) is refused at once
-     * with argparse's own sentence rather than silently taking the next flag as the path or ignoring
-     * the register. */
-    private static String deviationsFlag(String[] args) {
-        String value = null;
+    /** The fix each assess value flag's missing-value refusal names. */
+    private static final Map<String, String> ASSESS_VALUE_FLAGS = Map.of(
+            "--deviations", "pass --deviations <file>.",
+            "--fail-on", "pass --fail-on <expression>.");
+
+    /** {@code --deviations}' and {@code --fail-on}'s values, read in one left-to-right scan the way
+     * Python's argparse reads a {@code store} option: {@code --x <value>} or {@code --x=<value>}, the
+     * last occurrence of each wins, and the first flag with no value (trailing, or followed by another
+     * option) is refused at once with argparse's own sentence rather than silently taking the next flag
+     * as its value or ignoring it. */
+    private static Map<String, String> assessValueFlags(String[] args) {
+        Map<String, String> values = new HashMap<>();
         for (int i = 1; i < args.length; i++) {
             String token = args[i];
-            if (token.startsWith("--deviations=")) {
-                value = token.substring("--deviations=".length());
-            } else if (token.equals("--deviations")) {
-                if (i + 1 >= args.length || looksLikeOption(args[i + 1])) {
-                    throw new InputError(
-                            "input.assess_flag_needs_value",
-                            "argument --deviations: expected one argument",
-                            "pass --deviations <file>.");
-                }
-                value = args[++i];
+            int eq = token.indexOf('=');
+            String name = eq >= 0 ? token.substring(0, eq) : token;
+            String fix = ASSESS_VALUE_FLAGS.get(name);
+            if (fix == null) {
+                continue;
+            }
+            if (eq >= 0) {
+                values.put(name, token.substring(eq + 1));
+            } else if (i + 1 >= args.length || looksLikeOption(args[i + 1])) {
+                throw new InputError(
+                        "input.assess_flag_needs_value", "argument " + name + ": expected one argument", fix);
+            } else {
+                values.put(name, args[++i]);
             }
         }
-        return value;
+        return values;
     }
 
     private static CommandResult cmdAssess(String[] args) {
-        String deviations = deviationsFlag(args);
+        Map<String, String> valueFlags = assessValueFlags(args);
         String outArg = flagValue(args, "out");
         return runAssess(new AssessOptions(
                 flagValue(args, "bundle"),
@@ -1070,7 +1133,8 @@ public final class Cli {
                 "assess",
                 flagValue(args, "trust-root"),
                 Arrays.asList(args).contains("--allow-unverified-catalog"),
-                deviations));
+                valueFlags.get("--deviations"),
+                valueFlags.get("--fail-on")));
     }
 
     /** Assess the bundled quickstart project end to end — one command, offline (SPEC §13.4 AX-1). */
@@ -1097,6 +1161,7 @@ public final class Cli {
                 "quickstart",
                 null,
                 false,
+                null,
                 null));
         result.data.setAll(assess.data);
         result.data.put("quickstart", "ok");
@@ -1270,7 +1335,9 @@ public final class Cli {
     /** {@code agentce readiness}'s parsed args (see {@link #parseReadinessArgs}). */
     private record ReadinessArgs(String reportDir, String gaps, String deviations, List<String> catalogDirs) {}
 
-    private static final Pattern NEGATIVE_NUMBER = Pattern.compile("-\\d+|-\\d*\\.\\d+");
+    /** argparse's {@code ^-\d+$|^-\d*\.\d+$} over a {@code str}: {@code \d} is any Unicode decimal
+     * digit (Nd), and {@code $} also matches before one trailing newline. */
+    private static final Pattern NEGATIVE_NUMBER = Pattern.compile("-\\p{Nd}+\n?|-\\p{Nd}*\\.\\p{Nd}+\n?");
 
     /** A token argparse classifies as an option rather than a value: it starts with {@code -}, is not
      * a bare {@code -}, does not look like a negative number and holds no space

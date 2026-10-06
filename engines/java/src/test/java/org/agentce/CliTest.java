@@ -344,6 +344,152 @@ class CliTest {
         assertEquals("partial AUV-01", outcomeOf(second, "AUV-01"));
     }
 
+    private static final String FAIL_ON_FIX = "use comparisons of the form field==\"literal\" joined by and/or, over: "
+            + "control, family, mode, outcome, rung, severity, subject.";
+
+    /** Asserts {@code env} is the --fail-on refusal with Python's cause, and that nothing was written. */
+    private static void assertFailOnRefused(JsonNode env, Path out, String cause) {
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.fail_on_invalid_expression", env.get("error").get("message_key").asText());
+        assertEquals(cause, env.get("error").get("detail").asText());
+        assertEquals(FAIL_ON_FIX, env.get("error").get("fix").asText());
+        assertFalse(env.has("fail_on"));
+        assertFalse(Files.exists(out.resolve("assertions.json")));
+    }
+
+    /** Asserts {@code env} is assess's missing-value refusal naming {@code flag}, with nothing written. */
+    private static void assertNeedsValue(JsonNode env, Path out, String flag, String fix) {
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("input.assess_flag_needs_value", env.get("error").get("message_key").asText());
+        assertEquals("argument " + flag + ": expected one argument", env.get("error").get("detail").asText());
+        assertEquals(fix, env.get("error").get("fix").asText());
+        assertFalse(Files.exists(out.resolve("assertions.json")));
+    }
+
+    @Test
+    void assessFailOnGatesExitCode(@TempDir Path dir) {
+        // F0: no --fail-on keeps the any-non-conformant rule and adds no fail_on.
+        JsonNode env = runAssess(auditorAssessArgs(dir.resolve("f0")));
+        assertEquals(1, env.get("exit_code").asInt());
+        assertFalse(env.has("fail_on"));
+        // F1: the expression names two non-conformant high assertions.
+        env = runAssess(auditorAssessArgs(dir.resolve("f1")),
+                "--fail-on", "outcome==\"non-conformant\" and severity==\"high\"");
+        assertEquals(1, env.get("exit_code").asInt());
+        assertEquals("[\"findings\"]", env.get("exit_status").toString());
+        assertEquals("outcome==\"non-conformant\" and severity==\"high\"", env.get("fail_on").get("expression").asText());
+        assertEquals(2, env.get("fail_on").get("matched").asInt());
+        // F2: nothing matches, so the run exits 0 although it holds non-conformant assertions.
+        Path f2 = dir.resolve("f2");
+        env = runAssess(auditorAssessArgs(f2), "--fail-on", "severity==\"critical\"");
+        assertEquals(0, env.get("exit_code").asInt());
+        assertEquals("[\"ok\"]", env.get("exit_status").toString());
+        assertEquals(0, env.get("fail_on").get("matched").asInt());
+        assertTrue(Files.isRegularFile(f2.resolve("assertions.json")));
+        // F4b: and binds tighter than or.
+        env = runAssess(auditorAssessArgs(dir.resolve("f4b")), "--fail-on",
+                "control==\"AUV-01\" and severity==\"low\" or control==\"AUV-02\" and severity==\"low\"");
+        assertEquals(0, env.get("exit_code").asInt());
+        // F9/F9b: the expression sees the outcomes after deviations are applied.
+        env = runAssess(auditorAssessArgs(dir.resolve("f9")), "--deviations", AUDITOR_REGISTER.toString(),
+                "--fail-on", "outcome==\"non-conformant\"");
+        assertEquals(1, env.get("fail_on").get("matched").asInt());
+        env = runAssess(auditorAssessArgs(dir.resolve("f9b")), "--deviations", AUDITOR_REGISTER.toString(),
+                "--fail-on", "control==\"AUV-01\" and outcome==\"non-conformant\"");
+        assertEquals(0, env.get("exit_code").asInt());
+        // D2: a 3000-clause chain evaluates (Python's capture at base crashed with RecursionError).
+        String deep = String.join(" or ", java.util.Collections.nCopies(2999, "control==\"x\"")) + " or control==\"AUV-01\"";
+        env = runAssess(auditorAssessArgs(dir.resolve("d2")), "--fail-on", deep);
+        assertEquals(1, env.get("exit_code").asInt());
+        assertEquals(1, env.get("fail_on").get("matched").asInt());
+        // R4: a refused expression writes nothing.
+        Path r4 = dir.resolve("r4");
+        assertFailOnRefused(runAssess(auditorAssessArgs(r4), "--fail-on", "foo==\"x\""), r4,
+                "--fail-on 'foo==\"x\"' is not a valid expression: unknown field 'foo'; choose from: "
+                        + "control, family, mode, outcome, rung, severity, subject");
+        // O1: a missing bundle is refused before the expression is read.
+        JsonNode o1 = runJson("assess", "--out", dir.resolve("o1").toString(),
+                "--bundle", dir.resolve("nope").toString(),
+                "--profile", AUDITOR_FIXTURE.resolve("applicability.yaml").toString(), "--fail-on", "foo");
+        assertEquals("input.bundle_not_a_directory", o1.get("error").get("message_key").asText());
+        // O3/O4: the expression is refused before an unknown --catalog and a missing --deviations.
+        String fooCause = "--fail-on 'foo' is not a valid expression: unknown field 'foo'; choose from: "
+                + "control, family, mode, outcome, rung, severity, subject";
+        Path o3 = dir.resolve("o3");
+        assertFailOnRefused(runAssess(auditorAssessArgs(o3), "--catalog", "nope@1", "--fail-on", "foo"), o3, fooCause);
+        Path o4 = dir.resolve("o4");
+        assertFailOnRefused(runAssess(auditorAssessArgs(o4),
+                "--deviations", dir.resolve("nope.yaml").toString(), "--fail-on", "foo"), o4, fooCause);
+    }
+
+    @Test
+    void assessFailOnEqualsFormAndLastWins(@TempDir Path dir) {
+        // F7: --fail-on=<expression>, split at the first '=' only.
+        JsonNode env = runAssess(auditorAssessArgs(dir.resolve("f7")), "--fail-on=severity==\"critical\"");
+        assertEquals(0, env.get("exit_code").asInt());
+        assertEquals("severity==\"critical\"", env.get("fail_on").get("expression").asText());
+        // F8/F8b: the last occurrence wins, whichever spelling it uses.
+        env = runAssess(auditorAssessArgs(dir.resolve("f8")),
+                "--fail-on", "control==\"AUV-01\"", "--fail-on", "control==\"none\"");
+        assertEquals(0, env.get("exit_code").asInt());
+        assertEquals("control==\"none\"", env.get("fail_on").get("expression").asText());
+        env = runAssess(auditorAssessArgs(dir.resolve("f8b")),
+                "--fail-on=control==\"none\"", "--fail-on", "control==\"AUV-01\"");
+        assertEquals(1, env.get("exit_code").asInt());
+        assertEquals(1, env.get("fail_on").get("matched").asInt());
+        // R2: --fail-on= is an empty expression, not a missing value.
+        Path r2 = dir.resolve("r2");
+        assertFailOnRefused(runAssess(auditorAssessArgs(r2), "--fail-on="), r2,
+                "--fail-on '' is not a valid expression: the --fail-on expression is empty");
+        // M4: --fail-on=-x is a value.
+        Path m4 = dir.resolve("m4");
+        assertFailOnRefused(runAssess(auditorAssessArgs(m4), "--fail-on=-x"), m4,
+                "--fail-on '-x' is not a valid expression: unexpected character '-' at position 0");
+    }
+
+    @Test
+    void assessFailOnMissingValueRefused(@TempDir Path dir) {
+        String fix = "pass --fail-on <expression>.";
+        // M1: trailing.
+        Path m1 = dir.resolve("m1");
+        assertNeedsValue(runAssess(auditorAssessArgs(m1), "--fail-on"), m1, "--fail-on", fix);
+        // M2: directly before another flag.
+        Path m2 = dir.resolve("m2");
+        List<String> args = auditorAssessArgs(m2);
+        args.add(3, "--fail-on");
+        assertNeedsValue(runJson(args.toArray(String[]::new)), m2, "--fail-on", fix);
+        // M3: -x looks like an option.
+        Path m3 = dir.resolve("m3");
+        assertNeedsValue(runAssess(auditorAssessArgs(m3), "--fail-on", "-x"), m3, "--fail-on", fix);
+        // M7/M8/M9: a negative number (any Unicode decimal digit) or a token holding a space is a value.
+        List<String> values = List.of("-1", "-a b", "-١", "-.5");
+        for (int i = 0; i < values.size(); i++) {
+            String value = values.get(i);
+            Path out = dir.resolve("value" + i);
+            assertFailOnRefused(runAssess(auditorAssessArgs(out), "--fail-on", value), out,
+                    "--fail-on " + Readiness.pyRepr(value)
+                            + " is not a valid expression: unexpected character '-' at position 0");
+        }
+    }
+
+    @Test
+    void assessValueFlagsNameFirstMissing(@TempDir Path dir) {
+        // M5: --fail-on is first and has no value (--deviations follows it).
+        Path m5 = dir.resolve("m5");
+        assertNeedsValue(runAssess(auditorAssessArgs(m5), "--fail-on", "--deviations", AUDITOR_REGISTER.toString()),
+                m5, "--fail-on", "pass --fail-on <expression>.");
+        // M6: --deviations is first and has no value (--fail-on follows it).
+        Path m6 = dir.resolve("m6");
+        assertNeedsValue(runAssess(auditorAssessArgs(m6), "--deviations", "--fail-on", "control==\"x\""),
+                m6, "--deviations", "pass --deviations <file>.");
+        // Both given properly, in either order, apply together.
+        JsonNode env = runAssess(auditorAssessArgs(dir.resolve("both")),
+                "--fail-on", "outcome==\"partial\"", "--deviations", AUDITOR_REGISTER.toString());
+        assertEquals(1, env.get("exit_code").asInt());
+        assertEquals(1, env.get("fail_on").get("matched").asInt());
+        assertEquals("partial AUV-01", outcomeOf(dir.resolve("both"), "AUV-01"));
+    }
+
     /** The quickstart profile with its {@code catalogs:} list removed, written into {@code dir}. */
     private static Path profileWithoutCatalogs(Path dir) throws IOException {
         List<String> kept = new ArrayList<>();
