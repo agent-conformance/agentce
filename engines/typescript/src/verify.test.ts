@@ -1080,6 +1080,31 @@ test("verify unreadable input: a release directory", { skip: asRoot }, () => {
   }
 });
 
+test(
+  "verify unreadable input: a release artifact in an unreadable folder",
+  { skip: asRoot },
+  () => {
+    const dir = mkdtempSync(join(tmpdir(), "agentce-unreadable-"));
+    const release = join(dir, "release");
+    mkdirSync(join(release, "sub"), { recursive: true });
+    writeFileSync(join(release, "sub", "a.txt"), "a\n");
+    writeFileSync(
+      join(release, "release-manifest.json"),
+      JSON.stringify({ artifacts: [{ name: "sub/a.txt", sha256: "00" }] }),
+    );
+    writeFileSync(join(release, "signatures.json"), '{"signatures": []}');
+    try {
+      const { key, cause } = unreadableRefusal(join(release, "sub"), () =>
+        verifyRelease(release, TrustRoot.fromDict({ keys: {} })),
+      );
+      assert.equal(key, "input.release_unreadable");
+      assert.ok(cause.endsWith("cannot be read: sub/a.txt."), cause);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+);
+
 test("verify unreadable input: a catalog subdirectory is named", { skip: asRoot }, () => {
   const dir = mkdtempSync(join(tmpdir(), "agentce-unreadable-"));
   writeFileSync(join(dir, "catalog.yaml"), "id: demo\n");

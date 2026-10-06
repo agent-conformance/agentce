@@ -1033,6 +1033,20 @@ class VerifyTest {
     }
 
     @Test
+    void verifyUnreadableInputReleaseArtifactFolder(@TempDir Path dir) throws Exception {
+        assumeNotRoot();
+        Path release = Files.createDirectories(dir.resolve("release").resolve("sub"));
+        Files.writeString(release.resolve("a.txt"), "a\n");
+        Path root = release.getParent();
+        Files.writeString(root.resolve("release-manifest.json"),
+                "{\"artifacts\": [{\"name\": \"sub/a.txt\", \"sha256\": \"00\"}]}");
+        Files.writeString(root.resolve("signatures.json"), "{\"signatures\": []}");
+        InputError err = unreadableRefusal(release, () -> Verify.verifyRelease(root, noKeys()));
+        assertEquals("input.release_unreadable", err.key);
+        assertTrue(err.reason.endsWith("cannot be read: sub/a.txt."), err.reason);
+    }
+
+    @Test
     void verifyUnreadableInputCatalogSubdirectoryIsNamed(@TempDir Path dir) throws Exception {
         assumeNotRoot();
         Files.writeString(dir.resolve("catalog.yaml"), "id: demo\n");

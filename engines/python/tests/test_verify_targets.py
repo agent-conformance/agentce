@@ -602,6 +602,26 @@ def test_verify_unreadable_input_release_directory(
 
 
 @not_root
+def test_verify_unreadable_input_release_artifact_folder(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    release = tmp_path / "release"
+    (release / "sub").mkdir(parents=True)
+    (release / "sub" / "a.txt").write_text("a\n", encoding="utf-8")
+    manifest = {"artifacts": [{"name": "sub/a.txt", "sha256": "00"}]}
+    (release / "release-manifest.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+    (release / "signatures.json").write_text('{"signatures": []}', encoding="utf-8")
+    with _unreadable(release / "sub"):
+        code, env = run(["verify", "--release", str(release), "--json"], capsys)
+    assert code == 3
+    key, cause = _refusal(env)
+    assert key == "input.release_unreadable"
+    assert cause.endswith("cannot be read: sub/a.txt."), cause
+
+
+@not_root
 def test_verify_unreadable_input_catalog_subdirectory(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
