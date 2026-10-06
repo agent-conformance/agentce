@@ -16,7 +16,7 @@ Usage: ``uv run --project tools python tools/cryptography_intel_wheel_check.py``
 tracked lock naming ``cryptography`` passes: at least one entry admits Intel macOS, and each such entry
 has a ``macosx_*_universal2`` or ``macosx_*_x86_64`` wheel tagged ``cp*`` or ``abi3`` (a ``pp*`` wheel is
 PyPy-only). Exit 1 and print each offending lock otherwise, including a lock whose markers or TOML this
-script cannot read. ``--self-test`` runs the matcher over six small locks, two of them the seeded faults
+script cannot read. ``--self-test`` runs the matcher over seven small locks, two of them the seeded faults
 18.62 added: a PyPy-only Intel wheel, and a universal2 wheel on an entry whose markers exclude Intel macOS.
 """
 
@@ -133,10 +133,10 @@ def _marker_true(node: ast.expr, env: dict[str, str]) -> bool:
         if op not in (ast.Eq, ast.NotEq):
             raise ValueError(f"unsupported marker operator in {ast.unparse(node)!r}")
         prefix = _version(right.removesuffix(".*"))[: right.count(".")]
-        return _COMPARE[op](_version(left)[: len(prefix)], prefix)
+        return bool(_COMPARE[op](_version(left)[: len(prefix)], prefix))
     if names & _VERSION_VARIABLES:
-        return _COMPARE[op](_version(left), _version(right))
-    return _COMPARE[op](left, right)
+        return bool(_COMPARE[op](_version(left), _version(right)))
+    return bool(_COMPARE[op](left, right))
 
 
 def _candidate_versions(marker: str) -> list[tuple[int, ...]]:
@@ -201,14 +201,17 @@ def check() -> list[str]:
     for lock in tracked_uv_locks():
         name = str(lock.relative_to(ROOT))
         try:
-            if lacks_intel_wheel(lock.read_text(encoding="utf-8")):
-                problems.append(
-                    f"no Intel macOS cryptography wheel for CPython in {name}"
-                )
+            lacking = lacks_intel_wheel(lock.read_text(encoding="utf-8"))
+        except tomllib.TOMLDecodeError as exc:
+            problems.append(f"cannot read {name} as TOML: {exc}")
+            continue
         except (SyntaxError, ValueError) as exc:
             problems.append(
                 f"cannot read the cryptography resolution-markers in {name}: {exc}"
             )
+            continue
+        if lacking:
+            problems.append(f"no Intel macOS cryptography wheel for CPython in {name}")
     return problems
 
 
@@ -267,6 +270,20 @@ SELF_TEST_CASES = [
         "no cryptography entry",
         '[[package]]\nname = "jsonschema"\nversion = "4.21.0"\n',
         "out of scope",
+    ),
+    (
+        "a second Intel macOS entry with only a PyPy wheel",
+        _lock(
+            "48.0.1",
+            ["cryptography-48.0.1-cp311-abi3-macosx_10_9_universal2.whl"],
+            [f"python_full_version < '3.13' and {INTEL_ONLY}"],
+        )
+        + _lock(
+            "48.0.2",
+            ["cryptography-48.0.2-pp311-pypy311_pp73-macosx_10_9_x86_64.whl"],
+            [f"python_full_version >= '3.13' and {INTEL_ONLY}"],
+        ),
+        "lacks",
     ),
     (
         "PyPy-only Intel wheel",
