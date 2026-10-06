@@ -571,9 +571,8 @@ def _verify_report(
     (6) every manifest-tracked output's digest matches, (7) the packaged evidence/profile/domain/
     catalogs match, (8) an offline re-run reproduces every canonical output byte for byte, (9)
     success."""
-    os.listdir(
-        report_dir
-    )  # an unlistable report folder is unreadable, not a report with no claim
+    with os.scandir(report_dir):
+        pass  # an unlistable report folder is unreadable, not a report with no claim
     claim_path = report_dir / "claim.json"
     if not claim_path.is_file():
         raise InputError(

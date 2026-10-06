@@ -551,9 +551,7 @@ public final class Verify {
             return catalogSoftFail(digest, UNSIGNED_SENTENCE);
         }
         if (Bundle.cannotOpen(sigPath)) {
-            throw InputError.unreadable(
-                    "input.catalog_unreadable", "the catalog directory", dir, CATALOG_SIGNATURE_NAME,
-                    "catalog directory");
+            throw catalogUnreadable(dir, CATALOG_SIGNATURE_NAME);
         }
         JsonNode envelope;
         try {
@@ -633,9 +631,12 @@ public final class Verify {
     /** {@code input.catalog_unreadable}, naming the file or folder that cannot be read (Python's
      * {@code _catalog_unreadable}, 18.68). */
     static InputError catalogUnreadable(Path dir, Throwable err) {
+        return catalogUnreadable(dir, InputError.unreadableRel(dir, err));
+    }
+
+    static InputError catalogUnreadable(Path dir, String rel) {
         return InputError.unreadable(
-                "input.catalog_unreadable", "the catalog directory", dir, InputError.unreadableRel(dir, err),
-                "catalog directory");
+                "input.catalog_unreadable", "the catalog directory", dir, rel, "catalog directory");
     }
 
     /** Verifies a release bundle (or a single DSSE envelope) offline against {@code trust} -- the

@@ -3,6 +3,7 @@
  * The CLI renders these deterministically; unless `--debug` is set, no stack trace reaches the user.
  */
 
+import { constants, accessSync } from "node:fs";
 import { isAbsolute, relative, sep } from "node:path";
 import { ExitCode } from "./exitCodes";
 
@@ -39,6 +40,19 @@ export class InputError extends AgentceError {
 export function isPermissionError(err: unknown): boolean {
   const code = (err as { code?: unknown } | null)?.code;
   return code === "EACCES" || code === "EPERM";
+}
+
+/** The permission error that stops `path` being opened for reading, or undefined when it can be
+ * (any other error is left to the read that follows, 18.68). */
+export function readPermissionError(path: string): unknown {
+  try {
+    accessSync(path, constants.R_OK);
+  } catch (err) {
+    if (isPermissionError(err)) {
+      return err;
+    }
+  }
+  return undefined;
 }
 
 /** The path a filesystem error names, relative to `root` ("" for `root` itself or no path), as

@@ -1162,24 +1162,16 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         arg=arg_empty,
     )
 
-    def target_unreadable(build: Callable[[Path], Path]) -> Callable[[Path], Path]:
-        def unreadable(d: Path) -> Path:
-            dest = build(d)
-            dest.chmod(0)
-            return dest
-
-        return unreadable
-
     for flag_target, builder in (
-        ("catalog", catalog_with(lambda _dest: None)),
-        ("release", bundle_with(lambda _dest: None)),
-        ("bundle", bundle_evidence_with(lambda _dest: None)),
+        ("catalog", catalog_with(make_unreadable("."))),
+        ("release", bundle_with(make_unreadable("."))),
+        ("bundle", bundle_evidence_with(make_unreadable("."))),
     ):
         add(
             f"{flag_target}-unreadable",
             "target-argument",
             "unreadable",
-            target_unreadable(builder),
+            builder,
             target=flag_target,
         )
 
@@ -1996,7 +1988,7 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.commands._verify_report: embedded_path.is_file()": ("report-trust-root",),
     "agentce.commands._verify_report: manifest_path.is_file()": ("report-manifest",),
     "agentce.commands._verify_report: manifest_path.read_bytes()": ("report-manifest",),
-    "agentce.commands._verify_report: os.listdir(report_dir)": ("report-claim",),
+    "agentce.commands._verify_report: os.scandir(report_dir)": ("report-claim",),
     "agentce.commands._verify_report: packaging_path.is_file()": ("report-packaging",),
     "agentce.commands._verify_report: packaging_path.read_bytes()": (
         "report-packaging",

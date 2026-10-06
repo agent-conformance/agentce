@@ -547,7 +547,7 @@ def verify_envelope(envelope: Any, trust: TrustRoot) -> Verified:
                 # TrustRoot.resolve's own test: a "cert": null entry resolves as a key (18.68).
                 keyless=signature.get("cert") is not None,
             )
-        except (InvalidSignature, VerificationError, ValueError) as exc:
+        except (VerificationError, ValueError) as exc:
             last_error = exc
     raise VerificationError(
         f"no signature verified against the trust root: {last_error}"

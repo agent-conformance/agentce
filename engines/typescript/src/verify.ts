@@ -10,11 +10,17 @@
  */
 
 import { type KeyObject, createHash, createPublicKey, verify as cryptoVerify } from "node:crypto";
-import { constants, accessSync, readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { confineToRoot } from "./bundle";
 import { CanonicalizationError, canonicalize, sha256Hex } from "./canonical";
-import { InputError, isPermissionError, unreadableError, unreadableRel } from "./errors";
+import {
+  InputError,
+  isPermissionError,
+  readPermissionError,
+  unreadableError,
+  unreadableRel,
+} from "./errors";
 import { NonCanonicalNumber, parseJson } from "./json";
 import { errorCause } from "./messages";
 import { pyTruthy } from "./readiness";
@@ -454,12 +460,9 @@ export function verifyCatalog(dir: string, trust: TrustRoot): CatalogVerifyResul
   if (!sigIsFile) {
     return fail(UNSIGNED_SENTENCE);
   }
-  try {
-    accessSync(sigPath, constants.R_OK);
-  } catch (err) {
-    if (isPermissionError(err)) {
-      throw catalogUnreadable(dir, err);
-    }
+  const sigDenied = readPermissionError(sigPath);
+  if (sigDenied) {
+    throw catalogUnreadable(dir, sigDenied);
   }
   let envelope: unknown;
   try {
@@ -521,28 +524,25 @@ export interface ReleaseBundleResult {
 
 export type ReleaseResult = ReleaseSoftFail | ReleaseSingleResult | ReleaseBundleResult;
 
+/** Throws `input.release_unreadable` naming `path` when a permission error stops it being read
+ * (Python's PermissionError branch of `cmd_verify`'s release wrapper, 18.68). */
+function requireReleaseReadable(releasePath: string, path: string): void {
+  const denied = readPermissionError(path);
+  if (denied) {
+    throw unreadableError(
+      "input.release_unreadable",
+      "the release artifact",
+      releasePath,
+      unreadableRel(releasePath, denied),
+      "release",
+    );
+  }
+}
+
 /** Verifies a release bundle (or a single DSSE envelope) offline against `trust` -- the item's core
  * fix target, built correct from the start: every branch uses the soft-fail shape, and every new
  * JSON-parse-failure path this function adds uses a fixed, engine-neutral reason text (mirrors
  * `_verify_release`, `commands/__init__.py:758-875`). */
-/** Throws `input.release_unreadable` naming `path` when a permission error stops it being read
- * (Python's PermissionError branch of `cmd_verify`'s release wrapper, 18.68). */
-function requireReleaseReadable(releasePath: string, path: string): void {
-  try {
-    accessSync(path, constants.R_OK);
-  } catch (err) {
-    if (isPermissionError(err)) {
-      throw unreadableError(
-        "input.release_unreadable",
-        "the release artifact",
-        releasePath,
-        unreadableRel(releasePath, err),
-        "release",
-      );
-    }
-  }
-}
-
 export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseResult {
   const stat = statSync(releasePath);
   if (stat.isFile()) {

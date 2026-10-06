@@ -7,10 +7,10 @@
  */
 
 import { createHash } from "node:crypto";
-import { constants, accessSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { sha256Hex } from "./canonical";
-import { InputError, isPermissionError, unreadableError } from "./errors";
+import { InputError, isPermissionError, readPermissionError, unreadableError } from "./errors";
 import { readUntrustedJsonFile } from "./verify";
 
 export interface Bundle {
@@ -136,12 +136,8 @@ export function loadBundle(bundleDir: string): Bundle {
         "`examples/custom-loop/run.sh <dir>` from a checkout, then `agentce validate --bundle <dir>`.",
     );
   }
-  try {
-    accessSync(manifestPath, constants.R_OK);
-  } catch (err) {
-    if (isPermissionError(err)) {
-      throw bundleUnreadable(bundleDir, "manifest.json");
-    }
+  if (readPermissionError(manifestPath)) {
+    throw bundleUnreadable(bundleDir, "manifest.json");
   }
   let parsed: unknown;
   try {
