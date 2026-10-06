@@ -485,6 +485,14 @@ def _reason(out: str) -> str | None:
         return None
 
 
+def _error_key(out: str) -> str | None:
+    try:
+        error = json.loads(out).get("error")
+    except json.JSONDecodeError:
+        return None
+    return error.get("key") if isinstance(error, dict) else None
+
+
 def _normalized(out: str) -> str:
     """`out` with the `catalog`/`release`/`bundle` path field blanked -- each engine runs against
     its own per-engine copy of the fixture (never a shared mutable file, so cross-engine runs cannot
@@ -707,6 +715,8 @@ def run_census(
     if floor is not None:
         failures.append(floor)
     verified = []
+    as_root = os.geteuid() == 0  # a mode-000 file still reads as root
+    skipped_as_root = 0
     for mutation, runs in zip(selected, results, strict=True):
         label = f"census {mutation.name}"
         for engine, (out, code) in runs.items():
@@ -731,8 +741,20 @@ def run_census(
                 failures,
                 f"{label}: Python did not reach {expected} ({out.strip()[:300]!r})",
             )
+        key = verify_flow_census.UNREADABLE_EXPECTED.get(mutation.name)
+        if key is not None and as_root:
+            skipped_as_root += 1
+        elif key is not None:
+            out, code = runs["python"]
+            _assert(
+                code == 3 and _error_key(out) == key,
+                failures,
+                f"{label}: Python did not reach {key} ({out.strip()[:300]!r})",
+            )
         if runs["python"][1] == 0:
             verified.append(mutation.name)
+    if skipped_as_root:
+        print(f"unreadable key assertion skipped as root ({skipped_as_root} rows)")
     print(
         f"census: {len(results)} mutations over {len(verify_flow_census.FLOW_POINTS)} flow "
         f"points; still verified (unsigned fields only): {', '.join(verified) or 'none'}"
@@ -777,10 +799,11 @@ def run_scenarios(canonical: Path, tmp: Path, failures: list[str]) -> None:
     )
     for engine, (out, _) in runs.items():
         _assert(
-            _reason(out) == "no signature verified against the trust root: ",
+            _reason(out)
+            == "no signature verified against the trust root: signature does not verify",
             failures,
             f"s2-catalog-payload-flipped:{engine}: reason={_reason(out)!r}, expected the "
-            "empty-InvalidSignature sentence",
+            "bad-signature sentence",
         )
 
     # Scenario 3: catalog.sig.json deleted -- the exact unsigned sentence.
@@ -854,7 +877,8 @@ def run_scenarios(canonical: Path, tmp: Path, failures: list[str]) -> None:
             "not a clean refusal)",
         )
         _assert(
-            _reason(out) == "no signature verified against the trust root: ",
+            _reason(out)
+            == "no signature verified against the trust root: signature does not verify",
             failures,
             f"s5-release-kms-tampered:{engine}: reason={_reason(out)!r}",
         )

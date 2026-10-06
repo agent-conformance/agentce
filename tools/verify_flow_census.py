@@ -34,7 +34,7 @@ import shutil
 import sys
 from collections import Counter
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, TypeVar, cast
 
@@ -63,7 +63,14 @@ FLOW_POINTS = (
     FlowPoint(
         "catalog-sig-file",
         "catalog.sig.json bytes -> JSON (verify_catalog_directory)",
-        ("bytes", "number-token", "nesting", "duplicate-key", "not-a-file"),
+        (
+            "bytes",
+            "number-token",
+            "nesting",
+            "duplicate-key",
+            "not-a-file",
+            "unreadable",
+        ),
     ),
     FlowPoint(
         "catalog-envelope",
@@ -78,12 +85,18 @@ FLOW_POINTS = (
     FlowPoint(
         "catalog-tree",
         "the catalog directory's files -> digest_tree (names, order, links, content)",
-        ("content", "file-name-order", "link", "empty-directory"),
+        ("content", "file-name-order", "link", "empty-directory", "unreadable"),
     ),
     FlowPoint(
         "release-file",
         "a single-file --release envelope's bytes -> JSON",
-        ("bytes", "number-token", "nesting", "duplicate-key", "not-a-file"),
+        (
+            "bytes",
+            "number-token",
+            "nesting",
+            "duplicate-key",
+            "unreadable",
+        ),
     ),
     FlowPoint(
         "release-envelope",
@@ -99,7 +112,14 @@ FLOW_POINTS = (
     FlowPoint(
         "manifest-file",
         "release-manifest.json bytes -> JSON -> canonical form (manifest digest)",
-        ("bytes", "number-token", "nesting", "duplicate-key", "not-a-file"),
+        (
+            "bytes",
+            "number-token",
+            "nesting",
+            "duplicate-key",
+            "not-a-file",
+            "unreadable",
+        ),
     ),
     FlowPoint(
         "manifest-fields",
@@ -109,12 +129,19 @@ FLOW_POINTS = (
     FlowPoint(
         "artifact-path",
         "an artifact name -> a file inside the release directory",
-        ("path", "content"),
+        ("path", "content", "unreadable"),
     ),
     FlowPoint(
         "signatures-file",
         "signatures.json bytes -> JSON",
-        ("bytes", "number-token", "nesting", "duplicate-key", "not-a-file"),
+        (
+            "bytes",
+            "number-token",
+            "nesting",
+            "duplicate-key",
+            "not-a-file",
+            "unreadable",
+        ),
     ),
     FlowPoint(
         "signature-entries",
@@ -138,13 +165,14 @@ FLOW_POINTS = (
             "json-type",
             "missing-field",
             "source-id",
+            "unreadable",
         ),
     ),
     FlowPoint(
         "bundle-files",
         "manifest.json's files[] entries: each entry's path resolved inside the bundle "
         "(confine_to_root) and its content hashed",
-        ("path", "content"),
+        ("path", "content", "unreadable"),
     ),
     FlowPoint(
         "bundle-streams",
@@ -158,13 +186,14 @@ FLOW_POINTS = (
             "line-break",
             "whitespace",
             "json-type",
+            "unreadable",
         ),
     ),
     FlowPoint(
         "target-argument",
         "verify's own --catalog/--release/--bundle/--report value: empty, trailing-slash, '.', "
         "the flag given twice, and the --flag=value spelling",
-        ("empty", "trailing-slash", "dot", "repeated", "equals"),
+        ("empty", "trailing-slash", "dot", "repeated", "equals", "unreadable"),
     ),
     FlowPoint(
         "verify-argv",
@@ -194,6 +223,7 @@ FLOW_POINTS = (
             "json-type",
             "missing-field",
             "base64",
+            "unreadable",
         ),
         PYTHON_ONLY,
     ),
@@ -209,6 +239,7 @@ FLOW_POINTS = (
             "json-type",
             "missing-field",
             "base64",
+            "unreadable",
         ),
         PYTHON_ONLY,
     ),
@@ -227,6 +258,7 @@ FLOW_POINTS = (
             "base64",
             "empty",
             "trailing-slash",
+            "unreadable",
         ),
         PYTHON_ONLY,
     ),
@@ -248,6 +280,7 @@ FLOW_POINTS = (
             "duplicate-key",
             "json-type",
             "missing-field",
+            "unreadable",
         ),
         PYTHON_ONLY,
     ),
@@ -263,11 +296,58 @@ FLOW_POINTS = (
             "not-a-file",
             "json-type",
             "missing-field",
+            "unreadable",
         ),
         PYTHON_ONLY,
     ),
 )
 ENGINES_BY_FLOW = {point.id: point.engines for point in FLOW_POINTS}
+
+#: The flow points with no file or folder of their own to make unreadable (chmod 000), and why. The
+#: self-test fails if a filesystem read site in the surface inventory names one of them (18.68).
+UNREADABLE_EXEMPT = {
+    "catalog-envelope": "the fields of catalog.sig.json, read by catalog-sig-file",
+    "catalog-statement": "the signed payload inside catalog.sig.json, read by catalog-sig-file",
+    "certificate": "a certificate inside a release envelope, read by release-file or signatures-file",
+    "manifest-fields": "the entries of release-manifest.json, read by manifest-file",
+    "release-envelope": "the fields of a single-file release envelope, read by release-file",
+    "release-statement": "the signed payload inside signatures.json, read by signatures-file",
+    "report-statement": "the signed payload inside claim.json, read by report-claim",
+    "signature-entries": "the entries of signatures.json, read by signatures-file",
+    "verify-argv": "verify's argv tokens; the files they name are target-argument's",
+}
+
+#: The key each unreadable row must reach in Python, the reference, so a row that refuses for another
+#: reason fails the census rather than passing on agreement alone (18.68). Not asserted as root, where
+#: a mode-000 file still reads.
+UNREADABLE_EXPECTED = {
+    "catalog-sig-file:unreadable": "input.catalog_unreadable",
+    "catalog-tree:unreadable-file": "input.catalog_unreadable",
+    "catalog-tree:unreadable-subdirectory": "input.catalog_unreadable",
+    "release-file:release-kms:unreadable": "input.release_unreadable",
+    "release-file:release-cert:unreadable": "input.release_unreadable",
+    "manifest-file:unreadable": "input.release_unreadable",
+    "artifact-path:artifact-unreadable": "input.release_unreadable",
+    "signatures-file:unreadable": "input.release_unreadable",
+    "bundle-manifest:unreadable": "input.bundle_unreadable",
+    "bundle-files:unreadable-file": "input.bundle_unreadable",
+    "bundle-files:unreadable-events-directory": "input.bundle_unreadable",
+    "bundle-streams:unreadable-stream": "input.bundle_unreadable",
+    "target-argument:catalog-unreadable": "input.catalog_unreadable",
+    "target-argument:release-unreadable": "input.release_unreadable",
+    "target-argument:bundle-unreadable": "input.bundle_unreadable",
+    "report-claim:unreadable": "verify.report_unreadable",
+    "report-claim:report-directory-unreadable": "verify.report_unreadable",
+    "report-trust-root:unreadable": "input.trust_root_invalid",
+    "signer-trust-root:unreadable": "input.trust_root_invalid",
+    "report-manifest:unreadable": "verify.report_unreadable",
+    "report-manifest:unreadable-output": "verify.report_unreadable",
+    "report-manifest:unreadable-output-directory": "verify.report_unreadable",
+    "report-packaging:unreadable": "verify.report_unreadable",
+    "report-packaging:unreadable-profile": "verify.report_unreadable",
+    "report-packaging:unreadable-domain": "verify.report_unreadable",
+    "report-packaging:unreadable-evidence-directory": "verify.report_unreadable",
+}
 FLOW_IDS = frozenset(point.id for point in FLOW_POINTS)
 
 #: The real stream file `bundle-streams` mutates (`corpus/quickstart/evidence`).
@@ -652,7 +732,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
     add(
         "unreadable",
         "catalog-sig-file",
-        "not-a-file",
+        "unreadable",
         catalog_with(make_unreadable(CATALOG_SIGNATURE_NAME)),
     )
     for name, cls, doc in node_mutations(json.loads(sig_bytes)):
@@ -744,7 +824,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
             dest.chmod(0)
             return dest
 
-        add(f"{stem}:unreadable", "release-file", "not-a-file", unreadable)
+        add(f"{stem}:unreadable", "release-file", "unreadable", unreadable)
         for name, cls, doc in node_mutations(json.loads(raw)):
             add(f"{stem}:{name}", "release-envelope", cls, single_file(doc))
 
@@ -766,7 +846,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
     add(
         "unreadable",
         "manifest-file",
-        "not-a-file",
+        "unreadable",
         bundle_with(make_unreadable("release-manifest.json")),
     )
     manifest = json.loads(manifest_bytes)
@@ -797,19 +877,27 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         "content",
         bundle_with(replace_with_directory("artifact-a.txt")),
     )
-    if os.geteuid() != 0:  # root reads a mode-000 file anyway
-        add(
-            "artifact-unreadable",
-            "artifact-path",
-            "content",
-            bundle_with(lambda dest: (dest / "artifact-a.txt").chmod(0)),
-        )
-        add(
-            "unreadable-file",
-            "catalog-tree",
-            "content",
-            catalog_with(lambda dest: (dest / content_file).chmod(0)),
-        )
+    # As root a mode-000 file still reads: the rows stay so the list is the same on every machine,
+    # and run_census skips only their expected-key assertion (18.68).
+    add(
+        "artifact-unreadable",
+        "artifact-path",
+        "unreadable",
+        bundle_with(make_unreadable("artifact-a.txt")),
+    )
+    add(
+        "unreadable-file",
+        "catalog-tree",
+        "unreadable",
+        catalog_with(make_unreadable(content_file)),
+    )
+    content_dir = sorted(p.name for p in catalog.iterdir() if p.is_dir())[0]
+    add(
+        "unreadable-subdirectory",
+        "catalog-tree",
+        "unreadable",
+        catalog_with(make_unreadable(content_dir)),
+    )
     add(
         "broken-link",
         "catalog-tree",
@@ -835,7 +923,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
     add(
         "unreadable",
         "signatures-file",
-        "not-a-file",
+        "unreadable",
         bundle_with(make_unreadable("signatures.json")),
     )
     for name, cls, doc in node_mutations(json.loads(signatures_bytes)):
@@ -877,7 +965,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
     add(
         "unreadable",
         "bundle-manifest",
-        "not-a-file",
+        "unreadable",
         bundle_evidence_with(make_unreadable("manifest.json")),
         target="bundle",
     )
@@ -938,6 +1026,27 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         "bundle-files",
         "content",
         bundle_evidence_with(lambda dest: (dest / bundle_file_name).unlink()),
+        target="bundle",
+    )
+    add(
+        "unreadable-file",
+        "bundle-files",
+        "unreadable",
+        bundle_evidence_with(make_unreadable(bundle_file_name)),
+        target="bundle",
+    )
+    add(
+        "unreadable-events-directory",
+        "bundle-files",
+        "unreadable",
+        bundle_evidence_with(make_unreadable("events")),
+        target="bundle",
+    )
+    add(
+        "unreadable-stream",
+        "bundle-streams",
+        "unreadable",
+        bundle_evidence_with(make_unreadable(STREAM_FILE)),
         target="bundle",
     )
 
@@ -1053,6 +1162,27 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
         arg=arg_empty,
     )
 
+    def target_unreadable(build: Callable[[Path], Path]) -> Callable[[Path], Path]:
+        def unreadable(d: Path) -> Path:
+            dest = build(d)
+            dest.chmod(0)
+            return dest
+
+        return unreadable
+
+    for flag_target, builder in (
+        ("catalog", catalog_with(lambda _dest: None)),
+        ("release", bundle_with(lambda _dest: None)),
+        ("bundle", bundle_evidence_with(lambda _dest: None)),
+    ):
+        add(
+            f"{flag_target}-unreadable",
+            "target-argument",
+            "unreadable",
+            target_unreadable(builder),
+            target=flag_target,
+        )
+
     # The flag given twice (the same value, or one of them empty, in either order) and the
     # `--flag=value` spelling: one rule in all three engines (18.65 round 3).
     def repeated(first: Callable[[Path], str], second: Callable[[Path], str]):
@@ -1162,7 +1292,9 @@ def report_mutations(canonical: Path) -> list[Mutation]:
     base = canonical / REPORT_DIR
     mutations: list[Mutation] = []
 
-    def report_with(files: dict[str, bytes | Any | None]) -> Callable[[Path], Path]:
+    def report_with(
+        files: dict[str, bytes | Any | None], unreadable: str | None = None
+    ) -> Callable[[Path], Path]:
         def build(d: Path) -> Path:
             dest = d / "report"
             shutil.copytree(base, dest, symlinks=True)
@@ -1173,6 +1305,8 @@ def report_mutations(canonical: Path) -> list[Mutation]:
                     target.mkdir()
                 elif data is not None:
                     _write(target, data)
+            if unreadable is not None:
+                (dest / unreadable).chmod(0)
             return dest
 
         return build
@@ -1182,6 +1316,29 @@ def report_mutations(canonical: Path) -> list[Mutation]:
     ) -> None:
         mutations.append(
             Mutation(f"{flow}:{name}", flow, cls, "report", report_with(files))
+        )
+
+    # A file or folder of the report made unreadable (chmod 000); "." is the report folder itself.
+    for flow, name, unreadable in (
+        ("report-claim", "unreadable", "claim.json"),
+        ("report-claim", "report-directory-unreadable", "."),
+        ("report-trust-root", "unreadable", "trust-root.json"),
+        ("report-manifest", "unreadable", "manifest.json"),
+        ("report-manifest", "unreadable-output", "coverage.json"),
+        ("report-manifest", "unreadable-output-directory", "packs"),
+        ("report-packaging", "unreadable", "packaging.json"),
+        ("report-packaging", "unreadable-profile", "bundle/applicability.yaml"),
+        ("report-packaging", "unreadable-domain", "bundle/domain.linkml.yaml"),
+        ("report-packaging", "unreadable-evidence-directory", "bundle/evidence/events"),
+    ):
+        mutations.append(
+            Mutation(
+                f"{flow}:{name}",
+                flow,
+                "unreadable",
+                "report",
+                report_with({}, unreadable),
+            )
         )
 
     for flow, file_name in (
@@ -1235,6 +1392,28 @@ def report_mutations(canonical: Path) -> list[Mutation]:
     with_signer("dot", "not-a-file", original, ".")
     with_signer("empty", "empty", original, "")
     with_signer("trailing-slash", "trailing-slash", original, "{}/")
+
+    def signer_unreadable(d: Path) -> Path:
+        dest = report_with({})(d)
+        _write(d / SIGNER_TRUST_ROOT, original)
+        (d / SIGNER_TRUST_ROOT).chmod(0)
+        return dest
+
+    mutations.append(
+        Mutation(
+            "signer-trust-root:unreadable",
+            "signer-trust-root",
+            "unreadable",
+            "report",
+            signer_unreadable,
+            lambda dest: [
+                "--report",
+                str(dest),
+                "--signer-trust-root",
+                str(dest.parent / SIGNER_TRUST_ROOT),
+            ],
+        )
+    )
 
     variants = canonical / REPORT_VARIANTS
     classes = json.loads((variants / "classes.json").read_text(encoding="utf-8"))
@@ -1680,6 +1859,11 @@ def _verify_flags(graph: _CallGraph) -> set[str]:
             in_verify = bool(call.args) and ast.literal_eval(call.args[0]) == "verify"
             if in_verify and any(k.arg == "parents" for k in call.keywords):
                 flags |= _option_strings(graph.defs["agentce.cli._common_flags"])
+            if in_verify and not any(
+                k.arg == "add_help" and ast.literal_eval(k.value) is False
+                for k in call.keywords
+            ):
+                flags |= {"-h", "--help"}  # argparse adds them unless add_help=False
         elif call.func.attr == "add_argument" and in_verify:
             flags |= _option_strings(stmt)
     return flags
@@ -1741,6 +1925,10 @@ _HASHED_ONLY = (
     "never a parse"
 )
 _PACKAGED = "disposition: reads a file shipped inside the installed engine, not the verified input"
+_IMPLICIT_HELP = (
+    "disposition: argparse's implicit help; prints usage and reads no input (its argv spellings "
+    "across engines are 18.52's)"
+)
 
 #: Every flag of `agentce verify`, mapped to the census rows whose mutations exercise it, or to a
 #: written disposition. `inventory_problems` fails when the code grows a flag this map lacks.
@@ -1754,19 +1942,24 @@ INVENTORY_FLAGS: dict[str, tuple[str, ...] | str] = {
     "--json": ("verify-argv",),
     "--debug": _OUTPUT_SWITCH,
     "--quiet": ("verify-argv",),
+    "-h": _IMPLICIT_HELP,
+    "--help": _IMPLICIT_HELP,
 }
 
 #: Every read site reachable from `cmd_verify` (`surface_inventory`), keyed by function and the call
 #: as written, mapped to the census rows that mutate what it reads, or to a written disposition.
 INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.bundle._sha256_hex: path.open('rb')": ("bundle-files",),
-    "agentce.bundle.load_bundle: manifest_path.is_file()": ("bundle-manifest",),
+    "agentce.bundle.permission_denied: path.stat()": (
+        "bundle-manifest",
+        "bundle-files",
+    ),
     "agentce.bundle.load_bundle: manifest_path.read_bytes()": ("bundle-manifest",),
     "agentce.bundle.load_bundle: member.stat()": ("bundle-files",),
     "agentce.bundle.load_bundle: parse_untrusted_json(manifest_path.read_bytes())": (
         "bundle-manifest",
     ),
-    "agentce.bundle.safe_is_file: path.is_file()": ("bundle-files",),
+    "agentce.bundle.safe_is_file: path.is_file()": ("bundle-manifest", "bundle-files"),
     "agentce.commands._load_release_json: path.read_bytes()": (
         "release-file",
         "manifest-file",
@@ -1789,6 +1982,10 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.commands._require_dir: path.is_dir()": ("target-argument",),
     "agentce.commands._verify_release: artifact_file.read_bytes()": ("artifact-path",),
     "agentce.commands._verify_release: manifest_path.is_file()": ("manifest-file",),
+    "agentce.commands._verify_release: path.stat()": (
+        "manifest-file",
+        "signatures-file",
+    ),
     "agentce.commands._verify_release: release_path.is_file()": ("release-file",),
     "agentce.commands._verify_release: signatures_path.is_file()": ("signatures-file",),
     "agentce.commands._verify_report: candidate_path.is_file()": ("report-manifest",),
@@ -1796,6 +1993,7 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.commands._verify_report: catalog_path.is_dir()": ("report-packaging",),
     "agentce.commands._verify_report: claim_path.is_file()": ("report-claim",),
     "agentce.commands._verify_report: claim_path.read_bytes()": ("report-claim",),
+    "agentce.commands._verify_report: claim_path.stat()": ("report-claim",),
     "agentce.commands._verify_report: deviations_path.is_file()": ("report-packaging",),
     "agentce.commands._verify_report: deviations_path.read_bytes()": _HASHED_ONLY,
     "agentce.commands._verify_report: domain_path.is_file()": ("report-packaging",),
@@ -1803,6 +2001,7 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.commands._verify_report: embedded_path.is_file()": ("report-trust-root",),
     "agentce.commands._verify_report: manifest_path.is_file()": ("report-manifest",),
     "agentce.commands._verify_report: manifest_path.read_bytes()": ("report-manifest",),
+    "agentce.commands._verify_report: os.listdir(report_dir)": ("report-claim",),
     "agentce.commands._verify_report: packaging_path.is_file()": ("report-packaging",),
     "agentce.commands._verify_report: packaging_path.read_bytes()": (
         "report-packaging",
@@ -1825,6 +2024,8 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.schema.evidence_schema: json.loads(text)": _PACKAGED,
     "agentce.schema.evidence_schema: resources.files('agentce.data')"
     ".joinpath('agentce-evidence.schema.json').read_text()": _PACKAGED,
+    "agentce.signing.digest_tree: folder.is_dir()": ("catalog-tree",),
+    "agentce.signing.digest_tree: os.listdir(folder)": ("catalog-tree",),
     "agentce.signing.digest_tree: path.is_file()": ("catalog-tree",),
     "agentce.signing.digest_tree: path.read_bytes()": ("catalog-tree",),
     "agentce.signing.digest_tree: root.rglob('*')": ("catalog-tree",),
@@ -1859,6 +2060,48 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "catalog-sig-file",
     ),
 }
+
+
+#: The read calls that touch the filesystem (READ_CALLS without the parsers): a flow point one of these
+#: reads for has a file or folder that can be unreadable.
+FILESYSTEM_CALLS = READ_CALLS - {"loads", "load", "safe_load", "parse_untrusted_json"}
+
+
+def unreadable_problems(
+    points: tuple[FlowPoint, ...] = FLOW_POINTS,
+    exempt: dict[str, str] = UNREADABLE_EXEMPT,
+) -> list[str]:
+    """A flow point with neither an unreadable row nor an exemption, an exemption with no reason or
+    that also lists the class, or an exempt point a filesystem read site in INVENTORY_READS names."""
+    classes = {point.id: point.problem_classes for point in points}
+    problems = [
+        f"flow point {pid} has no unreadable row and no exemption"
+        for pid, cls in classes.items()
+        if "unreadable" not in cls and pid not in exempt
+    ]
+    for pid, reason in sorted(exempt.items()):
+        if not str(reason).strip():
+            problems.append(f"exempt flow point {pid} gives no reason")
+        if "unreadable" in classes.get(pid, ()):
+            problems.append(f"exempt flow point {pid} also lists the unreadable class")
+    for entry, rows in sorted(INVENTORY_READS.items()):
+        if isinstance(rows, str):
+            continue
+        call = ast.parse(entry.split(": ", 1)[1], mode="eval")
+        names = {
+            node.func.attr
+            if isinstance(node.func, ast.Attribute)
+            else getattr(node.func, "id", None)
+            for node in ast.walk(call)
+            if isinstance(node, ast.Call)
+        }
+        if names & FILESYSTEM_CALLS:
+            problems += [
+                f"exempt flow point {row} is read from the filesystem: {entry}"
+                for row in rows
+                if row in exempt
+            ]
+    return problems
 
 
 def _seed_unlisted_surface(sources: dict[str, str]) -> dict[str, str]:
@@ -1938,10 +2181,31 @@ def self_test() -> int:
     ):
         if expected not in seeded:
             failures.append(f"seeded surface not caught: {expected} (got {seeded})")
+    failures += unreadable_problems()
+    seeded_points = tuple(
+        replace(
+            point,
+            problem_classes=tuple(
+                c for c in point.problem_classes if c != "unreadable"
+            ),
+        )
+        if point.id == "bundle-streams"
+        else point
+        for point in FLOW_POINTS
+    )
+    seeded_exempt = {**UNREADABLE_EXEMPT, "bundle-streams": "seeded: reads no file"}
+    caught = any(
+        "bundle-streams" in problem
+        for problem in unreadable_problems(seeded_points, seeded_exempt)
+    )
+    if not caught:
+        failures.append("seeded exempt reader not caught: bundle-streams")
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if failures:
         return 1
+    print("every file and directory reader carries an unreadable row")
+    print("seeded exempt reader caught: bundle-streams")
     print(
         "SELF-TEST OK: walker, node/byte mutations, census ids, surface inventory "
         "(a seeded flag and reader are caught), certificate-field rows carry an expected outcome"
@@ -1964,6 +2228,11 @@ def coverage_problems(mutations: list[Mutation]) -> list[str]:
     for flow, cls in seen:
         if cls not in classes.get(flow, ()):
             problems.append(f"mutation class {flow}/{cls} is not in the census")
+    unreadable = {m.name for m in mutations if m.problem_class == "unreadable"}
+    problems += [
+        f"unreadable row {name} has no expected key, or the reverse"
+        for name in sorted(unreadable ^ UNREADABLE_EXPECTED.keys())
+    ]
     return problems
 
 
