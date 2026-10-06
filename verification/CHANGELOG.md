@@ -3,6 +3,14 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.46.0
+
+- `VG-CRYPTO-INTEL-WHEEL` (18.62) is stricter. It accepted any Intel-macOS `cryptography` wheel anywhere
+  in a lock, so a PyPy-only `pp*` wheel, or a universal2 wheel on an entry whose `resolution-markers`
+  keep it off Intel macOS, passed while CPython on an Intel Mac would build from source. Every entry
+  whose markers admit CPython on Intel macOS now needs a `cp*` or `abi3` Intel wheel, and a marker or
+  lock the check cannot read fails it. Two new seeded faults, one per rule.
+
 ## 0.45.0
 
 - `VG-DIFF-READINESS-PARITY` (18.59) is new. `tools/diff_parity_check.py` and

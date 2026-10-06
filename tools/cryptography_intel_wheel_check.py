@@ -1,5 +1,5 @@
 """cryptography_intel_wheel_check -- prove every tracked ``uv.lock`` resolving ``cryptography`` still
-resolves an Intel-macOS wheel (item 18.58, ADR-0024).
+resolves a wheel CPython on an Intel Mac can install (items 18.58 and 18.62, ADR-0024).
 
 ADR-0024 split ``engines/python/pyproject.toml`` and ``adapters/supply-chain/pyproject.toml``'s
 ``cryptography`` requirement by platform marker so Intel macOS resolves the last release with a real
@@ -9,17 +9,21 @@ own re-lock inherits that split -- but only once someone actually runs ``uv lock
 found 20 such locks still pinned to plain ``cryptography==50.0.1`` with no Intel wheel (O1): AGENTS.md's
 own documented docs and conformance commands would still fail a fresh Intel-macOS install. This script is
 the standing check a later dependency bump could otherwise silently regress: it parses every tracked lock
-that names ``cryptography`` and checks its resolved wheels for one macOS/x86_64 can actually install.
+that names ``cryptography`` and checks that every ``cryptography`` entry whose ``resolution-markers``
+admit CPython on Intel macOS carries a wheel that interpreter installs.
 
 Usage: ``uv run --project tools python tools/cryptography_intel_wheel_check.py``. Exit 0 when every
-tracked lock naming ``cryptography`` resolves an Intel-macOS wheel (``macosx_*_universal2`` or
-``macosx_*_x86_64``), exit 1 and print each offending lock otherwise. ``--self-test`` proves the matcher
-discriminates a real Intel wheel line from a lock that resolves only Linux/Windows/arm64 wheels.
+tracked lock naming ``cryptography`` passes: at least one entry admits Intel macOS, and each such entry
+has a ``macosx_*_universal2`` or ``macosx_*_x86_64`` wheel tagged ``cp*`` or ``abi3`` (a ``pp*`` wheel is
+PyPy-only). Exit 1 and print each offending lock otherwise, including a lock whose markers or TOML this
+script cannot read. ``--self-test`` runs the matcher over six small locks, two of them the seeded faults
+18.62 added: a PyPy-only Intel wheel, and a universal2 wheel on an entry whose markers exclude Intel macOS.
 """
 
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 import subprocess
@@ -38,6 +42,26 @@ ROOT = Path(__file__).resolve().parents[1]
 #: lock. A future wheel-tagging change upstream needs both updated together.
 INTEL_TAG = re.compile(r"^macosx_\d+_\d+_(universal2|x86_64)$")
 
+#: The marker environment of CPython on an Intel Mac, minus the interpreter version, which
+#: ``_admits_intel_macos`` varies. A ``resolution-markers`` entry naming any other variable is refused
+#: rather than guessed at.
+INTEL_MACOS = {
+    "sys_platform": "darwin",
+    "platform_machine": "x86_64",
+    "platform_system": "Darwin",
+    "os_name": "posix",
+    "implementation_name": "cpython",
+    "platform_python_implementation": "CPython",
+}
+
+#: Interpreter versions tried against a lock entry's markers: an entry admits Intel macOS when any of
+#: them satisfies one of its markers.
+PYTHON_VERSIONS = [
+    f"3.{minor}.{patch}" for minor in range(8, 21) for patch in range(31)
+]
+
+_VERSION_VARIABLES = {"python_version", "python_full_version"}
+
 
 def tracked_uv_locks() -> list[Path]:
     """Every tracked ``uv.lock``, found the way the rest of ``tools/`` lists tracked files (list all,
@@ -52,66 +76,213 @@ def tracked_uv_locks() -> list[Path]:
     return [ROOT / p for p in out.stdout.split("\0") if p.endswith("uv.lock")]
 
 
-def _platform_tag(wheel_url: str) -> str:
-    """The platform-tag segment of a wheel filename, e.g. ``macosx_10_9_universal2`` from
-    ``.../cryptography-48.0.1-cp311-abi3-macosx_10_9_universal2.whl``."""
-    filename = wheel_url.rsplit("/", 1)[-1]
-    return filename.removesuffix(".whl").rsplit("-", 1)[-1]
+def _cpython_intel_wheel(wheel_url: str) -> bool:
+    """True for a wheel CPython on an Intel Mac installs: an Intel-macOS platform tag and a ``cp*``
+    interpreter tag or ``abi3`` ABI tag, as in ``.../cryptography-48.0.1-cp311-abi3-
+    macosx_10_9_universal2.whl``. A ``pp*`` wheel is PyPy-only."""
+    filename = wheel_url.rsplit("/", 1)[-1].removesuffix(".whl")
+    python, abi, platform = (filename.split("-") + ["", "", ""])[2:5]
+    return bool(INTEL_TAG.match(platform)) and (
+        python.startswith("cp") or abi == "abi3"
+    )
+
+
+def _version(text: str) -> tuple[int, ...]:
+    parts = tuple(int(p) for p in text.split("."))
+    return parts + (0,) * (3 - len(parts))
+
+
+def _marker_value(node: ast.expr, env: dict[str, str]) -> str:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.Name) and node.id in env:
+        return env[node.id]
+    raise ValueError(f"unsupported marker term {ast.unparse(node)!r}")
+
+
+def _marker_true(node: ast.expr, env: dict[str, str]) -> bool:
+    """Evaluate a PEP 508 marker parsed as a Python expression (the two grammars agree on ``and``,
+    ``or``, parentheses and single-operator comparisons). Versions compare numerically, and
+    ``== '3.13.*'`` matches by prefix. Anything else raises ``ValueError``, so an unfamiliar marker
+    fails the check instead of being guessed at."""
+    if isinstance(node, ast.BoolOp):
+        results = [_marker_true(value, env) for value in node.values]
+        return all(results) if isinstance(node.op, ast.And) else any(results)
+    if not (isinstance(node, ast.Compare) and len(node.ops) == 1):
+        raise ValueError(f"unsupported marker {ast.unparse(node)!r}")
+    op, right_node = node.ops[0], node.comparators[0]
+    left, right = _marker_value(node.left, env), _marker_value(right_node, env)
+    names = {n.id for n in (node.left, right_node) if isinstance(n, ast.Name)}
+    if names & _VERSION_VARIABLES and right.endswith(".*"):
+        prefix = tuple(int(p) for p in right.removesuffix(".*").split("."))
+        matches = _version(left)[: len(prefix)] == prefix
+        compare = {ast.Eq: matches, ast.NotEq: not matches}
+    elif names & _VERSION_VARIABLES and not isinstance(op, (ast.In, ast.NotIn)):
+        a, b = _version(left), _version(right)
+        compare = {
+            ast.Eq: a == b,
+            ast.NotEq: a != b,
+            ast.Lt: a < b,
+            ast.LtE: a <= b,
+            ast.Gt: a > b,
+            ast.GtE: a >= b,
+        }
+    else:
+        compare = {
+            ast.Eq: left == right,
+            ast.NotEq: left != right,
+            ast.In: left in right,
+            ast.NotIn: left not in right,
+        }
+    if type(op) not in compare:
+        raise ValueError(f"unsupported marker operator in {ast.unparse(node)!r}")
+    return compare[type(op)]
+
+
+def _admits_intel_macos(markers: list[str]) -> bool:
+    """True when a lock entry with these ``resolution-markers`` can be what CPython on an Intel Mac
+    installs, for some interpreter version; an entry with no markers applies everywhere."""
+    if not markers:
+        return True
+    trees = [ast.parse(marker, mode="eval").body for marker in markers]
+    return any(
+        _marker_true(
+            tree,
+            {
+                **INTEL_MACOS,
+                "python_version": v.rsplit(".", 1)[0],
+                "python_full_version": v,
+            },
+        )
+        for tree in trees
+        for v in PYTHON_VERSIONS
+    )
 
 
 def lacks_intel_wheel(lock_text: str) -> bool:
-    """True when the lock names ``cryptography`` but resolves no Intel-macOS wheel for it. Parses the
-    lock as TOML (as ``tools/no_ml_check.py``'s own ``packages_in_uv_lock`` does) rather than
-    pattern-matching the raw text, so a reformatted or reordered lock is read the same way ``uv`` reads
-    it."""
+    """True when the lock names ``cryptography`` but CPython on an Intel Mac would build it from
+    source: no ``cryptography`` entry whose ``resolution-markers`` admit Intel macOS, or such an entry
+    with no ``cp*``/``abi3`` Intel-macOS wheel. Parses the lock as TOML (as ``tools/no_ml_check.py``'s
+    own ``packages_in_uv_lock`` does) rather than pattern-matching the raw text, so a reformatted or
+    reordered lock is read the same way ``uv`` reads it."""
     data: dict[str, Any] = tomllib.loads(lock_text)
     packages = [
         pkg for pkg in data.get("package", []) if pkg.get("name") == "cryptography"
     ]
     if not packages:
         return False
-    return not any(
-        INTEL_TAG.match(_platform_tag(wheel.get("url", "")))
+    intel = [
+        pkg
         for pkg in packages
-        for wheel in pkg.get("wheels", [])
+        if _admits_intel_macos(pkg.get("resolution-markers", []))
+    ]
+    return not intel or not all(
+        any(
+            _cpython_intel_wheel(wheel.get("url", ""))
+            for wheel in pkg.get("wheels", [])
+        )
+        for pkg in intel
     )
 
 
 def check() -> list[str]:
     problems = []
     for lock in tracked_uv_locks():
-        if lacks_intel_wheel(lock.read_text(encoding="utf-8")):
-            problems.append(str(lock.relative_to(ROOT)))
+        name = str(lock.relative_to(ROOT))
+        try:
+            if lacks_intel_wheel(lock.read_text(encoding="utf-8")):
+                problems.append(
+                    f"no Intel macOS cryptography wheel for CPython in {name}"
+                )
+        except (SyntaxError, ValueError) as exc:
+            problems.append(
+                f"cannot read the cryptography resolution-markers in {name}: {exc}"
+            )
     return problems
 
 
+def _lock(version: str, wheels: list[str], markers: list[str] | None = None) -> str:
+    """A one-entry lock resolving ``cryptography`` to these wheel filenames."""
+    lines = ["[[package]]", 'name = "cryptography"', f'version = "{version}"']
+    if markers is not None:
+        lines.append(
+            "resolution-markers = [" + ", ".join(f'"{m}"' for m in markers) + "]"
+        )
+    urls = ", ".join(
+        f'{{ url = "https://files.pythonhosted.org/packages/aa/{w}" }}' for w in wheels
+    )
+    return "\n".join(lines + [f"wheels = [{urls}]", ""])
+
+
+INTEL_ONLY = "platform_machine == 'x86_64' and sys_platform == 'darwin'"
+NOT_INTEL = "platform_machine != 'x86_64' or sys_platform != 'darwin'"
+
+#: (case, lock text, outcome): ``lacks`` when the check must report the lock, ``has`` or ``out of
+#: scope`` when it must not. The last two are the
+#: seeded faults 18.62 added: a PyPy-only Intel wheel, and a universal2 wheel on an entry whose
+#: markers keep it off Intel macOS. Both would build from source for CPython on an Intel Mac.
+SELF_TEST_CASES = [
+    (
+        "universal2 cp311-abi3 wheel, no markers",
+        _lock("48.0.1", ["cryptography-48.0.1-cp311-abi3-macosx_10_9_universal2.whl"]),
+        "has",
+    ),
+    (
+        "universal2 wheel on the Intel macOS entry of a forked lock",
+        _lock(
+            "48.0.1",
+            ["cryptography-48.0.1-cp311-abi3-macosx_10_9_universal2.whl"],
+            [INTEL_ONLY],
+        )
+        + _lock(
+            "50.0.1",
+            ["cryptography-50.0.1-cp311-abi3-macosx_11_0_arm64.whl"],
+            [NOT_INTEL],
+        ),
+        "has",
+    ),
+    (
+        "only Linux and arm64 wheels",
+        _lock(
+            "50.0.1",
+            [
+                "cryptography-50.0.1-cp311-abi3-manylinux_2_28_x86_64.whl",
+                "cryptography-50.0.1-cp311-abi3-macosx_11_0_arm64.whl",
+            ],
+        ),
+        "lacks",
+    ),
+    (
+        "no cryptography entry",
+        '[[package]]\nname = "jsonschema"\nversion = "4.21.0"\n',
+        "out of scope",
+    ),
+    (
+        "PyPy-only Intel wheel",
+        _lock(
+            "45.0.7", ["cryptography-45.0.7-pp311-pypy311_pp73-macosx_10_9_x86_64.whl"]
+        ),
+        "lacks",
+    ),
+    (
+        "universal2 wheel on an entry whose markers exclude Intel macOS",
+        _lock(
+            "50.0.1",
+            ["cryptography-50.0.1-cp311-abi3-macosx_10_9_universal2.whl"],
+            [NOT_INTEL],
+        ),
+        "lacks",
+    ),
+]
+
+
 def self_test() -> int:
-    with_wheel = (
-        '[[package]]\nname = "cryptography"\nversion = "48.0.1"\n'
-        "wheels = [\n"
-        '    { url = "https://files.pythonhosted.org/packages/aa/cryptography-48.0.1-cp311-abi3-'
-        'macosx_10_9_universal2.whl" },\n'
-        "]\n"
-    )
-    without_wheel = (
-        '[[package]]\nname = "cryptography"\nversion = "50.0.1"\n'
-        "wheels = [\n"
-        '    { url = "https://files.pythonhosted.org/packages/bb/cryptography-50.0.1-cp311-abi3-'
-        'manylinux_2_28_x86_64.whl" },\n'
-        '    { url = "https://files.pythonhosted.org/packages/cc/cryptography-50.0.1-cp311-abi3-'
-        'macosx_11_0_arm64.whl" },\n'
-        "]\n"
-    )
-    no_cryptography = '[[package]]\nname = "jsonschema"\nversion = "4.21.0"\n'
-    assert not lacks_intel_wheel(with_wheel), (
-        "a universal2 wheel line must satisfy the check"
-    )
-    assert lacks_intel_wheel(without_wheel), (
-        "a lock resolving cryptography with only Linux/arm64 wheels must fail the check"
-    )
-    assert not lacks_intel_wheel(no_cryptography), (
-        "a lock that never names cryptography is out of scope, not a failure"
-    )
+    for case, lock_text, outcome in SELF_TEST_CASES:
+        assert lacks_intel_wheel(lock_text) is (outcome == "lacks"), (
+            f"{case}: expected {outcome}"
+        )
+        detail = "" if outcome == "out of scope" else " a CPython Intel-macOS wheel"
+        print(f"ok: {case}: {outcome}{detail}")
     print("ok: cryptography_intel_wheel_check's matcher discriminates")
     return 0
 
@@ -138,9 +309,11 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"problems": problems}, indent=2))
     if problems:
         for p in problems:
-            print(f"FAIL: no Intel macOS cryptography wheel in {p}", file=sys.stderr)
+            print(f"FAIL: {p}", file=sys.stderr)
         return 1
-    print("ok: every tracked uv.lock naming cryptography resolves an Intel-macOS wheel")
+    print(
+        "ok: every tracked uv.lock naming cryptography resolves a CPython Intel-macOS wheel"
+    )
     return 0
 
 

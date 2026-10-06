@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.45.0",
+  "suite_version": "0.46.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -918,7 +918,7 @@
     },
     {
       "id": "VG-CRYPTO-INTEL-WHEEL",
-      "title": "Every tracked uv.lock resolving cryptography still resolves a real Intel-macOS wheel (ADR-0024)",
+      "title": "Every tracked uv.lock resolving cryptography still resolves a wheel CPython on an Intel Mac installs (ADR-0024)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -933,18 +933,30 @@
       "timeout_s": 120,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every tracked uv.lock that names cryptography (engines/python and adapters/supply-chain, which pin the platform-marker split directly, plus every other workspace that resolves it transitively through the editable agent-conformance dependency) resolves at least one cryptography wheel tagged macosx_*_universal2 or macosx_*_x86_64, so a fresh install on an Intel Mac never falls back to a source build; the check's own self-test proves its matcher discriminates a lock with such a wheel from one that resolves only Linux/Windows/arm64 wheels",
-        "fail": "any tracked lock naming cryptography resolves no Intel-macOS wheel (a later version bump dropped the platform split, or a new workspace's lock was never generated against the split pyproject.toml), or the self-test's seeded fault (the matcher always reporting no problem) fails to turn the check red"
+        "pass": "every tracked uv.lock that names cryptography (engines/python and adapters/supply-chain, which pin the platform-marker split directly, plus every other workspace that resolves it transitively through the editable agent-conformance dependency) has at least one cryptography entry whose resolution-markers admit CPython on Intel macOS, and every such entry carries a macosx_*_universal2 or macosx_*_x86_64 wheel tagged cp* or abi3, so a fresh install on an Intel Mac never falls back to a source build; the self-test's six cases include a PyPy-only Intel wheel and a universal2 wheel on an entry whose markers exclude Intel macOS, both of which must be reported",
+        "fail": "any tracked lock naming cryptography has no entry admitting Intel macOS, or an Intel-admitting entry with no CPython Intel wheel (a later bump dropped the platform split, shipped only a PyPy Intel wheel, or a new workspace's lock was never generated against the split pyproject.toml), or a lock whose TOML or resolution-markers the check cannot read; or any of the three seeded faults (the matcher always reporting no problem, the interpreter tag ignored, the resolution-markers ignored) fails to turn the self-test red"
       },
       "faults": [
         {
           "description": "the matcher stops checking lock text for an Intel-macOS wheel and always reports no problem, so a later cryptography bump that drops the platform split in any tracked lock would pass silently",
           "file": "tools/cryptography_intel_wheel_check.py",
-          "search": "    return not any(\n        INTEL_TAG.match(_platform_tag(wheel.get(\"url\", \"\")))\n        for pkg in packages\n        for wheel in pkg.get(\"wheels\", [])\n    )",
+          "search": "    return not intel or not all(\n        any(\n            _cpython_intel_wheel(wheel.get(\"url\", \"\"))\n            for wheel in pkg.get(\"wheels\", [])\n        )\n        for pkg in intel\n    )",
           "replace": "    return False"
+        },
+        {
+          "description": "the interpreter tag is ignored, so a lock whose only Intel-macOS cryptography wheel is PyPy-only (pp*) passes while CPython on an Intel Mac builds from source",
+          "file": "tools/cryptography_intel_wheel_check.py",
+          "search": "        python.startswith(\"cp\") or abi == \"abi3\"",
+          "replace": "        True"
+        },
+        {
+          "description": "resolution-markers are ignored, so a universal2 wheel on a cryptography entry that uv never installs on Intel macOS passes",
+          "file": "tools/cryptography_intel_wheel_check.py",
+          "search": "    if not markers:\n        return True",
+          "replace": "    return True"
         }
       ],
-      "fix_hint": "Run the gate's command and read the FAIL lines; tools/cryptography_intel_wheel_check.py names each offending uv.lock, which needs `uv lock` run inside it once its editable agent-conformance dependency (engines/python/pyproject.toml, ADR-0024) carries the platform split again."
+      "fix_hint": "Run the gate's command and read the FAIL lines; tools/cryptography_intel_wheel_check.py names each offending uv.lock. A lock with no CPython Intel wheel needs `uv lock` run inside it once its editable agent-conformance dependency (engines/python/pyproject.toml, ADR-0024) carries the platform split again; a lock it cannot read names the marker or TOML error."
     },
     {
       "id": "VG-VERIFY",
