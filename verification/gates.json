@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.49.0",
+  "suite_version": "0.50.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -724,8 +724,8 @@
         {
           "description": "Java's assess reads only the two-token --deviations <path> spelling, so --deviations=<path> (S15) silently applies nothing",
           "file": "engines/java/src/main/java/org/agentce/Cli.java",
-          "search": "            if (token.startsWith(\"--deviations=\")) {\n",
-          "replace": "            if (false) {\n"
+          "search": "                values.put(name, token.substring(eq + 1));\n",
+          "replace": "                if (!name.equals(\"--deviations\")) values.put(name, token.substring(eq + 1));\n"
         },
         {
           "description": "TypeScript's loadDeviationRegister decodes the register lossily instead of refusing non-UTF-8 bytes (S17)",
@@ -742,8 +742,8 @@
         {
           "description": "Java's --deviations lookup keeps the first value when the flag is given twice (S22, S22b)",
           "file": "engines/java/src/main/java/org/agentce/Cli.java",
-          "search": "                            \"pass --deviations <file>.\");\n                }\n                value = args[++i];\n",
-          "replace": "                            \"pass --deviations <file>.\");\n                }\n                value = value == null ? args[i + 1] : value;\n                i++;\n"
+          "search": "                values.put(name, args[++i]);\n",
+          "replace": "                values.putIfAbsent(name, args[++i]);\n"
         },
         {
           "description": "TypeScript's loadDeviationRegister names the register by the path as typed, not as Python's pathlib renders it, so a `.` segment (S6D) changes the cause",
@@ -1825,6 +1825,90 @@
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the rule lives in engines/python/agentce/safe_json.py (load_json), engines/typescript/src/json.ts (parseJson) and engines/java/src/main/java/org/agentce/Json.java (Json.parse); report --validate's TypeScript use is parseJsonText in engines/typescript/src/reportValidate.ts."
+    },
+    {
+      "id": "VG-FAIL-ON-PARITY",
+      "title": "assess --fail-on <expression> is parsed, refused and evaluated the same way in all three engines: the same exit code, exit_status and --json fail_on, or the same refusal with nothing written",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/fail_on_parity.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 600,
+      "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
+      "rubric": {
+        "pass": "over 38 scenarios run through each engine's real CLI with LC_ALL=C.UTF-8 (matches and misses, and before precedence, a single-quoted literal with an escape, --fail-on=<expression>, the flag given twice in both orders, matches after --deviations, the insufficient-evidence project with and without a match, Unicode whitespace, a 3000-clause chain, refusals including a dunder-import call, an astral character before the error position and a non-ASCII digit in a field name, a missing value trailing, mid-argv, before another option and as the first of two value flags, values that start with `-` including a non-ASCII digit, and the refusal order against a missing bundle or profile, an unknown --catalog and a missing --deviations register) TypeScript and Java give Python's exit code, exit_status and fail_on, or Python's key, cause and fix with no assertions.json written; a value flag with no value exits 3 with argparse's sentence (key input.assess_flag_needs_value in TypeScript and Java); Python's own results match python-reference.md; and Python's parse_fail_on and the TypeScript and Java fail-on-check seams print byte-identical refusals or match vectors for 6,051 expressions (R1-R31, F1-F14, D1, D2 and 6,000 fuzzed from a fixed seed) over seven assertions that cover every field",
+        "fail": "any engine evaluates, counts or refuses an expression differently from Python, differs in exit code, exit_status, fail_on, key, cause or fix, reads a value flag differently, refuses in a different order, writes assertions.json for a refused run, or prints a different line for any corpus expression"
+      },
+      "faults": [
+        {
+          "description": "TypeScript's assess skips the --fail-on match count, so the flag is ignored again and the default any-non-conformant rule decides the exit (F2, F7)",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "  if (failOnPredicate !== undefined) {\n",
+          "replace": "  if (false) {\n"
+        },
+        {
+          "description": "TypeScript's tokenizer counts positions in UTF-16 units instead of code points, so an error after an astral character names the wrong position (R19)",
+          "file": "engines/typescript/src/failOn.ts",
+          "search": "  const chars = Array.from(expr); // code points, so positions count what Python's do\n",
+          "replace": "  const chars = expr.split(\"\");\n"
+        },
+        {
+          "description": "TypeScript's tokenizer skips JavaScript's whitespace (/\\s/) instead of Python's isspace set, so U+001C and U+0085 are refused (F12)",
+          "file": "engines/typescript/src/failOn.ts",
+          "search": "    if (PY_WHITESPACE.has(c.codePointAt(0) as number)) {\n",
+          "replace": "    if (/\\s/u.test(c)) {\n"
+        },
+        {
+          "description": "Java's identifier continues with Character.isLetterOrDigit instead of Python's isalnum, so `a²` is an unexpected character rather than an unknown field (R24)",
+          "file": "engines/java/src/main/java/org/agentce/FailOn.java",
+          "search": "                while (j < n && (isPyAlnum(expr[j]) || expr[j] == '_')) {\n",
+          "replace": "                while (j < n && (Character.isLetterOrDigit(expr[j]) || expr[j] == '_')) {\n"
+        },
+        {
+          "description": "Java's assess value-flag scan keeps the first value when --fail-on is given twice (F8, F8b)",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "                values.put(name, args[++i]);\n",
+          "replace": "                if (!values.containsKey(name)) values.put(name, args[i + 1]);\n                i++;\n"
+        },
+        {
+          "description": "Java's assess parses the --fail-on expression after the catalogs resolve, so a bad expression with an unknown --catalog is refused for the catalog (O3)",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "        FailOn.Expression failOn = options.failOn() != null ? FailOn.parse(options.failOn()) : null;\n        Path out = Paths.get(options.out());\n        // --state's writability is proved here, before any --out write below (writeQuarantineJsonl\n        // etc.), not only when state.save() finally writes at the end of this method: a run refused\n        // for an unwritable --state must leave nothing in --out that looks like a result either.\n        if (options.state() != null) {\n            StateDir.ensureWritable(Paths.get(options.state()));\n        }\n        // Resolved on every run, even with no --catalog-dir (python-reference.md §9).\n        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());\n        Resolved resolved = resolveCatalogs(\n                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());\n",
+          "replace": "        Path out = Paths.get(options.out());\n        // --state's writability is proved here, before any --out write below (writeQuarantineJsonl\n        // etc.), not only when state.save() finally writes at the end of this method: a run refused\n        // for an unwritable --state must leave nothing in --out that looks like a result either.\n        if (options.state() != null) {\n            StateDir.ensureWritable(Paths.get(options.state()));\n        }\n        // Resolved on every run, even with no --catalog-dir (python-reference.md §9).\n        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());\n        Resolved resolved = resolveCatalogs(\n                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());\n        FailOn.Expression failOn = options.failOn() != null ? FailOn.parse(options.failOn()) : null;\n"
+        },
+        {
+          "description": "Python evaluates the list of OR-groups with all() instead of any(), so `or` acts as `and` (F1, F4)",
+          "file": "engines/python/agentce/fail_on.py",
+          "search": "        return any(\n            all(_FIELD_GETTERS",
+          "replace": "        return all(\n            all(_FIELD_GETTERS"
+        },
+        {
+          "description": "TypeScript's tokenizer keeps the backslash of an escape inside a string literal (F6)",
+          "file": "engines/typescript/src/failOn.ts",
+          "search": "          buf += chars[j + 1];\n",
+          "replace": "          buf += `${chars[j]}${chars[j + 1]}`;\n"
+        },
+        {
+          "description": "Java's parser treats `and` as a group separator, so `and` binds like `or` (F4)",
+          "file": "engines/java/src/main/java/org/agentce/FailOn.java",
+          "search": "            return tok != null && tok.kind() == Kind.IDENT && tok.value().equals(word);\n",
+          "replace": "            return tok != null && tok.kind() == Kind.IDENT && !word.equals(\"and\")\n                    && (tok.value().equals(word) || tok.value().equals(\"and\"));\n"
+        },
+        {
+          "description": "TypeScript's assess reads only the two-token --fail-on <expression> spelling, so --fail-on=<expression> is ignored (F7)",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "      if (token.startsWith(`--${name}=`)) {\n",
+          "replace": "      if (false) {\n"
+        }
+      ],
+      "fix_hint": "run verification/gates/fail_on_parity.sh and read the FAIL lines; the reference is engines/python/agentce/fail_on.py (parse_fail_on) and cmd_assess's --fail-on handling in engines/python/agentce/commands/__init__.py, ported in engines/typescript/src/failOn.ts and cli.ts (runAssess, assessValueFlags) and engines/java/src/main/java/org/agentce/FailOn.java and Cli.java (runAssess, assessValueFlags)."
     }
   ]
 }

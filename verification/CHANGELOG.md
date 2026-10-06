@@ -3,6 +3,22 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.50.0
+
+- `VG-FAIL-ON-PARITY` (18.73) is new. TypeScript and Java accepted `assess --fail-on <expression>` and
+  ignored it, so a run Python passed failed in the other two, and a malformed expression was not
+  refused. The gate runs 38 scenarios through each engine's real CLI and needs Python's exit code,
+  exit_status and `fail_on`, or Python's refusal with nothing written; a value flag with no value must
+  give argparse's sentence. It also runs Python's `parse_fail_on` and the TypeScript and Java
+  `fail-on-check` seams over 6,051 expressions, 6,000 of them fuzzed from a fixed seed, and needs the
+  same bytes from all three. Ten seeded faults: TypeScript ignores the match count, counts UTF-16 units,
+  uses JavaScript's whitespace, keeps an escape's backslash, or reads only `--fail-on <expression>`;
+  Java's identifier uses `Character.isLetterOrDigit`, its flag scan keeps the first value, it parses
+  after the catalogs resolve, or it treats `and` as `or`; Python evaluates the OR-groups with `all()`.
+- `VG-DEVIATIONS-PARITY` (18.73): its two Java faults on `--deviations` (the `=` spelling and the
+  first value kept) now anchor on the value-flag scan `--deviations` and `--fail-on` share, with the
+  same effect.
+
 ## 0.49.0
 
 - `VG-JSON-INTEGER-LIMIT` (18.71) is new. An evidence line or report artifact carrying an integer
