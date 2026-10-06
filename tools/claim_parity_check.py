@@ -18,6 +18,7 @@ Modes:
     claim_parity_check.py --fail-fast      # the same, stopping at the first mismatching run
     claim_parity_check.py --engine python  # Python alone, no build needed
     claim_parity_check.py --end-to-end     # each engine assesses, signs, and its signature verifies
+    claim_parity_check.py --sign-refusals  # sign_parity_check's claim.json refusal vectors
     claim_parity_check.py --self-test      # every tamper class is caught
 """
 
@@ -110,11 +111,12 @@ def runs(corpus: Path) -> list[Run]:
         "--deviations",
         str(AUDITOR / "deviations.yaml"),
     ]
+    # The fixtures come first so a fault in a rarely used field fails a --fail-fast run early.
     return [
-        *found,
         ("quickstart", _project_args(QUICKSTART), {}, True),
-        ("auditor_view", auditor, {"AGENTCE_OPERATOR": "Zoë Corp"}, True),
+        ("auditor_view", auditor, {"AGENTCE_OPERATOR": "Zo\u00eb Corp"}, True),
         ("no-assertions", _project_args(QUICKSTART, NO_ASSERTIONS), {}, False),
+        *found,
     ]
 
 
@@ -376,6 +378,20 @@ def run_end_to_end() -> int:
     return 0
 
 
+def run_sign_refusals() -> int:
+    """sign_parity_check's claim.json refusal vectors (sign.claim_malformed and the dry run), run on
+    their own for VG-CLAIM-PARITY."""
+    failures: list[str] = []
+    with tempfile.TemporaryDirectory(prefix="claim-refusals-") as raw:
+        spc.run_claim_malformed_scenarios(Path(raw), failures)
+    for failure in failures:
+        print(f"MISMATCH: {failure}", file=sys.stderr)
+    if failures:
+        return 1
+    print("SIGN REFUSALS OK")
+    return 0
+
+
 def self_test() -> int:
     """Each tamper class on a correct claim is caught, and the correct claim passes."""
     manifest = {
@@ -456,12 +472,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--end-to-end", action="store_true")
     parser.add_argument("--fail-fast", action="store_true")
+    parser.add_argument("--sign-refusals", action="store_true")
     parser.add_argument("--engine", choices=["python"], default=None)
     args = parser.parse_args(argv)
     if args.self_test:
         return self_test()
     if args.end_to_end:
         return run_end_to_end()
+    if args.sign_refusals:
+        return run_sign_refusals()
     return run_check(("python",) if args.engine else ENGINES, args.fail_fast)
 
 

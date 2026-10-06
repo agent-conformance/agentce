@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.42.0",
+  "suite_version": "0.43.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1578,6 +1578,61 @@
         }
       ],
       "fix_hint": "run verification/gates/verify_census_shard_coverage.sh and read which problem it found; the step is .github/workflows/quickstart.yml's jobs.verify-census, the selection is tools/verify_parity_check.py's select_shard, checked by tools/verify_census_shard_coverage_check.py; a list that differs with CI means something in build_canonical_fixtures reads the CI environment (its assess call must name its formats with --emit). The reference digest is quickstart.yml's jobs.census-list (--list-sha256) and each shard's --expect-list-sha256, compared in tools/verify_parity_check.py's run_census; the triggers are EXPECTED_TRIGGERS in the check."
+    },
+    {
+      "id": "VG-CLAIM-PARITY",
+      "title": "Python, TypeScript and Java assess write the same claim.json, each engine signs its own report end to end, and a malformed claim.json is refused alike",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/claim_parity.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "java",
+        "node"
+      ],
+      "timeout_s": 900,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "over corpus/quickstart, the auditor-view fixture, a no-subjects profile and the 30 generated corpus projects, each engine writes claim.json exactly when Python does, as json.dumps(sort_keys, indent=2) plus a newline, equal to Python's in every key but its own engine block and claim_id, with claim_id the sha256 of its canonical body; each engine assesses and signs corpus/quickstart and its signature verifies against the written trust-root.json; every malformed claim.json vector gives sign.claim_malformed (exit 3) with the same cause and fix in all three engines",
+        "fail": "any engine writes no claim.json or a different one, writes one with no assertions, cannot sign its own report, or answers a malformed claim.json with anything but sign.claim_malformed"
+      },
+      "faults": [
+        {
+          "description": "typescript writes no claim",
+          "file": "engines/typescript/src/report.ts",
+          "search": "  if (assertions.length > 0) {\n    // claim.json is unsigned here",
+          "replace": "  if (assertions.length < 0) {\n    // claim.json is unsigned here"
+        },
+        {
+          "description": "java drops deviations",
+          "file": "engines/java/src/main/java/org/agentce/Report.java",
+          "search": "        if (!deviations.isEmpty()) {\n            ArrayNode dev = body.putArray(\"deviations\");",
+          "replace": "        if (deviations.isEmpty()) {\n            ArrayNode dev = body.putArray(\"deviations\");"
+        },
+        {
+          "description": "claim_id over the wrong body (typescript hashes the body without its engine block)",
+          "file": "engines/typescript/src/report.ts",
+          "search": "update(canonicalize(body)).digest(\"hex\")}`;\n  return { claim_id: claimId, ...body };",
+          "replace": "update(canonicalize({ ...body, engine: {} })).digest(\"hex\")}`;\n  return { claim_id: claimId, ...body };"
+        },
+        {
+          "description": "signatures not a list is no longer refused by java sign with sign.claim_malformed",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "        if (claim.has(\"signatures\") && !claim.get(\"signatures\").isArray()) {",
+          "replace": "        if (claim.has(\"signatures\") && claim.get(\"signatures\").isMissingNode()) {"
+        },
+        {
+          "description": "java writes claim with no assertions",
+          "file": "engines/java/src/main/java/org/agentce/Report.java",
+          "search": "            if (!assertions.isEmpty()) {\n                // claim.json is unsigned here",
+          "replace": "            if (assertions.size() >= 0) {\n                // claim.json is unsigned here"
+        }
+      ],
+      "fix_hint": "run verification/gates/claim_parity.sh and read the MISMATCH lines; the reference is engines/python/agentce/report.py's _build_claim and commands/__init__.py's _read_sign_claim, ported as buildClaim in engines/typescript/src/report.ts and engines/java/src/main/java/org/agentce/Report.java and readSignClaim in cli.ts and Cli.java; the check is tools/claim_parity_check.py"
     }
   ]
 }

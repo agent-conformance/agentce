@@ -3,6 +3,18 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.43.0
+
+- `VG-CLAIM-PARITY` (18.53) is new. The TypeScript and Java engines now write `claim.json` when they
+  assess, so the gate rebuilds both and runs `tools/claim_parity_check.py`. It checks that each engine
+  writes the same claim as Python over the quickstart project, the auditor-view fixture, a profile with
+  no subjects and the 30 generated corpus projects; only the engine block and the `claim_id` over it
+  may differ. Each engine also signs its own quickstart report, and the signature must verify against
+  the written trust root. A damaged `claim.json` must get `sign.claim_malformed` from all three
+  engines. Five seeded faults: TypeScript writes no claim, Java drops the deviations list, the
+  `claim_id` is computed over the wrong body, Java stops refusing a `signatures` field that is not a
+  list, and Java writes a claim with no assertions.
+
 ## 0.42.0
 
 - `VG-VERIFY-CENSUS-SHARD-COVERAGE` (18.97) now checks that the four census shards split one list. A new
