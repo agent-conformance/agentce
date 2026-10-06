@@ -1616,8 +1616,8 @@
         {
           "description": "claim_id over the wrong body (typescript hashes the body without its engine block)",
           "file": "engines/typescript/src/report.ts",
-          "search": "update(canonicalize(body)).digest(\"hex\")}`;\n  return { claim_id: claimId, ...body };",
-          "replace": "update(canonicalize({ ...body, engine: {} })).digest(\"hex\")}`;\n  return { claim_id: claimId, ...body };"
+          "search": "const claimId = `sha256:${sha256Hex(body)}`;",
+          "replace": "const claimId = `sha256:${sha256Hex({ ...body, engine: {} })}`;"
         },
         {
           "description": "signatures not a list is no longer refused by java sign with sign.claim_malformed",

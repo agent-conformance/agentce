@@ -298,19 +298,8 @@ def _verify_signed(report: Path, problems: list[str], engine: str) -> None:
         )
         return
     trust = json.loads((report / "trust-root.json").read_bytes())
-    script = (
-        "import json, sys\n"
-        "from agentce import signing\n"
-        "envelope, trust = json.load(sys.stdin)\n"
-        "try:\n"
-        "    signing.verify_envelope(envelope, signing.TrustRoot.from_dict(trust))\n"
-        "    print('VERIFIED')\n"
-        "except signing.VerificationError as exc:\n"
-        "    print(f'FAILED: {exc}')\n"
-    )
-    out, _ = spc._py_engine_script(
-        script, input_text=json.dumps([signatures[0], trust])
-    )
+    [(keyid, entry)] = trust["keys"].items()
+    ok, out = spc.verify_offline(signatures[0], entry["public_key"], keyid)
     if out.strip() != "VERIFIED":
         problems.append(
             f"{engine}: envelope did not verify against trust-root.json ({out.strip()})"

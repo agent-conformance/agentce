@@ -1,6 +1,6 @@
 /** Shared helpers. */
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 /**
@@ -146,18 +146,10 @@ export function b64dStrict(value: string): Buffer {
 }
 
 /**
- * Decodes a file with a fatal UTF-8 decode (Node's lenient `utf-8` string coercion would otherwise
- * silently replace invalid byte sequences with U+FFFD rather than refuse, unlike Python's
- * `read_text("utf-8")` and Java's decoder); throws on a decode failure. `ignoreBOM: true` keeps a
- * leading U+FEFF in the decoded text instead of stripping it, so a byte-order-marked file fails
- * `JSON.parse`/`parseJson` here exactly as it does against Python's and Java's decoders, rather than
- * silently parsing where they refuse.
+ * A fatal, BOM-keeping UTF-8 decode: Node's lenient `utf-8` coercion would replace invalid bytes with
+ * U+FFFD where Python's and Java's decoders refuse, and `ignoreBOM: true` keeps a leading U+FEFF so a
+ * byte-order-marked file fails to parse here as it does there.
  */
-export function readTextFileStrict(path: string): string {
-  return decodeUtf8Strict(readFileSync(path));
-}
-
-/** The fatal, BOM-keeping UTF-8 decode {@link readTextFileStrict} applies, for bytes already read. */
 export function decodeUtf8Strict(raw: Uint8Array): string {
   return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(raw);
 }

@@ -277,10 +277,9 @@ jobs:
         run: |
           uv run --project tools --frozen python tools/sign_parity_check.py --self-test
           uv run --project tools --frozen python tools/sign_parity_check.py
-      - name: Cross-engine claim.json must agree (self-test, sign refusals, then sign end to end; the full comparison runs in claim-parity)
+      - name: Cross-engine claim.json must agree (self-test, then sign end to end; sign_parity_check runs the refusals, claim-parity the full comparison)
         run: |
           uv run --project tools --frozen python tools/claim_parity_check.py --self-test
-          uv run --project tools --frozen python tools/claim_parity_check.py --sign-refusals
           uv run --project tools --frozen python tools/claim_parity_check.py --end-to-end
       - name: Cross-engine report --validate must agree (self-test, then the real invocations)
         run: |

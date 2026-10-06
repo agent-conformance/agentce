@@ -18,7 +18,7 @@ import { DENIED_KINDS, RECORDER_CLASSES, summarizeActivity } from "./activity";
 import { type Assertion, aggregate, assertionToJson, checkDc5 } from "./assertions";
 import { deviationsByControl, indexBySubject } from "./assess";
 import type { BlindSpot, BlindSpots, CheckRef } from "./blindSpots";
-import { canonicalize } from "./canonical";
+import { canonicalize, sha256Hex } from "./canonical";
 import type { Catalog, ControlSpec } from "./catalog";
 import type { Event } from "./graph";
 import { DEFAULT_LANGUAGE, catalogue } from "./messages";
@@ -1357,12 +1357,7 @@ export function writeReport(
   if (assertions.length > 0) {
     // claim.json is unsigned here (SPEC §9.1: the engine never signs its own claim) and is not one
     // of the manifest's outputs, as in report.py; it exists so `agentce sign` can sign a real run.
-    const claim = buildClaim(
-      assertions,
-      manifest,
-      options.operator ?? "unknown",
-      options.limitations,
-    );
+    const claim = buildClaim(assertions, manifest, options.limitations);
     writeFileSync(join(outDir, "claim.json"), `${jsonStringifyAscii(sortKeysDeep(claim), 2)}\n`);
   }
   return manifest;
@@ -1375,13 +1370,12 @@ const CLAIM_STATEMENT =
 
 /**
  * The conformance claim body (SPEC §9.1, `claim.schema.json`), as report.py's `_build_claim`: the
- * catalogs are the manifest's own refs and the engine block is the manifest's minus its
+ * catalogs and operator are the manifest's own and the engine block is the manifest's minus its
  * `package_digest`; `claim_id` is the sha256 of the canonical body.
  */
 export function buildClaim(
   assertions: Assertion[],
   manifest: Record<string, unknown>,
-  operator: string,
   limitations?: string[],
 ): Record<string, unknown> {
   const minBy = (values: string[]): string =>
@@ -1398,7 +1392,7 @@ export function buildClaim(
     },
     catalogs: (manifest.inputs as Record<string, unknown>).catalogs,
     engine,
-    claimant: { org: operator },
+    claimant: { org: (manifest.run as Record<string, unknown>).operator },
     statement: CLAIM_STATEMENT,
   };
   if (limitations?.length) {
@@ -1410,6 +1404,6 @@ export function buildClaim(
   if (deviations.length > 0) {
     body.deviations = deviations;
   }
-  const claimId = `sha256:${createHash("sha256").update(canonicalize(body)).digest("hex")}`;
+  const claimId = `sha256:${sha256Hex(body)}`;
   return { claim_id: claimId, ...body };
 }
