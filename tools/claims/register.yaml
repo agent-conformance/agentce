@@ -114,12 +114,15 @@ claims:
       - website/src/pages/index.astro
       - website/src/content/docs/docs/running-assessments.md
     check:
-      workflow: .github/workflows/tests.yml
-      job: python
+      workflow: .github/workflows/verification.yml
+      job: build
       description: >-
-        engines/python/tests/test_verify_targets.py exercises `verify --catalog`/`--release`
-        (signer identity, trust, tamper and wrong-key rejection); test_cli.py::test_sign_ok and
-        test_signing.py exercise the `sign` CLI path and its DSSE/KMS/keyless signing profiles.
+        VG-VERIFY runs `verify --catalog`, `--release` and `--bundle` in the Python, TypeScript and
+        Java engines. Each engine refuses a tampered or unsigned catalog or release, verifies a
+        kms-signed and a keyless-certificate release, and refuses an unreadable bundle file with
+        input.bundle_unreadable.
+        tests.yml's python job runs test_verify_targets.py, test_cli.py::test_sign_ok and
+        test_signing.py for the `sign` path and its DSSE/KMS/keyless signing profiles.
   - id: cli.inspect-verify
     text: >-
       `agentce config show --json` prints every option, its resolved value, and where that value
