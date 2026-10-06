@@ -837,7 +837,7 @@
         {
           "description": "the signature check in verify_envelope always succeeds, so a tampered DSSE signature would be accepted",
           "file": "engines/python/agentce/signing.py",
-          "search": "            try:\n                sig_bytes = _b64d(sig)\n            except ValueError as exc:\n                raise VerificationError(SIG_NOT_BASE64) from exc\n            public_key.verify(sig_bytes, pae)\n",
+          "search": "            try:\n                sig_bytes = _b64d(sig)\n            except ValueError as exc:\n                raise VerificationError(SIG_NOT_BASE64) from exc\n            try:\n                public_key.verify(sig_bytes, pae)\n            except InvalidSignature as exc:\n                # InvalidSignature has no text of its own; give the reason a sentence (18.68).\n                raise VerificationError(SIGNATURE_INVALID) from exc\n",
           "replace": ""
         }
       ],
