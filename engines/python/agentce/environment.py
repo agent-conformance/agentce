@@ -5,11 +5,14 @@ wheels for Linux (glibc and musl), Windows x86_64, and macOS arm64 for every rel
 release since then ships an Intel-macOS wheel (ADR-0024). ``engines/python/pyproject.toml`` and
 ``adapters/supply-chain/pyproject.toml`` therefore pin darwin/x86_64 to the 48.x line instead, whose
 universal2 wheel (tagged ``macosx_10_9_universal2``) installs on Intel Macs as a real prebuilt
-binary, not a source build. Installing outside that matched set (for example a bare ``macosx_*_x86_64``
-tag, which no release in the pinned 48.x/50.x lines publishes for CPython; 46.0.0-46.0.3 shipped one,
-but only for PyPy, tagged ``pp*`` rather than ``cp*``) still compiles from source and needs a Rust
-toolchain and an OpenSSL 3 build. This module reads what the running interpreter actually has installed
-and reports it, so a user learns what is missing from ``agentce doctor`` instead of from a build failure.
+binary, not a source build. Installing outside that matched set still compiles from source and needs a
+Rust toolchain and an OpenSSL 3 build. No release in the pinned 48.x/50.x lines publishes a bare
+``macosx_*_x86_64`` wheel. Older releases did: CPython ones through 42.0.8 (``cp37-abi3-macosx_10_12_x86_64``,
+as in 41.0.7; 3.4.8 shipped ``cp36-abi3``), and PyPy-only ``pp*`` ones through 46.0.3 (45.0.7 among them).
+This module reports any bare ``macosx_*_x86_64`` tag as ``source-build``, which would be wrong for a
+genuine CPython wheel from 42.0.8 or older; the pins keep those releases out of reach. It reads what the
+running interpreter actually has installed and reports it, so a user learns what is missing from
+``agentce doctor`` instead of from a build failure.
 
 Nothing here is a constant standing in for a measurement: the interpreter version comes from
 ``sys.version_info``, and the wheel provenance from the installed distribution's own ``WHEEL`` file.

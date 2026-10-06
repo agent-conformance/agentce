@@ -108,7 +108,8 @@ envelopes or build X.509 certificate chains.
 ## Verification
 
 - `engines/python/uv.lock` and `adapters/supply-chain/uv.lock` each resolve a
-  `macosx_*_(universal2|x86_64)` `cryptography` wheel (`grep -E` in `state show 18.55`'s acceptance).
+  `macosx_*_(universal2|x86_64)` `cryptography` wheel (item 18.55's `grep -E` acceptance). The standing
+  gate in the last bullet also checks each wheel's interpreter tag and each entry's markers.
 - `uv run pytest` on this Intel Mac, with `uv sync` resolving `cryptography==48.0.1` here: full suite
   green (1183 passed).
 - `uv run agentce doctor --project corpus/quickstart --json` on this Intel Mac reports
@@ -119,8 +120,15 @@ envelopes or build X.509 certificate chains.
   shows no other advisory.
 - `engines/python/tests/test_environment.py::test_wheel_source_classifies_platform_tags` covers the
   `macosx_10_9_universal2` tag as `prebuilt` and keeps the architecture-specific `macosx_10_12_x86_64`
-  tag as `source-build` (no CPython release in the pinned 48.x/50.x lines publishes a bare macOS
-  x86_64 wheel; cryptography 46.0.0-46.0.3 shipped one, but tagged `pp*` for PyPy only, not `cp*`).
+  tag as `source-build`. No release in the pinned 48.x/50.x lines publishes a bare macOS x86_64 wheel.
+  Older releases did: CPython ones through 42.0.8 (`cp37-abi3-macosx_10_12_x86_64`, as in 41.0.7;
+  3.4.8 shipped `cp36-abi3`), and PyPy-only `pp*` ones through 46.0.3 (45.0.7 among them). For any of
+  them `environment.py` reports `source-build`, which is wrong for a genuine CPython wheel from 42.0.8 or
+  older; the pins keep those releases out of reach.
 - Item 18.58 extends this to every other tracked `uv.lock` that resolves `cryptography` transitively
   (the 20 workspaces besides the two above): `tools/cryptography_intel_wheel_check.py` parses every
-  tracked lock as TOML and checks its resolved wheels for an Intel-macOS one, in CI, with a seeded fault.
+  tracked lock as TOML and checks it in CI (gate `VG-CRYPTO-INTEL-WHEEL`). Since item 18.62, every
+  `cryptography` entry whose `resolution-markers` admit CPython on Intel macOS must carry a
+  `macosx_*_(universal2|x86_64)` wheel tagged `cp*` or `abi3`, and a marker or lock the check cannot
+  read fails it. Three seeded faults: the matcher always passing, the interpreter tag ignored, and the
+  markers ignored.
