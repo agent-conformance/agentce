@@ -5,11 +5,21 @@
 
 import assert from "node:assert/strict";
 import { sign as cryptoSign, verify as cryptoVerify, generateKeyPairSync } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { loadBundle } from "./bundle";
 import { canonicalize, sha256Hex } from "./canonical";
+import { InputError } from "./errors";
 import { errorCause } from "./messages";
 import { digestTree } from "./report";
 import { dssePae, keyidFor, signStatement } from "./sign";
@@ -177,7 +187,7 @@ test("verifyEnvelope verifies a real kms-signed envelope and returns the identit
   assert.equal(verified.keyless, false);
 });
 
-test("verifyEnvelope refuses a tampered signature with an empty trailing reason (InvalidSignature's str() is empty)", () => {
+test("verifyEnvelope refuses a tampered signature with 'signature does not verify' (Python's SIGNATURE_INVALID)", () => {
   const fixture = kmsFixture();
   const envelope = signEnvelope({ hello: "world" }, fixture) as {
     signatures: Array<{ sig: string }>;
@@ -979,5 +989,113 @@ test("keyless certificate: a window wholly in 1970 or wholly in 2999 verifies, s
   ]) {
     const { trust, envelope } = keylessWith({ not_before: notBefore, not_after: notAfter });
     assert.equal(verifyEnvelope(envelope, trust).keyless, true);
+  }
+});
+
+// --- 18.68: an input that cannot be read is refused with one key per target, naming the path. ---
+
+const QUICKSTART_EVIDENCE = join(__dirname, "..", "..", "..", "corpus", "quickstart", "evidence");
+const STREAM = "events/urn-agentce-source-langgraph-gateway-eu-1.jsonl";
+const asRoot = process.getuid?.() === 0; // root reads a mode-000 file anyway
+
+/** Runs `fn` with `path` made unreadable (chmod 000), restoring it after, and returns the refusal. */
+function unreadableRefusal(path: string, fn: () => unknown): { key: string; cause: string } {
+  chmodSync(path, 0);
+  try {
+    fn();
+  } catch (err) {
+    assert.ok(err instanceof InputError, String(err));
+    return { key: err.key, cause: err.cause };
+  } finally {
+    chmodSync(path, 0o755);
+  }
+  assert.fail("expected a refusal");
+}
+
+function evidenceCopy(): { dir: string; bundle: string } {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-unreadable-"));
+  const bundle = join(dir, "evidence");
+  cpSync(QUICKSTART_EVIDENCE, bundle, { recursive: true });
+  return { dir, bundle };
+}
+
+test("verify unreadable input: a bundle directory names manifest.json", { skip: asRoot }, () => {
+  const { dir, bundle } = evidenceCopy();
+  try {
+    assert.deepEqual(
+      unreadableRefusal(bundle, () => loadBundle(bundle)),
+      {
+        key: "input.bundle_unreadable",
+        cause: `the evidence bundle ${bundle} holds a file or folder that cannot be read: manifest.json.`,
+      },
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test(
+  "verify unreadable input: an events/ directory names a file under it",
+  { skip: asRoot },
+  () => {
+    const { dir, bundle } = evidenceCopy();
+    try {
+      const { key, cause } = unreadableRefusal(join(bundle, "events"), () => loadBundle(bundle));
+      assert.equal(key, "input.bundle_unreadable");
+      assert.match(cause, /cannot be read: events\//);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+);
+
+test("verify unreadable input: a stream file is named", { skip: asRoot }, () => {
+  const { dir, bundle } = evidenceCopy();
+  try {
+    assert.deepEqual(
+      unreadableRefusal(join(bundle, STREAM), () => loadBundle(bundle)),
+      {
+        key: "input.bundle_unreadable",
+        cause: `the evidence bundle ${bundle} holds a file or folder that cannot be read: ${STREAM}.`,
+      },
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("verify unreadable input: a release directory", { skip: asRoot }, () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-unreadable-"));
+  const release = join(dir, "release");
+  mkdirSync(release);
+  writeFileSync(join(release, "release-manifest.json"), "{}");
+  try {
+    const { key, cause } = unreadableRefusal(release, () =>
+      verifyRelease(release, TrustRoot.fromDict({ keys: {} })),
+    );
+    assert.equal(key, "input.release_unreadable");
+    assert.ok(cause.startsWith(`the release artifact ${release} `), cause);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("verify unreadable input: a catalog subdirectory is named", { skip: asRoot }, () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-unreadable-"));
+  writeFileSync(join(dir, "catalog.yaml"), "id: demo\n");
+  mkdirSync(join(dir, "controls"));
+  writeFileSync(join(dir, "controls", "c.yaml"), "id: c\n");
+  try {
+    assert.deepEqual(
+      unreadableRefusal(join(dir, "controls"), () =>
+        verifyCatalog(dir, TrustRoot.fromDict({ keys: {} })),
+      ),
+      {
+        key: "input.catalog_unreadable",
+        cause: `the catalog directory ${dir} holds a file or folder that cannot be read: controls.`,
+      },
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });

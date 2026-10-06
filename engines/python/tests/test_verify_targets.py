@@ -8,12 +8,16 @@ they exercise the real verification path without depending on the repository's c
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+import os
+import shutil
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from test_commands import _AUD_FIXTURE, _packaged_and_signed
 
 from agentce import cli, signing
 
@@ -507,3 +511,214 @@ def test_report_default_format(
     code, env = run(["report", "--from", str(src), "--json"], capsys)
     assert code == 0
     assert env["format"] == "md"
+
+
+# --- 18.68: an input that cannot be read is refused with one key per target, naming the path. ---
+
+_REPO = Path(__file__).resolve().parents[3]
+_QUICKSTART = _REPO / "corpus" / "quickstart"
+_STREAM = "events/urn-agentce-source-langgraph-gateway-eu-1.jsonl"
+
+not_root = pytest.mark.skipif(
+    os.geteuid() == 0, reason="root reads a mode-000 file anyway"
+)
+
+
+@contextmanager
+def _unreadable(path: Path) -> Iterator[None]:
+    mode = path.stat().st_mode
+    path.chmod(0)
+    try:
+        yield
+    finally:
+        path.chmod(mode)
+
+
+def _refusal(env: dict[str, Any]) -> tuple[str, str]:
+    return env["error"]["key"], env["error"]["cause"]
+
+
+def _evidence(tmp_path: Path) -> Path:
+    bundle = tmp_path / "evidence"
+    shutil.copytree(_QUICKSTART / "evidence", bundle)
+    return bundle
+
+
+@not_root
+def test_verify_unreadable_input_bundle_directory(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    bundle = _evidence(tmp_path)
+    with _unreadable(bundle):
+        code, env = run(["verify", "--bundle", str(bundle), "--json"], capsys)
+    assert code == 3
+    assert _refusal(env) == (
+        "input.bundle_unreadable",
+        f"the evidence bundle {bundle} holds a file or folder that cannot be read: "
+        "manifest.json.",
+    )
+
+
+@not_root
+def test_verify_unreadable_input_bundle_events_directory(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    bundle = _evidence(tmp_path)
+    with _unreadable(bundle / "events"):
+        code, env = run(["verify", "--bundle", str(bundle), "--json"], capsys)
+    assert code == 3
+    key, cause = _refusal(env)
+    assert key == "input.bundle_unreadable"
+    assert "cannot be read: events/" in cause
+
+
+@not_root
+def test_verify_unreadable_input_bundle_stream_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    bundle = _evidence(tmp_path)
+    with _unreadable(bundle / _STREAM):
+        code, env = run(["verify", "--bundle", str(bundle), "--json"], capsys)
+    assert code == 3
+    assert _refusal(env) == (
+        "input.bundle_unreadable",
+        f"the evidence bundle {bundle} holds a file or folder that cannot be read: {_STREAM}.",
+    )
+
+
+@not_root
+def test_verify_unreadable_input_release_directory(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    release = tmp_path / "release"
+    release.mkdir()
+    (release / "release-manifest.json").write_text("{}", encoding="utf-8")
+    with _unreadable(release):
+        code, env = run(["verify", "--release", str(release), "--json"], capsys)
+    assert code == 3
+    key, cause = _refusal(env)
+    assert key == "input.release_unreadable"
+    assert cause.startswith(f"the release artifact {release} ")
+
+
+@not_root
+def test_verify_unreadable_input_catalog_subdirectory(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "catalog.yaml").write_text("id: demo\n", encoding="utf-8")
+    (tmp_path / "controls").mkdir()
+    (tmp_path / "controls" / "c.yaml").write_text("id: c\n", encoding="utf-8")
+    with _unreadable(tmp_path / "controls"):
+        code, env = run(["verify", "--catalog", str(tmp_path), "--json"], capsys)
+    assert code == 3
+    assert _refusal(env) == (
+        "input.catalog_unreadable",
+        f"the catalog directory {tmp_path} holds a file or folder that cannot be read: "
+        "controls.",
+    )
+
+
+@not_root
+def test_verify_unreadable_input_report_directory(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    report = tmp_path / "report"
+    report.mkdir()
+    with _unreadable(report):
+        code, env = run(["verify", "--report", str(report), "--json"], capsys)
+    assert code == 3
+    assert _refusal(env) == (
+        "verify.report_unreadable",
+        f"the report directory {report} cannot be read.",
+    )
+
+
+def _report_refusal(
+    capsys: pytest.CaptureFixture[str], out: Path, rel: str
+) -> tuple[int, tuple[str, str]]:
+    capsys.readouterr()  # discard the setup commands' output
+    with _unreadable(out / rel):
+        code, env = run(["verify", "--report", str(out), "--json"], capsys)
+    return code, _refusal(env)
+
+
+@not_root
+def test_verify_unreadable_input_report_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out, _key = _packaged_and_signed(tmp_path)
+    assert _report_refusal(capsys, out, "manifest.json") == (
+        3,
+        (
+            "verify.report_unreadable",
+            f"the report directory {out} holds a file or folder that cannot be read: "
+            "manifest.json.",
+        ),
+    )
+
+
+@not_root
+def test_verify_unreadable_input_report_packaged_catalog(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out, _key = _packaged_and_signed(
+        tmp_path,
+        "--catalog-dir",
+        str(_AUD_FIXTURE / "catalog"),
+        "--allow-unverified-catalog",
+    )
+    code, (key, cause) = _report_refusal(capsys, out, "bundle/catalog/0")
+    assert (code, key) == (3, "verify.report_unreadable")
+    assert "cannot be read: bundle/catalog/0" in cause
+
+
+@not_root
+def test_verify_unreadable_input_report_packaged_deviations(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    deviations = tmp_path / "deviations.yaml"
+    deviations.write_text("deviations: []\n", encoding="utf-8")
+    out, _key = _packaged_and_signed(tmp_path, "--deviations", str(deviations))
+    assert _report_refusal(capsys, out, "bundle/deviations.yaml") == (
+        3,
+        (
+            "verify.report_unreadable",
+            f"the report directory {out} holds a file or folder that cannot be read: "
+            "bundle/deviations.yaml.",
+        ),
+    )
+
+
+@not_root
+@pytest.mark.parametrize(
+    "extra", [[], ["--allow-unverified-catalog"]], ids=["strict", "override"]
+)
+def test_verify_unreadable_input_assess_catalog_dir(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], extra: list[str]
+) -> None:
+    """Unreadable is not unverified: --allow-unverified-catalog does not cover it."""
+    catalog = tmp_path / "catalog"
+    shutil.copytree(_REPO / "spec" / "catalogs" / "base" / "eu-ai-act", catalog)
+    with _unreadable(catalog / "controls"):
+        code = cli.main(
+            [
+                "assess",
+                "--bundle",
+                str(_QUICKSTART / "evidence"),
+                "--profile",
+                str(_QUICKSTART / "applicability.yaml"),
+                "--catalog-dir",
+                str(catalog),
+                *extra,
+                "--out",
+                str(tmp_path / "out"),
+                "--json",
+            ]
+        )
+    env = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert _refusal(env) == (
+        "input.catalog_unreadable",
+        f"the catalog directory {catalog} holds a file or folder that cannot be read: "
+        "controls.",
+    )

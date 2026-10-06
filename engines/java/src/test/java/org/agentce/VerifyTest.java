@@ -12,6 +12,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -21,6 +23,8 @@ import java.security.Signature;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
+import java.util.Set;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -237,7 +241,7 @@ class VerifyTest {
     }
 
     @Test
-    void verifyEnvelopeRefusesATamperedSignatureWithAnEmptyTrailingReason() throws Exception {
+    void verifyEnvelopeRefusesATamperedSignatureWithSignatureDoesNotVerify() throws Exception {
         KmsFixture fixture = kmsFixture("test-identity");
         ObjectNode envelope = signEnvelope(Json.nodes().objectNode().put("hello", "world"), fixture);
         ObjectNode entry = (ObjectNode) envelope.get("signatures").get(0);
@@ -245,7 +249,7 @@ class VerifyTest {
         sigBuf[0] = (byte) (sigBuf[0] ^ 0xff);
         entry.put("sig", Base64.getEncoder().encodeToString(sigBuf));
         assertEquals(
-                "no signature verified against the trust root: ",
+                "no signature verified against the trust root: signature does not verify",
                 assertThrows(IllegalArgumentException.class, () -> Verify.verifyEnvelope(envelope, fixture.trust()))
                         .getMessage());
     }
@@ -950,5 +954,93 @@ class VerifyTest {
                     + "-01-01T00:10:00Z\"}";
             assertTrue(keylessWith(changes).verify().keyless(), changes);
         }
+    }
+
+    // --- 18.68: an input that cannot be read is refused with one key per target, naming the path. ---
+
+    private static final Path QUICKSTART_EVIDENCE = TestPaths.repoRoot().resolve("corpus/quickstart/evidence");
+    private static final String STREAM = "events/urn-agentce-source-langgraph-gateway-eu-1.jsonl";
+
+    private static void assumeNotRoot() {
+        // Root reads a mode-000 file anyway.
+        Assumptions.assumeFalse("root".equals(System.getProperty("user.name")), "running as root");
+    }
+
+    /** Runs {@code action} with {@code path} made unreadable (chmod 000), restoring it after. */
+    private static InputError unreadableRefusal(Path path, Runnable action) throws Exception {
+        Set<PosixFilePermission> mode = Files.getPosixFilePermissions(path);
+        Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("---------"));
+        try {
+            return assertThrows(InputError.class, action::run);
+        } finally {
+            Files.setPosixFilePermissions(path, mode);
+        }
+    }
+
+    private static Path evidenceCopy(Path dir) throws Exception {
+        Path bundle = dir.resolve("evidence");
+        try (var paths = Files.walk(QUICKSTART_EVIDENCE)) {
+            for (Path source : (Iterable<Path>) paths::iterator) {
+                Files.copy(source, bundle.resolve(QUICKSTART_EVIDENCE.relativize(source).toString()));
+            }
+        }
+        return bundle;
+    }
+
+    private static Verify.TrustRoot noKeys() {
+        return Verify.TrustRoot.fromDict(Json.parse("{\"keys\": {}}"));
+    }
+
+    @Test
+    void verifyUnreadableInputBundleDirectoryNamesTheManifest(@TempDir Path dir) throws Exception {
+        assumeNotRoot();
+        Path bundle = evidenceCopy(dir);
+        InputError err = unreadableRefusal(bundle, () -> Bundle.load(bundle));
+        assertEquals("input.bundle_unreadable", err.key);
+        assertEquals(
+                "the evidence bundle " + bundle + " holds a file or folder that cannot be read: manifest.json.",
+                err.reason);
+    }
+
+    @Test
+    void verifyUnreadableInputEventsDirectoryNamesAFileUnderIt(@TempDir Path dir) throws Exception {
+        assumeNotRoot();
+        Path bundle = evidenceCopy(dir);
+        InputError err = unreadableRefusal(bundle.resolve("events"), () -> Bundle.load(bundle));
+        assertEquals("input.bundle_unreadable", err.key);
+        assertTrue(err.reason.contains("cannot be read: events/"), err.reason);
+    }
+
+    @Test
+    void verifyUnreadableInputStreamFileIsNamed(@TempDir Path dir) throws Exception {
+        assumeNotRoot();
+        Path bundle = evidenceCopy(dir);
+        InputError err = unreadableRefusal(bundle.resolve(STREAM), () -> Bundle.load(bundle));
+        assertEquals("input.bundle_unreadable", err.key);
+        assertEquals(
+                "the evidence bundle " + bundle + " holds a file or folder that cannot be read: " + STREAM + ".",
+                err.reason);
+    }
+
+    @Test
+    void verifyUnreadableInputReleaseDirectory(@TempDir Path dir) throws Exception {
+        assumeNotRoot();
+        Path release = Files.createDirectory(dir.resolve("release"));
+        Files.writeString(release.resolve("release-manifest.json"), "{}");
+        InputError err = unreadableRefusal(release, () -> Verify.verifyRelease(release, noKeys()));
+        assertEquals("input.release_unreadable", err.key);
+        assertTrue(err.reason.startsWith("the release artifact " + release + " "), err.reason);
+    }
+
+    @Test
+    void verifyUnreadableInputCatalogSubdirectoryIsNamed(@TempDir Path dir) throws Exception {
+        assumeNotRoot();
+        Files.writeString(dir.resolve("catalog.yaml"), "id: demo\n");
+        Files.createDirectory(dir.resolve("controls"));
+        Files.writeString(dir.resolve("controls/c.yaml"), "id: c\n");
+        InputError err = unreadableRefusal(dir.resolve("controls"), () -> Verify.verifyCatalog(dir, noKeys()));
+        assertEquals("input.catalog_unreadable", err.key);
+        assertEquals(
+                "the catalog directory " + dir + " holds a file or folder that cannot be read: controls.", err.reason);
     }
 }
