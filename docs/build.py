@@ -56,6 +56,28 @@ _LINK = re.compile(r"(?<!\!)\[[^\]]*\]\(([^)]+)\)")
 _HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 
 
+# The exit-code reference both command index pages end with (docs and site), with the opt-in recipe for
+# failing CI on evidence gaps from a records-folder scan (SPEC §8.5, VG-RECORDS-EXIT-CODE).
+_EXIT_CODES = (
+    "## Exit codes\n\n"
+    "Every command shares one scheme: `0` success with nothing needing action; `1` findings "
+    "requiring action; `2` insufficient evidence on a high-severity control (`assess "
+    "--bundle`/`--profile` only, not a records-folder `assess <folder>` scan); `3` an "
+    "input, version, or signature-verification error. When several apply the highest is "
+    "returned and the `--json` output carries them all.\n\n"
+    "### Fail CI on evidence gaps from a records folder\n\n"
+    "A records-folder scan never returns `2` on its own, so a first run over the records you "
+    "already keep does not fail. To make a pipeline fail when a high-severity control has too "
+    "little evidence, opt in:\n\n"
+    "```bash\n"
+    "agentce assess ./records --fail-on 'outcome==\"insufficient_evidence\" and severity==\"high\"'\n"
+    "```\n\n"
+    "The run exits `1` when anything matches, and `--json` reports the expression and the number "
+    "of matches under `fail_on`. `--fail-on` replaces the default rule, so non-conformant results "
+    "no longer fail the run on their own. Add `or outcome==\"non-conformant\"` to fail on both. "
+    "Copy the values exactly as written. A misspelled value matches nothing, and the run exits `0`.\n"
+)
+
 def _slug(heading: str) -> str:
     """GitHub-style heading anchor: lowercase, punctuation dropped, spaces to hyphens."""
     text = heading.strip().lower().replace("`", "")
@@ -176,12 +198,7 @@ def _command_pages() -> dict[Path, str]:
         "parser, so the documentation and the tool never disagree.\n\n"
         "| Command | Purpose |\n|---|---|\n"
         f"{rows}\n\n"
-        "## Exit codes\n\n"
-        "Every command shares one scheme: `0` success with nothing needing action; `1` findings "
-        "requiring action; `2` insufficient evidence on a high-severity control (`assess "
-        "--bundle`/`--profile` only, not a records-folder `assess <folder>` scan); `3` an "
-        "input, version, or signature-verification error. When several apply the highest is "
-        "returned and the `--json` output carries them all.\n"
+        f"{_EXIT_CODES}"
     )
     return pages
 
@@ -879,12 +896,7 @@ def _site_command_pages() -> dict[Path, str]:
         "parser, so the documentation and the tool never disagree.\n\n"
         "| Command | Purpose |\n|---|---|\n"
         f"{rows}\n\n"
-        "## Exit codes\n\n"
-        "Every command shares one scheme: `0` success with nothing needing action; `1` findings "
-        "requiring action; `2` insufficient evidence on a high-severity control (`assess "
-        "--bundle`/`--profile` only, not a records-folder `assess <folder>` scan); `3` an "
-        "input, version, or signature-verification error. When several apply the highest is "
-        "returned and the `--json` output carries them all.\n"
+        f"{_EXIT_CODES}"
     )
     return pages
 
