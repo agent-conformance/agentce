@@ -3,6 +3,16 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.49.0
+
+- `VG-JSON-INTEGER-LIMIT` (18.71) is new. An evidence line or report artifact carrying an integer
+  literal over 4300 digits is invalid JSON in all three engines: `validate` and `assess` quarantine the
+  line as `schema_invalid`, the same as a malformed line, and `report --validate` names the artifact.
+  4300 digits, with or without a sign, still parse. Python gives the same results under
+  `PYTHONINTMAXSTRDIGITS=0` and `=640`, so the interpreter setting cannot change what a file means. Four
+  seeded faults: Python trusts the interpreter's limit, Python lets the bare `ValueError` escape, Python's
+  JSONL line check goes back to `json.loads`, and TypeScript's report check uses `JSON.parse` alone.
+
 ## 0.48.0
 
 - `VG-VERIFY` (18.68) now checks what its title says. Its legs were all key-signed, though the title

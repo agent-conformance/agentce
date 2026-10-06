@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.48.0",
+  "suite_version": "0.49.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1777,6 +1777,54 @@
         }
       ],
       "fix_hint": "Run verification/gates/diff_readiness_parity.sh and read the MISMATCH lines; the checks are tools/diff_parity_check.py and tools/readiness_parity_check.py, and the reference is engines/python/agentce/commands/__init__.py's cmd_diff and engines/python/agentce/readiness.py, ported in engines/typescript/src/diff.ts and readiness.ts and engines/java/src/main/java/org/agentce/Diff.java and Readiness.java"
+    },
+    {
+      "id": "VG-JSON-INTEGER-LIMIT",
+      "title": "An integer literal over 4300 digits is invalid JSON in all three engines, and in Python under every int_max_str_digits setting: validate and assess quarantine the evidence line as schema_invalid, and report --validate names the artifact as invalid JSON",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/json_integer_limit.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 900,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "for a bundle line with a 5000- or 4301-digit integer literal, every engine (Python also under PYTHONINTMAXSTRDIGITS=0 and =640) gives the same validate exit and counts, the malformed-JSON line's result, and a quarantine detail starting 'invalid JSON'; 4300 digits with or without a sign parse; assess quarantines the line identically; report --validate gives exactly one invalid-JSON problem for assertions.json, manifest.json or runtime_drift.jsonl carrying the literal (Python's text equal to Java's) and accepts a 4300-digit runtime_drift.jsonl line",
+        "fail": "any engine or interpreter setting crashes, accepts the over-limit literal, refuses a 4300-digit one, or differs from the others"
+      },
+      "faults": [
+        {
+          "description": "Python always takes json.loads' fast path, so the interpreter's own limit decides: under PYTHONINTMAXSTRDIGITS=0 the 5000-digit line parses",
+          "file": "engines/python/agentce/safe_json.py",
+          "search": "    if sys.get_int_max_str_digits() == MAX_INT_STR_DIGITS:\n",
+          "replace": "    if True:\n"
+        },
+        {
+          "description": "Python lets json.loads' bare ValueError for an over-limit literal escape, so ingest and report --validate crash with internal.unexpected",
+          "file": "engines/python/agentce/safe_json.py",
+          "search": "        except ValueError:\n            pass  # an integer literal past the limit",
+          "replace": "        except ValueError:\n            raise  # an integer literal past the limit"
+        },
+        {
+          "description": "Python's runtime_drift.jsonl line check goes back to json.loads, which raises a bare ValueError the JSONError handler does not catch",
+          "file": "engines/python/agentce/report.py",
+          "search": "            load_json(line)\n        except JSONError as exc:\n            problems.append(f\"{path.name}: line {i}",
+          "replace": "            json.loads(line)\n        except JSONError as exc:\n            problems.append(f\"{path.name}: line {i}"
+        },
+        {
+          "description": "TypeScript's report --validate parses with the native JSON.parse alone, which accepts the over-limit literal",
+          "file": "engines/typescript/src/reportValidate.ts",
+          "search": "  parseJson(text); // throws only",
+          "replace": "  // parseJson(text); // throws only"
+        }
+      ],
+      "fix_hint": "Run the gate's command and read the FAIL lines; the rule lives in engines/python/agentce/safe_json.py (load_json), engines/typescript/src/json.ts (parseJson) and engines/java/src/main/java/org/agentce/Json.java (Json.parse); report --validate's TypeScript use is parseJsonText in engines/typescript/src/reportValidate.ts."
     }
   ]
 }
