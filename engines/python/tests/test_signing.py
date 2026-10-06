@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from agentce import signing
+from agentce import error_catalogue, signing
 from agentce.canonical import canonicalize
 
 # A fixed key (all-zero seed) and its deterministic signature over a fixed statement.
@@ -244,3 +244,110 @@ def test_trust_root_from_dict_accepts_a_correctly_addressed_key() -> None:
     }
     trust = signing.TrustRoot.from_dict(data)
     assert keyid in trust.keys
+
+
+def _keyless_envelope(**fields: object) -> tuple[dict, signing.TrustRoot]:
+    """An envelope signed through a certificate the test authority issues and then re-signs after
+    `fields` change its body (a value of `None` deletes the field), so the authority's signature
+    verifies and only the field checks can refuse it."""
+    ca = Ed25519PrivateKey.generate()
+    leaf = Ed25519PrivateKey.generate()
+    cert = signing.issue_certificate(
+        ca,
+        issuer="dev-ca",
+        identity="ci@agent-conformance.org",
+        leaf_public=leaf.public_key(),
+        not_before="2026-01-01T00:00:00.000Z",
+        not_after="2027-01-01T00:00:00.000Z",
+    )
+    body = {k: v for k, v in cert.items() if k != "signature"}
+    for name, value in fields.items():
+        if value is None:
+            body.pop(name, None)
+        else:
+            body[name] = value
+    cert = {**body, "signature": signing._b64e(ca.sign(canonicalize(body)))}
+    env = signing.sign_statement(
+        _statement(), signing.KeylessSigner(private_key=leaf, cert=cert)
+    )
+    return env, signing.TrustRoot(authorities={"dev-ca": ca.public_key()})
+
+
+def _refusal(key: str) -> str:
+    cause = error_catalogue.MESSAGE_KEYS[key].cause.removesuffix(".")
+    return f"no signature verified against the trust root: {key}: {cause}"
+
+
+@pytest.mark.parametrize(
+    "algorithm", ["ecdsa-p256", "ED25519", "ed25519 ", 1, ["ed25519"], None]
+)
+def test_keyless_cert_algorithm_must_be_ed25519(algorithm: object) -> None:
+    env, trust = _keyless_envelope(algorithm=algorithm)
+    with pytest.raises(signing.VerificationError) as exc:
+        signing.verify_envelope(env, trust)
+    assert str(exc.value) == _refusal("verify.certificate_algorithm")
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"not_before": "2026-01-01 00:00:00Z"},
+        {"not_before": "2026-01-01T00:00:00+00:00"},
+        {"not_before": "2026-01-01T00:00:00"},
+        {"not_before": "2026-02-29T00:00:00Z"},
+        {"not_before": "2026-01-01T24:00:00Z"},
+        {"not_before": "2026-01-01T00:00:00Z\n"},
+        {"not_before": "٢٠٢٦-01-01T00:00:00Z"},
+        {"not_before": 1767225600},
+        {"not_before": None},
+        {"not_after": "2027-01-32T00:00:00Z"},
+        {"not_after": "2027-01-01T00:00:00.Z"},
+        {"not_after": None},
+    ],
+)
+def test_keyless_cert_validity_must_be_rfc3339_utc(fields: dict) -> None:
+    env, trust = _keyless_envelope(**fields)
+    with pytest.raises(signing.VerificationError) as exc:
+        signing.verify_envelope(env, trust)
+    assert str(exc.value) == _refusal("verify.certificate_validity_malformed")
+
+
+@pytest.mark.parametrize(
+    "not_before, not_after",
+    [
+        ("2027-01-01T00:00:00Z", "2026-01-01T00:00:00Z"),
+        ("2026-01-01T00:00:00.5Z", "2026-01-01T00:00:00.49Z"),
+    ],
+)
+def test_keyless_cert_window_must_not_be_reversed(
+    not_before: str, not_after: str
+) -> None:
+    env, trust = _keyless_envelope(not_before=not_before, not_after=not_after)
+    with pytest.raises(signing.VerificationError) as exc:
+        signing.verify_envelope(env, trust)
+    assert str(exc.value) == _refusal("verify.certificate_validity_inverted")
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"not_before": "2027-01-01T00:00:00Z", "not_after": "2027-01-01T00:00:00Z"},
+        {"not_before": "2026-01-01t00:00:00z"},
+        {"not_after": "2026-12-31T23:59:60Z"},
+        {"not_before": "2024-02-29T00:00:00Z"},
+        {
+            "not_before": "2026-01-01T00:00:00.5Z",
+            "not_after": "2026-01-01T00:00:00.50Z",
+        },
+    ],
+)
+def test_keyless_cert_well_formed_windows_verify(fields: dict) -> None:
+    env, trust = _keyless_envelope(**fields)
+    assert signing.verify_envelope(env, trust).keyless is True
+
+
+def test_keyless_cert_algorithm_is_checked_before_the_window() -> None:
+    env, trust = _keyless_envelope(algorithm="rsa", not_before="junk")
+    with pytest.raises(signing.VerificationError) as exc:
+        signing.verify_envelope(env, trust)
+    assert str(exc.value) == _refusal("verify.certificate_algorithm")

@@ -860,4 +860,94 @@ class VerifyTest {
             }
         }
     }
+
+    // --- Keyless certificate fields (item 18.63): algorithm, and the validity window's shape and order. --
+
+    /**
+     * A certificate-signed envelope whose certificate body the test authority re-signs after setting the
+     * fields in {@code changesJson} and deleting {@code deleted}, so only the field checks can refuse it.
+     */
+    private record Keyless(ObjectNode envelope, Verify.TrustRoot trust) {
+        Verify.VerifiedEnvelope verify() {
+            return Verify.verifyEnvelope(envelope, trust);
+        }
+    }
+
+    private static Keyless keylessWith(String changesJson, String... deleted) throws Exception {
+        CertFixture fixture = certFixture();
+        ObjectNode envelope = fixture.sign(Json.nodes().objectNode().put("hello", "world"));
+        ObjectNode cert = (ObjectNode) envelope.get("signatures").get(0).get("cert");
+        cert.remove("signature");
+        cert.setAll((ObjectNode) Json.parse(changesJson));
+        cert.remove(List.of(deleted));
+        byte[] signature = edSign(fixture.ca().privateKey(), Canonical.canonicalize(cert));
+        cert.put("signature", Base64.getEncoder().encodeToString(signature));
+        return new Keyless(envelope, fixture.trust());
+    }
+
+    private static void assertCertificateRefusal(String key, String changesJson, String... deleted)
+            throws Exception {
+        Keyless made = keylessWith(changesJson, deleted);
+        String expected = "no signature verified against the trust root: " + key + ": "
+                + Messages.errorCause(key).replaceAll("\\.$", "");
+        assertEquals(expected, assertThrows(IllegalArgumentException.class, made::verify).getMessage(),
+                changesJson);
+    }
+
+    @Test
+    void keylessCertificateWithAnAlgorithmOtherThanExactlyEd25519IsRefused() throws Exception {
+        for (String algorithm : List.of("\"ecdsa-p256\"", "\"ED25519\"", "\"ed25519 \"", "1", "[\"ed25519\"]", "null")) {
+            assertCertificateRefusal("verify.certificate_algorithm", "{\"algorithm\": " + algorithm + "}");
+        }
+        assertCertificateRefusal("verify.certificate_algorithm", "{}", "algorithm");
+    }
+
+    @Test
+    void keylessCertificateWithAMalformedValidityTimestampIsRefused() throws Exception {
+        for (String changes : List.of(
+                "{\"not_before\": \"2026-01-01 00:00:00Z\"}",
+                "{\"not_before\": \"2026-01-01T00:00:00+00:00\"}",
+                "{\"not_before\": \"2026-01-01T00:00:00\"}",
+                "{\"not_before\": \"2026-02-29T00:00:00Z\"}",
+                "{\"not_before\": \"2026-01-01T24:00:00Z\"}",
+                "{\"not_before\": \"2026-01-01T00:00:00Z\\n\"}",
+                "{\"not_before\": \"\u0662\u0660\u0662\u0666-01-01T00:00:00Z\"}",
+                "{\"not_before\": 1767225600}",
+                "{\"not_after\": \"2027-01-32T00:00:00Z\"}",
+                "{\"not_after\": \"2027-01-01T00:00:00.Z\"}",
+                "{\"not_after\": null}")) {
+            assertCertificateRefusal("verify.certificate_validity_malformed", changes);
+        }
+        assertCertificateRefusal("verify.certificate_validity_malformed", "{}", "not_before");
+    }
+
+    @Test
+    void keylessCertificateWithAReversedWindowIsRefused() throws Exception {
+        assertCertificateRefusal("verify.certificate_validity_inverted",
+                "{\"not_before\": \"2027-01-01T00:00:00Z\", \"not_after\": \"2026-01-01T00:00:00Z\"}");
+        assertCertificateRefusal("verify.certificate_validity_inverted",
+                "{\"not_before\": \"2026-01-01T00:00:00.5Z\", \"not_after\": \"2026-01-01T00:00:00.49Z\"}");
+    }
+
+    @Test
+    void keylessCertificateWithAWellFormedWindowVerifiesAndTheAlgorithmIsCheckedFirst() throws Exception {
+        for (String changes : List.of(
+                "{\"not_before\": \"2027-01-01T00:00:00Z\", \"not_after\": \"2027-01-01T00:00:00Z\"}",
+                "{\"not_before\": \"2026-01-01t00:00:00z\"}",
+                "{\"not_after\": \"2026-12-31T23:59:60Z\"}",
+                "{\"not_before\": \"2024-02-29T00:00:00Z\"}",
+                "{\"not_before\": \"2026-01-01T00:00:00.5Z\", \"not_after\": \"2026-01-01T00:00:00.50Z\"}")) {
+            assertTrue(keylessWith(changes).verify().keyless(), changes);
+        }
+        assertCertificateRefusal("verify.certificate_algorithm", "{\"algorithm\": \"rsa\", \"not_before\": \"junk\"}");
+    }
+
+    @Test
+    void keylessCertificateWithAWindowWhollyIn1970OrWhollyIn2999VerifiesSoTheClockIsNeverRead() throws Exception {
+        for (String year : List.of("1970", "2999")) {
+            String changes = "{\"not_before\": \"" + year + "-01-01T00:00:00Z\", \"not_after\": \"" + year
+                    + "-01-01T00:10:00Z\"}";
+            assertTrue(keylessWith(changes).verify().keyless(), changes);
+        }
+    }
 }

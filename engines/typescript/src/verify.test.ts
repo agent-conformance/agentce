@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { canonicalize, sha256Hex } from "./canonical";
+import { errorCause } from "./messages";
 import { digestTree } from "./report";
 import { dssePae, keyidFor, signStatement } from "./sign";
 import {
@@ -857,5 +858,125 @@ test("TrustRoot.fromDict refuses a truthy keys value that is not a mapping, as P
   for (const bad of ["x", [1], 5, true]) {
     assert.throws(() => TrustRoot.fromDict({ keys: bad }), JSON.stringify(bad));
     assert.throws(() => TrustRoot.fromDict({ certificate_authorities: bad }), JSON.stringify(bad));
+  }
+});
+
+// --- Keyless certificate fields (item 18.63): algorithm, and the validity window's shape and order. ---
+
+/** A certificate-signed envelope whose certificate body the test authority re-signs after `changes`
+ * (a value of `undefined` deletes the field), so only the field checks can refuse it. */
+function keylessWith(changes: Record<string, unknown>): {
+  trust: TrustRoot;
+  envelope: Record<string, unknown>;
+} {
+  const ca = ed25519RawPair();
+  const leaf = ed25519RawPair();
+  const cert = issueCertificate(
+    ca.privateKeyObject,
+    "test-ca",
+    "keyless-identity",
+    leaf.rawPublicKey,
+  );
+  const merged: Record<string, unknown> = { ...cert, ...changes };
+  const body = Object.fromEntries(
+    Object.entries(merged).filter(([field, value]) => field !== "signature" && value !== undefined),
+  );
+  const signature = cryptoSign(null, canonicalize(body), ca.privateKeyObject).toString("base64");
+  const payload = canonicalize({ hello: "world" });
+  const sig = cryptoSign(
+    null,
+    dssePae("application/vnd.in-toto+json", payload),
+    leaf.privateKeyObject,
+  );
+  return {
+    trust: TrustRoot.fromDict({
+      certificate_authorities: { "test-ca": { public_key: ca.rawPublicKey.toString("base64") } },
+    }),
+    envelope: {
+      payloadType: "application/vnd.in-toto+json",
+      payload: payload.toString("base64"),
+      signatures: [
+        {
+          keyid: keyidFor(leaf.rawPublicKey),
+          sig: sig.toString("base64"),
+          cert: { ...body, signature },
+        },
+      ],
+    },
+  };
+}
+
+function certificateRefusal(key: string): string {
+  return `no signature verified against the trust root: ${key}: ${errorCause(key).replace(/\.$/, "")}`;
+}
+
+test("keyless certificate: an algorithm other than exactly ed25519 is refused with verify.certificate_algorithm", () => {
+  for (const algorithm of ["ecdsa-p256", "ED25519", "ed25519 ", 1, ["ed25519"], null, undefined]) {
+    const { trust, envelope } = keylessWith({ algorithm });
+    assert.throws(() => verifyEnvelope(envelope, trust), {
+      message: certificateRefusal("verify.certificate_algorithm"),
+    });
+  }
+});
+
+test("keyless certificate: a not_before or not_after that is not an RFC 3339 UTC timestamp is refused with verify.certificate_validity_malformed", () => {
+  const cases: Record<string, unknown>[] = [
+    { not_before: "2026-01-01 00:00:00Z" },
+    { not_before: "2026-01-01T00:00:00+00:00" },
+    { not_before: "2026-01-01T00:00:00" },
+    { not_before: "2026-02-29T00:00:00Z" },
+    { not_before: "2026-01-01T24:00:00Z" },
+    { not_before: "2026-01-01T00:00:00Z\n" },
+    { not_before: "٢٠٢٦-01-01T00:00:00Z" },
+    { not_before: 1767225600 },
+    { not_before: undefined },
+    { not_after: "2027-01-32T00:00:00Z" },
+    { not_after: "2027-01-01T00:00:00.Z" },
+    { not_after: null },
+  ];
+  for (const changes of cases) {
+    const { trust, envelope } = keylessWith(changes);
+    assert.throws(() => verifyEnvelope(envelope, trust), {
+      message: certificateRefusal("verify.certificate_validity_malformed"),
+    });
+  }
+});
+
+test("keyless certificate: a reversed window is refused with verify.certificate_validity_inverted", () => {
+  for (const [notBefore, notAfter] of [
+    ["2027-01-01T00:00:00Z", "2026-01-01T00:00:00Z"],
+    ["2026-01-01T00:00:00.5Z", "2026-01-01T00:00:00.49Z"],
+  ]) {
+    const { trust, envelope } = keylessWith({ not_before: notBefore, not_after: notAfter });
+    assert.throws(() => verifyEnvelope(envelope, trust), {
+      message: certificateRefusal("verify.certificate_validity_inverted"),
+    });
+  }
+});
+
+test("keyless certificate: well-formed windows verify, the algorithm is checked first", () => {
+  for (const changes of [
+    { not_before: "2027-01-01T00:00:00Z", not_after: "2027-01-01T00:00:00Z" },
+    { not_before: "2026-01-01t00:00:00z" },
+    { not_after: "2026-12-31T23:59:60Z" },
+    { not_before: "2024-02-29T00:00:00Z" },
+    { not_before: "2026-01-01T00:00:00.5Z", not_after: "2026-01-01T00:00:00.50Z" },
+  ]) {
+    const { trust, envelope } = keylessWith(changes);
+    assert.equal(verifyEnvelope(envelope, trust).keyless, true);
+  }
+  const { trust, envelope } = keylessWith({ algorithm: "rsa", not_before: "junk" });
+  assert.throws(() => verifyEnvelope(envelope, trust), {
+    message: certificateRefusal("verify.certificate_algorithm"),
+  });
+});
+
+test("keyless certificate: a window wholly in 1970 or wholly in 2999 verifies, so the clock is never read", () => {
+  for (const [notBefore, notAfter] of [
+    ["1970-01-01T00:00:00Z", "1970-01-01T00:10:00Z"],
+    ["2999-01-01T00:00:00Z", "2999-01-01T00:10:00Z"],
+  ]) {
+    const { trust, envelope } = keylessWith({ not_before: notBefore, not_after: notAfter });
+    assert.equal(verifyEnvelope(envelope, trust).keyless, true);
   }
 });

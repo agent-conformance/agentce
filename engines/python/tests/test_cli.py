@@ -1129,3 +1129,50 @@ def test_config_no_action_is_input_error(capsys: pytest.CaptureFixture[str]) -> 
     code, env = run(["config", "--json"], capsys)
     assert code == 3
     assert env["error"]["key"] == "input.config_action"
+
+
+@pytest.mark.parametrize(
+    "not_before, not_after",
+    [
+        ("1970-01-01T00:00:00Z", "1970-01-01T00:10:00Z"),
+        ("2999-01-01T00:00:00Z", "2999-01-01T00:10:00Z"),
+    ],
+)
+def test_keyless_cert_window_ignores_the_clock(
+    not_before: str,
+    not_after: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """`verify --release` over a certificate whose window ended in 1970, and one whose window starts in
+    2999: both verify under the real clock, so an expiry check or a not-yet-valid check against the
+    clock in either direction fails this test (item 18.63)."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from agentce import signing
+
+    ca = Ed25519PrivateKey.generate()
+    leaf = Ed25519PrivateKey.generate()
+    cert = signing.issue_certificate(
+        ca,
+        issuer="test-ca",
+        identity="ci@agent-conformance.org",
+        leaf_public=leaf.public_key(),
+        not_before=not_before,
+        not_after=not_after,
+    )
+    statement = signing.intoto_statement(
+        "release", "sha256:" + "0" * 64, "https://example/pred", {}
+    )
+    envelope = signing.sign_statement(
+        statement, signing.KeylessSigner(private_key=leaf, cert=cert)
+    )
+    release = tmp_path / "release.json"
+    release.write_text(json.dumps(envelope), encoding="utf-8")
+    trust = signing.TrustRoot(authorities={"test-ca": ca.public_key()})
+    monkeypatch.setattr(signing, "vendored_trust", lambda: trust)
+
+    code = cli.main(["verify", "--release", str(release), "--json"])
+    out = json.loads(capsys.readouterr().out)
+    assert (code, out["verified"], out["keyless"]) == (0, True, True)
