@@ -6,8 +6,8 @@ fails if a gate in `gates.json` is not named in this file.
 ## 0.41.0
 
 - `VG-VERIFY-CENSUS-SHARD-COVERAGE` (18.96) now also builds the census list with `CI=true` and with `CI`
-  unset and fails if the two differ. The list used to have 2,320 mutations on CI and 2,312 on a laptop:
-  the census fixture's `assess` named no formats, so under CI it also wrote `report.junit.xml`, and its
+  unset, and fails if the two differ. The list used to have 2,320 mutations on CI and 2,312 on a laptop.
+  The census fixture's `assess` named no formats, so under CI it also wrote `report.junit.xml`, whose
   manifest entry added eight mutations. The fixture builder now passes `--emit` and no longer writes the
   report's summary into the CI job's step summary. A laptop now lists the same 2,320 mutations CI runs,
   and CI's list is unchanged. New seeded fault: the `--emit` argument removed.
