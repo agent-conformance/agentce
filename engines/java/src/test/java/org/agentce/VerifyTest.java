@@ -1047,6 +1047,36 @@ class VerifyTest {
     }
 
     @Test
+    void verifyUnreadableInputLinkOutOfTheTargetIsAnEscape(@TempDir Path dir) throws Exception {
+        // A link is judged by where it points, as Python's resolve() judges it: the folder it leads
+        // to is outside the target, so the member is unsafe (bundle) or missing (release), never
+        // "unreadable" inside the target (18.68 verifier r2).
+        assumeNotRoot();
+        Path bundle = evidenceCopy(dir);
+        Path sec = Files.createDirectories(dir.resolve("sec"));
+        Files.writeString(sec.resolve("x"), "outside\n");
+        Path manifest = bundle.resolve("manifest.json");
+        Files.writeString(manifest,
+                Files.readString(manifest).replace("events/_benign-quarantine.jsonl", "link-sec"));
+        Files.createSymbolicLink(bundle.resolve("link-sec"), Path.of("../sec/x"));
+        Path release = Files.createDirectories(dir.resolve("release"));
+        Files.writeString(release.resolve("release-manifest.json"),
+                "{\"artifacts\": [{\"name\": \"link-sec\", \"sha256\": \"00\"}]}");
+        Files.writeString(release.resolve("signatures.json"), "[]");
+        Files.createSymbolicLink(release.resolve("link-sec"), Path.of("../sec/x"));
+        assertEquals("input.bundle_manifest_path", unreadableRefusal(sec, () -> Bundle.load(bundle)).key);
+        Set<PosixFilePermission> mode = Files.getPosixFilePermissions(sec);
+        Files.setPosixFilePermissions(sec, PosixFilePermissions.fromString("---------"));
+        String reason;
+        try {
+            reason = Verify.verifyRelease(release, noKeys()).get("reason").asText();
+        } finally {
+            Files.setPosixFilePermissions(sec, mode);
+        }
+        assertEquals("missing artifact link-sec", reason);
+    }
+
+    @Test
     void verifyUnreadableInputCatalogSubdirectoryIsNamed(@TempDir Path dir) throws Exception {
         assumeNotRoot();
         Files.writeString(dir.resolve("catalog.yaml"), "id: demo\n");

@@ -622,6 +622,41 @@ def test_verify_unreadable_input_release_artifact_folder(
 
 
 @not_root
+def test_verify_unreadable_input_link_out_into_unreadable_folder(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # A link is judged by where it points: the folder it leads to is outside the target, so the
+    # member is unsafe (bundle) or missing (release), never "unreadable" inside the target (18.68).
+    bundle = _evidence(tmp_path)
+    sec = tmp_path / "sec"
+    sec.mkdir()
+    (sec / "x").write_text("outside\n", encoding="utf-8")
+    manifest = bundle / "manifest.json"
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace(
+            "events/_benign-quarantine.jsonl", "link-sec"
+        ),
+        encoding="utf-8",
+    )
+    (bundle / "link-sec").symlink_to("../sec/x")
+    release = tmp_path / "release"
+    release.mkdir()
+    (release / "release-manifest.json").write_text(
+        json.dumps({"artifacts": [{"name": "link-sec", "sha256": "00"}]}),
+        encoding="utf-8",
+    )
+    (release / "signatures.json").write_text("[]", encoding="utf-8")
+    (release / "link-sec").symlink_to("../sec/x")
+    with _unreadable(sec):
+        code, env = run(["verify", "--bundle", str(bundle), "--json"], capsys)
+        assert code == 3
+        assert _refusal(env)[0] == "input.bundle_manifest_path"
+        code, env = run(["verify", "--release", str(release), "--json"], capsys)
+    assert code == 3
+    assert env["reason"] == "missing artifact link-sec", env
+
+
+@not_root
 def test_verify_unreadable_input_catalog_subdirectory(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

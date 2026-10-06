@@ -12,6 +12,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -24,6 +25,7 @@ import { errorCause } from "./messages";
 import { digestTree } from "./report";
 import { dssePae, keyidFor, signStatement } from "./sign";
 import {
+  type ReleaseResult,
   TrustRoot,
   publicKeyFromRaw,
   vendoredTrustPath,
@@ -1099,6 +1101,50 @@ test(
       );
       assert.equal(key, "input.release_unreadable");
       assert.ok(cause.endsWith("cannot be read: sub/a.txt."), cause);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "verify unreadable input: a link out of the target into an unreadable folder is an escape",
+  { skip: asRoot },
+  () => {
+    // A link is judged by where it points, as Python's resolve() judges it: the folder it leads to
+    // is outside the target, so the member is unsafe (bundle) or missing (release), never
+    // "unreadable" inside the target (18.68 verifier r2).
+    const { dir, bundle } = evidenceCopy();
+    const sec = join(dir, "sec");
+    mkdirSync(sec);
+    writeFileSync(join(sec, "x"), "outside\n");
+    const manifest = join(bundle, "manifest.json");
+    writeFileSync(
+      manifest,
+      readFileSync(manifest, "utf8").replace("events/_benign-quarantine.jsonl", "link-sec"),
+    );
+    symlinkSync("../sec/x", join(bundle, "link-sec"));
+    const release = join(dir, "release");
+    mkdirSync(release);
+    writeFileSync(
+      join(release, "release-manifest.json"),
+      JSON.stringify({ artifacts: [{ name: "link-sec", sha256: "00" }] }),
+    );
+    writeFileSync(join(release, "signatures.json"), "[]");
+    symlinkSync("../sec/x", join(release, "link-sec"));
+    try {
+      assert.equal(
+        unreadableRefusal(sec, () => loadBundle(bundle)).key,
+        "input.bundle_manifest_path",
+      );
+      chmodSync(sec, 0);
+      let result: ReleaseResult;
+      try {
+        result = verifyRelease(release, TrustRoot.fromDict({ keys: {} }));
+      } finally {
+        chmodSync(sec, 0o755);
+      }
+      assert.equal("reason" in result ? result.reason : undefined, "missing artifact link-sec");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
