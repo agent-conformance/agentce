@@ -273,19 +273,22 @@ def _keyless_envelope(**fields: object) -> tuple[dict, signing.TrustRoot]:
     return env, signing.TrustRoot(authorities={"dev-ca": ca.public_key()})
 
 
-def _refusal(key: str) -> str:
+def _assert_refused(key: str, **fields: object) -> None:
+    env, trust = _keyless_envelope(**fields)
+    with pytest.raises(signing.VerificationError) as exc:
+        signing.verify_envelope(env, trust)
     cause = error_catalogue.MESSAGE_KEYS[key].cause.removesuffix(".")
-    return f"no signature verified against the trust root: {key}: {cause}"
+    assert (
+        str(exc.value)
+        == f"no signature verified against the trust root: {key}: {cause}"
+    )
 
 
 @pytest.mark.parametrize(
     "algorithm", ["ecdsa-p256", "ED25519", "ed25519 ", 1, ["ed25519"], None]
 )
 def test_keyless_cert_algorithm_must_be_ed25519(algorithm: object) -> None:
-    env, trust = _keyless_envelope(algorithm=algorithm)
-    with pytest.raises(signing.VerificationError) as exc:
-        signing.verify_envelope(env, trust)
-    assert str(exc.value) == _refusal("verify.certificate_algorithm")
+    _assert_refused("verify.certificate_algorithm", algorithm=algorithm)
 
 
 @pytest.mark.parametrize(
@@ -306,10 +309,7 @@ def test_keyless_cert_algorithm_must_be_ed25519(algorithm: object) -> None:
     ],
 )
 def test_keyless_cert_validity_must_be_rfc3339_utc(fields: dict) -> None:
-    env, trust = _keyless_envelope(**fields)
-    with pytest.raises(signing.VerificationError) as exc:
-        signing.verify_envelope(env, trust)
-    assert str(exc.value) == _refusal("verify.certificate_validity_malformed")
+    _assert_refused("verify.certificate_validity_malformed", **fields)
 
 
 @pytest.mark.parametrize(
@@ -322,10 +322,11 @@ def test_keyless_cert_validity_must_be_rfc3339_utc(fields: dict) -> None:
 def test_keyless_cert_window_must_not_be_reversed(
     not_before: str, not_after: str
 ) -> None:
-    env, trust = _keyless_envelope(not_before=not_before, not_after=not_after)
-    with pytest.raises(signing.VerificationError) as exc:
-        signing.verify_envelope(env, trust)
-    assert str(exc.value) == _refusal("verify.certificate_validity_inverted")
+    _assert_refused(
+        "verify.certificate_validity_inverted",
+        not_before=not_before,
+        not_after=not_after,
+    )
 
 
 @pytest.mark.parametrize(
@@ -347,7 +348,4 @@ def test_keyless_cert_well_formed_windows_verify(fields: dict) -> None:
 
 
 def test_keyless_cert_algorithm_is_checked_before_the_window() -> None:
-    env, trust = _keyless_envelope(algorithm="rsa", not_before="junk")
-    with pytest.raises(signing.VerificationError) as exc:
-        signing.verify_envelope(env, trust)
-    assert str(exc.value) == _refusal("verify.certificate_algorithm")
+    _assert_refused("verify.certificate_algorithm", algorithm="rsa", not_before="junk")

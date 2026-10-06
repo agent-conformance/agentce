@@ -1271,52 +1271,67 @@ def certificate_variants(cert: dict[str, Any]) -> Iterator[tuple[str, str, Any]]
     `release-envelope`'s own walk already covers."""
     body = {k: v for k, v in cert.items() if k != "signature"}
     yield from node_mutations(body, skip=lambda path: path[0] == "issuer")
-    for name, changes in certificate_field_changes(body).items():
-        yield name, "certificate-field", {**body, **changes}
+    for name, _, change in _CERTIFICATE_FIELD_ROWS:
+        yield name, "certificate-field", {**body, **change(body)}
 
 
-#: The outcome each `certificate-field` row must reach in Python, the reference (a message key, or
-#: `verified`), so a row the signature collapse refuses first cannot pass as a field check.
-CERTIFICATE_FIELD_EXPECTED = {
-    "/algorithm=ecdsa-p256": "verify.certificate_algorithm",
-    "/algorithm=ED25519": "verify.certificate_algorithm",
-    "/not_before=space-separator": "verify.certificate_validity_malformed",
-    "/not_before=impossible-date": "verify.certificate_validity_malformed",
-    "/not_after=utc-offset": "verify.certificate_validity_malformed",
-    "/not_after=impossible-date": "verify.certificate_validity_malformed",
-    "window=swapped": "verify.certificate_validity_inverted",
-    "window=equal": "verified",
-    "timestamps=lowercase-t-z": "verified",
-}
-
-
-def certificate_field_changes(body: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """The `certificate-field` mutations of a certificate body: the field values the rule refuses or
-    accepts, each named as in `CERTIFICATE_FIELD_EXPECTED`."""
-    before, after = body["not_before"], body["not_after"]
-    return {
-        "/algorithm=ecdsa-p256": {"algorithm": "ecdsa-p256"},
-        "/algorithm=ED25519": {"algorithm": "ED25519"},
-        "/not_before=space-separator": {"not_before": before.replace("T", " ")},
-        "/not_before=impossible-date": {"not_before": "2026-02-30T00:00:00Z"},
-        "/not_after=utc-offset": {"not_after": after.removesuffix("Z") + "+00:00"},
-        "/not_after=impossible-date": {"not_after": "2027-13-01T00:00:00Z"},
-        "window=swapped": {"not_before": after, "not_after": before},
-        "window=equal": {"not_after": before},
-        "timestamps=lowercase-t-z": {
-            "not_before": before.lower(),
-            "not_after": after.lower(),
+#: The `certificate-field` rows: each name, the outcome it must reach in Python, the reference (a
+#: message key, or `verified`), so a row the signature collapse refuses first cannot pass as a field
+#: check, and the field values it sets on a certificate body.
+_CERTIFICATE_FIELD_ROWS: tuple[
+    tuple[str, str, Callable[[dict[str, Any]], dict[str, Any]]], ...
+] = (
+    (
+        "/algorithm=ecdsa-p256",
+        "verify.certificate_algorithm",
+        lambda b: {"algorithm": "ecdsa-p256"},
+    ),
+    (
+        "/algorithm=ED25519",
+        "verify.certificate_algorithm",
+        lambda b: {"algorithm": "ED25519"},
+    ),
+    (
+        "/not_before=space-separator",
+        "verify.certificate_validity_malformed",
+        lambda b: {"not_before": b["not_before"].replace("T", " ")},
+    ),
+    (
+        "/not_before=impossible-date",
+        "verify.certificate_validity_malformed",
+        lambda b: {"not_before": "2026-02-30T00:00:00Z"},
+    ),
+    (
+        "/not_after=utc-offset",
+        "verify.certificate_validity_malformed",
+        lambda b: {"not_after": b["not_after"].removesuffix("Z") + "+00:00"},
+    ),
+    (
+        "/not_after=impossible-date",
+        "verify.certificate_validity_malformed",
+        lambda b: {"not_after": "2027-13-01T00:00:00Z"},
+    ),
+    (
+        "window=swapped",
+        "verify.certificate_validity_inverted",
+        lambda b: {"not_before": b["not_after"], "not_after": b["not_before"]},
+    ),
+    ("window=equal", "verified", lambda b: {"not_after": b["not_before"]}),
+    (
+        "timestamps=lowercase-t-z",
+        "verified",
+        lambda b: {
+            "not_before": b["not_before"].lower(),
+            "not_after": b["not_after"].lower(),
         },
-    }
+    ),
+)
 
-
-def certificate_field_expected(mutation_name: str) -> str | None:
-    """The expected outcome of a census mutation (`certificate:<name>` as listed), if it is a
-    `certificate-field` row."""
-    for name, outcome in CERTIFICATE_FIELD_EXPECTED.items():
-        if mutation_name == "certificate:" + name.replace("/", "."):
-            return outcome
-    return None
+#: The expected outcome of each `certificate-field` row, keyed by its census name as listed.
+CERTIFICATE_FIELD_EXPECTED = {
+    "certificate:" + name.replace("/", "."): expected
+    for name, expected, _ in _CERTIFICATE_FIELD_ROWS
+}
 
 
 def build_signed_variants(
@@ -1903,7 +1918,9 @@ def self_test() -> int:
         "not_after": "2026-01-01T00:10:00Z",
     }
     field_rows = [
-        n for n, cls, _ in certificate_variants(sample) if cls == "certificate-field"
+        "certificate:" + n.replace("/", ".")
+        for n, cls, _ in certificate_variants(sample)
+        if cls == "certificate-field"
     ]
     if sorted(field_rows) != sorted(CERTIFICATE_FIELD_EXPECTED):
         failures.append(

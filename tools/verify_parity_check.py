@@ -718,7 +718,7 @@ def run_census(
         if len(runs) > 1:
             outputs = [_census_view(*runs[e]) for e in runs]
             readiness_parity_check.compare_ports(label, outputs, failures)
-        expected = verify_flow_census.certificate_field_expected(mutation.name)
+        expected = verify_flow_census.CERTIFICATE_FIELD_EXPECTED.get(mutation.name)
         if expected is not None:
             out, code = runs["python"]
             reached = (

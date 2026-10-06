@@ -46,11 +46,8 @@ vpc.write_bundle_with_manifest(unsigned_bundle, {"artifacts": []})
 # certificate-field rows), each with the exact refusal Python, the reference, gives.
 causes = json.loads((Path("..") / "spec/i18n/messages.en.json").read_text(encoding="utf-8"))
 certificate_legs = []
-for name, key in (
-    (".algorithm=ecdsa-p256", "verify.certificate_algorithm"),
-    (".not_before=space-separator", "verify.certificate_validity_malformed"),
-    ("window=swapped", "verify.certificate_validity_inverted"),
-):
+for name in (".algorithm=ecdsa-p256", ".not_before=space-separator", "window=swapped"):
+    key = vpc.verify_flow_census.CERTIFICATE_FIELD_EXPECTED[f"certificate:{name}"]
     cause = causes[f"errors.{key}.cause"].removesuffix(".")
     certificate_legs.append(
         {
