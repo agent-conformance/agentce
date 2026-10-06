@@ -7,8 +7,8 @@
  */
 
 import { createHash } from "node:crypto";
-import { readFileSync, realpathSync, statSync } from "node:fs";
-import { isAbsolute, join, relative, sep } from "node:path";
+import { lstatSync, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
+import { isAbsolute, join, posix, relative, sep } from "node:path";
 import { sha256Hex } from "./canonical";
 import { InputError, isPermissionError, readPermissionError, unreadableError } from "./errors";
 import { readUntrustedJsonFile } from "./verify";
@@ -67,20 +67,88 @@ export function confineToRoot(root: string, rel: string): string | null {
   } catch {
     return null;
   }
-  let resolved: string;
-  try {
-    resolved = realpathSync(candidate);
-  } catch (exc) {
-    // A path that simply is not there is not a confinement failure: the caller's own
-    // "missing from the bundle" check reports that with its own message key. Any other
-    // hazard (symlink loop, name too long, an embedded NUL) fails closed.
-    return (exc as NodeJS.ErrnoException | null)?.code === "ENOENT" ? candidate : null;
+  // The member resolves the way Python's does, so a link is judged by where it points even when
+  // what it points at cannot be read.
+  const resolved = resolveLoose(candidate);
+  if (resolved === null) {
+    return null;
   }
   const inside = relative(resolvedRoot, resolved);
   if (inside !== "" && (inside === ".." || inside.startsWith(`..${sep}`) || isAbsolute(inside))) {
     return null;
   }
   return candidate;
+}
+
+/**
+ * `path` with every symlink it can follow resolved, as Python's `Path.resolve(strict=False)` does
+ * (`posixpath._joinrealpath`): a component that cannot be looked at (missing, not a folder, a name
+ * too long, inside a folder that cannot be listed) is kept as written, with the rest of the path, so
+ * a link that leaves the root is seen to leave it even when its target cannot be read. `null` where
+ * Python's `resolve()` raises: a symlink loop, a link that cannot be read, or a name no path can
+ * hold (18.68).
+ */
+export function resolveLoose(path: string): string | null {
+  const seen = new Map<string, string | null>();
+  const walk = (start: string, rest: string): { path: string; ok: boolean } | null => {
+    let current = start;
+    let remaining = rest;
+    if (remaining.startsWith("/")) {
+      remaining = remaining.slice(1);
+      current = "/";
+    }
+    while (remaining) {
+      const cut = remaining.indexOf("/");
+      const name = cut === -1 ? remaining : remaining.slice(0, cut);
+      remaining = cut === -1 ? "" : remaining.slice(cut + 1);
+      if (!name || name === ".") {
+        continue;
+      }
+      if (name === "..") {
+        current = current === "/" ? "/" : posix.dirname(current);
+        continue;
+      }
+      const next = posix.join(current, name);
+      let isLink: boolean;
+      try {
+        isLink = lstatSync(next).isSymbolicLink();
+      } catch (err) {
+        if (typeof (err as NodeJS.ErrnoException | null)?.errno !== "number") {
+          return null; // not an OS refusal: a name no path can hold (an embedded NUL)
+        }
+        isLink = false;
+      }
+      if (!isLink) {
+        current = next;
+        continue;
+      }
+      if (seen.has(next)) {
+        const cached = seen.get(next);
+        if (cached === null || cached === undefined) {
+          return null; // a symlink loop
+        }
+        current = cached;
+        continue;
+      }
+      seen.set(next, null);
+      let target: string;
+      try {
+        target = readlinkSync(next);
+      } catch {
+        return null;
+      }
+      const inner = walk(current, target);
+      if (inner === null || !inner.ok) {
+        return inner === null ? null : { path: posix.join(inner.path, remaining), ok: false };
+      }
+      current = inner.path;
+      seen.set(next, current);
+    }
+    return { path: current, ok: true };
+  };
+  const absolute = isAbsolute(path) ? path : posix.join(process.cwd(), path);
+  const result = walk("/", absolute);
+  return result?.ok ? result.path : null;
 }
 
 function bundleUnreadable(bundleDir: string, rel: string): InputError {
@@ -104,21 +172,9 @@ export function permissionDenied(path: string): boolean {
   return false;
 }
 
-/** True when `confineToRoot` refused a lexically safe `rel` because a permission error stopped it
- * resolving. Python resolves an unlistable folder's member without error and then finds it
- * unreadable; realpath fails here instead, so such a member is unreadable, not unsafe or missing
- * (18.68; the bundle and release readers share it). */
-export function deniedMember(root: string, rel: string): boolean {
-  const lexicallySafe = rel !== "" && !rel.startsWith("/") && !rel.split("/").includes("..");
-  return lexicallySafe && permissionDenied(join(root, rel));
-}
-
 function safeMember(root: string, rel: string): string {
   const member = confineToRoot(root, rel);
   if (member === null) {
-    if (deniedMember(root, rel)) {
-      throw bundleUnreadable(root, rel);
-    }
     throw new InputError(
       "input.bundle_manifest_path",
       `manifest lists an unsafe path ${rel}: it is absolute, contains '..', resolves outside the bundle root (a symlink or junction escapes it), or cannot be safely resolved.`,

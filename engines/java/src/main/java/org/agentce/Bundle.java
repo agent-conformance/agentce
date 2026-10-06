@@ -4,11 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -74,14 +75,8 @@ public final class Bundle {
     /** True when {@code path} cannot even be looked at because of a permission error (an unreadable
      * parent folder), as Python's {@code permission_denied} (18.68). */
     static boolean permissionDenied(Path path) {
-        return permissionDenied(path, "");
-    }
-
-    /** {@link #permissionDenied(Path)} for {@code rel} inside {@code root}; a name no path can hold
-     * (an embedded NUL) is not denied, it is unsafe. */
-    static boolean permissionDenied(Path root, String rel) {
         try {
-            Files.readAttributes(rel.isEmpty() ? root : root.resolve(rel), BasicFileAttributes.class);
+            Files.readAttributes(path, BasicFileAttributes.class);
         } catch (AccessDeniedException e) {
             return true;
         } catch (IOException | RuntimeException e) {
@@ -140,13 +135,14 @@ public final class Bundle {
         try {
             Path candidate = root.resolve(rel);
             Path resolvedRoot = root.toRealPath();
-            Path resolved;
-            try {
-                resolved = candidate.toRealPath();
-            } catch (NoSuchFileException missing) {
-                return candidate;
+            // The member resolves the way Python's does, so a link is judged by where it points even
+            // when what it points at cannot be read.
+            String resolved = resolveLoose(candidate);
+            if (resolved == null) {
+                return null;
             }
-            if (!resolved.equals(resolvedRoot) && !resolved.startsWith(resolvedRoot)) {
+            Path inside = Path.of(resolved);
+            if (!inside.equals(resolvedRoot) && !inside.startsWith(resolvedRoot)) {
                 return null;
             }
             return candidate;
@@ -155,22 +151,80 @@ public final class Bundle {
         }
     }
 
-    /** True when {@code confineToRoot} refused a lexically safe {@code rel} because a permission error
-     * stopped it resolving. Python resolves an unlistable folder's member without error and then
-     * finds it unreadable; toRealPath fails here instead, so such a member is unreadable, not unsafe
-     * or missing (18.68; the bundle and release readers share it). */
-    static boolean deniedMember(Path root, String rel) {
-        boolean lexicallySafe = !rel.isEmpty() && !rel.startsWith("/")
-                && !Arrays.asList(rel.split("/")).contains("..");
-        return lexicallySafe && permissionDenied(root, rel);
+    /**
+     * {@code path} with every symlink it can follow resolved, as Python's {@code
+     * Path.resolve(strict=False)} does ({@code posixpath._joinrealpath}): a component that cannot be
+     * looked at (missing, not a folder, a name too long, inside a folder that cannot be listed) is
+     * kept as written, with the rest of the path, so a link that leaves the root is seen to leave it
+     * even when its target cannot be read. {@code null} where Python's {@code resolve()} raises: a
+     * symlink loop, or a link that cannot be read (18.68).
+     */
+    static String resolveLoose(Path path) {
+        String[] out = walkLoose("/", path.toAbsolutePath().toString(), new HashMap<>());
+        return out != null && out[1] != null ? out[0] : null;
+    }
+
+    /** One step of {@link #resolveLoose}: {path, "ok"} when every link resolved, {path, null} on a
+     * symlink loop, null when a link cannot be read. */
+    private static String[] walkLoose(String start, String rest, Map<String, String> seen) {
+        String current = start;
+        String remaining = rest;
+        if (remaining.startsWith("/")) {
+            remaining = remaining.substring(1);
+            current = "/";
+        }
+        while (!remaining.isEmpty()) {
+            int cut = remaining.indexOf('/');
+            String name = cut == -1 ? remaining : remaining.substring(0, cut);
+            remaining = cut == -1 ? "" : remaining.substring(cut + 1);
+            if (name.isEmpty() || name.equals(".")) {
+                continue;
+            }
+            if (name.equals("..")) {
+                int slash = current.lastIndexOf('/');
+                current = slash <= 0 ? "/" : current.substring(0, slash);
+                continue;
+            }
+            String next = current.endsWith("/") ? current + name : current + "/" + name;
+            boolean isLink;
+            try {
+                isLink = Files.readAttributes(Path.of(next), BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS)
+                        .isSymbolicLink();
+            } catch (IOException e) {
+                isLink = false;
+            }
+            if (!isLink) {
+                current = next;
+                continue;
+            }
+            if (seen.containsKey(next)) {
+                String cached = seen.get(next);
+                if (cached == null) {
+                    return new String[] {next, null};
+                }
+                current = cached;
+                continue;
+            }
+            seen.put(next, null);
+            String target;
+            try {
+                target = Files.readSymbolicLink(Path.of(next)).toString();
+            } catch (IOException e) {
+                return null;
+            }
+            String[] inner = walkLoose(current, target, seen);
+            if (inner == null || inner[1] == null) {
+                return inner;
+            }
+            current = inner[0];
+            seen.put(next, current);
+        }
+        return new String[] {current, "ok"};
     }
 
     private static Path safeMember(Path root, String rel) {
         Path member = confineToRoot(root, rel);
         if (member == null) {
-            if (deniedMember(root, rel)) {
-                throw bundleUnreadable(root, rel);
-            }
             throw new InputError(
                     "input.bundle_manifest_path",
                     "manifest lists an unsafe path " + rel + ": it is absolute, contains '..', "
