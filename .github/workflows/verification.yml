@@ -41,10 +41,10 @@ jobs:
     timeout-minutes: 20
     strategy:
       fail-fast: false
-      # `lane` only fans out 6 parallel jobs; the partition itself uses
+      # `lane` only fans out 8 parallel jobs; the partition itself uses
       # strategy.job-index/strategy.job-total below, never this list's values.
       matrix:
-        lane: [1, 2, 3, 4, 5, 6]
+        lane: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup-verification-env
