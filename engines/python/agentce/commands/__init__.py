@@ -1577,8 +1577,9 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     high_insufficient: list[str] = []
     if scanned is None:
         # SPEC §8.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any
-        # records-folder discovery scan (contracts/P18-18.30.md Dispositions; item 18.72 is the
-        # follow-up that decides whether records-mode gets its own signal). This excludes a records
+        # records-folder discovery scan: a records run never returns 2 on its own, so a first scan is
+        # not a failure, and CI that should fail on evidence gaps opts in with --fail-on (above;
+        # VG-RECORDS-EXIT-CODE holds both). This excludes a records
         # run with a declared --profile too, not only the derived-profile case: RECORDS_LIMITATION is
         # appended unconditionally whenever `scanned is not None` (above), since even a declared
         # profile over discovered records does not carry the formal bundle's manifest-backed
