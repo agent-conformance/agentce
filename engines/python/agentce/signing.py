@@ -33,6 +33,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -202,7 +203,14 @@ def digest_tree(root: Path, *, exclude: frozenset[str] = frozenset()) -> str:
     directory yields the same digest on any host — the basis of the offline catalog/release check.
     """
     lines: list[bytes] = []
-    for path in sorted(root.rglob("*"), key=lambda p: p.relative_to(root).as_posix()):
+    paths = sorted(root.rglob("*"), key=lambda p: p.relative_to(root).as_posix())
+    # `rglob` skips a folder it cannot list without saying so, which would sign or check a digest
+    # that silently leaves the folder out: list each real folder it descends, so one that cannot
+    # be listed raises the OSError (naming it) before any digest is formed (18.68).
+    for folder in (root, *paths):
+        if folder.is_dir() and not folder.is_symlink():
+            os.listdir(folder)
+    for path in paths:
         if not path.is_file():
             continue
         rel = path.relative_to(root).as_posix()
@@ -526,13 +534,18 @@ def verify_envelope(envelope: Any, trust: TrustRoot) -> Verified:
                 sig_bytes = _b64d(sig)
             except ValueError as exc:
                 raise VerificationError(SIG_NOT_BASE64) from exc
-            public_key.verify(sig_bytes, pae)
+            try:
+                public_key.verify(sig_bytes, pae)
+            except InvalidSignature as exc:
+                # InvalidSignature has no text of its own; give the reason a sentence (18.68).
+                raise VerificationError(SIGNATURE_INVALID) from exc
             keyid = signature.get("keyid")
             return Verified(
                 payload=payload,
                 identity=identity,
                 keyid=keyid if isinstance(keyid, str) else None,
-                keyless="cert" in signature,
+                # TrustRoot.resolve's own test: a "cert": null entry resolves as a key (18.68).
+                keyless=signature.get("cert") is not None,
             )
         except (InvalidSignature, VerificationError, ValueError) as exc:
             last_error = exc
@@ -542,6 +555,7 @@ def verify_envelope(envelope: Any, trust: TrustRoot) -> Verified:
 
 
 SIG_NOT_BASE64 = "'sig' is not valid base64"
+SIGNATURE_INVALID = "signature does not verify"
 STATEMENT_UNREADABLE = "the signed statement is not readable JSON"
 STATEMENT_NO_DIGEST = "the signed statement carries no subject digest"
 
@@ -580,6 +594,8 @@ def verify_catalog_directory(directory: Path, trust: TrustRoot) -> Verified:
         )
     try:
         envelope = parse_untrusted_json(sig_path.read_bytes())
+    except PermissionError:
+        raise  # an unreadable signature is the caller's input.catalog_unreadable, not a bad one
     except (OSError, ValueError) as exc:
         raise VerificationError(
             f"{CATALOG_SIGNATURE_NAME} is not readable JSON"

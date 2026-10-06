@@ -411,13 +411,14 @@ public final class Verify {
                 }
                 boolean ok = verifyEd25519(pae, publicKeyFromRaw(resolved.publicKeyRaw()), sigBytes);
                 if (!ok) {
-                    // An empty message, matching `cryptography`'s `InvalidSignature` -- `str()` of
-                    // which is empty -- so the aggregate message below renders with nothing after the
-                    // colon-space.
-                    throw new IllegalArgumentException("");
+                    // Python's `SIGNATURE_INVALID`: a bad signature has a sentence of its own (18.68).
+                    throw new IllegalArgumentException("signature does not verify");
                 }
                 String keyid = textOrNull(entry.get("keyid"));
-                return new VerifiedEnvelope(payload, resolved.identity(), keyid, entry.has("cert"));
+                // `resolve`'s own test: a "cert": null entry resolves as a key (18.68).
+                JsonNode cert = entry.get("cert");
+                boolean keyless = cert != null && !cert.isNull();
+                return new VerifiedEnvelope(payload, resolved.identity(), keyid, keyless);
             } catch (RuntimeException e) {
                 lastError = e.getMessage() != null ? e.getMessage() : "";
             }
@@ -543,14 +544,16 @@ public final class Verify {
         try {
             digest = Catalog.digestTree(dir, Set.of(CATALOG_SIGNATURE_NAME));
         } catch (IllegalStateException e) {
-            throw new InputError(
-                    "input.catalog_unreadable",
-                    "the catalog directory " + dir + " holds a file that cannot be read.",
-                    "make every file in the catalog directory readable, then re-run.");
+            throw catalogUnreadable(dir, e);
         }
         Path sigPath = dir.resolve(CATALOG_SIGNATURE_NAME);
         if (!Files.isRegularFile(sigPath)) {
             return catalogSoftFail(digest, UNSIGNED_SENTENCE);
+        }
+        if (Bundle.cannotOpen(sigPath)) {
+            throw InputError.unreadable(
+                    "input.catalog_unreadable", "the catalog directory", dir, CATALOG_SIGNATURE_NAME,
+                    "catalog directory");
         }
         JsonNode envelope;
         try {
@@ -617,12 +620,31 @@ public final class Verify {
         }
     }
 
+    /** Throws {@code input.release_unreadable} naming {@code path} when a permission error stops it
+     * being read (Python's PermissionError branch of {@code cmd_verify}'s release wrapper, 18.68). */
+    private static void requireReleaseReadable(Path releasePath, Path path) {
+        if (Bundle.permissionDenied(path) || Bundle.cannotOpen(path)) {
+            String rel = path.equals(releasePath) ? "" : releasePath.relativize(path).toString().replace('\\', '/');
+            throw InputError.unreadable(
+                    "input.release_unreadable", "the release artifact", releasePath, rel, "release");
+        }
+    }
+
+    /** {@code input.catalog_unreadable}, naming the file or folder that cannot be read (Python's
+     * {@code _catalog_unreadable}, 18.68). */
+    static InputError catalogUnreadable(Path dir, Throwable err) {
+        return InputError.unreadable(
+                "input.catalog_unreadable", "the catalog directory", dir, InputError.unreadableRel(dir, err),
+                "catalog directory");
+    }
+
     /** Verifies a release bundle (or a single DSSE envelope) offline against {@code trust} -- the
      * item's core fix target, built correct from the start: every branch uses the soft-fail shape, and
      * every new JSON-parse-failure path this function adds uses a fixed, engine-neutral reason text
      * (mirrors {@code _verify_release}, {@code commands/__init__.py:758-875}). */
     public static ObjectNode verifyRelease(Path releasePath, TrustRoot trust) {
         if (Files.isRegularFile(releasePath)) {
+            requireReleaseReadable(releasePath, releasePath);
             JsonNode envelope;
             try {
                 envelope = readUntrustedJsonFile(releasePath);
@@ -646,12 +668,15 @@ public final class Verify {
         Path manifestPath = releasePath.resolve("release-manifest.json");
         Path signaturesPath = releasePath.resolve("signatures.json");
         if (!Files.isRegularFile(manifestPath) || !Files.isRegularFile(signaturesPath)) {
+            requireReleaseReadable(releasePath, manifestPath);
+            requireReleaseReadable(releasePath, signaturesPath);
             throw new InputError(
                     "input.release_bundle",
                     releasePath + " is not a release bundle (release-manifest.json/signatures.json).",
                     "pass the --out directory produced by the release tooling.");
         }
 
+        requireReleaseReadable(releasePath, manifestPath);
         JsonNode manifest;
         try {
             manifest = readUntrustedJsonFile(manifestPath);
@@ -681,6 +706,9 @@ public final class Verify {
             }
             String name = nameNode.textValue();
             Path artifactFile = Bundle.confineToRoot(releasePath, name);
+            if (artifactFile != null) {
+                requireReleaseReadable(releasePath, artifactFile);
+            }
             byte[] content;
             try {
                 content = artifactFile == null ? null : Files.readAllBytes(artifactFile);
@@ -698,6 +726,7 @@ public final class Verify {
             }
         }
 
+        requireReleaseReadable(releasePath, signaturesPath);
         JsonNode signatureEntries;
         try {
             signatureEntries = readUntrustedJsonFile(signaturesPath);

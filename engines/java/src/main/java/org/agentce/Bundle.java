@@ -2,9 +2,11 @@ package org.agentce;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -64,6 +66,42 @@ public final class Bundle {
         }
     }
 
+    private static InputError bundleUnreadable(Path bundleDir, String rel) {
+        return InputError.unreadable(
+                "input.bundle_unreadable", "the evidence bundle", bundleDir, rel, "evidence bundle");
+    }
+
+    /** True when {@code path} cannot even be looked at because of a permission error (an unreadable
+     * parent folder), as Python's {@code permission_denied} (18.68). */
+    static boolean permissionDenied(Path path) {
+        return permissionDenied(path, "");
+    }
+
+    /** {@link #permissionDenied(Path)} for {@code rel} inside {@code root}; a name no path can hold
+     * (an embedded NUL) is not denied, it is unsafe. */
+    static boolean permissionDenied(Path root, String rel) {
+        try {
+            Files.readAttributes(rel.isEmpty() ? root : root.resolve(rel), BasicFileAttributes.class);
+        } catch (AccessDeniedException e) {
+            return true;
+        } catch (IOException | RuntimeException e) {
+            return false;
+        }
+        return false;
+    }
+
+    /** True when {@code path} is there but its bytes cannot be read for lack of permission. */
+    static boolean cannotOpen(Path path) {
+        try {
+            Files.newInputStream(path).close();
+            return false;
+        } catch (AccessDeniedException e) {
+            return true;
+        } catch (IOException | RuntimeException e) {
+            return false;
+        }
+    }
+
     private static String normaliseDigest(String raw) {
         return raw.startsWith("sha256:")
                 ? raw.substring("sha256:".length()).toLowerCase(Locale.ROOT)
@@ -120,6 +158,14 @@ public final class Bundle {
     private static Path safeMember(Path root, String rel) {
         Path member = confineToRoot(root, rel);
         if (member == null) {
+            // Python resolves an unlistable folder's member without error and then finds it
+            // unreadable; toRealPath fails here instead, so a lexically safe path that is denied is
+            // unreadable too.
+            boolean lexicallySafe = !rel.isEmpty() && !rel.startsWith("/")
+                    && !Arrays.asList(rel.split("/")).contains("..");
+            if (lexicallySafe && permissionDenied(root, rel)) {
+                throw bundleUnreadable(root, rel);
+            }
             throw new InputError(
                     "input.bundle_manifest_path",
                     "manifest lists an unsafe path " + rel + ": it is absolute, contains '..', "
@@ -133,7 +179,10 @@ public final class Bundle {
 
     public static Bundle load(Path bundleDir) {
         Path manifestPath = bundleDir.resolve("manifest.json");
-        if (!Files.isRegularFile(manifestPath)) {
+        if (!safeIsFile(manifestPath)) {
+            if (permissionDenied(manifestPath)) {
+                throw bundleUnreadable(bundleDir, "manifest.json");
+            }
             throw new InputError(
                     "input.bundle_manifest_missing",
                     "the bundle at " + bundleDir + " has no manifest.json.",
@@ -141,6 +190,9 @@ public final class Bundle {
                             + "`AGENTCE_EMIT=1 AGENTCE_EMIT_OUT=<dir>` and see docs/integrate.md; to watch one "
                             + "built, run `examples/custom-loop/run.sh <dir>` from a checkout, then `agentce "
                             + "validate --bundle <dir>`.");
+        }
+        if (cannotOpen(manifestPath)) {
+            throw bundleUnreadable(bundleDir, "manifest.json");
         }
         JsonNode manifest;
         try {
@@ -188,10 +240,16 @@ public final class Bundle {
             String rel = entry.get("path").asText();
             Path member = safeMember(bundleDir, rel);
             if (!safeIsFile(member)) {
+                if (permissionDenied(member)) {
+                    throw bundleUnreadable(bundleDir, rel);
+                }
                 throw new InputError(
                         "input.bundle_manifest_mismatch",
                         "manifest lists " + rel + ", which is missing from the bundle.",
                         "regenerate the bundle so its files match the manifest.");
+            }
+            if (cannotOpen(member)) {
+                throw bundleUnreadable(bundleDir, rel);
             }
             if (!fileSha256Hex(member).equals(normaliseDigest(entry.get("sha256").asText()))) {
                 throw new InputError(

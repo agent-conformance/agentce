@@ -359,7 +359,7 @@ public final class Cli {
         Path path = Paths.get(raw);
         if (!Files.isDirectory(path)) {
             throw new InputError(
-                    "input." + key + "_not_a_directory", what + " '" + raw + "' is not an existing directory.", fix);
+                    "input." + key + "_not_a_directory", what + " " + Readiness.pyRepr(raw) + " is not an existing directory.", fix);
         }
         return raw;
     }

@@ -189,7 +189,7 @@ test("verifyEnvelope refuses a tampered signature with an empty trailing reason 
   entry.sig = sigBuf.toString("base64");
   assert.throws(
     () => verifyEnvelope(envelope, fixture.trust),
-    /^Error: no signature verified against the trust root: $/,
+    /^Error: no signature verified against the trust root: signature does not verify$/,
   );
 });
 

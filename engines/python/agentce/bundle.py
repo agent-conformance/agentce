@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from . import canonical
-from .errors import InputError
+from .errors import InputError, UnreadableError
 from .error_catalogue import MESSAGE_KEYS
 from .signing import parse_untrusted_json
 
@@ -54,6 +54,28 @@ class Bundle:
     def digest(self) -> str:
         """The bundle digest: SHA-256 of the RFC 8785 canonical manifest (SPEC §8.1)."""
         return "sha256:" + canonical.sha256_hex(self.manifest)
+
+
+def _unreadable(bundle_dir: Path, rel: str) -> UnreadableError:
+    return UnreadableError(
+        "input.bundle_unreadable",
+        "the evidence bundle",
+        bundle_dir,
+        rel,
+        "evidence bundle",
+    )
+
+
+def permission_denied(path: Path) -> bool:
+    """True when ``path`` cannot even be looked at because of a permission error (an unreadable
+    parent folder): the one reason a listed file that is "not a file" is unreadable, not missing."""
+    try:
+        path.stat()
+    except PermissionError:
+        return True
+    except (OSError, RuntimeError, ValueError):
+        return False
+    return False
 
 
 def safe_is_file(path: Path) -> bool:
@@ -125,7 +147,9 @@ def copy_bundle(src_root: Path, dst_root: Path) -> None:
 def load_bundle(bundle_dir: Path) -> Bundle:
     """Load and verify the bundle at ``bundle_dir``; raise :class:`InputError` (exit 3) on any problem."""
     manifest_path = bundle_dir / "manifest.json"
-    if not manifest_path.is_file():
+    if not safe_is_file(manifest_path):
+        if permission_denied(manifest_path):
+            raise _unreadable(bundle_dir, "manifest.json")
         raise InputError(
             "input.bundle_manifest_missing",
             f"the bundle at {str(bundle_dir)} has no manifest.json.",
@@ -133,6 +157,8 @@ def load_bundle(bundle_dir: Path) -> Bundle:
         )
     try:
         parsed = parse_untrusted_json(manifest_path.read_bytes())
+    except PermissionError as exc:
+        raise _unreadable(bundle_dir, "manifest.json") from exc
     except (OSError, ValueError) as exc:
         raise InputError(
             "input.bundle_manifest_invalid",
@@ -177,6 +203,8 @@ def load_bundle(bundle_dir: Path) -> Bundle:
         rel: str = entry["path"]
         member = _safe_member(bundle_dir, rel)
         if not safe_is_file(member):
+            if permission_denied(member):
+                raise _unreadable(bundle_dir, rel)
             raise InputError(
                 "input.bundle_manifest_mismatch",
                 f"manifest lists {rel}, which is missing from the bundle.",
@@ -184,6 +212,8 @@ def load_bundle(bundle_dir: Path) -> Bundle:
             )
         try:
             size = member.stat().st_size
+        except PermissionError as exc:
+            raise _unreadable(bundle_dir, rel) from exc
         except (OSError, RuntimeError, ValueError) as exc:
             raise InputError(
                 "input.bundle_manifest_mismatch",
@@ -198,7 +228,10 @@ def load_bundle(bundle_dir: Path) -> Bundle:
                 "split large evidence into more, smaller files, or reference bulk content by an "
                 "opaque locator instead of inlining it (SPEC R12).",
             )
-        actual = _sha256_hex(member)
+        try:
+            actual = _sha256_hex(member)
+        except PermissionError as exc:
+            raise _unreadable(bundle_dir, rel) from exc
         if actual != _normalise_digest(entry["sha256"]):
             raise InputError(
                 "input.bundle_manifest_mismatch",

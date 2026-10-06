@@ -42,3 +42,24 @@ class InputError(AgentceError):
         super().__init__(
             key=key, cause=cause, fix=fix, exit_code=int(ExitCode.INPUT_ERROR)
         )
+
+
+class UnreadableError(InputError):
+    """A target, or a file or folder inside it, that cannot be read (a permission error): one key per
+    target, naming the path relative to the target, the same in every engine (18.68). ``rel`` is empty
+    when the target itself is the thing that cannot be read."""
+
+    def __init__(
+        self, key: str, what: str, target: object, rel: str, noun: str
+    ) -> None:
+        cause = (
+            f"{what} {target} holds a file or folder that cannot be read: {rel}."
+            if rel
+            else f"{what} {target} cannot be read."
+        )
+        super().__init__(
+            key,
+            cause,
+            f"make every file and folder in the {noun} readable, then re-run.",
+        )
+        self.rel = rel

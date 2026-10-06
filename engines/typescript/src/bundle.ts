@@ -7,10 +7,10 @@
  */
 
 import { createHash } from "node:crypto";
-import { readFileSync, realpathSync, statSync } from "node:fs";
+import { constants, accessSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { sha256Hex } from "./canonical";
-import { InputError } from "./errors";
+import { InputError, isPermissionError, unreadableError } from "./errors";
 import { readUntrustedJsonFile } from "./verify";
 
 export interface Bundle {
@@ -83,9 +83,36 @@ export function confineToRoot(root: string, rel: string): string | null {
   return candidate;
 }
 
+function bundleUnreadable(bundleDir: string, rel: string): InputError {
+  return unreadableError(
+    "input.bundle_unreadable",
+    "the evidence bundle",
+    bundleDir,
+    rel,
+    "evidence bundle",
+  );
+}
+
+/** True when `path` cannot even be looked at because of a permission error (an unreadable parent
+ * folder), as Python's `permission_denied` (18.68). */
+export function permissionDenied(path: string): boolean {
+  try {
+    statSync(path);
+  } catch (err) {
+    return isPermissionError(err);
+  }
+  return false;
+}
+
 function safeMember(root: string, rel: string): string {
   const member = confineToRoot(root, rel);
   if (member === null) {
+    // Python resolves an unlistable folder's member without error and then finds it unreadable;
+    // realpath fails here instead, so a lexically safe path that is denied is unreadable too.
+    const lexicallySafe = rel !== "" && !rel.startsWith("/") && !rel.split("/").includes("..");
+    if (lexicallySafe && permissionDenied(join(root, rel))) {
+      throw bundleUnreadable(root, rel);
+    }
     throw new InputError(
       "input.bundle_manifest_path",
       `manifest lists an unsafe path ${rel}: it is absolute, contains '..', resolves outside the bundle root (a symlink or junction escapes it), or cannot be safely resolved.`,
@@ -98,6 +125,9 @@ function safeMember(root: string, rel: string): string {
 export function loadBundle(bundleDir: string): Bundle {
   const manifestPath = join(bundleDir, "manifest.json");
   if (!safeIsFile(manifestPath)) {
+    if (permissionDenied(manifestPath)) {
+      throw bundleUnreadable(bundleDir, "manifest.json");
+    }
     throw new InputError(
       "input.bundle_manifest_missing",
       `the bundle at ${bundleDir} has no manifest.json.`,
@@ -105,6 +135,13 @@ export function loadBundle(bundleDir: string): Bundle {
         "`AGENTCE_EMIT=1 AGENTCE_EMIT_OUT=<dir>` and see docs/integrate.md; to watch one built, run " +
         "`examples/custom-loop/run.sh <dir>` from a checkout, then `agentce validate --bundle <dir>`.",
     );
+  }
+  try {
+    accessSync(manifestPath, constants.R_OK);
+  } catch (err) {
+    if (isPermissionError(err)) {
+      throw bundleUnreadable(bundleDir, "manifest.json");
+    }
   }
   let parsed: unknown;
   try {
@@ -165,13 +202,25 @@ export function loadBundle(bundleDir: string): Bundle {
     const rel = entry.path;
     const member = safeMember(bundleDir, rel);
     if (!safeIsFile(member)) {
+      if (permissionDenied(member)) {
+        throw bundleUnreadable(bundleDir, rel);
+      }
       throw new InputError(
         "input.bundle_manifest_mismatch",
         `manifest lists ${rel}, which is missing from the bundle.`,
         "regenerate the bundle so its files match the manifest.",
       );
     }
-    if (fileSha256Hex(member) !== normaliseDigest(entry.sha256)) {
+    let actual: string;
+    try {
+      actual = fileSha256Hex(member);
+    } catch (err) {
+      if (isPermissionError(err)) {
+        throw bundleUnreadable(bundleDir, rel);
+      }
+      throw err;
+    }
+    if (actual !== normaliseDigest(entry.sha256)) {
       throw new InputError(
         "input.bundle_manifest_mismatch",
         `${rel} does not match its manifest SHA-256.`,

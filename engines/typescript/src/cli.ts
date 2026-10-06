@@ -234,7 +234,7 @@ function requireDir(
   if (!isDir) {
     throw new InputError(
       `input.${key}_not_a_directory`,
-      `${what} '${raw}' is not an existing directory.`,
+      `${what} ${pyRepr(raw)} is not an existing directory.`,
       fix,
     );
   }

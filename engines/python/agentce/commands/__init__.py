@@ -53,7 +53,7 @@ from ..assess import (
     evaluated_nothing,
 )
 from ..blind_spots import catalog_support_view, compute_blind_spots
-from ..bundle import confine_to_root, copy_bundle, load_bundle
+from ..bundle import confine_to_root, copy_bundle, load_bundle, permission_denied
 from ..canonical import CanonicalizationError, canonical_string, canonicalize
 from ..catalog import Catalog, lint_catalog, load_catalog
 from ..collect import EnvSecretManager, SourceSpec, load_config, run_collect
@@ -64,7 +64,7 @@ from ..coverage_matrix import MATRIX_FILE, check_matrix, write_matrix
 from ..domain import DomainBinding
 from ..environment import inspect_environment
 from ..error_catalogue import MESSAGE_KEYS, render_errors_md
-from ..errors import AgentceError, InputError
+from ..errors import AgentceError, InputError, UnreadableError
 from ..exit_codes import ExitCode
 from ..fail_on import parse_fail_on
 from ..graph import build_graph
@@ -329,7 +329,18 @@ def cmd_verify(ns: argparse.Namespace) -> CommandResult:
         return _verify_catalog(result, catalog_dir)
     if report is not None:
         report_dir = _require_dir(report, key="report", what="the report directory")
-        return _verify_report(result, report_dir, signer_trust_root, expect_keyid)
+        try:
+            return _verify_report(result, report_dir, signer_trust_root, expect_keyid)
+        except OSError as exc:
+            raise _report_unreadable(
+                report_dir, unreadable_rel(report_dir, exc)
+            ) from exc
+        except UnreadableError as exc:
+            if exc.key != "input.bundle_unreadable":
+                raise
+            # The packaged evidence is the report's own folder: name the path from the report.
+            inner = f"bundle/evidence/{exc.rel}" if exc.rel else "bundle/evidence"
+            raise _report_unreadable(report_dir, inner) from exc
     # `os.path.exists` on the raw string, not `Path(release).exists()`: pathlib drops a trailing
     # slash while building its parts, so `Path("file.tar/").exists()` silently checks "file.tar"
     # and answers True for a plain file, losing the OS's own "this must be a directory" refusal
@@ -341,7 +352,49 @@ def cmd_verify(ns: argparse.Namespace) -> CommandResult:
             "pass --release <bundle-dir-or-envelope>.",
         )
     release_path = Path(release)  # type: ignore[arg-type]
-    return _verify_release(result, release_path)
+    try:
+        return _verify_release(result, release_path)
+    except PermissionError as exc:
+        raise UnreadableError(
+            "input.release_unreadable",
+            "the release artifact",
+            release_path,
+            unreadable_rel(release_path, exc),
+            "release",
+        ) from exc
+
+
+def unreadable_rel(root: Path, exc: BaseException) -> str:
+    """The path an OSError names, relative to ``root`` ("" for ``root`` itself or no path): the
+    file or folder an unreadable-input refusal names (18.68)."""
+    name = getattr(exc, "filename", None)
+    if not name:
+        return ""
+    try:
+        rel = Path(name).relative_to(root).as_posix()
+    except ValueError:
+        return ""
+    return "" if rel == "." else rel
+
+
+def _report_unreadable(report_dir: Path, rel: str) -> UnreadableError:
+    return UnreadableError(
+        "verify.report_unreadable",
+        "the report directory",
+        report_dir,
+        rel,
+        "report directory",
+    )
+
+
+def _catalog_unreadable(catalog_dir: Path, exc: BaseException) -> UnreadableError:
+    return UnreadableError(
+        "input.catalog_unreadable",
+        "the catalog directory",
+        catalog_dir,
+        unreadable_rel(catalog_dir, exc),
+        "catalog directory",
+    )
 
 
 def _verify_catalog(result: CommandResult, catalog_dir: Path) -> CommandResult:
@@ -354,16 +407,14 @@ def _verify_catalog(result: CommandResult, catalog_dir: Path) -> CommandResult:
         OSError,
         UnicodeError,
     ) as exc:  # unreadable, or a file name that is not UTF-8
-        raise InputError(
-            "input.catalog_unreadable",
-            f"the catalog directory {catalog_dir} holds a file that cannot be read.",
-            "make every file in the catalog directory readable, then re-run.",
-        ) from exc
+        raise _catalog_unreadable(catalog_dir, exc) from exc
     result.data.update({"catalog": str(catalog_dir), "digest": recomputed})
     try:
         verified = signing.verify_catalog_directory(
             catalog_dir, signing.vendored_trust()
         )
+    except OSError as exc:
+        raise _catalog_unreadable(catalog_dir, exc) from exc
     except signing.UnsignedError as exc:
         result.data["verified"] = False
         result.data["reason"] = str(exc)
@@ -520,8 +571,13 @@ def _verify_report(
     (6) every manifest-tracked output's digest matches, (7) the packaged evidence/profile/domain/
     catalogs match, (8) an offline re-run reproduces every canonical output byte for byte, (9)
     success."""
+    os.listdir(
+        report_dir
+    )  # an unlistable report folder is unreadable, not a report with no claim
     claim_path = report_dir / "claim.json"
     if not claim_path.is_file():
+        if permission_denied(claim_path):
+            claim_path.stat()  # raises the PermissionError naming it
         raise InputError(
             "verify.report_no_claim",
             f"{report_dir} has no claim.json.",
@@ -530,6 +586,8 @@ def _verify_report(
     claim_fix = "regenerate the report; claim.json must be well-formed JSON."
     try:
         claim_bytes = claim_path.read_bytes()
+    except PermissionError:
+        raise
     except OSError as exc:
         raise InputError(
             "verify.report_claim_malformed", "claim.json is not valid JSON.", claim_fix
@@ -621,7 +679,7 @@ def _verify_report(
     if verified is None:
         raise InputError(
             "verify.report_signature_invalid",
-            f"no claimant signature verified against the trust root: {last_error}.",
+            f"no claimant signature verified: {last_error}.",
             "confirm the trust root holds the signer's real key, or re-sign the report.",
         )
     assert (
@@ -756,6 +814,8 @@ def _verify_report(
     try:
         loaded_bundle = load_bundle(bundle_evidence)
     except InputError as exc:
+        if isinstance(exc, UnreadableError):
+            raise  # unreadable, not tampered: cmd_verify names it from the report folder
         raise InputError(
             "verify.report_evidence_tampered",
             f"bundle/evidence does not load cleanly: {exc.cause}",
@@ -962,6 +1022,8 @@ def _load_release_json(
     need different grammar, not just a different noun."""
     try:
         value = signing.parse_untrusted_json(path.read_bytes())
+    except PermissionError:
+        raise  # the caller's input.release_unreadable, not a malformed file
     except (OSError, ValueError):
         return None, reason
     if not isinstance(value, expected_type):
@@ -1000,6 +1062,9 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
     manifest_path = release_path / "release-manifest.json"
     signatures_path = release_path / "signatures.json"
     if not manifest_path.is_file() or not signatures_path.is_file():
+        for path in (manifest_path, signatures_path):
+            if permission_denied(path):
+                path.stat()  # raises the PermissionError naming it
         raise InputError(
             "input.release_bundle",
             f"{release_path} is not a release bundle (release-manifest.json/signatures.json).",
@@ -1029,6 +1094,8 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
         artifact_file = confine_to_root(release_path, name)
         try:
             content = artifact_file.read_bytes() if artifact_file else None
+        except PermissionError:
+            raise
         except OSError:
             content = None
         if content is None:
@@ -1672,6 +1739,9 @@ def _verify_catalog_dirs(
     for catalog in loaded:
         try:
             signing.verify_catalog_directory(catalog.directory, trust)
+        except OSError as exc:
+            # Unreadable is not unverified: --allow-unverified-catalog does not cover it (18.68).
+            raise _catalog_unreadable(catalog.directory, exc) from exc
         except signing.VerificationError as exc:
             if allow_unverified:
                 limitations.append(

@@ -10,11 +10,11 @@
  */
 
 import { type KeyObject, createHash, createPublicKey, verify as cryptoVerify } from "node:crypto";
-import { readFileSync, statSync } from "node:fs";
+import { constants, accessSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { confineToRoot } from "./bundle";
 import { CanonicalizationError, canonicalize, sha256Hex } from "./canonical";
-import { InputError } from "./errors";
+import { InputError, isPermissionError, unreadableError, unreadableRel } from "./errors";
 import { NonCanonicalNumber, parseJson } from "./json";
 import { errorCause } from "./messages";
 import { pyTruthy } from "./readiness";
@@ -372,16 +372,16 @@ export function verifyEnvelope(envelope: unknown, trust: TrustRoot): VerifiedEnv
       }
       const ok = cryptoVerify(null, pae, publicKeyFromRaw(publicKeyRaw), sigBytes);
       if (!ok) {
-        // An empty message, matching `cryptography`'s `InvalidSignature` -- `str()` of which is
-        // empty -- so the aggregate message below renders with nothing after the colon-space.
-        throw new Error("");
+        // Python's `SIGNATURE_INVALID`: a bad signature has a sentence of its own (18.68).
+        throw new Error("signature does not verify");
       }
       const keyidVal = entry.keyid;
       return {
         payload,
         identity,
         keyid: typeof keyidVal === "string" ? keyidVal : null,
-        keyless: "cert" in entry,
+        // `resolve`'s own test: a "cert": null entry resolves as a key (18.68).
+        keyless: entry.cert !== undefined && entry.cert !== null,
       };
     } catch (exc) {
       lastError = exc instanceof Error ? exc.message : String(exc);
@@ -422,18 +422,26 @@ export interface CatalogVerifyResult {
   readonly reason?: string;
 }
 
+/** `input.catalog_unreadable`, naming the file or folder that cannot be read (Python's
+ * `_catalog_unreadable`, 18.68). */
+export function catalogUnreadable(dir: string, err: unknown): InputError {
+  return unreadableError(
+    "input.catalog_unreadable",
+    "the catalog directory",
+    dir,
+    unreadableRel(dir, err),
+    "catalog directory",
+  );
+}
+
 /** Verifies a catalog directory's detached signature against `trust` (mirrors `_verify_catalog`/
  * `verify_catalog_directory`, `signing.py:426-461`, `commands/__init__.py:321-352`). */
 export function verifyCatalog(dir: string, trust: TrustRoot): CatalogVerifyResult {
   let digest: string;
   try {
     digest = digestTree(dir, new Set([CATALOG_SIGNATURE_NAME]));
-  } catch {
-    throw new InputError(
-      "input.catalog_unreadable",
-      `the catalog directory ${dir} holds a file that cannot be read.`,
-      "make every file in the catalog directory readable, then re-run.",
-    );
+  } catch (err) {
+    throw catalogUnreadable(dir, err);
   }
   const fail = (reason: string): CatalogVerifyResult => ({ verified: false, digest, reason });
   const sigPath = join(dir, CATALOG_SIGNATURE_NAME);
@@ -445,6 +453,13 @@ export function verifyCatalog(dir: string, trust: TrustRoot): CatalogVerifyResul
   }
   if (!sigIsFile) {
     return fail(UNSIGNED_SENTENCE);
+  }
+  try {
+    accessSync(sigPath, constants.R_OK);
+  } catch (err) {
+    if (isPermissionError(err)) {
+      throw catalogUnreadable(dir, err);
+    }
   }
   let envelope: unknown;
   try {
@@ -510,9 +525,28 @@ export type ReleaseResult = ReleaseSoftFail | ReleaseSingleResult | ReleaseBundl
  * fix target, built correct from the start: every branch uses the soft-fail shape, and every new
  * JSON-parse-failure path this function adds uses a fixed, engine-neutral reason text (mirrors
  * `_verify_release`, `commands/__init__.py:758-875`). */
+/** Throws `input.release_unreadable` naming `path` when a permission error stops it being read
+ * (Python's PermissionError branch of `cmd_verify`'s release wrapper, 18.68). */
+function requireReleaseReadable(releasePath: string, path: string): void {
+  try {
+    accessSync(path, constants.R_OK);
+  } catch (err) {
+    if (isPermissionError(err)) {
+      throw unreadableError(
+        "input.release_unreadable",
+        "the release artifact",
+        releasePath,
+        unreadableRel(releasePath, err),
+        "release",
+      );
+    }
+  }
+}
+
 export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseResult {
   const stat = statSync(releasePath);
   if (stat.isFile()) {
+    requireReleaseReadable(releasePath, releasePath);
     let envelope: unknown;
     try {
       envelope = readUntrustedJsonFile(releasePath);
@@ -548,6 +582,8 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
     }
   };
   if (!isFile(manifestPath) || !isFile(signaturesPath)) {
+    requireReleaseReadable(releasePath, manifestPath);
+    requireReleaseReadable(releasePath, signaturesPath);
     throw new InputError(
       "input.release_bundle",
       `${releasePath} is not a release bundle (release-manifest.json/signatures.json).`,
@@ -555,6 +591,7 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
     );
   }
 
+  requireReleaseReadable(releasePath, manifestPath);
   let manifest: unknown;
   try {
     // Number tokens kept: `manifestDigest` below canonicalizes `manifest`, which must refuse a
@@ -602,6 +639,9 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
       continue;
     }
     const artifactFile = confineToRoot(releasePath, name);
+    if (artifactFile !== null) {
+      requireReleaseReadable(releasePath, artifactFile);
+    }
     let content: Buffer | null = null;
     try {
       content = artifactFile === null ? null : readFileSync(artifactFile);
@@ -619,6 +659,7 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
     }
   }
 
+  requireReleaseReadable(releasePath, signaturesPath);
   let signatureEntries: unknown;
   try {
     signatureEntries = readUntrustedJsonFile(signaturesPath);
