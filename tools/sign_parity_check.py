@@ -52,6 +52,7 @@ TEST_KEY = FIXTURES / "test-key.pem"
 RSA_KEY = FIXTURES / "rsa-key.pem"
 EC_KEY = FIXTURES / "ec-key.pem"
 ENCRYPTED_KEY = FIXTURES / "encrypted-key.pem"
+DSA_KEY = FIXTURES / "dsa-key.pem"
 
 
 def _run(
@@ -235,6 +236,13 @@ def _error_scenarios(directory: Path) -> list[tuple[str, list[str], str]]:
             "sign.key_algorithm",
         ),
         (
+            # 18.53 (MAINTAINER-NOTES 2026-09-30): a legacy `DSA PRIVATE KEY` PEM is a readable
+            # key of the wrong algorithm, never an unreadable one (Java used to say unreadable).
+            "dsa-key",
+            [str(ready), "--as", "claimant", "--profile", "kms", "--key", str(DSA_KEY)],
+            "sign.key_algorithm",
+        ),
+        (
             "6-encrypted-key-unreadable",
             [
                 str(ready),
@@ -344,6 +352,7 @@ def self_test() -> int:
         ("rsa-key.pem", "-----BEGIN PRIVATE KEY-----"),
         ("ec-key.pem", "-----BEGIN EC PRIVATE KEY-----"),
         ("encrypted-key.pem", "-----BEGIN ENCRYPTED PRIVATE KEY-----"),
+        ("dsa-key.pem", "-----BEGIN DSA PRIVATE KEY-----"),
     ]:
         path = FIXTURES / name
         if not path.is_file():
@@ -666,7 +675,9 @@ def run_real_check() -> int:
                 )
 
         # Scenarios 5/5b/6/7/8/9: every refusal carries the identical message key, cause, and fix.
-        for name, argv, expect_key in _error_scenarios(tmp):
+        error_scenarios = _error_scenarios(tmp)
+        error_names = [name for name, _, _ in error_scenarios]
+        for name, argv, expect_key in error_scenarios:
             runs = _run_engines(argv)
             codes = {engine: code for engine, (_, code) in runs}
             if set(codes.values()) != {3}:
@@ -685,60 +696,108 @@ def run_real_check() -> int:
                         f"{name}:{engine}: error key={key!r}, expected {expect_key!r}"
                     )
 
-        # Scenarios 11-14 (18.26 verifier rounds 2 and 3): a malformed `claim.json` is refused
-        # alike, `internal.unexpected`/exit 3, with nothing written. 11: array-shaped (TS used to
-        # append a property `JSON.stringify` then dropped, exiting 0). 12: a non-array
-        # `signatures` (TS and Java used to replace it with a fresh array; Python's `.append`
-        # crashes). 13: trailing content after the JSON value (Jackson's `readTree` used to ignore
-        # it). 14: invalid UTF-8 (TS's non-fatal decode used to substitute U+FFFD).
-        malformed_claims: list[tuple[str, Any]] = [
-            ("s11-array-claim", [1, 2]),
-            ("s12-signatures-null", {"claimant": {"org": "acme"}, "signatures": None}),
-            ("s12-signatures-string", {"claimant": {"org": "acme"}, "signatures": "x"}),
-            ("s12-signatures-object", {"claimant": {"org": "acme"}, "signatures": {}}),
-            ("s13-trailing-content", b'{"claimant": {"org": "acme"}} GARBAGE'),
-            ("s14-invalid-utf8", b'{"claimant": {"org": "acme\xff"}}'),
-        ]
-        for scenario, claim in malformed_claims:
-            reports = _build_reports(
-                _per_engine_dirs(tmp, scenario), ready_fixture, claim
-            )
-            for engine, report in reports.items():
-                before = (report / "claim.json").read_bytes()
-                out, code = runners[engine](
-                    [
-                        "--json",
-                        str(report),
-                        "--as",
-                        "claimant",
-                        "--profile",
-                        "kms",
-                        "--key",
-                        str(TEST_KEY),
-                    ]
-                )
-                if code != 3:
-                    failures.append(
-                        f"{scenario}:{engine}: exit {code}, expected 3 ({out.strip()[:200]!r})"
-                    )
-                key = _error_key(out)
-                if key != "internal.unexpected":
-                    failures.append(
-                        f"{scenario}:{engine}: error key={key!r}, expected 'internal.unexpected'"
-                    )
-                _assert_claim_untouched(
-                    report, before, engine, scenario, "refusing to sign", failures
-                )
+        run_claim_malformed_scenarios(tmp, failures)
 
     for failure in failures:
         print(f"MISMATCH: {failure}", file=sys.stderr)
+    for scenario in scenario_ids(error_names):
+        failed = any(f.startswith(f"{scenario}:") for f in failures)
+        print(f"{'MISMATCH' if failed else 'MATCH'}: {scenario}")
     if failures:
         return 1
     print(
-        "MATCH: sign kms-profile scenarios (happy path, trust-root, NOT_READY, dry-run, 8 refusal "
-        "shapes, and 6 malformed claim.json shapes) byte-identical and offline-verifying across python, typescript, java"
+        "MATCH: sign kms-profile scenarios byte-identical and offline-verifying across python, "
+        "typescript, java"
     )
     return 0
+
+
+#: A malformed claim.json (18.53): each is refused with `sign.claim_malformed`, exit 3, the same
+#: cause and fix in all three engines, before any key is read and with nothing written. `signatures`
+#: null or an object is refused too, never read as "no signatures".
+MALFORMED_CLAIMS: list[tuple[str, Any]] = [
+    ("claim-not-utf8", b'{"claimant": {"org": "acme\xff"}}'),
+    ("claim-not-json", b'{"claimant": '),
+    ("claim-trailing-content", b'{"claimant": {"org": "acme"}} GARBAGE'),
+    ("claim-lone-surrogate", b'{"claimant": {"org": "\\ud800"}}'),
+    ("claim-array", [1, 2]),
+    ("claim-signatures-null", {"claimant": {"org": "acme"}, "signatures": None}),
+    ("claim-signatures-string", {"claimant": {"org": "acme"}, "signatures": "x"}),
+    ("claim-signatures-object", {"claimant": {"org": "acme"}, "signatures": {}}),
+]
+
+#: (scenario, claim, extra argv, expected key): the same check with the key file missing (the claim
+#: is read first), with --dry-run (a dry run never says "would sign" over a damaged claim), and a
+#: dry run with no claim.json at all (`None`: the file is removed).
+CLAIM_EDGE_CASES: list[tuple[str, Any, list[str], str]] = [
+    (
+        "claim-malformed-missing-key",
+        {"claimant": {"org": "acme"}, "signatures": "x"},
+        ["--key", "does-not-exist.pem"],
+        "sign.claim_malformed",
+    ),
+    (
+        "claim-malformed-dry-run",
+        b'{"claimant": ',
+        ["--key", str(TEST_KEY), "--dry-run"],
+        "sign.claim_malformed",
+    ),
+    ("dry-run-no-claim", None, ["--key", str(TEST_KEY), "--dry-run"], "sign.no_claim"),
+]
+
+
+def scenario_ids(errors: list[str]) -> list[str]:
+    """Every scenario `run_real_check` reports one MATCH or MISMATCH line for, in order."""
+    return [
+        "s1-ready",
+        "s2-trust-root",
+        "s3-not-ready",
+        "s4-dry-run",
+        *errors,
+        *(name for name, _ in MALFORMED_CLAIMS),
+        *(name for name, _, _, _ in CLAIM_EDGE_CASES),
+    ]
+
+
+def run_claim_malformed_scenarios(tmp: Path, failures: list[str]) -> None:
+    """The 18.53 claim.json refusals, shared with VG-CLAIM-PARITY: every engine exits 3 with the
+    expected key and byte-identical error fields, and writes nothing."""
+    runners = {"python": python_sign, "typescript": typescript_sign, "java": java_sign}
+    cases = [
+        (name, claim, ["--key", str(TEST_KEY)], "sign.claim_malformed")
+        for name, claim in MALFORMED_CLAIMS
+    ]
+    for scenario, claim, extra, expect_key in [*cases, *CLAIM_EDGE_CASES]:
+        reports = _build_reports(
+            _per_engine_dirs(tmp, scenario), ready_fixture, claim or {}
+        )
+        outs: list[str] = []
+        for engine, report in reports.items():
+            if claim is None:
+                (report / "claim.json").unlink()
+            before = b"" if claim is None else (report / "claim.json").read_bytes()
+            out, code = runners[engine](
+                ["--json", str(report), "--as", "claimant", "--profile", "kms", *extra]
+            )
+            outs.append(out)
+            if code != 3:
+                failures.append(
+                    f"{scenario}:{engine}: exit {code}, expected 3 ({out.strip()[:200]!r})"
+                )
+            key = _error_key(out)
+            if key != expect_key:
+                failures.append(
+                    f"{scenario}:{engine}: error key={key!r}, expected {expect_key!r}"
+                )
+            if claim is not None:
+                _assert_claim_untouched(
+                    report, before, engine, scenario, "refusing to sign", failures
+                )
+        readiness_parity_check.compare_ports(
+            f"{scenario}:error",
+            [readiness_parity_check._error_fields(out) for out in outs],
+            failures,
+        )
 
 
 def main(argv: list[str] | None = None) -> int:

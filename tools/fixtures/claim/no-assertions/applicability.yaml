@@ -1,0 +1,11 @@
+# A quickstart applicability profile with no subjects: an assessment over it evaluates nothing, so no
+# engine writes a claim.json (tools/claim_parity_check.py, 18.53).
+profile_version: 1
+observation_window:
+  start: "2026-05-01T00:00:00Z"
+  end: "2026-08-29T00:00:00Z"
+content_capture:
+  mode: hashes_only
+catalogs:
+  - "eu-ai-act@2026.09"
+subjects: []
