@@ -37,11 +37,12 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.bundle_manifest_mismatch` | a stream file's digest does not match the manifest. | regenerate the bundle so its files match the manifest. |
 | `input.bundle_manifest_missing` | the evidence bundle has no manifest.json. | an agent writes a bundle by running with the agentce_emit emitter on: set `AGENTCE_EMIT=1 AGENTCE_EMIT_OUT=<dir>` and see docs/integrate.md; to watch one built, run `examples/custom-loop/run.sh <dir>` from a checkout, then `agentce validate --bundle <dir>`. |
 | `input.bundle_manifest_path` | a bundle manifest entry's path is absolute, contains '..', or escapes the bundle root through a symlink. | the manifest must list only paths that stay inside the bundle after symlinks resolve. |
+| `input.bundle_unreadable` | the evidence bundle, or a file or folder inside it, could not be read (permissions). | make every file and folder in the evidence bundle readable, then re-run. |
 | `input.catalog_action` | the catalog actions are `lint`, `coverage-matrix`, `init`, and `sign`. | run `agentce catalog lint <dir>`, `agentce catalog coverage-matrix <dir>`, `agentce catalog init <dir>`, or `agentce catalog sign <dir>`. |
 | `input.catalog_mismatch` | a --catalog-dir carries an id@version the --catalog request did not name. | pass --catalog-dir for the catalog you named, or name the id@version the directory carries. |
 | `input.catalog_missing` | --catalog was given but names no catalog. | pass --catalog <id@version>, or leave --catalog out to assess against the baseline. |
 | `input.catalog_not_found` | no base catalog was found under the expected path. | run from the repository root or pass --catalog-dir to a catalog directory. |
-| `input.catalog_unreadable` | a file in the catalog directory could not be read (permissions, or a non-UTF-8 file name). | make every file in the catalog directory readable, then re-run. |
+| `input.catalog_unreadable` | a file or folder in the catalog directory could not be read (permissions, or a non-UTF-8 file name). | make every file and folder in the catalog directory readable, then re-run. |
 | `input.catalog_unresolved` | a requested catalog id@version does not resolve to any catalog directory. | use an available <id>@<version>, or pass --catalog-dir <dir> for a catalog on disk. |
 | `input.catalog_unverified` | a --catalog-dir catalog is unsigned, or its signature does not verify against the effective trust root. | point --catalog-dir at a catalog whose catalog.sig.json verifies, or pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) for the root that signed it; --allow-unverified-catalog assesses it anyway and records the override as a limitation. |
 | `input.config_action` | the only config action is `show`. | run `agentce config show`. |
@@ -79,6 +80,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.records_subject_ambiguous` | the profile declares several subjects, and a records folder is assessed as one. | declare one subject in the profile, or assess each agent's records folder separately. |
 | `input.release_bundle` | the given directory has no release-manifest.json or signatures.json, so it is not a release bundle. | pass the --out directory produced by the release tooling. |
 | `input.release_missing` | the release artifact named on the command line does not exist. | pass --release <bundle-dir-or-envelope>. |
+| `input.release_unreadable` | the release artifact, or a file or folder inside it, could not be read (permissions). | make every file and folder in the release readable, then re-run. |
 | `input.sign_profile` | unknown signing profile. | choose one of: sigstore-public, sigstore-private, kms. |
 | `input.sign_role` | --as must be `claimant` or `assessor`. | pass --as claimant|assessor. |
 | `input.sign_unrecognized_flag` | sign was given a flag it does not recognize. | pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag. |
@@ -112,6 +114,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `verify.report_reproduction_mismatch` | an offline re-run from the packaged evidence does not reproduce a canonical output byte for byte. | run `agentce diff` between the shipped and re-run outputs for the full picture. |
 | `verify.report_signature_invalid` | no claimant signature verifies against the trust root. | confirm the trust root holds the signer's real key, or re-sign the report. |
 | `verify.report_subject_missing` | the signed statement is missing a required subject (manifest.json or claim.json). | re-sign the report: `agentce sign <report-dir> --as claimant`. |
+| `verify.report_unreadable` | the report directory, or a file or folder inside it, could not be read (permissions). | make every file and folder in the report directory readable, then re-run. |
 | `verify.report_unsigned` | claim.json carries no signatures. | sign the report first: `agentce sign <report-dir> --as claimant`. |
 
 ## Warnings
