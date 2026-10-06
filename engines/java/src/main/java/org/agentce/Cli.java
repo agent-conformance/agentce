@@ -1547,6 +1547,26 @@ public final class Cli {
         return defaultValue;
     }
 
+    /** claim.json as {@code sign} appends to it, as Python's {@code _read_sign_claim}: an object whose
+     * {@code signatures}, when present, is a list. Read through verify's own strict reader, with
+     * verify's wording. */
+    static ObjectNode readSignClaim(Path claimPath) {
+        String fix = "re-run the `agentce assess` command that wrote this report, then sign the new report.";
+        JsonNode claim;
+        try {
+            claim = Verify.readUntrustedJsonFile(claimPath);
+        } catch (IllegalArgumentException e) {
+            throw new InputError("sign.claim_malformed", "claim.json is not valid JSON.", fix);
+        }
+        if (!claim.isObject()) {
+            throw new InputError("sign.claim_malformed", "claim.json is not an object.", fix);
+        }
+        if (claim.has("signatures") && !claim.get("signatures").isArray()) {
+            throw new InputError("sign.claim_malformed", "claim.json's signatures field is not a list.", fix);
+        }
+        return (ObjectNode) claim;
+    }
+
     /** Resolves the operator's signing key for {@code agentce sign} (SPEC §9.1), matching
      * {@code _sign_signer} exactly: {@code kms} signs with an operator-held {@code --key}; the two
      * keyless {@code sigstore-*} profiles always refuse offline (this port never obtains a Fulcio
@@ -1620,11 +1640,8 @@ public final class Cli {
                     "resolve the blocking reasons (agentce readiness <report-dir>) before signing.");
         }
 
-        if (dryRun) {
-            result.note("dry run: would sign the claim as " + role + " (" + profile + ")");
-            return result;
-        }
-
+        // The claim is read and checked before the dry-run return, so a dry run answers as the real
+        // sign would, and before the key is read (TRADEOFFS 2026-10-06 18.53).
         Path claimPath = reportDir.resolve("claim.json");
         if (!Files.isRegularFile(claimPath)) {
             throw new InputError(
@@ -1632,7 +1649,12 @@ public final class Cli {
                     "the report directory has no claim.json to sign.",
                     "produce the report first: `agentce assess … --out <report-dir>`.");
         }
-        ObjectNode claim = (ObjectNode) Json.parseFile(claimPath);
+        ObjectNode claim = readSignClaim(claimPath);
+
+        if (dryRun) {
+            result.note("dry run: would sign the claim as " + role + " (" + profile + ")");
+            return result;
+        }
 
         Sign.Signer signer = signSigner(parsed.key(), profile);
         ArrayNode subjects = Sign.signSubjects(reportDir, claim);
@@ -1652,14 +1674,7 @@ public final class Cli {
         record.put("role", role);
         record.put("profile", profile);
         record.setAll(envelope);
-        // A present-but-non-array "signatures" (null, a string, an object) matches Python's
-        // `claim["signatures"].append(record)` crashing with AttributeError, not a silent
-        // replacement with a fresh array (18.26 round-3 verifier finding).
         JsonNode existingSignatures = claim.get("signatures");
-        if (existingSignatures != null && !existingSignatures.isArray()) {
-            throw new IllegalArgumentException(
-                    "claim.json's \"signatures\" is not an array (got " + existingSignatures.getNodeType() + ")");
-        }
         ArrayNode signatures = existingSignatures != null
                 ? (ArrayNode) existingSignatures
                 : claim.putArray("signatures");

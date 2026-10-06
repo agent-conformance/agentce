@@ -86,6 +86,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.verify_unrecognized_flag` | verify was given a flag it does not recognize. | pass --bundle, --catalog, --release, or --report (with --signer-trust-root or --expect-keyid for --report), or drop the flag. |
 | `internal.unexpected` | an unexpected internal error occurred. | re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate. |
 | `report.missing_evidence_pointer` | an assertion reached a conformant, non-conformant, or partial outcome with no evidence pointer. | every conformant, non-conformant, or partial outcome must cite evidence (DC-5). |
+| `sign.claim_malformed` | claim.json is not a JSON object whose signatures field, if present, is a list. | re-run the `agentce assess` command that wrote this report, then sign the new report. |
 | `sign.key_algorithm` | the signing key is not an Ed25519 private key. | supply an Ed25519 key (the algorithm the engine signs with, SPEC §8.7). |
 | `sign.key_unreadable` | the signing key file could not be parsed as an unencrypted PEM private key. | supply an unencrypted Ed25519 private key PEM (`openssl genpkey -algorithm ed25519 -out key.pem`, or `agentce catalog sign --new-key <path>`). |
 | `sign.keyless_offline` | the profile is keyless and obtains a certificate from a Fulcio instance (network); the engine does not sign it offline. | use --profile kms --key <file> offline, or run keyless signing where the Fulcio and Rekor endpoints are reachable. |

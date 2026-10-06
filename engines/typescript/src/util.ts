@@ -163,17 +163,6 @@ export function decodeUtf8Strict(raw: Uint8Array): string {
 }
 
 /**
- * Reads a JSON file with a fatal UTF-8 decode (see {@link readTextFileStrict}); throws on a decode
- * or parse failure, never on a valid-JSON-but-wrong-shape value (the caller decides what "wrong
- * shape" means). Folds a non-canonical number token (`1.0`, `1e2`, an out-of-range integer) to an
- * ordinary number exactly as `JSON.parse` does -- callers that feed the result to `canonicalize`
- * (so a non-canonical token must stay refusable) read with `parseJson` from `./json` instead.
- */
-export function readJsonFileStrict(path: string): unknown {
-  return JSON.parse(readTextFileStrict(path));
-}
-
-/**
  * Recursively sort object keys, matching Python's `json.dumps(sort_keys=True)`. With
  * `JSON.stringify(sortKeysDeep(x), null, 2)` the output is byte-for-byte identical to
  * `json.dumps(x, sort_keys=True, indent=2)` for ASCII content.

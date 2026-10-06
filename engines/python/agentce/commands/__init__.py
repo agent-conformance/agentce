@@ -2805,10 +2805,8 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
             "resolve the blocking reasons (agentce readiness <report-dir>) before signing.",
         )
 
-    if dry_run:
-        result.note(f"dry run: would sign the claim as {role} ({profile})")
-        return result
-
+    # The claim is read and checked before the dry-run return, so a dry run answers as the real
+    # sign would, and before the key is read (TRADEOFFS 2026-10-06 18.53).
     claim_path = report_dir / "claim.json"
     if not claim_path.is_file():
         raise InputError(
@@ -2816,7 +2814,11 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
             "the report directory has no claim.json to sign.",
             "produce the report first: `agentce assess … --out <report-dir>`.",
         )
-    claim = json.loads(claim_path.read_text("utf-8"))
+    claim = _read_sign_claim(claim_path)
+
+    if dry_run:
+        result.note(f"dry run: would sign the claim as {role} ({profile})")
+        return result
 
     signer = _sign_signer(ns, profile)
     subjects = _sign_subjects(report_dir, claim)
@@ -2875,6 +2877,26 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
         result.data["trust_root"] = str(trust_root_path)
     result.note(f"signed {claim_path.name} as {role} ({profile})")
     return result
+
+
+def _read_sign_claim(claim_path: Path) -> dict[str, Any]:
+    """claim.json as `sign` appends to it: an object whose `signatures`, when present, is a list.
+    The causes are verify's own wording; a null `signatures` is refused, never read as none."""
+    fix = "re-run the `agentce assess` command that wrote this report, then sign the new report."
+    try:
+        data = claim_path.read_bytes()
+    except OSError as exc:
+        raise InputError(
+            "sign.claim_malformed", "claim.json is not valid JSON.", fix
+        ) from exc
+    claim = _parse_untrusted_object(
+        data, key="sign.claim_malformed", noun="claim.json", fix=fix
+    )
+    if "signatures" in claim and not isinstance(claim["signatures"], list):
+        raise InputError(
+            "sign.claim_malformed", "claim.json's signatures field is not a list.", fix
+        )
+    return claim
 
 
 def _sign_subjects(report_dir: Path, claim: dict[str, Any]) -> list[dict[str, Any]]:

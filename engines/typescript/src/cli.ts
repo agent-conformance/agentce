@@ -67,19 +67,12 @@ import { computeSecurityView } from "./securityView";
 import { INTOTO_STATEMENT_TYPE, KmsSigner, type Signer, signStatement, signSubjects } from "./sign";
 import { StateDir, windowEnd } from "./state";
 import { GraphStore } from "./store";
-import {
-  byteCompare,
-  jsonStringifyAscii,
-  pyRepr,
-  pyStr,
-  readJsonFileStrict,
-  sortKeysDeep,
-  writeJsonl,
-} from "./util";
+import { byteCompare, jsonStringifyAscii, pyRepr, pyStr, sortKeysDeep, writeJsonl } from "./util";
 import { summarize } from "./verdict";
 import {
   type TrustRoot,
   loadTrustRoot,
+  parseUntrustedJson,
   vendoredTrust,
   verifyCatalog,
   verifyRelease,
@@ -1350,6 +1343,30 @@ function signSigner(keyPath: string | undefined, profile: string): Signer {
  * matching the Python reference's `cmd_sign` byte for byte (see `sign.ts`). Refuses to sign unless the
  * report's readiness verdict is not `NOT READY` (`agentce readiness`'s own gate, computed the same
  * way). */
+/** claim.json as `sign` appends to it, as Python's `_read_sign_claim`: an object whose `signatures`,
+ * when present, is a list. Read through verify's own strict reader, with verify's wording. */
+function readSignClaim(claimPath: string): Record<string, unknown> {
+  const fix =
+    "re-run the `agentce assess` command that wrote this report, then sign the new report.";
+  let claim: unknown;
+  try {
+    claim = parseUntrustedJson(readFileSync(claimPath));
+  } catch {
+    throw new InputError("sign.claim_malformed", "claim.json is not valid JSON.", fix);
+  }
+  if (!isRecord(claim)) {
+    throw new InputError("sign.claim_malformed", "claim.json is not an object.", fix);
+  }
+  if ("signatures" in claim && !Array.isArray(claim.signatures)) {
+    throw new InputError(
+      "sign.claim_malformed",
+      "claim.json's signatures field is not a list.",
+      fix,
+    );
+  }
+  return claim;
+}
+
 function cmdSign(argv: string[]): CommandResult {
   const result = new CommandResult("sign");
   const args = parseSignArgv(argv);
@@ -1402,11 +1419,8 @@ function cmdSign(argv: string[]): CommandResult {
     );
   }
 
-  if (dryRun) {
-    result.note(`dry run: would sign the claim as ${role} (${profile})`);
-    return result;
-  }
-
+  // The claim is read and checked before the dry-run return, so a dry run answers as the real sign
+  // would, and before the key is read (TRADEOFFS 2026-10-06 18.53).
   const claimPath = join(reportDir, "claim.json");
   if (!existsSync(claimPath) || !statSync(claimPath).isFile()) {
     throw new InputError(
@@ -1415,21 +1429,12 @@ function cmdSign(argv: string[]): CommandResult {
       "produce the report first: `agentce assess … --out <report-dir>`.",
     );
   }
-  // A fatal decode, not `readFileSync(claimPath, "utf-8")`: Node's utf-8 string coercion silently
-  // replaces invalid byte sequences with U+FFFD, while Python's and Java's decoders refuse
-  // (18.26 round-3 verifier finding). `readJsonFileStrict`'s `TextDecoder` with `fatal: true`
-  // throws instead.
-  const parsedClaim: unknown = readJsonFileStrict(claimPath);
-  if (!isRecord(parsedClaim)) {
-    // Matches Python's `claim.setdefault("signatures", [])` (AttributeError on a non-dict claim)
-    // and Java's `(ObjectNode) Json.parseFile(claimPath)` cast (ClassCastException) -- both crash
-    // into `internal.unexpected` rather than silently appending a "signatures" property that
-    // `JSON.stringify` would then drop from a top-level array (18.26 round-2 verifier finding).
-    throw new Error(
-      `claim.json does not hold an object (got ${Array.isArray(parsedClaim) ? "array" : parsedClaim === null ? "null" : typeof parsedClaim})`,
-    );
+  const claim = readSignClaim(claimPath);
+
+  if (dryRun) {
+    result.note(`dry run: would sign the claim as ${role} (${profile})`);
+    return result;
   }
-  const claim = parsedClaim;
 
   const signer = signSigner(args.key, profile);
   const subjects = signSubjects(reportDir, claim);
@@ -1447,12 +1452,6 @@ function cmdSign(argv: string[]): CommandResult {
   };
   const envelope = signStatement(statement, signer);
   const record = { role, profile, ...envelope };
-  // A present-but-non-array `signatures` (null, a string, an object) matches Python's
-  // `claim["signatures"].append(record)` crashing with AttributeError, not a silent replacement
-  // with a fresh array (18.26 round-3 verifier finding).
-  if (claim.signatures !== undefined && !Array.isArray(claim.signatures)) {
-    throw new Error(`claim.json's "signatures" is not an array (got ${typeof claim.signatures})`);
-  }
   const signatures = (claim.signatures as unknown[] | undefined) ?? [];
   signatures.push(record);
   claim.signatures = signatures;

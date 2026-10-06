@@ -904,6 +904,7 @@ def test_diff_json_envelope_wins_over_format(
 
 
 def test_sign_ok(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    (tmp_path / "claim.json").write_text("{}", encoding="utf-8")
     code, env = run(
         ["sign", str(tmp_path), "--as", "claimant", "--dry-run", "--json"], capsys
     )
@@ -911,6 +912,56 @@ def test_sign_ok(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert env["as"] == "claimant"
     assert env["dry_run"] is True
     assert env["profile"] == "sigstore-public"
+
+
+def test_sign_dry_run_without_a_claim_is_no_claim(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A dry run answers as the real sign would: no claim.json, nothing to sign (18.53)."""
+    code, env = run(
+        ["sign", str(tmp_path), "--as", "claimant", "--dry-run", "--json"], capsys
+    )
+    assert code == 3
+    assert env["error"]["key"] == "sign.no_claim"
+
+
+@pytest.mark.parametrize(
+    ("raw", "cause"),
+    [
+        (b'{"a": "\xff"}', "claim.json is not valid JSON."),
+        (b'{"a": ', "claim.json is not valid JSON."),
+        (b"{} GARBAGE", "claim.json is not valid JSON."),
+        (b'{"a": "\\ud800"}', "claim.json is not valid JSON."),
+        (b"[1, 2]", "claim.json is not an object."),
+        (b'{"signatures": null}', "claim.json's signatures field is not a list."),
+        (b'{"signatures": "x"}', "claim.json's signatures field is not a list."),
+        (b'{"signatures": {}}', "claim.json's signatures field is not a list."),
+    ],
+)
+def test_sign_malformed_claim_is_claim_malformed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], raw: bytes, cause: str
+) -> None:
+    """A damaged claim.json is refused with a keyed error before the key is read and before a dry
+    run would say "would sign" (18.53)."""
+    (tmp_path / "claim.json").write_bytes(raw)
+    for extra in (["--key", str(tmp_path / "missing.pem")], ["--dry-run"]):
+        code, env = run(
+            [
+                "sign",
+                str(tmp_path),
+                "--as",
+                "claimant",
+                "--profile",
+                "kms",
+                *extra,
+                "--json",
+            ],
+            capsys,
+        )
+        assert code == 3
+        assert env["error"]["key"] == "sign.claim_malformed"
+        assert env["error"]["cause"] == cause
+    assert (tmp_path / "claim.json").read_bytes() == raw
 
 
 def test_sign_missing_dir(capsys: pytest.CaptureFixture[str]) -> None:

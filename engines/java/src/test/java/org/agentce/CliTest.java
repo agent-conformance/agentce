@@ -1,5 +1,6 @@
 package org.agentce;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -861,6 +862,56 @@ class CliTest {
 
     private static Path signReportDir(Path dir) throws IOException {
         return signReportDir(dir, "{\"claimant\":{\"org\":\"acme\"}}");
+    }
+
+    @Test
+    void signMalformedClaimGivesClaimMalformedBeforeTheKeyOrADryRun(@TempDir Path dir) throws Exception {
+        String notJson = "claim.json is not valid JSON.";
+        String notList = "claim.json's signatures field is not a list.";
+        Object[][] cases = {
+            {new byte[] {'{', '"', 'a', '"', ':', '"', (byte) 0xff, '"', '}'}, notJson},
+            {"{\"a\": ".getBytes(StandardCharsets.UTF_8), notJson},
+            {"{} GARBAGE".getBytes(StandardCharsets.UTF_8), notJson},
+            {"{\"a\": \"\\ud800\"}".getBytes(StandardCharsets.UTF_8), notJson},
+            {"[1, 2]".getBytes(StandardCharsets.UTF_8), "claim.json is not an object."},
+            {"{\"signatures\": null}".getBytes(StandardCharsets.UTF_8), notList},
+            {"{\"signatures\": \"x\"}".getBytes(StandardCharsets.UTF_8), notList},
+            {"{\"signatures\": {}}".getBytes(StandardCharsets.UTF_8), notList},
+        };
+        for (int i = 0; i < cases.length; i++) {
+            byte[] raw = (byte[]) cases[i][0];
+            Path report = readinessReport(Files.createDirectories(dir.resolve("c" + i)));
+            Files.write(report.resolve("claim.json"), raw);
+            for (String[] extra : new String[][] {{"--key", dir.resolve("missing.pem").toString()}, {"--dry-run"}}) {
+                List<String> argv = new ArrayList<>(List.of(
+                        "sign", report.toString(), "--as", "claimant", "--profile", "kms"));
+                argv.addAll(List.of(extra));
+                JsonNode env = runJson(argv.toArray(String[]::new));
+                assertEquals(3, env.get("exit_code").asInt());
+                assertEquals("sign.claim_malformed", env.get("error").get("message_key").asText());
+                assertEquals(cases[i][1], env.get("error").get("detail").asText());
+            }
+            assertArrayEquals(raw, Files.readAllBytes(report.resolve("claim.json")));
+            assertFalse(Files.exists(report.resolve("signatures")));
+        }
+    }
+
+    @Test
+    void signDryRunWithNoClaimGivesNoClaim(@TempDir Path dir) throws Exception {
+        Path report = readinessReport(dir);
+        JsonNode env = runJson("sign", report.toString(), "--as", "claimant", "--dry-run");
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("sign.no_claim", env.get("error").get("message_key").asText());
+    }
+
+    @Test
+    void signLegacyDsaKeyGivesKeyAlgorithm(@TempDir Path dir) throws Exception {
+        Path report = signReportDir(dir);
+        Path dsa = Path.of("..", "..", "tools", "fixtures", "sign", "dsa-key.pem").toAbsolutePath();
+        JsonNode env = runJson(
+                "sign", report.toString(), "--as", "claimant", "--profile", "kms", "--key", dsa.toString());
+        assertEquals(3, env.get("exit_code").asInt());
+        assertEquals("sign.key_algorithm", env.get("error").get("message_key").asText());
     }
 
     @Test

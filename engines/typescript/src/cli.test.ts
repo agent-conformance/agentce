@@ -1558,29 +1558,52 @@ test("sign: a missing claim.json gives sign.no_claim", () => {
   }
 });
 
-test("sign: an array-shaped claim.json refuses with internal.unexpected, leaving the file untouched", () => {
+for (const [raw, cause] of [
+  [Buffer.from('{"a": "\xff"}', "latin1"), "claim.json is not valid JSON."],
+  [Buffer.from('{"a": '), "claim.json is not valid JSON."],
+  [Buffer.from("{} GARBAGE"), "claim.json is not valid JSON."],
+  [Buffer.from('{"a": "\\ud800"}'), "claim.json is not valid JSON."],
+  [Buffer.from("[1, 2]"), "claim.json is not an object."],
+  [Buffer.from('{"signatures": null}'), "claim.json's signatures field is not a list."],
+  [Buffer.from('{"signatures": "x"}'), "claim.json's signatures field is not a list."],
+  [Buffer.from('{"signatures": {}}'), "claim.json's signatures field is not a list."],
+] as const) {
+  test(`sign: claim.json ${JSON.stringify(raw.toString("latin1"))} gives sign.claim_malformed before the key or a dry run`, () => {
+    const dir = mkdtempSync(join(tmpdir(), "agentce-cli-sign-"));
+    try {
+      const report = readinessReport(dir);
+      const claimPath = join(report, "claim.json");
+      writeFileSync(claimPath, raw);
+      for (const extra of [["--key", join(dir, "missing.pem")], ["--dry-run"]]) {
+        const { exitCode, envelope } = runJson([
+          "sign",
+          report,
+          "--as",
+          "claimant",
+          "--profile",
+          "kms",
+          ...extra,
+        ]);
+        assert.equal(exitCode, 3);
+        const error = envelope.error as { message_key: string; detail: string };
+        assert.equal(error.message_key, "sign.claim_malformed");
+        assert.equal(error.detail, cause);
+      }
+      assert.deepEqual(readFileSync(claimPath), raw);
+      assert.equal(existsSync(join(report, "signatures")), false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+test("sign: a dry run with no claim.json gives sign.no_claim", () => {
   const dir = mkdtempSync(join(tmpdir(), "agentce-cli-sign-"));
   try {
     const report = readinessReport(dir);
-    const claimPath = join(report, "claim.json");
-    writeFileSync(claimPath, JSON.stringify([1, 2]));
-    const before = readFileSync(claimPath);
-    const { path: keyPath } = edKeyFile(dir);
-    const { exitCode, envelope } = runJson([
-      "sign",
-      report,
-      "--as",
-      "claimant",
-      "--profile",
-      "kms",
-      "--key",
-      keyPath,
-    ]);
+    const { exitCode, envelope } = runJson(["sign", report, "--as", "claimant", "--dry-run"]);
     assert.equal(exitCode, 3);
-    const error = envelope.error as { message_key: string };
-    assert.equal(error.message_key, "internal.unexpected");
-    assert.deepEqual(readFileSync(claimPath), before);
-    assert.equal(existsSync(join(report, "signatures")), false);
+    assert.equal((envelope.error as { message_key: string }).message_key, "sign.no_claim");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

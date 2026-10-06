@@ -99,6 +99,8 @@
   "errors.sign.not_ready.fix": "resolve the blocking reasons (agentce readiness <report-dir>) before signing.",
   "errors.sign.no_claim.cause": "the report directory has no claim.json to sign.",
   "errors.sign.no_claim.fix": "produce the report first: `agentce assess … --out <report-dir>`.",
+  "errors.sign.claim_malformed.cause": "claim.json is not a JSON object whose signatures field, if present, is a list.",
+  "errors.sign.claim_malformed.fix": "re-run the `agentce assess` command that wrote this report, then sign the new report.",
   "errors.sign.kms_key_missing.cause": "the kms profile signs with an operator-held key.",
   "errors.sign.kms_key_missing.fix": "pass --key <ed25519-private-key.pem>.",
   "errors.sign.key_algorithm.cause": "the signing key is not an Ed25519 private key.",
