@@ -2078,8 +2078,8 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "report-statement",
     ),
     "agentce.commands.cmd_verify: os.path.exists(release)": ("target-argument",),
-    "agentce.ingest.ingest: json.loads(line)": ("bundle-streams",),
     "agentce.ingest.ingest: path.read_bytes()": ("bundle-streams",),
+    "agentce.safe_json.load_json: json.loads(text)": ("bundle-streams",),
     "agentce.schema.evidence_schema: json.loads(text)": _PACKAGED,
     "agentce.schema.evidence_schema: resources.files('agentce.data')"
     ".joinpath('agentce-evidence.schema.json').read_text()": _PACKAGED,
