@@ -8,20 +8,23 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$root"
 python3 tools/no_ml_check.py --self-test
-python3 - <<'PY'
+uv run --project tools --frozen python - <<'PY'
 import sys
 from pathlib import Path
 
-steps = Path(".github/workflows/no-ml.yml").read_text(encoding="utf-8").split("\n      - ")
-vendor = [i for i, s in enumerate(steps) if "run: python3 tools/vendor_skill_engine.py --write" in s]
-scan = [i for i, s in enumerate(steps) if "tools/no_ml_check.py --require-skill-locks" in s]
-if not vendor or not scan or min(vendor) > min(scan):
+import yaml
+
+steps = yaml.safe_load(Path(".github/workflows/no-ml.yml").read_text(encoding="utf-8"))["jobs"]["no-ml"]["steps"]
+runs = [step.get("run", "") for step in steps]
+vendor = next((i for i, r in enumerate(runs) if "tools/vendor_skill_engine.py --write" in r), None)
+scan = next((i for i, r in enumerate(runs) if "tools/no_ml_check.py --require-skill-locks" in r), None)
+if vendor is None or scan is None or vendor > scan:
     print(
         "FAIL: no-ml.yml must run `python3 tools/vendor_skill_engine.py --write` in a step before the "
-        f"step running `no_ml_check.py --require-skill-locks` (vendor steps {vendor}, scan steps {scan})"
+        f"step running `no_ml_check.py --require-skill-locks` (vendor step {vendor}, scan step {scan})"
     )
     sys.exit(1)
-print(f"no-ml.yml: vendor step {min(vendor)} runs before scan step {min(scan)}")
+print(f"no-ml.yml: vendor step {vendor} runs before scan step {scan}")
 PY
 python3 tools/vendor_skill_engine.py --write >/dev/null
 python3 tools/no_ml_check.py --require-skill-locks
