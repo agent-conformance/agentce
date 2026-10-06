@@ -329,8 +329,6 @@ UNREADABLE_EXPECTED = {
     "manifest-file:unreadable": "input.release_unreadable",
     "artifact-path:artifact-unreadable": "input.release_unreadable",
     "artifact-path:artifact-folder-unreadable": "input.release_unreadable",
-    # A release escape is a failed verification, not a keyed refusal: the reason names it.
-    "artifact-path:link-out-into-unreadable-folder": "missing artifact link-sec",
     "signatures-file:unreadable": "input.release_unreadable",
     "bundle-manifest:unreadable": "input.bundle_unreadable",
     "bundle-files:unreadable-file": "input.bundle_unreadable",
@@ -352,6 +350,12 @@ UNREADABLE_EXPECTED = {
     "report-packaging:unreadable-profile": "verify.report_unreadable",
     "report-packaging:unreadable-domain": "verify.report_unreadable",
     "report-packaging:unreadable-evidence-directory": "verify.report_unreadable",
+}
+
+#: The reason an unreadable row's Python output must give where the outcome is a failed verification,
+#: not a keyed refusal: a release artifact that escapes the release is missing from it (18.68).
+UNREADABLE_EXPECTED_REASON = {
+    "artifact-path:link-out-into-unreadable-folder": "missing artifact link-sec",
 }
 FLOW_IDS = frozenset(point.id for point in FLOW_POINTS)
 
@@ -2286,7 +2290,10 @@ def coverage_problems(mutations: list[Mutation]) -> list[str]:
     unreadable = {m.name for m in mutations if m.problem_class == "unreadable"}
     problems += [
         f"unreadable row {name} has no expected key, or the reverse"
-        for name in sorted(unreadable ^ UNREADABLE_EXPECTED.keys())
+        for name in sorted(
+            unreadable
+            ^ (UNREADABLE_EXPECTED.keys() | UNREADABLE_EXPECTED_REASON.keys())
+        )
     ]
     return problems
 

@@ -967,14 +967,19 @@ class VerifyTest {
     }
 
     /** Runs {@code action} with {@code path} made unreadable (chmod 000), restoring it after. */
-    private static InputError unreadableRefusal(Path path, Runnable action) throws Exception {
+    /** Runs {@code action} with {@code path} made unreadable (chmod 000), restoring it after. */
+    private static <T> T withUnreadable(Path path, java.util.concurrent.Callable<T> action) throws Exception {
         Set<PosixFilePermission> mode = Files.getPosixFilePermissions(path);
         Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("---------"));
         try {
-            return assertThrows(InputError.class, action::run);
+            return action.call();
         } finally {
             Files.setPosixFilePermissions(path, mode);
         }
+    }
+
+    private static InputError unreadableRefusal(Path path, Runnable action) throws Exception {
+        return withUnreadable(path, () -> assertThrows(InputError.class, action::run));
     }
 
     private static Path evidenceCopy(Path dir) throws Exception {
@@ -1065,14 +1070,7 @@ class VerifyTest {
         Files.writeString(release.resolve("signatures.json"), "[]");
         Files.createSymbolicLink(release.resolve("link-sec"), Path.of("../sec/x"));
         assertEquals("input.bundle_manifest_path", unreadableRefusal(sec, () -> Bundle.load(bundle)).key);
-        Set<PosixFilePermission> mode = Files.getPosixFilePermissions(sec);
-        Files.setPosixFilePermissions(sec, PosixFilePermissions.fromString("---------"));
-        String reason;
-        try {
-            reason = Verify.verifyRelease(release, noKeys()).get("reason").asText();
-        } finally {
-            Files.setPosixFilePermissions(sec, mode);
-        }
+        String reason = withUnreadable(sec, () -> Verify.verifyRelease(release, noKeys()).get("reason").asText());
         assertEquals("missing artifact link-sec", reason);
     }
 

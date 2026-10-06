@@ -1000,16 +1000,23 @@ const QUICKSTART_EVIDENCE = join(__dirname, "..", "..", "..", "corpus", "quickst
 const STREAM = "events/urn-agentce-source-langgraph-gateway-eu-1.jsonl";
 const asRoot = process.getuid?.() === 0; // root reads a mode-000 file anyway
 
-/** Runs `fn` with `path` made unreadable (chmod 000), restoring it after, and returns the refusal. */
-function unreadableRefusal(path: string, fn: () => unknown): { key: string; cause: string } {
+/** Runs `fn` with `path` made unreadable (chmod 000), restoring it after. */
+function withUnreadable<T>(path: string, fn: () => T): T {
   chmodSync(path, 0);
   try {
-    fn();
+    return fn();
+  } finally {
+    chmodSync(path, 0o755);
+  }
+}
+
+/** Runs `fn` with `path` made unreadable and returns the refusal it throws. */
+function unreadableRefusal(path: string, fn: () => unknown): { key: string; cause: string } {
+  try {
+    withUnreadable(path, fn);
   } catch (err) {
     assert.ok(err instanceof InputError, String(err));
     return { key: err.key, cause: err.cause };
-  } finally {
-    chmodSync(path, 0o755);
   }
   assert.fail("expected a refusal");
 }
@@ -1137,13 +1144,9 @@ test(
         unreadableRefusal(sec, () => loadBundle(bundle)).key,
         "input.bundle_manifest_path",
       );
-      chmodSync(sec, 0);
-      let result: ReleaseResult;
-      try {
-        result = verifyRelease(release, TrustRoot.fromDict({ keys: {} }));
-      } finally {
-        chmodSync(sec, 0o755);
-      }
+      const result: ReleaseResult = withUnreadable(sec, () =>
+        verifyRelease(release, TrustRoot.fromDict({ keys: {} })),
+      );
       assert.equal("reason" in result ? result.reason : undefined, "missing artifact link-sec");
     } finally {
       rmSync(dir, { recursive: true, force: true });

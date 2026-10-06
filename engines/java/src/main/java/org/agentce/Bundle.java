@@ -123,10 +123,10 @@ public final class Bundle {
      * <p>Every bundle-adjacent reference an adversarial evidence bundle can carry -- the primary
      * manifest's own file list, a coverage denominator's manifest, an integrity block's {@code
      * sig_ref} -- is confined through this one function, so a symlink escape, a literal {@code
-     * ..}/absolute path, a symlink loop, an embedded NUL byte, or a path segment too long for the
-     * filesystem are refused the same deliberate way everywhere. A path that simply does not exist
-     * yet is not a confinement failure: it is returned unresolved so the caller's own "missing from
-     * the bundle" check reports it under its own message key.
+     * ..}/absolute path, a symlink loop, or an embedded NUL byte are refused the same deliberate way
+     * everywhere. A path that cannot be looked at (missing, too long, under a file or an unreadable
+     * folder) is not a confinement failure: it is returned unresolved so the caller's own checks
+     * report it under their own message key.
      */
     static Path confineToRoot(Path root, String rel) {
         if (rel == null || rel.isEmpty() || rel.startsWith("/") || Arrays.asList(rel.split("/")).contains("..")) {
@@ -137,7 +137,7 @@ public final class Bundle {
             Path resolvedRoot = root.toRealPath();
             // The member resolves the way Python's does, so a link is judged by where it points even
             // when what it points at cannot be read.
-            String resolved = resolveLoose(candidate);
+            String resolved = walkLoose(resolvedRoot.toString(), rel, new HashMap<>());
             if (resolved == null) {
                 return null;
             }
@@ -160,23 +160,15 @@ public final class Bundle {
      * symlink loop, or a link that cannot be read (18.68).
      */
     static String resolveLoose(Path path) {
-        String[] out = walkLoose("/", path.toAbsolutePath().toString(), new HashMap<>());
-        return out != null && out[1] != null ? out[0] : null;
+        return walkLoose("/", path.toAbsolutePath().toString(), new HashMap<>());
     }
 
-    /** One step of {@link #resolveLoose}: {path, "ok"} when every link resolved, {path, null} on a
-     * symlink loop, null when a link cannot be read. */
-    private static String[] walkLoose(String start, String rest, Map<String, String> seen) {
-        String current = start;
-        String remaining = rest;
-        if (remaining.startsWith("/")) {
-            remaining = remaining.substring(1);
-            current = "/";
-        }
-        while (!remaining.isEmpty()) {
-            int cut = remaining.indexOf('/');
-            String name = cut == -1 ? remaining : remaining.substring(0, cut);
-            remaining = cut == -1 ? "" : remaining.substring(cut + 1);
+    /** {@code rest} resolved from the already resolved folder {@code start}, for {@link
+     * #resolveLoose}; {@code seen} maps each link to what it resolved to, or null while it is being
+     * resolved (a loop). */
+    private static String walkLoose(String start, String rest, Map<String, String> seen) {
+        String current = rest.startsWith("/") ? "/" : start;
+        for (String name : rest.split("/")) {
             if (name.isEmpty() || name.equals(".")) {
                 continue;
             }
@@ -186,12 +178,12 @@ public final class Bundle {
                 continue;
             }
             String next = current.endsWith("/") ? current + name : current + "/" + name;
-            boolean isLink;
+            boolean isLink = false;
             try {
                 isLink = Files.readAttributes(Path.of(next), BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS)
                         .isSymbolicLink();
             } catch (IOException e) {
-                isLink = false;
+                // kept as written, as Python keeps a component lstat cannot look at
             }
             if (!isLink) {
                 current = next;
@@ -200,26 +192,25 @@ public final class Bundle {
             if (seen.containsKey(next)) {
                 String cached = seen.get(next);
                 if (cached == null) {
-                    return new String[] {next, null};
+                    return null; // a symlink loop
                 }
                 current = cached;
                 continue;
             }
             seen.put(next, null);
-            String target;
+            String inner;
             try {
-                target = Files.readSymbolicLink(Path.of(next)).toString();
+                inner = walkLoose(current, Files.readSymbolicLink(Path.of(next)).toString(), seen);
             } catch (IOException e) {
                 return null;
             }
-            String[] inner = walkLoose(current, target, seen);
-            if (inner == null || inner[1] == null) {
-                return inner;
+            if (inner == null) {
+                return null;
             }
-            current = inner[0];
-            seen.put(next, current);
+            seen.put(next, inner);
+            current = inner;
         }
-        return new String[] {current, "ok"};
+        return current;
     }
 
     private static Path safeMember(Path root, String rel) {

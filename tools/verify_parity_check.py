@@ -742,19 +742,16 @@ def run_census(
                 f"{label}: Python did not reach {expected} ({out.strip()[:300]!r})",
             )
         key = verify_flow_census.UNREADABLE_EXPECTED.get(mutation.name)
-        if key is not None and as_root:
+        reason = verify_flow_census.UNREADABLE_EXPECTED_REASON.get(mutation.name)
+        if (key or reason) and as_root:
             skipped_as_root += 1
-        elif key is not None:
+        elif key or reason:
             out, code = runs["python"]
-            reached = (
-                key in (_reason(out) or "")
-                if key.startswith("missing artifact")
-                else _error_key(out) == key
-            )
+            reached = _error_key(out) == key if key else reason in (_reason(out) or "")
             _assert(
                 code == 3 and reached,
                 failures,
-                f"{label}: Python did not reach {key} ({out.strip()[:300]!r})",
+                f"{label}: Python did not reach {key or reason} ({out.strip()[:300]!r})",
             )
         if runs["python"][1] == 0:
             verified.append(mutation.name)

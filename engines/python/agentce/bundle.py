@@ -93,9 +93,10 @@ def confine_to_root(root: Path, rel: str) -> Path | None:
     symlinks resolve, else ``None``. Every bundle-adjacent reference an adversarial evidence bundle
     can carry -- the primary manifest's own file list, a coverage denominator's manifest, an
     integrity block's ``sig_ref`` -- is confined through this one function, so a symlink escape, a
-    literal ``..``/absolute path, a symlink loop, an embedded NUL byte, or a path segment too long
-    for the filesystem are refused the same deliberate way everywhere, never left to surface as an
-    unexpected error."""
+    literal ``..``/absolute path, a symlink loop, or an embedded NUL byte are refused the same
+    deliberate way everywhere, never left to surface as an unexpected error. A path that cannot be
+    looked at (missing, too long, under a file or an unreadable folder) is returned for the
+    caller's own checks to report."""
     if not rel or rel.startswith("/") or ".." in Path(rel).parts:
         return None
     candidate = root / rel

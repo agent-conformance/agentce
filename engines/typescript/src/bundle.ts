@@ -52,8 +52,9 @@ export function safeIsFile(path: string): boolean {
  * resolve, else `null`. Every bundle-adjacent reference an adversarial evidence bundle can carry --
  * the primary manifest's own file list, a coverage denominator's manifest, an integrity block's
  * `sig_ref` -- is confined through this one function, so a symlink escape, a literal `..`/absolute
- * path, a symlink loop, an embedded NUL byte, or a path segment too long for the filesystem are
- * refused the same deliberate way everywhere, never left to surface as an unexpected error.
+ * path, a symlink loop, or an embedded NUL byte are refused the same deliberate way everywhere,
+ * never left to surface as an unexpected error. A path that cannot be looked at (missing, too long,
+ * under a file or an unreadable folder) is returned for the caller's own checks to report.
  */
 export function confineToRoot(root: string, rel: string): string | null {
   if (!rel || rel.startsWith("/") || rel.split("/").includes("..")) {
@@ -69,7 +70,7 @@ export function confineToRoot(root: string, rel: string): string | null {
   }
   // The member resolves the way Python's does, so a link is judged by where it points even when
   // what it points at cannot be read.
-  const resolved = resolveLoose(candidate);
+  const resolved = walkLoose(resolvedRoot, rel, new Map());
   if (resolved === null) {
     return null;
   }
@@ -89,47 +90,39 @@ export function confineToRoot(root: string, rel: string): string | null {
  * hold (18.68).
  */
 export function resolveLoose(path: string): string | null {
-  const seen = new Map<string, string | null>();
-  const walk = (start: string, rest: string): { path: string; ok: boolean } | null => {
-    let current = start;
-    let remaining = rest;
-    if (remaining.startsWith("/")) {
-      remaining = remaining.slice(1);
-      current = "/";
+  return walkLoose("/", isAbsolute(path) ? path : posix.join(process.cwd(), path), new Map());
+}
+
+/** `rest` resolved from the already resolved folder `start`, for {@link resolveLoose}; `seen` maps
+ * each link to what it resolved to, or `null` while it is being resolved (a loop). */
+function walkLoose(start: string, rest: string, seen: Map<string, string | null>): string | null {
+  let current = rest.startsWith("/") ? "/" : start;
+  for (const name of rest.split("/")) {
+    if (!name || name === ".") {
+      continue;
     }
-    while (remaining) {
-      const cut = remaining.indexOf("/");
-      const name = cut === -1 ? remaining : remaining.slice(0, cut);
-      remaining = cut === -1 ? "" : remaining.slice(cut + 1);
-      if (!name || name === ".") {
-        continue;
+    if (name === "..") {
+      current = posix.dirname(current);
+      continue;
+    }
+    const next = posix.join(current, name);
+    let isLink = false;
+    try {
+      isLink = lstatSync(next).isSymbolicLink();
+    } catch (err) {
+      if (typeof (err as NodeJS.ErrnoException | null)?.errno !== "number") {
+        return null; // not an OS refusal: a name no path can hold (an embedded NUL)
       }
-      if (name === "..") {
-        current = current === "/" ? "/" : posix.dirname(current);
-        continue;
-      }
-      const next = posix.join(current, name);
-      let isLink: boolean;
-      try {
-        isLink = lstatSync(next).isSymbolicLink();
-      } catch (err) {
-        if (typeof (err as NodeJS.ErrnoException | null)?.errno !== "number") {
-          return null; // not an OS refusal: a name no path can hold (an embedded NUL)
-        }
-        isLink = false;
-      }
-      if (!isLink) {
-        current = next;
-        continue;
-      }
-      if (seen.has(next)) {
-        const cached = seen.get(next);
-        if (cached === null || cached === undefined) {
-          return null; // a symlink loop
-        }
-        current = cached;
-        continue;
-      }
+    }
+    if (!isLink) {
+      current = next;
+      continue;
+    }
+    const cached = seen.get(next);
+    if (cached === null) {
+      return null; // a symlink loop
+    }
+    if (cached === undefined) {
       seen.set(next, null);
       let target: string;
       try {
@@ -137,18 +130,17 @@ export function resolveLoose(path: string): string | null {
       } catch {
         return null;
       }
-      const inner = walk(current, target);
-      if (inner === null || !inner.ok) {
-        return inner === null ? null : { path: posix.join(inner.path, remaining), ok: false };
+      const inner = walkLoose(current, target, seen);
+      if (inner === null) {
+        return null;
       }
-      current = inner.path;
-      seen.set(next, current);
+      seen.set(next, inner);
+      current = inner;
+    } else {
+      current = cached;
     }
-    return { path: current, ok: true };
-  };
-  const absolute = isAbsolute(path) ? path : posix.join(process.cwd(), path);
-  const result = walk("/", absolute);
-  return result?.ok ? result.path : null;
+  }
+  return current;
 }
 
 function bundleUnreadable(bundleDir: string, rel: string): InputError {
