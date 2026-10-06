@@ -16,6 +16,7 @@ import Ajv2020 from "ajv/dist/2020";
 import anyOfDef from "ajv/dist/vocabularies/applicator/anyOf";
 import oneOfDef from "ajv/dist/vocabularies/applicator/oneOf";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
+import { parseJson } from "./json";
 import { byteCompare } from "./util";
 
 /** Always written, regardless of `--emit`: the run's structural core. */
@@ -55,6 +56,17 @@ const CSV_COLUMNS = ["control", "subject", "outcome", "control_version", "rung",
 
 function schemaDir(): string {
   return join(__dirname, "..", "schema");
+}
+
+/**
+ * `JSON.parse`, refusing an integer literal over 4300 digits as Python's `json.loads` and Java's
+ * `Json.parse` do (item 18.71). The native parse keeps its own syntax messages and gives the value;
+ * `parseJson` then adds only the digit check.
+ */
+function parseJsonText(text: string): unknown {
+  const value = JSON.parse(text);
+  parseJson(text); // throws only for an integer literal past MAX_INT_STR_DIGITS once the native parse passed
+  return value;
 }
 
 function loadSchemaJson(name: string): Record<string, unknown> {
@@ -230,7 +242,7 @@ function recordedOutputs(outDir: string): Record<string, string> {
     return {};
   }
   try {
-    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    const manifest = parseJsonText(readFileSync(manifestPath, "utf-8"));
     const outputs = isRecord(manifest) ? manifest.outputs : undefined;
     return isRecord(outputs) ? (outputs as Record<string, string>) : {};
   } catch {
@@ -339,7 +351,7 @@ function validateJsonl(path: string, filename: string): string[] {
       return;
     }
     try {
-      JSON.parse(line);
+      parseJsonText(line);
     } catch (exc) {
       problems.push(`${filename}: line ${i + 1} is not valid JSON (${(exc as Error).message})`);
     }
@@ -444,7 +456,7 @@ export function validateReport(outDir: string): string[] {
     }
     let instance: unknown;
     try {
-      instance = JSON.parse(readFileSync(path, "utf-8"));
+      instance = parseJsonText(readFileSync(path, "utf-8"));
     } catch (exc) {
       problems.push(`${filename}: invalid JSON (${(exc as Error).message})`);
       continue;

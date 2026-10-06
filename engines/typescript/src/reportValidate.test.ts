@@ -572,3 +572,53 @@ test("two keywords at one location order by keyword", () => {
     JSON.stringify(problems),
   );
 });
+
+// An integer literal over 4300 digits is invalid JSON, as Python's `json.loads` and Java's
+// `Json.parse` read it (item 18.71); the native `JSON.parse` would accept it.
+const BIG = "9".repeat(5000);
+const TOO_LONG = "Integer literal exceeds 4300 digits";
+
+for (const [artifact, prefix] of [
+  ["assertions.json", "assertions.json: invalid JSON ("],
+  ["manifest.json", "manifest.json: invalid JSON ("],
+  ["runtime_drift.jsonl", "runtime_drift.jsonl: line 1 is not valid JSON ("],
+] as const) {
+  test(`an integer literal over 4300 digits in ${artifact} is one invalid-JSON problem`, () => {
+    const out = freshFullReport();
+    try {
+      writeFileSync(join(out, artifact), `{"n": ${BIG}}\n`);
+      const problems = validateReport(out);
+      assert.equal(problems.length, 1, problems.join("\n"));
+      assert.ok(problems[0].startsWith(prefix) && problems[0].includes(TOO_LONG), problems[0]);
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
+  });
+}
+
+test("an integer literal over 4300 digits in manifest.json records no outputs", () => {
+  const out = freshFullReport();
+  try {
+    writeFileSync(
+      join(out, "manifest.json"),
+      `{"outputs": {"runtime_drift.jsonl": "x"}, "n": ${BIG}}`,
+    );
+    const problems = validateReport(out);
+    assert.equal(problems.length, 1, problems.join("\n"));
+    assert.ok(
+      problems[0].startsWith("manifest.json: invalid JSON (") && problems[0].includes(TOO_LONG),
+    );
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("an integer literal of 4300 digits in a JSONL line is valid", () => {
+  const out = freshFullReport();
+  try {
+    writeFileSync(join(out, "runtime_drift.jsonl"), `{"n": -${"9".repeat(4300)}}\n`);
+    assert.deepEqual(validateReport(out), []);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
