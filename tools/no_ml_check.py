@@ -158,6 +158,8 @@ def skill_lock_problems(root: Path) -> tuple[list[str], list[str]]:
     for pyproject in sorted((root / "skills").glob("*/pyproject.toml")):
         lock = pyproject.parent / "uv.lock"
         rel = lock.relative_to(root).as_posix()
+        # uv lock cannot re-lock over an unreadable file, so a bad lock is removed first.
+        regenerate = f"remove {rel}, then run `{VENDOR_HINT}`"
         if not lock.is_file():
             problems.append(f"{rel} is missing: run `{VENDOR_HINT}` before the scan")
             continue
@@ -173,14 +175,14 @@ def skill_lock_problems(root: Path) -> tuple[list[str], list[str]]:
             TypeError,
         ) as exc:
             problems.append(
-                f"{rel} cannot be read ({type(exc).__name__}): run `{VENDOR_HINT}`"
+                f"{rel} cannot be read ({type(exc).__name__}): {regenerate}"
             )
             continue
         missing = {normalize(project), SKILL_ENGINE} - locked
         if missing:
             problems.append(
                 f"{rel} is not a real lock of the skill (lists no {', '.join(sorted(missing))}): "
-                f"run `{VENDOR_HINT}`"
+                f"{regenerate}"
             )
             continue
         scanned.append(rel)
@@ -275,7 +277,11 @@ def _selftest_skill_locks() -> None:
         assert run(td)[0] == 0
         lock.write_text("", encoding="utf-8")
         code, out = run("--require-skill-locks", td)
-        assert code == 1 and "skills/foo/uv.lock is not a real lock" in out, (code, out)
+        assert (
+            code == 1
+            and "skills/foo/uv.lock is not a real lock" in out
+            and "remove skills/foo/uv.lock, then run" in out
+        ), (code, out)
         lock.write_text(
             "version = 1\n\n" + pkg.format("pyyaml") + pkg.format(SKILL_ENGINE),
             encoding="utf-8",
