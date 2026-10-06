@@ -3,6 +3,19 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.51.0
+
+- `VG-RECORDS-EXIT-CODE` (18.72) is new. A records-folder scan (`agentce assess <folder>`) never returns
+  exit 2 on its own, so a first run over the records a team already keeps is not a failure; CI that
+  should fail on evidence gaps opts in with `--fail-on 'outcome=="insufficient_evidence" and
+  severity=="high"'`, which returns 1. Nine scenarios over a gate-only catalog and the default one: a
+  records run exits 1 or 0, never 2, with or without a declared `--profile`; the same evidence as a
+  formal `--bundle`/`--profile` run exits 2; the opt-in, the docs recipe's combined form and an opt-in
+  that matches nothing give the expected `fail_on`; an unquoted literal is refused with nothing written.
+  Three seeded faults: the exit-2 rule applies to records runs, a declared `--profile` makes a records
+  run formal, or `--fail-on` is ignored for records runs. Python only until TypeScript and Java gain
+  the records-folder mode (18.69); 18.72a then runs it in all three.
+
 ## 0.50.0
 
 - `VG-FAIL-ON-PARITY` (18.73) is new. TypeScript and Java accepted `assess --fail-on <expression>` and

@@ -1,0 +1,6 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+
+# No sh:property: the outcome is governed by minimum_evidence alone (a missing ModelCall).
+agentce:RX-GAP-Shape a sh:NodeShape ;
+  sh:targetClass agentce:ToolCall .

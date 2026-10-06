@@ -1,0 +1,23 @@
+id: RX-GAP
+version: "2026.09"
+title: Gate fixture control the records cannot show
+description: >
+  VG-RECORDS-EXIT-CODE gate fixture only (verification/gates/records_exit_code.sh): requires a
+  self-reported ToolCall and a self-reported ModelCall. The otel-genai-agent-session records carry a
+  ToolCall but no ModelCall, so this severity-high control is insufficient_evidence: the evidence gap
+  a formal --bundle/--profile assessment would exit 2 on, and a records-folder scan does not.
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: any
+  minimum_evidence:
+    - {event: ToolCall, class: self_report}
+    - {event: ModelCall, class: self_report}
+  shape: shapes/RX-GAP.ttl
+expectations:
+  - {id: F1, text: "Fixture-only; not a real requirement."}
+severity: high
+tolerance: {kind: count, max: 0}
+test_cases: []

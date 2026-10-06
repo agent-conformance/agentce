@@ -1,0 +1,6 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+
+agentce:RX-FAIL-Shape a sh:NodeShape ;
+  sh:targetClass agentce:ToolCall ;
+  sh:property [ sh:path agentce:actsOnUntrusted ; sh:hasValue true ; sh:name "S1" ] .

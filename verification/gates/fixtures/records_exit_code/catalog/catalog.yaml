@@ -1,0 +1,7 @@
+# A small, gate-only catalog for VG-RECORDS-EXIT-CODE: one severity-high control the records cannot
+# show (RX-GAP, insufficient_evidence) and one medium control every recorded tool call fails
+# (RX-FAIL, non-conformant). Not a base or third-party catalog; loaded only via --catalog-dir
+# --allow-unverified-catalog by this gate's own script.
+id: records-exit-code-fixture
+version: "2026.09"
+title: "VG-RECORDS-EXIT-CODE gate fixture"

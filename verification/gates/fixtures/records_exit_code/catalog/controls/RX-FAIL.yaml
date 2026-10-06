@@ -1,0 +1,21 @@
+id: RX-FAIL
+version: "2026.09"
+title: Gate fixture control every recorded tool call fails
+description: >
+  VG-RECORDS-EXIT-CODE gate fixture only (verification/gates/records_exit_code.sh): every ToolCall
+  must carry agentce:actsOnUntrusted true, which no recorded tool call does, so this medium control
+  is non-conformant and a records-folder scan exits 1 on it.
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: any
+  minimum_evidence:
+    - {event: ToolCall, class: self_report}
+  shape: shapes/RX-FAIL.ttl
+expectations:
+  - {id: F1, text: "Fixture-only; not a real requirement."}
+severity: medium
+tolerance: {kind: count, max: 0}
+test_cases: []

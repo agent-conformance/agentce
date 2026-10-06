@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.50.0",
+  "suite_version": "0.51.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1909,6 +1909,46 @@
         }
       ],
       "fix_hint": "run verification/gates/fail_on_parity.sh and read the FAIL lines; the reference is engines/python/agentce/fail_on.py (parse_fail_on) and cmd_assess's --fail-on handling in engines/python/agentce/commands/__init__.py, ported in engines/typescript/src/failOn.ts and cli.ts (runAssess, assessValueFlags) and engines/java/src/main/java/org/agentce/FailOn.java and Cli.java (runAssess, assessValueFlags)."
+    },
+    {
+      "id": "VG-RECORDS-EXIT-CODE",
+      "title": "A records-folder scan (assess <folder>) never returns exit 2 on its own, the --fail-on opt-in returns 1 on evidence gaps, and the same evidence still exits 2 as a formal --bundle/--profile assessment",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/records_exit_code.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 300,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "over the gate-only RX catalog (RX-GAP severity high insufficient_evidence, RX-FAIL non-conformant), a records-folder run exits 1 with exit_status [findings] with and without a declared --profile, the same derived evidence as a formal --bundle/--profile run exits 2 with [findings, insufficient_evidence], the opt-in --fail-on 'outcome==\"insufficient_evidence\" and severity==\"high\"' matches 1 and the docs recipe's combined form with or outcome==\"non-conformant\" matches 2; over the default catalog a first run with only insufficient_evidence assertions, some severity high, exits 0 [ok], the opt-in exits 1 with matched equal to the severity-high ones, and an opt-in that matches nothing exits 0; an unquoted literal is refused with exit 3, input.fail_on_invalid_expression and no assertions.json",
+        "fail": "a records-folder run returns 2, the formal run on the same evidence does not, the opt-in is ignored or counts the wrong assertions, any exit code, exit_status, fail_on or assertion differs from the rubric, or the refusal writes assertions.json"
+      },
+      "faults": [
+        {
+          "description": "the severity-high insufficient_evidence rule applies to records-folder runs too, so a first scan with evidence gaps exits 2 (G1, G3, G5)",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    if scanned is None:\n        # SPEC §8.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n",
+          "replace": "    if True:\n        # SPEC §8.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n"
+        },
+        {
+          "description": "a records-folder run with a declared --profile is treated as a formal assessment and exits 2 (G3)",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    if scanned is None:\n        # SPEC §8.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n",
+          "replace": "    if scanned is None or _opt_str(ns, \"profile\") is not None:\n        # SPEC §8.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n"
+        },
+        {
+          "description": "--fail-on is ignored for records-folder runs, so the opt-in neither reports fail_on nor fails CI on evidence gaps (G4, G6, G8)",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    if fail_on_predicate is not None:\n",
+          "replace": "    if fail_on_predicate is not None and scanned is None:\n"
+        }
+      ],
+      "fix_hint": "run verification/gates/records_exit_code.sh and read the records-exit-code line; the rule is cmd_assess's exit-code block in engines/python/agentce/commands/__init__.py (the --fail-on branch and the `if scanned is None:` scoping of the severity-high insufficient_evidence rule)."
     }
   ]
 }

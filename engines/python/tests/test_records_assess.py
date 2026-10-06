@@ -1075,3 +1075,117 @@ def test_compressed_files_and_symlinked_folders_are_listed_as_not_read(
     assert code == 0
     assert "decompress" in reasons["old.json.gz"]
     assert "symlinked folder" in reasons["linked"]
+
+
+# The records-mode exit code (SPEC §8.5, VG-RECORDS-EXIT-CODE): a records-folder scan never returns 2 on
+# its own, and CI that should fail on evidence gaps opts in with --fail-on. The gate's fixture has a
+# gate-only catalog: RX-GAP (severity high, insufficient_evidence) and RX-FAIL (non-conformant).
+_EXIT_FIXTURE = _REPO_ROOT / "verification" / "gates" / "fixtures" / "records_exit_code"
+_EXIT_CATALOG = [
+    "--catalog-dir",
+    str(_EXIT_FIXTURE / "catalog"),
+    "--allow-unverified-catalog",
+]
+_GAP = 'outcome=="insufficient_evidence" and severity=="high"'
+
+
+def _high_gaps(out: Path) -> int:
+    return sum(
+        a["outcome"] == "insufficient_evidence" and a["severity"] == "high"
+        for a in _assertions(out)
+    )
+
+
+def test_a_first_records_run_with_severity_high_gaps_exits_0_not_2(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out = tmp_path / "out"
+    code, env = _run(
+        ["assess", str(_EXIT_FIXTURE / "records"), "--out", str(out)], capsys
+    )
+
+    assert code == 0 and env["exit_status"] == ["ok"]
+    assert _high_gaps(out) > 0
+
+
+def test_a_records_run_with_a_finding_and_a_severity_high_gap_exits_1_not_2(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    records = str(_EXIT_FIXTURE / "records")
+    first = tmp_path / "first"
+    code, env = _run(["assess", records, *_EXIT_CATALOG, "--out", str(first)], capsys)
+    assert code == 1 and env["exit_status"] == ["findings"]
+    assert sorted((a["control"], a["outcome"]) for a in _assertions(first)) == [
+        ("RX-FAIL", "non-conformant"),
+        ("RX-GAP", "insufficient_evidence"),
+    ]
+
+    # The derived profile passed back as a declared --profile is still a records scan.
+    declared = tmp_path / "declared"
+    code, env = _run(
+        [
+            "assess",
+            records,
+            "--profile",
+            str(first / "applicability.yaml"),
+            *_EXIT_CATALOG,
+            "--out",
+            str(declared),
+        ],
+        capsys,
+    )
+    assert code == 1 and env["exit_status"] == ["findings"]
+    assert _high_gaps(declared) == 1
+
+
+def test_the_same_evidence_as_a_formal_assessment_exits_2(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    scan = tmp_path / "scan"
+    _run(
+        ["assess", str(_EXIT_FIXTURE / "records"), *_EXIT_CATALOG, "--out", str(scan)],
+        capsys,
+    )
+    code, env = _run(
+        [
+            "assess",
+            "--bundle",
+            str(scan / "records-bundle"),
+            "--profile",
+            str(scan / "applicability.yaml"),
+            *_EXIT_CATALOG,
+            "--out",
+            str(tmp_path / "formal"),
+        ],
+        capsys,
+    )
+
+    assert code == 2
+    assert env["exit_status"] == ["findings", "insufficient_evidence"]
+
+
+def test_fail_on_opts_a_records_run_into_failing_on_evidence_gaps(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    records = str(_EXIT_FIXTURE / "records")
+    gated = tmp_path / "gated"
+    code, env = _run(
+        ["assess", records, "--fail-on", _GAP, "--out", str(gated)], capsys
+    )
+    assert code == 1 and env["exit_status"] == ["findings"]
+    assert env["fail_on"] == {"expression": _GAP, "matched": _high_gaps(gated)}
+    assert env["fail_on"]["matched"] > 0
+
+    code, env = _run(
+        [
+            "assess",
+            records,
+            "--fail-on",
+            'severity=="critical"',
+            "--out",
+            str(tmp_path / "none"),
+        ],
+        capsys,
+    )
+    assert code == 0 and env["exit_status"] == ["ok"]
+    assert env["fail_on"]["matched"] == 0
