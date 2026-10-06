@@ -32,8 +32,8 @@ fail() {
 # Runs `assess <args...> --out <work>/<id> --json` and fails unless the exit code is <exit> and the
 # --json exit_status and fail_on equal the given JSON values. <assertions> is either the exact JSON
 # list of sorted [control, outcome, severity] for every assertion that is not conformant, or
-# "baseline": every assertion insufficient_evidence, at least one severity high, and (when fail_on
-# is given) fail_on.matched equal to the number of severity-high ones.
+# "baseline": every assertion insufficient_evidence and at least one severity high (G6 passes the
+# severity-high count from G5 as its expected fail_on.matched). A mismatch prints its reason and exits.
 check() {
   local id="$1" want_code="$2" want_status="$3" want_fail_on="$4" want_assertions="$5"
   shift 5
@@ -60,9 +60,6 @@ if expected == "baseline":
     high = sum(1 for a in assertions if a["severity"] == "high")
     if outcomes != ["insufficient_evidence"] or high == 0:
         problems.append(f"expected only insufficient_evidence with a severity-high one, got {outcomes}, {high} high")
-    matched = (result.get("fail_on") or {}).get("matched")
-    if fail_on != "null" and json.loads(fail_on)["expression"].endswith('severity=="high"') and matched != high:
-        problems.append(f"fail_on matched {matched}, expected the {high} severity-high gaps")
 else:
     got = sorted([a["control"], a["outcome"], a["severity"]] for a in assertions if a["outcome"] != "conformant")
     if got != json.loads(expected):
@@ -72,7 +69,7 @@ if problems:
     sys.exit(1)
 print(f"{sid}: exit {result['exit_code']} {result['exit_status']} fail_on={result.get('fail_on')}")
 PY
-    fail "$id: --json or assertions.json did not match"
+    exit 1
 }
 
 # fail_on_json <expression> <matched>: the --json fail_on object for an opt-in run.
