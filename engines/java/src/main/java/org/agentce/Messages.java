@@ -87,6 +87,17 @@ public final class Messages {
         return merged;
     }
 
+    /** The English cause text the catalogue holds for error {@code key} ({@code errors.<key>.cause}),
+     * the same text Python's {@code error_catalogue.MESSAGE_KEYS[key].cause} reads. Throws if the key
+     * has none, so a missing entry fails loudly rather than printing an empty reason. */
+    public static String errorCause(String key) {
+        String cause = loadCatalog(DEFAULT_LANGUAGE).get("errors." + key + ".cause");
+        if (cause == null) {
+            throw new IllegalStateException("message catalogue has no errors." + key + ".cause");
+        }
+        return cause;
+    }
+
     public static Map<String, String> catalogue() {
         return catalogue(DEFAULT_LANGUAGE);
     }

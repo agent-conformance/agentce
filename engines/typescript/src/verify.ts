@@ -16,6 +16,7 @@ import { confineToRoot } from "./bundle";
 import { CanonicalizationError, canonicalize, sha256Hex } from "./canonical";
 import { InputError } from "./errors";
 import { NonCanonicalNumber, parseJson } from "./json";
+import { errorCause } from "./messages";
 import { pyTruthy } from "./readiness";
 import { digestTree } from "./report";
 import { dssePae, keyidFor } from "./sign";
@@ -143,6 +144,7 @@ function verifyCertificate(
   if (ca === undefined) {
     throw new Error(`unknown certificate issuer ${describeUntrusted(issuer)}`);
   }
+  let leaf: KeyEntry;
   try {
     const body: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(cert)) {
@@ -162,9 +164,57 @@ function verifyCertificate(
     if (typeof identity !== "string") {
       throw new Error("missing certificate identity");
     }
-    return { publicKeyRaw: leafRaw, identity };
+    leaf = { publicKeyRaw: leafRaw, identity };
   } catch {
     throw new Error("certificate signature does not verify");
+  }
+  checkCertificateFields(cert);
+  return leaf;
+}
+
+/** RFC 3339 `date-time` in UTC (§5.6): `T`/`Z` in either case, ASCII digits only, an optional fraction. */
+const RFC3339_UTC =
+  /^([0-9]{4})-([0-9]{2})-([0-9]{2})[Tt]([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]+))?[Zz]$/;
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/** `<key>: <cause>` with the catalogue's cause text, minus its final period (the aggregate reasons
+ * that wrap it add their own); mirrors `signing._certificate_refusal`. */
+function certificateRefusal(key: string): Error {
+  return new Error(`${key}: ${errorCause(key).replace(/\.$/, "")}`);
+}
+
+/** A text form of an RFC 3339 UTC timestamp that sorts in time order, or `null` if `value` is not one:
+ * the 14 date-time digits, then the fraction without trailing zeros. Mirrors `signing._utc_order_key`. */
+function utcOrderKey(value: unknown): string | null {
+  const match = typeof value === "string" ? RFC3339_UTC.exec(value) : null;
+  if (match === null) {
+    return null;
+  }
+  const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  if (month < 1 || month > 12) {
+    return null;
+  }
+  const days = month === 2 && leap ? 29 : DAYS_IN_MONTH[month - 1];
+  if (day < 1 || day > days || hour > 23 || minute > 59 || second > 60) {
+    return null;
+  }
+  return `${match.slice(1, 7).join("")}.${(match[7] ?? "").replace(/0+$/, "")}`;
+}
+
+/** `algorithm` exactly `ed25519`, and a well-formed RFC 3339 UTC window with `not_before <=
+ * not_after`, never compared with the clock; mirrors `signing._check_certificate_fields`. */
+function checkCertificateFields(cert: Record<string, unknown>): void {
+  if (cert.algorithm !== "ed25519") {
+    throw certificateRefusal("verify.certificate_algorithm");
+  }
+  const notBefore = utcOrderKey(cert.not_before);
+  const notAfter = utcOrderKey(cert.not_after);
+  if (notBefore === null || notAfter === null) {
+    throw certificateRefusal("verify.certificate_validity_malformed");
+  }
+  if (notBefore > notAfter) {
+    throw certificateRefusal("verify.certificate_validity_inverted");
   }
 }
 

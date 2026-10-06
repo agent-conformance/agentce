@@ -97,6 +97,9 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `sign.no_claim` | the report directory has no claim.json to sign. | produce the report first: `agentce assess … --out <report-dir>`. |
 | `sign.not_ready` | the report is not ready to sign. | resolve the blocking reasons (agentce readiness <report-dir>) before signing. |
 | `sign.trust_root_requires_kms` | --write-trust-root needs an exportable public key; the sigstore-public profile has none. | pass --profile kms --key <ed25519-private-key.pem> --write-trust-root. |
+| `verify.certificate_algorithm` | the keyless certificate names a signing algorithm other than ed25519, the only one AgentCE verifies. | ask the signer to re-sign with a keyless certificate whose algorithm is ed25519. |
+| `verify.certificate_validity_inverted` | the keyless certificate's not_before is later than its not_after, so its validity window is empty. | ask the signer to re-sign with a certificate whose not_before is no later than its not_after. |
+| `verify.certificate_validity_malformed` | the keyless certificate's not_before or not_after is missing or is not an RFC 3339 UTC timestamp such as 2026-01-01T00:00:00Z. | ask the signer to re-sign with a certificate whose not_before and not_after are RFC 3339 UTC timestamps ending in Z. |
 | `verify.report_claim_malformed` | claim.json exists but is not valid JSON. | regenerate the report; claim.json must be well-formed JSON. |
 | `verify.report_claim_tampered` | claim.json does not match the digest the signature covers. | the claim was altered after signing; regenerate and re-sign the report. |
 | `verify.report_engine_mismatch` | the report was produced by a different engine build (version, spec version, or package digest) than the one re-running it. | install the same engine build the report names, then re-run verify. |

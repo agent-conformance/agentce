@@ -51,3 +51,14 @@ function reportKeys(language: string): Record<string, string> {
 export function catalogue(language: string = DEFAULT_LANGUAGE): Record<string, string> {
   return { ...reportKeys("en"), ...reportKeys(language) };
 }
+
+/** The English cause text the catalogue holds for error `key` (`errors.<key>.cause`), the same text
+ * Python's `error_catalogue.MESSAGE_KEYS[key].cause` reads. Throws if the key has none, so a
+ * missing entry fails loudly rather than printing an empty reason. */
+export function errorCause(key: string): string {
+  const cause = loadCatalog(DEFAULT_LANGUAGE)[`errors.${key}.cause`];
+  if (cause === undefined) {
+    throw new Error(`message catalogue has no errors.${key}.cause`);
+  }
+  return cause;
+}

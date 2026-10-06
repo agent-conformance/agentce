@@ -25,6 +25,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * {@code agentce verify}, the offline DSSE/certificate verification primitives (SPEC §8.7, §9.1):
@@ -136,6 +138,7 @@ public final class Verify {
         if (ca == null) {
             throw new IllegalArgumentException("unknown certificate issuer " + describeUntrusted(issuerNode));
         }
+        KeyEntry leaf;
         try {
             ObjectNode body = Json.nodes().objectNode();
             var fields = cert.fields();
@@ -157,9 +160,74 @@ public final class Verify {
             if (identity == null) {
                 throw new IllegalArgumentException("missing certificate identity");
             }
-            return new KeyEntry(leafRaw, identity);
+            leaf = new KeyEntry(leafRaw, identity);
         } catch (RuntimeException e) {
             throw new IllegalArgumentException("certificate signature does not verify");
+        }
+        checkCertificateFields(cert);
+        return leaf;
+    }
+
+    /** RFC 3339 {@code date-time} in UTC (§5.6): {@code T}/{@code Z} in either case, ASCII digits only, an
+     * optional fraction. */
+    private static final Pattern RFC3339_UTC = Pattern.compile(
+            "([0-9]{4})-([0-9]{2})-([0-9]{2})[Tt]([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\\.([0-9]+))?[Zz]");
+    private static final int[] DAYS_IN_MONTH = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+    /** {@code <key>: <cause>} with the catalogue's cause text, minus its final period (the aggregate
+     * reasons that wrap it add their own); mirrors {@code signing._certificate_refusal}. */
+    private static IllegalArgumentException certificateRefusal(String key) {
+        String cause = Messages.errorCause(key);
+        if (cause.endsWith(".")) {
+            cause = cause.substring(0, cause.length() - 1);
+        }
+        return new IllegalArgumentException(key + ": " + cause);
+    }
+
+    /** A text form of an RFC 3339 UTC timestamp that sorts in time order, or {@code null} if {@code value}
+     * is not one: the 14 date-time digits, then the fraction without trailing zeros. Mirrors
+     * {@code signing._utc_order_key}. */
+    private static String utcOrderKey(JsonNode value) {
+        if (value == null || !value.isTextual()) {
+            return null;
+        }
+        Matcher m = RFC3339_UTC.matcher(value.textValue());
+        if (!m.matches()) {
+            return null;
+        }
+        int year = Integer.parseInt(m.group(1));
+        int month = Integer.parseInt(m.group(2));
+        int day = Integer.parseInt(m.group(3));
+        int hour = Integer.parseInt(m.group(4));
+        int minute = Integer.parseInt(m.group(5));
+        int second = Integer.parseInt(m.group(6));
+        boolean leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+        if (month < 1 || month > 12) {
+            return null;
+        }
+        int days = month == 2 && leap ? 29 : DAYS_IN_MONTH[month - 1];
+        if (day < 1 || day > days || hour > 23 || minute > 59 || second > 60) {
+            return null;
+        }
+        String fraction = m.group(7) == null ? "" : m.group(7).replaceAll("0+$", "");
+        return m.group(1) + m.group(2) + m.group(3) + m.group(4) + m.group(5) + m.group(6) + "." + fraction;
+    }
+
+    /** {@code algorithm} exactly {@code ed25519}, and a well-formed RFC 3339 UTC window with {@code
+     * not_before <= not_after}, never compared with the clock; mirrors {@code
+     * signing._check_certificate_fields}. */
+    private static void checkCertificateFields(JsonNode cert) {
+        JsonNode algorithm = cert.get("algorithm");
+        if (algorithm == null || !algorithm.isTextual() || !"ed25519".equals(algorithm.textValue())) {
+            throw certificateRefusal("verify.certificate_algorithm");
+        }
+        String notBefore = utcOrderKey(cert.get("not_before"));
+        String notAfter = utcOrderKey(cert.get("not_after"));
+        if (notBefore == null || notAfter == null) {
+            throw certificateRefusal("verify.certificate_validity_malformed");
+        }
+        if (notBefore.compareTo(notAfter) > 0) {
+            throw certificateRefusal("verify.certificate_validity_inverted");
         }
     }
 

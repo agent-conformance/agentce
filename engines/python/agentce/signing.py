@@ -45,6 +45,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 )
 
 from .canonical import canonicalize
+from .error_catalogue import MESSAGE_KEYS
 
 #: DSSE payload type for an in-toto Statement (in-toto attestation framework).
 INTOTO_PAYLOAD_TYPE = "application/vnd.in-toto+json"
@@ -288,7 +289,53 @@ def verify_certificate(
         RecursionError,
     ) as exc:
         raise VerificationError("certificate signature does not verify") from exc
+    _check_certificate_fields(cert)
     return leaf_key, identity
+
+
+#: RFC 3339 `date-time` in UTC (§5.6): `T`/`Z` in either case, ASCII digits only, an optional fraction.
+_RFC3339_UTC = re.compile(
+    r"([0-9]{4})-([0-9]{2})-([0-9]{2})[Tt]([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]+))?[Zz]"
+)
+_DAYS_IN_MONTH = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+
+
+def _certificate_refusal(key: str) -> VerificationError:
+    """``<key>: <cause>`` with the catalogue's cause text, minus its final period (the aggregate
+    reasons that wrap it add their own)."""
+    return VerificationError(f"{key}: {MESSAGE_KEYS[key].cause.removesuffix('.')}")
+
+
+def _utc_order_key(value: Any) -> str | None:
+    """A text form of an RFC 3339 UTC timestamp that sorts in time order, or ``None`` if ``value``
+    is not one. The 14 date-time digits, then the fraction without trailing zeros, so ``.5`` equals
+    ``.50``. Second 60 is admitted (the ABNF's leap second); no leap-second table is consulted."""
+    match = _RFC3339_UTC.fullmatch(value) if isinstance(value, str) else None
+    if match is None:
+        return None
+    year, month, day, hour, minute, second = (int(g) for g in match.groups()[:6])
+    leap = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+    if not 1 <= month <= 12:
+        return None
+    days = 29 if month == 2 and leap else _DAYS_IN_MONTH[month - 1]
+    if not (1 <= day <= days and hour <= 23 and minute <= 59 and second <= 60):
+        return None
+    return "".join(match.groups()[:6]) + "." + (match.group(7) or "").rstrip("0")
+
+
+def _check_certificate_fields(cert: dict[str, Any]) -> None:
+    """The fields a verified certificate must also carry: ``algorithm`` exactly ``ed25519``, and a
+    well-formed RFC 3339 UTC window with ``not_before <= not_after``. The window is never compared
+    with the clock: keyless certificates are short-lived by design, and the bundle carries no trusted
+    signing time to compare it with (docs/verification.md)."""
+    if cert.get("algorithm") != "ed25519":
+        raise _certificate_refusal("verify.certificate_algorithm")
+    not_before = _utc_order_key(cert.get("not_before"))
+    not_after = _utc_order_key(cert.get("not_after"))
+    if not_before is None or not_after is None:
+        raise _certificate_refusal("verify.certificate_validity_malformed")
+    if not_before > not_after:
+        raise _certificate_refusal("verify.certificate_validity_inverted")
 
 
 # --- Signers. ---

@@ -69,6 +69,25 @@ A keyless signature carries its certificate in the DSSE signature entry (`cert`)
 the certificate against the pinned authority, then checks the signature with the certified key. A
 `kms` signature carries a `keyid` that must resolve to a pinned key.
 
+Once the authority's signature on a certificate checks out, the engines also check three of its fields,
+in this order, and refuse the signature if one fails:
+
+| Check | Message key |
+|---|---|
+| `algorithm` is exactly `ed25519` (no other value, no other case, no spaces) | `verify.certificate_algorithm` |
+| `not_before` and `not_after` are RFC 3339 UTC timestamps ending in `Z` or `z`, such as `2026-01-01T00:00:00Z`, with a date that exists. A numeric offset, even `+00:00`, is refused | `verify.certificate_validity_malformed` |
+| `not_before` is no later than `not_after` | `verify.certificate_validity_inverted` |
+
+The refusal reads `<key>: <cause>` inside the usual `no signature verified against the trust root: ...`
+reason. The errors reference (`docs/errors.md`) gives the fix for each key.
+
+**Known limitation: the validity window is not checked against any time.** The engines never compare
+`not_before` or `not_after` with the verifier's clock. A keyless certificate is valid for minutes, so a
+clock check would refuse every keyless signature soon after it was made, and `verify` output would
+change with the date it runs. The window only means something against a trusted signing time, such as
+a transparency-log integrated time or an RFC 3161 timestamp, and a bundle does not carry one today. So
+`verify` does not detect a signature made outside its certificate's window.
+
 ## Verifying a catalog or corpus
 
 Catalogs, overlays, probe corpora, and rule fixtures are distributed with a detached signature,
