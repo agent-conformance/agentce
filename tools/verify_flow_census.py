@@ -36,7 +36,7 @@ from collections import Counter
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar, cast
 
 CATALOG_SIGNATURE_NAME = "catalog.sig.json"
 
@@ -534,6 +534,16 @@ class Mutation:
     arg: Callable[[Path], str | list[str]] | None = None
 
 
+_T = TypeVar("_T")
+
+
+def _bound(
+    argv: Callable[[Path, _T], list[str]], value: _T
+) -> Callable[[Path], list[str]]:
+    """`argv` with its second argument fixed now, not when the mutation runs (a loop variable)."""
+    return lambda path: argv(path, value)
+
+
 def _write(path: Path, data: bytes | Any) -> None:
     if isinstance(data, bytes):
         path.write_bytes(data)
@@ -544,7 +554,14 @@ def _write(path: Path, data: bytes | Any) -> None:
 def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Mutation]:
     """Every mutation the census generates, from the canonical fixtures in `canonical` (built by
     `verify_parity_check.build_canonical_fixtures`), the real signed catalog at `catalog`, and the
-    real signed evidence bundle at `evidence_bundle` (`corpus/quickstart/evidence`)."""
+    real signed evidence bundle at `evidence_bundle` (`corpus/quickstart/evidence`).
+
+    The result is a platform-independent mutation list: it depends on those three inputs only, so a
+    `--list-shard` run on a laptop lists what CI's shards run. The 2,312 (macOS) vs 2,320 (Linux CI)
+    gap once taken for a platform difference was the `CI` variable: the fixture report's `assess`
+    had no `--emit`, so under CI it added `report.junit.xml` and its eight manifest mutations. The
+    builder now names the formats, and VG-VERIFY-CENSUS-SHARD-COVERAGE compares the list built with
+    and without `CI`."""
     mutations: list[Mutation] = []
 
     def add(
@@ -1064,7 +1081,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
                 "repeated",
                 builder,
                 target=flag_target,
-                arg=lambda path, argv=argv, flag=flag: argv(path, flag),
+                arg=_bound(argv, flag),
             )
         if flag_target != "report":
             # TypeScript/Java parse `--report=<dir>` and then refuse --report as unported, so only
@@ -1075,7 +1092,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
                 "equals",
                 builder,
                 target=flag_target,
-                arg=lambda path, flag=flag: [f"{flag}={path}"],
+                arg=_bound(lambda path, flag: [f"{flag}={path}"], flag),
             )
         add(
             f"{flag_target}-equals-empty",
@@ -1083,7 +1100,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
             "equals",
             builder,
             target=flag_target,
-            arg=lambda _path, flag=flag: [f"{flag}="],
+            arg=_bound(lambda _path, flag: [f"{flag}="], flag),
         )
     # A trailing slash on a plain file (not a release-bundle directory) must refuse the same way a
     # nonexistent path does (F5, 18.65): `release-trailing-slash` above exercises a bundle
@@ -1133,7 +1150,7 @@ def generate(canonical: Path, catalog: Path, evidence_bundle: Path) -> list[Muta
             cls,
             evidence_ok,
             target="bundle",
-            arg=lambda path, tokens=tokens: [t.format(path) for t in tokens],
+            arg=_bound(lambda path, tokens: [t.format(path) for t in tokens], tokens),
         )
 
     mutations.extend(report_mutations(canonical))
@@ -1227,7 +1244,7 @@ def report_mutations(canonical: Path) -> list[Mutation]:
         files: dict[str, bytes | Any | None] = {
             f.name: f.read_bytes() for f in sorted((variants / stem).iterdir())
         }
-        for name, how in json.loads(files.pop(REMOVED, b"{}")).items():
+        for name, how in json.loads(cast(bytes, files.pop(REMOVED, b"{}"))).items():
             files[name] = DIRECTORY if how == "directory" else None
         add(stem.split("__", 1)[1], flow, cls, files)
     return mutations

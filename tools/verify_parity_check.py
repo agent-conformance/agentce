@@ -245,11 +245,17 @@ verify_flow_census.build_signed_variants(
 )
 
 # The `--report` rows: a real `assess --package-for-sharing` report of the quickstart, signed as
-# claimant with `--write-trust-root`, then its re-signed variants.
+# claimant with `--write-trust-root`, then its re-signed variants. The formats are named, so the CI
+# variable (which adds `junit` when no `--emit` is given) cannot change the report's outputs, and
+# with them the census list, between CI and a laptop; the step summary stays out of the job's page.
 import contextlib
 import io
+import os
 from agentce import cli
+from agentce.report import ASSESS_DEFAULT_EMIT
 from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat
+
+os.environ.pop("GITHUB_STEP_SUMMARY", None)
 
 quickstart = Path({quickstart!r})
 report = out / verify_flow_census.REPORT_DIR
@@ -263,6 +269,7 @@ with contextlib.redirect_stdout(io.StringIO()):
         "--profile", str(quickstart / "applicability.yaml"),
         "--domain", str(quickstart / "domain.linkml.yaml"),
         "--out", str(report), "--package-for-sharing", "--quiet",
+        "--emit", ",".join(sorted(ASSESS_DEFAULT_EMIT | {{"junit"}})),
     ])
     sign_code = cli.main([
         "sign", str(report), "--as", "claimant", "--profile", "kms",
