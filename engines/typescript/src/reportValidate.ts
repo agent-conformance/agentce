@@ -16,7 +16,7 @@ import Ajv2020 from "ajv/dist/2020";
 import anyOfDef from "ajv/dist/vocabularies/applicator/anyOf";
 import oneOfDef from "ajv/dist/vocabularies/applicator/oneOf";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
-import { parseJson } from "./json";
+import { MAX_INT_STR_DIGITS, parseJson } from "./json";
 import { byteCompare } from "./util";
 
 /** Always written, regardless of `--emit`: the run's structural core. */
@@ -58,14 +58,19 @@ function schemaDir(): string {
   return join(__dirname, "..", "schema");
 }
 
+/** A digit run long enough to hold an over-limit integer literal; text without one needs no token scan. */
+const LONG_DIGIT_RUN = new RegExp(`[0-9]{${MAX_INT_STR_DIGITS + 1}}`);
+
 /**
  * `JSON.parse`, refusing an integer literal over 4300 digits as Python's `json.loads` and Java's
  * `Json.parse` do (item 18.71). The native parse keeps its own syntax messages and gives the value;
- * `parseJson` then adds only the digit check.
+ * `parseJson` then adds only the digit check, and only when such a digit run exists.
  */
 function parseJsonText(text: string): unknown {
   const value = JSON.parse(text);
-  parseJson(text); // throws only for an integer literal past MAX_INT_STR_DIGITS once the native parse passed
+  if (LONG_DIGIT_RUN.test(text)) {
+    parseJson(text); // throws only for an integer literal past MAX_INT_STR_DIGITS once the native parse passed
+  }
   return value;
 }
 
