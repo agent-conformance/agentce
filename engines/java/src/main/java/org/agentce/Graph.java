@@ -424,10 +424,6 @@ public final class Graph {
             }
         }
 
-        /** Materialise the Conduct-overlay instruction-trust flag (SPEC §7.7): whether an
-         * instruction's declared source class is untrusted (Appendix F). Scope and budget are
-         * computed from the enforcement point's records in a second pass
-         * ({@code conductScopeBudget}). */
         /** Collects what the manifests declare and what the calls exercise (DOC-01); the literals come in the second pass. */
         private void mapComponents(String node, String ptype, JsonNode data) {
             if (!COMPONENT_RECORD_TYPES.contains(ptype)) {
@@ -454,6 +450,10 @@ public final class Graph {
             }
         }
 
+        /** Materialise the Conduct-overlay instruction-trust flag (SPEC §7.7): whether an
+         * instruction's declared source class is untrusted (Appendix F). Scope and budget are
+         * computed from the enforcement point's records in a second pass
+         * ({@code conductScopeBudget}). */
         private void mapConduct(String node, String ptype, JsonNode data) {
             if (!"Instruction".equals(ptype)) {
                 return;

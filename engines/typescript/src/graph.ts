@@ -347,9 +347,6 @@ class Builder {
     }
   }
 
-  /** Materialise the Conduct-overlay instruction-trust flag (SPEC §7.7): whether an instruction's
-   * declared source class is untrusted (Appendix F). Scope and budget are computed from the
-   * enforcement point's records in a second pass (`conductScopeBudget`). */
   // Collect what the manifests declare and what the calls exercise (DOC-01); the two literals are set
   // in the second pass, once every event is mapped.
   private mapComponents(node: string, ptype: string, data: Record<string, unknown>): void {
@@ -378,6 +375,9 @@ class Builder {
     }
   }
 
+  /** Materialise the Conduct-overlay instruction-trust flag (SPEC §7.7): whether an instruction's
+   * declared source class is untrusted (Appendix F). Scope and budget are computed from the
+   * enforcement point's records in a second pass (`conductScopeBudget`). */
   private mapConduct(node: string, ptype: string, data: Record<string, unknown>): void {
     if (ptype !== "Instruction") {
       return;
@@ -549,11 +549,8 @@ class Builder {
     const [family, names, version] = operated(ptype, data);
     const known = this.declared[family];
     const declared = names.some((name) => {
-      if (!known.has(name)) {
-        return false;
-      }
       const pins = known.get(name);
-      return pins === null || pins === undefined || version === null || pins.has(version);
+      return pins !== undefined && (pins === null || version === null || pins.has(version));
     });
     this.store.addLiteral(node, "agentce:componentDeclared", declared ? "true" : "false", BOOL);
   }

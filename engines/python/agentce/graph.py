@@ -117,7 +117,7 @@ def _declared_components(
                 (
                     kind if isinstance(kind, str) else None,
                     component["name"],
-                    frozenset(p for p in pins if isinstance(p, str) and p),
+                    frozenset(filter(None, map(_text, pins))),
                 )
             )
     return out
