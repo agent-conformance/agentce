@@ -1787,6 +1787,7 @@ READ_CALLS = frozenset(
         "islink",
         "getsize",
         "parse_untrusted_json",
+        "parse_verify_input",
     }
 )
 
@@ -2029,7 +2030,7 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "manifest-file",
         "signatures-file",
     ),
-    "agentce.commands._load_release_json: signing.parse_untrusted_json(path.read_bytes())": (
+    "agentce.commands._load_release_json: signing.parse_verify_input(raw)": (
         "release-file",
         "manifest-file",
         "signatures-file",
@@ -2074,7 +2075,7 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.commands._verify_report: shipped.is_file()": ("report-manifest",),
     "agentce.commands._verify_report: shipped.read_bytes()": "disposition: compared byte for byte "
     "with the re-run's output; never parsed",
-    "agentce.commands._verify_report: signing.parse_untrusted_json(v.payload)": (
+    "agentce.commands._verify_report: signing.parse_verify_input(v.payload)": (
         "report-statement",
     ),
     "agentce.commands.cmd_verify: os.path.exists(release)": ("target-argument",),
@@ -2101,7 +2102,16 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "release-file",
         "bundle-manifest",
     ),
-    "agentce.signing.statement_subject_digest: parse_untrusted_json(payload)": (
+    "agentce.signing.parse_verify_input: parse_untrusted_json(raw)": (
+        "catalog-sig-file",
+        "catalog-statement",
+        "release-file",
+        "manifest-file",
+        "signatures-file",
+        "release-statement",
+        "report-statement",
+    ),
+    "agentce.signing.statement_subject_digest: parse_verify_input(payload)": (
         "catalog-statement",
         "release-statement",
     ),
@@ -2109,7 +2119,7 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         _PACKAGED
     ),
     "agentce.signing.vendored_trust: vendored_trust_path().read_text('utf-8')": _PACKAGED,
-    "agentce.signing.verify_catalog_directory: parse_untrusted_json(sig_path.read_bytes())": (
+    "agentce.signing.verify_catalog_directory: parse_verify_input(raw)": (
         "catalog-sig-file",
     ),
     "agentce.signing.verify_catalog_directory: sig_path.is_file()": (
@@ -2123,7 +2133,13 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
 
 #: The read calls that touch the filesystem (READ_CALLS without the parsers): a flow point one of these
 #: reads for has a file or folder that can be unreadable.
-FILESYSTEM_CALLS = READ_CALLS - {"loads", "load", "safe_load", "parse_untrusted_json"}
+FILESYSTEM_CALLS = READ_CALLS - {
+    "loads",
+    "load",
+    "safe_load",
+    "parse_untrusted_json",
+    "parse_verify_input",
+}
 
 
 def unreadable_problems(
