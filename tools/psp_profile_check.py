@@ -299,7 +299,7 @@ def installed() -> int:
             capture_output=True,
         )
         subprocess.run(["uv", "venv", str(t / "venv")], check=True, capture_output=True)
-        wheel = next((t / "dist").glob("agentce-*.whl"))
+        wheel = next((t / "dist").glob("agent_conformance-*.whl"))
         subprocess.run(
             [
                 "uv",
@@ -319,7 +319,7 @@ def installed() -> int:
             check=True,
             capture_output=True,
         )
-        tarball = next(t.glob("agentce-*.tgz"))
+        tarball = next(t.glob("agent-conformance-cli-*.tgz"))
         subprocess.run(
             ["npm", "install", "--prefix", str(t / "node"), str(tarball)],
             check=True,
