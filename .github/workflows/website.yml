@@ -59,17 +59,19 @@ jobs:
           # A setup/build failure here is never the defect this check exists to find, so it gets its
           # own exit code (3), distinct from both the defect's exit (1) and GREEN's exit (0).
           rm -rf website/dist
-          pnpm install --offline --frozen-lockfile
+          # pnpm runs from website/ so Corepack reads its packageManager pin (the root has no
+          # package.json, and there Corepack fetches the newest pnpm, whose offline check fails).
+          (cd website && pnpm install --offline --frozen-lockfile)
           install_exit=$?
           if [ "$install_exit" -ne 0 ]; then
             echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
-          pnpm -C website build
+          (cd website && pnpm build)
           build_exit=$?
           if [ "$build_exit" -ne 0 ]; then
-            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            echo "pnpm build in website/ failed (exit $build_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
@@ -142,17 +144,19 @@ jobs:
           # A setup/build failure here is never the defect this check exists to find, so it gets its
           # own exit code (3), distinct from both the defect's exit (1) and GREEN's exit (0).
           rm -rf website/dist
-          pnpm install --offline --frozen-lockfile
+          # pnpm runs from website/ so Corepack reads its packageManager pin (the root has no
+          # package.json, and there Corepack fetches the newest pnpm, whose offline check fails).
+          (cd website && pnpm install --offline --frozen-lockfile)
           install_exit=$?
           if [ "$install_exit" -ne 0 ]; then
             echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
-          pnpm -C website build
+          (cd website && pnpm build)
           build_exit=$?
           if [ "$build_exit" -ne 0 ]; then
-            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            echo "pnpm build in website/ failed (exit $build_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
@@ -243,17 +247,19 @@ jobs:
           # at base_sha, where that file does not exist yet (it is new on the fix branch). At the fix
           # commit and in real CI the file is already committed, so the overlay is a no-op there.
           rm -rf website/dist
-          pnpm install --offline --frozen-lockfile
+          # pnpm runs from website/ so Corepack reads its packageManager pin (the root has no
+          # package.json, and there Corepack fetches the newest pnpm, whose offline check fails).
+          (cd website && pnpm install --offline --frozen-lockfile)
           install_exit=$?
           if [ "$install_exit" -ne 0 ]; then
             echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
-          pnpm -C website build
+          (cd website && pnpm build)
           build_exit=$?
           if [ "$build_exit" -ne 0 ]; then
-            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            echo "pnpm build in website/ failed (exit $build_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
@@ -341,17 +347,19 @@ jobs:
           # exists to find, so it gets its own exit code (3), distinct from both the defect's
           # exit (1) and GREEN's exit (0).
           rm -rf website/dist
-          pnpm install --offline --frozen-lockfile
+          # pnpm runs from website/ so Corepack reads its packageManager pin (the root has no
+          # package.json, and there Corepack fetches the newest pnpm, whose offline check fails).
+          (cd website && pnpm install --offline --frozen-lockfile)
           install_exit=$?
           if [ "$install_exit" -ne 0 ]; then
             echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
-          pnpm -C website build
+          (cd website && pnpm build)
           build_exit=$?
           if [ "$build_exit" -ne 0 ]; then
-            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            echo "pnpm build in website/ failed (exit $build_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
@@ -406,17 +414,19 @@ jobs:
           # never the defect this check exists to find, so it gets its own exit code (3), distinct
           # from both the defect's exit (1) and GREEN's exit (0).
           rm -rf website/dist
-          pnpm install --offline --frozen-lockfile
+          # pnpm runs from website/ so Corepack reads its packageManager pin (the root has no
+          # package.json, and there Corepack fetches the newest pnpm, whose offline check fails).
+          (cd website && pnpm install --offline --frozen-lockfile)
           install_exit=$?
           if [ "$install_exit" -ne 0 ]; then
             echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
-          pnpm -C website build
+          (cd website && pnpm build)
           build_exit=$?
           if [ "$build_exit" -ne 0 ]; then
-            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            echo "pnpm build in website/ failed (exit $build_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
@@ -468,17 +478,19 @@ jobs:
         run: |
           set -u
           rm -rf website/dist
-          pnpm install --offline --frozen-lockfile
+          # pnpm runs from website/ so Corepack reads its packageManager pin (the root has no
+          # package.json, and there Corepack fetches the newest pnpm, whose offline check fails).
+          (cd website && pnpm install --offline --frozen-lockfile)
           install_exit=$?
           if [ "$install_exit" -ne 0 ]; then
             echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
-          pnpm -C website build
+          (cd website && pnpm build)
           build_exit=$?
           if [ "$build_exit" -ne 0 ]; then
-            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            echo "pnpm build in website/ failed (exit $build_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
@@ -534,17 +546,19 @@ jobs:
         run: |
           set -u
           rm -rf website/dist
-          pnpm install --offline --frozen-lockfile
+          # pnpm runs from website/ so Corepack reads its packageManager pin (the root has no
+          # package.json, and there Corepack fetches the newest pnpm, whose offline check fails).
+          (cd website && pnpm install --offline --frozen-lockfile)
           install_exit=$?
           if [ "$install_exit" -ne 0 ]; then
             echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
-          pnpm -C website build
+          (cd website && pnpm build)
           build_exit=$?
           if [ "$build_exit" -ne 0 ]; then
-            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            echo "pnpm build in website/ failed (exit $build_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
@@ -604,17 +618,19 @@ jobs:
           set -u
 
           rm -rf website/dist
-          pnpm install --offline --frozen-lockfile
+          # pnpm runs from website/ so Corepack reads its packageManager pin (the root has no
+          # package.json, and there Corepack fetches the newest pnpm, whose offline check fails).
+          (cd website && pnpm install --offline --frozen-lockfile)
           install_exit=$?
           if [ "$install_exit" -ne 0 ]; then
             echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
-          pnpm -C website build
+          (cd website && pnpm build)
           build_exit=$?
           if [ "$build_exit" -ne 0 ]; then
-            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            echo "pnpm build in website/ failed (exit $build_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
@@ -737,17 +753,19 @@ jobs:
           # canonical-IRI sources relative to it. Three disjoint exit codes so a setup/build failure
           # can never masquerade as the defect: 3 = setup, 1 = defect present, 0 = GREEN.
           rm -rf website/dist
-          pnpm install --offline --frozen-lockfile
+          # pnpm runs from website/ so Corepack reads its packageManager pin (the root has no
+          # package.json, and there Corepack fetches the newest pnpm, whose offline check fails).
+          (cd website && pnpm install --offline --frozen-lockfile)
           install_exit=$?
           if [ "$install_exit" -ne 0 ]; then
             echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
-          pnpm -C website build
+          (cd website && pnpm build)
           build_exit=$?
           if [ "$build_exit" -ne 0 ]; then
-            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            echo "pnpm build in website/ failed (exit $build_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
@@ -799,17 +817,19 @@ jobs:
           # Fresh-clone-safe bootstrap: see C1 for the full rationale. Three disjoint exit codes:
           # 3 = setup, 1 = defect present, 0 = GREEN.
           rm -rf website/dist
-          pnpm install --offline --frozen-lockfile
+          # pnpm runs from website/ so Corepack reads its packageManager pin (the root has no
+          # package.json, and there Corepack fetches the newest pnpm, whose offline check fails).
+          (cd website && pnpm install --offline --frozen-lockfile)
           install_exit=$?
           if [ "$install_exit" -ne 0 ]; then
             echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
-          pnpm -C website build
+          (cd website && pnpm build)
           build_exit=$?
           if [ "$build_exit" -ne 0 ]; then
-            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            echo "pnpm build in website/ failed (exit $build_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
@@ -881,17 +901,19 @@ jobs:
           # Fresh-clone-safe bootstrap: see C1 for the full rationale. Three disjoint exit codes:
           # 3 = setup, 1 = defect present, 0 = GREEN.
           rm -rf website/dist
-          pnpm install --offline --frozen-lockfile
+          # pnpm runs from website/ so Corepack reads its packageManager pin (the root has no
+          # package.json, and there Corepack fetches the newest pnpm, whose offline check fails).
+          (cd website && pnpm install --offline --frozen-lockfile)
           install_exit=$?
           if [ "$install_exit" -ne 0 ]; then
             echo "pnpm install --offline --frozen-lockfile failed (exit $install_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
-          pnpm -C website build
+          (cd website && pnpm build)
           build_exit=$?
           if [ "$build_exit" -ne 0 ]; then
-            echo "pnpm -C website build failed (exit $build_exit) -- setup, not the defect" >&2
+            echo "pnpm build in website/ failed (exit $build_exit) -- setup, not the defect" >&2
             exit 3
           fi
 
