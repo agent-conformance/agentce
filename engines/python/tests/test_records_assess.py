@@ -91,6 +91,11 @@ def _activity(out: Path) -> dict[str, Any]:
     return loaded
 
 
+def _project(out: Path) -> dict[str, Any]:
+    loaded: dict[str, Any] = json.loads((out / "project.json").read_text("utf-8"))
+    return loaded
+
+
 def _events(out: Path) -> list[dict[str, Any]]:
     """Every event in the run's rebuilt records bundle."""
     return [
@@ -548,26 +553,113 @@ def test_a_profile_with_one_subject_gives_the_records_that_subject(
     assert {a["subject"] for a in _assertions(out)} == {"spiffe://corp/agents/mine"}
 
 
-def test_a_profile_with_several_subjects_is_refused_for_a_records_folder(
+def test_derived_profile_round_trip(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    import yaml
+    """The derived profile's own instruction works (18.77): passing a multi-agent first run's profile
+    back unedited gives the same per-agent results, with every agent now declared."""
+    folder = str(_multi_agent_records(tmp_path / "records"))
+    first, second = tmp_path / "first", tmp_path / "second"
+    assert _run(["assess", folder, "--out", str(first)], capsys)[0] == 0
+    derived = str(first / "applicability.yaml")
 
+    code, _ = _run(
+        ["assess", folder, "--profile", derived, "--out", str(second)], capsys
+    )
+
+    assert code == 0
+    assert (second / "assertions.json").read_bytes() == (
+        first / "assertions.json"
+    ).read_bytes()
+    before = _project(first)
+    after = _project(second)
+    assert [a["id"] for a in after["agents"]] == [a["id"] for a in before["agents"]]
+    # Same per-agent results: every row matches the first run's except that it is now declared.
+    assert [{**a, "declared": True} for a in before["agents"]] == after["agents"]
+    assert len(after["agents"]) == 3
+    assert all(a["declared"] for a in after["agents"])
+    assert after["undeclared_agents"] == []
+    assert _activity(second)["undeclared"]["agents"] == []
+
+
+def test_an_agent_the_profile_does_not_name_is_undeclared_with_its_own_report(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = str(_multi_agent_records(tmp_path / "records"))
+    first = tmp_path / "first"
+    _run(["assess", folder, "--out", str(first)], capsys)
+    profile = yaml.safe_load((first / "applicability.yaml").read_text(encoding="utf-8"))
+    fraud = "spiffe://corp/agents/fraud-detection-agent"
+    profile["subjects"] = [s for s in profile["subjects"] if s["id"] != fraud]
+    mine = tmp_path / "mine.yaml"
+    mine.write_text(yaml.safe_dump(profile), encoding="utf-8")
+
+    out = tmp_path / "out"
+    code, _ = _run(
+        ["assess", folder, "--profile", str(mine), "--out", str(out)], capsys
+    )
+
+    assert code == 0
+    rows = {a["id"]: a for a in _project(out)["agents"]}
+    assert rows[fraud]["declared"] is False
+    assert rows[fraud]["agents_observed"] == [fraud]
+    assert _project(out)["undeclared_agents"] == [fraud]
+    # Nobody declared the undeclared agent's tools or models either.
+    assert _activity(out)["undeclared"] == {
+        "agents": [fraud],
+        "models": ["gemini-1.5-pro"],
+        "tools": ["sanctions_screen"],
+    }
+    assert sorted(map(json.dumps, _assertions(out))) == sorted(
+        map(json.dumps, _assertions(first))
+    )
+
+
+def test_a_profile_with_several_subjects_never_guesses_an_id_less_record(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     folder = str(_records(tmp_path / "records"))
     first = tmp_path / "first"
     _run(["assess", folder, "--out", str(first)], capsys)
     profile = yaml.safe_load((first / "applicability.yaml").read_text(encoding="utf-8"))
-    profile["subjects"].append(
-        {**profile["subjects"][0], "id": "spiffe://corp/agents/other"}
-    )
+    (only,) = profile["subjects"]
+    other = "spiffe://corp/agents/other"
+    profile["subjects"] = [only, {**only, "id": other}]
     two = tmp_path / "two.yaml"
     two.write_text(yaml.safe_dump(profile), encoding="utf-8")
 
     out = tmp_path / "out"
+    code, _ = _run(["assess", folder, "--profile", str(two), "--out", str(out)], capsys)
+
+    assert code == 0
+    by_subject: dict[str, set[str | None]] = {}
+    for event in _events(out):
+        agent = event["data"].get("agent")
+        by_subject.setdefault(event["subject"], set()).add(
+            agent.get("id") if isinstance(agent, dict) else None
+        )
+    assert by_subject[only["id"]] == {only["id"]}
+    assert by_subject["agentce:subject/local"] == {None}
+    rows = {a["id"]: a["declared"] for a in _project(out)["agents"]}
+    assert rows == {only["id"]: True, other: True, "agentce:subject/local": False}
+
+
+def test_a_profile_that_repeats_a_subject_is_refused_for_a_records_folder(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = str(_multi_agent_records(tmp_path / "records"))
+    first = tmp_path / "first"
+    _run(["assess", folder, "--out", str(first)], capsys)
+    profile = yaml.safe_load((first / "applicability.yaml").read_text(encoding="utf-8"))
+    profile["subjects"].append(profile["subjects"][0])
+    twice = tmp_path / "twice.yaml"
+    twice.write_text(yaml.safe_dump(profile), encoding="utf-8")
+
+    out = tmp_path / "out"
     code, env = _run(
-        ["assess", folder, "--profile", str(two), "--out", str(out)], capsys
+        ["assess", folder, "--profile", str(twice), "--out", str(out)], capsys
     )
-    assert code == 3 and env["error"]["key"] == "input.records_subject_ambiguous"
+    assert code == 3 and env["error"]["key"] == "input.profile_invalid"
     assert not out.exists()
 
 

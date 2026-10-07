@@ -24,7 +24,7 @@ import sys
 import tempfile
 from collections.abc import Iterable, Iterator
 from contextlib import redirect_stdout
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -1201,6 +1201,8 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     folder_arg = _opt_str(ns, "folder")
     scanned: ScannedRecords | None = None
     derived_profile = False
+    #: The subjects a records run counts as declared: the adopter's own profile's, or none for a derived one.
+    records_declared_ids: frozenset[str] = frozenset()
     if folder_arg is None:
         bundle = _require_dir(
             _opt_str(ns, "bundle"), key="bundle", what="the evidence bundle"
@@ -1234,10 +1236,15 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         else:
             profile = Path(out) / DERIVED_PROFILE_FILE
         scanned = scan_records(
-            folder, subject=_records_subject(declared), exclude=Path(out)
+            folder,
+            subject=_records_subject(declared),
+            exclude=Path(out),
+            per_agent=declared is not None and len(declared.subjects) > 1,
         )
         derived_profile = declared is None
-        profile_obj = declared or Profile.from_dict(scanned.profile)
+        profile_obj = _records_profile(declared, scanned)
+        if declared is not None:
+            records_declared_ids = frozenset(s.id for s in declared.subjects)
         bundle = Path(out) / BUNDLE_DIR
     catalog = _opt_str(ns, "catalog")
     # --package-for-sharing (18.8, Hill 3): a records-folder run's evaluation mode
@@ -1488,11 +1495,12 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     )
     # "Declared" means named in the profile (None: every profile subject). A derived profile names each
     # agent the scan saw by its own id, so a fresh single-agent run shows nothing undeclared (18.4) and a
-    # re-fed profile declares exactly the agent it was derived from. The one exception: a fresh run that
-    # discovered several agents declares none of them, since nobody has named them yet (Hill 7).
+    # re-fed profile declares exactly the agent it was derived from. A records run with several subjects
+    # declares only what the adopter's own profile names: none on a fresh run, since nobody has named
+    # them yet (Hill 7), and not the agents `_records_profile` added for the scan (18.77).
     declared_subject_ids: frozenset[str] | None = None
-    if scanned is not None and declared is None and len(scanned.subjects) > 1:
-        declared_subject_ids = frozenset()
+    if scanned is not None and len(profile_obj.subjects) > 1:
+        declared_subject_ids = records_declared_ids
     activity = summarize_activity(
         ingested.accepted, profile_obj, declared_subject_ids=declared_subject_ids
     )
@@ -1621,9 +1629,9 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
 
 
 def _records_subject(declared: Profile | None) -> str | None:
-    """The subject a records folder is assessed as: the one subject an adopter's own profile declares,
-    else ``None`` to let ``scan()`` discover one subject per distinct agent id in the records (18.14 C4).
-    A profile declaring several subjects cannot say which of them the records are about."""
+    """The subject every record is forced onto: the one subject an adopter's own profile declares, else
+    ``None`` to let ``scan()`` put each record on the agent id it carries (18.14 C4; for a profile that
+    declares several subjects, 18.77)."""
     if declared is None:
         return None
     if not declared.subjects:
@@ -1632,14 +1640,31 @@ def _records_subject(declared: Profile | None) -> str | None:
             "the profile declares no subject, so the records have no agent to be about.",
             "declare one subject in the profile, or leave out --profile to use the default one.",
         )
-    if len(declared.subjects) > 1:
+    ids = [s.id for s in declared.subjects]
+    repeated = sorted({i for i in ids if ids.count(i) > 1})
+    if repeated:
         raise InputError(
-            "input.records_subject_ambiguous",
-            f"the profile declares {len(declared.subjects)} subjects, and a records folder is "
-            "assessed as one.",
-            "declare one subject in the profile, or assess each agent's records folder separately.",
+            "input.profile_invalid",
+            f"the profile declares the subject {repeated[0]!r} more than once.",
+            "declare each subject once in the profile.",
         )
-    return declared.subjects[0].id
+    return ids[0] if len(ids) == 1 else None
+
+
+def _records_profile(declared: Profile | None, scanned: ScannedRecords) -> Profile:
+    """The profile a records run evaluates: the derived one, or the adopter's own plus the derived entry
+    of each agent the scan found that it does not name (18.77). Those agents are evaluated and shown as
+    undeclared, as on a first run, but declare no tools or models: nobody has declared them."""
+    derived = Profile.from_dict(scanned.profile)
+    if declared is None:
+        return derived
+    named = {s.id for s in declared.subjects}
+    extra = [
+        replace(s, declared_tools=[], declared_models=[])
+        for s in derived.subjects
+        if s.id not in named
+    ]
+    return replace(declared, subjects=declared.subjects + extra)
 
 
 def _printable(text: str) -> str:

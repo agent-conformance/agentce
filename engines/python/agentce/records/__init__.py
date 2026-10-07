@@ -278,12 +278,18 @@ def _read(path: Path, subject: str) -> _FileRead | str:
 
 
 def scan(
-    folder: Path, *, subject: str | None, exclude: Path | None = None
+    folder: Path,
+    *,
+    subject: str | None,
+    exclude: Path | None = None,
+    per_agent: bool = False,
 ) -> ScannedRecords:
     """Read every recognised trace export under ``folder``; refuse a folder with none.
 
     ``subject`` is the one subject an adopter's ``--profile`` declares, forced onto every event
     unchanged; ``None`` discovers subjects from each event's own ``gen_ai.agent.id`` instead (18.14 C4).
+    ``per_agent`` (an adopter's profile declaring several subjects, 18.77) keeps each event on its own
+    agent id even when the folder names only one, so an id-less event is never folded into a named agent.
 
     ``exclude`` is the run's ``--out``: when it lies strictly inside the folder its files are never read
     as records, and a previous run's bundle under it never is, wherever it lies."""
@@ -376,9 +382,10 @@ def scan(
         resulting_subjects = [subject]
     else:
         real_ids = {rid for e in by_id.values() if (rid := _real_id(e)) is not None}
-        if len(real_ids) >= 2:
-            # Two or more distinct agents: one subject per id, plus a DEFAULT_SUBJECT catch-all only
-            # if some event carries no id at all -- never guess an id-less event into a named agent.
+        if per_agent or len(real_ids) >= 2:
+            # Two or more distinct agents, or a profile that declares several (18.77): one subject per
+            # id, plus a DEFAULT_SUBJECT catch-all only if some event carries no id at all -- never
+            # guess an id-less event into a named agent.
             # The catch-all is always appended last (never sorted in among the real ids), so a real id
             # that happens to equal the DEFAULT_SUBJECT constant itself (18.14b C2 probe b') must be
             # excluded from this check, or it would be listed twice.

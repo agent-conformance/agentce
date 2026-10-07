@@ -77,7 +77,6 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.records_not_a_directory` | the records folder does not exist or is not a directory. | pass a folder of OpenTelemetry GenAI or OpenInference trace exports. |
 | `input.records_out_collides` | the output folder would overwrite records: it is the records folder, holds them, or lies inside that folder with files that are not a previous run's output. | choose an output folder outside the records folder with --out, or an empty one. |
 | `input.records_source_ambiguous` | both a records folder and --bundle were given. | pass either a folder of trace exports or --bundle <dir>, not both. |
-| `input.records_subject_ambiguous` | the profile declares several subjects, and a records folder is assessed as one. | declare one subject in the profile, or assess each agent's records folder separately. |
 | `input.release_bundle` | the given directory has no release-manifest.json or signatures.json, so it is not a release bundle. | pass the --out directory produced by the release tooling. |
 | `input.release_missing` | the release artifact named on the command line does not exist. | pass --release <bundle-dir-or-envelope>. |
 | `input.release_unreadable` | the release artifact, or a file or folder inside it, could not be read (permissions). | make every file and folder in the release readable, then re-run. |

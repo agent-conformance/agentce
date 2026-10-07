@@ -65,7 +65,6 @@ _KINDS: dict[str, str] = {
     "input.records_none_recognised": "error",
     "input.records_not_a_directory": "error",
     "input.records_source_ambiguous": "error",
-    "input.records_subject_ambiguous": "error",
     "input.package_requires_bundle": "error",
     "input.package_path_overlap": "error",
     "input.diff_field_not_string": "error",
