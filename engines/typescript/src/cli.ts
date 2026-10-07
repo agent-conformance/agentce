@@ -231,6 +231,24 @@ function verifyTarget(args: VerifyArgs, name: VerifyTarget): string | undefined 
   return emptyToUndefined(values[0]);
 }
 
+/** The digest assess records for an input it already read and parsed (deviation register, profile,
+ * domain file), as Python's `_digest_of`: a read that fails now gets its own key, not
+ * `internal.unexpected`. Exported for its unit test. */
+export function digestOf(path: string): string {
+  let bytes: Buffer;
+  try {
+    bytes = readFileSync(path);
+  } catch (exc) {
+    const reason = exc instanceof Error ? exc.message : String(exc);
+    throw new InputError(
+      "input.digest_unreadable",
+      `${path} could not be read to record its digest: ${reason}.`,
+      "make the file readable, then re-run.",
+    );
+  }
+  return digestBytes(bytes);
+}
+
 function requireDir(
   raw: string | undefined,
   key: string,
@@ -817,7 +835,7 @@ function runAssess(options: AssessOptions): CommandResult {
         formatTemplate(template, { control, expiry: pyStr(byControl.get(control)?.expiry ?? "") }),
       );
     }
-    deviationRegisterDigest = digestBytes(readFileSync(deviationFile));
+    deviationRegisterDigest = digestOf(deviationFile);
   }
 
   // A records run with several subjects declares only what the adopter's own profile names (18.77).
@@ -827,9 +845,8 @@ function runAssess(options: AssessOptions): CommandResult {
   }
   const activity = summarizeActivity(ingested.accepted, profileObj, declaredSubjectIds);
   const blindSpots = computeBlindSpots(evaluated, profileObj, catalogs, ingested.accepted);
-  const applicabilityProfileDigest = digestBytes(readFileSync(profilePath));
-  const domainBindingDigest =
-    domainPath !== undefined ? digestBytes(readFileSync(domainPath)) : undefined;
+  const applicabilityProfileDigest = digestOf(profilePath);
+  const domainBindingDigest = domainPath !== undefined ? digestOf(domainPath) : undefined;
   writeReport(out, evaluated, {
     bundleDigest: bundle.digest,
     catalogs: catalogLabels,

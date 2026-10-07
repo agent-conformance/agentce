@@ -379,6 +379,20 @@ public final class Cli {
         return emptyToNull(values.isEmpty() ? null : values.get(0));
     }
 
+    /** The digest assess records for an input it already read and parsed (deviation register, profile,
+     * domain file), as Python's {@code _digest_of}: a read that fails gets its own key, not {@code
+     * internal.unexpected} (18.80). */
+    static String digestOf(Path path) {
+        try {
+            return Report.digestBytes(Files.readAllBytes(path));
+        } catch (IOException e) {
+            throw new InputError(
+                    "input.digest_unreadable",
+                    path + " could not be read to record its digest: " + e.getMessage() + ".",
+                    "make the file readable, then re-run.");
+        }
+    }
+
     private static String requireDir(String raw, String key, String what) {
         return requireDir(raw, key, what, "pass --" + key + " <dir>.");
     }
@@ -961,25 +975,15 @@ public final class Cli {
                         .replace("{control}", control)
                         .replace("{expiry}", Assess.fieldStr(byControl.get(control), "expiry")));
             }
-            try {
-                deviationRegisterDigest = Report.digestBytes(Files.readAllBytes(deviationFile));
-            } catch (IOException e) {
-                throw new IllegalStateException("cannot read the deviation register for digest: " + e.getMessage(), e);
-            }
+            deviationRegisterDigest = digestOf(deviationFile);
         }
 
         String operatorEnv = System.getenv("AGENTCE_OPERATOR");
         List<String> invocation = List.of(options.invocationCommand(), scrubPath(bundleDir), scrubPath(profilePath));
         ObjectNode activity = Activity.summarizeActivity(ingested.accepted, profileObj);
         ObjectNode blindSpots = BlindSpots.computeBlindSpots(evaluated, profileObj, resolved.catalogs(), ingested.accepted);
-        String applicabilityProfileDigest;
-        String domainBindingDigest;
-        try {
-            applicabilityProfileDigest = Report.digestBytes(Files.readAllBytes(Paths.get(profilePath)));
-            domainBindingDigest = domainPath != null ? Report.digestBytes(Files.readAllBytes(Paths.get(domainPath))) : null;
-        } catch (IOException e) {
-            throw new IllegalStateException("cannot read profile/domain for digest: " + e.getMessage(), e);
-        }
+        String applicabilityProfileDigest = digestOf(Paths.get(profilePath));
+        String domainBindingDigest = domainPath != null ? digestOf(Paths.get(domainPath)) : null;
         Report.writeReport(
                 out, evaluated, bundle.digest(), resolved.labels(),
                 // config.py's operator default (SPEC §8.4); agentce.toml is not read here (Python only).

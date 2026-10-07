@@ -47,6 +47,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.catalog_unreadable` | a file or folder in the catalog directory could not be read (permissions, or a non-UTF-8 file name). | make every file and folder in the catalog directory readable, then re-run. |
 | `input.catalog_unresolved` | a requested catalog id@version does not resolve to any catalog directory. | use an available <id>@<version>, or pass --catalog-dir <dir> for a catalog on disk. |
 | `input.catalog_unverified` | a --catalog-dir catalog is unsigned, or its signature does not verify against the effective trust root. | point --catalog-dir at a catalog whose catalog.sig.json verifies, or pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) for the root that signed it; --allow-unverified-catalog assesses it anyway and records the override as a limitation. |
+| `input.collect_config` | the collect config could not be read, or does not have the expected shape. | fix the config file the error names, then re-run collect. |
 | `input.config_action` | the only config action is `show`. | run `agentce config show`. |
 | `input.conformance_action` | the only conformance action is `run`. | run `agentce conformance run ...`. |
 | `input.corpus_generate_failed` | the corpus generator did not produce a corpus-manifest.json. | check that the corpus generator runs: python corpus/generator/generate.py --out <dir>. |
@@ -57,8 +58,11 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.diff_field_not_string` | diff was given an assertion whose control, subject, or outcome field is present but is not a JSON string. | emit control/subject/outcome as JSON strings. |
 | `input.diff_format` | --format must be one of text, json, or md. | pass --format text|json|md. |
 | `input.diff_unrecognized_flag` | diff was given a flag it does not recognize. | pass --format text|json|md, or drop the flag. |
+| `input.digest_unreadable` | assess could not read the deviation register, profile or domain file again to record its digest. | make the file readable, then re-run. |
 | `input.domain_binding_invalid` | the domain binding is not safe YAML: a disallowed construct, or a structure nested too deeply to parse safely. | remove custom YAML tags and flatten deep nesting in the domain binding file. |
+| `input.emit_format` | --emit named a format the engine does not write. | pass --emit with formats from the list the error names. |
 | `input.event_structure_too_deep` | an evidence event line is nested too deeply to parse safely. | flatten the event's structure; reference deeply nested content by an opaque locator instead (SPEC R12). |
+| `input.fail_on_invalid_expression` | the --fail-on expression could not be read. | use comparisons of the form field=="literal" joined by and/or, over the fields the error lists. |
 | `input.for_emit_ambiguous` | both --for and --emit were given. | pass --for <preset> or --emit <formats>, not both. |
 | `input.for_preset` | --for names a preset assess does not know. | choose one of: ci, compliance, engineering, security, share. |
 | `input.ingest_empty` | the adapter produced no events from the given export file. | check the export file actually contains records the adapter recognizes. |
@@ -82,6 +86,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.release_bundle` | the given directory has no release-manifest.json or signatures.json, so it is not a release bundle. | pass the --out directory produced by the release tooling. |
 | `input.release_missing` | the release artifact named on the command line does not exist. | pass --release <bundle-dir-or-envelope>. |
 | `input.release_unreadable` | the release artifact, or a file or folder inside it, could not be read (permissions). | make every file and folder in the release readable, then re-run. |
+| `input.report_format` | report was given a --format it does not know. | pass --format with one of the formats report lists. |
 | `input.sign_profile` | unknown signing profile. | choose one of: sigstore-public, sigstore-private, kms. |
 | `input.sign_role` | --as must be `claimant` or `assessor`. | pass --as claimant|assessor. |
 | `input.sign_unrecognized_flag` | sign was given a flag it does not recognize. | pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag. |

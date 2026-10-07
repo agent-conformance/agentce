@@ -230,6 +230,19 @@ def _require_file(
     return path
 
 
+def _digest_of(path: Path) -> str:
+    """The digest assess records for an input it already read and parsed (deviation register,
+    profile, domain file); a read that fails now gets its own key, not ``internal.unexpected``."""
+    try:
+        return signing.sha256_prefixed(path.read_bytes())
+    except OSError as exc:
+        raise InputError(
+            "input.digest_unreadable",
+            f"{path} could not be read to record its digest: {exc.strerror or exc}.",
+            "make the file readable, then re-run.",
+        ) from exc
+
+
 def _write_jsonl(records: Iterable[dict[str, Any]], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
@@ -1417,7 +1430,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
                         expiry=deviation_by_control.get(control, {}).get("expiry", ""),
                     )
                 )
-        deviation_register_digest = signing.sha256_prefixed(deviation_file.read_bytes())
+        deviation_register_digest = _digest_of(deviation_file)
     if state_arg is not None:
         state = StateDir.load(
             Path(state_arg)
@@ -1478,11 +1491,9 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         "applicability.jsonl",
     ):
         extra_outputs[artifact] = (out_dir / artifact).read_bytes()
-    applicability_profile_digest = signing.sha256_prefixed(profile.read_bytes())
+    applicability_profile_digest = _digest_of(profile)
     domain_binding_digest = (
-        signing.sha256_prefixed(Path(domain_path).read_bytes())
-        if domain_path is not None
-        else None
+        _digest_of(Path(domain_path)) if domain_path is not None else None
     )
     extra_outputs["packaging.json"] = canonicalize(
         {
