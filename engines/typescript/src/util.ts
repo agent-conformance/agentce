@@ -70,7 +70,7 @@ export function pyStr(value: unknown): string {
  * nor `Z*` other than `U+0020` (verified against an exhaustive Unicode 15.0 scan: 0 differences from
  * this characterization).
  */
-function isPrintableCodePoint(codePoint: number): boolean {
+export function isPrintableCodePoint(codePoint: number): boolean {
   if (codePoint === 0x20) {
     return true;
   }

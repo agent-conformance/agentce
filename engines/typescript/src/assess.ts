@@ -143,6 +143,7 @@ function assertControl(
   events: Event[],
   eventsByIri: Map<string, Event>,
   win: [string, string],
+  applicabilityDeclared: boolean,
 ): Assertion {
   const base = {
     control: control.id,
@@ -166,7 +167,13 @@ function assertControl(
 
   const [applicable, failing, violations] = evaluateShape(store, shape, catalog.shapes, control.id);
   if (applicable.length === 0) {
-    return makeAssertion({ ...base, outcome: "not_applicable", population: [0, 0] });
+    // Where nobody declared what the agent decides (a profile derived from the records), an empty
+    // population says the records show none, not that the control does not apply.
+    return makeAssertion({
+      ...base,
+      outcome: applicabilityDeclared ? "not_applicable" : "insufficient_evidence",
+      population: [0, 0],
+    });
   }
   if (!hasMinimumEvidence(events, control.minimumEvidence)) {
     return makeAssertion({
@@ -205,12 +212,14 @@ export function indexBySubject(accepted: Event[]): Map<string, Event[]> {
   return index;
 }
 
-/** Evaluate every catalog control against every subject and return the assertions. */
+/** Evaluate every catalog control against every subject and return the assertions.
+ * `applicabilityDeclared` is false only for a records-folder run, whose profile nobody declared. */
 export function assessSubjects(
   accepted: Event[],
   profile: Profile,
   catalogs: Catalog[],
   domain: DomainBinding,
+  applicabilityDeclared = true,
 ): Assertion[] {
   const assertions: Assertion[] = [];
   const eventsBySubject = indexBySubject(accepted);
@@ -228,7 +237,17 @@ export function assessSubjects(
     for (const catalog of catalogs) {
       for (const control of catalog.controls) {
         assertions.push(
-          assertControl(store, catalog, control, subject, roles, subjectEvents, eventsByIri, win),
+          assertControl(
+            store,
+            catalog,
+            control,
+            subject,
+            roles,
+            subjectEvents,
+            eventsByIri,
+            win,
+            applicabilityDeclared,
+          ),
         );
       }
     }

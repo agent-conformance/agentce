@@ -50,6 +50,16 @@ import {
   parseGapsFile,
 } from "./readiness";
 import {
+  BUNDLE_DIR,
+  DERIVED_PROFILE_FILE,
+  RECORDS_LIMITATION,
+  type ScannedRecords,
+  recordsLines,
+  recordsProfile,
+  recordsSubject,
+  scanRecords,
+} from "./records";
+import {
   activityCliLines,
   blindSpotsCliLines,
   catalogProvenanceDigest,
@@ -608,8 +618,12 @@ function cmdValidate(argv: string[]): CommandResult {
 }
 
 interface AssessOptions {
-  bundle: string;
-  profile: string;
+  /** `assess <folder>`'s records folder; unset for a `--bundle`/`--profile` run. */
+  folder?: string;
+  bundle?: string;
+  profile?: string;
+  /** `--package-for-sharing`, which a records folder refuses. */
+  packageForSharing?: boolean;
   catalog?: string;
   domain?: string;
   catalogDirs: string[];
@@ -630,10 +644,55 @@ interface AssessOptions {
  * same pipeline `conformance run` exercises per corpus project, generalised to an arbitrary bundle. */
 function runAssess(options: AssessOptions): CommandResult {
   const result = new CommandResult("assess");
-  const bundleDir = requireDir(options.bundle, "bundle", "the evidence bundle");
-  const profilePath = requireFile(options.profile, "profile", "the applicability profile");
   const out = options.out;
-  const profileObj = loadProfile(profilePath);
+  let bundleDir: string;
+  let profilePath: string;
+  let profileObj: Profile;
+  let scanned: ScannedRecords | undefined;
+  /** The adopter's own --profile on a records run (undefined: the run derives one). */
+  let declared: Profile | undefined;
+  if (options.folder === undefined) {
+    bundleDir = requireDir(options.bundle, "bundle", "the evidence bundle");
+    profilePath = requireFile(options.profile, "profile", "the applicability profile");
+    profileObj = loadProfile(profilePath);
+  } else {
+    // A records folder is read in memory first; nothing is written until the run is known to be
+    // well-formed, so a refused run leaves nothing behind that looks like a result.
+    if (options.bundle !== undefined) {
+      throw new InputError(
+        "input.records_source_ambiguous",
+        "both a records folder and --bundle were given.",
+        "pass either a folder of trace exports or --bundle <dir>, not both.",
+      );
+    }
+    const folder = requireDir(
+      options.folder,
+      "records",
+      "the records folder",
+      "pass a folder of OpenTelemetry GenAI or OpenInference trace exports.",
+    );
+    if (options.profile !== undefined) {
+      profilePath = requireFile(options.profile, "profile", "the applicability profile");
+      declared = loadProfile(profilePath);
+    } else {
+      profilePath = join(out, DERIVED_PROFILE_FILE);
+    }
+    const forced = recordsSubject(declared);
+    scanned = scanRecords(folder, {
+      subject: forced,
+      exclude: out,
+      perAgent: declared !== undefined && forced === undefined,
+    });
+    profileObj = recordsProfile(declared, scanned);
+    bundleDir = join(out, BUNDLE_DIR);
+    if (options.packageForSharing) {
+      throw new InputError(
+        "input.package_requires_bundle",
+        "--package-for-sharing works only with --bundle/--profile, not a records folder.",
+        "pass --bundle and --profile instead of a records folder, or drop --package-for-sharing.",
+      );
+    }
+  }
   // --fail-on is parsed (never eval'd) before any output is written: a hostile or malformed expression
   // is refused at exit 3 before any assertion is evaluated against it (SPEC §7), and before the
   // catalogs, --state or --deviations are looked at, in Python's order.
@@ -658,6 +717,10 @@ function runAssess(options: AssessOptions): CommandResult {
     trust,
     options.allowUnverified,
   );
+  if (scanned !== undefined) {
+    scanned.write(out, declared === undefined);
+    limitations.push(RECORDS_LIMITATION);
+  }
 
   // Stage 1: ingest and validate. A missing/mismatching manifest aborts with exit 3.
   const bundle = loadBundle(bundleDir);
@@ -692,7 +755,17 @@ function runAssess(options: AssessOptions): CommandResult {
   );
 
   // Stage 6: catalog evaluation and report artifacts.
-  let evaluated = assessSubjects(ingested.accepted, profileObj, catalogs, domain);
+  let evaluated = assessSubjects(
+    ingested.accepted,
+    profileObj,
+    catalogs,
+    domain,
+    scanned === undefined,
+  );
+  // A records run that judged nothing renders no report: its headline would read "Conformant".
+  if (scanned !== undefined && evaluatedNothing(evaluated)) {
+    throw nothingEvaluated(profileObj, ingested.accepted, evaluated.length);
+  }
 
   // Stage 6a: incremental state (SPEC §5.4 B7, HR-10).
   const newWindowEnd = windowEnd(profileObj.observationWindow, ingested.accepted);
@@ -742,7 +815,12 @@ function runAssess(options: AssessOptions): CommandResult {
     deviationRegisterDigest = digestBytes(readFileSync(deviationFile));
   }
 
-  const activity = summarizeActivity(ingested.accepted, profileObj);
+  // A records run with several subjects declares only what the adopter's own profile names (18.77).
+  let declaredSubjectIds: Set<string> | undefined;
+  if (scanned !== undefined && profileObj.subjects.length > 1) {
+    declaredSubjectIds = new Set(declared?.subjects.map((s) => s.id) ?? []);
+  }
+  const activity = summarizeActivity(ingested.accepted, profileObj, declaredSubjectIds);
   const blindSpots = computeBlindSpots(evaluated, profileObj, catalogs, ingested.accepted);
   const applicabilityProfileDigest = digestBytes(readFileSync(profilePath));
   const domainBindingDigest =
@@ -753,7 +831,10 @@ function runAssess(options: AssessOptions): CommandResult {
     catalogObjects: catalogs,
     // config.py's `operator` default (SPEC §8.4); agentce.toml is not read here (Python only).
     operator: process.env.AGENTCE_OPERATOR ?? "unset",
-    invocation: [options.invocationCommand, scrubPath(bundleDir), scrubPath(profilePath)],
+    invocation:
+      options.folder !== undefined
+        ? ["assess", scrubPath(options.folder)]
+        : [options.invocationCommand, scrubPath(bundleDir), scrubPath(profilePath)],
     supersedes,
     activity,
     blindSpots,
@@ -764,6 +845,7 @@ function runAssess(options: AssessOptions): CommandResult {
     domainBindingDigest,
     deviationRegisterDigest,
     deviations,
+    declaredSubjectIds,
   });
   if (state !== null) {
     state.record(bundle.digest, join(out, "manifest.json"), newWindowEnd);
@@ -790,6 +872,13 @@ function runAssess(options: AssessOptions): CommandResult {
   };
   result.data.activity = activity;
   result.data.blind_spots = blindSpots;
+  if (scanned !== undefined) {
+    result.data.records = scanned.summary;
+    const shown = declared === undefined ? `${out}/${DERIVED_PROFILE_FILE}` : undefined;
+    for (const line of recordsLines(scanned.summary, shown)) {
+      result.note(line);
+    }
+  }
   if (options.state !== undefined) {
     result.data.supersedes = supersedes;
   }
@@ -813,15 +902,18 @@ function runAssess(options: AssessOptions): CommandResult {
     result.addCode(ExitCode.FINDINGS);
   }
   // SPEC.md:1076 (SPEC Sec.8.5): exit 2 whenever any assertion is both insufficient_evidence and
-  // severity: high. TypeScript's assess has no records-folder entrypoint (Python-only, 18.30
-  // Dispositions), so this check applies unconditionally, unlike Python's `scanned is None` scoping.
-  const highInsufficient = Array.from(
-    new Set(
-      evaluated
-        .filter((a) => a.outcome === "insufficient_evidence" && a.severity === "high")
-        .map((a) => a.control),
-    ),
-  ).sort();
+  // severity: high -- scoped, as in Python, to the formal --bundle/--profile assessment: a records run
+  // never returns 2 on its own, so a first scan is not a failure (VG-RECORDS-EXIT-CODE).
+  const highInsufficient =
+    scanned !== undefined
+      ? []
+      : Array.from(
+          new Set(
+            evaluated
+              .filter((a) => a.outcome === "insufficient_evidence" && a.severity === "high")
+              .map((a) => a.control),
+          ),
+        ).sort();
   if (highInsufficient.length > 0) {
     result.addCode(ExitCode.INSUFFICIENT_EVIDENCE);
   }
@@ -882,13 +974,49 @@ function assessValueFlags(argv: string[]): Map<string, string> {
   return values;
 }
 
+/** Every assess option that takes a value, so the positional `<folder>` is never mistaken for one. */
+const ASSESS_OPTIONS_WITH_VALUE = new Set([
+  "--bundle",
+  "--catalog",
+  "--profile",
+  "--deviations",
+  "--domain",
+  "--catalog-dir",
+  "--trust-root",
+  "--manual",
+  "--probes",
+  "--out",
+  "--state",
+  "--report-language",
+  "--emit",
+  "--for",
+  "--fail-on",
+  "--format",
+]);
+
+/** `assess`'s optional positional `<folder>`: the first token that is neither an option nor an
+ * option's value, as argparse reads it. */
+function assessFolder(argv: string[]): string | undefined {
+  for (let i = 1; i < argv.length; i++) {
+    const token = argv[i] as string;
+    if (ASSESS_OPTIONS_WITH_VALUE.has(token)) {
+      i++;
+    } else if (!looksLikeOption(token)) {
+      return token;
+    }
+  }
+  return undefined;
+}
+
 function cmdAssess(argv: string[]): CommandResult {
   const values = assessValueFlags(argv);
   return runAssess({
+    folder: assessFolder(argv),
+    packageForSharing: argv.includes("--package-for-sharing"),
     deviations: values.get("--deviations"),
     failOn: values.get("--fail-on"),
-    bundle: flagValue(argv, "bundle") as string,
-    profile: flagValue(argv, "profile") as string,
+    bundle: flagValue(argv, "bundle"),
+    profile: flagValue(argv, "profile"),
     catalog: flagValue(argv, "catalog"),
     domain: flagValue(argv, "domain"),
     catalogDirs: flagValues(argv, "catalog-dir"),
