@@ -165,6 +165,8 @@ public final class Rdf {
         PNAME,
         A,
         STRING,
+        LANG_STRING,
+        DTYPE,
         NUMBER,
         BOOLEAN,
         DOT,
@@ -266,7 +268,14 @@ public final class Rdf {
                 case PNAME:
                     return Term.iri(expandPname(token.value()));
                 case STRING:
+                    if (peek().type() == Type.DTYPE) {
+                        next();
+                        Token dt = next();
+                        return Term.literal(token.value(), parseTerm(dt).value);
+                    }
                     return Term.literal(token.value(), XSD + "string");
+                case LANG_STRING:
+                    return Term.literal(token.value(), RDF_NS + "langString");
                 case NUMBER:
                     return Term.literal(token.value(), XSD + numericType(token.value()));
                 case BOOLEAN:
@@ -378,6 +387,12 @@ public final class Rdf {
                     return scanIriRef();
                 case '"':
                     return scanString();
+                case '^':
+                    if (src.startsWith("^^", pos)) {
+                        pos += 2;
+                        return new Token(Type.DTYPE, "^^");
+                    }
+                    throw new IllegalArgumentException("unexpected character '^'");
                 case '@':
                     return scanAt();
                 default:
@@ -455,7 +470,7 @@ public final class Rdf {
             while (pos < src.length()) {
                 char c = src.charAt(pos++);
                 if (c == '"') {
-                    return new Token(Type.STRING, sb.toString());
+                    return stringToken(sb.toString());
                 }
                 if (c == '\\' && pos < src.length()) {
                     char e = src.charAt(pos++);
@@ -476,6 +491,21 @@ public final class Rdf {
                 }
             }
             throw new IllegalArgumentException("unterminated string literal");
+        }
+
+        /** A string literal's token: a language tag ({@code "x"@en}) right after the quote makes it rdf:langString. */
+        private Token stringToken(String text) {
+            if (pos < src.length() && src.charAt(pos) == '@') {
+                int start = ++pos;
+                while (pos < src.length() && (Character.isLetterOrDigit(src.charAt(pos)) || src.charAt(pos) == '-')) {
+                    pos++;
+                }
+                if (pos == start) {
+                    throw new IllegalArgumentException("empty language tag");
+                }
+                return new Token(Type.LANG_STRING, text);
+            }
+            return new Token(Type.STRING, text);
         }
 
         private Token scanAt() {

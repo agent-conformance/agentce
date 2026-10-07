@@ -1,6 +1,6 @@
 {
-  "about": "Pinned answers for VG-PSP-SHAPE-PROFILE-ENFORCED (18.78): psp_check.py's output at c2a71bf for the first 38 rows, with the changes contract P18-18.78 names (sh:CLOSED reports sh:closed; a bad IRI escape is a parse error), plus the contract's added rows. Edit only with a reason in the commit.",
-  "count": 56,
+  "about": "Pinned answers for VG-PSP-SHAPE-PROFILE-ENFORCED (18.78): psp_check.py's output at c2a71bf for the first 38 rows, with the changes contract P18-18.78 names (sh:CLOSED reports sh:closed; a bad IRI escape is a parse error), plus the contract's added rows, and three rows pinned when Java was found unable to read a typed or language-tagged literal (a typed xsd:dateTime bound is the profile's only date form). Edit only with a reason in the commit.",
+  "count": 59,
   "scenarios": {
     "baseline": {
       "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
@@ -229,6 +229,18 @@
     "two-unknown-terms": {
       "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:zzzTerm true ;\n  sh:aaaTerm true ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
       "expect": "REFUSED sh:aaaTerm"
+    },
+    "range-datetime-typed-ok": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ; sh:minInclusive \"2026-01-01T00:00:00Z\"^^xsd:dateTime ] .\n",
+      "expect": "OK"
+    },
+    "range-datetime-untyped": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ; sh:minInclusive \"2026-01-01T00:00:00Z\" ] .\n",
+      "expect": "REFUSED minInclusive on a non-integer/dateTime bound"
+    },
+    "name-language-tag-ok": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\"@en ] .\n",
+      "expect": "OK"
     }
   }
 }
