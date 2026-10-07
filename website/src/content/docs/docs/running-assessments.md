@@ -12,6 +12,8 @@ Python engine for any of them:
 
 - `assess --for <role>` and `assess --emit <format>` are accepted, and the run exits 0, but TypeScript and
   Java write only the core outputs, not the role view or the extra formats.
+- Java reads only an evidence bundle: `assess <folder>` on a folder of trace exports stops with
+  `input.bundle_missing`. Pass `--bundle` and `--profile` to Java, or read the folder with Python.
 - At the end of `assess`, TypeScript and Java print a bare `verdict:` line where Python's summary also
   gives the outcomes, the top gaps and the next step.
 - A profile with a repeated key (`profile_version` twice, for example) stops TypeScript with
