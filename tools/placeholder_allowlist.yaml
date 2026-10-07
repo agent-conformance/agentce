@@ -706,3 +706,39 @@ allow:
     count: 2
     class: legitimate
     justification: "The gate's deviation-register scenarios (18.17a) name their owner and approver with the reserved example.com domain (RFC 2606); a named test identity, never an unfinished part of the gate."
+
+  - path: spec/report/buyer.schema.json
+    pattern: placeholder
+    count: 1
+    class: legitimate
+    justification: "Honest status in the buyer view's description: the AI Controls Matrix crosswalk is a disclosed placeholder (status: placeholder in ai-controls-matrix.yaml), so the view adds no AICM answers yet."
+
+  - path: engines/python/agentce/data/schemas/buyer.schema.json
+    pattern: placeholder
+    count: 1
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/report/buyer.schema.json, which carries the same hit for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/typescript/schema/buyer.schema.json
+    pattern: placeholder
+    count: 1
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/report/buyer.schema.json, which carries the same hit for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: engines/java/src/main/resources/schemas/buyer.schema.json
+    pattern: placeholder
+    count: 1
+    class: legitimate
+    justification: "Byte-identical vendored copy of spec/report/buyer.schema.json, which carries the same hit for the reason its own entry gives; a sync test holds the two equal."
+
+  - path: docs/reference/report-schemas/buyer.md
+    pattern: placeholder
+    count: 1
+    class: legitimate
+    justification: "Generated from spec/report/buyer.schema.json's description by docs/build.py, which carries the same hit for the reason its own entry gives; --check-links and --check-publish hold the page equal to the schema."
+
+  - path: website/src/content/docs/reference/report-schemas/buyer.md
+    pattern: placeholder
+    count: 1
+    class: legitimate
+    justification: "Generated from spec/report/buyer.schema.json's description by docs/build.py, which carries the same hit for the reason its own entry gives; --check-links and --check-publish hold the page equal to the schema."
