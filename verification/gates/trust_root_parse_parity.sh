@@ -130,7 +130,9 @@ for via in signer embedded; do
   set -e
   key="$(jq -r '.error.key // empty' <<<"$out" 2>/dev/null || true)"
   cause="$(jq -r '.error.cause // empty' <<<"$out" 2>/dev/null || true)"
-  if [ "$code" != 3 ] || [ "$key" != input.trust_root_invalid ] || [[ "$cause" != *"deep-object-10000.json' could not be loaded: "*"$too_deep" && "$cause" != *"trust-root.json' could not be loaded: "*"$too_deep" ]]; then
+  loaded="$report/trust-root.json"
+  [ "$via" = signer ] && loaded="$fixtures/deep-object-10000.json"
+  if [ "$code" != 3 ] || [ "$key" != input.trust_root_invalid ] || [ "$cause" != "the trust root '$loaded' could not be loaded: $loaded $too_deep" ]; then
     echo "trust-root-parse-parity: python verify --report ($via): exit $code key [$key] cause [$cause]" >&2
     status=1
   fi

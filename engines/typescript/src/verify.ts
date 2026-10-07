@@ -105,11 +105,14 @@ function* trustEntries(
  * Jackson's own default); all three engines enforce it with the same byte pre-scan. */
 export const MAX_JSON_DEPTH = 1000;
 
+/** The generic text of the untrusted parser's own refusals; it names no parser error. */
+const NOT_READABLE_JSON = "not readable JSON";
+
 /** A document nested past {@link MAX_JSON_DEPTH}; its message stays "not readable JSON" for callers
  * that do not tell depth apart. Mirrors `signing.JsonTooDeep`. */
 export class JsonTooDeep extends Error {
   constructor() {
-    super("not readable JSON");
+    super(NOT_READABLE_JSON);
   }
 }
 
@@ -162,7 +165,7 @@ export function parseUntrustedJson(raw: Buffer, keepNumberTokens = false): unkno
     const node = stack.pop();
     if (typeof node === "string") {
       if (LONE_SURROGATE.test(node)) {
-        throw new Error("not readable JSON");
+        throw new Error(NOT_READABLE_JSON);
       }
     } else if (Array.isArray(node)) {
       for (const child of node) stack.push(child);
@@ -391,16 +394,16 @@ export function loadTrustRoot(path: string): TrustRoot {
     data = readUntrustedJsonFile(path);
   } catch (exc) {
     if (exc instanceof JsonTooDeep) {
-      const tooDeep = formatTemplate(errorCause("verify.json_too_deep"), {
+      const tooDeep = refusal("verify.json_too_deep", {
         what: "it",
         limit: String(MAX_JSON_DEPTH),
       });
-      throw new Error(`${path} is not readable JSON: ${tooDeep}`);
+      throw new Error(`${path} is not readable JSON: ${tooDeep.message}`);
     }
     // The shared parser's own refusals (a lone surrogate) carry only its generic text, and name nothing.
     const message = exc instanceof Error ? exc.message : String(exc);
     throw new Error(
-      `${path} is not readable JSON${message === "not readable JSON" ? "" : `: ${message}`}`,
+      `${path} is not readable JSON${message === NOT_READABLE_JSON ? "" : `: ${message}`}`,
     );
   }
   if (!isRecord(data)) {

@@ -722,8 +722,8 @@ def load_trust_root(path: Path) -> TrustRoot:
     except OSError as exc:
         raise VerificationError(f"{path} is not readable JSON: {exc}") from exc
     except JsonTooDeep as exc:
-        too_deep = format_message(
-            MESSAGE_KEYS["verify.json_too_deep"].cause, what="it", limit=MAX_JSON_DEPTH
+        too_deep = VerificationError.refusal(
+            "verify.json_too_deep", what="it", limit=MAX_JSON_DEPTH
         )
         raise VerificationError(f"{path} is not readable JSON: {too_deep}") from exc
     except ValueError as exc:
