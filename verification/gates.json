@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.52.0",
+  "suite_version": "0.53.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1170,8 +1170,8 @@
       "timeout_s": 60,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "tools/ci_demo_coverage_check.py's --self-test confirms its comparator discriminates correct job-index/job-total wiring from a matrix-value-keyed, swallowed, conditional or under-checked invocation on either the demo-fault step or the quick job, that shard.py's own partition() assigns every gate to exactly one shard at two different totals, then the real run confirms .github/workflows/verification.yml's demo-fault job's step invokes verification/shard.py with exactly strategy.job-index and strategy.job-total, and that quick's step is an exact match for its canonical dependency-check run text with needs/if/continue-on-error wired correctly on both jobs",
-        "fail": "the self-test's comparator fails to discriminate any of the bad cases, shard.py's partition() drops or duplicates a gate, or the real run finds the demo-fault job's step not wired to strategy.job-index/strategy.job-total, quick's step not an exact match for its canonical run text, or continue-on-error/a stray if: on either job or step"
+        "pass": "tools/ci_demo_coverage_check.py's --self-test confirms its comparator discriminates correct job-index/job-total wiring from a matrix-value-keyed, swallowed, conditional or under-checked invocation on either the demo-fault step or the quick job, that shard.py's own partition() assigns every gate to exactly one shard at two different totals, then the real run confirms .github/workflows/verification.yml's demo-fault job's step invokes verification/shard.py with exactly strategy.job-index and strategy.job-total, that quick's step is an exact match for its canonical dependency-check run text with needs/if/continue-on-error wired correctly on both jobs, and that the workflow root carries only name, on, permissions and jobs (no root env: such as BASH_ENV, no defaults)",
+        "fail": "the self-test's comparator fails to discriminate any of the bad cases, shard.py's partition() drops or duplicates a gate, or the real run finds the demo-fault job's step not wired to strategy.job-index/strategy.job-total, quick's step not an exact match for its canonical run text, continue-on-error/a stray if: on either job or step, or a workflow-root key outside name, on, permissions and jobs"
       },
       "faults": [
         {
@@ -1191,6 +1191,12 @@
           "file": ".github/workflows/verification.yml",
           "search": "needs: [build, demo-fault]",
           "replace": "needs: [build]"
+        },
+        {
+          "description": "a workflow-root env: sets BASH_ENV to a file that exits 0; bash sources it before every run: step under GitHub's default bash -e {0}, so quick and every demo shard report success whatever happened, without any job or step text changing (18.76)",
+          "file": ".github/workflows/verification.yml",
+          "search": "\npermissions:\n  contents: read\n",
+          "replace": "\npermissions:\n  contents: read\n\nenv:\n  BASH_ENV: '$(f=$(mktemp); echo \"exit 0\" > $f; echo $f)'\n"
         }
       ],
       "fix_hint": "run verification/gates/ci_demo_coverage.sh and read which wiring problem it found; the step is .github/workflows/verification.yml's jobs.demo-fault's 'This shard's seeded-fault demos' step, checked by tools/ci_demo_coverage_check.py."

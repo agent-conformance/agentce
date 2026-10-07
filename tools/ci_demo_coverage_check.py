@@ -14,7 +14,7 @@ rewired ``run:`` line, ``needs``, ``exit 0``, ``|| true``, a stray ``if:``) did 
 ``shell: "true {0}"`` override, for example, changes how ``run:`` text is interpreted and defeats
 every blocklist entry at once without tripping any of them. So this check instead asserts the good
 shape: a step may carry only ``name``/``run`` (``run:`` matched exactly), a job may carry only the
-keys it has today, no workflow- or job-level ``defaults.run.shell`` may exist, and ``quick``'s own
+keys it has today, the workflow root may carry only the keys it has today, and ``quick``'s own
 ``if:`` must be exactly ``always()`` (or the equivalent ``${{ always() }}``) -- not merely contain
 ``always()`` as a substring of some larger, possibly-false expression. This covers four independent
 ways the design can silently stop proving anything:
@@ -33,10 +33,12 @@ ways the design can silently stop proving anything:
    ``always()`` without being exactly that), defeating the one property the item asks for by name: a
    failed, cancelled or skipped shard must still fail the required check. Checked by the same
    job/step key allowlist plus exact matches on ``needs``, ``if:``, and the step's ``run:``.
-4. A workflow- or job-level ``defaults.run.shell`` override could change how any step's ``run:`` text
-   is interpreted without changing the text itself, defeating checks 2 and 3 without tripping either
-   one. Checked by rejecting ``defaults.run.shell`` at the workflow root (job-level is already
-   subsumed by the key allowlists in checks 2 and 3, since ``defaults`` is not an allowed job key).
+4. A workflow-root key could change how every step's ``run:`` text is interpreted without changing
+   the text itself, defeating checks 2 and 3 without tripping either one: ``defaults.run.shell``, or
+   an ``env:`` that sets ``BASH_ENV`` (bash sources that file before every ``run:`` step under
+   GitHub's default ``bash -e {0}``, so a payload that exits 0 turns every step green). Checked by
+   an allowlist of the root's keys (``name``, ``on``, ``permissions``, ``jobs``); the job-level
+   forms are already refused by the job and step allowlists in checks 2 and 3.
 
 Usage:
     ci_demo_coverage_check.py              # checks the real workflow and the real shard.py
@@ -66,9 +68,12 @@ CANONICAL_RUN = 'python3 verification/shard.py "${{ strategy.job-index }}" "${{ 
 # (continue-on-error, a rewired run line, needs, exit 0, || true, a step if:). Listing bad edits one
 # at a time cannot converge: a step `shell: "true {0}"` override, for example, changes how `run:` is
 # interpreted and defeats every check above without tripping any of them. So this check now asserts
-# the good shape instead: a step may carry only `name`/`run` (checked exactly), a job may carry only
-# the keys it has today, and neither a workflow- nor job-level `defaults.run.shell` may exist.
+# the good shape instead: a step may carry only `name`/`run` (checked exactly), and a job and the
+# workflow root may carry only the keys they have today. A root `env:` setting BASH_ENV, which bash
+# sources before every run: step, got past the old root check, which named only
+# defaults.run.shell (18.76).
 STEP_ALLOWED_KEYS = {"name", "run"}
+WORKFLOW_ALLOWED_KEYS = {"jobs", "name", "on", "permissions"}
 DEMO_JOB_ALLOWED_KEYS = {"runs-on", "steps", "strategy", "timeout-minutes"}
 QUICK_JOB_ALLOWED_KEYS = {"if", "needs", "runs-on", "steps", "timeout-minutes"}
 
@@ -80,20 +85,12 @@ def _unknown_keys(mapping: dict[str, Any], allowed: set[str], label: str) -> lis
     return [f"{label} has key(s) outside the allowed set {sorted(allowed)}: {extra}"]
 
 
-def _shell_override_problems(mapping: dict[str, Any], label: str) -> list[str]:
-    defaults = mapping.get("defaults")
-    run_defaults = defaults.get("run") if isinstance(defaults, dict) else None
-    if isinstance(run_defaults, dict) and "shell" in run_defaults:
-        return [
-            f"{label} sets defaults.run.shell, which can silently change how run: text is interpreted"
-        ]
-    return []
-
-
 def workflow_level_problems(doc: Any) -> list[str]:
     if not isinstance(doc, dict):
         return []
-    return _shell_override_problems(doc, "the workflow")
+    # PyYAML reads the bare key `on` as the boolean True (YAML 1.1); other keys are compared as text.
+    keys = {"on" if key is True else str(key): None for key in doc}
+    return _unknown_keys(keys, WORKFLOW_ALLOWED_KEYS, "the workflow")
 
 
 # Two arbitrary probe sizes for the generic, total-agnostic partition() function below --
@@ -156,6 +153,8 @@ def wiring_problems(job: Any) -> list[str]:
     return problems + _step_wiring_problems(step, SHARD_SCRIPT, CANONICAL_RUN)
 
 
+# `${{always()}}` without the inner spaces is also valid GitHub syntax; it is refused on purpose
+# (fails closed), so the workflow keeps one of these two spellings.
 CANONICAL_QUICK_IF_VALUES = {"always()", "${{ always() }}"}
 CANONICAL_QUICK_RUN = (
     'if [ "${{ needs.build.result }}" != "success" ] || '
@@ -282,12 +281,17 @@ def _misjudged(cases: list[tuple[str, Any, bool]], check: Any) -> list[str]:
     return [name for name, arg, should_pass in cases if bool(check(arg)) == should_pass]
 
 
+# Verifier round 3's payload for 18.74: bash expands the command substitution and sources the file
+# it names, which exits 0 before the step's own script runs.
+BASH_ENV_PAYLOAD = '$(f=$(mktemp); echo "exit 0" > $f; echo $f)'
+
+
 def _shape_violation_cases(
     prefix: str, good_step: dict[str, Any], good_job: dict[str, Any]
 ) -> list[tuple[str, Any, bool]]:
-    """The four allowlist-violating shapes (a step-level `shell:` override or unknown key, a
-    job-level `defaults.run.shell` or unknown key) that both the demo-fault and quick jobs must
-    reject identically -- shared so the two case lists can't silently drift apart."""
+    """The allowlist-violating shapes (a step-level `shell:` override, `env:` BASH_ENV or unknown
+    key, a job-level `defaults.run.shell`, `env:` BASH_ENV or unknown key) that both the demo-fault
+    and quick jobs must reject identically -- shared so the two case lists can't silently drift apart."""
     return [
         (
             f"{prefix} step with a shell: override",
@@ -305,6 +309,19 @@ def _shape_violation_cases(
             False,
         ),
         (f"{prefix} job with an unknown key", {**good_job, "mystery": True}, False),
+        (
+            f"{prefix} step with env: BASH_ENV",
+            {
+                **good_job,
+                "steps": [{**good_step, "env": {"BASH_ENV": BASH_ENV_PAYLOAD}}],
+            },
+            False,
+        ),
+        (
+            f"{prefix} job with env: BASH_ENV",
+            {**good_job, "env": {"BASH_ENV": BASH_ENV_PAYLOAD}},
+            False,
+        ),
     ]
 
 
@@ -437,13 +454,34 @@ def self_test() -> int:
         *_shape_violation_cases("quick", quick_good_step, quick_good),
     ]
     failures += _misjudged(quick_cases, quick_wiring_problems)
+    good_root: dict[Any, Any] = {
+        "name": "verification",
+        True: {"push": None},
+        "permissions": {"contents": "read"},
+        "jobs": {},
+    }
     workflow_cases: list[tuple[str, Any, bool]] = [
-        ("workflow without defaults", {}, True),
+        ("workflow root as PyYAML reads it (on as True)", good_root, True),
+        (
+            "workflow root with on as a string",
+            {**{k: v for k, v in good_root.items() if k is not True}, "on": {}},
+            True,
+        ),
+        ("empty workflow root", {}, True),
         (
             "workflow with defaults.run.shell",
-            {"defaults": {"run": {"shell": "true {0}"}}},
+            {**good_root, "defaults": {"run": {"shell": "true {0}"}}},
             False,
         ),
+        (
+            "root env BASH_ENV",
+            {**good_root, "env": {"BASH_ENV": BASH_ENV_PAYLOAD}},
+            False,
+        ),
+        ("root env ENV", {**good_root, "env": {"ENV": "/tmp/payload"}}, False),
+        ("root env unrelated", {**good_root, "env": {"FOO": "bar"}}, False),
+        ("root concurrency", {**good_root, "concurrency": "x"}, False),
+        ("root with a non-string key (off as False)", {**good_root, False: 1}, False),
     ]
     failures += _misjudged(workflow_cases, workflow_level_problems)
     gates = ["A", "B", "C", "D", "E", "F"]

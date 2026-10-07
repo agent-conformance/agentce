@@ -3,6 +3,17 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.53.0
+
+- `VG-DEMO-SHARD-COVERAGE` (18.76) is hardened. At the workflow root it refused only
+  `defaults.run.shell`, so a root `env:` that sets `BASH_ENV` got through. Bash sources that file
+  before every `run:` step under GitHub's default `bash -e {0}`, so a file that exits 0 turned
+  `quick` green while `build` had failed; a scratch-branch run on `ubuntu-latest` showed it. The
+  root may now carry only `name`, `on`, `permissions` and `jobs`, the same allowlist approach the
+  two jobs already use. `VG-VERIFY-CENSUS-SHARD-COVERAGE` shares the root check, so
+  `quickstart.yml` gets the same protection. One seeded fault added: a root `env:` with a
+  `BASH_ENV` payload.
+
 ## 0.52.0
 
 - `VG-REPORT-BRANCH-COVERAGE` (18.75) is hardened. coverage.py does not count a line marked `# pragma: no
