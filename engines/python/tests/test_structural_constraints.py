@@ -180,7 +180,7 @@ def test_inclusive_boundaries_are_conformant() -> None:
 def test_datetime_inclusive_comparison() -> None:
     body = (
         "sh:property [ sh:path agentce:t ; "
-        'sh:minInclusive "2026-01-01T00:00:00Z" ; sh:maxInclusive "2026-12-31T00:00:00Z" ]'
+        'sh:minInclusive "2026-01-01T00:00:00Z"^^xsd:dateTime ; sh:maxInclusive "2026-12-31T00:00:00Z"^^xsd:dateTime ]'
     )
     at_bound = _store()
     at_bound.add_literal(FOCUS, "agentce:t", "2026-01-01T00:00:00Z", "xsd:dateTime")
@@ -229,7 +229,7 @@ def test_min_inclusive_is_exact_at_the_double_boundary() -> None:
 
 
 def test_mixed_aware_and_naive_datetimes_are_a_violation_not_a_crash() -> None:
-    body = 'sh:property [ sh:path agentce:t ; sh:minInclusive "2026-01-01T00:00:00" ]'
+    body = 'sh:property [ sh:path agentce:t ; sh:minInclusive "2026-01-01T00:00:00"^^xsd:dateTime ]'
     aware = _store()
     aware.add_literal(FOCUS, "agentce:t", "2026-01-01T00:00:00Z", "xsd:dateTime")
     assert _fails(body, aware)

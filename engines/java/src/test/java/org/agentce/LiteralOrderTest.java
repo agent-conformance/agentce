@@ -64,8 +64,8 @@ class LiteralOrderTest {
     @Test
     void anAwareDateTimeAgainstANaiveBoundIsAViolationNotACrash() {
         String[] value = {"agentce:n", "2026-01-01T00:00:00Z", "xsd:dateTime"};
-        assertTrue(flagged("sh:minInclusive \"2026-01-01T00:00:00\"", value));
-        assertFalse(flagged("sh:minInclusive \"2026-01-01T00:00:00Z\"", value));
+        assertTrue(flagged("sh:minInclusive \"2026-01-01T00:00:00\"^^xsd:dateTime", value));
+        assertFalse(flagged("sh:minInclusive \"2026-01-01T00:00:00Z\"^^xsd:dateTime", value));
     }
 
     @Test
