@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.59.0",
+  "suite_version": "0.60.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1080,6 +1080,50 @@
         }
       ],
       "fix_hint": "Run verification/gates/verify_refusal_keys.sh and read which engine's test, source scan or CLI leg failed. Refusals are built by signing.VerificationError.refusal (engines/python/agentce/signing.py), refusal() in engines/typescript/src/verify.ts and Verify.refusal in engines/java/src/main/java/org/agentce/Verify.java; a new refusal key goes into spec/i18n/messages.en.json, its three vendored copies and Python's _KINDS, then docs/errors.md is regenerated with agentce doctor --write-errors."
+    },
+    {
+      "id": "VG-TRUST-ROOT-PARSE-PARITY",
+      "title": "The three engines parse an operator's trust root with one rule: a trust root nested past 1000 levels is refused with the same cause in Python, TypeScript and Java, and NaN, lone surrogates, invalid UTF-8 and a byte-order mark are refused alike",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/trust_root_parse_parity.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 900,
+      "invariant": "An attestation is reported as verified only after its signature verifies against a trusted key.",
+      "rubric": {
+        "pass": "Python's tests/test_trust_root_parse.py, TypeScript's src/trustRootParse.test.ts and Java's TrustRootParseTest each exist, run at least one test and pass (10000-deep array and object, 1001 deep inside keys and a truncated 1001-deep document give the fixed depth text; 1000 deep reaches the shape stage; NaN, a lone surrogate, invalid UTF-8, a byte-order mark and {not json are 'not readable JSON' refusals); and the real Python, TypeScript and Java CLIs exit 3 with input.trust_root_invalid and the byte-identical depth cause on the deep trust roots (by --trust-root and by AGENTCE_TRUST_ROOT), the identical shape cause at 1000 deep, a 'not readable JSON' cause on the NaN, lone-surrogate, invalid-UTF-8 and byte-order-mark trust roots, and Python's verify --report gives the depth cause for a deep --signer-trust-root and a deep embedded trust-root.json",
+        "fail": "any engine's test file is missing, declares no tests or fails; or any CLI loads one of these trust roots, exits other than 3, gives another key, or gives a depth cause that differs from the other engines'"
+      },
+      "faults": [
+        {
+          "description": "Python parses the trust root with plain json.loads again, so a 10000-deep file is a raw RecursionError and NaN loads",
+          "file": "engines/python/agentce/signing.py",
+          "search": "        data = parse_untrusted_json(path.read_bytes())\n    except OSError as exc:\n",
+          "replace": "        data = json.loads(path.read_text(\"utf-8\"))\n    except (OSError, RecursionError) as exc:\n"
+        },
+        {
+          "description": "TypeScript parses the trust root with JSON.parse over a lossy text decode again, so a deep object or an invalid UTF-8 byte loads and the assessment runs",
+          "file": "engines/typescript/src/verify.ts",
+          "search": "    data = readUntrustedJsonFile(path);\n  } catch (exc) {\n    if (exc instanceof JsonTooDeep) {",
+          "replace": "    data = JSON.parse(readFileSync(path, \"utf-8\"));\n  } catch (exc) {\n    if (exc instanceof JsonTooDeep) {"
+        },
+        {
+          "description": "Java parses the trust root with Json.parseFile again, so past 1000 levels it gives Jackson's own text and a lone surrogate loads",
+          "file": "engines/java/src/main/java/org/agentce/Verify.java",
+          "search": "            data = readUntrustedJsonFile(path);\n        } catch (JsonTooDeep e) {",
+          "replace": "            data = Json.parseFile(path);\n        } catch (JsonTooDeep e) {"
+        }
+      ],
+      "fix_hint": "Run verification/gates/trust_root_parse_parity.sh and read which engine's test or CLI leg failed. The loaders are load_trust_root in engines/python/agentce/signing.py, loadTrustRoot in engines/typescript/src/verify.ts and Verify.loadTrustRoot in engines/java/src/main/java/org/agentce/Verify.java; each must read the file's bytes through its engine's untrusted-JSON parser, and its depth text comes from the catalogue's verify.json_too_deep cause."
     },
     {
       "id": "VG-OTEL-GENAI-PARITY",

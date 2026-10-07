@@ -3,6 +3,19 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.60.0
+
+- `VG-TRUST-ROOT-PARSE-PARITY` (18.81) is new. The trust root an operator passes with `--trust-root` or
+  `AGENTCE_TRUST_ROOT` (and, in Python, `verify --report`'s signer or embedded trust root) is now read with
+  the same strict JSON rule all three engines use for the files `verify` reads. Before, a trust root nested
+  thousands of levels deep got a raw recursion error from Python and Jackson's own limit text from Java, and
+  TypeScript loaded one such file, or a file with an invalid UTF-8 byte, as an empty trust root and ran the
+  assessment. Now all three refuse a trust root nested more than 1000 levels deep with exit 3,
+  `input.trust_root_invalid` and the same cause: `<path> is not readable JSON: it nests containers more than
+  1000 levels deep`. NaN, an escaped lone surrogate, an invalid UTF-8 byte and a byte-order mark are refused
+  in all three as well. The gate runs each engine's unit tests and the real CLIs on trust roots it generates.
+  The demo has three seeded faults, one in each engine.
+
 ## 0.59.0
 
 - `VG-VERIFY-REFUSAL-KEYS` (18.64) is new. Every reason `agentce verify` gives for a catalog or release it
