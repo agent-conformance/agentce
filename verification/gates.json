@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.55.0",
+  "suite_version": "0.56.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1215,7 +1215,7 @@
     },
     {
       "id": "VG-QUICK-PATH",
-      "title": "The records-folder quick path (`agentce assess <folder>`, SPEC §12, §13.4 AX-1) proves the records-vs-bundle divergence, checks_unlocked on a real scan, and the derived profile's pilot_window still passing the skill's own lint",
+      "title": "The records-folder quick path (`agentce assess <folder>`, SPEC \u00a712, \u00a713.4 AX-1) proves the records-vs-bundle divergence, checks_unlocked on a real scan, and the derived profile's pilot_window still passing the skill's own lint",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -1495,8 +1495,8 @@
         {
           "description": "README swaps one Experimental name for one Roadmap name between the two tier lines (AuthZEN decisions <-> Cedar); both lines keep their real stated count, so only the per-name tier check can catch it",
           "file": "README.md",
-          "search": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, AuthZEN decisions.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, Cedar — help wanted.\n",
-          "replace": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, Cedar.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, AuthZEN decisions — help wanted.\n"
+          "search": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, AuthZEN decisions.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, Cedar \u2014 help wanted.\n",
+          "replace": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, Cedar.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, AuthZEN decisions \u2014 help wanted.\n"
         },
         {
           "description": "the trace-store connectors page's table claims Datadog LLM Observability is Supported, reviving the old overstated claim the matrix (Experimental) disagrees with",
@@ -1575,8 +1575,8 @@
         {
           "description": "README's \"Distinct products, deduplicated\" row is hand-edited to a number the matrix disagrees with, caught by the count-mismatch check",
           "file": "README.md",
-          "search": "| Distinct products, deduplicated | 408 (348 counting only self-managed Kubernetes) | 2026-09-29 | — |",
-          "replace": "| Distinct products, deduplicated | 409 (348 counting only self-managed Kubernetes) | 2026-09-29 | — |"
+          "search": "| Distinct products, deduplicated | 408 (348 counting only self-managed Kubernetes) | 2026-09-29 | \u2014 |",
+          "replace": "| Distinct products, deduplicated | 409 (348 counting only self-managed Kubernetes) | 2026-09-29 | \u2014 |"
         }
       ],
       "fix_hint": "Run verification/gates/reach_table.sh; it names the exact message key (reach.table.count_mismatch, .missing_provenance, .missing_section, .missing_headline, .duplicate_section or .floor_violated) and the offending row or surface."
@@ -1902,7 +1902,7 @@
           "replace": "    if (/\\s/u.test(c)) {\n"
         },
         {
-          "description": "Java's identifier continues with Character.isLetterOrDigit instead of Python's isalnum, so `a²` is an unexpected character rather than an unknown field (R24)",
+          "description": "Java's identifier continues with Character.isLetterOrDigit instead of Python's isalnum, so `a\u00b2` is an unexpected character rather than an unknown field (R24)",
           "file": "engines/java/src/main/java/org/agentce/FailOn.java",
           "search": "                while (j < n && (isPyAlnum(expr[j]) || expr[j] == '_')) {\n",
           "replace": "                while (j < n && (Character.isLetterOrDigit(expr[j]) || expr[j] == '_')) {\n"
@@ -1916,8 +1916,8 @@
         {
           "description": "Java's assess parses the --fail-on expression after the catalogs resolve, so a bad expression with an unknown --catalog is refused for the catalog (O3)",
           "file": "engines/java/src/main/java/org/agentce/Cli.java",
-          "search": "        FailOn.Expression failOn = options.failOn() != null ? FailOn.parse(options.failOn()) : null;\n        Path out = Paths.get(options.out());\n        // --state's writability is proved here, before any --out write below (writeQuarantineJsonl\n        // etc.), not only when state.save() finally writes at the end of this method: a run refused\n        // for an unwritable --state must leave nothing in --out that looks like a result either.\n        if (options.state() != null) {\n            StateDir.ensureWritable(Paths.get(options.state()));\n        }\n        // Resolved on every run, even with no --catalog-dir (python-reference.md §9).\n        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());\n        Resolved resolved = resolveCatalogs(\n                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());\n",
-          "replace": "        Path out = Paths.get(options.out());\n        // --state's writability is proved here, before any --out write below (writeQuarantineJsonl\n        // etc.), not only when state.save() finally writes at the end of this method: a run refused\n        // for an unwritable --state must leave nothing in --out that looks like a result either.\n        if (options.state() != null) {\n            StateDir.ensureWritable(Paths.get(options.state()));\n        }\n        // Resolved on every run, even with no --catalog-dir (python-reference.md §9).\n        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());\n        Resolved resolved = resolveCatalogs(\n                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());\n        FailOn.Expression failOn = options.failOn() != null ? FailOn.parse(options.failOn()) : null;\n"
+          "search": "        FailOn.Expression failOn = options.failOn() != null ? FailOn.parse(options.failOn()) : null;\n        Path out = Paths.get(options.out());\n        // --state's writability is proved here, before any --out write below (writeQuarantineJsonl\n        // etc.), not only when state.save() finally writes at the end of this method: a run refused\n        // for an unwritable --state must leave nothing in --out that looks like a result either.\n        if (options.state() != null) {\n            StateDir.ensureWritable(Paths.get(options.state()));\n        }\n        // Resolved on every run, even with no --catalog-dir (python-reference.md \u00a79).\n        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());\n        Resolved resolved = resolveCatalogs(\n                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());\n",
+          "replace": "        Path out = Paths.get(options.out());\n        // --state's writability is proved here, before any --out write below (writeQuarantineJsonl\n        // etc.), not only when state.save() finally writes at the end of this method: a run refused\n        // for an unwritable --state must leave nothing in --out that looks like a result either.\n        if (options.state() != null) {\n            StateDir.ensureWritable(Paths.get(options.state()));\n        }\n        // Resolved on every run, even with no --catalog-dir (python-reference.md \u00a79).\n        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());\n        Resolved resolved = resolveCatalogs(\n                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());\n        FailOn.Expression failOn = options.failOn() != null ? FailOn.parse(options.failOn()) : null;\n"
         },
         {
           "description": "Python evaluates the list of OR-groups with all() instead of any(), so `or` acts as `and` (F1, F4)",
@@ -1968,14 +1968,14 @@
         {
           "description": "the severity-high insufficient_evidence rule applies to records-folder runs too, so a first scan with evidence gaps exits 2 (G1, G3, G5)",
           "file": "engines/python/agentce/commands/__init__.py",
-          "search": "    if scanned is None:\n        # SPEC §8.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n",
-          "replace": "    if True:\n        # SPEC §8.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n"
+          "search": "    if scanned is None:\n        # SPEC \u00a78.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n",
+          "replace": "    if True:\n        # SPEC \u00a78.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n"
         },
         {
           "description": "a records-folder run with a declared --profile is treated as a formal assessment and exits 2 (G3)",
           "file": "engines/python/agentce/commands/__init__.py",
-          "search": "    if scanned is None:\n        # SPEC §8.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n",
-          "replace": "    if scanned is None or _opt_str(ns, \"profile\") is not None:\n        # SPEC §8.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n"
+          "search": "    if scanned is None:\n        # SPEC \u00a78.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n",
+          "replace": "    if scanned is None or _opt_str(ns, \"profile\") is not None:\n        # SPEC \u00a78.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n"
         },
         {
           "description": "--fail-on is ignored for records-folder runs, so the opt-in neither reports fail_on nor fails CI on evidence gaps (G4, G6, G8)",
@@ -2031,6 +2031,78 @@
         }
       ],
       "fix_hint": "run verification/gates/records_profile_round_trip.sh and read the R1-R4 lines; the rule is cmd_assess's records branch in engines/python/agentce/commands/__init__.py (_records_subject, _records_profile, declared_subject_ids) and scan()'s per_agent in engines/python/agentce/records/__init__.py."
+    },
+    {
+      "id": "VG-RECORDS-FOLDER-PARITY",
+      "title": "agentce assess <folder> gives the same answer in Python and TypeScript: the same exit code, refusal key, records summary and lines, out folder, bundle, derived profile and results, over the reference scenarios, hostile file names and YAML-quoting names, nesting and encoding edge cases, every refusal, profiles passed back and a newcomer's relative forms",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/records_folder_parity.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "node"
+      ],
+      "timeout_s": 300,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "tools/records_folder_parity_check.py runs exactly 42 scenarios, each as text and with --json in a fresh tree, through Python (the reference) and a fresh build of TypeScript, and for every step the exit code, --json error key, exit_status and records summary, the records lines, the out folder's file list (less the outputs that are engine-specific today), the bytes of applicability.yaml, records-bundle/**, assertions.json, activity.json, applicability.jsonl, blind-spots.json, integrity.jsonl, quarantine.jsonl, project.json, oscal-ar.json, agents/*/*.json and packs/*/pack.json, coverage.json as parsed JSON and manifest.json's inputs, run.invocation and limitations are equal; every refusal scenario exits 3 with its key and leaves the out folder as it was; the hostile scenarios' not-read lines equal the pinned lines in every engine; and Python's forked runner agrees with its console script",
+        "fail": "any compared value differs between Python and TypeScript (a MISMATCH line names the scenario, step, mode and field or file), a refusal exits otherwise or changes the out folder (REFUSAL), a hostile scenario's not-read lines differ from the pinned ones (PIN), or the scenario count is not 42"
+      },
+      "faults": [
+        {
+          "description": "(a) TypeScript sorts a folder's file names by UTF-16 unit (JavaScript's default sort) instead of by code point, so a.json named with U+FF21 and one named with U+1F600 are read in the opposite order to Python's (the sortorder scenarios' records summary and lines)",
+          "file": "engines/typescript/src/records.ts",
+          "search": "    for (const name of filenames.sort(byteCompare)) {\n",
+          "replace": "    for (const name of filenames.sort()) {\n"
+        },
+        {
+          "description": "(b) the YAML writer drops the plain-scalar fold at column 80, so the derived applicability.yaml's class_justification line and a 200-character tool name with spaces are written on one line where PyYAML folds them (applicability.yaml bytes)",
+          "file": "engines/typescript/src/pyyaml.ts",
+          "search": "          if (start + 1 === end && this.column > BEST_WIDTH && split) {\n",
+          "replace": "          if (start + 1 === end && this.column > BEST_WIDTH && split && false) {\n"
+        },
+        {
+          "description": "(c) TypeScript returns exit 2 on a records run with a severity-high insufficient-evidence control, the exit Python scopes to a --bundle/--profile assessment (exit codes)",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "  const highInsufficient =\n    scanned !== undefined\n      ? []\n      : Array.from(",
+          "replace": "  const highInsufficient =\n    scanned !== undefined && false\n      ? []\n      : Array.from("
+        },
+        {
+          "description": "(d) a compressed file is offered to the adapter as a record file instead of being named as not read (the compressed scenario's pinned not-read lines and records summary)",
+          "file": "engines/typescript/src/records.ts",
+          "search": "      if (COMPRESSED_SUFFIXES.has(suffix(name))) {\n        unread.push({\n          path: rel(path),\n          reason: \"compressed files are not read; decompress them first\",\n        });\n        continue;\n      }\n      if (!RECORD_SUFFIXES.has(suffix(name)) || !safeIsFile(path)) {\n",
+          "replace": "      if (\n        (!RECORD_SUFFIXES.has(suffix(name)) && !COMPRESSED_SUFFIXES.has(suffix(name))) ||\n        !safeIsFile(path)\n      ) {\n"
+        },
+        {
+          "description": "(f) TypeScript writes records-bundle/ into the out folder before it raises input.records_out_collides, so a refused run leaves a bundle behind (the out-is-folder and out-inside refusals: out folder untouched, file list)",
+          "file": "engines/typescript/src/records.ts",
+          "search": "        (statOrNull(out) !== null && !isDir(stale) && readdirSync(out).length > 0)\n      ) {\n",
+          "replace": "        (statOrNull(out) !== null && !isDir(stale) && readdirSync(out).length > 0)\n      ) {\n        mkdirSync(stale, { recursive: true });\n        writeFileSync(join(stale, \"manifest.json\"), \"{}\");\n"
+        },
+        {
+          "description": "(g) TypeScript ignores a --profile passed back on a records run and derives its own, so it writes applicability.yaml and evaluates the derived subjects (the round-trip scenarios' file list and results)",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "      declared = loadProfile(profilePath);\n",
+          "replace": "      loadProfile(profilePath);\n"
+        },
+        {
+          "description": "(h) TypeScript reads a record document nested 257 deep, one past the fixed limit Python holds (the depth scenarios' pinned not-read lines and records summary)",
+          "file": "engines/typescript/src/records.ts",
+          "search": "export const MAX_RECORD_DEPTH = 256;\n",
+          "replace": "export const MAX_RECORD_DEPTH = 257;\n"
+        },
+        {
+          "description": "(i) TypeScript drops the lone-surrogate check and encodes a lone surrogate in service.name or gen_ai.agent.id silently as U+FFFD, reading the file Python names as not read (the strings scenario's pinned not-read lines, records summary and bundle)",
+          "file": "engines/typescript/src/records.ts",
+          "search": "      if (LONE_SURROGATE_RE.test(canonicalString(event))) {\n",
+          "replace": "      if (LONE_SURROGATE_RE.test(canonicalString(event)) && false) {\n"
+        }
+      ],
+      "fix_hint": "run verification/gates/records_folder_parity.sh and read the MISMATCH, REFUSAL and PIN lines, each naming the scenario, step, mode and engine; the reference is engines/python/agentce/records/__init__.py (scan) and cmd_assess's records branch in engines/python/agentce/commands/__init__.py, ported in engines/typescript/src/records.ts, engines/typescript/src/cli.ts (runAssess) and engines/typescript/src/pyyaml.ts; the scenarios and pins are in tools/records_folder_parity_check.py."
     }
   ]
 }

@@ -3,6 +3,25 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.56.0
+
+- `VG-RECORDS-FOLDER-PARITY` (18.69) is new. TypeScript now reads a records folder with
+  `agentce assess <folder>`, and this gate holds its answer to Python's. `tools/records_folder_parity_check.py`
+  runs 42 scenarios, each as text and with `--json` in a fresh tree, through both engines, and compares
+  exit codes, refusal keys, the records summary and lines, the out folder's file list, and the bytes of
+  the bundle, the derived `applicability.yaml` and the results. The scenarios cover the reference set,
+  file names and agent ids whose UTF-16 order differs from their code-point order, tool and model names
+  for each PyYAML quoting path, nesting at 256 and 257 (also inside a JSON Lines line and behind a BOM),
+  lone surrogates, `NaN`, invalid UTF-8, CRLF JSON Lines, 25 bad lines, compressed files and symlinks,
+  every refusal (each must exit 3 and leave the out folder as it was), profiles passed back (unedited,
+  reversed, trimmed, and 18.77's id-less records), and a newcomer's relative forms from one working
+  directory. The hostile scenarios' `not read:` lines are pinned in the gate. Eight seeded faults, one per
+  rule. Running it found four TypeScript differences, now fixed: `NaN` and `Infinity` in a trace export
+  were refused where Python reads them; `applicability.jsonl`, `integrity.jsonl` and `quarantine.jsonl`
+  wrote non-ASCII raw where Python escapes it, and `quarantine.jsonl` did not sort its keys; and a
+  profile was read with YAML 1.2 rules, so a tool named `0o17` or `1e10` that PyYAML writes unquoted
+  came back as a number. Java joins in 18.69b.
+
 ## 0.55.0
 
 - `VG-OTEL-GENAI-PARITY` is hardened. An earlier fix replaced the schema-URL trailing-slash regex in
