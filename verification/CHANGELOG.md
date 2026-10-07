@@ -3,6 +3,16 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.55.0
+
+- `VG-OTEL-GENAI-PARITY` is hardened. An earlier fix replaced the schema-URL trailing-slash regex in
+  TypeScript (`/\/+$/`) and Java (`replaceAll("/+$", "")`) with a linear scan, since the regex took over
+  180 s on one million slashes followed by text, but no vector pinned it. The new hostile vector
+  `long-slash-run-schema-url` carries that schema URL (30 vectors now), and
+  `tools/otel_genai_adapter_check.py` gives each TypeScript and Java run a fixed 30 s per vector; a run
+  past it fails with a `TIMEOUT` line naming the vector and the engine. Two seeded faults added: TypeScript's
+  scan reverts to the regex, and Java's reverts to `replaceAll`.
+
 ## 0.54.0
 
 - `VG-RECORDS-PROFILE-ROUND-TRIP` (18.77) is new. A records-folder run writes `applicability.yaml` with the

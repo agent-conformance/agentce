@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.54.0",
+  "suite_version": "0.55.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1039,7 +1039,7 @@
     },
     {
       "id": "VG-OTEL-GENAI-PARITY",
-      "title": "The otel-genai adapter's translation layer (bytes -> canonical AgentCE events) is byte-identical across Python, TypeScript, and Java over all 9 vendor fixtures plus all 20 hostile vectors",
+      "title": "The otel-genai adapter's translation layer (bytes -> canonical AgentCE events) is byte-identical across Python, TypeScript, and Java over all 9 vendor fixtures plus all 21 hostile vectors",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -1054,8 +1054,8 @@
       "timeout_s": 400,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
-        "pass": "tools/otel_genai_adapter_check.py's --self-test confirms every vector matches Python's own reference and the comparator discriminates the truncation/enum-filter fault class, then the real cross-engine run over fresh builds of the TypeScript dist/ and the Java runnable jar produces byte-identical EVENT/REPORT/ERROR output in all three engines for all 25 vectors",
-        "fail": "any vector's output disagrees between python, typescript, or java, or the self-test's comparator fails to discriminate the seeded truncation/enum-filter fault"
+        "pass": "tools/otel_genai_adapter_check.py's --self-test confirms every vector matches Python's own reference and the comparator discriminates the truncation/enum-filter fault class, then the real cross-engine run over fresh builds of the TypeScript dist/ and the Java runnable jar produces byte-identical EVENT/REPORT/ERROR output in all three engines for all 30 vectors, each TypeScript and Java run finishing within the check's fixed 30 s per-vector limit",
+        "fail": "any vector's output disagrees between python, typescript, or java, a TypeScript or Java run over one vector exceeds 30 s, or the self-test's comparator fails to discriminate the seeded truncation/enum-filter fault"
       },
       "faults": [
         {
@@ -1063,9 +1063,21 @@
           "file": "engines/typescript/src/otelGenai.ts",
           "search": "  if (protocol !== null && [\"mcp\", \"a2a\", \"http\", \"native\"].includes(protocol)) {\n    tool.protocol = protocol;",
           "replace": "  if (protocol !== null) {\n    tool.protocol = protocol;"
+        },
+        {
+          "description": "TypeScript: the schema-URL trailing-slash strip reverts to the regex /\\/+$/, which rescans the slash run from every start position, so the long-slash-run-schema-url vector (one million slashes then text) runs past the check's 30 s per-vector limit and fails as a TIMEOUT naming the vector and typescript",
+          "file": "engines/typescript/src/otelGenai.ts",
+          "search": "    let end = url.length;\n    while (end > 0 && url[end - 1] === \"/\") {\n      end--; // url.rstrip(\"/\")\n    }\n    const stripped = url.slice(0, end);\n",
+          "replace": "    const stripped = url.replace(/\\/+$/, \"\");\n"
+        },
+        {
+          "description": "Java: the schema-URL trailing-slash strip reverts to replaceAll(\"/+$\", \"\"), which rescans the slash run from every start position, so the long-slash-run-schema-url vector (one million slashes then text) runs past the check's 30 s per-vector limit and fails as a TIMEOUT naming the vector and java",
+          "file": "engines/java/src/main/java/org/agentce/OtelGenai.java",
+          "search": "            int end = url.length();\n            while (end > 0 && url.charAt(end - 1) == '/') {\n                end--; // url.rstrip(\"/\")\n            }\n            String stripped = url.substring(0, end);\n",
+          "replace": "            String stripped = url.replaceAll(\"/+$\", \"\");\n"
         }
       ],
-      "fix_hint": "run verification/gates/otel_genai_parity.sh and read the MISMATCH lines, each naming the vector and the two engines that disagree; the reference implementation is engines/python/agentce/records/otel_genai.py, ported in engines/typescript/src/otelGenai.ts and engines/java/src/main/java/org/agentce/OtelGenai.java."
+      "fix_hint": "run verification/gates/otel_genai_parity.sh and read the MISMATCH lines, each naming the vector and the two engines that disagree, and any TIMEOUT line, naming the vector and the engine that ran past 30 s; the reference implementation is engines/python/agentce/records/otel_genai.py, ported in engines/typescript/src/otelGenai.ts and engines/java/src/main/java/org/agentce/OtelGenai.java."
     },
     {
       "id": "VG-ASSESS-EXIT-INSUFFICIENT-EVIDENCE",

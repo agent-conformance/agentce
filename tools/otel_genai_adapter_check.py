@@ -5,8 +5,8 @@ item 18.29, contract `P18-18.29` C3).
 Three independently-interpreted ports of the same adapter (18.29's C1/C2) can each pass their own
 unit-test suite while silently disagreeing on an edge case none of those suites happens to probe.
 This check never trusts that: it runs the identical 9 vendor fixtures
-(`adapters/otel-genai/fixtures/`) and 20 hostile vectors
-(`spec/model/test-vectors/otel-genai-hostile/`) -- 29 in total -- through all three engines and
+(`adapters/otel-genai/fixtures/`) and 21 hostile vectors
+(`spec/model/test-vectors/otel-genai-hostile/`) -- 30 in total -- through all three engines and
 asserts their `EVENT`/`REPORT`/`ERROR` output is byte-identical.
 
 Python's own adapter (`agentce.records.otel_genai`, the engine's vendored copy C0 hardened) is
@@ -17,7 +17,7 @@ are driven as built artifacts (`engines/typescript/dist/cli.js`, the Java runnab
 through the shared `otel-genai-fixture <dir>` seam verb (`cli.ts`/`Cli.java`).
 
 * `--self-test` needs no TypeScript/Java build: it proves two things about this checker itself, not
-  about any engine. First, every one of the 29 vectors' own expected output
+  about any engine. First, every one of the 30 vectors' own expected output
   (`expected.jsonl`/`expected-report.json`, or `expected-error.json` -- both plain `AdapterError`
   reasons and `canonical:<reason>` canonicalization refusals) matches what Python's own adapter
   actually produces, so a later edit to a vector's expected file cannot silently drift from the
@@ -28,11 +28,13 @@ through the shared `otel-genai-fixture <dir>` seam verb (`cli.ts`/`Cli.java`).
   output -- proving the check design actually discriminates on this fault class, not only that the
   seam exists.
 * The real invocation (the caller builds TypeScript's `dist/` and the Java runnable jar first) runs,
-  for each of the 29 vectors, a fresh temporary directory holding only that vector's own
+  for each of the 30 vectors, a fresh temporary directory holding only that vector's own
   `input.json` and `adapt.json` (never its `expected*.json*`, so a seam that merely echoes the
   directory it is given cannot pass) through Python's `adapt` directly, the built TypeScript
   `dist/cli.js otel-genai-fixture <dir>`, and the built Java jar's `otel-genai-fixture <dir>`, and
-  asserts all three engines' stdout/stderr and exit code agree.
+  asserts all three engines' stdout/stderr and exit code agree. Each TypeScript and Java run has a
+  fixed 30 s limit; a run that exceeds it fails naming the vector and the engine (the
+  `long-slash-run-schema-url` vector exists to catch a super-linear scan this way).
 
 Usage:
     otel_genai_adapter_check.py             # needs `pnpm build` (TS) and `:assemble` (Java) run first
@@ -59,10 +61,15 @@ JAVA_ENGINE = ROOT / "engines" / "java"
 FIXTURES_DIR = ROOT / "adapters" / "otel-genai" / "fixtures"
 HOSTILE_DIR = ROOT / "spec" / "model" / "test-vectors" / "otel-genai-hostile"
 
-#: The vendor fixtures plus hostile vectors this check exercises every engine against -- 9 + 20 = 29
+#: The vendor fixtures plus hostile vectors this check exercises every engine against -- 9 + 21 = 30
 #: (contract `P18-18.29` C3; 18.29 verifier round 1 added `empty-input` and `doubled-bom`,
-#: round 2 `long-number-strings` and `integer-literal-too-long`).
-EXPECTED_VECTOR_COUNT = 29
+#: round 2 `long-number-strings` and `integer-literal-too-long`; `long-slash-run-schema-url` pins
+#: the linear schema-URL trailing-slash scan).
+EXPECTED_VECTOR_COUNT = 30
+
+#: The fixed limit on one TypeScript or Java run over one vector. Every vector runs in well under a
+#: second; a run that exceeds this is a hang (a super-linear scan), reported as a TIMEOUT failure.
+ENGINE_TIMEOUT_S = 30
 
 
 def all_vector_dirs() -> list[Path]:
@@ -139,7 +146,7 @@ def python_fixture_lines(vector_dir: Path) -> tuple[list[str], list[str], int]:
 
 @functools.lru_cache(maxsize=1)
 def _typescript_entry() -> Path:
-    """The built TypeScript CLI entry point, resolved once -- every one of the 29 vectors drives
+    """The built TypeScript CLI entry point, resolved once -- every one of the 30 vectors drives
     the same build, so there is exactly one entry point to find, not one lookup per vector."""
     entry = TS_ENGINE / "dist" / "cli.js"
     if not entry.is_file():
@@ -163,24 +170,30 @@ def _java_jar() -> Path:
     return jars[-1]
 
 
-def typescript_fixture(vector_dir: Path) -> tuple[str, str, int]:
-    proc = subprocess.run(
-        ["node", str(_typescript_entry()), "otel-genai-fixture", str(vector_dir)],
-        capture_output=True,
-        text=True,
-        cwd=ROOT,
-    )
+class EngineTimeout(Exception):
+    """One TypeScript or Java run exceeded `ENGINE_TIMEOUT_S`."""
+
+
+def _run_engine(cmd: list[str]) -> tuple[str, str, int]:
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, cwd=ROOT, timeout=ENGINE_TIMEOUT_S
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise EngineTimeout from exc
     return proc.stdout, proc.stderr, proc.returncode
+
+
+def typescript_fixture(vector_dir: Path) -> tuple[str, str, int]:
+    return _run_engine(
+        ["node", str(_typescript_entry()), "otel-genai-fixture", str(vector_dir)]
+    )
 
 
 def java_fixture(vector_dir: Path) -> tuple[str, str, int]:
-    proc = subprocess.run(
-        ["java", "-jar", str(_java_jar()), "otel-genai-fixture", str(vector_dir)],
-        capture_output=True,
-        text=True,
-        cwd=ROOT,
+    return _run_engine(
+        ["java", "-jar", str(_java_jar()), "otel-genai-fixture", str(vector_dir)]
     )
-    return proc.stdout, proc.stderr, proc.returncode
 
 
 def copy_io_only(vector_dir: Path, dest: Path) -> None:
@@ -341,8 +354,21 @@ def run_real_check() -> int:
             py_lines, py_err_lines, py_code = python_fixture_lines(tmp)
             py_out = "\n".join(py_lines)
             py_err = "\n".join(py_err_lines)
-            ts_out, ts_err, ts_code = typescript_fixture(tmp)
-            java_out, java_err, java_code = java_fixture(tmp)
+            results: dict[str, tuple[str, str, int]] = {}
+            for engine, run in (
+                ("typescript", typescript_fixture),
+                ("java", java_fixture),
+            ):
+                try:
+                    results[engine] = run(tmp)
+                except EngineTimeout:
+                    failures.append(
+                        f"TIMEOUT: {label} ({engine}) exceeded {ENGINE_TIMEOUT_S} s"
+                    )
+            if len(results) != 2:
+                continue
+            ts_out, ts_err, ts_code = results["typescript"]
+            java_out, java_err, java_code = results["java"]
 
             if not (py_code == ts_code == java_code):
                 failures.append(
@@ -357,7 +383,8 @@ def run_real_check() -> int:
             compare(label, py_combined, java_combined, "python", "java", failures)
 
     for failure in failures:
-        print(f"MISMATCH: {failure}", file=sys.stderr)
+        prefix = "" if failure.startswith("TIMEOUT: ") else "MISMATCH: "
+        print(f"{prefix}{failure}", file=sys.stderr)
     if failures:
         return 1
     print(
