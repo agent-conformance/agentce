@@ -106,6 +106,8 @@ def _judge(functions: dict[str, Any]) -> tuple[bool, str]:
             False,
             f"FAIL: {FUNCTION_NAME} is missing from {TARGET_PATH}'s per-function coverage",
         )
+    # excluded_lines backs up the pragma scan: it also catches an exclusion the per-line scan cannot
+    # see, such as a multi-line exclude_also pattern.
     gaps = [
         f"{name}: missing lines {data.get('missing_lines', [])}, "
         f"missing branches {data.get('missing_branches', [])}, "
@@ -120,35 +122,33 @@ def _judge(functions: dict[str, Any]) -> tuple[bool, str]:
             f"FAIL: {FUNCTION_NAME} is not at 100% branch coverage with nothing excluded -- "
             + "; ".join(gaps)
         )
-    statements = sum(
-        d.get("summary", {}).get("num_statements", 0) for d in regions.values()
-    )
-    branches = sum(
-        d.get("summary", {}).get("num_branches", 0) for d in regions.values()
-    )
+    summaries = [d.get("summary", {}) for d in regions.values()]
+    statements = sum(x.get("num_statements", 0) for x in summaries)
+    branches = sum(x.get("num_branches", 0) for x in summaries)
     return True, (
         f"PASS: {FUNCTION_NAME} and its {len(regions) - 1} nested function(s) are at 100% line and "
         f"branch coverage ({statements} statements, {branches} branches), with no line excluded"
     )
 
 
+def _region(
+    missing_lines: list[int] | None = None,
+    missing_branches: list[list[int]] | None = None,
+    excluded_lines: list[int] | None = None,
+) -> dict[str, Any]:
+    """One coverage.py per-function report entry, for the self-test."""
+    return {
+        "missing_lines": missing_lines or [],
+        "missing_branches": missing_branches or [],
+        "excluded_lines": excluded_lines or [],
+    }
+
+
 def self_test() -> int:
     """The comparator and the pragma scan alone, no real suite run: each must discriminate."""
-    clean: dict[str, Any] = {
-        "missing_lines": [],
-        "missing_branches": [],
-        "excluded_lines": [],
-    }
-    gap: dict[str, Any] = {
-        "missing_lines": [900],
-        "missing_branches": [[899, 900]],
-        "excluded_lines": [],
-    }
-    excluded: dict[str, Any] = {
-        "missing_lines": [],
-        "missing_branches": [],
-        "excluded_lines": [901],
-    }
+    clean = _region()
+    gap = _region(missing_lines=[900], missing_branches=[[899, 900]])
+    excluded = _region(excluded_lines=[901])
     cases: list[tuple[str, dict[str, Any], bool]] = [
         (
             "a fully-covered function",
