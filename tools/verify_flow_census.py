@@ -2085,11 +2085,11 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.signing.digest_tree: path.is_file()": ("catalog-tree",),
     "agentce.signing.digest_tree: path.read_bytes()": ("catalog-tree",),
     "agentce.signing.digest_tree: root.rglob('*')": ("catalog-tree",),
-    "agentce.signing.load_trust_root: json.loads(path.read_text('utf-8'))": (
+    "agentce.signing.load_trust_root: parse_untrusted_json(path.read_bytes())": (
         "report-trust-root",
         "signer-trust-root",
     ),
-    "agentce.signing.load_trust_root: path.read_text('utf-8')": (
+    "agentce.signing.load_trust_root: path.read_bytes()": (
         "report-trust-root",
         "signer-trust-root",
     ),
