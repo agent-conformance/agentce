@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.53.0",
+  "suite_version": "0.54.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -420,7 +420,7 @@
         {
           "description": "the records-folder declared_subject_ids computation for several discovered agents is changed from an empty set (nobody was declared) to every discovered agent's own id, so a genuinely undeclared agent is wrongly marked declared and disappears from undeclared_agents",
           "file": "engines/python/agentce/commands/__init__.py",
-          "search": "        declared_subject_ids = frozenset()\n",
+          "search": "        declared_subject_ids = records_declared_ids\n",
           "replace": "        declared_subject_ids = None\n"
         }
       ],
@@ -1973,6 +1973,52 @@
         }
       ],
       "fix_hint": "run verification/gates/records_exit_code.sh and read the records-exit-code line; the rule is cmd_assess's exit-code block in engines/python/agentce/commands/__init__.py (the --fail-on branch and the `if scanned is None:` scoping of the severity-high insufficient_evidence rule)."
+    },
+    {
+      "id": "VG-RECORDS-PROFILE-ROUND-TRIP",
+      "title": "The profile a records-folder run derives can be passed back with --profile: the same assertions, every agent declared; an agent the profile does not name keeps its own records and row and is listed as undeclared, and an id-less record is never put on a named agent",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/records_profile_round_trip.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 300,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "over a folder with two agents and id-less records, R1: the derived applicability.yaml passed back unedited exits 0 with assertions.json byte-identical to the first run's, three project.json agents all declared and undeclared_agents empty; R2: with fraud-detection-agent removed from the profile, that agent keeps its own row (declared false, agents_observed itself), is the only undeclared agent in project.json and activity.json, its tools and models (sanctions_screen, gemini-1.5-pro) are undeclared, and the assertions equal the first run's as a set; R3: a profile naming credit-underwriter and a second agent over a folder with credit-underwriter and id-less records puts the id-less records on agentce:subject/local only; R4: the derived profile with its subjects reversed gives the same assertions as a set and the same project.json",
+        "fail": "any run exits non-zero, the round trip changes an assertion or leaves an agent undeclared, the removed agent loses its row or its undeclared status, its tools or models read as declared, an id-less record lands on a named agent, or reordering the profile changes the result"
+      },
+      "faults": [
+        {
+          "description": "a profile that declares several subjects folds id-less records into the folder's one named agent, as a discovery scan does (R3)",
+          "file": "engines/python/agentce/records/__init__.py",
+          "search": "        if per_agent or len(real_ids) >= 2:\n",
+          "replace": "        if len(real_ids) >= 2:\n"
+        },
+        {
+          "description": "an agent the profile does not name keeps the tools and models the scan saw as declared (R2)",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "        replace(s, declared_tools=[], declared_models=[])\n",
+          "replace": "        s\n"
+        },
+        {
+          "description": "a records run with several subjects declares none of them even when the adopter's profile names them (R1, R2)",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "        declared_subject_ids = records_declared_ids\n",
+          "replace": "        declared_subject_ids = frozenset()\n"
+        },
+        {
+          "description": "a profile that declares several subjects has every record forced onto its first subject (R1 to R4)",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    return ids[0] if len(ids) == 1 else None\n",
+          "replace": "    return ids[0]\n"
+        }
+      ],
+      "fix_hint": "run verification/gates/records_profile_round_trip.sh and read the R1-R4 lines; the rule is cmd_assess's records branch in engines/python/agentce/commands/__init__.py (_records_subject, _records_profile, declared_subject_ids) and scan()'s per_agent in engines/python/agentce/records/__init__.py."
     }
   ]
 }

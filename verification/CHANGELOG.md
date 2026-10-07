@@ -3,6 +3,22 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.54.0
+
+- `VG-RECORDS-PROFILE-ROUND-TRIP` (18.77) is new. A records-folder run writes `applicability.yaml` with the
+  line "Edit it ... and pass it back with --profile", but a folder with two or more agents gave a profile that
+  AgentCE refused when it was passed back. A profile that declares several subjects now works over a records
+  folder: each record stays on the agent id it carries, an agent the profile does not name gets its own row
+  and report and is listed as undeclared, and a record with no agent id goes to `agentce:subject/local`. The
+  gate runs four scenarios: the unedited round trip gives byte-identical assertions with every agent declared;
+  a removed agent is undeclared, and so are its tools and models; id-less records never land on a named agent;
+  a reversed profile gives the same result. It has four seeded faults, one for each rule the scenarios check.
+  The error key that refused such a profile is retired, since no case raises it now. Python only until
+  TypeScript and Java gain the records-folder mode (18.69).
+- `VG-PROJECT-TIME` (18.77): its fault that marks a fresh multi-agent run's agents declared now edits the line
+  that sets the declared ids from the profile's own, the line 18.77 moved it to. The fault and its effect are
+  unchanged.
+
 ## 0.53.0
 
 - `VG-DEMO-SHARD-COVERAGE` (18.76) is hardened. At the workflow root it refused only
