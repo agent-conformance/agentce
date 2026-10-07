@@ -12,9 +12,12 @@ fails if a gate in `gates.json` is not named in this file.
   file, `spec/rules/psp-terms.json`, which the checker reads and each engine ships a copy of. A refusal
   is `catalog.shape.outside_profile` and names the feature and the shape file; a shape file that will
   not parse is `catalog.shape.parse_error` in every engine (it was `internal.unexpected`, and Python
-  accepted an IRI escape like `\uZZZZ`). `tools/psp_profile_check.py` runs 56 pinned scenarios through
+  accepted an IRI escape like `\uZZZZ`). `tools/psp_profile_check.py` runs 59 pinned scenarios through
   the three engines' `assess --catalog-dir` (Python under two hash seeds) and Python's `catalog lint`.
-  Nine seeded faults. Building it found Java's Turtle reader could not read a decimal such as `1.5`.
+  Nine seeded faults. Building it found Java's Turtle reader could not read a decimal such as `1.5`,
+  a typed literal such as `"2026-01-01T00:00:00Z"^^xsd:dateTime` (the only date bound the profile
+  allows) or a language tag; it reads all three now. Measured: one gate run 39 s on a 10-core laptop;
+  the nine-fault demo 5 min 56 s on one CI demo-fault shard (18 gate runs, about 20 s each).
 - `VG-CATALOG-SHAPE-SAFETY` (18.34) keeps its three faults, now aimed at the shared profile check.
 
 ## 0.56.0
