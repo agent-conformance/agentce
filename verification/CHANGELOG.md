@@ -3,6 +3,25 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.58.0
+
+- `VG-I18N-ERROR-CATALOGUE` (18.80) is new. TypeScript and Java now hold an error-key registry read from
+  the vendored `spec/i18n/` catalogue, as Python's `error_catalogue` does, and each engine's unit test
+  checks that every literal key its own code raises is in the catalogue. That check found four keys
+  Python, TypeScript and Java raised with no catalogue entry (`input.report_format`, `input.emit_format`,
+  `input.fail_on_invalid_expression`, `input.collect_config`); they are in the catalogue and
+  `docs/errors.md` now. A missing catalogue is empty in every engine; a malformed one, or one whose top
+  level is not an object, is refused (TypeScript returned `{}` for both, Java an empty map for the
+  second). A malformed trust root gets one cause per shape in all three engines, such as `keys entry
+  'abc' has no public_key`, where Python printed its own exception text and TypeScript and Java a base64
+  error. A digest read that fails in `assess` is `input.digest_unreadable` (it was
+  `internal.unexpected`). The real CLIs run eight committed trust-root fixtures. Eight seeded faults,
+  one or more in each engine.
+- `VG-I18N-ONE-CATALOGUE` (18.80) now fails when a TypeScript test file or Java test class it names is
+  missing or runs no tests: node skipped a missing file, and Gradle passed while any other class
+  matched. Two new seeded faults point each leg at a deleted file. The two loader faults follow the
+  loaders' new code.
+
 ## 0.57.0
 
 - `VG-PSP-SHAPE-PROFILE-ENFORCED` (18.78) is new. Python, TypeScript and Java now refuse every catalog shape

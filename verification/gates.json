@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.57.0",
+  "suite_version": "0.58.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1385,7 +1385,7 @@
       "timeout_s": 600,
       "invariant": "Every error, warning, and skipped-evaluation reason carries a stable message key.",
       "rubric": {
-        "pass": "engines/typescript/data/i18n/ and engines/java/src/main/resources/i18n/ are byte-identical to spec/i18n/; each engine's sync test and catalogue unit test pass against a live read of the spec file; the real project_view fixture's delegate agent report.md reads exactly '- Agents: spiffe://corp/agents/project-view-fixture-delegate' under its 'Not yet declared in your profile' heading, in all three engines",
+        "pass": "engines/typescript/data/i18n/ and engines/java/src/main/resources/i18n/ are byte-identical to spec/i18n/; each engine's sync test and catalogue unit test exist, run at least one test and pass against a live read of the spec file; the real project_view fixture's delegate agent report.md reads exactly '- Agents: spiffe://corp/agents/project-view-fixture-delegate' under its 'Not yet declared in your profile' heading, in all three engines",
         "fail": "either engine's vendored catalogue differs from spec/i18n/, a sync or catalogue unit test fails, or any engine's real delegate-agent report.md does not read that exact line under that exact heading"
       },
       "faults": [
@@ -1404,17 +1404,102 @@
         {
           "description": "TypeScript's loadCatalog is reverted to a hand-copied literal object instead of reading the vendored file, caught by messages.test.ts's deep-equality check against a live read of the spec",
           "file": "engines/typescript/src/messages.ts",
-          "search": "function loadCatalog(language: string): Record<string, string> {\n  const path = join(i18nDir(), `messages.${language}.json`);\n  try {\n    return JSON.parse(readFileSync(path, \"utf-8\")) as Record<string, string>;\n  } catch {\n    return {};\n  }\n}",
-          "replace": "function loadCatalog(language: string): Record<string, string> {\n  return { \"report.activity_none_undeclared\": \"mutated\" };\n}"
+          "search": "export function loadCatalog(language: string): Record<string, string> {\n  return readCatalogFile(join(i18nDir(), `messages.${language}.json`));\n}",
+          "replace": "export function loadCatalog(language: string): Record<string, string> {\n  return { \"report.activity_none_undeclared\": \"mutated\" };\n}"
         },
         {
           "description": "Java's loadCatalog is reverted to a hand-copied literal map instead of reading the vendored resource, caught by MessagesTest's deep-equality check against a live read of the spec",
           "file": "engines/java/src/main/java/org/agentce/Messages.java",
-          "search": "    private static Map<String, String> loadCatalog(String language) {\n        String text = readClasspathResource(\"/i18n/messages.\" + language + \".json\");\n        if (text == null) {\n            return Map.of();\n        }\n        Map<String, String> out = new LinkedHashMap<>();\n        JsonNode node = Json.parse(text);\n        for (Iterator<String> it = node.fieldNames(); it.hasNext(); ) {\n            String key = it.next();\n            out.put(key, node.get(key).asText());\n        }\n        return out;\n    }",
-          "replace": "    private static Map<String, String> loadCatalog(String language) {\n        return Map.of(\"report.activity_none_undeclared\", \"mutated\");\n    }"
+          "search": "    static Map<String, String> loadCatalog(String language) {\n        String path = \"/i18n/messages.\" + language + \".json\";\n        return parseCatalog(path, readClasspathResource(path));\n    }",
+          "replace": "    static Map<String, String> loadCatalog(String language) {\n        return Map.of(\"report.activity_none_undeclared\", \"mutated\");\n    }"
+        },
+        {
+          "description": "the gate's TypeScript leg names a test file that does not exist (as if src/messages.test.ts were deleted); node would skip it silently, the per-file check fails it",
+          "file": "verification/gates/i18n_one_catalogue.sh",
+          "search": "ts_tests src/bundledData.test.ts src/messages.test.ts",
+          "replace": "ts_tests src/bundledData.test.ts src/messages-deleted.test.ts"
+        },
+        {
+          "description": "the gate's Java leg names a test class that does not exist (as if org.agentce.MessagesTest were deleted); Gradle would pass while BundledDataTest matches, the per-class report check fails it",
+          "file": "verification/gates/i18n_one_catalogue.sh",
+          "search": "java_tests org.agentce.BundledDataTest org.agentce.MessagesTest",
+          "replace": "java_tests org.agentce.BundledDataTest org.agentce.MessagesTestDeleted"
         }
       ],
       "fix_hint": "Run verification/gates/i18n_one_catalogue.sh and read which engine's test or CLI leg failed; the loader lives in engines/typescript/src/messages.ts and engines/java/src/main/java/org/agentce/Messages.java, both reading engines/<lang>/.../i18n/, vendored from spec/i18n/."
+    },
+    {
+      "id": "VG-I18N-ERROR-CATALOGUE",
+      "title": "Every engine reads its error keys from the vendored spec/i18n catalogue and gives one stable cause per malformed trust-root shape",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/i18n_error_catalogue.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 600,
+      "invariant": "Every error, warning, and skipped-evaluation reason carries a stable message key.",
+      "rubric": {
+        "pass": "Python's tests/test_error_catalogue.py, TypeScript's src/errorCatalogue.test.ts and Java's ErrorCatalogueTest each exist, run at least one test and pass (the registry equals the spec catalogue's errors.* pairs, every literal key the engine raises is in it, a missing catalogue is empty while a malformed or non-object one is refused, the six trust-root shapes and a quoted hostile id give their stable causes, a failed digest read is input.digest_unreadable); and the real Python, TypeScript and Java CLIs exit 3 with input.trust_root_invalid and the cause tail in fixtures/trust_root_shapes/expected.txt on each fixture, and agree on an empty keys mapping",
+        "fail": "any engine's test file is missing, runs no tests or fails, or any CLI gives another exit code, key or cause tail on a malformed shape, or refuses or disagrees on the empty keys mapping"
+      },
+      "faults": [
+        {
+          "description": "TypeScript's catalogue loader goes back to returning {} on any error, so a corrupt catalogue reads as empty strings",
+          "file": "engines/typescript/src/messages.ts",
+          "search": "  const data: unknown = JSON.parse(readFileSync(path, \"utf-8\"));",
+          "replace": "  let data: unknown;\n  try {\n    data = JSON.parse(readFileSync(path, \"utf-8\"));\n  } catch {\n    return {};\n  }"
+        },
+        {
+          "description": "Java's catalogue loader goes back to an empty map for a non-object top level",
+          "file": "engines/java/src/main/java/org/agentce/Messages.java",
+          "search": "            throw new IllegalArgumentException(path + \" does not hold a message catalogue object\");",
+          "replace": "            return Map.of();"
+        },
+        {
+          "description": "Python's cause for an entry with no public_key drifts in wording",
+          "file": "engines/python/agentce/signing.py",
+          "search": "has no public_key\")",
+          "replace": "has no public key\")"
+        },
+        {
+          "description": "TypeScript's cause for a keys value that is not a mapping drifts in wording",
+          "file": "engines/typescript/src/verify.ts",
+          "search": "throw new Error(`${field} is not a mapping of ${shape}`);",
+          "replace": "throw new Error(`${field} is not a mapping`);"
+        },
+        {
+          "description": "Java's cause for an entry that is not a mapping stops quoting the id as Python's repr does",
+          "file": "engines/java/src/main/java/org/agentce/Verify.java",
+          "search": "throw new IllegalArgumentException(field + \" entry \" + quoted + \" is not a mapping\");",
+          "replace": "throw new IllegalArgumentException(field + \" entry \" + id + \" is not a mapping\");"
+        },
+        {
+          "description": "TypeScript raises a key the catalogue does not hold (a typo in the digest-read key), caught by catalogueGaps over the engine's sources",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "      \"input.digest_unreadable\",",
+          "replace": "      \"input.digest_unreadabel\","
+        },
+        {
+          "description": "the gate's TypeScript leg names a test file that does not exist; node would skip it silently, the per-file check fails it",
+          "file": "verification/gates/i18n_error_catalogue.sh",
+          "search": "ts_tests src/errorCatalogue.test.ts",
+          "replace": "ts_tests src/errorCatalogue-deleted.test.ts"
+        },
+        {
+          "description": "the gate's Java leg names a test class that does not exist; the per-class report check fails it",
+          "file": "verification/gates/i18n_error_catalogue.sh",
+          "search": "java_tests org.agentce.ErrorCatalogueTest",
+          "replace": "java_tests org.agentce.ErrorCatalogueTestDeleted"
+        }
+      ],
+      "fix_hint": "Run verification/gates/i18n_error_catalogue.sh and read which engine's test or CLI leg failed. The registries are engines/python/agentce/error_catalogue.py, engines/typescript/src/errorCatalogue.ts and engines/java/src/main/java/org/agentce/ErrorCatalogue.java; the trust-root causes are in signing.py, verify.ts and Verify.java; a new key goes into spec/i18n/messages.en.json, its three vendored copies and Python's _KINDS, then docs/errors.md is regenerated with agentce doctor --write-errors."
     },
     {
       "id": "VG-BYO-CATALOG-PARITY",

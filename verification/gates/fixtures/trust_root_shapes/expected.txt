@@ -1,0 +1,7 @@
+keys-not-mapping|keys is not a mapping of key id to key entry
+string-entry|keys entry 'abc' is not a mapping
+no-public-key|keys entry 'abc' has no public_key
+ca-string|certificate_authorities is not a mapping of id to entry
+ca-string-entry|certificate_authorities entry 'ca1' is not a mapping
+ca-no-public-key|certificate_authorities entry 'ca1' has no public_key
+hostile-id|keys entry "a'b\nc" is not a mapping

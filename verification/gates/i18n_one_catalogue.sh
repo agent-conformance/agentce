@@ -18,6 +18,10 @@ trap 'rm -rf "$work"' EXIT
 
 status=0
 
+# Each named test file must exist and run at least one test (18.80).
+# shellcheck source=verification/gates/test_files.sh
+. "$root/verification/gates/test_files.sh"
+
 echo "i18n-one-catalogue: direct cmp of spec/i18n against both vendored copies"
 for f in "$root"/spec/i18n/messages.*.json; do
   b="$(basename "$f")"
@@ -39,7 +43,7 @@ if ! (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen pytest -q 
 fi
 
 echo "i18n-one-catalogue: typescript sync and catalogue unit tests"
-if ! (cd "$root/engines/typescript" && node --import tsx --test src/bundledData.test.ts src/messages.test.ts); then
+if ! ts_tests src/bundledData.test.ts src/messages.test.ts; then
   echo "i18n-one-catalogue: typescript's vendored catalogue or loader did not match the spec" >&2
   status=1
 fi
@@ -48,8 +52,7 @@ echo "i18n-one-catalogue: java build"
 (cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist)
 
 echo "i18n-one-catalogue: java sync and catalogue unit tests"
-if ! (cd "$root/engines/java" && ./gradlew --no-daemon --quiet test \
-  --tests org.agentce.BundledDataTest --tests org.agentce.MessagesTest); then
+if ! java_tests org.agentce.BundledDataTest org.agentce.MessagesTest; then
   echo "i18n-one-catalogue: java's vendored catalogue or loader did not match the spec" >&2
   status=1
 fi
