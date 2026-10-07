@@ -137,7 +137,9 @@ def load_catalog(directory: Path) -> Catalog:
         control = _control_from_dict(data)
         controls.append(control)
         if control.shape_path:
-            shapes.update(load_shapes(directory / control.shape_path))
+            shapes.update(
+                load_shapes(directory / control.shape_path, control.shape_path)
+            )
     return Catalog(
         id=str(meta.get("id", "")),
         version=str(meta.get("version", "")),

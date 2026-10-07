@@ -12,6 +12,8 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `catalog.init_exists` | catalog init would overwrite a scaffolded file that already exists. | pass --force to overwrite, or a different <dir>. |
 | `catalog.init_family_collision` | the control family named by --id is already used by a vendored base or overlay catalog. | pass a different --id. |
 | `catalog.init_family_invalid` | the --id given to catalog init is not 2-4 uppercase letters. | pass --id as 2-4 uppercase letters, e.g. --id ACM. |
+| `catalog.shape.outside_profile` | the shape file {path} uses {feature}, which the Portable Shape Profile excludes (spec/rules/psp.md). | remove it or rewrite the constraint with the profile's permitted terms (spec/rules/psp.md, Permitted). |
+| `catalog.shape.parse_error` | the shape file {path} is not valid Turtle: {detail} | fix the Turtle syntax at the position named. |
 | `catalog.shape.script_forbidden` | a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable Shape Profile forbids (spec/rules/psp.md). | remove the sh:js constraint; express it with the profile's declarative vocabulary instead (spec/rules/psp.md). |
 | `catalog.shape.sparql_forbidden` | a shape uses sh:sparql, a SPARQL-based SHACL construct the Portable Shape Profile forbids (spec/rules/psp.md). | remove the sh:sparql constraint; express it with the profile's declarative vocabulary instead (spec/rules/psp.md). |
 | `catalog.sign_exists` | the catalog directory already carries a catalog.sig.json. | pass --force to re-sign, or remove the existing signature first. |

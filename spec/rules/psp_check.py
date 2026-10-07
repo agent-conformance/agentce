@@ -27,90 +27,35 @@ carries a SPARQL constraint.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
 from rdflib import BNode, Graph, Literal, URIRef
 from rdflib.collection import Collection
-from rdflib.namespace import RDF, XSD, Namespace
+from rdflib.namespace import RDF, Namespace
 
 SH = Namespace("http://www.w3.org/ns/shacl#")
 AGENTCE = Namespace("https://agent-conformance.org/vocab/evidence/v1#")
 
-# SHACL terms the profile permits, by local name (SPEC 7.2).
-#   targets:        targetClass, targetNode (agentce:targetWhere is handled separately)
-#   shape wiring:   property, path, node, qualifiedValueShape, qualifiedMinCount
-#   constraints:    the exact list SPEC 7.2 enumerates for rung 2
-#   path operators: alternativePath, inversePath (their shape is checked in _path_reason)
-#   annotations:    name, message, description, order, group, severity (never affect an outcome)
-ALLOWED = frozenset(
-    {
-        "targetClass",
-        "targetNode",
-        "property",
-        "path",
-        "node",
-        "qualifiedValueShape",
-        "qualifiedMinCount",
-        "minCount",
-        "maxCount",
-        "class",
-        "datatype",
-        "nodeKind",
-        "in",
-        "hasValue",
-        "equals",
-        "disjoint",
-        "lessThan",
-        "lessThanOrEquals",
-        "minInclusive",
-        "maxInclusive",
-        "pattern",
-        "alternativePath",
-        "inversePath",
-        "name",
-        "message",
-        "description",
-        "order",
-        "group",
-        "severity",
-    }
+# The profile's term lists live in one language-neutral file, psp-terms.json beside this script; every
+# engine vendors a byte-identical copy and refuses the same shapes this checker refuses (18.78).
+#   allowed:        SHACL terms the profile permits, by local name (SPEC 7.2)
+#   priority_deny:  excluded SHACL terms checked first, in this order and matched case-insensitively,
+#                   so the refusal is deterministic and names the most meaningful feature (SPARQL
+#                   before its helper predicates). Any other SHACL-namespace predicate that is not
+#                   allowed is still refused, by local name as written, after this pass.
+_TERMS = json.loads(
+    (Path(__file__).with_name("psp-terms.json")).read_text(encoding="utf-8")
 )
-
-# Excluded SHACL terms checked first, in this order, so the refusal is deterministic and names the
-# most meaningful feature (SPARQL before its helper predicates). Anything in the SHACL namespace that
-# is neither ALLOWED nor listed here is still refused, by local name, after this pass.
-PRIORITY_DENY = (
-    "sparql",
-    "js",
-    "jsLibrary",
-    "jsFunctionName",
-    "select",
-    "ask",
-    "construct",
-    "prefixes",
-    "closed",
-    "ignoredProperties",
-    "and",
-    "or",
-    "not",
-    "xone",
-    "zeroOrMorePath",
-    "oneOrMorePath",
-    "zeroOrOnePath",
-    "languageIn",
-    "uniqueLang",
-    "flags",
-    "targetSubjectsOf",
-    "targetObjectsOf",
-    "qualifiedMaxCount",
-    "qualifiedValueShapesDisjoint",
-)
-
-MAX_PATH_LENGTH = 3  # SPEC 7.2: sequence and alternative of at most three
+ALLOWED = frozenset(_TERMS["allowed"])
+PRIORITY_DENY = tuple(_TERMS["priority_deny"])
+MAX_PATH_LENGTH = int(
+    _TERMS["max_path_length"]
+)  # SPEC 7.2: sequence and alternative of at most three
 # Regex metacharacters forbidden after the mandatory leading anchor (SPEC 7.2: "^<literal>").
-REGEX_META = frozenset(".^$*+?()[]{}|\\")
-RANGE_DATATYPES = frozenset({XSD.integer, XSD.dateTime})
+REGEX_META = frozenset(_TERMS["regex_meta"])
+RANGE_DATATYPES = frozenset(URIRef(iri) for iri in _TERMS["range_datatypes"])
 
 
 class Refused(Exception):
@@ -130,7 +75,9 @@ def _local(term: URIRef) -> str:
 
 
 def _sh_predicates(graph: Graph) -> set[str]:
-    return {_local(p) for p in set(graph.predicates()) if str(p).startswith(str(SH))}
+    return {
+        str(p)[len(SH) :] for p in set(graph.predicates()) if str(p).startswith(str(SH))
+    }
 
 
 def _is_list(graph: Graph, node: object) -> bool:
@@ -187,11 +134,16 @@ def _first_reason(reasons) -> str | None:
     return None
 
 
+def _least(features) -> None:
+    # Each stage reports the code-point-least feature it finds, so the answer never depends on triple
+    # order or the hash seed.
+    found = sorted(f for f in features if f is not None)
+    if found:
+        raise Refused(found[0])
+
+
 def _check_paths(graph: Graph) -> None:
-    for path_node in graph.objects(None, SH.path):
-        reason = _path_reason(graph, path_node)
-        if reason is not None:
-            raise Refused(reason)
+    _least(_path_reason(graph, node) for node in graph.objects(None, SH.path))
 
 
 def _check_patterns(graph: Graph) -> None:
@@ -205,10 +157,12 @@ def _check_patterns(graph: Graph) -> None:
 
 def _check_ranges(graph: Graph) -> None:
     # sh:minInclusive / sh:maxInclusive are permitted on xsd:integer and xsd:dateTime only.
-    for pred in (SH.minInclusive, SH.maxInclusive):
-        for value in graph.objects(None, pred):
-            if not isinstance(value, Literal) or value.datatype not in RANGE_DATATYPES:
-                raise Refused(f"{_local(pred)} on a non-integer/dateTime bound")
+    _least(
+        f"{_local(pred)} on a non-integer/dateTime bound"
+        for pred in (SH.minInclusive, SH.maxInclusive)
+        for value in graph.objects(None, pred)
+        if not isinstance(value, Literal) or value.datatype not in RANGE_DATATYPES
+    )
 
 
 def _check_target_where(graph: Graph) -> None:
@@ -224,8 +178,9 @@ def _check_target_where(graph: Graph) -> None:
 def check_graph(graph: Graph) -> None:
     """Raise Refused(feature) if the shapes graph steps outside the profile."""
     used = _sh_predicates(graph)
+    folded = {name.lower() for name in used}
     for feature in PRIORITY_DENY:
-        if feature in used:
+        if feature.lower() in folded:
             raise Refused(f"sh:{feature}")
     for name in sorted(used):
         if name not in ALLOWED:
@@ -236,6 +191,21 @@ def check_graph(graph: Graph) -> None:
     _check_target_where(graph)
 
 
+def _bad_iri(graph: Graph) -> str | None:
+    # rdflib keeps an IRI escape it cannot decode (``\uZZZZ``) as a literal backslash instead of
+    # rejecting it; a backslash never survives in a well-formed IRIREF, so any left over is a parse
+    # error, as it is in the engines' parsers.
+    for triple in graph:
+        for term in triple:
+            iris = [term] if isinstance(term, URIRef) else []
+            if isinstance(term, Literal) and term.datatype is not None:
+                iris.append(term.datatype)
+            for iri in iris:
+                if "\\" in str(iri):
+                    return f"invalid escape in IRI <{iri}>"
+    return None
+
+
 def check_file(path: Path) -> None:
     """Parse and check one shapes file. Raises Refused on a non-portable shape; ValueError on parse."""
     graph = Graph()
@@ -243,6 +213,9 @@ def check_file(path: Path) -> None:
         graph.parse(path, format="turtle")
     except Exception as e:
         raise ValueError(str(e)) from e
+    bad = _bad_iri(graph)
+    if bad is not None:
+        raise ValueError(bad)
     check_graph(graph)
 
 

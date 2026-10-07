@@ -91,7 +91,10 @@ export function loadCatalog(directory: string): Catalog {
     const control = controlFromDict(data);
     controls.push(control);
     if (control.shapePath) {
-      for (const [iri, shape] of loadShapes(join(directory, control.shapePath))) {
+      for (const [iri, shape] of loadShapes(
+        join(directory, control.shapePath),
+        control.shapePath,
+      )) {
         shapes.set(iri, shape);
       }
     }

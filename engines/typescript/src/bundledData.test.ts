@@ -61,3 +61,10 @@ test("the vendored data is byte-identical to the Python engine's copy", () => {
     for (const [name, bytes] of a) assert.ok(bytes.equals(b.get(name) as Buffer), name);
   }
 });
+
+test("the vendored psp-terms.json is byte-identical to spec/rules/psp-terms.json", () => {
+  // The engine refuses exactly the shapes spec/rules/psp_check.py refuses only while both read the
+  // same term list (18.78).
+  const vendored = readFileSync(join(ENGINE, "data", "psp-terms.json"));
+  assert.ok(vendored.equals(readFileSync(join(REPO, "spec", "rules", "psp-terms.json"))));
+});

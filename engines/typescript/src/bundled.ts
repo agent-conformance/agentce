@@ -28,6 +28,11 @@ export function quickstartDir(): string {
   return join(dataRoot(), "corpus", "quickstart");
 }
 
+/** The vendored Portable Shape Profile term lists (the original is `spec/rules/psp-terms.json`). */
+export function pspTermsPath(): string {
+  return join(dataRoot(), "psp-terms.json");
+}
+
 /** The vendored ICU MessageFormat catalogue (the language-neutral original lives in `spec/i18n/`). */
 export function i18nDir(): string {
   return join(dataRoot(), "i18n");

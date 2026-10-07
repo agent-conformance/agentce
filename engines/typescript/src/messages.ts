@@ -62,3 +62,12 @@ export function errorCause(key: string): string {
   }
   return cause;
 }
+
+/** The English fix text the catalogue holds for error `key` (`errors.<key>.fix`); throws if missing. */
+export function errorFix(key: string): string {
+  const fix = loadCatalog(DEFAULT_LANGUAGE)[`errors.${key}.fix`];
+  if (fix === undefined) {
+    throw new Error(`message catalogue has no errors.${key}.fix`);
+  }
+  return fix;
+}

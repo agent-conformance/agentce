@@ -102,6 +102,8 @@ _KINDS: dict[str, str] = {
     "catalog.support_matrix_inside_catalog": "error",
     "catalog.shape.sparql_forbidden": "error",
     "catalog.shape.script_forbidden": "error",
+    "catalog.shape.outside_profile": "error",
+    "catalog.shape.parse_error": "error",
     "verify.certificate_algorithm": "error",
     "verify.certificate_validity_malformed": "error",
     "verify.certificate_validity_inverted": "error",

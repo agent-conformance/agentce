@@ -98,6 +98,16 @@ public final class Messages {
         return cause;
     }
 
+    /** The English fix text the catalogue holds for error {@code key} ({@code errors.<key>.fix}); throws
+     * if the key has none. */
+    public static String errorFix(String key) {
+        String fix = loadCatalog(DEFAULT_LANGUAGE).get("errors." + key + ".fix");
+        if (fix == null) {
+            throw new IllegalStateException("message catalogue has no errors." + key + ".fix");
+        }
+        return fix;
+    }
+
     public static Map<String, String> catalogue() {
         return catalogue(DEFAULT_LANGUAGE);
     }

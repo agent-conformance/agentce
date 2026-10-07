@@ -1,12 +1,17 @@
 package org.agentce;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Parse a Portable Shape Profile shape into a small AST (SPEC §7.2, ADR-0002). A node shape has targets
@@ -15,11 +20,10 @@ import java.util.Map;
  * bounded sequence or alternative) and the profile's constraints. A faithful port of the reference; it
  * compacts terms to the store's CURIE representation identically.
  *
- * <p>{@code spec/rules/psp_check.py} is the authoring-time checker for the profile's full
- * excluded-feature list; this class independently refuses the two constructs that would let a shape
- * carry logic no engine can evaluate identically ({@code sh:sparql}, {@code sh:js}/{@code
- * sh:javascript}, 18.34) before a shape ever reaches the evaluator, since those triples would
- * otherwise just be ignored, not rejected, below.
+ * <p>{@code spec/rules/psp_check.py} is the authoring-time checker for the profile; this class reads the
+ * same term list ({@code psp-terms.json}) and refuses every shape that checker refuses, and every shape
+ * file that will not parse, under a stable message key before a shape ever reaches the evaluator (18.34,
+ * 18.78).
  */
 public final class Psp {
     private Psp() {}
@@ -248,61 +252,198 @@ public final class Psp {
         return shapes;
     }
 
-    /** One forbidden predicate's name, message key, cause, and fix, checked in this fixed order
-     * (matching {@code spec/rules/psp_check.py}'s own {@code PRIORITY_DENY}: sparql before its
-     * script counterpart), never store-iteration order -- so a shape carrying BOTH predicates
-     * reports the same key as Python and TypeScript regardless of triple order. {@code js} and
-     * {@code javascript} share one key and therefore one message. SHACL predicates that embed
-     * arbitrary query or script logic are forbidden by the Portable Shape Profile (spec/rules/psp.md)
-     * because they are not portable across the three engines' independent structural evaluators. */
-    private record ForbiddenShapePredicate(String name, String key, String cause, String fix) {}
+    /** The Portable Shape Profile's term lists (spec/rules/psp-terms.json, vendored byte-identical and
+     * held in sync by BundledDataTest): the same file spec/rules/psp_check.py reads, so the engine refuses
+     * exactly the shapes the authoring-time checker refuses (18.78). Left unchecked, an excluded predicate
+     * parses as ordinary Turtle and the reads above, which only ask for the predicates they name, drop it
+     * silently: the shape would be evaluated as if the construct were not there. */
+    private static final JsonNode TERMS = loadTerms();
+    private static final Set<String> ALLOWED = textSet(TERMS.get("allowed"));
+    private static final Set<String> RANGE_DATATYPES = textSet(TERMS.get("range_datatypes"));
+    private static final String REGEX_META = TERMS.get("regex_meta").asText();
+    private static final int MAX_PATH_LENGTH = TERMS.get("max_path_length").asInt();
 
-    private static final List<ForbiddenShapePredicate> FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER = List.of(
-            new ForbiddenShapePredicate(
-                    "sparql",
-                    "catalog.shape.sparql_forbidden",
-                    "a shape uses sh:sparql, a SPARQL-based SHACL construct the Portable Shape "
-                            + "Profile forbids (spec/rules/psp.md).",
-                    "remove the sh:sparql constraint; express it with the profile's declarative "
-                            + "vocabulary instead (spec/rules/psp.md)."),
-            new ForbiddenShapePredicate(
-                    "js",
-                    "catalog.shape.script_forbidden",
-                    "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable "
-                            + "Shape Profile forbids (spec/rules/psp.md).",
-                    "remove the sh:js constraint; express it with the profile's declarative "
-                            + "vocabulary instead (spec/rules/psp.md)."),
-            new ForbiddenShapePredicate(
-                    "javascript",
-                    "catalog.shape.script_forbidden",
-                    "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable "
-                            + "Shape Profile forbids (spec/rules/psp.md).",
-                    "remove the sh:js constraint; express it with the profile's declarative "
-                            + "vocabulary instead (spec/rules/psp.md)."));
+    /** The two features 18.34 gave their own keys; every other excluded feature is outside_profile. */
+    private static final Map<String, String> FEATURE_KEYS = Map.of(
+            "sh:sparql", "catalog.shape.sparql_forbidden",
+            "sh:js", "catalog.shape.script_forbidden",
+            "sh:javascript", "catalog.shape.script_forbidden");
+    private static final String OUTSIDE_PROFILE = "catalog.shape.outside_profile";
+    private static final String PARSE_ERROR = "catalog.shape.parse_error";
 
-    private static void checkForbiddenPredicates(Rdf.Store store) {
-        java.util.Set<String> used = new java.util.HashSet<>();
-        for (String predicate : store.predicates()) {
-            if (predicate.startsWith(SH)) {
-                used.add(predicate.substring(SH.length()).toLowerCase(java.util.Locale.ROOT));
+    private static JsonNode loadTerms() {
+        try (InputStream in = Psp.class.getResourceAsStream("/psp-terms.json")) {
+            if (in == null) {
+                throw new IllegalStateException("vendored psp-terms.json not on classpath");
             }
-        }
-        for (ForbiddenShapePredicate forbidden : FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER) {
-            if (used.contains(forbidden.name())) {
-                throw new InputError(forbidden.key(), forbidden.cause(), forbidden.fix());
-            }
+            return Json.parse(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot read psp-terms.json: " + e.getMessage(), e);
         }
     }
 
-    public static Map<String, Shape> parseShapesTtl(String text) {
-        Rdf.Store store = Rdf.parse(text);
-        checkForbiddenPredicates(store);
+    private static Set<String> textSet(JsonNode array) {
+        Set<String> out = new HashSet<>();
+        array.forEach(item -> out.add(item.asText()));
+        return out;
+    }
+
+    /** The excluded feature a property path uses, or null: a predicate, an inverse of a permitted path,
+     * or a sequence or alternative of at most {@code max_path_length} permitted paths. */
+    private static String pathFeature(Rdf.Store store, Rdf.Term node, Set<Rdf.Term> seen) {
+        if (node.isIri()) {
+            return null;
+        }
+        if (seen.contains(node)) {
+            return "path (cyclic)";
+        }
+        Set<Rdf.Term> inner = new HashSet<>(seen);
+        inner.add(node);
+        for (String banned : List.of("zeroOrMorePath", "oneOrMorePath", "zeroOrOnePath")) {
+            if (store.value(node, sh(banned)) != null) {
+                return "sh:" + banned;
+            }
+        }
+        Rdf.Term inverse = store.value(node, sh("inversePath"));
+        if (inverse != null) {
+            return pathFeature(store, inverse, inner);
+        }
+        Rdf.Term alternative = store.value(node, sh("alternativePath"));
+        if (alternative != null) {
+            if (store.value(alternative, Rdf.Term.iri(Rdf.RDF_FIRST)) == null) {
+                return "sh:alternativePath (not a list)";
+            }
+            return membersFeature(store, collection(store, alternative), "alternative", inner);
+        }
+        if (store.value(node, Rdf.Term.iri(Rdf.RDF_FIRST)) != null) {
+            return membersFeature(store, collection(store, node), "sequence", inner);
+        }
+        return "path (unsupported blank node)";
+    }
+
+    private static String membersFeature(Rdf.Store store, List<Rdf.Term> members, String kind, Set<Rdf.Term> seen) {
+        if (members.size() > MAX_PATH_LENGTH) {
+            return "path " + kind + " of " + members.size() + " (max " + MAX_PATH_LENGTH + ")";
+        }
+        for (Rdf.Term member : members) {
+            String feature = pathFeature(store, member, seen);
+            if (feature != null) {
+                return feature;
+            }
+        }
+        return null;
+    }
+
+    private static boolean nonLiteralPattern(String text) {
+        if (!text.startsWith("^")) {
+            return true;
+        }
+        return text.substring(1).codePoints().anyMatch(c -> REGEX_META.indexOf(c) >= 0);
+    }
+
+    /** The path, pattern, range and targetWhere stages, in that order, each as the features it finds. */
+    private static List<List<String>> structuralFeatures(Rdf.Store store) {
+        List<String> paths = new ArrayList<>();
+        for (Rdf.Term node : store.objectsOf(sh("path"))) {
+            String feature = pathFeature(store, node, Set.of());
+            if (feature != null) {
+                paths.add(feature);
+            }
+        }
+        List<String> patterns = new ArrayList<>();
+        for (Rdf.Term value : store.objectsOf(sh("pattern"))) {
+            if (nonLiteralPattern(value.value)) {
+                patterns.add("sh:pattern (non-literal regex)");
+            }
+        }
+        List<String> ranges = new ArrayList<>();
+        for (String name : List.of("minInclusive", "maxInclusive")) {
+            for (Rdf.Term value : store.objectsOf(sh(name))) {
+                if (!value.isLiteral() || !RANGE_DATATYPES.contains(value.datatype)) {
+                    ranges.add(name + " on a non-integer/dateTime bound");
+                }
+            }
+        }
+        List<String> targetWhere = new ArrayList<>();
+        for (Rdf.Term where : store.objectsOf(Rdf.Term.iri(AGENTCE + "targetWhere"))) {
+            for (Rdf.Term[] quad : store.quadsOf(where)) {
+                if (quad[2].isBlank()) {
+                    targetWhere.add("agentce:targetWhere (nested node, not a value equality)");
+                }
+            }
+        }
+        return List.of(paths, patterns, ranges, targetWhere);
+    }
+
+    /** The first feature the store uses that the Portable Shape Profile excludes, or null. The order is
+     * fixed so the answer never depends on triple order, and matches Python's {@code profile_feature}:
+     * the priority terms in list order, matched case-insensitively and named canonically ({@code
+     * sh:CLOSED} is {@code sh:closed}); then any other SHACL-namespace predicate the profile does not
+     * allow, as written, least by code point; then the path, pattern, range and targetWhere stages, each
+     * naming the code-point-least feature it finds (spec/rules/psp.md). */
+    public static String profileFeature(Rdf.Store store) {
+        List<String> used = new ArrayList<>();
+        for (String predicate : store.predicates()) {
+            if (predicate.startsWith(SH)) {
+                used.add(predicate.substring(SH.length()));
+            }
+        }
+        used.sort(Json::byteCompare);
+        Set<String> folded = new HashSet<>();
+        for (String name : used) {
+            folded.add(name.toLowerCase(Locale.ROOT));
+        }
+        for (JsonNode term : TERMS.get("priority_deny")) {
+            if (folded.contains(term.asText().toLowerCase(Locale.ROOT))) {
+                return "sh:" + term.asText();
+            }
+        }
+        for (String name : used) {
+            if (!ALLOWED.contains(name)) {
+                return "sh:" + name;
+            }
+        }
+        for (List<String> found : structuralFeatures(store)) {
+            if (!found.isEmpty()) {
+                return found.stream().min(Json::byteCompare).orElseThrow();
+            }
+        }
+        return null;
+    }
+
+    /** Parse PSP shapes from Turtle, refusing a file that will not parse or a shape outside the profile.
+     * {@code shown} names the shape file in the message (a catalog-relative path). */
+    public static Map<String, Shape> parseShapesTtl(String text, String shown) {
+        Rdf.Store store;
+        try {
+            store = Rdf.parse(text);
+        } catch (RuntimeException e) { // the hand-written lexer and parser signal bad Turtle this way
+            String detail = String.join(" ", String.valueOf(e.getMessage()).trim().split("\\s+"));
+            throw new InputError(
+                    PARSE_ERROR,
+                    Messages.errorCause(PARSE_ERROR)
+                            .replace("{path}", shown)
+                            .replace("{detail}", detail.substring(0, Math.min(200, detail.length()))),
+                    Messages.errorFix(PARSE_ERROR));
+        }
+        String feature = profileFeature(store);
+        if (feature != null) {
+            String key = FEATURE_KEYS.getOrDefault(feature, OUTSIDE_PROFILE);
+            throw new InputError(
+                    key,
+                    Messages.errorCause(key).replace("{path}", shown).replace("{feature}", feature),
+                    Messages.errorFix(key));
+        }
         return parseShapes(store);
     }
 
-    public static Map<String, Shape> loadShapes(java.nio.file.Path path) {
+    public static Map<String, Shape> parseShapesTtl(String text) {
+        return parseShapesTtl(text, "(inline)");
+    }
+
+    public static Map<String, Shape> loadShapes(java.nio.file.Path path, String shown) {
         try {
-            return parseShapesTtl(Files.readString(path, StandardCharsets.UTF_8));
+            return parseShapesTtl(Files.readString(path, StandardCharsets.UTF_8), shown);
         } catch (IOException e) {
             throw new IllegalArgumentException("cannot read shapes " + path + ": " + e.getMessage(), e);
         }

@@ -57,6 +57,16 @@ class BundledDataTest {
         assertSameTree(onClasspath("/i18n"), repo.resolve("spec/i18n"), false);
     }
 
+    /** The engine refuses exactly the shapes spec/rules/psp_check.py refuses only while both read the
+     * same term list (18.78). */
+    @Test
+    void bundledPspTermsAreByteIdenticalToSpecRules() throws IOException, URISyntaxException {
+        assertArrayEquals(
+                Files.readAllBytes(TestPaths.repoRoot().resolve("spec/rules/psp-terms.json")),
+                Files.readAllBytes(onClasspath("/psp-terms.json")),
+                "re-sync engines/java/src/main/resources/psp-terms.json from spec/rules/psp-terms.json");
+    }
+
     @Test
     void bundledDataIsByteIdenticalToThePythonEnginesCopy() throws IOException, URISyntaxException {
         Path python = TestPaths.repoRoot().resolve("engines/python/agentce/data");

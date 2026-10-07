@@ -233,4 +233,4 @@ def evaluate_probe(
 
 def parse_shape_file(path: Path) -> dict[str, Shape]:
     """Parse a probe corpus's PSP shapes (Turtle) into the AST keyed by shape IRI."""
-    return parse_shapes_ttl(path.read_text(encoding="utf-8"))
+    return parse_shapes_ttl(path.read_text(encoding="utf-8"), path.name)

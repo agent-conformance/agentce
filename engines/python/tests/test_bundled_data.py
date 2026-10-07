@@ -120,3 +120,14 @@ def test_default_catalog_severities_come_from_the_bundled_catalogs() -> None:
     assert {"conduct", "employment", "finance", "insurance"} <= {
         d.name for d in (bundled.catalogs_dir() / "overlays").iterdir()
     }
+
+
+def test_vendored_psp_terms_match_spec_rules() -> None:
+    # The engine refuses exactly the shapes spec/rules/psp_check.py refuses only while both read the
+    # same term list (18.78).
+    vendored = Path(bundled._data_root()) / "psp-terms.json"
+    assert (
+        vendored.read_bytes() == (_REPO_ROOT / "spec/rules/psp-terms.json").read_bytes()
+    ), (
+        "re-sync with `cp spec/rules/psp-terms.json engines/python/agentce/data/psp-terms.json`"
+    )

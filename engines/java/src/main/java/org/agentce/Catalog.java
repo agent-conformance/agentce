@@ -132,7 +132,7 @@ public final class Catalog {
             ControlSpec control = controlFromDict(data);
             controls.add(control);
             if (control.shapePath != null) {
-                shapes.putAll(Psp.loadShapes(directory.resolve(control.shapePath)));
+                shapes.putAll(Psp.loadShapes(directory.resolve(control.shapePath), control.shapePath));
             }
         }
         return new Catalog(

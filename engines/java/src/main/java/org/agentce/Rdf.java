@@ -102,6 +102,17 @@ public final class Rdf {
             return out;
         }
 
+        /** Objects of {@code predicate} under any subject, in insertion order. */
+        public List<Term> objectsOf(Term predicate) {
+            List<Term> out = new ArrayList<>();
+            for (Term[] q : quads) {
+                if (q[1].equals(predicate)) {
+                    out.add(q[2]);
+                }
+            }
+            return out;
+        }
+
         /** Subjects of {@code (predicate, object)} in insertion order. */
         public List<Term> subjects(Term predicate, Term object) {
             List<Term> out = new ArrayList<>();
@@ -168,6 +179,18 @@ public final class Rdf {
     }
 
     private record Token(Type type, String value) {}
+
+    /** A Turtle INTEGER, DECIMAL or DOUBLE (Turtle 1.1, section 6.5); a leading-dot decimal is not read. */
+    private static final java.util.regex.Pattern NUMBER_RE =
+            java.util.regex.Pattern.compile("[+-]?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?");
+
+    /** The XSD datatype a Turtle numeric literal carries: double with an exponent, decimal with a point. */
+    static String numericType(String lexical) {
+        if (lexical.indexOf('e') >= 0 || lexical.indexOf('E') >= 0) {
+            return "double";
+        }
+        return lexical.indexOf('.') >= 0 ? "decimal" : "integer";
+    }
 
     private static final class Parser {
         private final String src;
@@ -245,7 +268,7 @@ public final class Rdf {
                 case STRING:
                     return Term.literal(token.value(), XSD + "string");
                 case NUMBER:
-                    return Term.literal(token.value(), XSD + "integer");
+                    return Term.literal(token.value(), XSD + numericType(token.value()));
                 case BOOLEAN:
                     return Term.literal(token.value(), XSD + "boolean");
                 case LBRACKET:
@@ -323,6 +346,11 @@ public final class Rdf {
             if (pos >= src.length()) {
                 return new Token(Type.EOF, "");
             }
+            java.util.regex.Matcher number = NUMBER_RE.matcher(src).region(pos, src.length());
+            if (number.lookingAt()) {
+                pos = number.end();
+                return new Token(Type.NUMBER, number.group());
+            }
             char c = src.charAt(pos);
             switch (c) {
                 case '.':
@@ -393,14 +421,14 @@ public final class Rdf {
                     char e = src.charAt(pos);
                     if (e == 'u') {
                         pos++;
-                        sb.append((char) Integer.parseInt(src.substring(pos, pos + 4), 16));
-                        pos += 4;
+                        sb.append((char) hexEscape(4));
                     } else if (e == 'U') {
                         pos++;
-                        sb.appendCodePoint(Integer.parseInt(src.substring(pos, pos + 8), 16));
-                        pos += 8;
+                        sb.appendCodePoint(hexEscape(8));
                     } else {
-                        sb.append(c);
+                        // IRIREF allows only \\u and \\U escapes (Turtle 1.1, UCHAR); Python and
+                        // TypeScript refuse any other as a parse error too.
+                        throw new IllegalArgumentException("invalid escape \\" + e + " in IRI");
                     }
                 } else {
                     sb.append(c);
@@ -409,6 +437,16 @@ public final class Rdf {
             String iri = sb.toString();
             pos++; // skip '>'
             return new Token(Type.IRIREF, iri);
+        }
+
+        /** The {@code digits} hex digits of a \\u or \\U escape at {@code pos}, advancing past them. */
+        private int hexEscape(int digits) {
+            if (pos + digits > src.length() || !src.substring(pos, pos + digits).matches("[0-9A-Fa-f]+")) {
+                throw new IllegalArgumentException("invalid escape in IRI: expected " + digits + " hex digits");
+            }
+            int value = Integer.parseInt(src.substring(pos, pos + digits), 16);
+            pos += digits;
+            return value;
         }
 
         private Token scanString() {
@@ -469,9 +507,6 @@ public final class Rdf {
             }
             if (word.indexOf(':') >= 0) {
                 return new Token(Type.PNAME, word);
-            }
-            if (word.matches("[+-]?[0-9]+")) {
-                return new Token(Type.NUMBER, word);
             }
             throw new IllegalArgumentException("unrecognised token '" + word + "'");
         }

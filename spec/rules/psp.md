@@ -121,8 +121,28 @@ psp_check.py <shape.ttl> [<shape.ttl> ...]
 | a shape uses an excluded construct | `REFUSED: <feature>` | 1 |
 | a file will not parse | `ERROR: <detail>` | 2 |
 
-The refusal names the first excluded feature found, in a fixed priority order, so the message does
-not depend on triple ordering; a SPARQL constraint is always reported as `REFUSED: sh:sparql`. Every
-shape a shipped catalog carries passes `psp_check`; the check runs in the catalog build and in the
-conformance evaluation. A construct that a real control needs but the profile excludes is a change to
-the profile, proposed through the specification's RFC process — never a local exception in one engine.
+The permitted and excluded term lists live in one file, `psp-terms.json`, beside the checker. Every
+engine ships a byte-identical copy and refuses the same shapes the checker refuses, with the same
+feature named, so a catalog behaves the same in each engine.
+
+The refusal names one feature, chosen in a fixed order so it never depends on triple order:
+
+1. the excluded terms in `priority_deny`, in list order, matched without regard to case and named as
+   listed (`sh:CLOSED` is reported as `sh:closed`);
+2. any other SHACL term the profile does not permit, as written, the least by code point;
+3. then property paths, patterns, ranges and `agentce:targetWhere`, in that order, each reporting the
+   least feature string it finds by code point.
+
+A SPARQL constraint is always reported as `REFUSED: sh:sparql`. An IRI escape that does not decode
+(`\uZZZZ`) is a parse error, not a refusal.
+
+The engines report a refusal under three message keys: `catalog.shape.sparql_forbidden` for
+`sh:sparql`, `catalog.shape.script_forbidden` for `sh:js` and `sh:javascript`, and
+`catalog.shape.outside_profile` for every other feature, naming the shape file and the feature. A shape
+file that will not parse is `catalog.shape.parse_error`. `agentce catalog lint` reports the same keys
+as problems. All four stop an assessment with exit code 3.
+
+Every shape a shipped catalog carries passes `psp_check`; the engines apply the same check whenever
+they load a catalog, and the verification suite holds all three to it (`VG-PSP-SHAPE-PROFILE-ENFORCED`).
+A construct that a real control needs but the profile excludes is a change to the profile, proposed
+through the specification's RFC process, never as a local exception in one engine.

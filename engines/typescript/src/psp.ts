@@ -7,15 +7,17 @@
  * or alternative) and the profile's constraints. The structural evaluator compiles this AST to queries
  * over the graph store. This is a faithful port of the Python reference; it parses Turtle with N3.js
  * where the reference uses rdflib, and compacts terms to the store's CURIE representation identically.
- * `spec/rules/psp_check.py` is the authoring-time checker for the profile's full excluded-feature
- * list; this module independently refuses the two constructs that would let a shape carry logic no
- * engine can evaluate identically (`sh:sparql`, `sh:js`/`sh:javascript`, 18.34) before a shape ever
- * reaches the evaluator, since those triples would otherwise just be ignored, not rejected, below.
+ * `spec/rules/psp_check.py` is the authoring-time checker for the profile; this module reads the same
+ * term list (`psp-terms.json`) and refuses every shape that checker refuses, and every shape file that
+ * will not parse, under a stable message key before a shape ever reaches the evaluator (18.34, 18.78).
  */
 
 import { readFileSync } from "node:fs";
 import { DataFactory, Parser, Store, type Term } from "n3";
+import { pspTermsPath } from "./bundled";
 import { InputError } from "./errors";
+import { errorCause, errorFix } from "./messages";
+import { byteCompare } from "./util";
 
 const { namedNode } = DataFactory;
 
@@ -263,63 +265,176 @@ export function parseShapes(store: Store): Map<string, Shape> {
   return shapes;
 }
 
-/** SHACL predicates that embed arbitrary query or script logic, forbidden by the Portable Shape
- * Profile (spec/rules/psp.md) because they are not portable across the three engines' independent
- * structural evaluators. Checked in this fixed order (matching `spec/rules/psp_check.py`'s own
- * `PRIORITY_DENY`: sparql before its script counterpart), never store-iteration order -- so a shape
- * carrying BOTH predicates reports the same key as Python and Java regardless of triple order.
- * `js` and `javascript` share one key and therefore one message. */
-const FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER: Array<
-  [name: string, key: string, cause: string, fix: string]
-> = [
-  [
-    "sparql",
-    "catalog.shape.sparql_forbidden",
-    "a shape uses sh:sparql, a SPARQL-based SHACL construct the Portable Shape Profile forbids " +
-      "(spec/rules/psp.md).",
-    "remove the sh:sparql constraint; express it with the profile's declarative vocabulary " +
-      "instead (spec/rules/psp.md).",
-  ],
-  [
-    "js",
-    "catalog.shape.script_forbidden",
-    "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable Shape " +
-      "Profile forbids (spec/rules/psp.md).",
-    "remove the sh:js constraint; express it with the profile's declarative vocabulary instead " +
-      "(spec/rules/psp.md).",
-  ],
-  [
-    "javascript",
-    "catalog.shape.script_forbidden",
-    "a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable Shape " +
-      "Profile forbids (spec/rules/psp.md).",
-    "remove the sh:js constraint; express it with the profile's declarative vocabulary instead " +
-      "(spec/rules/psp.md).",
-  ],
-];
+/** The Portable Shape Profile's term lists (spec/rules/psp-terms.json, vendored byte-identical and held
+ * in sync by bundledData.test.ts): the same file spec/rules/psp_check.py reads, so the engine refuses
+ * exactly the shapes the authoring-time checker refuses (18.78). Left unchecked, an excluded predicate
+ * parses as ordinary Turtle and the reads above, which only ask for the predicates they name, drop it
+ * silently: the shape would be evaluated as if the construct were not there. */
+interface PspTerms {
+  allowed: string[];
+  priority_deny: string[];
+  max_path_length: number;
+  range_datatypes: string[];
+  regex_meta: string;
+}
+const TERMS = JSON.parse(readFileSync(pspTermsPath(), "utf-8")) as PspTerms;
+const ALLOWED = new Set(TERMS.allowed);
+const REGEX_META = new Set(TERMS.regex_meta);
+const RANGE_DATATYPES = new Set(TERMS.range_datatypes);
 
-function checkForbiddenPredicates(store: Store): void {
-  const used = new Set<string>();
-  for (const quad of store.getQuads(null, null, null, null)) {
-    const text = quad.predicate.value;
-    if (text.startsWith(SH)) {
-      used.add(text.slice(SH.length).toLowerCase());
-    }
-  }
-  for (const [name, key, cause, fix] of FORBIDDEN_SHAPE_PREDICATES_IN_PRIORITY_ORDER) {
-    if (used.has(name)) {
-      throw new InputError(key, cause, fix);
-    }
-  }
+/** The two features 18.34 gave their own keys; every other excluded feature is outside_profile. */
+const FEATURE_KEYS: Record<string, string> = {
+  "sh:sparql": "catalog.shape.sparql_forbidden",
+  "sh:js": "catalog.shape.script_forbidden",
+  "sh:javascript": "catalog.shape.script_forbidden",
+};
+const OUTSIDE_PROFILE = "catalog.shape.outside_profile";
+const PARSE_ERROR = "catalog.shape.parse_error";
+
+function hasQuad(store: Store, subject: Term, predicate: Term): boolean {
+  return store.getObjects(subject, predicate, null).length > 0;
 }
 
-export function parseShapesTtl(text: string): Map<string, Shape> {
+/** The excluded feature a property path uses, or null: a predicate, an inverse of a permitted path,
+ * or a sequence or alternative of at most `max_path_length` permitted paths. */
+function pathFeature(
+  store: Store,
+  node: Term,
+  seen: ReadonlySet<string> = new Set(),
+): string | null {
+  if (node.termType === "NamedNode") {
+    return null;
+  }
+  if (seen.has(node.value)) {
+    return "path (cyclic)";
+  }
+  const inner = new Set(seen).add(node.value);
+  for (const banned of ["zeroOrMorePath", "oneOrMorePath", "zeroOrOnePath"]) {
+    if (hasQuad(store, node, sh(banned))) {
+      return `sh:${banned}`;
+    }
+  }
+  const inverse = value(store, node, sh("inversePath"));
+  if (inverse !== null) {
+    return pathFeature(store, inverse, inner);
+  }
+  const alternative = value(store, node, sh("alternativePath"));
+  if (alternative !== null) {
+    if (!hasQuad(store, alternative, RDF_FIRST)) {
+      return "sh:alternativePath (not a list)";
+    }
+    return membersFeature(store, collection(store, alternative), "alternative", inner);
+  }
+  if (hasQuad(store, node, RDF_FIRST)) {
+    return membersFeature(store, collection(store, node), "sequence", inner);
+  }
+  return "path (unsupported blank node)";
+}
+
+function membersFeature(
+  store: Store,
+  members: Term[],
+  kind: string,
+  seen: ReadonlySet<string>,
+): string | null {
+  if (members.length > TERMS.max_path_length) {
+    return `path ${kind} of ${members.length} (max ${TERMS.max_path_length})`;
+  }
+  for (const member of members) {
+    const feature = pathFeature(store, member, seen);
+    if (feature !== null) {
+      return feature;
+    }
+  }
+  return null;
+}
+
+/** The path, pattern, range and targetWhere stages, in that order, each as the features it finds. */
+function structuralFeatures(store: Store): string[][] {
+  const paths = store
+    .getObjects(null, sh("path"), null)
+    .map((node) => pathFeature(store, node))
+    .filter((f): f is string => f !== null);
+  const patterns = store
+    .getObjects(null, sh("pattern"), null)
+    .filter((v) => !v.value.startsWith("^") || [...v.value.slice(1)].some((c) => REGEX_META.has(c)))
+    .map(() => "sh:pattern (non-literal regex)");
+  const ranges = ["minInclusive", "maxInclusive"].flatMap((name) =>
+    store
+      .getObjects(null, sh(name), null)
+      .filter((v) => v.termType !== "Literal" || !RANGE_DATATYPES.has(v.datatype.value))
+      .map(() => `${name} on a non-integer/dateTime bound`),
+  );
+  const targetWhere = store
+    .getObjects(null, namedNode(`${AGENTCE}targetWhere`), null)
+    .flatMap((where) => store.getObjects(where, null, null))
+    .filter((v) => v.termType === "BlankNode")
+    .map(() => "agentce:targetWhere (nested node, not a value equality)");
+  return [paths, patterns, ranges, targetWhere];
+}
+
+/** The first feature the store uses that the Portable Shape Profile excludes, or null. The order is
+ * fixed so the answer never depends on triple order, and matches Python's `profile_feature`: the
+ * priority terms in list order, matched case-insensitively and named canonically (`sh:CLOSED` is
+ * `sh:closed`); then any other SHACL-namespace predicate the profile does not allow, as written,
+ * least by code point; then the path, pattern, range and targetWhere stages, each naming the
+ * code-point-least feature it finds (spec/rules/psp.md). */
+export function profileFeature(store: Store): string | null {
+  const used = new Set<string>();
+  for (const predicate of store.getPredicates(null, null, null)) {
+    if (predicate.value.startsWith(SH)) {
+      used.add(predicate.value.slice(SH.length));
+    }
+  }
+  const sorted = [...used].sort(byteCompare);
+  const folded = new Set(sorted.map((name) => name.toLowerCase()));
+  for (const term of TERMS.priority_deny) {
+    if (folded.has(term.toLowerCase())) {
+      return `sh:${term}`;
+    }
+  }
+  for (const name of sorted) {
+    if (!ALLOWED.has(name)) {
+      return `sh:${name}`;
+    }
+  }
+  for (const found of structuralFeatures(store)) {
+    if (found.length > 0) {
+      return found.sort(byteCompare)[0] as string;
+    }
+  }
+  return null;
+}
+
+function fill(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (whole, name: string) => vars[name] ?? whole);
+}
+
+/** Parse PSP shapes from Turtle, refusing a file that will not parse or a shape outside the profile.
+ * `shown` names the shape file in the message (a catalog-relative path). */
+export function parseShapesTtl(text: string, shown = "(inline)"): Map<string, Shape> {
   const store = new Store();
-  store.addQuads(new Parser().parse(text));
-  checkForbiddenPredicates(store);
+  try {
+    store.addQuads(new Parser().parse(text));
+  } catch (err) {
+    const detail = String(err instanceof Error ? err.message : err)
+      .split(/\s+/)
+      .filter(Boolean)
+      .join(" ");
+    throw new InputError(
+      PARSE_ERROR,
+      fill(errorCause(PARSE_ERROR), { path: shown, detail: detail.slice(0, 200) }),
+      errorFix(PARSE_ERROR),
+    );
+  }
+  const feature = profileFeature(store);
+  if (feature !== null) {
+    const key = FEATURE_KEYS[feature] ?? OUTSIDE_PROFILE;
+    throw new InputError(key, fill(errorCause(key), { path: shown, feature }), errorFix(key));
+  }
   return parseShapes(store);
 }
 
-export function loadShapes(path: string): Map<string, Shape> {
-  return parseShapesTtl(readFileSync(path, "utf-8"));
+export function loadShapes(path: string, shown: string): Map<string, Shape> {
+  return parseShapesTtl(readFileSync(path, "utf-8"), shown);
 }
