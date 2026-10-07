@@ -51,6 +51,7 @@ import argparse
 import importlib.util
 import subprocess
 import sys
+from collections.abc import Collection
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -78,7 +79,7 @@ DEMO_JOB_ALLOWED_KEYS = {"runs-on", "steps", "strategy", "timeout-minutes"}
 QUICK_JOB_ALLOWED_KEYS = {"if", "needs", "runs-on", "steps", "timeout-minutes"}
 
 
-def _unknown_keys(mapping: dict[str, Any], allowed: set[str], label: str) -> list[str]:
+def _unknown_keys(mapping: Collection[Any], allowed: set[str], label: str) -> list[str]:
     extra = sorted(set(mapping) - allowed)
     if not extra:
         return []
@@ -89,7 +90,7 @@ def workflow_level_problems(doc: Any) -> list[str]:
     if not isinstance(doc, dict):
         return []
     # PyYAML reads the bare key `on` as the boolean True (YAML 1.1); other keys are compared as text.
-    keys = {"on" if key is True else str(key): None for key in doc}
+    keys = {"on" if key is True else str(key) for key in doc}
     return _unknown_keys(keys, WORKFLOW_ALLOWED_KEYS, "the workflow")
 
 
