@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.56.0",
+  "suite_version": "0.57.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1269,25 +1269,104 @@
       },
       "faults": [
         {
-          "description": "Python's shape parser stops checking for forbidden SHACL predicates",
+          "description": "Python's shape parser stops checking for excluded SHACL constructs",
           "file": "engines/python/agentce/psp.py",
-          "search": "    graph.parse(data=text, format=\"turtle\")\n    _check_forbidden_predicates(graph)\n",
-          "replace": "    graph.parse(data=text, format=\"turtle\")\n"
+          "search": "    feature = profile_feature(graph)\n",
+          "replace": "    feature = None\n"
         },
         {
-          "description": "TypeScript's shape parser stops checking for forbidden SHACL predicates",
+          "description": "TypeScript's shape parser stops checking for excluded SHACL constructs",
           "file": "engines/typescript/src/psp.ts",
-          "search": "  store.addQuads(new Parser().parse(text));\n  checkForbiddenPredicates(store);\n",
-          "replace": "  store.addQuads(new Parser().parse(text));\n"
+          "search": "  const feature = profileFeature(store);\n",
+          "replace": "  const feature: string | null = null;\n"
         },
         {
-          "description": "Java's shape parser stops checking for forbidden SHACL predicates",
+          "description": "Java's shape parser stops checking for excluded SHACL constructs",
           "file": "engines/java/src/main/java/org/agentce/Psp.java",
-          "search": "checkForbiddenPredicates(store);",
-          "replace": "// checkForbiddenPredicates(store);"
+          "search": "String feature = profileFeature(store);",
+          "replace": "String feature = null;"
         }
       ],
-      "fix_hint": "Run verification/gates/catalog_shape_safety.sh and read which engine's test failed; the forbidden-predicate check lives in psp.py/psp.ts/Psp.java's parseShapesTtl/parseShapes equivalents."
+      "fix_hint": "Run verification/gates/catalog_shape_safety.sh and read which engine's test failed; the check lives in profile_feature/profileFeature (psp.py, psp.ts, Psp.java), called from parse_shapes_ttl/parseShapesTtl."
+    },
+    {
+      "id": "VG-PSP-SHAPE-PROFILE-ENFORCED",
+      "title": "Every engine refuses a catalog shape outside the Portable Shape Profile, and a shape file that will not parse, with the same key and feature",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/psp_shape_profile.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 300,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every pinned scenario in tools/psp_profile_expected.json gives its pinned answer in Python (PYTHONHASHSEED 0 and 1), TypeScript and Java assess --catalog-dir and in Python's catalog lint: exit 0 for a shape inside the profile; exit 3 with catalog.shape.sparql_forbidden, script_forbidden or outside_profile naming the feature and the shape file for one outside it; exit 3 with catalog.shape.parse_error for Turtle that will not parse",
+        "fail": "any engine or catalog lint accepts a shape the profile excludes, names a different feature, depends on triple order or hash seed, or stops on bad Turtle with internal.unexpected"
+      },
+      "faults": [
+        {
+          "description": "Python's vendored term list drops closed from priority_deny",
+          "file": "engines/python/agentce/data/psp-terms.json",
+          "search": "    \"closed\",\n",
+          "replace": ""
+        },
+        {
+          "description": "TypeScript skips the path-length check",
+          "file": "engines/typescript/src/psp.ts",
+          "search": "if (members.length > TERMS.max_path_length) {",
+          "replace": "if (members.length > TERMS.max_path_length + 100) {"
+        },
+        {
+          "description": "Java skips the sh:pattern check",
+          "file": "engines/java/src/main/java/org/agentce/Psp.java",
+          "search": "if (nonLiteralPattern(value.value)) {",
+          "replace": "if (false && nonLiteralPattern(value.value)) {"
+        },
+        {
+          "description": "TypeScript reports the first unknown SHACL term in quad order, not the code-point-least",
+          "file": "engines/typescript/src/psp.ts",
+          "search": "const sorted = [...used].sort(byteCompare);",
+          "replace": "const sorted = [...used];"
+        },
+        {
+          "description": "Java's vendored term list drifts: minCount is no longer allowed",
+          "file": "engines/java/src/main/resources/psp-terms.json",
+          "search": "    \"minCount\",\n",
+          "replace": ""
+        },
+        {
+          "description": "Python accepts an IRI escape that does not decode",
+          "file": "engines/python/agentce/psp.py",
+          "search": "    bad = _bad_iri(graph)\n",
+          "replace": "    bad = None\n"
+        },
+        {
+          "description": "TypeScript lets a Turtle parse error escape as internal.unexpected",
+          "file": "engines/typescript/src/psp.ts",
+          "search": "    store.addQuads(new Parser().parse(text));\n  } catch (err) {\n",
+          "replace": "    store.addQuads(new Parser().parse(text));\n  } catch (err) {\n    if (err) throw err;\n"
+        },
+        {
+          "description": "Java matches the priority terms case-sensitively",
+          "file": "engines/java/src/main/java/org/agentce/Psp.java",
+          "search": "folded.add(name.toLowerCase(Locale.ROOT));",
+          "replace": "folded.add(name);"
+        },
+        {
+          "description": "TypeScript's vendored term list drops closed from priority_deny",
+          "file": "engines/typescript/data/psp-terms.json",
+          "search": "    \"closed\",\n",
+          "replace": ""
+        }
+      ],
+      "fix_hint": "Run verification/gates/psp_shape_profile.sh and read the first FAIL line: it names the scenario, the engine and what it printed. The check lives in profile_feature/profileFeature (psp.py, psp.ts, Psp.java); the term lists in each engine's vendored psp-terms.json, which must equal spec/rules/psp-terms.json."
     },
     {
       "id": "VG-I18N-ONE-CATALOGUE",

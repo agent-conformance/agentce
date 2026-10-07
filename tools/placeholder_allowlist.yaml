@@ -153,6 +153,12 @@ allow:
     class: legitimate
     justification: "A committed golden capture of a real assess run over verification/gates/fixtures/auditor_view/deviations.yaml, whose owner/approver fields use the reserved example.com domain (RFC 2606); the golden file itself sits outside a fixtures/ path so the example-domain exemption does not match it by path alone."
 
+  - path: tools/psp_profile_expected.json
+    pattern: example-domain
+    count: 4
+    class: legitimate
+    justification: "Pinned shape-profile scenarios (18.78) use the reserved example.org domain (RFC 2606) for IRIs that test escape decoding and a foreign-namespace closed term; test data for VG-PSP-SHAPE-PROFILE-ENFORCED, never an unfinished part of the gate."
+
   - path: verification/gates/ingest_support_matrix_check.py
     pattern: example-domain
     count: 3

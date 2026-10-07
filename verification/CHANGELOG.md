@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.57.0
+
+- `VG-PSP-SHAPE-PROFILE-ENFORCED` (18.78) is new. Python, TypeScript and Java now refuse every catalog shape
+  that `spec/rules/psp_check.py` refuses, not only `sh:sparql` and `sh:js`: `sh:closed`, the logical
+  combinators, unbounded paths, paths longer than three, unanchored patterns, ranges on other types,
+  nested `agentce:targetWhere` and any SHACL term the profile does not permit. The term lists live in one
+  file, `spec/rules/psp-terms.json`, which the checker reads and each engine ships a copy of. A refusal
+  is `catalog.shape.outside_profile` and names the feature and the shape file; a shape file that will
+  not parse is `catalog.shape.parse_error` in every engine (it was `internal.unexpected`, and Python
+  accepted an IRI escape like `\uZZZZ`). `tools/psp_profile_check.py` runs 56 pinned scenarios through
+  the three engines' `assess --catalog-dir` (Python under two hash seeds) and Python's `catalog lint`.
+  Nine seeded faults. Building it found Java's Turtle reader could not read a decimal such as `1.5`.
+- `VG-CATALOG-SHAPE-SAFETY` (18.34) keeps its three faults, now aimed at the shared profile check.
+
 ## 0.56.0
 
 - `VG-RECORDS-FOLDER-PARITY` (18.69) is new. TypeScript now reads a records folder with

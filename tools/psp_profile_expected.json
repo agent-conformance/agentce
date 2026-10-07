@@ -1,0 +1,234 @@
+{
+  "about": "Pinned answers for VG-PSP-SHAPE-PROFILE-ENFORCED (18.78): psp_check.py's output at c2a71bf for the first 38 rows, with the changes contract P18-18.78 names (sh:CLOSED reports sh:closed; a bad IRI escape is a parse error), plus the contract's added rows. Edit only with a reason in the commit.",
+  "count": 56,
+  "scenarios": {
+    "baseline": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "OK"
+    },
+    "sparql": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:sparql [ sh:select \"SELECT $this WHERE {}\" ] ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:sparql"
+    },
+    "js": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:js [ sh:jsFunctionName \"f\" ] ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:js"
+    },
+    "jsLibrary": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:jsLibrary [ ] ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:jsLibrary"
+    },
+    "jsFunctionName": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:jsFunctionName \"f\" ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:jsFunctionName"
+    },
+    "select": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:select \"SELECT $this WHERE {}\" ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:select"
+    },
+    "ask": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:ask \"ASK {}\" ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:ask"
+    },
+    "construct": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:construct \"CONSTRUCT {} WHERE {}\" ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:construct"
+    },
+    "prefixes": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:prefixes agentce:x ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:prefixes"
+    },
+    "closed": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:closed true ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:closed"
+    },
+    "ignoredProperties": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:ignoredProperties ( prov:used ) ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:ignoredProperties"
+    },
+    "and": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:and ( [ sh:minCount 1 ] ) ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:and"
+    },
+    "or": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:or ( [ sh:minCount 1 ] [ sh:maxCount 2 ] ) ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:or"
+    },
+    "not": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:not [ sh:minCount 1 ] ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:not"
+    },
+    "xone": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:xone ( [ sh:minCount 1 ] ) ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:xone"
+    },
+    "zeroOrMorePath": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path [ sh:zeroOrMorePath prov:used ] ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:zeroOrMorePath"
+    },
+    "oneOrMorePath": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path [ sh:oneOrMorePath prov:used ] ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:oneOrMorePath"
+    },
+    "zeroOrOnePath": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path [ sh:zeroOrOnePath prov:used ] ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:zeroOrOnePath"
+    },
+    "languageIn": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ; sh:languageIn ( \"en\" ) ] .\n",
+      "expect": "REFUSED sh:languageIn"
+    },
+    "uniqueLang": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ; sh:uniqueLang true ] .\n",
+      "expect": "REFUSED sh:uniqueLang"
+    },
+    "flags": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ; sh:pattern \"^a\" ; sh:flags \"i\" ] .\n",
+      "expect": "REFUSED sh:flags"
+    },
+    "targetSubjectsOf": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:targetSubjectsOf prov:used ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:targetSubjectsOf"
+    },
+    "targetObjectsOf": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:targetObjectsOf prov:used ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:targetObjectsOf"
+    },
+    "qualifiedMaxCount": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ; sh:qualifiedMaxCount 1 ; sh:qualifiedValueShape [ sh:minCount 1 ] ] .\n",
+      "expect": "REFUSED sh:qualifiedMaxCount"
+    },
+    "qualifiedValueShapesDisjoint": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ; sh:qualifiedValueShapesDisjoint true ] .\n",
+      "expect": "REFUSED sh:qualifiedValueShapesDisjoint"
+    },
+    "custom-sh-term": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:fooBar true ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:fooBar"
+    },
+    "sh-lowercase-closed": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:CLOSED true ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:closed"
+    },
+    "path-sequence-4": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path ( prov:used prov:used prov:used prov:used ) ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED path sequence of 4 (max 3)"
+    },
+    "path-alternative-4": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path [ sh:alternativePath ( prov:used prov:used prov:used prov:used ) ] ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED path alternative of 4 (max 3)"
+    },
+    "path-alternative-not-list": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path [ sh:alternativePath prov:used ] ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:alternativePath (not a list)"
+    },
+    "path-blank-unsupported": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path [ agentce:x prov:used ] ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED path (unsupported blank node)"
+    },
+    "path-nested-unbounded": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path ( prov:used [ sh:inversePath [ sh:zeroOrMorePath prov:used ] ] ) ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:zeroOrMorePath"
+    },
+    "pattern-unanchored": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ; sh:pattern \"abc\" ] .\n",
+      "expect": "REFUSED sh:pattern (non-literal regex)"
+    },
+    "pattern-meta": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ; sh:pattern \"^a.*\" ] .\n",
+      "expect": "REFUSED sh:pattern (non-literal regex)"
+    },
+    "range-decimal": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ; sh:minInclusive 1.5 ] .\n",
+      "expect": "REFUSED minInclusive on a non-integer/dateTime bound"
+    },
+    "range-integer-ok": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ; sh:minInclusive 1 ] .\n",
+      "expect": "OK"
+    },
+    "targetWhere-nested": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  agentce:targetWhere [ agentce:a [ agentce:b 1 ] ] ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED agentce:targetWhere (nested node, not a value equality)"
+    },
+    "iri-bad-escape": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:name <http://example.org/a\\uZZZZ> ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "PARSE"
+    },
+    "garbage-turtle": {
+      "ttl": "this is not Turtle at all {",
+      "expect": "PARSE"
+    },
+    "iri-bad-escape-U": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:name <http://example.org/a\\UZZZZZZZZ> ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "PARSE"
+    },
+    "iri-good-escape": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:name <http://example.org/\\u0041> ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "OK"
+    },
+    "aliased-prefix-closed": {
+      "ttl": "@prefix s: <http://www.w3.org/ns/shacl#> .\n@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  s:closed true ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:closed"
+    },
+    "escaped-iri-closed": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  <http://www.w3.org/ns/shacl\\u0023closed> true ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:closed"
+    },
+    "closed-in-literal": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:description \"uses sh:closed true\" ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "OK"
+    },
+    "closed-in-comment": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n# sh:closed true\n",
+      "expect": "OK"
+    },
+    "javascript-and-or": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:javascript [ ] ;\n  sh:or ( [ sh:minCount 1 ] ) ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:javascript"
+    },
+    "or-and-closed": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:or ( [ sh:minCount 1 ] ) ;\n  sh:closed true ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:closed"
+    },
+    "sh-mixedcase-closed": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:Closed true ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:closed"
+    },
+    "foreign-closed": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  <http://example.org/ns#closed> true ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "OK"
+    },
+    "two-bad-paths": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path ( prov:used prov:used prov:used prov:used ) ; sh:minCount 1 ; sh:name \"S1\" ] .\nagentce:DAT-01-Shape2 a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:property [ sh:path [ sh:alternativePath ( prov:used prov:used prov:used prov:used ) ] ; sh:minCount 1 ] .\n",
+      "expect": "REFUSED path alternative of 4 (max 3)"
+    },
+    "empty-file": {
+      "ttl": "",
+      "expect": "OK"
+    },
+    "prefixes-only": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\n",
+      "expect": "OK"
+    },
+    "second-shape-file": {
+      "shapes": {
+        "DAT-02": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-02-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:closed true ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n"
+      },
+      "expect": "REFUSED sh:closed"
+    },
+    "probe-shape-closed": {
+      "surface": "probe",
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:closed true ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:closed"
+    },
+    "lint-two-catalogs": {
+      "surface": "lint-two-catalogs",
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:closed true ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:closed"
+    },
+    "two-unknown-terms": {
+      "ttl": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-01-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:zzzTerm true ;\n  sh:aaaTerm true ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n",
+      "expect": "REFUSED sh:aaaTerm"
+    }
+  }
+}
