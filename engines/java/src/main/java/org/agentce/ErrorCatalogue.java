@@ -30,7 +30,7 @@ public final class ErrorCatalogue {
      * run time ({@code "input." + key + "_missing"}) do not end in a comma after the literal and are not
      * matched, as in Python. */
     private static final Pattern RAISED =
-            Pattern.compile("(?:new\\s+(?:InputError|AgentceError)|InputError\\.unreadable)\\(\\s*\"([^\"]+)\"\\s*,");
+            Pattern.compile("(?:new\\s+(?:InputError|AgentceError)|InputError\\.unreadable|refusal)\\(\\s*\"([^\"]+)\"\\s*[,)]");
 
     private static volatile Map<String, Entry> cached;
 

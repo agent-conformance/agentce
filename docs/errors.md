@@ -102,9 +102,31 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `sign.no_claim` | the report directory has no claim.json to sign. | produce the report first: `agentce assess … --out <report-dir>`. |
 | `sign.not_ready` | the report is not ready to sign. | resolve the blocking reasons (agentce readiness <report-dir>) before signing. |
 | `sign.trust_root_requires_kms` | --write-trust-root needs an exportable public key; the sigstore-public profile has none. | pass --profile kms --key <ed25519-private-key.pem> --write-trust-root. |
+| `verify.catalog_digest_mismatch` | the signature covers a different catalog digest than the directory content | a catalog file changed after signing; restore the published files, or re-sign the catalog with `agentce catalog sign`. |
+| `verify.catalog_signature_unreadable` | catalog.sig.json is not readable JSON | replace catalog.sig.json with the one the catalog's publisher signed, or re-sign the catalog with `agentce catalog sign`. |
+| `verify.catalog_unsigned` | unsigned: catalog.sig.json is absent, so there is no signature to verify (SPEC §8.7). | sign the catalog with `agentce catalog sign`, or ask its publisher for the catalog.sig.json that goes with it. |
 | `verify.certificate_algorithm` | the keyless certificate names a signing algorithm other than ed25519, the only one AgentCE verifies. | ask the signer to re-sign with a keyless certificate whose algorithm is ed25519. |
+| `verify.certificate_issuer_unknown` | unknown certificate issuer {issuer} | add the issuing certificate authority to your trust root if you trust it, or ask the signer to re-sign with one you already trust. |
+| `verify.certificate_signature_invalid` | certificate signature does not verify | ask the signer for a keyless certificate issued by an authority in your trust root, or re-sign with a key the trust root holds. |
 | `verify.certificate_validity_inverted` | the keyless certificate's not_before is later than its not_after, so its validity window is empty. | ask the signer to re-sign with a certificate whose not_before is no later than its not_after. |
 | `verify.certificate_validity_malformed` | the keyless certificate's not_before or not_after is missing or is not an RFC 3339 UTC timestamp such as 2026-01-01T00:00:00Z. | ask the signer to re-sign with a certificate whose not_before and not_after are RFC 3339 UTC timestamps ending in Z. |
+| `verify.envelope_malformed` | malformed DSSE envelope | re-sign the file; a DSSE envelope needs a string payloadType, a base64 payload and a signatures array. |
+| `verify.envelope_no_signatures` | DSSE envelope carries no signatures | re-sign the file; its envelope has an empty signatures array. |
+| `verify.json_too_deep` | {what} nests containers more than {limit} levels deep | replace the file with the one that was signed; no file AgentCE writes nests that deep. |
+| `verify.keyid_untrusted` | no trusted key for keyid {keyid} | add the signer's public key to your trust root if you trust it, or pass --trust-root with a file that holds it. |
+| `verify.no_signature_verified` | no signature verified against the trust root: {inner} | fix the cause after the colon; it is the reason the last signature in the envelope was refused. |
+| `verify.release_artifact_digest` | digest mismatch for {name} | the named file changed after the release was signed; restore the published file. |
+| `verify.release_artifact_missing` | missing artifact {name} | put the named file back in the release directory, as published. |
+| `verify.release_artifact_unnamed` | release manifest has an artifact entry with no name | restore release-manifest.json from the published release; every artifact entry needs a name. |
+| `verify.release_envelope_missing` | a signature entry has no envelope | restore signatures.json from the published release; each entry needs an envelope field. |
+| `verify.release_envelope_unreadable` | release envelope is not readable JSON | pass the DSSE envelope the release tooling wrote, or the release bundle's --out directory. |
+| `verify.release_manifest_not_covered` | signature does not cover the release manifest | the manifest changed after signing, or the signature belongs to another release; restore the published release-manifest.json. |
+| `verify.release_manifest_uncanonical` | release manifest cannot be canonicalized | restore release-manifest.json from the published release; it holds a value with no canonical form, such as a non-integer number. |
+| `verify.release_manifest_unreadable` | release manifest is not readable JSON | restore release-manifest.json from the published release; it must be a JSON object. |
+| `verify.release_no_signatures` | release bundle carries no signatures | sign the release with the release tooling; signatures.json is empty. |
+| `verify.release_signature` | signature ({profile}): {inner} | fix the cause after the colon for the named signing profile. |
+| `verify.release_signature_not_object` | signature entry is not an object | restore signatures.json from the published release; each entry must be an object with a profile and an envelope. |
+| `verify.release_signatures_unreadable` | release signatures are not readable JSON | restore signatures.json from the published release; it must be a JSON array of signature entries. |
 | `verify.report_claim_malformed` | claim.json exists but is not valid JSON. | regenerate the report; claim.json must be well-formed JSON. |
 | `verify.report_claim_tampered` | claim.json does not match the digest the signature covers. | the claim was altered after signing; regenerate and re-sign the report. |
 | `verify.report_engine_mismatch` | the report was produced by a different engine build (version, spec version, or package digest) than the one re-running it. | install the same engine build the report names, then re-run verify. |
@@ -112,13 +134,21 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `verify.report_keyid_mismatch` | no claimant signature carries the keyid --expect-keyid named. | confirm the keyid with the sender, or drop --expect-keyid. |
 | `verify.report_manifest_tampered` | manifest.json does not match the digest the signature covers. | the manifest was altered after signing; regenerate and re-sign the report. |
 | `verify.report_no_claim` | the report directory has no claim.json: it was never signed, or the wrong directory was given. | pass the directory `agentce assess` wrote and `agentce sign` signed. |
+| `verify.report_no_claimant_entry` | claim.json has no signature entry whose role is 'claimant' | re-sign the report with `agentce sign --as claimant`. |
 | `verify.report_no_trust_root` | the report has no embedded trust-root.json, and --signer-trust-root was not given. | pass --signer-trust-root <file>, or ask the sender to re-sign with `sign --write-trust-root`. |
 | `verify.report_output_tampered` | a manifest-tracked output file is missing, or its bytes no longer match the manifest. | the report was altered after signing; regenerate and re-sign it. |
 | `verify.report_reproduction_mismatch` | an offline re-run from the packaged evidence does not reproduce a canonical output byte for byte. | run `agentce diff` between the shipped and re-run outputs for the full picture. |
+| `verify.report_role_not_claimant` | the verified predicate's own role is not 'claimant' | re-sign the report with `agentce sign --as claimant`. |
 | `verify.report_signature_invalid` | no claimant signature verifies against the trust root. | confirm the trust root holds the signer's real key, or re-sign the report. |
+| `verify.report_statement_shape` | the payload is not a statement shaped like the one `agentce sign` writes | re-sign the report with `agentce sign`. |
 | `verify.report_subject_missing` | the signed statement is missing a required subject (manifest.json or claim.json). | re-sign the report: `agentce sign <report-dir> --as claimant`. |
 | `verify.report_unreadable` | the report directory, or a file or folder inside it, could not be read (permissions). | make every file and folder in the report directory readable, then re-run. |
 | `verify.report_unsigned` | claim.json carries no signatures. | sign the report first: `agentce sign <report-dir> --as claimant`. |
+| `verify.signature_invalid` | signature does not verify | the signed content changed after signing or the key does not match; re-sign it, or check you have the right trust root. |
+| `verify.signature_not_base64` | 'sig' is not valid base64 | re-sign the file; the signature entry's sig field must be standard base64. |
+| `verify.signature_sig_missing` | a signature entry has no sig field | re-sign the file; every entry in the envelope's signatures array needs a base64 sig string. |
+| `verify.statement_no_digest` | the signed statement carries no subject digest | re-sign with `agentce sign` or the release tooling; the statement needs subject[0].digest.sha256. |
+| `verify.statement_unreadable` | the signed statement is not readable JSON | re-sign with `agentce sign` or the release tooling; the signed payload must be a JSON in-toto statement. |
 
 ## Warnings
 

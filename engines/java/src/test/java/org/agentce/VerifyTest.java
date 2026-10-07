@@ -208,7 +208,7 @@ class VerifyTest {
         envelope.put("payload", "e30=");
         envelope.putArray("signatures").addObject().put("keyid", fixture.keyid());
         assertEquals(
-                "no signature verified against the trust root: 'sig'",
+                "no signature verified against the trust root: a signature entry has no sig field",
                 assertThrows(IllegalArgumentException.class, () -> Verify.verifyEnvelope(envelope, fixture.trust()))
                         .getMessage());
     }
@@ -710,7 +710,7 @@ class VerifyTest {
         Files.writeString(dir.resolve("signatures.json"), Json.pretty(sigs));
         ObjectNode result = Verify.verifyRelease(dir, fixture.trust());
         assertFalse(result.get("verified").asBoolean());
-        assertEquals("signature (kms): 'envelope'", result.get("reason").asText());
+        assertEquals("signature (kms): a signature entry has no envelope", result.get("reason").asText());
     }
 
     @Test
@@ -832,7 +832,7 @@ class VerifyTest {
         Files.writeString(dir.resolve("signatures.json"), "[]");
         ObjectNode result = Verify.verifyRelease(dir, fixture.trust());
         assertFalse(result.get("verified").asBoolean());
-        assertEquals("release manifest is not readable JSON", result.get("reason").asText());
+        assertEquals("release manifest nests containers more than 1000 levels deep", result.get("reason").asText());
     }
 
     @Test

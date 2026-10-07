@@ -161,7 +161,7 @@ test("verifyEnvelope refuses a signature entry missing 'sig'", () => {
   };
   assert.throws(
     () => verifyEnvelope(envelope, fixture.trust),
-    /no signature verified against the trust root: 'sig'/,
+    /no signature verified against the trust root: a signature entry has no sig field/,
   );
 });
 
@@ -639,7 +639,7 @@ test("verifyRelease flags a signature entry missing its 'envelope' key with pySt
   try {
     const result = verifyRelease(dir, fixture.trust) as { verified: boolean; reason?: string };
     assert.equal(result.verified, false);
-    assert.equal(result.reason, "signature (kms): 'envelope'");
+    assert.equal(result.reason, "signature (kms): a signature entry has no envelope");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -792,7 +792,7 @@ test("verifyRelease refuses a manifest nested past MAX_JSON_DEPTH as unreadable,
   try {
     const result = verifyRelease(dir, fixture.trust) as { verified: boolean; reason?: string };
     assert.equal(result.verified, false);
-    assert.equal(result.reason, "release manifest is not readable JSON");
+    assert.equal(result.reason, "release manifest nests containers more than 1000 levels deep");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

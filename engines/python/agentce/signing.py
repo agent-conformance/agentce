@@ -48,6 +48,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 
 from .canonical import canonicalize
 from .error_catalogue import MESSAGE_KEYS
+from .i18n_format import format_message
 
 #: DSSE payload type for an in-toto Statement (in-toto attestation framework).
 INTOTO_PAYLOAD_TYPE = "application/vnd.in-toto+json"
@@ -87,16 +88,76 @@ class SigningError(Exception):
 
 
 class VerificationError(Exception):
-    """A signature, certificate, or bound digest failed verification (exit code 3)."""
+    """A signature, certificate, or bound digest failed verification (exit code 3).
+
+    ``keys`` names the catalogue entries its text was built from, in reading order: one key for a
+    leaf refusal, a wrapper's own key followed by its inner refusal's keys. ``verify --json`` lists
+    them as ``reason_keys`` so a script can match on the key, not the sentence."""
+
+    def __init__(self, text: str, keys: tuple[str, ...] = ()) -> None:
+        super().__init__(text)
+        self.keys = keys
+
+    @classmethod
+    def refusal(
+        cls, key: str, inner: Exception | None = None, **params: object
+    ) -> "VerificationError":
+        """The refusal for catalogue ``key``: its cause with ``{params}`` filled in. A wrapper
+        passes the refusal it wraps as ``inner``, which fills ``{inner}`` and adds its keys."""
+        keys = (key,)
+        if inner is not None:
+            params["inner"] = inner
+            keys += getattr(inner, "keys", ())
+        return cls(format_message(MESSAGE_KEYS[key].cause, **params), keys)
 
 
 class UnsignedError(VerificationError):
     """The directory carries no detached signature at all, so there is nothing to verify."""
 
 
-#: The deepest container nesting `parse_untrusted_json` accepts: Jackson's own default limit, which
-#: the Java engine enforces natively, so all three engines refuse at the same depth.
+#: The deepest container nesting `parse_untrusted_json` accepts (Jackson's own default limit); all
+#: three engines enforce it with the same byte pre-scan, so they refuse at the same depth.
 MAX_JSON_DEPTH = 1000
+
+
+class JsonTooDeep(ValueError):
+    """A document nests containers past :data:`MAX_JSON_DEPTH`. Its text stays "not readable JSON"
+    for callers that do not tell depth apart; verify's own readers key it as ``verify.json_too_deep``."""
+
+    def __init__(self) -> None:
+        super().__init__("not readable JSON")
+
+
+_STRUCTURE = re.compile(rb'["\\\[\]{}]')
+
+
+def _too_deep(raw: bytes) -> bool:
+    """Whether ``raw`` opens more than :data:`MAX_JSON_DEPTH` containers at once, counting ``[``
+    and ``{`` up and ``]`` and ``}`` down outside strings (a backslash in a string skips the next
+    byte). Run before parsing, so depth is found first whatever else is wrong with the bytes."""
+    depth = 0
+    in_string = False
+    escaped_until = -1
+    for match in _STRUCTURE.finditer(raw):
+        i = match.start()
+        if i < escaped_until:
+            continue
+        byte = raw[i]
+        if in_string:
+            if byte == 0x5C:
+                escaped_until = i + 2
+            elif byte == 0x22:
+                in_string = False
+        elif byte == 0x22:
+            in_string = True
+        elif byte in (0x5B, 0x7B):
+            depth += 1
+            if depth > MAX_JSON_DEPTH:
+                return True
+        elif byte in (0x5D, 0x7D):
+            depth -= 1
+    return False
+
 
 _SURROGATE = re.compile("[\ud800-\udfff]")
 _PLAIN_ASCII = re.compile(r"[ !#-&(-\[\]-~]*")
@@ -113,25 +174,39 @@ def parse_untrusted_json(raw: bytes) -> Any:
     UTF-8 with no byte-order mark, standard JSON only (no ``NaN``/``Infinity``, no trailing data),
     containers nested at most :data:`MAX_JSON_DEPTH` deep, and every string and key well-formed
     Unicode (an escaped lone surrogate such as ``"\\ud800"`` is refused). Callers turn the
-    ``ValueError`` into their own fixed reason text; its message is never shown."""
+    ``ValueError`` into their own fixed reason text; its message is never shown. A document too
+    deep raises the :class:`JsonTooDeep` subclass, whatever else is wrong with it."""
+    if _too_deep(raw):
+        raise JsonTooDeep()
     try:
         value = json.loads(raw.decode("utf-8"), parse_constant=_refuse_constant)
     except (ValueError, RecursionError) as exc:
         raise ValueError("not readable JSON") from exc
-    stack: list[tuple[Any, int]] = [(value, 1)]
+    stack: list[Any] = [value]
     while stack:
-        node, depth = stack.pop()
+        node = stack.pop()
         if isinstance(node, str):
             if _SURROGATE.search(node):
                 raise ValueError("not readable JSON")
-        elif isinstance(node, (list, dict)):
-            if depth > MAX_JSON_DEPTH:
-                raise ValueError("not readable JSON")
-            children = (
-                list(node.values()) + list(node) if isinstance(node, dict) else node
-            )
-            stack.extend((child, depth + 1) for child in children)
+        elif isinstance(node, dict):
+            stack.extend(node.values())
+            stack.extend(node)
+        elif isinstance(node, list):
+            stack.extend(node)
     return value
+
+
+def parse_verify_input(raw: bytes, unreadable_key: str, what: str) -> Any:
+    """:func:`parse_untrusted_json` for one input verify reads, refused with that input's own key:
+    ``verify.json_too_deep`` naming ``what`` past the depth limit, else ``unreadable_key``."""
+    try:
+        return parse_untrusted_json(raw)
+    except JsonTooDeep as exc:
+        raise VerificationError.refusal(
+            "verify.json_too_deep", what=what, limit=MAX_JSON_DEPTH
+        ) from exc
+    except ValueError as exc:
+        raise VerificationError.refusal(unreadable_key) from exc
 
 
 def describe_untrusted(value: Any) -> str:
@@ -272,15 +347,15 @@ def verify_certificate(
 
     Every way a certificate can be malformed -- not an object, a missing/non-base64 ``signature``, a
     signature that does not verify, a missing ``public_key``/``identity`` -- collapses to the one
-    ``"certificate signature does not verify"`` message (SPEC's keyless model treats a malformed
+    ``verify.certificate_signature_invalid`` refusal (SPEC's keyless model treats a malformed
     certificate the same as one that fails to verify; TS/Java mirror this exact collapse)."""
     if not isinstance(cert, dict):
-        raise VerificationError("certificate signature does not verify")
+        raise VerificationError.refusal("verify.certificate_signature_invalid")
     issuer = cert.get("issuer")
     ca = authorities.get(issuer) if isinstance(issuer, str) else None
     if ca is None:
-        raise VerificationError(
-            f"unknown certificate issuer {describe_untrusted(issuer)}"
+        raise VerificationError.refusal(
+            "verify.certificate_issuer_unknown", issuer=describe_untrusted(issuer)
         )
     body = {k: v for k, v in cert.items() if k != "signature"}
     try:
@@ -297,7 +372,7 @@ def verify_certificate(
         AttributeError,
         RecursionError,
     ) as exc:
-        raise VerificationError("certificate signature does not verify") from exc
+        raise VerificationError.refusal("verify.certificate_signature_invalid") from exc
     _check_certificate_fields(cert)
     return leaf_key, identity
 
@@ -312,7 +387,9 @@ _DAYS_IN_MONTH = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 def _certificate_refusal(key: str) -> VerificationError:
     """``<key>: <cause>`` with the catalogue's cause text, minus its final period (the aggregate
     reasons that wrap it add their own)."""
-    return VerificationError(f"{key}: {MESSAGE_KEYS[key].cause.removesuffix('.')}")
+    return VerificationError(
+        f"{key}: {MESSAGE_KEYS[key].cause.removesuffix('.')}", (key,)
+    )
 
 
 def _utc_order_key(value: Any) -> str | None:
@@ -478,8 +555,8 @@ class TrustRoot:
             return verify_certificate(cert, self.authorities)
         keyid = signature.get("keyid")
         if not isinstance(keyid, str) or keyid not in self.keys:
-            raise VerificationError(
-                f"no trusted key for keyid {describe_untrusted(keyid)}"
+            raise VerificationError.refusal(
+                "verify.keyid_untrusted", keyid=describe_untrusted(keyid)
             )
         return self.keys[keyid], self.key_identities.get(keyid, keyid)
 
@@ -518,47 +595,45 @@ def verify_envelope(envelope: Any, trust: TrustRoot) -> Verified:
     with the one message below, never surface as an unhandled crash (TS/Java port this exact sequence,
     since neither language throws on an ordinary out-of-shape property read the way Python does)."""
     if not isinstance(envelope, dict):
-        raise VerificationError("malformed DSSE envelope")
+        raise VerificationError.refusal("verify.envelope_malformed")
     payload_type = envelope.get("payloadType")
     if not isinstance(payload_type, str):
-        raise VerificationError("malformed DSSE envelope")
+        raise VerificationError.refusal("verify.envelope_malformed")
     raw_payload = envelope.get("payload")
     if not isinstance(raw_payload, str):
-        raise VerificationError("malformed DSSE envelope")
+        raise VerificationError.refusal("verify.envelope_malformed")
     try:
         payload = _b64d(raw_payload)
     except ValueError as exc:
-        raise VerificationError("malformed DSSE envelope") from exc
+        raise VerificationError.refusal("verify.envelope_malformed") from exc
     signatures = envelope.get("signatures")
     if not isinstance(signatures, list):
-        raise VerificationError("malformed DSSE envelope")
+        raise VerificationError.refusal("verify.envelope_malformed")
     if not signatures:
-        raise VerificationError("DSSE envelope carries no signatures")
+        raise VerificationError.refusal("verify.envelope_no_signatures")
     pae = _pae(payload_type, payload)
     last_error: Exception | None = None
     for signature in signatures:
         try:
             if not isinstance(signature, dict):
                 # A non-object entry has no keyid to resolve; route it through the same
-                # missing-keyid message `TrustRoot.resolve` gives for an absent `keyid` field, so the
-                # text is one the per-entry loop already defines, not a second ad-hoc string.
-                raise VerificationError("no trusted key for keyid None")
+                # missing-keyid refusal `TrustRoot.resolve` gives for an absent `keyid` field.
+                raise VerificationError.refusal(
+                    "verify.keyid_untrusted", keyid=describe_untrusted(None)
+                )
             public_key, identity = trust.resolve(signature)
             sig = signature.get("sig")
             if not isinstance(sig, str):
-                # `signature["sig"]` would raise a bare ``KeyError`` today for a missing key; keep
-                # that same repr text as an explicit, pinned message (TS/Java have no native
-                # equivalent to mirror otherwise).
-                raise VerificationError("'sig'")
+                raise VerificationError.refusal("verify.signature_sig_missing")
             try:
                 sig_bytes = _b64d(sig)
             except ValueError as exc:
-                raise VerificationError(SIG_NOT_BASE64) from exc
+                raise VerificationError.refusal("verify.signature_not_base64") from exc
             try:
                 public_key.verify(sig_bytes, pae)
             except InvalidSignature as exc:
                 # InvalidSignature has no text of its own; give the reason a sentence (18.68).
-                raise VerificationError(SIGNATURE_INVALID) from exc
+                raise VerificationError.refusal("verify.signature_invalid") from exc
             keyid = signature.get("keyid")
             return Verified(
                 payload=payload,
@@ -569,31 +644,22 @@ def verify_envelope(envelope: Any, trust: TrustRoot) -> Verified:
             )
         except (VerificationError, ValueError) as exc:
             last_error = exc
-    raise VerificationError(
-        f"no signature verified against the trust root: {last_error}"
-    )
-
-
-SIG_NOT_BASE64 = "'sig' is not valid base64"
-SIGNATURE_INVALID = "signature does not verify"
-STATEMENT_UNREADABLE = "the signed statement is not readable JSON"
-STATEMENT_NO_DIGEST = "the signed statement carries no subject digest"
+    raise VerificationError.refusal("verify.no_signature_verified", inner=last_error)
 
 
 def statement_subject_digest(payload: bytes) -> str:
     """Return the ``sha256:`` digest of the first subject of the in-toto Statement in ``payload``
     (a verified envelope's payload bytes), or raise :class:`VerificationError` with one of two fixed
     texts: the payload is not readable JSON, or it has no ``subject[0].digest.sha256`` string."""
-    try:
-        statement = parse_untrusted_json(payload)
-    except ValueError as exc:
-        raise VerificationError(STATEMENT_UNREADABLE) from exc
+    statement = parse_verify_input(
+        payload, "verify.statement_unreadable", "the signed statement"
+    )
     subject = statement.get("subject") if isinstance(statement, dict) else None
     first = subject[0] if isinstance(subject, list) and subject else None
     digest = first.get("digest") if isinstance(first, dict) else None
     sha256 = digest.get("sha256") if isinstance(digest, dict) else None
     if not isinstance(sha256, str):
-        raise VerificationError(STATEMENT_NO_DIGEST)
+        raise VerificationError.refusal("verify.statement_no_digest")
     return "sha256:" + sha256
 
 
@@ -608,25 +674,21 @@ def verify_catalog_directory(directory: Path, trust: TrustRoot) -> Verified:
     """
     sig_path = directory / CATALOG_SIGNATURE_NAME
     if not sig_path.is_file():
-        raise UnsignedError(
-            f"unsigned: {CATALOG_SIGNATURE_NAME} is absent, so there is no signature to verify "
-            "(SPEC §8.7)."
-        )
+        raise UnsignedError.refusal("verify.catalog_unsigned")
     try:
-        envelope = parse_untrusted_json(sig_path.read_bytes())
+        raw = sig_path.read_bytes()
     except PermissionError:
         raise  # an unreadable signature is the caller's input.catalog_unreadable, not a bad one
-    except (OSError, ValueError) as exc:
-        raise VerificationError(
-            f"{CATALOG_SIGNATURE_NAME} is not readable JSON"
-        ) from exc
+    except OSError as exc:
+        raise VerificationError.refusal("verify.catalog_signature_unreadable") from exc
+    envelope = parse_verify_input(
+        raw, "verify.catalog_signature_unreadable", CATALOG_SIGNATURE_NAME
+    )
     verified = verify_envelope(envelope, trust)
     signed_digest = statement_subject_digest(verified.payload)
     recomputed = digest_tree(directory, exclude=frozenset({CATALOG_SIGNATURE_NAME}))
     if signed_digest != recomputed:
-        raise VerificationError(
-            "the signature covers a different catalog digest than the directory content"
-        )
+        raise VerificationError.refusal("verify.catalog_digest_mismatch")
     return verified
 
 

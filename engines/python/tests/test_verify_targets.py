@@ -342,8 +342,8 @@ def test_verify_release_bundle_artifact_name_unsafe_is_missing(
 def test_verify_release_bundle_manifest_deeply_nested_refused(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A manifest nested past `MAX_JSON_DEPTH` is refused as unreadable, the same depth Java's Jackson
-    refuses natively, never a crash -- verifier round-2 (adjacent probes). Built as raw text (not
+    """A manifest nested past `MAX_JSON_DEPTH` is refused as verify.json_too_deep (18.64), at the same
+    depth in all three engines, never a crash -- verifier round-2 (adjacent probes). Built as raw text (not
     `json.dumps` on a Python object), since building the fixture that way would itself recurse."""
     nested_text = '{"artifacts": [], "nested": ' + "[" * 5000 + "]" * 5000 + "}"
     (tmp_path / "release-manifest.json").write_text(nested_text, encoding="utf-8")
@@ -352,14 +352,17 @@ def test_verify_release_bundle_manifest_deeply_nested_refused(
     assert code == 3
     assert env["verified"] is False
     assert "error" not in env
-    assert env["reason"] == "release manifest is not readable JSON"
+    assert (
+        env["reason"] == "release manifest nests containers more than 1000 levels deep"
+    )
+    assert env["reason_keys"] == ["verify.json_too_deep"]
 
 
 @pytest.mark.parametrize(
     ("depth", "reason"),
     [
         (1000, "signature (None): signature entry is not an object"),
-        (1001, "release signatures are not readable JSON"),
+        (1001, "release signatures nests containers more than 1000 levels deep"),
     ],
 )
 def test_verify_release_signatures_depth_boundary(
@@ -416,18 +419,20 @@ def test_describe_untrusted(value: object, text: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("payload", "reason"),
+    ("payload", "key"),
     [
-        (b"{", signing.STATEMENT_UNREADABLE),
-        (b'{"subject": NaN}', signing.STATEMENT_UNREADABLE),
-        (b"[]", signing.STATEMENT_NO_DIGEST),
-        (b'{"subject": {}}', signing.STATEMENT_NO_DIGEST),
-        (b'{"subject": [{"digest": {"sha256": 7}}]}', signing.STATEMENT_NO_DIGEST),
+        (b"{", "verify.statement_unreadable"),
+        (b'{"subject": NaN}', "verify.statement_unreadable"),
+        (b"[" * 1001, "verify.json_too_deep"),
+        (b"[]", "verify.statement_no_digest"),
+        (b'{"subject": {}}', "verify.statement_no_digest"),
+        (b'{"subject": [{"digest": {"sha256": 7}}]}', "verify.statement_no_digest"),
     ],
 )
-def test_statement_subject_digest_fixed_texts(payload: bytes, reason: str) -> None:
-    with pytest.raises(signing.VerificationError, match=f"^{reason}$"):
+def test_statement_subject_digest_keyed_texts(payload: bytes, key: str) -> None:
+    with pytest.raises(signing.VerificationError) as caught:
         signing.statement_subject_digest(payload)
+    assert caught.value.keys == (key,)
 
 
 def test_verify_release_single_file_deeply_nested_envelope_refused(
@@ -443,7 +448,9 @@ def test_verify_release_single_file_deeply_nested_envelope_refused(
     assert code == 3
     assert env["verified"] is False
     assert "error" not in env
-    assert env["reason"] == "release envelope is not readable JSON"
+    assert (
+        env["reason"] == "release envelope nests containers more than 1000 levels deep"
+    )
 
 
 def test_verify_catalog_unreadable_file_is_refused(

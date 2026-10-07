@@ -45,9 +45,53 @@ public final class Verify {
     /** The detached signature a signed catalog (or corpus) directory carries (SPEC §8.7). */
     public static final String CATALOG_SIGNATURE_NAME = "catalog.sig.json";
 
-    /** The exact unsigned sentence {@code verify_catalog_directory} raises when no signature is present. */
-    private static final String UNSIGNED_SENTENCE =
-            "unsigned: catalog.sig.json is absent, so there is no signature to verify (SPEC §8.7).";
+    /** A verify refusal: its text, and the catalogue keys the text was built from in reading order (one
+     * key for a leaf refusal, a wrapper's own key followed by its inner refusal's keys). {@code verify
+     * --json} lists them as {@code reason_keys}. Mirrors {@code signing.VerificationError}. */
+    static final class VerifyRefusal extends IllegalArgumentException {
+        private static final long serialVersionUID = 1L;
+        private final transient List<String> keys;
+
+        VerifyRefusal(String text, List<String> keys) {
+            super(text);
+            this.keys = List.copyOf(keys);
+        }
+
+        List<String> keys() {
+            return keys;
+        }
+    }
+
+    private static final Pattern PARAM = Pattern.compile("\\{(\\w+)\\}");
+
+    /** The refusal for catalogue {@code key}: its cause with {@code {params}} filled in (name, value
+     * pairs). Mirrors {@code VerificationError.refusal}. */
+    static VerifyRefusal refusal(String key, String... params) {
+        return refusal(key, null, params);
+    }
+
+    /** A wrapper refusal: {@code inner} fills {@code {inner}} and adds its keys. */
+    static VerifyRefusal refusal(String key, RuntimeException inner, String... params) {
+        Map<String, String> vars = new LinkedHashMap<>();
+        for (int i = 0; i + 1 < params.length; i += 2) {
+            vars.put(params[i], params[i + 1]);
+        }
+        List<String> keys = new ArrayList<>(List.of(key));
+        if (inner != null) {
+            vars.put("inner", inner.getMessage() != null ? inner.getMessage() : "");
+            if (inner instanceof VerifyRefusal r) {
+                keys.addAll(r.keys());
+            }
+        }
+        Matcher m = PARAM.matcher(ErrorCatalogue.errorCause(key));
+        StringBuilder text = new StringBuilder();
+        while (m.find()) {
+            String value = vars.get(m.group(1));
+            m.appendReplacement(text, Matcher.quoteReplacement(value != null ? value : m.group()));
+        }
+        m.appendTail(text);
+        return new VerifyRefusal(text.toString(), keys);
+    }
 
     /** The fixed 12-byte RFC 8410 SPKI DER prefix every Ed25519 SPKI public key export carries before
      * its 32 raw key bytes -- the same constant {@code Sign.java} slices off; here it is prepended to
@@ -130,13 +174,13 @@ public final class Verify {
      * verify"} message, mirroring {@code verify_certificate}'s own collapse exactly. */
     private static KeyEntry verifyCertificate(JsonNode cert, Map<String, AuthorityEntry> authorities) {
         if (cert == null || !cert.isObject()) {
-            throw new IllegalArgumentException("certificate signature does not verify");
+            throw refusal("verify.certificate_signature_invalid");
         }
         JsonNode issuerNode = cert.get("issuer");
         String issuer = textOrNull(issuerNode);
         AuthorityEntry ca = issuer != null ? authorities.get(issuer) : null;
         if (ca == null) {
-            throw new IllegalArgumentException("unknown certificate issuer " + describeUntrusted(issuerNode));
+            throw refusal("verify.certificate_issuer_unknown", "issuer", describeUntrusted(issuerNode));
         }
         KeyEntry leaf;
         try {
@@ -162,7 +206,7 @@ public final class Verify {
             }
             leaf = new KeyEntry(leafRaw, identity);
         } catch (RuntimeException e) {
-            throw new IllegalArgumentException("certificate signature does not verify");
+            throw refusal("verify.certificate_signature_invalid");
         }
         checkCertificateFields(cert);
         return leaf;
@@ -176,12 +220,12 @@ public final class Verify {
 
     /** {@code <key>: <cause>} with the catalogue's cause text, minus its final period (the aggregate
      * reasons that wrap it add their own); mirrors {@code signing._certificate_refusal}. */
-    private static IllegalArgumentException certificateRefusal(String key) {
+    private static VerifyRefusal certificateRefusal(String key) {
         String cause = ErrorCatalogue.errorCause(key);
         if (cause.endsWith(".")) {
             cause = cause.substring(0, cause.length() - 1);
         }
-        return new IllegalArgumentException(key + ": " + cause);
+        return new VerifyRefusal(key + ": " + cause, List.of(key));
     }
 
     /** A text form of an RFC 3339 UTC timestamp that sorts in time order, or {@code null} if {@code value}
@@ -288,7 +332,7 @@ public final class Verify {
             String keyid = textOrNull(keyidNode);
             KeyEntry found = keyid != null ? keys.get(keyid) : null;
             if (found == null) {
-                throw new IllegalArgumentException("no trusted key for keyid " + describeUntrusted(keyidNode));
+                throw refusal("verify.keyid_untrusted", "keyid", describeUntrusted(keyidNode));
             }
             return found;
         }
@@ -381,55 +425,53 @@ public final class Verify {
      * signing.py:365-417}). */
     public static VerifiedEnvelope verifyEnvelope(JsonNode envelope, TrustRoot trust) {
         if (envelope == null || !envelope.isObject()) {
-            throw new IllegalArgumentException("malformed DSSE envelope");
+            throw refusal("verify.envelope_malformed");
         }
         JsonNode payloadTypeNode = envelope.get("payloadType");
         if (payloadTypeNode == null || !payloadTypeNode.isTextual()) {
-            throw new IllegalArgumentException("malformed DSSE envelope");
+            throw refusal("verify.envelope_malformed");
         }
         JsonNode rawPayloadNode = envelope.get("payload");
         if (rawPayloadNode == null || !rawPayloadNode.isTextual()) {
-            throw new IllegalArgumentException("malformed DSSE envelope");
+            throw refusal("verify.envelope_malformed");
         }
         byte[] payload;
         try {
             payload = b64dStrict(rawPayloadNode.textValue());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("malformed DSSE envelope");
+            throw refusal("verify.envelope_malformed");
         }
         JsonNode signatures = envelope.get("signatures");
         if (signatures == null || !signatures.isArray()) {
-            throw new IllegalArgumentException("malformed DSSE envelope");
+            throw refusal("verify.envelope_malformed");
         }
         if (signatures.isEmpty()) {
-            throw new IllegalArgumentException("DSSE envelope carries no signatures");
+            throw refusal("verify.envelope_no_signatures");
         }
         byte[] pae = Sign.dssePae(payloadTypeNode.textValue(), payload);
-        String lastError = "";
+        RuntimeException lastError = null;
         for (JsonNode entry : signatures) {
             try {
                 if (!entry.isObject()) {
                     // A non-object entry has no keyid to resolve; route it through the same
-                    // missing-keyid message `TrustRoot.resolve` gives for an absent `keyid`, not a
-                    // second ad-hoc string.
-                    throw new IllegalArgumentException("no trusted key for keyid None");
+                    // missing-keyid refusal `TrustRoot.resolve` gives for an absent `keyid`.
+                    throw refusal("verify.keyid_untrusted", "keyid", describeUntrusted(null));
                 }
                 KeyEntry resolved = trust.resolve(entry);
                 JsonNode sigNode = entry.get("sig");
                 if (sigNode == null || !sigNode.isTextual()) {
-                    // Mirrors Python's `KeyError` repr for the same missing-key access.
-                    throw new IllegalArgumentException("'sig'");
+                    throw refusal("verify.signature_sig_missing");
                 }
                 byte[] sigBytes;
                 try {
                     sigBytes = b64dStrict(sigNode.textValue());
                 } catch (IllegalArgumentException e) {
-                    throw new IllegalArgumentException(SIG_NOT_BASE64);
+                    throw refusal("verify.signature_not_base64");
                 }
                 boolean ok = verifyEd25519(pae, publicKeyFromRaw(resolved.publicKeyRaw()), sigBytes);
                 if (!ok) {
-                    // Python's `SIGNATURE_INVALID`: a bad signature has a sentence of its own (18.68).
-                    throw new IllegalArgumentException("signature does not verify");
+                    // A bad signature has a sentence of its own (18.68).
+                    throw refusal("verify.signature_invalid");
                 }
                 String keyid = textOrNull(entry.get("keyid"));
                 // `resolve`'s own test: a "cert": null entry resolves as a key (18.68).
@@ -437,29 +479,94 @@ public final class Verify {
                 boolean keyless = cert != null && !cert.isNull();
                 return new VerifiedEnvelope(payload, resolved.identity(), keyid, keyless);
             } catch (RuntimeException e) {
-                lastError = e.getMessage() != null ? e.getMessage() : "";
+                lastError = e;
             }
         }
-        throw new IllegalArgumentException("no signature verified against the trust root: " + lastError);
+        throw refusal("verify.no_signature_verified", lastError);
     }
 
     /** The deepest container nesting {@link #parseUntrustedJson} accepts (mirrors {@code
-     * signing.MAX_JSON_DEPTH}, which is Jackson's own default limit). */
+     * signing.MAX_JSON_DEPTH}, which is Jackson's own default limit); all three engines enforce it with
+     * the same byte pre-scan. */
     static final int MAX_JSON_DEPTH = 1000;
+
+    /** A document nested past {@link #MAX_JSON_DEPTH}; its message stays "not readable JSON" for
+     * callers that do not tell depth apart. Mirrors {@code signing.JsonTooDeep}. */
+    static final class JsonTooDeep extends IllegalArgumentException {
+        private static final long serialVersionUID = 1L;
+
+        JsonTooDeep() {
+            super("not readable JSON");
+        }
+    }
+
+    /** Whether {@code raw} opens more than {@link #MAX_JSON_DEPTH} containers at once, counting
+     * {@code [} and {@code {} up and {@code ]} and {@code }} down outside strings (a backslash in a
+     * string skips the next byte). Run before parsing, so depth is found first whatever else is wrong
+     * with the bytes. Mirrors {@code signing._too_deep}. */
+    private static boolean tooDeep(byte[] raw) {
+        int depth = 0;
+        boolean inString = false;
+        for (int i = 0; i < raw.length; i++) {
+            byte b = raw[i];
+            if (inString) {
+                if (b == '\\') {
+                    i++;
+                } else if (b == '"') {
+                    inString = false;
+                }
+            } else if (b == '"') {
+                inString = true;
+            } else if (b == '[' || b == '{') {
+                if (++depth > MAX_JSON_DEPTH) {
+                    return true;
+                }
+            } else if (b == ']' || b == '}') {
+                depth--;
+            }
+        }
+        return false;
+    }
+
+    /** {@link #parseUntrustedJson} for one input verify reads, refused with that input's own key:
+     * {@code verify.json_too_deep} naming {@code what} past the depth limit, else {@code
+     * unreadableKey}. Mirrors {@code signing.parse_verify_input}. */
+    private static JsonNode parseVerifyInput(byte[] raw, String unreadableKey, String what) {
+        try {
+            return parseUntrustedJson(raw);
+        } catch (JsonTooDeep e) {
+            throw refusal("verify.json_too_deep", "what", what, "limit", String.valueOf(MAX_JSON_DEPTH));
+        } catch (IllegalArgumentException e) {
+            throw refusal(unreadableKey);
+        }
+    }
+
+    /** Reads one JSON file of a release with {@link #parseVerifyInput} (mirrors {@code
+     * _load_release_json}); the caller checks the shape. */
+    private static JsonNode loadVerifyInput(Path path, String unreadableKey, String what) {
+        byte[] raw;
+        try {
+            raw = Files.readAllBytes(path);
+        } catch (IOException e) {
+            throw refusal(unreadableKey);
+        }
+        return parseVerifyInput(raw, unreadableKey, what);
+    }
 
     private static final java.util.regex.Pattern PLAIN_ASCII =
             java.util.regex.Pattern.compile("[ !#-&(-\\[\\]-~]*");
 
-    private static final String SIG_NOT_BASE64 = "'sig' is not valid base64";
-    private static final String STATEMENT_UNREADABLE = "the signed statement is not readable JSON";
-    private static final String STATEMENT_NO_DIGEST = "the signed statement carries no subject digest";
 
     /** Mirrors {@code signing.parse_untrusted_json}: parse JSON {@code verify} reads from an untrusted
      * file or signed payload, or throw {@link IllegalArgumentException}. Strict UTF-8 with no
      * byte-order mark, standard JSON only, containers nested at most {@link #MAX_JSON_DEPTH} deep, and
      * every string and key well-formed Unicode. Callers turn the exception into their own fixed reason
-     * text; its message is never shown. */
+     * text; its message is never shown. A document too deep throws {@link JsonTooDeep}, whatever else
+     * is wrong with it. */
     static JsonNode parseUntrustedJson(byte[] raw) {
+        if (tooDeep(raw)) {
+            throw new JsonTooDeep();
+        }
         JsonNode value;
         try {
             value = Json.parse(decodeStrict(raw).toString());
@@ -469,23 +576,18 @@ public final class Verify {
         if (value == null || value.isMissingNode()) {
             throw new IllegalArgumentException("not readable JSON");
         }
-        java.util.ArrayDeque<Map.Entry<JsonNode, Integer>> stack = new java.util.ArrayDeque<>();
-        stack.push(Map.entry(value, 1));
+        java.util.ArrayDeque<JsonNode> stack = new java.util.ArrayDeque<>();
+        stack.push(value);
         while (!stack.isEmpty()) {
-            var top = stack.pop();
-            JsonNode node = top.getKey();
-            int depth = top.getValue();
+            JsonNode node = stack.pop();
             if (node.isTextual()) {
                 requireWellFormed(node.textValue());
             } else if (node.isContainerNode()) {
-                if (depth > MAX_JSON_DEPTH) {
-                    throw new IllegalArgumentException("not readable JSON");
-                }
                 if (node.isObject()) {
                     node.fieldNames().forEachRemaining(Verify::requireWellFormed);
                 }
                 for (JsonNode child : node) {
-                    stack.push(Map.entry(child, depth + 1));
+                    stack.push(child);
                 }
             }
         }
@@ -529,18 +631,13 @@ public final class Verify {
     /** Mirrors {@code signing.statement_subject_digest}: the {@code sha256:} digest of the first
      * subject of the in-toto Statement in {@code payload}, or one of two fixed refusals. */
     private static String statementSubjectDigest(byte[] payload) {
-        JsonNode statement;
-        try {
-            statement = parseUntrustedJson(payload);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException(STATEMENT_UNREADABLE, e);
-        }
+        JsonNode statement = parseVerifyInput(payload, "verify.statement_unreadable", "the signed statement");
         JsonNode subject = statement.isObject() ? statement.get("subject") : null;
         JsonNode first = subject != null && subject.isArray() && !subject.isEmpty() ? subject.get(0) : null;
         JsonNode digest = first != null && first.isObject() ? first.get("digest") : null;
         JsonNode sha256 = digest != null && digest.isObject() ? digest.get("sha256") : null;
         if (sha256 == null || !sha256.isTextual()) {
-            throw new IllegalArgumentException(STATEMENT_NO_DIGEST);
+            throw refusal("verify.statement_no_digest");
         }
         return "sha256:" + sha256.textValue();
     }
@@ -565,32 +662,23 @@ public final class Verify {
         }
         Path sigPath = dir.resolve(CATALOG_SIGNATURE_NAME);
         if (!Files.isRegularFile(sigPath)) {
-            return catalogSoftFail(digest, UNSIGNED_SENTENCE);
+            return catalogSoftFail(digest, refusal("verify.catalog_unsigned"));
         }
         if (Bundle.cannotOpen(sigPath)) {
             throw catalogUnreadable(dir, CATALOG_SIGNATURE_NAME);
         }
-        JsonNode envelope;
-        try {
-            envelope = readUntrustedJsonFile(sigPath);
-        } catch (IllegalArgumentException e) {
-            return catalogSoftFail(digest, CATALOG_SIGNATURE_NAME + " is not readable JSON");
-        }
         VerifiedEnvelope verified;
-        try {
-            verified = verifyEnvelope(envelope, trust);
-        } catch (RuntimeException e) {
-            return catalogSoftFail(digest, e.getMessage());
-        }
         String signedDigest;
         try {
+            JsonNode envelope =
+                    loadVerifyInput(sigPath, "verify.catalog_signature_unreadable", CATALOG_SIGNATURE_NAME);
+            verified = verifyEnvelope(envelope, trust);
             signedDigest = statementSubjectDigest(verified.payload());
-        } catch (IllegalArgumentException e) {
-            return catalogSoftFail(digest, e.getMessage());
+        } catch (RuntimeException e) {
+            return catalogSoftFail(digest, e);
         }
         if (!signedDigest.equals(digest)) {
-            return catalogSoftFail(
-                digest, "the signature covers a different catalog digest than the directory content");
+            return catalogSoftFail(digest, refusal("verify.catalog_digest_mismatch"));
         }
         ObjectNode out = Json.nodes().objectNode();
         out.put("verified", true);
@@ -604,23 +692,37 @@ public final class Verify {
     /** The shared soft-fail shape for a catalog that cannot be verified: mirrors {@code
      * _verify_catalog}'s own three-field shape; every early-return soft-fail in {@link
      * #verifyCatalog} uses this shape. */
-    private static ObjectNode catalogSoftFail(String digest, String reason) {
+    private static ObjectNode catalogSoftFail(String digest, RuntimeException refusal) {
         ObjectNode out = Json.nodes().objectNode();
-        out.put("verified", false);
         out.put("digest", digest);
-        out.put("reason", reason);
+        putRefused(out, List.of(refusal));
         return out;
+    }
+
+    /** A verified:false result's {@code reason} and {@code reason_keys}: the refusals' texts joined
+     * with "; " and their keys in the same order (mirrors {@code commands._refused}). */
+    private static void putRefused(ObjectNode out, List<? extends RuntimeException> refusals) {
+        List<String> texts = new ArrayList<>();
+        ArrayNode keys = Json.nodes().arrayNode();
+        for (RuntimeException r : refusals) {
+            texts.add(r.getMessage() != null ? r.getMessage() : "");
+            if (r instanceof VerifyRefusal v) {
+                v.keys().forEach(keys::add);
+            }
+        }
+        out.put("verified", false);
+        out.put("reason", String.join("; ", texts));
+        out.set("reason_keys", keys);
     }
 
     /** The shared soft-fail shape for a release that cannot be verified at all (no {@code
      * manifest_digest}/{@code signers} field): mirrors {@code _verify_release_soft_fail}'s own
      * three-field shape exactly -- every early-return soft-fail in {@link #verifyRelease}, including
      * the directory-bundle branch's own JSON-parse failures, uses this shape. */
-    private static ObjectNode releaseSoftFail(Path releasePath, String reason) {
+    private static ObjectNode releaseSoftFail(Path releasePath, RuntimeException refusal) {
         ObjectNode out = Json.nodes().objectNode();
         out.put("release", releasePath.toString());
-        out.put("verified", false);
-        out.put("reason", reason);
+        putRefused(out, List.of(refusal));
         return out;
     }
 
@@ -663,13 +765,9 @@ public final class Verify {
     public static ObjectNode verifyRelease(Path releasePath, TrustRoot trust) {
         if (Files.isRegularFile(releasePath)) {
             requireReleaseReadable(releasePath, releasePath);
-            JsonNode envelope;
             try {
-                envelope = readUntrustedJsonFile(releasePath);
-            } catch (IllegalArgumentException e) {
-                return releaseSoftFail(releasePath, "release envelope is not readable JSON");
-            }
-            try {
+                JsonNode envelope =
+                        loadVerifyInput(releasePath, "verify.release_envelope_unreadable", "release envelope");
                 VerifiedEnvelope verified = verifyEnvelope(envelope, trust);
                 ObjectNode out = Json.nodes().objectNode();
                 out.put("release", releasePath.toString());
@@ -679,7 +777,7 @@ public final class Verify {
                 out.put("keyless", verified.keyless());
                 return out;
             } catch (RuntimeException e) {
-                return releaseSoftFail(releasePath, e.getMessage());
+                return releaseSoftFail(releasePath, e);
             }
         }
 
@@ -697,21 +795,21 @@ public final class Verify {
         requireReleaseReadable(releasePath, manifestPath);
         JsonNode manifest;
         try {
-            manifest = readUntrustedJsonFile(manifestPath);
-        } catch (IllegalArgumentException e) {
-            return releaseSoftFail(releasePath, "release manifest is not readable JSON");
+            manifest = loadVerifyInput(manifestPath, "verify.release_manifest_unreadable", "release manifest");
+        } catch (VerifyRefusal e) {
+            return releaseSoftFail(releasePath, e);
         }
         if (!manifest.isObject()) {
-            return releaseSoftFail(releasePath, "release manifest is not readable JSON");
+            return releaseSoftFail(releasePath, refusal("verify.release_manifest_unreadable"));
         }
 
         String manifestDigest;
         try {
             manifestDigest = "sha256:" + Canonical.sha256Hex(manifest);
         } catch (Canonical.CanonicalizationError e) {
-            return releaseSoftFail(releasePath, "release manifest cannot be canonicalized");
+            return releaseSoftFail(releasePath, refusal("verify.release_manifest_uncanonical"));
         }
-        List<String> problems = new ArrayList<>();
+        List<VerifyRefusal> problems = new ArrayList<>();
         JsonNode artifacts =
                 manifest.has("artifacts") && manifest.get("artifacts").isArray()
                         ? manifest.get("artifacts")
@@ -719,7 +817,7 @@ public final class Verify {
         for (JsonNode artifact : artifacts) {
             JsonNode nameNode = artifact != null && artifact.isObject() ? artifact.get("name") : null;
             if (nameNode == null || !nameNode.isTextual()) {
-                problems.add("release manifest has an artifact entry with no name");
+                problems.add(refusal("verify.release_artifact_unnamed"));
                 continue;
             }
             String name = nameNode.textValue();
@@ -734,41 +832,46 @@ public final class Verify {
                 content = null; // unreadable (a directory, no permission, gone) counts as missing, as in Python
             }
             if (content == null) {
-                problems.add("missing artifact " + name);
+                problems.add(refusal("verify.release_artifact_missing", "name", name));
                 continue;
             }
             String actual = "sha256:" + Canonical.sha256Hex(content);
             JsonNode expected = artifact.get("digest");
             if (expected == null || !actual.equals(expected.asText())) {
-                problems.add("digest mismatch for " + name);
+                problems.add(refusal("verify.release_artifact_digest", "name", name));
             }
         }
 
         requireReleaseReadable(releasePath, signaturesPath);
         JsonNode signatureEntries;
         try {
-            signatureEntries = readUntrustedJsonFile(signaturesPath);
-        } catch (IllegalArgumentException e) {
-            return releaseSoftFail(releasePath, "release signatures are not readable JSON");
+            signatureEntries =
+                    loadVerifyInput(signaturesPath, "verify.release_signatures_unreadable", "release signatures");
+        } catch (VerifyRefusal e) {
+            return releaseSoftFail(releasePath, e);
         }
         if (!signatureEntries.isArray()) {
-            return releaseSoftFail(releasePath, "release signatures are not readable JSON");
+            return releaseSoftFail(releasePath, refusal("verify.release_signatures_unreadable"));
         }
 
         List<ObjectNode> signers = new ArrayList<>();
         for (JsonNode raw : signatureEntries) {
             if (raw == null || !raw.isObject()) {
-                problems.add("signature (None): signature entry is not an object");
+                problems.add(refusal(
+                        "verify.release_signature",
+                        refusal("verify.release_signature_not_object"),
+                        "profile",
+                        "None"));
                 continue;
             }
             String profile = textOrNull(raw.get("profile"));
             try {
                 if (!raw.has("envelope")) {
-                    throw new IllegalArgumentException("'envelope'");
+                    throw refusal("verify.release_envelope_missing");
                 }
                 VerifiedEnvelope verified = verifyEnvelope(raw.get("envelope"), trust);
                 if (!statementSubjectDigest(verified.payload()).equals(manifestDigest)) {
-                    throw new IllegalArgumentException("signature does not cover the release manifest");
+                    throw refusal("verify.release_manifest_not_covered");
                 }
                 ObjectNode signer = Json.nodes().objectNode();
                 if (profile != null) {
@@ -779,12 +882,11 @@ public final class Verify {
                 signer.put("identity", verified.identity());
                 signers.add(signer);
             } catch (RuntimeException e) {
-                String message = e.getMessage() != null ? e.getMessage() : "";
-                problems.add("signature (" + (profile != null ? profile : "None") + "): " + message);
+                problems.add(refusal("verify.release_signature", e, "profile", profile != null ? profile : "None"));
             }
         }
         if (problems.isEmpty() && signers.isEmpty()) {
-            problems.add("release bundle carries no signatures");
+            problems.add(refusal("verify.release_no_signatures"));
         }
 
         ObjectNode out = Json.nodes().objectNode();
@@ -794,7 +896,7 @@ public final class Verify {
         ArrayNode signersArr = out.putArray("signers");
         signers.forEach(signersArr::add);
         if (!problems.isEmpty()) {
-            out.put("reason", String.join("; ", problems));
+            putRefused(out, problems);
         }
         return out;
     }

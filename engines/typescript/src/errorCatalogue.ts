@@ -58,7 +58,7 @@ export function errorFix(key: string): string {
 
 /** A literal key passed as the first argument of an error constructor or helper. Keys composed at
  * run time (`` `input.${key}_missing` ``) are template literals and are not matched, as in Python. */
-const RAISED = /(?:new\s+(?:InputError|AgentceError)|unreadableError)\(\s*"([^"]+)"/g;
+const RAISED = /(?:new\s+(?:InputError|AgentceError)|unreadableError|refusal)\(\s*"([^"]+)"/g;
 
 /** The completeness check: a key with an empty cause or fix, and any key raised in `sources` (the
  * engine's own source texts) that the catalogue lacks. Empty when the catalogue covers them all. */

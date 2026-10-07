@@ -411,6 +411,14 @@ def _catalog_unreadable(catalog_dir: Path, exc: BaseException) -> UnreadableErro
     )
 
 
+def _refused(result: CommandResult, *refusals: signing.VerificationError) -> None:
+    """Record a verified:false result: the refusals' texts joined as ``reason``, and their keys,
+    in the same order, as ``reason_keys``."""
+    result.data["verified"] = False
+    result.data["reason"] = "; ".join(str(r) for r in refusals)
+    result.data["reason_keys"] = [key for r in refusals for key in r.keys]
+
+
 def _verify_catalog(result: CommandResult, catalog_dir: Path) -> CommandResult:
     """Verify a catalog directory's signature offline against the vendored trust root (SPEC §8.7)."""
     try:
@@ -430,14 +438,12 @@ def _verify_catalog(result: CommandResult, catalog_dir: Path) -> CommandResult:
     except OSError as exc:
         raise _catalog_unreadable(catalog_dir, exc) from exc
     except signing.UnsignedError as exc:
-        result.data["verified"] = False
-        result.data["reason"] = str(exc)
+        _refused(result, exc)
         result.note(f"catalog {catalog_dir.name}: unsigned")
         result.add_code(int(ExitCode.INPUT_ERROR))
         return result
     except signing.VerificationError as exc:
-        result.data["verified"] = False
-        result.data["reason"] = str(exc)
+        _refused(result, exc)
         result.note(f"catalog {catalog_dir.name}: verification failed — {exc}")
         result.add_code(int(ExitCode.INPUT_ERROR))
         return result
@@ -665,23 +671,25 @@ def _verify_report(
             )
     verified = None
     verified_statement: dict[str, Any] = {}
-    last_error: Exception | None = None
+    last_error = signing.VerificationError.refusal("verify.report_no_claimant_entry")
     for candidate in candidates:
         try:
             v = signing.verify_envelope(candidate, trust)
-            parsed_statement = signing.parse_untrusted_json(v.payload)
-        except (signing.VerificationError, ValueError) as exc:
+            parsed_statement = signing.parse_verify_input(
+                v.payload, "verify.statement_unreadable", "the signed statement"
+            )
+        except signing.VerificationError as exc:
             last_error = exc
             continue
         if not _is_report_statement(parsed_statement):
-            last_error = signing.VerificationError(
-                "the payload is not a statement shaped like the one `agentce sign` writes"
+            last_error = signing.VerificationError.refusal(
+                "verify.report_statement_shape"
             )
             continue
         statement: dict[str, Any] = parsed_statement
         if statement["predicate"].get("role") != "claimant":
-            last_error = signing.VerificationError(
-                "the verified predicate's own role is not 'claimant'"
+            last_error = signing.VerificationError.refusal(
+                "verify.report_role_not_claimant"
             )
             continue
         verified = v
@@ -1011,34 +1019,36 @@ def _deep_recursion() -> Iterator[None]:
 
 
 def _verify_release_soft_fail(
-    result: CommandResult, release_path: Path, reason: str
+    result: CommandResult, release_path: Path, refusal: signing.VerificationError
 ) -> CommandResult:
     """The shared soft-fail shape for a release that cannot be verified: `{release, verified: False,
-    reason}`, no `error`/`key` field -- matching `--catalog`'s and the directory-bundle branch's own
-    shape (SPEC's three-engine parity standard; see Dispositions)."""
-    result.data.update(
-        {"release": str(release_path), "verified": False, "reason": reason}
-    )
+    reason, reason_keys}`, no `error`/`key` field -- matching `--catalog`'s and the directory-bundle
+    branch's own shape (SPEC's three-engine parity standard; see Dispositions)."""
+    result.data["release"] = str(release_path)
+    _refused(result, refusal)
     result.note(f"release {release_path.name}: verification failed")
     result.add_code(int(ExitCode.INPUT_ERROR))
     return result
 
 
 def _load_release_json(
-    path: Path, expected_type: type, reason: str
-) -> tuple[Any, str | None]:
-    """Parse a release bundle JSON file, returning `(value, None)` on success or `(None, reason)`
-    on a read/decode/shape failure -- the caller passes the exact, already-pluralized `reason` text
-    (e.g. "release signatures are not readable JSON") since the manifest and signature-list callers
-    need different grammar, not just a different noun."""
+    path: Path, expected_type: type, unreadable_key: str, what: str
+) -> tuple[Any, signing.VerificationError | None]:
+    """Parse a release bundle JSON file, returning `(value, None)` on success or `(None, refusal)`
+    on a read/decode/shape failure: `unreadable_key`'s refusal, or `verify.json_too_deep` naming
+    `what` for a document nested past the limit."""
     try:
-        value = signing.parse_untrusted_json(path.read_bytes())
+        raw = path.read_bytes()
     except PermissionError:
         raise  # the caller's input.release_unreadable, not a malformed file
-    except (OSError, ValueError):
-        return None, reason
+    except OSError:
+        return None, signing.VerificationError.refusal(unreadable_key)
+    try:
+        value = signing.parse_verify_input(raw, unreadable_key, what)
+    except signing.VerificationError as exc:
+        return None, exc
     if not isinstance(value, expected_type):
-        return None, reason
+        return None, signing.VerificationError.refusal(unreadable_key)
     return value, None
 
 
@@ -1051,14 +1061,17 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
     trust = signing.vendored_trust()
     if release_path.is_file():
         envelope, err = _load_release_json(
-            release_path, object, "release envelope is not readable JSON"
+            release_path,
+            object,
+            "verify.release_envelope_unreadable",
+            "release envelope",
         )
         if err:
             return _verify_release_soft_fail(result, release_path, err)
         try:
             verified = signing.verify_envelope(envelope, trust)
         except signing.VerificationError as exc:
-            return _verify_release_soft_fail(result, release_path, str(exc))
+            return _verify_release_soft_fail(result, release_path, exc)
         result.data.update(
             {
                 "release": str(release_path),
@@ -1079,7 +1092,7 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
             "pass the --out directory produced by the release tooling.",
         )
     manifest, err = _load_release_json(
-        manifest_path, dict, "release manifest is not readable JSON"
+        manifest_path, dict, "verify.release_manifest_unreadable", "release manifest"
     )
     if err:
         return _verify_release_soft_fail(result, release_path, err)
@@ -1088,16 +1101,19 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
             manifest_digest = signing.sha256_prefixed(canonicalize(manifest))
     except CanonicalizationError:
         return _verify_release_soft_fail(
-            result, release_path, "release manifest cannot be canonicalized"
+            result,
+            release_path,
+            signing.VerificationError.refusal("verify.release_manifest_uncanonical"),
         )
-    problems: list[str] = []
+    refusal = signing.VerificationError.refusal
+    problems: list[signing.VerificationError] = []
     artifacts = manifest.get("artifacts", [])
     if not isinstance(artifacts, list):
         artifacts = []
     for artifact in artifacts:
         name = artifact.get("name") if isinstance(artifact, dict) else None
         if not isinstance(name, str):
-            problems.append("release manifest has an artifact entry with no name")
+            problems.append(refusal("verify.release_artifact_unnamed"))
             continue
         artifact_file = confine_to_root(release_path, name)
         try:
@@ -1107,36 +1123,43 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
         except OSError:
             content = None
         if content is None:
-            problems.append(f"missing artifact {name}")
+            problems.append(refusal("verify.release_artifact_missing", name=name))
             continue
         if signing.sha256_prefixed(content) != artifact.get("digest"):
-            problems.append(f"digest mismatch for {name}")
+            problems.append(refusal("verify.release_artifact_digest", name=name))
     signature_entries, err = _load_release_json(
-        signatures_path, list, "release signatures are not readable JSON"
+        signatures_path,
+        list,
+        "verify.release_signatures_unreadable",
+        "release signatures",
     )
     if err:
         return _verify_release_soft_fail(result, release_path, err)
     signers: list[dict[str, Any]] = []
     for entry in signature_entries:
         if not isinstance(entry, dict):
-            problems.append("signature (None): signature entry is not an object")
+            problems.append(
+                refusal(
+                    "verify.release_signature",
+                    refusal("verify.release_signature_not_object"),
+                    profile=None,
+                )
+            )
             continue
         profile = entry.get("profile")
         if not isinstance(profile, str):
             profile = None
         try:
             if "envelope" not in entry:
-                raise signing.VerificationError("'envelope'")
+                raise refusal("verify.release_envelope_missing")
             verified = signing.verify_envelope(entry["envelope"], trust)
             if signing.statement_subject_digest(verified.payload) != manifest_digest:
-                raise signing.VerificationError(
-                    "signature does not cover the release manifest"
-                )
+                raise refusal("verify.release_manifest_not_covered")
             signers.append({"profile": profile, "identity": verified.identity})
         except signing.VerificationError as exc:
-            problems.append(f"signature ({profile}): {exc}")
+            problems.append(refusal("verify.release_signature", exc, profile=profile))
     if not problems and not signers:
-        problems.append("release bundle carries no signatures")
+        problems.append(refusal("verify.release_no_signatures"))
     ok = not problems
     result.data.update(
         {
@@ -1147,7 +1170,7 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
         }
     )
     if not ok:
-        result.data["reason"] = "; ".join(problems)
+        _refused(result, *problems)
         result.note(f"release {release_path.name}: verification failed")
         result.add_code(int(ExitCode.INPUT_ERROR))
     else:

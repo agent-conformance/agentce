@@ -26,14 +26,41 @@ import { NonCanonicalNumber, parseJson } from "./json";
 import { pyTruthy } from "./readiness";
 import { digestTree } from "./report";
 import { dssePae, keyidFor } from "./sign";
+import { formatTemplate } from "./util";
 import { b64dStrict, decodeUtf8Strict, pyRepr } from "./util";
 
 /** The detached signature a signed catalog (or corpus) directory carries (SPEC §8.7). */
 export const CATALOG_SIGNATURE_NAME = "catalog.sig.json";
 
-/** The exact unsigned sentence `verify_catalog_directory` raises when no signature is present. */
-const UNSIGNED_SENTENCE =
-  "unsigned: catalog.sig.json is absent, so there is no signature to verify (SPEC §8.7).";
+/** A verify refusal: its text, and the catalogue keys the text was built from in reading order (one
+ * key for a leaf refusal, a wrapper's own key followed by its inner refusal's keys). `verify --json`
+ * lists them as `reason_keys`. Mirrors `signing.VerificationError`. */
+export class VerifyRefusal extends Error {
+  readonly keys: readonly string[];
+
+  constructor(text: string, keys: readonly string[]) {
+    super(text);
+    this.keys = keys;
+  }
+}
+
+/** The refusal for catalogue `key`: its cause with `{params}` filled in. A wrapper passes the error it
+ * wraps as `inner`, which fills `{inner}` and adds its keys. Mirrors `VerificationError.refusal`. */
+export function refusal(
+  key: string,
+  params: Record<string, string> = {},
+  inner?: unknown,
+): VerifyRefusal {
+  const keys = [key];
+  const vars = { ...params };
+  if (inner !== undefined) {
+    vars.inner = inner instanceof Error ? inner.message : String(inner);
+    if (inner instanceof VerifyRefusal) {
+      keys.push(...inner.keys);
+    }
+  }
+  return new VerifyRefusal(formatTemplate(errorCause(key), vars), keys);
+}
 
 /** The fixed 12-byte RFC 8410 SPKI DER prefix every Ed25519 SPKI public key export carries before
  * its 32 raw key bytes -- the same constant `sign.ts` slices off; here it is prepended to go the
@@ -76,8 +103,44 @@ function* trustEntries(
 }
 
 /** The deepest container nesting {@link parseUntrustedJson} accepts (mirrors `signing.MAX_JSON_DEPTH`,
- * Jackson's own default, so all three engines refuse at the same depth). */
+ * Jackson's own default); all three engines enforce it with the same byte pre-scan. */
 export const MAX_JSON_DEPTH = 1000;
+
+/** A document nested past {@link MAX_JSON_DEPTH}; its message stays "not readable JSON" for callers
+ * that do not tell depth apart. Mirrors `signing.JsonTooDeep`. */
+export class JsonTooDeep extends Error {
+  constructor() {
+    super("not readable JSON");
+  }
+}
+
+/** Whether `raw` opens more than {@link MAX_JSON_DEPTH} containers at once, counting `[` and `{` up and
+ * `]` and `}` down outside strings (a backslash in a string skips the next byte). Run before parsing,
+ * so depth is found first whatever else is wrong with the bytes. Mirrors `signing._too_deep`. */
+function tooDeep(raw: Buffer): boolean {
+  let depth = 0;
+  let inString = false;
+  for (let i = 0; i < raw.length; i++) {
+    const byte = raw[i];
+    if (inString) {
+      if (byte === 0x5c) {
+        i++;
+      } else if (byte === 0x22) {
+        inString = false;
+      }
+    } else if (byte === 0x22) {
+      inString = true;
+    } else if (byte === 0x5b || byte === 0x7b) {
+      depth++;
+      if (depth > MAX_JSON_DEPTH) {
+        return true;
+      }
+    } else if (byte === 0x5d || byte === 0x7d) {
+      depth--;
+    }
+  }
+  return false;
+}
 
 const LONE_SURROGATE = /[\uD800-\uDFFF]/u;
 const PLAIN_ASCII = /^[ !#-&(-\[\]-~]*$/;
@@ -87,28 +150,47 @@ const PLAIN_ASCII = /^[ !#-&(-\[\]-~]*$/;
  * most {@link MAX_JSON_DEPTH} deep, and every string and key well-formed Unicode. With
  * `keepNumberTokens`, a non-canonical number token survives as a {@link NonCanonicalNumber} so the
  * canonical form can still refuse it (the release manifest). Callers turn the error into their own
- * fixed reason text; its message is never shown. */
+ * fixed reason text; its message is never shown. A document too deep throws {@link JsonTooDeep},
+ * whatever else is wrong with it. */
 export function parseUntrustedJson(raw: Buffer, keepNumberTokens = false): unknown {
+  if (tooDeep(raw)) {
+    throw new JsonTooDeep();
+  }
   const text = decodeUtf8Strict(raw);
   const value = keepNumberTokens ? parseJson(text) : JSON.parse(text);
-  const stack: Array<[unknown, number]> = [[value, 1]];
+  const stack: unknown[] = [value];
   while (stack.length > 0) {
-    const [node, depth] = stack.pop() as [unknown, number];
+    const node = stack.pop();
     if (typeof node === "string") {
       if (LONE_SURROGATE.test(node)) {
         throw new Error("not readable JSON");
       }
-    } else if (Array.isArray(node) || isRecord(node)) {
-      if (depth > MAX_JSON_DEPTH) {
-        throw new Error("not readable JSON");
-      }
-      const children = Array.isArray(node) ? node : [...Object.values(node), ...Object.keys(node)];
-      for (const child of children) {
-        stack.push([child, depth + 1]);
-      }
+    } else if (Array.isArray(node)) {
+      stack.push(...node);
+    } else if (isRecord(node)) {
+      stack.push(...Object.values(node), ...Object.keys(node));
     }
   }
   return value;
+}
+
+/** {@link parseUntrustedJson} for one input verify reads, refused with that input's own key:
+ * `verify.json_too_deep` naming `what` past the depth limit, else `unreadableKey`. Mirrors
+ * `signing.parse_verify_input`. */
+function parseVerifyInput(
+  raw: Buffer,
+  unreadableKey: string,
+  what: string,
+  keepNumberTokens = false,
+): unknown {
+  try {
+    return parseUntrustedJson(raw, keepNumberTokens);
+  } catch (exc) {
+    if (exc instanceof JsonTooDeep) {
+      throw refusal("verify.json_too_deep", { what, limit: String(MAX_JSON_DEPTH) });
+    }
+    throw refusal(unreadableKey);
+  }
 }
 
 /** {@link parseUntrustedJson} over a file's bytes (mirrors Java's `readUntrustedJsonFile`). */
@@ -157,12 +239,12 @@ function verifyCertificate(
   authorities: ReadonlyMap<string, AuthorityEntry>,
 ): KeyEntry {
   if (!isRecord(cert)) {
-    throw new Error("certificate signature does not verify");
+    throw refusal("verify.certificate_signature_invalid");
   }
   const issuer = cert.issuer;
   const ca = typeof issuer === "string" ? authorities.get(issuer) : undefined;
   if (ca === undefined) {
-    throw new Error(`unknown certificate issuer ${describeUntrusted(issuer)}`);
+    throw refusal("verify.certificate_issuer_unknown", { issuer: describeUntrusted(issuer) });
   }
   let leaf: KeyEntry;
   try {
@@ -186,7 +268,7 @@ function verifyCertificate(
     }
     leaf = { publicKeyRaw: leafRaw, identity };
   } catch {
-    throw new Error("certificate signature does not verify");
+    throw refusal("verify.certificate_signature_invalid");
   }
   checkCertificateFields(cert);
   return leaf;
@@ -199,8 +281,8 @@ const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 /** `<key>: <cause>` with the catalogue's cause text, minus its final period (the aggregate reasons
  * that wrap it add their own); mirrors `signing._certificate_refusal`. */
-function certificateRefusal(key: string): Error {
-  return new Error(`${key}: ${errorCause(key).replace(/\.$/, "")}`);
+function certificateRefusal(key: string): VerifyRefusal {
+  return new VerifyRefusal(`${key}: ${errorCause(key).replace(/\.$/, "")}`, [key]);
 }
 
 /** A text form of an RFC 3339 UTC timestamp that sorts in time order, or `null` if `value` is not one:
@@ -286,7 +368,7 @@ export class TrustRoot {
     }
     const keyid = signature.keyid;
     if (typeof keyid !== "string" || !this.keys.has(keyid)) {
-      throw new Error(`no trusted key for keyid ${describeUntrusted(keyid)}`);
+      throw refusal("verify.keyid_untrusted", { keyid: describeUntrusted(keyid) });
     }
     return this.keys.get(keyid) as KeyEntry;
   }
@@ -342,54 +424,53 @@ export interface VerifiedEnvelope {
  * fix, so the two are a real mirror, not an analogy (see `signing.py:365-417`). */
 export function verifyEnvelope(envelope: unknown, trust: TrustRoot): VerifiedEnvelope {
   if (!isRecord(envelope)) {
-    throw new Error("malformed DSSE envelope");
+    throw refusal("verify.envelope_malformed");
   }
   const payloadType = envelope.payloadType;
   if (typeof payloadType !== "string") {
-    throw new Error("malformed DSSE envelope");
+    throw refusal("verify.envelope_malformed");
   }
   const rawPayload = envelope.payload;
   if (typeof rawPayload !== "string") {
-    throw new Error("malformed DSSE envelope");
+    throw refusal("verify.envelope_malformed");
   }
   let payload: Buffer;
   try {
     payload = b64dStrict(rawPayload);
   } catch {
-    throw new Error("malformed DSSE envelope");
+    throw refusal("verify.envelope_malformed");
   }
   const signatures = envelope.signatures;
   if (!Array.isArray(signatures)) {
-    throw new Error("malformed DSSE envelope");
+    throw refusal("verify.envelope_malformed");
   }
   if (signatures.length === 0) {
-    throw new Error("DSSE envelope carries no signatures");
+    throw refusal("verify.envelope_no_signatures");
   }
   const pae = dssePae(payloadType, payload);
-  let lastError = "";
+  let lastError: unknown;
   for (const entry of signatures) {
     try {
       if (!isRecord(entry)) {
         // A non-object entry has no keyid to resolve; route it through the same missing-keyid
-        // message `TrustRoot.resolve` gives for an absent `keyid`, not a second ad-hoc string.
-        throw new Error("no trusted key for keyid None");
+        // refusal `TrustRoot.resolve` gives for an absent `keyid`.
+        throw refusal("verify.keyid_untrusted", { keyid: describeUntrusted(null) });
       }
       const { publicKeyRaw, identity } = trust.resolve(entry);
       const sig = entry.sig;
       if (typeof sig !== "string") {
-        // Mirrors Python's `KeyError` repr for the same missing-key access.
-        throw new Error("'sig'");
+        throw refusal("verify.signature_sig_missing");
       }
       let sigBytes: Buffer;
       try {
         sigBytes = b64dStrict(sig);
       } catch {
-        throw new Error(SIG_NOT_BASE64);
+        throw refusal("verify.signature_not_base64");
       }
       const ok = cryptoVerify(null, pae, publicKeyFromRaw(publicKeyRaw), sigBytes);
       if (!ok) {
-        // Python's `SIGNATURE_INVALID`: a bad signature has a sentence of its own (18.68).
-        throw new Error("signature does not verify");
+        // A bad signature has a sentence of its own (18.68).
+        throw refusal("verify.signature_invalid");
       }
       const keyidVal = entry.keyid;
       return {
@@ -400,31 +481,26 @@ export function verifyEnvelope(envelope: unknown, trust: TrustRoot): VerifiedEnv
         keyless: entry.cert !== undefined && entry.cert !== null,
       };
     } catch (exc) {
-      lastError = exc instanceof Error ? exc.message : String(exc);
+      lastError = exc;
     }
   }
-  throw new Error(`no signature verified against the trust root: ${lastError}`);
+  throw refusal("verify.no_signature_verified", {}, lastError);
 }
-
-const SIG_NOT_BASE64 = "'sig' is not valid base64";
-const STATEMENT_UNREADABLE = "the signed statement is not readable JSON";
-const STATEMENT_NO_DIGEST = "the signed statement carries no subject digest";
 
 /** Mirrors `signing.statement_subject_digest`: the `sha256:` digest of the first subject of the
  * in-toto Statement in `payload`, or one of two fixed refusals. */
 function statementSubjectDigest(payload: Buffer): string {
-  let statement: unknown;
-  try {
-    statement = parseUntrustedJson(payload);
-  } catch {
-    throw new Error(STATEMENT_UNREADABLE);
-  }
+  const statement = parseVerifyInput(
+    payload,
+    "verify.statement_unreadable",
+    "the signed statement",
+  );
   const subject = isRecord(statement) ? statement.subject : undefined;
   const first = Array.isArray(subject) && subject.length > 0 ? subject[0] : undefined;
   const digest = isRecord(first) ? first.digest : undefined;
   const sha256 = isRecord(digest) ? digest.sha256 : undefined;
   if (typeof sha256 !== "string") {
-    throw new Error(STATEMENT_NO_DIGEST);
+    throw refusal("verify.statement_no_digest");
   }
   return `sha256:${sha256}`;
 }
@@ -436,6 +512,7 @@ export interface CatalogVerifyResult {
   readonly keyid?: string | null;
   readonly keyless?: boolean;
   readonly reason?: string;
+  readonly reason_keys?: readonly string[];
 }
 
 /** `input.catalog_unreadable`, naming the file or folder that cannot be read (Python's
@@ -459,7 +536,11 @@ export function verifyCatalog(dir: string, trust: TrustRoot): CatalogVerifyResul
   } catch (err) {
     throw catalogUnreadable(dir, err);
   }
-  const fail = (reason: string): CatalogVerifyResult => ({ verified: false, digest, reason });
+  const fail = (exc: unknown): CatalogVerifyResult => ({
+    verified: false,
+    digest,
+    ...refused(exc),
+  });
   const sigPath = join(dir, CATALOG_SIGNATURE_NAME);
   let sigIsFile = false;
   try {
@@ -468,33 +549,33 @@ export function verifyCatalog(dir: string, trust: TrustRoot): CatalogVerifyResul
     sigIsFile = false;
   }
   if (!sigIsFile) {
-    return fail(UNSIGNED_SENTENCE);
+    return fail(refusal("verify.catalog_unsigned"));
   }
   const sigDenied = readPermissionError(sigPath);
   if (sigDenied) {
     throw catalogUnreadable(dir, sigDenied);
   }
-  let envelope: unknown;
-  try {
-    envelope = readUntrustedJsonFile(sigPath);
-  } catch {
-    return fail(`${CATALOG_SIGNATURE_NAME} is not readable JSON`);
-  }
+  let signedDigest: string;
   let verified: VerifiedEnvelope;
   try {
+    let raw: Buffer;
+    try {
+      raw = readFileSync(sigPath);
+    } catch {
+      throw refusal("verify.catalog_signature_unreadable");
+    }
+    const envelope = parseVerifyInput(
+      raw,
+      "verify.catalog_signature_unreadable",
+      CATALOG_SIGNATURE_NAME,
+    );
     verified = verifyEnvelope(envelope, trust);
-  } catch (exc) {
-    const message = exc instanceof Error ? exc.message : String(exc);
-    return fail(message);
-  }
-  let signedDigest: string;
-  try {
     signedDigest = statementSubjectDigest(verified.payload);
   } catch (exc) {
-    return fail((exc as Error).message);
+    return fail(exc);
   }
   if (signedDigest !== digest) {
-    return fail("the signature covers a different catalog digest than the directory content");
+    return fail(refusal("verify.catalog_digest_mismatch"));
   }
   return {
     verified: true,
@@ -514,6 +595,38 @@ export interface ReleaseSoftFail {
   readonly release: string;
   readonly verified: false;
   readonly reason: string;
+  readonly reason_keys: readonly string[];
+}
+
+/** A verified:false result's `reason` and `reason_keys`: the refusals' texts joined with "; " and their
+ * keys in the same order (mirrors `commands._refused`). */
+function refused(...refusals: unknown[]): { reason: string; reason_keys: string[] } {
+  return {
+    reason: refusals.map((r) => (r instanceof Error ? r.message : String(r))).join("; "),
+    reason_keys: refusals.flatMap((r) => (r instanceof VerifyRefusal ? [...r.keys] : [])),
+  };
+}
+
+/** Reads one JSON file of a release with {@link parseVerifyInput}, refusing a file that cannot be read
+ * or is not of the expected shape with `unreadableKey` (mirrors `_load_release_json`). */
+function loadReleaseJson(
+  path: string,
+  isShape: (value: unknown) => boolean,
+  unreadableKey: string,
+  what: string,
+  keepNumberTokens = false,
+): unknown {
+  let raw: Buffer;
+  try {
+    raw = readFileSync(path);
+  } catch {
+    throw refusal(unreadableKey);
+  }
+  const value = parseVerifyInput(raw, unreadableKey, what, keepNumberTokens);
+  if (!isShape(value)) {
+    throw refusal(unreadableKey);
+  }
+  return value;
 }
 
 export interface ReleaseSingleResult {
@@ -530,6 +643,7 @@ export interface ReleaseBundleResult {
   readonly manifest_digest: string;
   readonly signers: ReadonlyArray<{ readonly profile: string | null; readonly identity: string }>;
   readonly reason?: string;
+  readonly reason_keys?: readonly string[];
 }
 
 export type ReleaseResult = ReleaseSoftFail | ReleaseSingleResult | ReleaseBundleResult;
@@ -554,20 +668,21 @@ function requireReleaseReadable(releasePath: string, path: string): void {
  * JSON-parse-failure path this function adds uses a fixed, engine-neutral reason text (mirrors
  * `_verify_release`, `commands/__init__.py:758-875`). */
 export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseResult {
+  const softFail = (exc: unknown): ReleaseSoftFail => ({
+    release: releasePath,
+    verified: false,
+    ...refused(exc),
+  });
   const stat = statSync(releasePath);
   if (stat.isFile()) {
     requireReleaseReadable(releasePath, releasePath);
-    let envelope: unknown;
     try {
-      envelope = readUntrustedJsonFile(releasePath);
-    } catch {
-      return {
-        release: releasePath,
-        verified: false,
-        reason: "release envelope is not readable JSON",
-      };
-    }
-    try {
+      const envelope = loadReleaseJson(
+        releasePath,
+        () => true,
+        "verify.release_envelope_unreadable",
+        "release envelope",
+      );
       const verified = verifyEnvelope(envelope, trust);
       return {
         release: releasePath,
@@ -577,8 +692,7 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
         keyless: verified.keyless,
       };
     } catch (exc) {
-      const message = exc instanceof Error ? exc.message : String(exc);
-      return { release: releasePath, verified: false, reason: message };
+      return softFail(exc);
     }
   }
 
@@ -602,25 +716,20 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
   }
 
   requireReleaseReadable(releasePath, manifestPath);
-  let manifest: unknown;
+  let manifest: Record<string, unknown>;
   try {
     // Number tokens kept: `manifestDigest` below canonicalizes `manifest`, which must refuse a
     // non-canonical number token (`1.0`, `1e2`, `-0.0`) the way Python's and Java's decoders do,
     // rather than have `JSON.parse` fold it to an ordinary number first.
-    manifest = readUntrustedJsonFile(manifestPath, true);
-  } catch {
-    return {
-      release: releasePath,
-      verified: false,
-      reason: "release manifest is not readable JSON",
-    };
-  }
-  if (!isRecord(manifest)) {
-    return {
-      release: releasePath,
-      verified: false,
-      reason: "release manifest is not readable JSON",
-    };
+    manifest = loadReleaseJson(
+      manifestPath,
+      isRecord,
+      "verify.release_manifest_unreadable",
+      "release manifest",
+      true,
+    ) as Record<string, unknown>;
+  } catch (exc) {
+    return softFail(exc);
   }
 
   let manifestDigest: string;
@@ -633,19 +742,15 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
     if (!(exc instanceof CanonicalizationError) && !(exc instanceof RangeError)) {
       throw exc;
     }
-    return {
-      release: releasePath,
-      verified: false,
-      reason: "release manifest cannot be canonicalized",
-    };
+    return softFail(refusal("verify.release_manifest_uncanonical"));
   }
-  const problems: string[] = [];
+  const problems: VerifyRefusal[] = [];
   const artifacts = Array.isArray(manifest.artifacts) ? manifest.artifacts : [];
   for (const raw of artifacts) {
     const artifact = isRecord(raw) ? raw : {};
     const name = artifact.name;
     if (typeof name !== "string") {
-      problems.push("release manifest has an artifact entry with no name");
+      problems.push(refusal("verify.release_artifact_unnamed"));
       continue;
     }
     const artifactFile = confineToRoot(releasePath, name);
@@ -660,61 +765,60 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
       content = null;
     }
     if (content === null) {
-      problems.push(`missing artifact ${name}`);
+      problems.push(refusal("verify.release_artifact_missing", { name }));
       continue;
     }
     const actual = `sha256:${createHash("sha256").update(content).digest("hex")}`;
     if (actual !== artifact.digest) {
-      problems.push(`digest mismatch for ${name}`);
+      problems.push(refusal("verify.release_artifact_digest", { name }));
     }
   }
 
   requireReleaseReadable(releasePath, signaturesPath);
-  let signatureEntries: unknown;
+  let signatureEntries: unknown[];
   try {
-    signatureEntries = readUntrustedJsonFile(signaturesPath);
-  } catch {
-    // The bare 3-field soft-fail shape (`_verify_release_soft_fail`'s own shape) -- Python computes
+    signatureEntries = loadReleaseJson(
+      signaturesPath,
+      Array.isArray,
+      "verify.release_signatures_unreadable",
+      "release signatures",
+    ) as unknown[];
+  } catch (exc) {
+    // The bare soft-fail shape (`_verify_release_soft_fail`'s own shape) -- Python computes
     // `manifest_digest` as a local before this point too, but never adds it to `result.data` on this
     // path, so this port must not either (a field TS alone would carry is a real parity bug, not a
     // cosmetic one: a consumer branching on the field's presence would see a different shape per engine).
-    return {
-      release: releasePath,
-      verified: false,
-      reason: "release signatures are not readable JSON",
-    };
-  }
-  if (!Array.isArray(signatureEntries)) {
-    return {
-      release: releasePath,
-      verified: false,
-      reason: "release signatures are not readable JSON",
-    };
+    return softFail(exc);
   }
 
   const signers: Array<{ profile: string | null; identity: string }> = [];
   for (const raw of signatureEntries) {
     if (!isRecord(raw)) {
-      problems.push("signature (None): signature entry is not an object");
+      problems.push(
+        refusal(
+          "verify.release_signature",
+          { profile: "None" },
+          refusal("verify.release_signature_not_object"),
+        ),
+      );
       continue;
     }
     const profile = typeof raw.profile === "string" ? raw.profile : null;
     try {
       if (!("envelope" in raw)) {
-        throw new Error("'envelope'");
+        throw refusal("verify.release_envelope_missing");
       }
       const verified = verifyEnvelope(raw.envelope, trust);
       if (statementSubjectDigest(verified.payload) !== manifestDigest) {
-        throw new Error("signature does not cover the release manifest");
+        throw refusal("verify.release_manifest_not_covered");
       }
       signers.push({ profile, identity: verified.identity });
     } catch (exc) {
-      const message = exc instanceof Error ? exc.message : String(exc);
-      problems.push(`signature (${profile ?? "None"}): ${message}`);
+      problems.push(refusal("verify.release_signature", { profile: profile ?? "None" }, exc));
     }
   }
   if (problems.length === 0 && signers.length === 0) {
-    problems.push("release bundle carries no signatures");
+    problems.push(refusal("verify.release_no_signatures"));
   }
 
   if (problems.length === 0) {
@@ -725,6 +829,6 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
     verified: false,
     manifest_digest: manifestDigest,
     signers,
-    reason: problems.join("; "),
+    ...refused(...problems),
   };
 }
