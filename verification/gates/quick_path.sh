@@ -45,7 +45,7 @@ run_step() {
 }
 
 # Every assertion in $1/assertions.json has outcome $2 (python3 -c does the one-outcomes check used
-# by both step 1 and step 2).
+# by step 1).
 assert_only_outcome() {
   local out="$1" expected="$2" label="$3"
   local outcomes
@@ -68,17 +68,21 @@ run_step "step 1 (records/, default catalog)" 0 "$work/step1.out" "$work/step1.e
 assert_only_outcome "$work/step1" insufficient_evidence "step 1"
 
 # Step 2: the very same derived evidence, reduced to a formal --bundle/--profile assessment -- every
-# assertion flips to not_applicable and the run judges nothing (exit 3, input.nothing_evaluated):
-# the bundle side of the divergence this gate exists to prove.
-run_step "step 2 (--bundle/--profile on the same evidence)" 3 "$work/step2.json" "$work/step2.err" \
+# control the records give no population for flips to not_applicable (the bundle side of the
+# divergence this gate exists to prove). DOC-01 is the one exception: the records hold a ToolCall,
+# which is DOC-01's population, and no BundleLoaded manifest declaring it, so DOC-01 reads
+# insufficient_evidence and, being severity high, the run exits 2.
+run_step "step 2 (--bundle/--profile on the same evidence)" 2 "$work/step2.json" "$work/step2.err" \
   assess --bundle "$work/step1/records-bundle" --profile "$work/step1/applicability.yaml" \
   --out "$work/step2" --json
-python3 -c "
+outcomes="$(python3 -c "
 import json
-error = json.load(open('$work/step2.json'))
-exit(0 if error['error']['key'] == 'input.nothing_evaluated' else 1)
-" || fail "step 2: expected error key input.nothing_evaluated"
-assert_only_outcome "$work/step2" not_applicable "step 2"
+data = json.load(open('$work/step2/assertions.json'))
+print(sorted({(a['outcome'] if a['control'] == 'DOC-01' else 'other:' + a['outcome']) for a in data}))
+")"
+if [ "$outcomes" != "['insufficient_evidence', 'other:not_applicable']" ]; then
+  fail "step 2: expected DOC-01 insufficient_evidence and every other control not_applicable, got $outcomes"
+fi
 
 # Step 3: the same records folder against the gate-only QP-UNLOCK catalog -- a self-reported
 # ToolCall but no ModelCall leaves exactly one requirement missing: one assertion

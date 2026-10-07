@@ -16,6 +16,10 @@ fails if a gate in `gates.json` is not named in this file.
 - `VG-CATALOG-RULE-UNIQUE` (18.37a): DOC-01 no longer shares a rule with REC-01, so the baseline catalog's
   pair list is empty and its ceiling drops from 1 to 0, and eu-ai-act's drops from 26 to 25. The ceiling
   fault now raises baseline's ceiling from 0 to 1.
+- `VG-QUICK-PATH` (18.37a): step 2, the records folder's derived bundle and profile run through
+  `assess --bundle`, no longer expects every control to be not applicable. The records hold a `ToolCall`
+  and no manifest declaring it, so DOC-01 reads insufficient evidence and the run exits 2. Every other
+  control still reads not applicable.
 
 ## 0.60.0
 
