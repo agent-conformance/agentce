@@ -37,6 +37,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from collections.abc import Iterator
 from typing import Any
 
 from cryptography.exceptions import InvalidSignature
@@ -404,6 +405,23 @@ class KeylessSigner(Signer):
 # --- Trust root. ---
 
 
+def _trust_entries(
+    data: dict[str, Any], field_name: str, shape: str
+) -> Iterator[tuple[str, dict[str, Any]]]:
+    """The ``(id, entry)`` pairs of a trust root's ``keys`` or ``certificate_authorities`` mapping, with
+    one stable cause per malformed shape (18.80): the same words in all three engines, never the text of
+    whatever exception a bad shape would otherwise raise. A falsy value is no entries, as before."""
+    mapping = data.get(field_name) or {}
+    if not isinstance(mapping, dict):
+        raise ValueError(f"{field_name} is not a mapping of {shape}")
+    for entry_id, entry in mapping.items():
+        if not isinstance(entry, dict):
+            raise ValueError(f"{field_name} entry {entry_id!r} is not a mapping")
+        if entry.get("public_key") is None:
+            raise ValueError(f"{field_name} entry {entry_id!r} has no public_key")
+        yield entry_id, entry
+
+
 @dataclass
 class TrustRoot:
     """The offline material a verifier trusts: pinned KMS keys and keyless certificate authorities."""
@@ -424,7 +442,7 @@ class TrustRoot:
         `verify_envelope`/`--expect-keyid` would then accept as if it were the real signer (SPEC §9.1)."""
         keys: dict[str, Ed25519PublicKey] = {}
         identities: dict[str, str] = {}
-        for keyid, entry in (data.get("keys") or {}).items():
+        for keyid, entry in _trust_entries(data, "keys", "key id to key entry"):
             public_key = load_public_ed25519(entry["public_key"])
             if keyid_for(public_key) != keyid:
                 raise VerificationError(
@@ -434,7 +452,9 @@ class TrustRoot:
             identities[keyid] = entry.get("identity", keyid)
         authorities = {
             issuer: load_public_ed25519(entry["public_key"])
-            for issuer, entry in (data.get("certificate_authorities") or {}).items()
+            for issuer, entry in _trust_entries(
+                data, "certificate_authorities", "id to entry"
+            )
         }
         return cls(
             keys=keys,

@@ -14,6 +14,7 @@ import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { confineToRoot } from "./bundle";
 import { CanonicalizationError, canonicalize, sha256Hex } from "./canonical";
+import { errorCause } from "./errorCatalogue";
 import {
   InputError,
   isPermissionError,
@@ -22,7 +23,6 @@ import {
   unreadableRel,
 } from "./errors";
 import { NonCanonicalNumber, parseJson } from "./json";
-import { errorCause } from "./messages";
 import { pyTruthy } from "./readiness";
 import { digestTree } from "./report";
 import { dssePae, keyidFor } from "./sign";
@@ -49,16 +49,30 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   );
 }
 
-/** Mirrors Python's `(data.get(field) or {}).items()`: a falsy value is no entries; a plain object
- * is returned as-is; any other truthy value throws, as Python's `.items()` on it would. */
-function asMapping(value: unknown): Record<string, unknown> {
+/** The `(id, entry)` pairs of a trust root's `keys` or `certificate_authorities`, as Python's
+ * `signing._trust_entries`: a falsy value is no entries, and each malformed shape gets one stable
+ * cause, the same words in all three engines (18.80). */
+function* trustEntries(
+  data: Record<string, unknown>,
+  field: string,
+  shape: string,
+): Generator<[string, Record<string, unknown>]> {
+  const value = data[field];
+  let mapping: Record<string, unknown> = {};
   if (isRecord(value)) {
-    return value;
+    mapping = value;
+  } else if (pyTruthy(value)) {
+    throw new Error(`${field} is not a mapping of ${shape}`);
   }
-  if (!pyTruthy(value)) {
-    return {};
+  for (const [id, entry] of Object.entries(mapping)) {
+    if (!isRecord(entry)) {
+      throw new Error(`${field} entry ${pyRepr(id)} is not a mapping`);
+    }
+    if (entry.public_key === undefined || entry.public_key === null) {
+      throw new Error(`${field} entry ${pyRepr(id)} has no public_key`);
+    }
+    yield [id, entry];
   }
-  throw new Error("not a mapping");
 }
 
 /** The deepest container nesting {@link parseUntrustedJson} accepts (mirrors `signing.MAX_JSON_DEPTH`,
@@ -241,12 +255,10 @@ export class TrustRoot {
   /** Loads a trust root from its JSON shape. Every `keys` entry's declared id must equal
    * `keyidFor` of the key it maps to (`signing.py:295-297`). The top-level-is-an-object check is
    * `loadTrustRoot`'s, as in Python (`signing.py:570-571`). `keys`/`certificate_authorities` go
-   * through {@link asMapping}, Python's `data.get(field) or {}`. */
+   * through {@link trustEntries}, Python's `_trust_entries`. */
   static fromDict(data: Record<string, unknown>): TrustRoot {
     const keys = new Map<string, KeyEntry>();
-    const keysIn = asMapping(data.keys);
-    for (const [keyid, raw] of Object.entries(keysIn)) {
-      const entry = isRecord(raw) ? raw : {};
+    for (const [keyid, entry] of trustEntries(data, "keys", "key id to key entry")) {
       const publicKeyRaw = b64dStrict(String(entry.public_key));
       if (keyidFor(publicKeyRaw) !== keyid) {
         // Python's `from_dict` raises its own `VerificationError` here directly, so
@@ -259,9 +271,7 @@ export class TrustRoot {
       keys.set(keyid, { publicKeyRaw, identity });
     }
     const authorities = new Map<string, AuthorityEntry>();
-    const authsIn = asMapping(data.certificate_authorities);
-    for (const [issuer, raw] of Object.entries(authsIn)) {
-      const entry = isRecord(raw) ? raw : {};
+    for (const [issuer, entry] of trustEntries(data, "certificate_authorities", "id to entry")) {
       authorities.set(issuer, { publicKeyRaw: b64dStrict(String(entry.public_key)) });
     }
     return new TrustRoot(keys, authorities);

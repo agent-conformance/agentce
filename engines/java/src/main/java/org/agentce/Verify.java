@@ -177,7 +177,7 @@ public final class Verify {
     /** {@code <key>: <cause>} with the catalogue's cause text, minus its final period (the aggregate
      * reasons that wrap it add their own); mirrors {@code signing._certificate_refusal}. */
     private static IllegalArgumentException certificateRefusal(String key) {
-        String cause = Messages.errorCause(key);
+        String cause = ErrorCatalogue.errorCause(key);
         if (cause.endsWith(".")) {
             cause = cause.substring(0, cause.length() - 1);
         }
@@ -247,15 +247,15 @@ public final class Verify {
          * keyid mapped to an attacker's key) is refused, not silently accepted (matches {@code
          * signing.py:295-297}). {@code data} is already an object: the top-level check is a separate
          * stage in {@link #loadTrustRoot}, as in Python's {@code load_trust_root}. {@code keys}/{@code
-         * certificate_authorities} each go through {@link #asMapping}, Python's {@code data.get(field)
-         * or {}} (18.36). */
+         * certificate_authorities} each go through {@link #trustMapping} and {@link #trustEntry},
+         * Python's {@code _trust_entries} (18.36, 18.80). */
         public static TrustRoot fromDict(JsonNode data) {
             Map<String, KeyEntry> keys = new LinkedHashMap<>();
-            var keyIt = asMapping(data.get("keys")).fields();
+            var keyIt = trustMapping(data, "keys", "key id to key entry").fields();
             while (keyIt.hasNext()) {
                 var entry = keyIt.next();
                 String keyid = entry.getKey();
-                JsonNode value = entry.getValue();
+                JsonNode value = trustEntry("keys", keyid, entry.getValue());
                 byte[] raw = b64dStrict(value.get("public_key"));
                 if (!Sign.keyidFor(raw).equals(keyid)) {
                     // Python's `from_dict` raises its own VerificationError here, which
@@ -268,10 +268,11 @@ public final class Verify {
                 keys.put(keyid, new KeyEntry(raw, identity != null ? identity : keyid));
             }
             Map<String, AuthorityEntry> authorities = new LinkedHashMap<>();
-            var authIt = asMapping(data.get("certificate_authorities")).fields();
+            var authIt = trustMapping(data, "certificate_authorities", "id to entry").fields();
             while (authIt.hasNext()) {
                 var entry = authIt.next();
-                authorities.put(entry.getKey(), new AuthorityEntry(b64dStrict(entry.getValue().get("public_key"))));
+                JsonNode value = trustEntry("certificate_authorities", entry.getKey(), entry.getValue());
+                authorities.put(entry.getKey(), new AuthorityEntry(b64dStrict(value.get("public_key"))));
             }
             return new TrustRoot(keys, authorities);
         }
@@ -308,16 +309,32 @@ public final class Verify {
         }
     }
 
-    /** Python's {@code (value or {})}: a falsy value is an empty mapping; an object is itself; any
-     * other value throws, as Python's {@code .items()} on it would. */
-    private static JsonNode asMapping(JsonNode value) {
+    /** A trust root's {@code keys} or {@code certificate_authorities} mapping, as Python's {@code
+     * signing._trust_entries}: a falsy value is no entries, any other non-object gets one stable cause,
+     * the same words in all three engines (18.80). */
+    private static JsonNode trustMapping(JsonNode data, String field, String shape) {
+        JsonNode value = data.get(field);
         if (value != null && value.isObject()) {
             return value;
         }
         if (!Readiness.pyTruthy(value)) {
             return Json.nodes().objectNode();
         }
-        throw new IllegalArgumentException("not a mapping");
+        throw new IllegalArgumentException(field + " is not a mapping of " + shape);
+    }
+
+    /** One entry of {@link #trustMapping}'s mapping: an object with a {@code public_key}, or one stable
+     * cause naming the entry (its id quoted as Python's repr quotes it). */
+    private static JsonNode trustEntry(String field, String id, JsonNode entry) {
+        String quoted = Readiness.pyRepr(Json.nodes().textNode(id));
+        if (entry == null || !entry.isObject()) {
+            throw new IllegalArgumentException(field + " entry " + quoted + " is not a mapping");
+        }
+        JsonNode publicKey = entry.get("public_key");
+        if (publicKey == null || publicKey.isNull()) {
+            throw new IllegalArgumentException(field + " entry " + quoted + " has no public_key");
+        }
+        return entry;
     }
 
     /** Reads and parses a trust root file ({@code --trust-root}-shaped JSON) at {@code path}, in
