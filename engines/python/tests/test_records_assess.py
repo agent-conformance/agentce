@@ -20,6 +20,7 @@ import pytest
 import yaml
 
 from agentce import bundle, cli, records
+from agentce.ingest import _max_nesting
 from agentce.tools.validate_profile import validate_profile
 from conftest import unwritable_dir
 
@@ -914,8 +915,8 @@ def _nested(depth: int, text: str = "x") -> bytes:
             b'"probe", "value": {',
             b'"probe", "nest": ' + b"[" * extra + b"]" * extra + b', "value": {',
         )
-        if records._depth(nested) >= depth:
-            assert records._depth(nested) == depth
+        if _max_nesting(nested.decode("latin-1")) >= depth:
+            assert _max_nesting(nested.decode("latin-1")) == depth
             return nested
         extra += 1
 

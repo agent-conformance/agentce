@@ -36,7 +36,7 @@ const JSON_WHITESPACE_EDGES = /^[ \t\r\n]+|[ \t\r\n]+$/g;
  * \r\n or a lone \r. Split on bytes, before decoding, so each line is decoded (and refused) on its
  * own; \r and \n never occur inside a multi-byte UTF-8 sequence.
  */
-function splitLines(raw: Uint8Array): Uint8Array[] {
+export function splitLines(raw: Uint8Array): Uint8Array[] {
   const lines: Uint8Array[] = [];
   let start = 0;
   for (let i = 0; i < raw.length; i++) {
@@ -76,7 +76,7 @@ function bracketCount(line: string): number {
   return count;
 }
 
-function maxNesting(line: string): number {
+export function maxNesting(line: string): number {
   let depth = 0;
   let deepest = 0;
   let inString = false;

@@ -29,6 +29,7 @@ from .. import bundle, bundled
 from ..activity import summarize_activity
 from ..canonical import canonical_string
 from ..errors import InputError
+from ..ingest import _max_nesting
 from ..profile import Profile
 from . import otel_genai
 
@@ -178,31 +179,10 @@ LONE_SURROGATE = (
 )
 
 
-def _depth(payload: bytes) -> int:
-    """The deepest ``[``/``{`` nesting in ``payload``'s bytes, not counting brackets inside JSON strings."""
-    depth = deepest = 0
-    in_string = escaped = False
-    for byte in payload:
-        if in_string:
-            if escaped:
-                escaped = False
-            elif byte == 0x5C:
-                escaped = True
-            elif byte == 0x22:
-                in_string = False
-        elif byte == 0x22:
-            in_string = True
-        elif byte in (0x5B, 0x7B):
-            depth += 1
-            deepest = max(deepest, depth)
-        elif byte in (0x5D, 0x7D):
-            depth -= 1
-    return deepest
-
-
 def _adapt(payload: bytes, subject: str) -> otel_genai.AdaptResult:
     """Adapt one OTLP/JSON document; raise ``ValueError`` when it is not a trace export."""
-    if _depth(payload) > MAX_RECORD_DEPTH:
+    # Latin-1 maps each byte to one code point, and the bytes the count reads are all ASCII.
+    if _max_nesting(payload.decode("latin-1")) > MAX_RECORD_DEPTH:
         raise ValueError(NESTED_TOO_DEEPLY)
     try:
         result = otel_genai.adapt(payload, subject=subject, source_class=SOURCE_CLASS)

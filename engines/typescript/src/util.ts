@@ -38,16 +38,22 @@ export function jsonStringifyAscii(value: unknown, indent?: number): string {
   return out;
 }
 
-/** Write `records` to `path` as one compact JSON object per line, in input order, keys sorted and
- * non-ASCII escaped as Python's `json.dumps(sort_keys=True, separators=(",", ":"))` writes them
- * (applicability.jsonl and integrity.jsonl are compared byte for byte by VG-RECORDS-FOLDER-PARITY). */
+/** `records` as JSON Lines: one compact JSON object per line, in input order, keys sorted and
+ * non-ASCII escaped as Python's `json.dumps(sort_keys=True, separators=(",", ":"))` writes them, each
+ * line ended by `\n`; the empty string when there are none. */
+export function jsonlText(records: Iterable<unknown>): string {
+  let out = "";
+  for (const record of records) {
+    out += `${jsonStringifyAscii(sortKeysDeep(record))}\n`;
+  }
+  return out;
+}
+
+/** Write `records` to `path` as {@link jsonlText} (applicability.jsonl and integrity.jsonl are
+ * compared byte for byte by VG-RECORDS-FOLDER-PARITY). */
 export function writeJsonl(records: Iterable<unknown>, path: string): void {
   mkdirSync(dirname(path), { recursive: true });
-  const lines: string[] = [];
-  for (const record of records) {
-    lines.push(jsonStringifyAscii(sortKeysDeep(record)));
-  }
-  writeFileSync(path, lines.length > 0 ? `${lines.join("\n")}\n` : "");
+  writeFileSync(path, jsonlText(records));
 }
 
 /**

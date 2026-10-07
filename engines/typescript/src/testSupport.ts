@@ -1,8 +1,25 @@
-/** Shared test-only helpers for exercising unwritable-directory error paths. */
+/** Shared test-only helpers: unwritable-directory error paths and running the CLI for its envelope. */
 
 import { constants, accessSync, chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { main } from "./cli";
+
+/** Run `agentce <argv> --json` in-process; return its exit code and the parsed `--json` envelope. */
+export function runJson(argv: string[]): { exitCode: number; envelope: Record<string, unknown> } {
+  const lines: string[] = [];
+  const original = console.log;
+  console.log = (line: string) => {
+    lines.push(line);
+  };
+  let exitCode: number;
+  try {
+    exitCode = main([...argv, "--json"]);
+  } finally {
+    console.log = original;
+  }
+  return { exitCode, envelope: JSON.parse(lines.join("\n")) };
+}
 
 /**
  * Creates a fresh temp directory, chmods it to 0o555, and runs `body` against it -- unless this

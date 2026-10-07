@@ -6,7 +6,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { InputError } from "./errors";
-import { jsonStringifyAscii, sortKeysDeep } from "./util";
+import { jsonlText } from "./util";
 
 export enum QuarantineReason {
   SCHEMA_INVALID = "schema_invalid",
@@ -63,16 +63,10 @@ export function countsByReason(records: Iterable<QuarantineRecord>): Record<stri
 
 /** Write `records` to `path` as one JSON object per line, in input order. Return the count written. */
 export function writeQuarantine(records: Iterable<QuarantineRecord>, path: string): number {
-  let written = 0;
-  const lines: string[] = [];
-  for (const record of records) {
-    // Python's `json.dumps(sort_keys=True, separators=(",", ":"))`: keys sorted, non-ASCII escaped.
-    lines.push(jsonStringifyAscii(sortKeysDeep(quarantineToJson(record))));
-    written += 1;
-  }
+  const rows = Array.from(records, quarantineToJson);
   try {
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, lines.length > 0 ? `${lines.join("\n")}\n` : "");
+    writeFileSync(path, jsonlText(rows));
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     throw new InputError(
@@ -81,5 +75,5 @@ export function writeQuarantine(records: Iterable<QuarantineRecord>, path: strin
       "choose a writable --out directory.",
     );
   }
-  return written;
+  return rows.length;
 }

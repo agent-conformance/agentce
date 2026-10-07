@@ -141,11 +141,8 @@ interface Analysis {
   text: number[];
   empty: boolean;
   multiline: boolean;
-  allowFlowPlain: boolean;
   allowBlockPlain: boolean;
   allowSingleQuoted: boolean;
-  allowDoubleQuoted: boolean;
-  allowBlock: boolean;
 }
 
 /** Emitter.analyze_scalar with `allow_unicode=False`. */
@@ -156,15 +153,11 @@ function analyzeScalar(scalar: string): Analysis {
       text,
       empty: true,
       multiline: false,
-      allowFlowPlain: false,
       allowBlockPlain: true,
       allowSingleQuoted: true,
-      allowDoubleQuoted: true,
-      allowBlock: false,
     };
   }
   let blockIndicators = false;
-  let flowIndicators = false;
   let lineBreaks = false;
   let specialCharacters = false;
   let leadingSpace = false;
@@ -175,7 +168,6 @@ function analyzeScalar(scalar: string): Analysis {
   let spaceBreak = false;
   if (scalar.startsWith("---") || scalar.startsWith("...")) {
     blockIndicators = true;
-    flowIndicators = true;
   }
   let precededByWhitespace = true;
   let followedByWhitespace = text.length === 1 || isSpaceOrBreakOrNul(text[1] as number);
@@ -185,28 +177,11 @@ function analyzeScalar(scalar: string): Analysis {
     const ch = text[index] as number;
     const c = String.fromCodePoint(ch);
     if (index === 0) {
-      if ("#,[]{}&*!|>'\"%@`".includes(c)) {
-        flowIndicators = true;
-        blockIndicators = true;
-      }
-      if (c === "?" || c === ":") {
-        flowIndicators = true;
-        if (followedByWhitespace) blockIndicators = true;
-      }
-      if (c === "-" && followedByWhitespace) {
-        flowIndicators = true;
-        blockIndicators = true;
-      }
+      if ("#,[]{}&*!|>'\"%@`".includes(c)) blockIndicators = true;
+      if ((c === "?" || c === ":" || c === "-") && followedByWhitespace) blockIndicators = true;
     } else {
-      if (",?[]{}".includes(c)) flowIndicators = true;
-      if (c === ":") {
-        flowIndicators = true;
-        if (followedByWhitespace) blockIndicators = true;
-      }
-      if (c === "#" && precededByWhitespace) {
-        flowIndicators = true;
-        blockIndicators = true;
-      }
+      if (c === ":" && followedByWhitespace) blockIndicators = true;
+      if (c === "#" && precededByWhitespace) blockIndicators = true;
     }
     if (isBreak(ch)) lineBreaks = true;
     if (!(ch === 0x0a || (ch >= 0x20 && ch <= 0x7e))) {
@@ -234,30 +209,22 @@ function analyzeScalar(scalar: string): Analysis {
     followedByWhitespace =
       index + 1 >= text.length || isSpaceOrBreakOrNul(text[index + 1] as number);
   }
-  let allowFlowPlain = true;
   let allowBlockPlain = true;
   let allowSingleQuoted = true;
-  let allowBlock = true;
   if (leadingSpace || leadingBreak || trailingSpace || trailingBreak) {
-    allowFlowPlain = allowBlockPlain = false;
+    allowBlockPlain = false;
   }
-  if (trailingSpace) allowBlock = false;
-  if (breakSpace) allowFlowPlain = allowBlockPlain = allowSingleQuoted = false;
+  if (breakSpace) allowBlockPlain = allowSingleQuoted = false;
   if (spaceBreak || specialCharacters) {
-    allowFlowPlain = allowBlockPlain = allowSingleQuoted = allowBlock = false;
+    allowBlockPlain = allowSingleQuoted = false;
   }
-  if (lineBreaks) allowFlowPlain = allowBlockPlain = false;
-  if (flowIndicators) allowFlowPlain = false;
-  if (blockIndicators) allowBlockPlain = false;
+  if (lineBreaks || blockIndicators) allowBlockPlain = false;
   return {
     text,
     empty: false,
     multiline: lineBreaks,
-    allowFlowPlain,
     allowBlockPlain,
     allowSingleQuoted,
-    allowDoubleQuoted: true,
-    allowBlock,
   };
 }
 
@@ -462,7 +429,7 @@ class Emitter {
     for (let end = 0; end <= text.length; end++) {
       const ch = end < text.length ? (text[end] as number) : null;
       if (spaces) {
-        if (ch === null || ch !== 0x20) {
+        if (ch !== 0x20) {
           if (
             start + 1 === end &&
             this.column > BEST_WIDTH &&

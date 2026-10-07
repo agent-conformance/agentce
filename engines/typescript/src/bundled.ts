@@ -10,6 +10,10 @@
 
 import { join } from "node:path";
 
+/** The cross-standard baseline a run evaluates when nothing names a catalog (Python's
+ * `bundled.DEFAULT_LENS`). */
+export const DEFAULT_LENS = "baseline@2026.09";
+
 function dataRoot(): string {
   return join(__dirname, "..", "data");
 }

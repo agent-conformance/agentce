@@ -7,7 +7,6 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
-import { main } from "./cli";
 import { AgentceError } from "./errors";
 import { profileFromDict } from "./profile";
 import {
@@ -19,6 +18,7 @@ import {
   recordsSubject,
   scanRecords,
 } from "./records";
+import { runJson } from "./testSupport";
 
 const FIXTURES = join(__dirname, "..", "..", "..", "adapters", "otel-genai", "fixtures");
 const SESSION = readFileSync(join(FIXTURES, "otel-genai-agent-session", "input.json"), "utf-8");
@@ -343,21 +343,6 @@ test("a passed-back profile with several subjects keeps id-less records off the 
   );
   assert.deepEqual(evaluated.subjects[2]?.declaredTools, []);
 });
-
-function runJson(argv: string[]): { exitCode: number; envelope: Record<string, unknown> } {
-  const lines: string[] = [];
-  const original = console.log;
-  console.log = (line: string) => {
-    lines.push(line);
-  };
-  let exitCode: number;
-  try {
-    exitCode = main([...argv, "--json"]);
-  } finally {
-    console.log = original;
-  }
-  return { exitCode, envelope: JSON.parse(lines.join("\n")) };
-}
 
 function errorKey(envelope: Record<string, unknown>): unknown {
   return (envelope.error as Record<string, unknown> | undefined)?.message_key;

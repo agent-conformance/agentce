@@ -3,6 +3,7 @@
 
 import { createHash } from "node:crypto";
 import {
+  type Dirent,
   type Stats,
   lstatSync,
   mkdirSync,
@@ -16,8 +17,10 @@ import {
 import { basename, dirname, join, posix } from "node:path";
 import { summarizeActivity } from "./activity";
 import { confineToRoot, resolveLoose, safeIsFile } from "./bundle";
+import { DEFAULT_LENS } from "./bundled";
 import { CanonicalizationError, canonicalString } from "./canonical";
 import { InputError } from "./errors";
+import { maxNesting, splitLines } from "./ingest";
 import { type AdaptResult, OtelGenaiAdapterError, adapt } from "./otelGenai";
 import { type Profile, profileFromDict } from "./profile";
 import { safeDump } from "./pyyaml";
@@ -43,8 +46,6 @@ export const BUNDLE_DIR = "records-bundle";
 export const DERIVED_PROFILE_FILE = "applicability.yaml";
 /** The subject id a scan uses when the records name no agent, or name exactly one by no real id. */
 export const DEFAULT_SUBJECT = "agentce:subject/local";
-/** The cross-standard baseline the derived profile names (Python's `bundled.DEFAULT_LENS`). */
-const DEFAULT_LENS = "baseline@2026.09";
 /** Python's `bundle.DEFAULT_MAX_MANIFEST_FILE_BYTES`: the per-file size limit. */
 const MAX_FILE_BYTES = 512 * 1024 * 1024;
 /** How many lines of a JSON Lines file that were not trace exports are named in the summary. */
@@ -108,6 +109,8 @@ export interface RecordsSummary {
 
 /** What a records folder held: the adapted events and the summary of how they were found. */
 export class ScannedRecords {
+  private derived: Record<string, unknown> | undefined;
+
   constructor(
     readonly events: Event[],
     readonly subjects: string[],
@@ -118,9 +121,11 @@ export class ScannedRecords {
 
   /** The default applicability profile (SPEC §6.5), field for field Python's `ScannedRecords.profile`;
    * every subject shares one `evidence_sources` list, as Python's does, so the YAML carries the same
-   * anchor. */
+   * anchor. Built once: the events are already in time order, so the window is the first and last. */
   profile(): Record<string, unknown> {
-    const times = this.events.map((e) => String(e.time)).sort(byteCompare);
+    if (this.derived !== undefined) {
+      return this.derived;
+    }
     const evidenceSources = [...this.sources.keys()].sort(byteCompare).map((source) => ({
       adapter: ADAPTER,
       source,
@@ -128,11 +133,17 @@ export class ScannedRecords {
       class_justification: CLASS_JUSTIFICATION,
     }));
     const empty: Profile = { profileVersion: 1, observationWindow: {}, subjects: [], catalogs: [] };
+    const bySubject = new Map<unknown, Event[]>();
+    for (const event of this.events) {
+      const group = bySubject.get(event.subject);
+      if (group === undefined) {
+        bySubject.set(event.subject, [event]);
+      } else {
+        group.push(event);
+      }
+    }
     const subjects = this.subjects.map((id) => {
-      const seen = summarizeActivity(
-        this.events.filter((e) => e.subject === id),
-        empty,
-      );
+      const seen = summarizeActivity(bySubject.get(id) ?? [], empty);
       return {
         id,
         name: "Agent records",
@@ -142,18 +153,24 @@ export class ScannedRecords {
         declared_models: seen.models.map((m) => m.name),
       };
     });
-    return {
+    const first = this.events[0];
+    const last = this.events[this.events.length - 1];
+    this.derived = {
       profile_version: 1,
-      observation_window: { start: times[0], end: times[times.length - 1] },
+      observation_window: {
+        start: first === undefined ? undefined : String(first.time),
+        end: last === undefined ? undefined : String(last.time),
+      },
       pilot_window: true,
       catalogs: [DEFAULT_LENS],
       subjects,
     };
+    return this.derived;
   }
 
   /** Write the evidence bundle under `outDir` (replacing a previous run's) and, when `writeProfile`,
-   * the default profile beside it; return the bundle directory. */
-  write(outDir: string, writeProfile: boolean): string {
+   * the default profile beside it. */
+  write(outDir: string, writeProfile: boolean): void {
     const root = join(outDir, BUNDLE_DIR);
     try {
       try {
@@ -200,35 +217,15 @@ export class ScannedRecords {
         "choose a writable --out directory.",
       );
     }
-    return root;
   }
 }
 
-/** The deepest `[`/`{` nesting in `payload`'s bytes, not counting brackets inside JSON strings. */
+/** The deepest `[`/`{` nesting in `payload`'s bytes, not counting brackets inside JSON strings: the
+ * ingest count over a latin-1 decode, one code point per byte (the bytes it counts are all ASCII). */
 export function rawDepth(payload: Uint8Array): number {
-  let depth = 0;
-  let deepest = 0;
-  let inString = false;
-  let escaped = false;
-  for (const byte of payload) {
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (byte === 0x5c) {
-        escaped = true;
-      } else if (byte === 0x22) {
-        inString = false;
-      }
-    } else if (byte === 0x22) {
-      inString = true;
-    } else if (byte === 0x5b || byte === 0x7b) {
-      depth += 1;
-      deepest = Math.max(deepest, depth);
-    } else if (byte === 0x5d || byte === 0x7d) {
-      depth -= 1;
-    }
-  }
-  return deepest;
+  return maxNesting(
+    Buffer.from(payload.buffer, payload.byteOffset, payload.byteLength).toString("latin1"),
+  );
 }
 
 /** Why a document is not a trace export, as Python's `_adapt` raises it. */
@@ -300,6 +297,10 @@ function within(path: string, root: string): boolean {
   }
 }
 
+function sameAsAny(st: Stats | null, trees: Stats[]): boolean {
+  return st !== null && trees.some((t) => t.dev === st.dev && t.ino === st.ino);
+}
+
 function isSymlink(path: string): boolean {
   try {
     return lstatSync(path).isSymbolicLink();
@@ -322,25 +323,43 @@ function candidates(
 ): Array<[string, string | null]> {
   const found: Array<[string, string | null]> = [];
   const rel = (path: string): string => posix.relative(folder, path);
+  const skipTrees = skip.map(statOrNull).filter((st): st is Stats => st !== null);
   const walk = (here: string): void => {
-    let entries: string[];
+    let entries: Dirent[];
     try {
-      entries = readdirSync(here);
+      entries = readdirSync(here, { withFileTypes: true });
     } catch {
       return; // os.walk skips a folder it cannot list
     }
+    // A symlink is sorted and checked by what it points to (os.walk follows it to classify it); any
+    // other entry by its own type.
     const dirnames: string[] = [];
     const filenames: string[] = [];
-    for (const name of entries) {
-      (isDir(join(here, name)) ? dirnames : filenames).push(name);
+    const links = new Set<string>();
+    const regular = new Set<string>();
+    for (const entry of entries) {
+      const name = entry.name;
+      if (entry.isSymbolicLink()) {
+        links.add(name);
+        (isDir(join(here, name)) ? dirnames : filenames).push(name);
+      } else if (entry.isDirectory()) {
+        dirnames.push(name);
+      } else {
+        filenames.push(name);
+        if (entry.isFile()) {
+          regular.add(name);
+        }
+      }
     }
+    const isFile = (name: string): boolean =>
+      links.has(name) ? safeIsFile(join(here, name)) : regular.has(name);
     const kept: string[] = [];
     for (const d of dirnames.sort(byteCompare)) {
       const path = join(here, d);
-      if (d.startsWith(".") || skip.some((tree) => same(path, tree))) {
+      if (d.startsWith(".") || sameAsAny(statOrNull(path), skipTrees)) {
         continue;
       }
-      if (isSymlink(path)) {
+      if (links.has(d)) {
         unread.push({ path: rel(path), reason: "a symlinked folder is not followed" });
         continue;
       }
@@ -358,7 +377,7 @@ function candidates(
         });
         continue;
       }
-      if (!RECORD_SUFFIXES.has(suffix(name)) || !safeIsFile(path)) {
+      if (!RECORD_SUFFIXES.has(suffix(name)) || !isFile(name)) {
         continue;
       }
       found.push([rel(path), confineToRoot(folder, rel(path))]);
@@ -371,28 +390,8 @@ function candidates(
   return found;
 }
 
-/** Python's `bytes.splitlines()`: lines end at `\n`, `\r\n` or `\r`. */
-function splitLines(raw: Buffer): Buffer[] {
-  const lines: Buffer[] = [];
-  let start = 0;
-  for (let i = 0; i < raw.length; i++) {
-    const byte = raw[i];
-    if (byte === 0x0a || byte === 0x0d) {
-      lines.push(raw.subarray(start, i));
-      if (byte === 0x0d && raw[i + 1] === 0x0a) {
-        i++;
-      }
-      start = i + 1;
-    }
-  }
-  if (start < raw.length) {
-    lines.push(raw.subarray(start));
-  }
-  return lines;
-}
-
 /** Python's `bytes.strip()` is non-empty: the line holds a byte other than ASCII whitespace. */
-function hasContent(line: Buffer): boolean {
+function hasContent(line: Uint8Array): boolean {
   return line.some((b) => !(b === 0x20 || (b >= 0x09 && b <= 0x0d)));
 }
 
@@ -413,11 +412,11 @@ function readRecordFile(path: string, subject: string): FileRead | string {
   } catch (err) {
     return `could not be read: ${strerror(err)}`;
   }
-  const documents: Array<[number, Buffer]> =
+  const documents: Array<[number, Uint8Array]> =
     suffix(basename(path)) === ".json"
       ? [[1, raw]]
       : splitLines(raw)
-          .map((line, i): [number, Buffer] => [i + 1, line])
+          .map((line, i): [number, Uint8Array] => [i + 1, line])
           .filter(([, line]) => hasContent(line));
   const read: FileRead = { results: [], badLines: [] };
   for (const [number, document] of documents) {
@@ -531,11 +530,9 @@ export function scanRecords(folderArg: string, options: ScanOptions = {}): Scann
     }
     counts.spans += spans;
     read.push({ path: rel, spans });
-    if (suffix(basename(path)) !== ".json") {
-      counts.lines_unrecognised += got.badLines.length;
-      for (const [line, reason] of got.badLines.slice(0, MAX_LISTED_LINES - badLines.length)) {
-        badLines.push({ path: rel, line, reason });
-      }
+    counts.lines_unrecognised += got.badLines.length;
+    for (const [line, reason] of got.badLines.slice(0, MAX_LISTED_LINES - badLines.length)) {
+      badLines.push({ path: rel, line, reason });
     }
   }
 

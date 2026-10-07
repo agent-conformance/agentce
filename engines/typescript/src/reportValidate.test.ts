@@ -9,8 +9,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { quickstartDir } from "./bundled";
-import { main } from "./cli";
 import { validateReport } from "./reportValidate";
+import { runJson } from "./testSupport";
 
 const ENGINE = join(__dirname, "..");
 const REPO = join(ENGINE, "..", "..");
@@ -46,19 +46,6 @@ test("the two vendored third-party schemas are byte-identical to spec/report/ven
     assert.equal(vendored, spec, `${name}.schema.json has drifted from spec/report/vendor`);
   }
 });
-
-function runJson(argv: string[]): { exitCode: number; envelope: Record<string, unknown> } {
-  const lines: string[] = [];
-  const original = console.log;
-  console.log = (line: string) => lines.push(line);
-  let exitCode: number;
-  try {
-    exitCode = main([...argv, "--json"]);
-  } finally {
-    console.log = original;
-  }
-  return { exitCode, envelope: JSON.parse(lines.join("\n")) };
-}
 
 function freshFullReport(): string {
   const out = mkdtempSync(join(tmpdir(), "agentce-report-validate-"));

@@ -28,21 +28,7 @@ import { quickstartDir } from "./bundled";
 import { main } from "./cli";
 import { digestBytes, digestTree } from "./report";
 import { keyidFor, signStatement } from "./sign";
-
-function runJson(argv: string[]): { exitCode: number; envelope: Record<string, unknown> } {
-  const lines: string[] = [];
-  const original = console.log;
-  console.log = (line: string) => {
-    lines.push(line);
-  };
-  let exitCode: number;
-  try {
-    exitCode = main([...argv, "--json"]);
-  } finally {
-    console.log = original;
-  }
-  return { exitCode, envelope: JSON.parse(lines.join("\n")) };
-}
+import { runJson } from "./testSupport";
 
 function runText(argv: string[]): { exitCode: number; lines: string[] } {
   const lines: string[] = [];

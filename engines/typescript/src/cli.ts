@@ -16,7 +16,7 @@ import { applyDeviations, assessSubjects, deviationsByControl, evaluatedNothing 
 import { computeAuditorView } from "./auditorView";
 import { computeBlindSpots } from "./blindSpots";
 import { loadBundle } from "./bundle";
-import { catalogsDir as bundledCatalogsDir, quickstartDir } from "./bundled";
+import { DEFAULT_LENS, catalogsDir as bundledCatalogsDir, quickstartDir } from "./bundled";
 import { CanonicalizationError, canonicalString } from "./canonical";
 import { type Catalog, loadCatalog } from "./catalog";
 import { runEcs } from "./conformance";
@@ -91,8 +91,6 @@ import {
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
 const DEFAULT_OUT_DIR = "out";
-/** The catalog an assessment evaluates when nothing names one: the cross-standard baseline. */
-const DEFAULT_LENS = "baseline@2026.09";
 const REPORT_FORMATS = ["md", "html", "oscal", "sarif", "pack"] as const;
 
 function emit(result: CommandResult, json: boolean): void {
@@ -904,16 +902,16 @@ function runAssess(options: AssessOptions): CommandResult {
   // SPEC.md:1076 (SPEC Sec.8.5): exit 2 whenever any assertion is both insufficient_evidence and
   // severity: high -- scoped, as in Python, to the formal --bundle/--profile assessment: a records run
   // never returns 2 on its own, so a first scan is not a failure (VG-RECORDS-EXIT-CODE).
-  const highInsufficient =
-    scanned !== undefined
-      ? []
-      : Array.from(
-          new Set(
-            evaluated
-              .filter((a) => a.outcome === "insufficient_evidence" && a.severity === "high")
-              .map((a) => a.control),
-          ),
-        ).sort();
+  let highInsufficient: string[] = [];
+  if (scanned === undefined) {
+    highInsufficient = Array.from(
+      new Set(
+        evaluated
+          .filter((a) => a.outcome === "insufficient_evidence" && a.severity === "high")
+          .map((a) => a.control),
+      ),
+    ).sort();
+  }
   if (highInsufficient.length > 0) {
     result.addCode(ExitCode.INSUFFICIENT_EVIDENCE);
   }
