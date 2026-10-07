@@ -7,10 +7,17 @@ The engine ships a single command-line tool, `agentce`. Every command supports `
 and returns a documented exit code. The commands below use the Python engine. The TypeScript and Java
 engines implement the same commands (`assess`, `validate`, `report`, `report --validate`, and
 `quickstart`) on the same evaluation path, and their `conformance run` command produces byte-identical
-`assertions.json` files over the simulated corpus. One difference remains. On a damaged report file, such
-as one with bytes that are not valid UTF-8 or a CSV, XML or JSONL file in an unusual shape,
-`report --validate` in TypeScript or Java can disagree with Python. Check such a file with the
-Python engine.
+`assertions.json` files over the simulated corpus. They still differ from Python in these ways, so use the
+Python engine for any of them:
+
+- `assess --for <role>` and `assess --emit <format>` are accepted, and the run exits 0, but TypeScript and
+  Java write only the core outputs, not the role view or the extra formats.
+- At the end of `assess`, TypeScript and Java print a bare `verdict:` line where Python's summary also
+  gives the outcomes, the top gaps and the next step.
+- A profile with a repeated key (`profile_version` twice, for example) stops TypeScript with
+  `internal.unexpected`, while Python and Java keep the last value.
+- On a damaged report file, such as one with bytes that are not valid UTF-8 or a CSV, XML or JSONL file
+  in an unusual shape, `report --validate` in TypeScript or Java can disagree with Python.
 
 ## Declare an applicability profile
 
@@ -67,7 +74,9 @@ uv run --project engines/python agentce assess ./traces --out ./out
 
 The engine reads every trace export it recognises (vendor-native export formats are not read yet), writes an evidence bundle and a default profile under
 `./out` (`./out/applicability.yaml`), and assesses against the baseline lens. It lists each file it could
-not read with the reason, and it stops with exit code `3` and the message key `input.records_none_recognised`
+not read with the reason. It skips a dangling symlink, a symlink loop, a FIFO or a folder named like an
+export without a message, so if a file you expected is missing from the report, check that it is a regular
+file. It stops with exit code `3` and the message key `input.records_none_recognised`
 when the folder holds nothing it can read.
 
 Traces record model calls and tool calls, not decisions, and nothing yet says which tool calls are

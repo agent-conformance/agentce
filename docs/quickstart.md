@@ -36,7 +36,9 @@ uv run --project engines/python agentce assess ./traces --out ./out
 ```
 
 The engine reads the exports it recognises, writes a default profile to `./out/applicability.yaml`, and assesses
-against the baseline lens. Files it cannot read are listed with the reason. See
+against the baseline lens. It lists each file it cannot read with the reason. It skips a dangling symlink, a
+symlink loop, a FIFO or a folder named like an export without a message, so if a file you expected is missing,
+check that it is a regular file. See
 [Running assessments](../website/src/content/docs/docs/running-assessments.md) for what the default profile
 leaves undeclared.
 
