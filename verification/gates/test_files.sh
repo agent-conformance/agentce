@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Shared by gates that name unit test files (18.80): run each named TypeScript test file or Java test
-# class and fail when it is missing or runs no tests, which neither runner does by itself. Source it
+# class and fail when it is missing or declares no tests, which neither runner does by itself. Source it
 # after setting `root` to the repository root.
 
 : "${root:?test_files.sh needs root set to the repository root}"

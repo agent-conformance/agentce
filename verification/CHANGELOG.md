@@ -18,7 +18,7 @@ fails if a gate in `gates.json` is not named in this file.
   `internal.unexpected`). The real CLIs run eight committed trust-root fixtures. Nine seeded faults,
   one or more in each engine.
 - `VG-I18N-ONE-CATALOGUE` (18.80) now fails when a TypeScript test file or Java test class it names is
-  missing or runs no tests: node skipped a missing file and counted a file with no tests as one passing
+  missing or declares no tests: node skipped a missing file and counted a file with no tests as one passing
   test, and Gradle passed while any other class matched. Three new seeded faults point each leg at a
   deleted file, and the TypeScript leg at a file with no tests. The two loader faults follow the
   loaders' new code.

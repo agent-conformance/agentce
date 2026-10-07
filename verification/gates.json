@@ -1453,7 +1453,7 @@
       "invariant": "Every error, warning, and skipped-evaluation reason carries a stable message key.",
       "rubric": {
         "pass": "Python's tests/test_error_catalogue.py, TypeScript's src/errorCatalogue.test.ts and Java's ErrorCatalogueTest each exist, run at least one test and pass (the registry equals the spec catalogue's errors.* pairs, every literal key the engine raises is in it, a missing catalogue is empty while a malformed or non-object one is refused, the six trust-root shapes and a quoted hostile id give their stable causes, a failed digest read is input.digest_unreadable); and the real Python, TypeScript and Java CLIs exit 3 with input.trust_root_invalid and the cause tail in fixtures/trust_root_shapes/expected.txt on each fixture, and agree on an empty keys mapping",
-        "fail": "any engine's test file is missing, runs no tests or fails, or any CLI gives another exit code, key or cause tail on a malformed shape, or refuses or disagrees on the empty keys mapping"
+        "fail": "any engine's test file is missing, declares no tests or fails, or any CLI gives another exit code, key or cause tail on a malformed shape, or refuses or disagrees on the empty keys mapping"
       },
       "faults": [
         {
