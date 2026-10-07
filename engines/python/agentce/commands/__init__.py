@@ -1201,8 +1201,8 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     folder_arg = _opt_str(ns, "folder")
     scanned: ScannedRecords | None = None
     derived_profile = False
-    #: The subjects a records run counts as declared: the adopter's own profile's, or none for a derived one.
-    records_declared_ids: frozenset[str] = frozenset()
+    #: The adopter's own --profile on a records run (None: the run derives one).
+    declared: Profile | None = None
     if folder_arg is None:
         bundle = _require_dir(
             _opt_str(ns, "bundle"), key="bundle", what="the evidence bundle"
@@ -1227,7 +1227,6 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             fix="pass a folder of OpenTelemetry GenAI or OpenInference trace exports.",
         )
         profile_arg = _opt_str(ns, "profile")
-        declared: Profile | None = None
         if profile_arg is not None:
             profile = _require_file(
                 profile_arg, key="profile", what="the applicability profile"
@@ -1235,16 +1234,15 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             declared = Profile.load(profile)
         else:
             profile = Path(out) / DERIVED_PROFILE_FILE
+        forced = _records_subject(declared)
         scanned = scan_records(
             folder,
-            subject=_records_subject(declared),
+            subject=forced,
             exclude=Path(out),
-            per_agent=declared is not None and len(declared.subjects) > 1,
+            per_agent=declared is not None and forced is None,
         )
         derived_profile = declared is None
         profile_obj = _records_profile(declared, scanned)
-        if declared is not None:
-            records_declared_ids = frozenset(s.id for s in declared.subjects)
         bundle = Path(out) / BUNDLE_DIR
     catalog = _opt_str(ns, "catalog")
     # --package-for-sharing (18.8, Hill 3): a records-folder run's evaluation mode
@@ -1500,7 +1498,9 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     # them yet (Hill 7), and not the agents `_records_profile` added for the scan (18.77).
     declared_subject_ids: frozenset[str] | None = None
     if scanned is not None and len(profile_obj.subjects) > 1:
-        declared_subject_ids = records_declared_ids
+        declared_subject_ids = (
+            frozenset(s.id for s in declared.subjects) if declared else frozenset()
+        )
     activity = summarize_activity(
         ingested.accepted, profile_obj, declared_subject_ids=declared_subject_ids
     )
