@@ -87,7 +87,7 @@ export interface PyyamlTimestamp {
   readonly pyyamlTimestamp: string;
 }
 
-function isPyyamlTimestamp(value: unknown): value is PyyamlTimestamp {
+export function isPyyamlTimestamp(value: unknown): value is PyyamlTimestamp {
   return isRecord(value) && typeof value.pyyamlTimestamp === "string";
 }
 
@@ -250,9 +250,10 @@ function defaultImplicit(tag: string): YamlType {
  * string (exactly like PyYAML) while an *unquoted* one resolves the same type PyYAML's own
  * `SafeLoader` would give it -- never `CORE_SCHEMA` (which erases the quoted/unquoted distinction
  * entirely, the opposite-direction bug from js-yaml's built-in `Date`-constructing timestamp type).
- * The **only** call site for this schema (`loadDeviationRegister` below); `catalog.ts`'s YAML `load`
- * calls elsewhere in this engine are untouched. */
-const DEVIATION_REGISTER_SCHEMA = FAILSAFE_SCHEMA.extend({
+ * Used by `loadDeviationRegister` below and by `profile.ts`'s `loadProfile` (a profile `agentce
+ * assess <folder>` derived is written by PyYAML and must read back as PyYAML reads it);
+ * `catalog.ts`'s YAML `load` calls elsewhere in this engine are untouched. */
+export const PYYAML_SAFE_SCHEMA = FAILSAFE_SCHEMA.extend({
   implicit: [
     defaultImplicit("tag:yaml.org,2002:null"),
     pyyamlBoolType,
@@ -363,7 +364,7 @@ export function loadDeviationRegister(path: string): Record<string, unknown>[] {
     // `json: true` disables js-yaml's own duplicate-mapping-key error (PyYAML's `SafeLoader` never
     // rejects a duplicate key -- `BaseConstructor.construct_mapping` just does `dict[key] = value` in
     // document order, so the last occurrence wins, confirmed this item).
-    parsed = yamlLoad(text, { schema: DEVIATION_REGISTER_SCHEMA, json: true });
+    parsed = yamlLoad(text, { schema: PYYAML_SAFE_SCHEMA, json: true });
   } catch (error) {
     if (error instanceof RangeError || /exceeded maxDepth/.test((error as Error).message)) {
       // js-yaml caps nesting (and recurses per level), as PyYAML's composer hits its RecursionError.

@@ -10,6 +10,8 @@
 
 import { readFileSync } from "node:fs";
 import { load } from "js-yaml";
+import { PYYAML_SAFE_SCHEMA, isPyyamlTimestamp, pythonizeTimestamp } from "./readiness";
+import { pyStr } from "./util";
 
 export interface EvidenceSource {
   adapter: string;
@@ -55,11 +57,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Python's `str()` of a value PyYAML's `SafeLoader` resolved: a plain timestamp as `str(datetime)`,
+ * a boolean as `True`/`False`, a null as `None`, so a profile reads the same in both engines. */
+function text(value: unknown): string {
+  return isPyyamlTimestamp(value) ? pythonizeTimestamp(value.pyyamlTimestamp) : pyStr(value);
+}
+
 function strMap(value: unknown): Record<string, string> {
   const out: Record<string, string> = {};
   if (isRecord(value)) {
     for (const [key, val] of Object.entries(value)) {
-      out[String(key)] = String(val);
+      out[key] = text(val);
     }
   }
   return out;
@@ -75,25 +83,25 @@ function asArray(value: unknown): unknown[] {
 
 function parseSubject(raw: Record<string, unknown>): Subject {
   const subject: Subject = {
-    id: String(raw.id),
+    id: text(raw.id),
     name: opt(raw.name),
     role: opt(raw.role),
     evidenceSources: [],
     coverageDenominators: [],
-    declaredDecisionTypes: asArray(raw.declared_decision_types).map(String),
+    declaredDecisionTypes: asArray(raw.declared_decision_types).map(text),
     declaredOversight: strMap(raw.declared_oversight),
     declaredComponents: asArray(raw.third_party_components)
       .filter((c): c is Record<string, unknown> => isRecord(c) && "name" in c)
-      .map((c) => String(c.name)),
-    declaredTools: asArray(raw.declared_tools).map(String),
-    declaredModels: asArray(raw.declared_models).map(String),
+      .map((c) => text(c.name)),
+    declaredTools: asArray(raw.declared_tools).map(text),
+    declaredModels: asArray(raw.declared_models).map(text),
   };
   for (const entry of asArray(raw.evidence_sources)) {
     if (isRecord(entry) && "source" in entry) {
       subject.evidenceSources.push({
-        adapter: String(entry.adapter ?? ""),
-        source: String(entry.source),
-        cls: String(entry.class ?? ""),
+        adapter: text(entry.adapter ?? ""),
+        source: text(entry.source),
+        cls: text(entry.class ?? ""),
         manifest: opt(entry.manifest),
       });
     }
@@ -101,9 +109,9 @@ function parseSubject(raw: Record<string, unknown>): Subject {
   for (const entry of asArray(raw.coverage_denominators)) {
     if (isRecord(entry) && "source" in entry) {
       subject.coverageDenominators.push({
-        kind: String(entry.kind ?? ""),
-        source: String(entry.source),
-        covers: asArray(entry.covers).map(String),
+        kind: text(entry.kind ?? ""),
+        source: text(entry.source),
+        covers: asArray(entry.covers).map(text),
         manifest: opt(entry.manifest),
         statement: opt(entry.statement),
       });
@@ -117,7 +125,7 @@ export function profileFromDict(data: Record<string, unknown>): Profile {
     profileVersion: Number(data.profile_version ?? 1),
     observationWindow: strMap(data.observation_window),
     subjects: [],
-    catalogs: asArray(data.catalogs).map(String),
+    catalogs: asArray(data.catalogs).map(text),
   };
   for (const raw of asArray(data.subjects)) {
     if (isRecord(raw) && "id" in raw) {
@@ -128,7 +136,8 @@ export function profileFromDict(data: Record<string, unknown>): Profile {
 }
 
 export function loadProfile(path: string): Profile {
-  const data = load(readFileSync(path, "utf-8"));
+  // PyYAML's SafeLoader resolution (YAML 1.1): `0o17` and `1e10` stay strings, as Python reads them.
+  const data = load(readFileSync(path, "utf-8"), { schema: PYYAML_SAFE_SCHEMA });
   if (!isRecord(data)) {
     return { profileVersion: 1, observationWindow: {}, subjects: [], catalogs: [] };
   }
