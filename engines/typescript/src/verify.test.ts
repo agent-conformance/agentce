@@ -20,8 +20,8 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { loadBundle } from "./bundle";
 import { canonicalize, sha256Hex } from "./canonical";
+import { errorCause } from "./errorCatalogue";
 import { InputError } from "./errors";
-import { errorCause } from "./messages";
 import { digestTree } from "./report";
 import { dssePae, keyidFor, signStatement } from "./sign";
 import {

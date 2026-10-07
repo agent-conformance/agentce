@@ -427,18 +427,18 @@ public final class Psp {
             String detail = String.join(" ", String.valueOf(e.getMessage()).trim().split("\\s+"));
             throw new InputError(
                     PARSE_ERROR,
-                    Messages.errorCause(PARSE_ERROR)
+                    ErrorCatalogue.errorCause(PARSE_ERROR)
                             .replace("{path}", shown)
                             .replace("{detail}", detail.substring(0, Math.min(200, detail.length()))),
-                    Messages.errorFix(PARSE_ERROR));
+                    ErrorCatalogue.errorFix(PARSE_ERROR));
         }
         String feature = profileFeature(store);
         if (feature != null) {
             String key = FEATURE_KEYS.getOrDefault(feature, OUTSIDE_PROFILE);
             throw new InputError(
                     key,
-                    Messages.errorCause(key).replace("{path}", shown).replace("{feature}", feature),
-                    Messages.errorFix(key));
+                    ErrorCatalogue.errorCause(key).replace("{path}", shown).replace("{feature}", feature),
+                    ErrorCatalogue.errorFix(key));
         }
         return parseShapes(store);
     }

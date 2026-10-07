@@ -15,8 +15,8 @@
 import { readFileSync } from "node:fs";
 import { DataFactory, Parser, Store, type Term } from "n3";
 import { pspTermsPath } from "./bundled";
+import { errorCause, errorFix } from "./errorCatalogue";
 import { InputError } from "./errors";
-import { errorCause, errorFix } from "./messages";
 import { byteCompare, formatTemplate } from "./util";
 
 const { namedNode } = DataFactory;

@@ -42,13 +42,25 @@ public final class Messages {
         }
     }
 
-    private static Map<String, String> loadCatalog(String language) {
-        String text = readClasspathResource("/i18n/messages." + language + ".json");
+    /** The vendored catalogue for {@code language}, as Python's {@code i18n_format.load_catalog}: empty
+     * when that language has no file at all; a file that is not valid JSON, or whose top level is not an
+     * object, throws (a corrupt catalogue must never read as silently empty strings). */
+    static Map<String, String> loadCatalog(String language) {
+        String path = "/i18n/messages." + language + ".json";
+        return parseCatalog(path, readClasspathResource(path));
+    }
+
+    /** {@link #loadCatalog}'s parse of one catalogue's text ({@code null} for a missing file), package
+     * visible for its unit test. */
+    static Map<String, String> parseCatalog(String path, String text) {
         if (text == null) {
             return Map.of();
         }
         Map<String, String> out = new LinkedHashMap<>();
         JsonNode node = Json.parse(text);
+        if (node == null || !node.isObject()) {
+            throw new IllegalArgumentException(path + " does not hold a message catalogue object");
+        }
         for (Iterator<String> it = node.fieldNames(); it.hasNext(); ) {
             String key = it.next();
             out.put(key, node.get(key).asText());
@@ -85,27 +97,6 @@ public final class Messages {
         Map<String, String> merged = new LinkedHashMap<>(reportKeys("en"));
         merged.putAll(reportKeys(language));
         return merged;
-    }
-
-    /** The English cause text the catalogue holds for error {@code key} ({@code errors.<key>.cause}),
-     * the same text Python's {@code error_catalogue.MESSAGE_KEYS[key].cause} reads. Throws if the key
-     * has none, so a missing entry fails loudly rather than printing an empty reason. */
-    public static String errorCause(String key) {
-        String cause = loadCatalog(DEFAULT_LANGUAGE).get("errors." + key + ".cause");
-        if (cause == null) {
-            throw new IllegalStateException("message catalogue has no errors." + key + ".cause");
-        }
-        return cause;
-    }
-
-    /** The English fix text the catalogue holds for error {@code key} ({@code errors.<key>.fix}); throws
-     * if the key has none. */
-    public static String errorFix(String key) {
-        String fix = loadCatalog(DEFAULT_LANGUAGE).get("errors." + key + ".fix");
-        if (fix == null) {
-            throw new IllegalStateException("message catalogue has no errors." + key + ".fix");
-        }
-        return fix;
     }
 
     public static Map<String, String> catalogue() {

@@ -893,7 +893,7 @@ class VerifyTest {
             throws Exception {
         Keyless made = keylessWith(changesJson, deleted);
         String expected = "no signature verified against the trust root: " + key + ": "
-                + Messages.errorCause(key).replaceAll("\\.$", "");
+                + ErrorCatalogue.errorCause(key).replaceAll("\\.$", "");
         assertEquals(expected, assertThrows(IllegalArgumentException.class, made::verify).getMessage(),
                 changesJson);
     }

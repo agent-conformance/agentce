@@ -11,7 +11,7 @@
  * (`engines/python/agentce/messages.py`, `i18n_format.py`); mirrors `engines/java/.../Messages.java`.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { i18nDir } from "./bundled";
 
@@ -25,13 +25,23 @@ const REPORT_KEY_PREFIXES = ["report.", "verdict.", "next.", "outcome.", "readin
  * so the parsed-and-filtered result is cached per language rather than re-reading the file each time. */
 const reportKeyCache = new Map<string, Record<string, string>>();
 
-function loadCatalog(language: string): Record<string, string> {
-  const path = join(i18nDir(), `messages.${language}.json`);
-  try {
-    return JSON.parse(readFileSync(path, "utf-8")) as Record<string, string>;
-  } catch {
+/** The vendored catalogue for `language`, as Python's `i18n_format.load_catalog`: `{}` when that
+ * language has no file at all; a file that is not valid JSON, or whose top level is not an object,
+ * throws (a corrupt catalogue must never read as silently empty strings). */
+export function loadCatalog(language: string): Record<string, string> {
+  return readCatalogFile(join(i18nDir(), `messages.${language}.json`));
+}
+
+/** {@link loadCatalog}'s read of one catalogue file, exported for its unit test. */
+export function readCatalogFile(path: string): Record<string, string> {
+  if (!existsSync(path)) {
     return {};
   }
+  const data: unknown = JSON.parse(readFileSync(path, "utf-8"));
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    throw new Error(`${path} does not hold a message catalogue object`);
+  }
+  return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, String(value)]));
 }
 
 function reportKeys(language: string): Record<string, string> {
@@ -50,24 +60,4 @@ function reportKeys(language: string): Record<string, string> {
 /** The message catalogue for `language`, backed by `en` for any missing key. */
 export function catalogue(language: string = DEFAULT_LANGUAGE): Record<string, string> {
   return { ...reportKeys("en"), ...reportKeys(language) };
-}
-
-/** The English cause text the catalogue holds for error `key` (`errors.<key>.cause`), the same text
- * Python's `error_catalogue.MESSAGE_KEYS[key].cause` reads. Throws if the key has none, so a
- * missing entry fails loudly rather than printing an empty reason. */
-export function errorCause(key: string): string {
-  const cause = loadCatalog(DEFAULT_LANGUAGE)[`errors.${key}.cause`];
-  if (cause === undefined) {
-    throw new Error(`message catalogue has no errors.${key}.cause`);
-  }
-  return cause;
-}
-
-/** The English fix text the catalogue holds for error `key` (`errors.<key>.fix`); throws if missing. */
-export function errorFix(key: string): string {
-  const fix = loadCatalog(DEFAULT_LANGUAGE)[`errors.${key}.fix`];
-  if (fix === undefined) {
-    throw new Error(`message catalogue has no errors.${key}.fix`);
-  }
-  return fix;
 }
