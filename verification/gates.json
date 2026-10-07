@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.60.0",
+  "suite_version": "0.61.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1124,6 +1124,50 @@
         }
       ],
       "fix_hint": "Run verification/gates/trust_root_parse_parity.sh and read which engine's test or CLI leg failed. The loaders are load_trust_root in engines/python/agentce/signing.py, loadTrustRoot in engines/typescript/src/verify.ts and Verify.loadTrustRoot in engines/java/src/main/java/org/agentce/Verify.java; each must read the file's bytes through its engine's untrusted-JSON parser, and its depth text comes from the catalogue's verify.json_too_deep cause."
+    },
+    {
+      "id": "VG-DOC01-COMPONENTS",
+      "title": "DOC-01 checks what its title says in all three engines: the tools and models a subject's calls exercise must be declared in its BundleLoaded manifests (with matching pinned versions), and every model and MCP server a manifest declares must be exercised",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/doc01_components.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/doc01_components/cases.json (at least 15: all declared; undeclared tool; undeclared model; model version drift; unpinned call; declared model unseen; declared MCP server unseen; skill and prompt need not be seen; tool declared by name; manifest after calls; two manifests; model call naming nothing; a consequential decision naming its agent with an undeclared tool; calls without a manifest; no component records) gives the expected DOC-01 outcome, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined",
+        "fail": "any case gives another DOC-01 outcome, another set of failing events or another exit code in any engine, quarantines a record, or the case file has fewer than 15 cases"
+      },
+      "faults": [
+        {
+          "description": "Python marks every tool or model call as declared, so a call to an undeclared tool or a drifted model version reads DOC-01 conformant",
+          "file": "engines/python/agentce/graph.py",
+          "search": "        self.store.add_literal(\n            node, \"agentce:componentDeclared\", \"true\" if declared else \"false\", BOOL\n        )",
+          "replace": "        self.store.add_literal(node, \"agentce:componentDeclared\", \"true\", BOOL)"
+        },
+        {
+          "description": "TypeScript marks every manifest's declared components as observed, so a declared model or MCP server that no call exercises reads DOC-01 conformant",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "      \"agentce:declaredComponentsObserved\",\n      observed ? \"true\" : \"false\",",
+          "replace": "      \"agentce:declaredComponentsObserved\",\n      observed ? \"true\" : \"true\","
+        },
+        {
+          "description": "Java marks every tool or model call as declared, so a call to an undeclared tool or a drifted model version reads DOC-01 conformant",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "store.addLiteral(node, \"agentce:componentDeclared\", isDeclared ? \"true\" : \"false\", BOOL);",
+          "replace": "store.addLiteral(node, \"agentce:componentDeclared\", \"true\", BOOL);"
+        }
+      ],
+      "fix_hint": "Run verification/gates/doc01_components.sh and read which case and engine it names. The two literals are materialised by _component_declared and _declared_components_observed in engines/python/agentce/graph.py, ported as componentDeclared and declaredComponentsObserved in engines/typescript/src/graph.ts and engines/java/src/main/java/org/agentce/Graph.java; the shape is spec/catalogs/base/baseline/shapes/DOC-01.ttl."
     },
     {
       "id": "VG-OTEL-GENAI-PARITY",

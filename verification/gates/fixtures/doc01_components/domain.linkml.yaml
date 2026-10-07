@@ -1,0 +1,7 @@
+# Domain ontology binding for the VG-DOC01-COMPONENTS gate fixture. One consequential decision type,
+# used only by the decision-names-agent-tool-undeclared case, where the old DOC-01 rule (a
+# consequential decision names its agent) reads conformant and the new one fails an undeclared tool.
+decision_types:
+  - id: "dom:CreditDecision"
+    subclass_of: "agentce:ConsequentialDecision"
+    consequential: true

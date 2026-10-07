@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.61.0
+
+- `VG-DOC01-COMPONENTS` (18.37a) is new. DOC-01, "Operating components match the declared documentation",
+  used the same rule as REC-01 (a consequential decision names its agent), so it passed a subject whose calls
+  used a tool nobody declared. It now compares a subject's `BundleLoaded` manifests with its `ToolCall` and
+  `ModelCall` events. A call to a tool or model no manifest declares fails, and so does a call whose pinned
+  version differs from the declared one. A model or MCP server that a manifest declares but no call uses also
+  fails. Calls with no manifest read insufficient evidence, and a subject with neither reads not applicable.
+  The gate builds 15 bundles and checks DOC-01's outcome, failing events and exit code from the real Python,
+  TypeScript and Java CLIs. The demo has three seeded faults, one in each engine's graph builder.
+- `VG-CATALOG-RULE-UNIQUE` (18.37a): DOC-01 no longer shares a rule with REC-01, so the baseline catalog's
+  pair list is empty and its ceiling drops from 1 to 0, and eu-ai-act's drops from 26 to 25. The ceiling
+  fault now raises baseline's ceiling from 0 to 1.
+
 ## 0.60.0
 
 - `VG-TRUST-ROOT-PARSE-PARITY` (18.81) is new. The trust root an operator passes with `--trust-root` or
