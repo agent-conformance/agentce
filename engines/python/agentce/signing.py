@@ -712,13 +712,23 @@ def vendored_trust() -> TrustRoot:
 
 
 def load_trust_root(path: Path) -> TrustRoot:
-    """Load a trust root from a JSON file an operator supplies (``--trust-root``, SPEC §8.7)."""
-    import json
+    """Load a trust root from a JSON file an operator supplies (``--trust-root``, SPEC §8.7).
 
+    The bytes go through :func:`parse_untrusted_json`, the rule TypeScript's and Java's loaders share,
+    so the three engines accept the same files (18.81). Past :data:`MAX_JSON_DEPTH` the text is fixed;
+    any other refusal names the parser's own error, if it has one."""
     try:
-        data = json.loads(path.read_text("utf-8"))
-    except (OSError, ValueError, RecursionError) as exc:
+        data = parse_untrusted_json(path.read_bytes())
+    except OSError as exc:
         raise VerificationError(f"{path} is not readable JSON: {exc}") from exc
+    except JsonTooDeep as exc:
+        too_deep = format_message(
+            MESSAGE_KEYS["verify.json_too_deep"].cause, what="it", limit=MAX_JSON_DEPTH
+        )
+        raise VerificationError(f"{path} is not readable JSON: {too_deep}") from exc
+    except ValueError as exc:
+        detail = f": {exc.__cause__}" if exc.__cause__ is not None else ""
+        raise VerificationError(f"{path} is not readable JSON{detail}") from exc
     if not isinstance(data, dict):
         raise VerificationError(f"{path} does not hold a trust-root object")
     try:

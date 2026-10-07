@@ -381,16 +381,27 @@ export function vendoredTrustPath(): string {
 }
 
 /** Reads a trust root file (`--trust-root`-shaped JSON), mirroring `signing.load_trust_root`: the
- * top level must be an object (`signing.py:570-571`), and any non-`TrustRootError` that `fromDict`
- * throws is re-wrapped as Python's `except (AttributeError, KeyError, TypeError, ValueError)` does
- * (`signing.py:572-578`). */
+ * bytes go through {@link parseUntrustedJson}, the rule all three engines' loaders share (18.81), with
+ * a fixed text past {@link MAX_JSON_DEPTH}; the top level must be an object (`signing.py:570-571`), and
+ * any non-`TrustRootError` that `fromDict` throws is re-wrapped as Python's `except (AttributeError,
+ * KeyError, TypeError, ValueError)` does (`signing.py:572-578`). */
 export function loadTrustRoot(path: string): TrustRoot {
   let data: unknown;
   try {
-    data = JSON.parse(readFileSync(path, "utf-8"));
+    data = readUntrustedJsonFile(path);
   } catch (exc) {
+    if (exc instanceof JsonTooDeep) {
+      const tooDeep = formatTemplate(errorCause("verify.json_too_deep"), {
+        what: "it",
+        limit: String(MAX_JSON_DEPTH),
+      });
+      throw new Error(`${path} is not readable JSON: ${tooDeep}`);
+    }
+    // The shared parser's own refusals (a lone surrogate) carry only its generic text, and name nothing.
     const message = exc instanceof Error ? exc.message : String(exc);
-    throw new Error(`${path} is not readable JSON: ${message}`);
+    throw new Error(
+      `${path} is not readable JSON${message === "not readable JSON" ? "" : `: ${message}`}`,
+    );
   }
   if (!isRecord(data)) {
     throw new Error(`${path} does not hold a trust-root object`);

@@ -384,13 +384,21 @@ public final class Verify {
     /** Reads and parses a trust root file ({@code --trust-root}-shaped JSON) at {@code path}, in
      * {@code signing.load_trust_root}'s three stages: readable JSON, a top-level object, then
      * {@link TrustRoot#fromDict}, whose shape and key errors are re-wrapped as Python's {@code except
-     * (AttributeError, KeyError, TypeError, ValueError)} re-wraps them (18.36). */
+     * (AttributeError, KeyError, TypeError, ValueError)} re-wraps them (18.36). The bytes go through
+     * {@link #readUntrustedJsonFile}, the rule all three engines' loaders share (18.81), with a fixed
+     * text past {@link #MAX_JSON_DEPTH}; any other refusal names the parser's own error, if it has one. */
     public static TrustRoot loadTrustRoot(Path path) {
         JsonNode data;
         try {
-            data = Json.parseFile(path);
+            data = readUntrustedJsonFile(path);
+        } catch (JsonTooDeep e) {
+            String tooDeep = refusal("verify.json_too_deep", "what", "it", "limit", String.valueOf(MAX_JSON_DEPTH))
+                    .getMessage();
+            throw new IllegalArgumentException(path + " is not readable JSON: " + tooDeep, e);
         } catch (RuntimeException e) {
-            throw new IllegalArgumentException(path + " is not readable JSON: " + e.getMessage(), e);
+            Throwable cause = e.getCause();
+            String detail = cause != null && cause.getMessage() != null ? ": " + cause.getMessage() : "";
+            throw new IllegalArgumentException(path + " is not readable JSON" + detail, e);
         }
         if (data == null || !data.isObject()) {
             throw new IllegalArgumentException(path + " does not hold a trust-root object");
