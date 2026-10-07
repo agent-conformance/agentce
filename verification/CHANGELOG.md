@@ -3,6 +3,17 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.52.0
+
+- `VG-REPORT-BRANCH-COVERAGE` (18.75) is hardened. coverage.py does not count a line marked `# pragma: no
+  cover` or a branch marked `# pragma: no branch` as missing, so a pragma let an untested branch in
+  `_verify_report` pass. The gate now reads coverage.py's own exclusion and partial-branch patterns and
+  fails on any matching line in `_verify_report`'s span, nested functions and decorators included, and
+  on any excluded line in the report. It also holds `_has_expect_keyid`, which coverage.py reports as
+  its own region, to 100%; a new test covers its untested branch. Three seeded faults added: a
+  no-cover pragma on an untested branch, a no-branch pragma, and an untested branch in the nested
+  function.
+
 ## 0.51.0
 
 - `VG-RECORDS-EXIT-CODE` (18.72) is new. A records-folder scan (`agentce assess <folder>`) never returns

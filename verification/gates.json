@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.51.0",
+  "suite_version": "0.52.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1111,7 +1111,7 @@
     },
     {
       "id": "VG-REPORT-BRANCH-COVERAGE",
-      "title": "`_verify_report`'s own reproduction steps (engines/python/agentce/commands/__init__.py) are 100% branch-covered by the Python engine's own test_verify_report* tests, so no two raise sites sharing a message key can hide a missed branch",
+      "title": "`_verify_report`'s own reproduction steps (engines/python/agentce/commands/__init__.py), and every function nested in it, are 100% branch-covered by the Python engine's own test_verify_report* tests with no coverage.py pragma or excluded line in its span, so no two raise sites sharing a message key can hide a missed branch",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -1124,8 +1124,8 @@
       "timeout_s": 300,
       "invariant": "Lint and type-check are clean; tests pass with the coverage thresholds each package declares.",
       "rubric": {
-        "pass": "tools/verify_report_branch_coverage_check.py's --self-test confirms its comparator discriminates a function with a missing branch from one fully covered, then the real run collects coverage.py branch data from the test_verify_report*-named tests alone and finds zero missing lines and zero missing branches in _verify_report's own per-function report",
-        "fail": "the self-test's comparator fails to discriminate a missing branch, the real run's test_verify_report* tests do not all pass, or coverage.py's per-function report lists any missing line or missing branch for _verify_report"
+        "pass": "tools/verify_report_branch_coverage_check.py's --self-test confirms its comparator discriminates a missing branch, a missing branch in a nested function and an excluded line from a fully covered function, and its pragma scan flags no-cover and no-branch pragmas inside _verify_report's span but not outside it; the real run finds no line in _verify_report's source span matching coverage.py's own effective exclusion or partial-branch patterns, then collects coverage.py branch data from the test_verify_report*-named tests alone and finds zero missing lines, zero missing branches and zero excluded lines in _verify_report and every _verify_report.<nested> region",
+        "fail": "the self-test does not discriminate, a line in _verify_report's span (nested functions and decorators included) matches a coverage.py exclusion or partial-branch pattern, the real run's test_verify_report* tests do not all pass, or coverage.py's per-function report lists any missing line, missing branch or excluded line for _verify_report or a function nested in it"
       },
       "faults": [
         {
@@ -1133,9 +1133,27 @@
           "file": "engines/python/agentce/commands/__init__.py",
           "search": "    if bundle_digest is None or bundle_digest != inputs.get(\"bundle_digest\"):",
           "replace": "    if False:  # bundle_digest is None or bundle_digest != inputs.get(\"bundle_digest\")"
+        },
+        {
+          "description": "an untested branch is added to _verify_report and hidden from coverage.py with `# pragma: no cover` (probe C in the 18.8.R1 verdict); coverage.py would not count it as missing, so only the gate's pragma scan turns it RED",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    signatures = claim.get(\"signatures\") or []\n",
+          "replace": "    signatures = claim.get(\"signatures\") or []\n    if signatures == \"never\":  # pragma: no cover\n        signatures = []\n"
+        },
+        {
+          "description": "`# pragma: no branch` on an if in _verify_report whose arms are both tested today: a later untested arm would never be reported, and partial branches never reach excluded_lines, so only the gate's pragma scan turns it RED",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    if not signatures:\n",
+          "replace": "    if not signatures:  # pragma: no branch\n"
+        },
+        {
+          "description": "an untested branch is added to _has_expect_keyid, the function nested in _verify_report that coverage.py reports as its own region; the gate turns RED only because it judges nested regions too",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "            if not isinstance(nested, list):\n                return False\n",
+          "replace": "            if not isinstance(nested, list):\n                return False\n            if nested == []:\n                return False\n"
         }
       ],
-      "fix_hint": "run verification/gates/report_branch_coverage.sh and read which test failed, or read coverage.py's own missing_lines/missing_branches for _verify_report in the JSON report it writes; the function is engines/python/agentce/commands/__init__.py's _verify_report."
+      "fix_hint": "run verification/gates/report_branch_coverage.sh and read its FAIL line: an escape hatch names the line and the coverage.py pattern it matches (remove the pragma and test the branch instead); a coverage gap names the region (_verify_report or _verify_report.<nested>) and its missing lines and branches. The function is engines/python/agentce/commands/__init__.py's _verify_report."
     },
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
