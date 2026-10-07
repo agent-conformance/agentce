@@ -10,13 +10,13 @@ fails if a gate in `gates.json` is not named in this file.
   checks that every literal key its own code raises is in the catalogue. That check found four keys
   Python, TypeScript and Java raised with no catalogue entry (`input.report_format`, `input.emit_format`,
   `input.fail_on_invalid_expression`, `input.collect_config`); they are in the catalogue and
-  `docs/errors.md` now. A missing catalogue is empty in every engine; a malformed one, or one whose top
-  level is not an object, is refused (TypeScript returned `{}` for both, Java an empty map for the
-  second). A malformed trust root gets one cause per shape in all three engines, such as `keys entry
+  `docs/errors.md` now. A missing catalogue is empty in every engine. Every engine refuses a malformed
+  one, or one whose top level is not an object (TypeScript returned `{}` for both, Java an empty map for
+  the second). A malformed trust root gets one cause per shape in all three engines, such as `keys entry
   'abc' has no public_key`, where Python printed its own exception text and TypeScript and Java a base64
   error. A digest read that fails in `assess` is `input.digest_unreadable` (it was
-  `internal.unexpected`). The real CLIs run eight committed trust-root fixtures. Nine seeded faults,
-  one or more in each engine.
+  `internal.unexpected`). The gate runs the real CLIs on eight committed trust-root fixtures. The demo has
+  nine seeded faults, at least one in each engine.
 - `VG-I18N-ONE-CATALOGUE` (18.80) now fails when a TypeScript test file or Java test class it names is
   missing or declares no tests: node skipped a missing file and counted a file with no tests as one passing
   test, and Gradle passed while any other class matched. Three new seeded faults point each leg at a
