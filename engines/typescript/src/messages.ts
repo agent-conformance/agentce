@@ -11,7 +11,7 @@
  * (`engines/python/agentce/messages.py`, `i18n_format.py`); mirrors `engines/java/.../Messages.java`.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { i18nDir } from "./bundled";
 
@@ -34,10 +34,16 @@ export function loadCatalog(language: string): Record<string, string> {
 
 /** {@link loadCatalog}'s read of one catalogue file, exported for its unit test. */
 export function readCatalogFile(path: string): Record<string, string> {
-  if (!existsSync(path)) {
-    return {};
+  let text: string;
+  try {
+    text = readFileSync(path, "utf-8");
+  } catch (exc) {
+    if ((exc as { code?: unknown }).code === "ENOENT") {
+      return {};
+    }
+    throw exc;
   }
-  const data: unknown = JSON.parse(readFileSync(path, "utf-8"));
+  const data: unknown = JSON.parse(text);
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
     throw new Error(`${path} does not hold a message catalogue object`);
   }

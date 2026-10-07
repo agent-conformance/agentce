@@ -326,7 +326,7 @@ public final class Verify {
     /** One entry of {@link #trustMapping}'s mapping: an object with a {@code public_key}, or one stable
      * cause naming the entry (its id quoted as Python's repr quotes it). */
     private static JsonNode trustEntry(String field, String id, JsonNode entry) {
-        String quoted = Readiness.pyRepr(Json.nodes().textNode(id));
+        String quoted = Readiness.pyRepr(id);
         if (entry == null || !entry.isObject()) {
             throw new IllegalArgumentException(field + " entry " + quoted + " is not a mapping");
         }

@@ -6,28 +6,24 @@
  * the generic, documented text `docs/errors.md` is rendered from. Mirrors `ErrorCatalogue.java`.
  */
 
-import { loadCatalog } from "./messages";
+import { DEFAULT_LANGUAGE, loadCatalog } from "./messages";
 
 export interface CatalogueEntry {
   readonly cause: string;
   readonly fix: string;
 }
 
-const PREFIX = "errors.";
-
 function loadMessageKeys(): ReadonlyMap<string, CatalogueEntry> {
-  const catalog = loadCatalog("en");
-  const keys = new Set<string>();
-  for (const name of Object.keys(catalog)) {
-    const match = /^errors\.(.+)\.(cause|fix)$/.exec(name);
-    if (match) keys.add(match[1]);
-  }
+  const catalog = loadCatalog(DEFAULT_LANGUAGE);
   const entries = new Map<string, CatalogueEntry>();
-  for (const key of [...keys].sort()) {
-    entries.set(key, {
-      cause: catalog[`${PREFIX}${key}.cause`] ?? "",
-      fix: catalog[`${PREFIX}${key}.fix`] ?? "",
-    });
+  for (const name of Object.keys(catalog).sort()) {
+    const key = /^errors\.(.+)\.(?:cause|fix)$/.exec(name)?.[1];
+    if (key !== undefined && !entries.has(key)) {
+      entries.set(key, {
+        cause: catalog[`errors.${key}.cause`] ?? "",
+        fix: catalog[`errors.${key}.fix`] ?? "",
+      });
+    }
   }
   return entries;
 }

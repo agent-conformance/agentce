@@ -36,18 +36,15 @@ public final class ErrorCatalogue {
 
     private static Map<String, Entry> load() {
         Map<String, String> catalog = Messages.loadCatalog(Messages.DEFAULT_LANGUAGE);
-        Set<String> keys = new TreeSet<>();
+        Map<String, Entry> entries = new TreeMap<>();
         for (String name : catalog.keySet()) {
             Matcher m = CATALOGUE_KEY.matcher(name);
             if (m.matches()) {
-                keys.add(m.group(1));
+                String key = m.group(1);
+                entries.putIfAbsent(key, new Entry(
+                        catalog.getOrDefault("errors." + key + ".cause", ""),
+                        catalog.getOrDefault("errors." + key + ".fix", "")));
             }
-        }
-        Map<String, Entry> entries = new TreeMap<>();
-        for (String key : keys) {
-            entries.put(key, new Entry(
-                    catalog.getOrDefault("errors." + key + ".cause", ""),
-                    catalog.getOrDefault("errors." + key + ".fix", "")));
         }
         return Collections.unmodifiableMap(entries);
     }

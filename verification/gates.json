@@ -1453,8 +1453,8 @@
         {
           "description": "TypeScript's catalogue loader goes back to returning {} on any error, so a corrupt catalogue reads as empty strings",
           "file": "engines/typescript/src/messages.ts",
-          "search": "  const data: unknown = JSON.parse(readFileSync(path, \"utf-8\"));",
-          "replace": "  let data: unknown;\n  try {\n    data = JSON.parse(readFileSync(path, \"utf-8\"));\n  } catch {\n    return {};\n  }"
+          "search": "  const data: unknown = JSON.parse(text);",
+          "replace": "  let data: unknown;\n  try {\n    data = JSON.parse(text);\n  } catch {\n    return {};\n  }"
         },
         {
           "description": "Java's catalogue loader goes back to an empty map for a non-object top level",
