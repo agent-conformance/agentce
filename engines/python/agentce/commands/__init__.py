@@ -1038,13 +1038,8 @@ def _load_release_json(
     on a read/decode/shape failure: `unreadable_key`'s refusal, or `verify.json_too_deep` naming
     `what` for a document nested past the limit."""
     try:
-        raw = path.read_bytes()
-    except PermissionError:
-        raise  # the caller's input.release_unreadable, not a malformed file
-    except OSError:
-        return None, signing.VerificationError.refusal(unreadable_key)
-    try:
-        value = signing.parse_verify_input(raw, unreadable_key, what)
+        # A PermissionError propagates: the caller's input.release_unreadable, not a malformed file.
+        value = signing.read_verify_input(path, unreadable_key, what)
     except signing.VerificationError as exc:
         return None, exc
     if not isinstance(value, expected_type):

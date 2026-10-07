@@ -209,6 +209,18 @@ def parse_verify_input(raw: bytes, unreadable_key: str, what: str) -> Any:
         raise VerificationError.refusal(unreadable_key) from exc
 
 
+def read_verify_input(path: Path, unreadable_key: str, what: str) -> Any:
+    """Read one file verify parses and :func:`parse_verify_input` it; a file that cannot be read is
+    ``unreadable_key``'s refusal. A ``PermissionError`` propagates: it is the caller's input error."""
+    try:
+        raw = path.read_bytes()
+    except PermissionError:
+        raise
+    except OSError as exc:
+        raise VerificationError.refusal(unreadable_key) from exc
+    return parse_verify_input(raw, unreadable_key, what)
+
+
 def describe_untrusted(value: Any) -> str:
     """How a refusal names a value read from an untrusted document (a keyid, an issuer): ``None``,
     a quoted plain-ASCII string, or a fixed description -- never a language's own repr of an arbitrary
@@ -675,14 +687,9 @@ def verify_catalog_directory(directory: Path, trust: TrustRoot) -> Verified:
     sig_path = directory / CATALOG_SIGNATURE_NAME
     if not sig_path.is_file():
         raise UnsignedError.refusal("verify.catalog_unsigned")
-    try:
-        raw = sig_path.read_bytes()
-    except PermissionError:
-        raise  # an unreadable signature is the caller's input.catalog_unreadable, not a bad one
-    except OSError as exc:
-        raise VerificationError.refusal("verify.catalog_signature_unreadable") from exc
-    envelope = parse_verify_input(
-        raw, "verify.catalog_signature_unreadable", CATALOG_SIGNATURE_NAME
+    # A PermissionError is the caller's input.catalog_unreadable, not a bad signature.
+    envelope = read_verify_input(
+        sig_path, "verify.catalog_signature_unreadable", CATALOG_SIGNATURE_NAME
     )
     verified = verify_envelope(envelope, trust)
     signed_digest = statement_subject_digest(verified.payload)

@@ -26,8 +26,7 @@ import { NonCanonicalNumber, parseJson } from "./json";
 import { pyTruthy } from "./readiness";
 import { digestTree } from "./report";
 import { dssePae, keyidFor } from "./sign";
-import { formatTemplate } from "./util";
-import { b64dStrict, decodeUtf8Strict, pyRepr } from "./util";
+import { b64dStrict, decodeUtf8Strict, formatTemplate, pyRepr } from "./util";
 
 /** The detached signature a signed catalog (or corpus) directory carries (SPEC §8.7). */
 export const CATALOG_SIGNATURE_NAME = "catalog.sig.json";
@@ -166,9 +165,9 @@ export function parseUntrustedJson(raw: Buffer, keepNumberTokens = false): unkno
         throw new Error("not readable JSON");
       }
     } else if (Array.isArray(node)) {
-      stack.push(...node);
+      for (const child of node) stack.push(child);
     } else if (isRecord(node)) {
-      stack.push(...Object.values(node), ...Object.keys(node));
+      for (const [key, child] of Object.entries(node)) stack.push(child, key);
     }
   }
   return value;
@@ -558,14 +557,9 @@ export function verifyCatalog(dir: string, trust: TrustRoot): CatalogVerifyResul
   let signedDigest: string;
   let verified: VerifiedEnvelope;
   try {
-    let raw: Buffer;
-    try {
-      raw = readFileSync(sigPath);
-    } catch {
-      throw refusal("verify.catalog_signature_unreadable");
-    }
-    const envelope = parseVerifyInput(
-      raw,
+    const envelope = loadReleaseJson(
+      sigPath,
+      () => true,
       "verify.catalog_signature_unreadable",
       CATALOG_SIGNATURE_NAME,
     );

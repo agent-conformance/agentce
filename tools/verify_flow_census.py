@@ -1788,6 +1788,7 @@ READ_CALLS = frozenset(
         "getsize",
         "parse_untrusted_json",
         "parse_verify_input",
+        "read_verify_input",
     }
 )
 
@@ -2025,12 +2026,7 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "bundle-manifest",
     ),
     "agentce.bundle.safe_is_file: path.is_file()": ("bundle-manifest", "bundle-files"),
-    "agentce.commands._load_release_json: path.read_bytes()": (
-        "release-file",
-        "manifest-file",
-        "signatures-file",
-    ),
-    "agentce.commands._load_release_json: signing.parse_verify_input(raw)": (
+    "agentce.commands._load_release_json: signing.read_verify_input(path)": (
         "release-file",
         "manifest-file",
         "signatures-file",
@@ -2111,6 +2107,18 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "release-statement",
         "report-statement",
     ),
+    "agentce.signing.read_verify_input: path.read_bytes()": (
+        "catalog-sig-file",
+        "release-file",
+        "manifest-file",
+        "signatures-file",
+    ),
+    "agentce.signing.read_verify_input: parse_verify_input(raw)": (
+        "catalog-sig-file",
+        "release-file",
+        "manifest-file",
+        "signatures-file",
+    ),
     "agentce.signing.statement_subject_digest: parse_verify_input(payload)": (
         "catalog-statement",
         "release-statement",
@@ -2119,13 +2127,10 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         _PACKAGED
     ),
     "agentce.signing.vendored_trust: vendored_trust_path().read_text('utf-8')": _PACKAGED,
-    "agentce.signing.verify_catalog_directory: parse_verify_input(raw)": (
+    "agentce.signing.verify_catalog_directory: read_verify_input(sig_path)": (
         "catalog-sig-file",
     ),
     "agentce.signing.verify_catalog_directory: sig_path.is_file()": (
-        "catalog-sig-file",
-    ),
-    "agentce.signing.verify_catalog_directory: sig_path.read_bytes()": (
         "catalog-sig-file",
     ),
 }
