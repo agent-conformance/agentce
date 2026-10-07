@@ -38,12 +38,14 @@ export function jsonStringifyAscii(value: unknown, indent?: number): string {
   return out;
 }
 
-/** Write `records` to `path` as one compact JSON object per line, in input order (side-channel diagnostics — not part of the cross-engine canonical output set). */
+/** Write `records` to `path` as one compact JSON object per line, in input order, keys sorted and
+ * non-ASCII escaped as Python's `json.dumps(sort_keys=True, separators=(",", ":"))` writes them
+ * (applicability.jsonl and integrity.jsonl are compared byte for byte by VG-RECORDS-FOLDER-PARITY). */
 export function writeJsonl(records: Iterable<unknown>, path: string): void {
   mkdirSync(dirname(path), { recursive: true });
   const lines: string[] = [];
   for (const record of records) {
-    lines.push(JSON.stringify(sortKeysDeep(record)));
+    lines.push(jsonStringifyAscii(sortKeysDeep(record)));
   }
   writeFileSync(path, lines.length > 0 ? `${lines.join("\n")}\n` : "");
 }

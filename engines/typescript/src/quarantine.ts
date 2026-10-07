@@ -6,6 +6,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { InputError } from "./errors";
+import { jsonStringifyAscii, sortKeysDeep } from "./util";
 
 export enum QuarantineReason {
   SCHEMA_INVALID = "schema_invalid",
@@ -65,7 +66,8 @@ export function writeQuarantine(records: Iterable<QuarantineRecord>, path: strin
   let written = 0;
   const lines: string[] = [];
   for (const record of records) {
-    lines.push(JSON.stringify(quarantineToJson(record)));
+    // Python's `json.dumps(sort_keys=True, separators=(",", ":"))`: keys sorted, non-ASCII escaped.
+    lines.push(jsonStringifyAscii(sortKeysDeep(quarantineToJson(record))));
     written += 1;
   }
   try {
