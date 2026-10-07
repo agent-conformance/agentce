@@ -3,5 +3,6 @@
 @prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
 
 agentce:DOC-01-Shape a sh:NodeShape ;
-  sh:targetClass agentce:ConsequentialDecision ;
-  sh:property [ sh:path prov:wasAssociatedWith ; sh:minCount 1 ; sh:name "S1" ] .
+  sh:targetClass agentce:ComponentRecord ;
+  sh:property [ sh:path agentce:componentDeclared ; sh:in ( true ) ; sh:name "S1" ] ;
+  sh:property [ sh:path agentce:declaredComponentsObserved ; sh:in ( true ) ; sh:name "S2" ] .

@@ -2709,7 +2709,7 @@ def test_assess_deviations_flag_is_recorded_in_manifest_and_reverify_argv(
     packages = list(out.glob("remediation/*/remediation-package.json"))
     assert packages
     package = json.loads(packages[0].read_text())
-    finding = next(f for f in package["findings"] if f["control"] == "DOC-01")
+    finding = next(f for f in package["findings"] if f["control"] == "REC-01")
     assert "--deviations" in finding["acceptance"]["reverify_command"]
 
 

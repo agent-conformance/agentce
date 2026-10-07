@@ -703,6 +703,70 @@ def _benign_quarantine(subject: str, source: str) -> list[dict[str, Any]]:
     return [dup, dup2, unknown]
 
 
+def _component_manifests(
+    events: list[dict[str, Any]], source: str, clock: _Clock, prefix: str
+) -> list[dict[str, Any]]:
+    """One self-reported BundleLoaded per subject that calls tools, declaring each MCP server its
+    ToolCall events name, or the tool itself (no kind) when a call names no server (DOC-01, SPEC
+    §6.2): the declared components match the operating ones, so DOC-01 reads conformant rather than
+    insufficient_evidence on every curated project."""
+    declared: dict[str, set[tuple[str, str]]] = {}
+    for event in events:
+        if event["data"].get("@type") == "ToolCall":
+            tool = event["data"]["tool"]
+            declared.setdefault(str(event["subject"]), set()).add(
+                ("mcp_server", tool["server"])
+                if "server" in tool
+                else ("", tool["name"])
+            )
+    manifests = []
+    for n, subject in enumerate(sorted(declared), start=1):
+        components = [
+            {"kind": kind, "name": name} if kind else {"name": name}
+            for kind, name in sorted(declared[subject])
+        ]
+        manifests.append(
+            _event(
+                eid=f"{prefix}-bundle{n}",
+                source=source,
+                subject=subject,
+                time=clock.next(),
+                etype="BundleLoaded",
+                sclass="self_report",
+                data={
+                    "bundle_digest": "sha256:" + canonical.sha256_hex(components),
+                    "components": components,
+                },
+            )
+        )
+    return manifests
+
+
+def _declared_components(
+    events: list[dict[str, Any]], subject: str
+) -> list[tuple[str, str]]:
+    """The (kind, name) of each component ``subject``'s BundleLoaded manifests declare, for its
+    profile's ``third_party_components`` (SPEC §6.5), so a manifest never reads as applicability
+    drift. A component with no kind is a tool."""
+    return sorted(
+        {
+            (c.get("kind", "tool"), c["name"])
+            for e in events
+            if e["subject"] == subject and e["data"].get("@type") == "BundleLoaded"
+            for c in e["data"]["components"]
+        }
+    )
+
+
+def _profile_components(components: list[tuple[str, str]]) -> list[str]:
+    lines = ["    third_party_components:"] if components else []
+    for kind, name in components:
+        lines.append(f'      - kind: "{kind}"')
+        lines.append(f'        name: "{name}"')
+        lines.append('        controls_affected: ["DOC-01"]')
+    return lines
+
+
 def _apply_tamper(events: list[dict[str, Any]]) -> None:
     """Edit one chained event after its hash was computed, so the engine detects the tamper.
 
@@ -860,6 +924,9 @@ def _write_project(
     )
 
     subject = f"spiffe://corp/agents/{domain.subject_prefix}-{style_id}"
+    events += _component_manifests(
+        events, sources["agent"], clock, f"{style_id}-{variant}"
+    )
     # Integrity chains over the curated streams (export_chained -> verified_weak, a clean status).
     _chain(events, "export_chained")
     if extras.get("tamper"):
@@ -926,7 +993,15 @@ def _write_project(
     )
     bundle_digest = "sha256:" + canonical.sha256_hex(manifest)
 
-    _write_profile(proj_dir, domain, subject, style_id, coverage_denoms, sources)
+    _write_profile(
+        proj_dir,
+        domain,
+        subject,
+        style_id,
+        coverage_denoms,
+        sources,
+        _declared_components(events, subject),
+    )
     _write_domain(proj_dir, domain)
     _write_deviations(proj_dir)
     _write_expected(proj_dir, subject, expected, faults, variant)
@@ -1094,6 +1169,7 @@ def _write_multi_agent(
         )
         events.extend(role_events)
         expected_by_subject[subj] = role_expected
+    events += _component_manifests(events, sources["agent"], clock, kind)
     _chain(events, "export_chained")
 
     proj_dir = root.joinpath("projects", "multi-agent", domain.name, kind)
@@ -1121,7 +1197,13 @@ def _write_multi_agent(
     )
     bundle_digest = "sha256:" + canonical.sha256_hex(manifest)
 
-    _write_multi_profile(proj_dir, domain, subjects, sources)
+    _write_multi_profile(
+        proj_dir,
+        domain,
+        subjects,
+        sources,
+        {s: _declared_components(events, s) for s in subjects.values()},
+    )
     _write_domain(proj_dir, domain)
     _write_deviations(proj_dir)
     _write_multi_expected(proj_dir, expected_by_subject, kind)
@@ -1162,7 +1244,11 @@ _SOURCE_TRUST: dict[str, tuple[str, str]] = {
 
 
 def _write_multi_profile(
-    proj_dir: Path, domain: Domain, subjects: dict[str, str], sources: dict[str, str]
+    proj_dir: Path,
+    domain: Domain,
+    subjects: dict[str, str],
+    sources: dict[str, str],
+    components: dict[str, list[tuple[str, str]]],
 ) -> None:
     lines = [
         "# Applicability profile (SPEC §6.5): a two-subject (multi-agent) assessment.",
@@ -1182,6 +1268,7 @@ def _write_multi_profile(
         lines.append(f'      - "{domain.consequential}"')
         lines.append("    declared_oversight:")
         lines.append(f'      "{domain.consequential}": "review_before"')
+        lines.extend(_profile_components(components[subjects[role]]))
         lines.append("    evidence_sources:")
         for key in ("agent", "gateway", "idp", "register"):
             cls, justification = _SOURCE_TRUST[key]
@@ -1285,6 +1372,7 @@ def _write_profile(
     style_id: str,
     coverage_denoms: list[dict[str, Any]],
     sources: dict[str, str],
+    components: list[tuple[str, str]],
 ) -> None:
     lines = [
         "# Applicability profile (SPEC §6.5): what the adopter declares about the assessed system.",
@@ -1302,6 +1390,7 @@ def _write_profile(
         f'      - "{domain.consequential}"',
         "    declared_oversight:",
         f'      "{domain.consequential}": "review_before"',
+        *_profile_components(components),
         "    evidence_sources:",
     ]
     for key in ("agent", "gateway", "idp", "register"):

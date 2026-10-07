@@ -505,6 +505,36 @@
       "rdfs:range": {
         "@id": "agentce:Notice"
       }
+    },
+    {
+      "@id": "agentce:ComponentRecord",
+      "@type": "owl:Class",
+      "rdfs:comment": "An engine-materialised type on every BundleLoaded, ToolCall and ModelCall node, so one shape can judge a subject's declared components against the ones it operates (DOC-01).",
+      "rdfs:label": "Component record"
+    },
+    {
+      "@id": "agentce:componentDeclared",
+      "@type": "owl:DatatypeProperty",
+      "rdfs:comment": "On a ToolCall or ModelCall: whether the tool or model it names is declared in one of its subject's BundleLoaded manifests and, when both state a version or digest, the call's matches one declared.",
+      "rdfs:domain": {
+        "@id": "agentce:ComponentRecord"
+      },
+      "rdfs:label": "component declared",
+      "rdfs:range": {
+        "@id": "xsd:boolean"
+      }
+    },
+    {
+      "@id": "agentce:declaredComponentsObserved",
+      "@type": "owl:DatatypeProperty",
+      "rdfs:comment": "On a BundleLoaded: whether every model and MCP server its manifest declares is exercised by a ToolCall or ModelCall of the same subject.",
+      "rdfs:domain": {
+        "@id": "agentce:ComponentRecord"
+      },
+      "rdfs:label": "declared components observed",
+      "rdfs:range": {
+        "@id": "xsd:boolean"
+      }
     }
   ]
 }

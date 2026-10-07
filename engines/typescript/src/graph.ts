@@ -115,6 +115,67 @@ function principalClass(kind: string | null): string {
   return "agentce:Principal";
 }
 
+// DOC-01 (SPEC §7.4, Art. 11 / Annex IV): the events that declare an operating component (a
+// BundleLoaded manifest) or exercise one (a ToolCall or ModelCall) are typed with this
+// engine-materialised class, so one shape can compare the declaration with what operated.
+const COMPONENT_RECORD = "agentce:ComponentRecord";
+const COMPONENT_RECORD_TYPES = new Set(["BundleLoaded", "ToolCall", "ModelCall"]);
+
+// Which declared component kinds a call can exercise. A tool call exercises a skill or an MCP server
+// (by its tool name or server name), a model call a model; a component with no kind may be either.
+// Prompts, configs and policies are never exercised by a call, so they take no part in DOC-01.
+type Family = "tool" | "model";
+
+function families(kind: string | null): Family[] {
+  if (kind === null) {
+    return ["tool", "model"];
+  }
+  return kind === "model" ? ["model"] : kind === "skill" || kind === "mcp_server" ? ["tool"] : [];
+}
+
+// Declared kinds that must be seen operating (DOC-01 S2). A skill is left out: its name is not
+// reliably a tool name, so not seeing it is not evidence that it never ran.
+function mustOperate(kind: string | null): Family | null {
+  return kind === "model" ? "model" : kind === "mcp_server" ? "tool" : null;
+}
+
+function text(value: unknown): string | null {
+  return typeof value === "string" && value !== "" ? value : null;
+}
+
+// [kind, name, pins] for each named component a BundleLoaded manifest declares, where pins holds its
+// declared version and digest (empty: any version matches).
+function declaredComponents(data: Record<string, unknown>): [string | null, string, string[]][] {
+  const components = Array.isArray(data.components) ? data.components : [];
+  const out: [string | null, string, string[]][] = [];
+  for (const component of components) {
+    const bare = text(component);
+    if (bare !== null) {
+      out.push([null, bare, []]);
+    } else if (isRecord(component) && text(component.name) !== null) {
+      const kind = typeof component.kind === "string" ? component.kind : null;
+      const pins = [component.version, component.digest]
+        .map(text)
+        .filter((p): p is string => p !== null);
+      out.push([kind, component.name as string, pins]);
+    }
+  }
+  return out;
+}
+
+// [family, names, version] of the component a ToolCall or ModelCall exercises: a tool call is known
+// by its tool name and its server name, a model call by its model name.
+function operated(ptype: string, data: Record<string, unknown>): [Family, string[], string | null] {
+  const family: Family = ptype === "ToolCall" ? "tool" : "model";
+  const ref = data[family];
+  if (!isRecord(ref)) {
+    return [family, [], null];
+  }
+  const keys = family === "tool" ? ["name", "server"] : ["name"];
+  const names = keys.map((k) => text(ref[k])).filter((n): n is string => n !== null);
+  return [family, names, text(ref.version_or_digest)];
+}
+
 class Builder {
   private readonly eventIris = new Set<string>();
   private readonly decisionType = new Map<string, string>();
@@ -124,6 +185,13 @@ class Builder {
   private readonly decisionNotice = new Map<string, Set<string>>(); // Decision IRI -> every notifying Notice IRI (order-independent)
   private readonly danglingNodes = new Set<string>(); // event IRI -> has >=1 agentce:danglingRef literal
   private readonly instructionUntrusted = new Map<string, boolean>(); // Instruction IRI -> untrusted flag
+  // DOC-01: family -> declared name -> declared pins, null when any version matches; the union of every
+  // BundleLoaded manifest in the subject's records, so event order does not matter.
+  private readonly declared: Record<Family, Map<string, Set<string> | null>> = {
+    tool: new Map(),
+    model: new Map(),
+  };
+  private readonly operated: Record<Family, Set<string>> = { tool: new Set(), model: new Set() };
 
   constructor(
     private readonly store: GraphStore,
@@ -141,6 +209,9 @@ class Builder {
     }
     for (const event of events) {
       usedClasses.add(`agentce:${this.ptype(event)}`);
+      if (COMPONENT_RECORD_TYPES.has(this.ptype(event))) {
+        usedClasses.add(COMPONENT_RECORD);
+      }
       this.mapEvent(event);
     }
     for (const type of this.decisionType.values()) {
@@ -194,6 +265,7 @@ class Builder {
 
     this.mapDecisionLinks(node, ptype, event);
     this.mapConduct(node, ptype, data);
+    this.mapComponents(node, ptype, data);
     this.dangling(node, event);
 
     if (ptype === "DelegationIssued") {
@@ -278,6 +350,34 @@ class Builder {
   /** Materialise the Conduct-overlay instruction-trust flag (SPEC §7.7): whether an instruction's
    * declared source class is untrusted (Appendix F). Scope and budget are computed from the
    * enforcement point's records in a second pass (`conductScopeBudget`). */
+  // Collect what the manifests declare and what the calls exercise (DOC-01); the two literals are set
+  // in the second pass, once every event is mapped.
+  private mapComponents(node: string, ptype: string, data: Record<string, unknown>): void {
+    if (!COMPONENT_RECORD_TYPES.has(ptype)) {
+      return;
+    }
+    this.store.addType(node, COMPONENT_RECORD);
+    if (ptype === "BundleLoaded") {
+      for (const [kind, name, pins] of declaredComponents(data)) {
+        for (const family of families(kind)) {
+          const known = this.declared[family];
+          if (known.has(name) && known.get(name) === null) {
+            continue;
+          }
+          known.set(
+            name,
+            pins.length === 0 ? null : new Set([...(known.get(name) ?? []), ...pins]),
+          );
+        }
+      }
+    } else {
+      const [family, names] = operated(ptype, data);
+      for (const name of names) {
+        this.operated[family].add(name);
+      }
+    }
+  }
+
   private mapConduct(node: string, ptype: string, data: Record<string, unknown>): void {
     if (ptype !== "Instruction") {
       return;
@@ -364,6 +464,12 @@ class Builder {
       if (ptype === "Outcome") {
         this.adverseOutcomeLinked(node, data);
       }
+      if (ptype === "ToolCall" || ptype === "ModelCall") {
+        this.componentDeclared(node, ptype, data);
+      }
+      if (ptype === "BundleLoaded") {
+        this.declaredComponentsObserved(node, data);
+      }
       this.chainTerminus(node, data);
     }
     this.actsOnUntrusted(events);
@@ -432,6 +538,37 @@ class Builder {
       node,
       "agentce:explanationReconstructable",
       reconstructable ? "true" : "false",
+      BOOL,
+    );
+  }
+
+  // DOC-01 S1: a call exercises a component some BundleLoaded manifest declares -- one of its names is
+  // declared for its family, and when both the call and the declaration state a version or digest,
+  // they agree. A call that names nothing cannot be shown declared.
+  private componentDeclared(node: string, ptype: string, data: Record<string, unknown>): void {
+    const [family, names, version] = operated(ptype, data);
+    const known = this.declared[family];
+    const declared = names.some((name) => {
+      if (!known.has(name)) {
+        return false;
+      }
+      const pins = known.get(name);
+      return pins === null || pins === undefined || version === null || pins.has(version);
+    });
+    this.store.addLiteral(node, "agentce:componentDeclared", declared ? "true" : "false", BOOL);
+  }
+
+  // DOC-01 S2: every model and MCP server this manifest declares is exercised by at least one call in
+  // the subject's records (declared but never seen is drift too).
+  private declaredComponentsObserved(node: string, data: Record<string, unknown>): void {
+    const observed = declaredComponents(data).every(([kind, name]) => {
+      const family = mustOperate(kind);
+      return family === null || this.operated[family].has(name);
+    });
+    this.store.addLiteral(
+      node,
+      "agentce:declaredComponentsObserved",
+      observed ? "true" : "false",
       BOOL,
     );
   }

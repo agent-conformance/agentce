@@ -1688,10 +1688,10 @@
           "replace": "  shape: shapes/REC-01.ttl\nexpectations:\n  - {id: S1, text: \"Adverse outcomes are linked to their consequential decision.\"}\nseverity: medium\nevidence_strength: strong\ntolerance: {kind: count, max: 0}\ntolerance_rationale: \"INC-01 is a structural expectation with no tolerated exceptions.\"\nfalse_positive_modes:\n  - \"A condition declared as an accepted deviation in the applicability profile.\"\ntechniques:\n  - \"techniques/inc-evidence-at-source\"\ntest_cases:\n  - {id: pass, expected: passed, fixture: test/REC-01/passed.jsonl}\n  - {id: fail, expected: failed, fixture: test/REC-01/failed.jsonl}\n  - {id: na, expected: inapplicable, fixture: test/REC-01/inapplicable.jsonl}\n"
         },
         {
-          "description": "the baseline catalog's ceiling is raised from 1 to 2 with no new pair, which is the free slot a paid-down pair leaves when nobody lowers its ceiling",
+          "description": "the baseline catalog's ceiling is raised from 0 to 1 with no new pair, which is the free slot a paid-down pair leaves when nobody lowers its ceiling",
           "file": "verification/gates/fixtures/rule_uniqueness/baseline.json",
-          "search": "  \"ceilings\": {\n    \"baseline\": 1,\n",
-          "replace": "  \"ceilings\": {\n    \"baseline\": 2,\n"
+          "search": "  \"ceilings\": {\n    \"baseline\": 0,\n",
+          "replace": "  \"ceilings\": {\n    \"baseline\": 1,\n"
         }
       ],
       "fix_hint": "Run verification/gates/catalog_rule_uniqueness.sh and read which catalog/pair it names; the check is engines/python/agentce/catalog.py's new_rule_uniqueness_problems against verification/gates/fixtures/rule_uniqueness/baseline.json."

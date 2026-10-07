@@ -42,6 +42,8 @@ agentce:ModelCall a owl:Class ; rdfs:subClassOf agentce:Activity ; rdfs:label "M
 agentce:ResourceAccess a owl:Class ; rdfs:subClassOf agentce:Activity ; rdfs:label "Resource access" .
 agentce:MemoryRead a owl:Class ; rdfs:subClassOf agentce:Activity ; rdfs:label "Memory read" .
 agentce:MemoryWrite a owl:Class ; rdfs:subClassOf agentce:Activity ; rdfs:label "Memory write" .
+agentce:ComponentRecord a owl:Class ; rdfs:label "Component record" ;
+  rdfs:comment "An engine-materialised type on every BundleLoaded, ToolCall and ModelCall node, so one shape can judge a subject's declared components against the ones it operates (DOC-01)." .
 
 # ---------------------------------------------------------------------------------------------
 # Glue relations (SPEC 6.3). Reused PROV-O relations (prov:wasAssociatedWith, prov:actedOnBehalfOf,
@@ -107,3 +109,9 @@ agentce:adverseOutcomeLinked a owl:DatatypeProperty ; rdfs:label "adverse outcom
 agentce:explanationReconstructable a owl:DatatypeProperty ; rdfs:label "explanation reconstructable" ;
   rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
   rdfs:comment "Whether a decision is notifiedBy a Notice and its own evidence chain resolves (no danglingRef), so the explanation the notice points at can be reconstructed." .
+agentce:componentDeclared a owl:DatatypeProperty ; rdfs:label "component declared" ;
+  rdfs:domain agentce:ComponentRecord ; rdfs:range xsd:boolean ;
+  rdfs:comment "On a ToolCall or ModelCall: whether the tool or model it names is declared in one of its subject's BundleLoaded manifests and, when both state a version or digest, the call's matches one declared." .
+agentce:declaredComponentsObserved a owl:DatatypeProperty ; rdfs:label "declared components observed" ;
+  rdfs:domain agentce:ComponentRecord ; rdfs:range xsd:boolean ;
+  rdfs:comment "On a BundleLoaded: whether every model and MCP server its manifest declares is exercised by a ToolCall or ModelCall of the same subject." .

@@ -4,6 +4,7 @@ C	agentce:Agent	agentce:Agent
 C	agentce:Agent	prov:Agent
 C	agentce:Agent	prov:SoftwareAgent
 C	agentce:ApprovalDecided	agentce:ApprovalDecided
+C	agentce:ComponentRecord	agentce:ComponentRecord
 C	agentce:ConsequentialDecision	agentce:Activity
 C	agentce:ConsequentialDecision	agentce:ConsequentialDecision
 C	agentce:ConsequentialDecision	agentce:Decision
@@ -89,6 +90,7 @@ E	agentce:event/del-1	rdf:type	agentce:DelegationIssued
 E	agentce:event/out-1	rdf:type	agentce:Outcome
 E	agentce:event/tc-1	agentce:executes	agentce:event/dec-1
 E	agentce:event/tc-1	prov:wasAssociatedWith	spiffe://corp/agent-a
+E	agentce:event/tc-1	rdf:type	agentce:ComponentRecord
 E	agentce:event/tc-1	rdf:type	agentce:ToolCall
 E	agentce:principal/4f9618842a3b141eae7bfb7cd81ee43b2ba78b2eef1a7c1d0c13c7ea559ab534	rdf:type	agentce:HumanPrincipal
 E	agentce:principal/ae09877c4f2f6fab64bf06beb9aa698fba9fe36828b1b24970b101a580e068c8	rdf:type	agentce:HumanPrincipal
@@ -113,6 +115,7 @@ L	agentce:event/del-1	prov:atTime	2026-06-01T08:00:00.000Z	xsd:dateTime
 L	agentce:event/out-1	agentce:adverseOutcomeLinked	true	xsd:boolean
 L	agentce:event/out-1	prov:atTime	2026-06-01T09:10:00.000Z	xsd:dateTime
 L	agentce:event/tc-1	agentce:actsOnUntrusted	false	xsd:boolean
+L	agentce:event/tc-1	agentce:componentDeclared	false	xsd:boolean
 L	agentce:event/tc-1	agentce:executesConsequential	true	xsd:boolean
 L	agentce:event/tc-1	agentce:withinBudget	true	xsd:boolean
 L	agentce:event/tc-1	agentce:withinScope	true	xsd:boolean

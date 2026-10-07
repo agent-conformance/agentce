@@ -17,6 +17,10 @@ subjects:
       - "dom:CreditDecision"
     declared_oversight:
       "dom:CreditDecision": "review_before"
+    third_party_components:
+      - kind: "mcp_server"
+        name: "mcp://credit-core.internal"
+        controls_affected: ["DOC-01"]
     evidence_sources:
       - adapter: "otel-genai"
         source: "urn:agentce:source:langgraph-runtime:eu-1"

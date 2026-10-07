@@ -35,12 +35,12 @@ does.
 ## What it cannot show
 
 `blind_spots.json`'s `checks_unlocked` names the one missing record type that would unlock the most
-checks — but on baseline@2026.09 run against the vendored `otel-genai-agent-session` fixture, 9 of its
-10 controls (`DOC-01`, `INC-01`, `INC-02`, `OVS-03`, `OVS-08`, `REC-01`, `REC-04`, `ROB-02`, `TRN-03`)
-land under `blind_spots`/`needed_by`, not `no_population`, because they need one of:
+checks — but on baseline@2026.09 run against the vendored `otel-genai-agent-session` fixture, 8 of its
+10 controls (`INC-01`, `INC-02`, `OVS-03`, `OVS-08`, `REC-01`, `REC-04`, `ROB-02`, `TRN-03`) land
+under `blind_spots`/`needed_by`, not `no_population`, because they need one of:
 
-- a declared decision type (`DOC-01`, `INC-01`, `OVS-08`, `REC-01`, `REC-04`, `ROB-02`, `TRN-03` — 7
-  controls, via `ConsequentialDecision` typing),
+- a declared decision type (`INC-01`, `OVS-08`, `REC-01`, `REC-04`, `ROB-02`, `TRN-03` — 6 controls,
+  via `ConsequentialDecision` typing),
 - an `Incident` event (`INC-02`),
 - consequential-tagged `ToolCall` provenance (`OVS-03`),
 
@@ -48,8 +48,13 @@ and none of these is suppliable from trace records alone. Only `INT-01` lands un
 (its `ToolCall` shape itself cannot be reached from records at all, declared or not). The `otel-genai`
 adapter maps exactly seven event types (`adapters/otel-genai/support-matrix.yaml`): `SessionStart`,
 `SessionEnd`, `ModelCall`, `ToolCall`, `ResourceAccess`, `MemoryRead`, `MemoryWrite` — never `Decision`,
-`Outcome`, `Incident`, `Notice`, or `ApprovalDecided`. Closing any of the 9 gaps above needs Phases A-C:
+`Outcome`, `Incident`, `Notice`, or `ApprovalDecided`. Closing any of the 8 gaps above needs Phases A-C:
 a declared decision type or an enforcement-point/independent-system source, not another records scan.
+
+The tenth control, `DOC-01`, is the one gap this path can close. The session's calls are recorded,
+but nothing says which tools and models the agent was supposed to run, so `BundleLoaded` is listed
+in `blind_spots` with `checks_unlocked: 1`. Adding a `BundleLoaded` manifest that lists the agent's
+models and MCP servers lets `DOC-01` compare them with the calls.
 
 ## After the first look
 

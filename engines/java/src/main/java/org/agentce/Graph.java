@@ -101,6 +101,91 @@ public final class Graph {
         return node != null && node.isTextual() ? node.textValue() : null;
     }
 
+    // DOC-01 (SPEC §7.4, Art. 11 / Annex IV): the events that declare an operating component (a
+    // BundleLoaded manifest) or exercise one (a ToolCall or ModelCall) are typed with this
+    // engine-materialised class, so one shape can compare the declaration with what operated.
+    private static final String COMPONENT_RECORD = "agentce:ComponentRecord";
+    private static final Set<String> COMPONENT_RECORD_TYPES = Set.of("BundleLoaded", "ToolCall", "ModelCall");
+
+    /** A non-empty string, else null. */
+    private static String text(JsonNode node) {
+        String value = str(node);
+        return value == null || value.isEmpty() ? null : value;
+    }
+
+    /**
+     * Which declared component kinds a call can exercise. A tool call exercises a skill or an MCP server (by its
+     * tool name or server name), a model call a model; a component with no kind may be either. Prompts, configs and
+     * policies are never exercised by a call, so they take no part in DOC-01.
+     */
+    private static List<String> families(String kind) {
+        if (kind == null) {
+            return List.of("tool", "model");
+        }
+        return switch (kind) {
+            case "skill", "mcp_server" -> List.of("tool");
+            case "model" -> List.of("model");
+            default -> List.of();
+        };
+    }
+
+    /**
+     * Declared kinds that must be seen operating (DOC-01 S2). A skill is left out: its name is not reliably a tool
+     * name, so not seeing it is not evidence that it never ran.
+     */
+    private static String mustOperate(String kind) {
+        if ("model".equals(kind)) {
+            return "model";
+        }
+        return "mcp_server".equals(kind) ? "tool" : null;
+    }
+
+    /** One named component a BundleLoaded manifest declares; empty pins: any version matches. */
+    private record Declared(String kind, String name, Set<String> pins) {}
+
+    /** The component a ToolCall or ModelCall exercises: a tool by its tool and server names, a model by its name. */
+    private record Operated(String family, List<String> names, String version) {}
+
+    private static List<Declared> declaredComponents(JsonNode data) {
+        List<Declared> out = new ArrayList<>();
+        JsonNode components = data.get("components");
+        if (components == null || !components.isArray()) {
+            return out;
+        }
+        for (JsonNode component : components) {
+            String bare = text(component);
+            if (bare != null) {
+                out.add(new Declared(null, bare, Set.of()));
+            } else if (component.isObject() && text(component.get("name")) != null) {
+                Set<String> pins = new LinkedHashSet<>();
+                for (String key : List.of("version", "digest")) {
+                    String pin = text(component.get(key));
+                    if (pin != null) {
+                        pins.add(pin);
+                    }
+                }
+                out.add(new Declared(str(component.get("kind")), text(component.get("name")), pins));
+            }
+        }
+        return out;
+    }
+
+    private static Operated operated(String ptype, JsonNode data) {
+        String family = "ToolCall".equals(ptype) ? "tool" : "model";
+        JsonNode ref = data.get(family);
+        if (ref == null || !ref.isObject()) {
+            return new Operated(family, List.of(), null);
+        }
+        List<String> names = new ArrayList<>();
+        for (String key : "tool".equals(family) ? List.of("name", "server") : List.of("name")) {
+            String name = text(ref.get(key));
+            if (name != null) {
+                names.add(name);
+            }
+        }
+        return new Operated(family, names, text(ref.get("version_or_digest")));
+    }
+
     private static boolean truthy(JsonNode node) {
         if (node == null || node.isNull() || node.isMissingNode()) {
             return false;
@@ -173,6 +258,12 @@ public final class Graph {
         private final Map<String, Set<String>> decisionNotice = new LinkedHashMap<>(); // Decision IRI -> every notifying Notice IRI (order-independent)
         private final Set<String> danglingNodes = new LinkedHashSet<>(); // event IRI -> has >=1 agentce:danglingRef literal
         private final Map<String, Boolean> instructionUntrusted = new LinkedHashMap<>(); // Instruction IRI -> untrusted flag
+        // DOC-01: family -> declared name -> declared pins, null when any version matches; the union of every
+        // BundleLoaded manifest in the subject's records, so event order does not matter.
+        private final Map<String, Map<String, Set<String>>> declared =
+                Map.of("tool", new LinkedHashMap<>(), "model", new LinkedHashMap<>());
+        private final Map<String, Set<String>> operatedNames =
+                Map.of("tool", new LinkedHashSet<>(), "model", new LinkedHashSet<>());
 
         Builder(GraphStore store, DomainBinding domain, byte[] key) {
             this.store = store;
@@ -190,6 +281,9 @@ public final class Graph {
             }
             for (JsonNode event : events) {
                 usedClasses.add("agentce:" + ptype(event));
+                if (COMPONENT_RECORD_TYPES.contains(ptype(event))) {
+                    usedClasses.add(COMPONENT_RECORD);
+                }
                 mapEvent(event);
             }
             usedClasses.addAll(decisionType.values());
@@ -249,6 +343,7 @@ public final class Graph {
 
             mapDecisionLinks(node, ptype, event);
             mapConduct(node, ptype, data);
+            mapComponents(node, ptype, data);
             dangling(node, event);
 
             if ("DelegationIssued".equals(ptype)) {
@@ -333,6 +428,32 @@ public final class Graph {
          * instruction's declared source class is untrusted (Appendix F). Scope and budget are
          * computed from the enforcement point's records in a second pass
          * ({@code conductScopeBudget}). */
+        /** Collects what the manifests declare and what the calls exercise (DOC-01); the literals come in the second pass. */
+        private void mapComponents(String node, String ptype, JsonNode data) {
+            if (!COMPONENT_RECORD_TYPES.contains(ptype)) {
+                return;
+            }
+            store.addType(node, COMPONENT_RECORD);
+            if ("BundleLoaded".equals(ptype)) {
+                for (Declared component : declaredComponents(data)) {
+                    for (String family : families(component.kind())) {
+                        Map<String, Set<String>> known = declared.get(family);
+                        if (known.containsKey(component.name()) && known.get(component.name()) == null) {
+                            continue;
+                        }
+                        if (component.pins().isEmpty()) {
+                            known.put(component.name(), null);
+                        } else {
+                            known.computeIfAbsent(component.name(), k -> new LinkedHashSet<>()).addAll(component.pins());
+                        }
+                    }
+                }
+            } else {
+                Operated call = operated(ptype, data);
+                operatedNames.get(call.family()).addAll(call.names());
+            }
+        }
+
         private void mapConduct(String node, String ptype, JsonNode data) {
             if (!"Instruction".equals(ptype)) {
                 return;
@@ -413,6 +534,12 @@ public final class Graph {
                 if ("Outcome".equals(ptype)) {
                     adverseOutcomeLinked(node, data);
                 }
+                if ("ToolCall".equals(ptype) || "ModelCall".equals(ptype)) {
+                    componentDeclared(node, ptype, data);
+                }
+                if ("BundleLoaded".equals(ptype)) {
+                    declaredComponentsObserved(node, data);
+                }
                 chainTerminus(node, data);
             }
             actsOnUntrusted(events);
@@ -482,6 +609,28 @@ public final class Graph {
                             && notices.stream().anyMatch(notice -> !danglingNodes.contains(notice));
             store.addLiteral(
                     node, "agentce:explanationReconstructable", reconstructable ? "true" : "false", BOOL);
+        }
+
+        /**
+         * DOC-01 S1: a call exercises a component some BundleLoaded manifest declares -- one of its names is declared
+         * for its family, and when both the call and the declaration state a version or digest, they agree. A call
+         * that names nothing cannot be shown declared.
+         */
+        private void componentDeclared(String node, String ptype, JsonNode data) {
+            Operated call = operated(ptype, data);
+            Map<String, Set<String>> known = declared.get(call.family());
+            boolean isDeclared = call.names().stream().anyMatch(name -> known.containsKey(name)
+                    && (known.get(name) == null || call.version() == null || known.get(name).contains(call.version())));
+            store.addLiteral(node, "agentce:componentDeclared", isDeclared ? "true" : "false", BOOL);
+        }
+
+        /** DOC-01 S2: every model and MCP server this manifest declares is exercised by at least one call. */
+        private void declaredComponentsObserved(String node, JsonNode data) {
+            boolean observed = declaredComponents(data).stream().allMatch(component -> {
+                String family = mustOperate(component.kind());
+                return family == null || operatedNames.get(family).contains(component.name());
+            });
+            store.addLiteral(node, "agentce:declaredComponentsObserved", observed ? "true" : "false", BOOL);
         }
 
         private void chainVerified(String node, JsonNode data) {

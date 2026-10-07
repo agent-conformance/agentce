@@ -99,7 +99,6 @@ def test_the_doc_names_exactly_the_live_blind_spot_grouping(
         doc_needed_by
         == needed_by_controls
         == {
-            "DOC-01",
             "INC-01",
             "INC-02",
             "OVS-03",

@@ -112,15 +112,15 @@
       "control": "DOC-01",
       "outcome": "non-conformant",
       "population": {
-        "applicable": 1,
+        "applicable": 4,
         "failed": 1
       },
       "violations": [
         {
-          "constraint": "sh:minCount",
-          "focus": "agentce:event/d1",
+          "constraint": "sh:in",
+          "focus": "agentce:event/t2",
           "message_key": "DOC-01.S1",
-          "path": "prov:wasAssociatedWith"
+          "path": "agentce:componentDeclared"
         }
       ]
     },
@@ -137,7 +137,7 @@
       "control": "DOC-01",
       "outcome": "conformant",
       "population": {
-        "applicable": 1,
+        "applicable": 3,
         "failed": 0
       },
       "violations": []

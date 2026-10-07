@@ -19,7 +19,7 @@ fails the check.
 | Field | Value |
 |---|---|
 | Corpus set | v1 |
-| Manifest SHA-256 | `sha256:3ce7e195a7280ce5133e25dc3a7cffe1df1d29de634272274a9b24dab68bbf58` |
+| Manifest SHA-256 | `sha256:f18cfca6b47696d0b0f10e47329657f8d9a680b1375afc0f003c0d97179c3507` |
 | Projects | 30 (credit domain × six implementation styles × five variants) |
 | Corpus version | 2026.09 |
 | Validated catalog | eu-ai-act@2026.09 |
@@ -41,3 +41,11 @@ fails the check.
   source's real trust class in every project's manifest instead of leaving it to the event's own
   self-assertion (SPEC §6.4: an undeclared source's event now defaults to `self_report`), which changes
   every generated manifest's bytes.
+- **v1 (2026.09), pin re-extended (18.37a)** — the corpus was still unpublished, so the pin was again
+  corrected in place. DOC-01 now compares a subject's declared components (its `BundleLoaded`
+  manifests) with the tools and models its calls use, so `generate.py`'s new `_component_manifests()`
+  helper gives every subject that calls tools one self-reported `BundleLoaded` declaring the MCP servers
+  (or, for a call that names no server, the tool) those calls name, and the subject's applicability
+  profile lists the same components under `third_party_components`, so the manifest is not read as
+  applicability drift. `corpus/quickstart` is the credit/langgraph/known-pass project and carries the
+  same event and profile entry.

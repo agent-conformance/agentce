@@ -52,9 +52,9 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
 
 ### High severity
 
-- **Operating components match the declared documentation** (`DOC-01` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+- **Operating components match the declared documentation** (`DOC-01` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/2 failed)
   - `eu-ai-act Art. 11 / Annex IV (clause reference unverified)`
-  - Evidence: `agentce:event/langgraph-known-pass-dec1`
+  - Evidence: `agentce:event/langgraph-known-pass-bundle1`, `agentce:event/langgraph-known-pass-tc1`
   - Remediation: doc-evidence-at-source
 - **Serious incidents are recorded with an accountable actor (by role)** (`INC-02` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
   - `eu-ai-act Art. 73 (clause reference unverified)`

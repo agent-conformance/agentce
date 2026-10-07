@@ -4,7 +4,8 @@ Events are materialised into a PROV-O profile stored in the SQLite graph store (
 becomes a typed node with deterministic IRIs, the §6.3 relations become edges, and the engine
 materialises the glue edges that let the Portable Shape Profile avoid unbounded path traversal --
 ``agentce:chainTerminus``, ``agentce:chainVerified``, ``agentce:executesConsequential``,
-``agentce:oversightModalityMatchesDeclared``, ``agentce:danglingRef``, and ``agentce:precededBy`` --
+``agentce:oversightModalityMatchesDeclared``, ``agentce:danglingRef``, ``agentce:precededBy``,
+``agentce:componentDeclared`` and ``agentce:declaredComponentsObserved`` --
 from the domain binding, the delegation events, and the references between events. The
 ``rdfs:subClassOf*`` closure of the class hierarchy (base vocabulary plus the domain binding) is
 materialised so class membership needs no inference (SPEC §7.2). Everything is deterministic.
@@ -74,6 +75,66 @@ def _closure(subclass: dict[str, str], classes: set[str]) -> set[tuple[str, str]
     return pairs
 
 
+#: DOC-01 (SPEC §7.4, Art. 11 / Annex IV): the events that declare an operating component (a
+#: ``BundleLoaded`` manifest) or exercise one (a ``ToolCall`` or ``ModelCall``) are typed with this
+#: engine-materialised class, so one shape can compare the declaration with what operated.
+COMPONENT_RECORD = "agentce:ComponentRecord"
+_COMPONENT_RECORD_TYPES = frozenset({"BundleLoaded", "ToolCall", "ModelCall"})
+
+#: Which declared component kinds a call can exercise. A tool call exercises a skill or an MCP server
+#: (by its tool name or server name), a model call a model; a component with no kind may be either.
+#: Prompts, configs and policies are never exercised by a call, so they take no part in DOC-01.
+_FAMILIES: dict[str | None, tuple[str, ...]] = {
+    "skill": ("tool",),
+    "mcp_server": ("tool",),
+    "model": ("model",),
+    None: ("tool", "model"),
+}
+
+#: Declared kinds that must be seen operating (DOC-01 S2). A skill is left out: its name is not
+#: reliably a tool name, so not seeing it is not evidence that it never ran.
+_MUST_OPERATE: dict[str, str] = {"model": "model", "mcp_server": "tool"}
+
+
+def _text(value: Any) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
+def _declared_components(
+    data: dict[str, Any],
+) -> list[tuple[str | None, str, frozenset[str]]]:
+    """``(kind, name, pins)`` for each named component a ``BundleLoaded`` manifest declares, where
+    ``pins`` holds its declared version and digest (empty: any version matches)."""
+    components = data.get("components")
+    out: list[tuple[str | None, str, frozenset[str]]] = []
+    for component in components if isinstance(components, list) else []:
+        if _text(component):
+            out.append((None, component, frozenset()))
+        elif isinstance(component, dict) and _text(component.get("name")):
+            kind = component.get("kind")
+            pins = (component.get("version"), component.get("digest"))
+            out.append(
+                (
+                    kind if isinstance(kind, str) else None,
+                    component["name"],
+                    frozenset(p for p in pins if isinstance(p, str) and p),
+                )
+            )
+    return out
+
+
+def _operated(ptype: str, data: dict[str, Any]) -> tuple[str, list[str], str | None]:
+    """``(family, names, version)`` of the component a ``ToolCall`` or ``ModelCall`` exercises: a
+    tool call is known by its tool name and its server name, a model call by its model name."""
+    family = "tool" if ptype == "ToolCall" else "model"
+    ref = data.get(family)
+    if not isinstance(ref, dict):
+        return family, [], None
+    keys = ("name", "server") if family == "tool" else ("name",)
+    names = [ref[k] for k in keys if _text(ref.get(k))]
+    return family, names, _text(ref.get("version_or_digest"))
+
+
 def _principal_ref(entry: Any) -> tuple[str | None, str | None]:
     """A principal in ``acted_for`` is a bare id string or ``{id, kind}`` (SPEC §5.3)."""
     if isinstance(entry, str):
@@ -123,6 +184,10 @@ class _Builder:
         self.dangling_nodes: set[str] = (
             set()
         )  # event IRI -> has >=1 agentce:danglingRef literal
+        # DOC-01: family -> declared name -> declared pins, None when any version matches; the union
+        # of every BundleLoaded manifest in the subject's records, so event order does not matter.
+        self.declared: dict[str, dict[str, set[str] | None]] = {"tool": {}, "model": {}}
+        self.operated: dict[str, set[str]] = {"tool": set(), "model": set()}
 
     def build(self, events: list[dict[str, Any]]) -> GraphStore:
         used_classes: set[str] = set(BASE_SUBCLASS) | {
@@ -134,6 +199,8 @@ class _Builder:
             self.event_iris.add(event_iri(str(event["id"])))
         for event in events:
             used_classes.add(f"agentce:{self._ptype(event)}")
+            if self._ptype(event) in _COMPONENT_RECORD_TYPES:
+                used_classes.add(COMPONENT_RECORD)
             self._map_event(event)
         used_classes |= set(
             self.decision_type.values()
@@ -180,6 +247,7 @@ class _Builder:
 
         self._map_decision_links(node, ptype, event)
         self._map_conduct(node, ptype, data)
+        self._map_components(node, ptype, data)
         self._dangling(node, event)
 
         if ptype == "DelegationIssued":
@@ -267,6 +335,25 @@ class _Builder:
                 BOOL,
             )
 
+    def _map_components(self, node: str, ptype: str, data: dict[str, Any]) -> None:
+        """Collect what the manifests declare and what the calls exercise (DOC-01); the two literals
+        are set in the second pass, once every event is mapped."""
+        if ptype not in _COMPONENT_RECORD_TYPES:
+            return
+        self.store.add_type(node, COMPONENT_RECORD)
+        if ptype == "BundleLoaded":
+            for kind, name, pins in _declared_components(data):
+                for family in _FAMILIES.get(kind, ()):
+                    known = self.declared[family]
+                    if name in known and known[name] is None:
+                        continue
+                    known[name] = (
+                        None if not pins else (known.get(name) or set()) | pins
+                    )
+        else:
+            family, names, _version = _operated(ptype, data)
+            self.operated[family].update(names)
+
     def _conduct_scope_budget(self, events: list[dict[str, Any]]) -> None:
         """Compute the Conduct within-scope and within-budget flags (SPEC §7.7, CND-01/CND-07) from
         the enforcement point's records: an action is out of scope when a ``PolicyDecision`` denies
@@ -338,6 +425,10 @@ class _Builder:
                 self._explanation_reconstructable(node)
             if ptype == "Outcome":
                 self._adverse_outcome_linked(node, data)
+            if ptype in ("ToolCall", "ModelCall"):
+                self._component_declared(node, ptype, data)
+            if ptype == "BundleLoaded":
+                self._declared_components_observed(node, data)
             self._chain_terminus(node, data)
         self._acts_on_untrusted(events)
         self._conduct_scope_budget(events)
@@ -436,6 +527,36 @@ class _Builder:
             node,
             "agentce:explanationReconstructable",
             "true" if reconstructable else "false",
+            BOOL,
+        )
+
+    def _component_declared(self, node: str, ptype: str, data: dict[str, Any]) -> None:
+        """DOC-01 S1: a call exercises a component some ``BundleLoaded`` manifest declares -- one of
+        its names is declared for its family, and when both the call and the declaration state a
+        version or digest, they agree. A call that names nothing cannot be shown declared."""
+        family, names, version = _operated(ptype, data)
+        known = self.declared[family]
+        declared = any(
+            name in known
+            and ((pins := known[name]) is None or version is None or version in pins)
+            for name in names
+        )
+        self.store.add_literal(
+            node, "agentce:componentDeclared", "true" if declared else "false", BOOL
+        )
+
+    def _declared_components_observed(self, node: str, data: dict[str, Any]) -> None:
+        """DOC-01 S2: every model and MCP server this manifest declares is exercised by at least one
+        call in the subject's records (declared but never seen is drift too)."""
+        observed = all(
+            name in self.operated[_MUST_OPERATE[kind]]
+            for kind, name, _pins in _declared_components(data)
+            if kind in _MUST_OPERATE
+        )
+        self.store.add_literal(
+            node,
+            "agentce:declaredComponentsObserved",
+            "true" if observed else "false",
             BOOL,
         )
 

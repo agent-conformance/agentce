@@ -10,10 +10,11 @@ evaluation:
   rung: 2
   min_source_class: self_report
   minimum_evidence:
-    - {event: Decision, class: self_report}
+    - {event: BundleLoaded, class: self_report}
   shape: shapes/DOC-01.ttl
 expectations:
-  - {id: S1, text: "Operating components match the declared documentation."}
+  - {id: S1, text: "Every tool and model the agent calls is declared in a loaded bundle manifest."}
+  - {id: S2, text: "Every model and MCP server a loaded bundle manifest declares is seen operating."}
 severity: high
 evidence_strength: strong
 tolerance: {kind: count, max: 0}

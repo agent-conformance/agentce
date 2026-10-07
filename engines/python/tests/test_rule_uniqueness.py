@@ -231,6 +231,17 @@ def _load_check_driver():
     return module
 
 
+def _copy_rec_01_onto_doc_01(catalog_dir: Path) -> None:
+    """The 18.37 regression as it shipped: DOC-01 carrying REC-01's shape and fixtures verbatim."""
+    (catalog_dir / "shapes" / "DOC-01.ttl").write_bytes(
+        (catalog_dir / "shapes" / "REC-01.ttl").read_bytes()
+    )
+    for case_id in ("passed", "failed", "inapplicable"):
+        (catalog_dir / "test" / "DOC-01" / f"{case_id}.jsonl").write_bytes(
+            (catalog_dir / "test" / "REC-01" / f"{case_id}.jsonl").read_bytes()
+        )
+
+
 @pytest.mark.parametrize(("ceiling", "expected"), [(0, 1), (1, 0), (2, 1)])
 def test_a_baseline_pair_count_must_equal_its_pinned_ceiling(
     tmp_path: Path, ceiling: int, expected: int
@@ -239,10 +250,12 @@ def test_a_baseline_pair_count_must_equal_its_pinned_ceiling(
     (0): a change declared a brand-new duplicate "already disclosed" by adding it to `pairs`, which
     `new_rule_uniqueness_problems` alone would not catch. Below it (2): a pair was paid down without
     lowering the ceiling, leaving a free slot a later duplicate could take by editing `pairs` alone.
-    At it (1, today's committed state): no failure."""
+    At it (1): no failure. The catalog copy carries one real duplicate, seeded, since the shipped
+    baseline catalog has none since 18.37a."""
     catalogs_root = tmp_path / "catalogs"
     (catalogs_root / "base").mkdir(parents=True)
     shutil.copytree(_BASE_CATALOGS / "baseline", catalogs_root / "base" / "baseline")
+    _copy_rec_01_onto_doc_01(catalogs_root / "base" / "baseline")
     baseline_path = tmp_path / "baseline.json"
     baseline_path.write_text(
         json.dumps(
@@ -277,13 +290,7 @@ def test_seeded_fault_copying_rec_01s_shape_into_doc_01_is_caught(
     fixtures onto another's. A real catalog copy, mutated the way the regression actually shipped."""
     copy = tmp_path / "baseline"
     shutil.copytree(_BASE_CATALOGS / "baseline", copy)
-    (copy / "shapes" / "DOC-01.ttl").write_bytes(
-        (copy / "shapes" / "REC-01.ttl").read_bytes()
-    )
-    for case_id in ("passed", "failed", "inapplicable"):
-        (copy / "test" / "DOC-01" / f"{case_id}.jsonl").write_bytes(
-            (copy / "test" / "REC-01" / f"{case_id}.jsonl").read_bytes()
-        )
+    _copy_rec_01_onto_doc_01(copy)
     catalog = load_catalog(copy)
     problems = rule_uniqueness_problems(catalog)
     assert any("DOC-01" in p and "REC-01" in p for p in problems), problems

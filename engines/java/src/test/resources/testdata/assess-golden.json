@@ -104,7 +104,7 @@
       "control": "DOC-01",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
+      "outcome": "insufficient_evidence",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -117,15 +117,6 @@
       },
       "severity": "high",
       "family": "DOC",
-      "evidence": [
-        {
-          "ref": "agentce:event/d1",
-          "digest": "sha256:d4a9f7dd9e7227f646c01d480a0fdbdf12213d627286826d3dcb8a13a8dff9d4",
-          "source_class": "self_report"
-        }
-      ],
-      "source_class_satisfied": true,
-      "evidence_strength": "strong",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1562,7 +1553,7 @@
       "control": "DOC-01",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
+      "outcome": "insufficient_evidence",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -1575,15 +1566,6 @@
       },
       "severity": "high",
       "family": "DOC",
-      "evidence": [
-        {
-          "ref": "agentce:event/d1",
-          "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
-          "source_class": "self_report"
-        }
-      ],
-      "source_class_satisfied": true,
-      "evidence_strength": "strong",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3036,7 +3018,7 @@
       "control": "DOC-01",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
+      "outcome": "not_applicable",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -3044,20 +3026,11 @@
         "end": "2026-01-01T00:00:00Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "high",
       "family": "DOC",
-      "evidence": [
-        {
-          "ref": "agentce:event/d1",
-          "digest": "sha256:f56466bad88f6ad62c52aed5aa73e39693224c23ff2ebf6c2585dbcf04a052e2",
-          "source_class": "self_report"
-        }
-      ],
-      "source_class_satisfied": true,
-      "evidence_strength": "strong",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
