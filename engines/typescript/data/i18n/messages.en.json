@@ -312,7 +312,7 @@
   "report.buyer_how_to_check": "Re-run this report offline and compare the result: `agentce verify --report {folder}`.",
   "report.buyer_how_to_check_heading": "How to check this report",
   "report.buyer_how_to_check_unpackaged": "This report was not packaged for offline re-verification; re-run the assessment with `--package-for-sharing` to produce one that can be.",
-  "report.buyer_intro": "This view answers generated questionnaire questions (CAIQ, the AI Controls Matrix) from the same records report.md already draws on. It draws no new conclusion and is not itself a certification -- it is evidence against the standard and version named below.",
+  "report.buyer_intro": "This view answers generated questionnaire questions (CAIQ; the AI Controls Matrix adds none until its crosswalk is confirmed) from the same records report.md already draws on. It draws no new conclusion and is not itself a certification -- it is evidence against the standard and version named below.",
   "report.buyer_not_a_certification": "Evidence against {framework} {version}, not a certification.",
   "report.buyer_summary_heading": "Summary",
   "report.buyer_title": "AgentCE buyer view",
