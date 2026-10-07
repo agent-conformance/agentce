@@ -19,7 +19,7 @@ from typing import Any
 import pytest
 import yaml
 
-from agentce import bundle, cli
+from agentce import bundle, cli, records
 from agentce.tools.validate_profile import validate_profile
 from conftest import unwritable_dir
 
@@ -897,6 +897,89 @@ def test_renamed_and_reordered_files_give_the_same_result_with_multiple_agents(
     _, first = _run(["assess", str(one), "--out", str(tmp_path / "o1")], capsys)
     _, second = _run(["assess", str(two), "--out", str(tmp_path / "o2")], capsys)
     assert first["bundle_digest"] == second["bundle_digest"]
+
+
+def _nested(depth: int, text: str = "x") -> bytes:
+    """The chat fixture with one extra attribute whose value holds ``text`` and is nested so the whole
+    document's raw ``[``/``{`` depth is exactly ``depth``."""
+    document = json.loads(
+        (_FIXTURES / "otel-genai-chat" / "input.json").read_text(encoding="utf-8")
+    )
+    span = document["resourceSpans"][0]["scopeSpans"][0]["spans"][0]
+    span["attributes"].append({"key": "probe", "value": {"stringValue": text}})
+    raw = json.dumps(document).encode()
+    extra = 0
+    while True:
+        nested = raw.replace(
+            b'"probe", "value": {',
+            b'"probe", "nest": ' + b"[" * extra + b"]" * extra + b', "value": {',
+        )
+        if records._depth(nested) >= depth:
+            assert records._depth(nested) == depth
+            return nested
+        extra += 1
+
+
+def test_nesting_is_judged_by_a_fixed_limit_on_the_raw_bytes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = tmp_path / "records"
+    folder.mkdir()
+    (folder / "at.json").write_bytes(_nested(records.MAX_RECORD_DEPTH))
+    (folder / "over.json").write_bytes(_nested(records.MAX_RECORD_DEPTH + 1))
+    # Brackets inside a string, behind escaped quotes, are not nesting.
+    (folder / "string.jsonl").write_bytes(
+        _nested(records.MAX_RECORD_DEPTH, '\\"[[[[' + "{" * 300) + b"\n"
+    )
+    code, env = _run(["assess", str(folder), "--out", str(tmp_path / "out")], capsys)
+    assert code == 0
+    assert [f["path"] for f in env["records"]["files"]] == ["at.json", "string.jsonl"]
+    assert env["records"]["unrecognised"] == [
+        {"path": "over.json", "reason": "nested too deeply to parse safely"}
+    ]
+
+
+def test_a_document_that_does_not_parse_or_decode_gets_a_fixed_reason(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = _records(tmp_path / "records")
+    (folder / "empty.json").write_bytes(b"")
+    (folder / "junk.json").write_bytes(b"{not json")
+    (folder / "latin1.json").write_bytes(b'{"resourceSpans": "\xff"}')
+    code, env = _run(["assess", str(folder), "--out", str(tmp_path / "out")], capsys)
+    assert code == 0
+    unread = {u["path"]: u["reason"] for u in env["records"]["unrecognised"]}
+    assert unread == {
+        "empty.json": "invalid_json: not valid JSON",
+        "junk.json": "invalid_json: not valid JSON",
+        "latin1.json": "invalid_encoding: not valid UTF-8",
+    }
+
+
+def test_a_lone_surrogate_names_the_file_instead_of_ending_the_run(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = tmp_path / "records"
+    folder.mkdir()
+    raw = (_FIXTURES / "otel-genai-chat" / "input.json").read_text(encoding="utf-8")
+    service = json.loads(raw)["resourceSpans"][0]["resource"]["attributes"]
+    name = next(a for a in service if a["key"] == "service.name")["value"][
+        "stringValue"
+    ]
+    lone = raw.replace(f'"{name}"', f'"{name}\\ud800"', 1)
+    pair = raw.replace(f'"{name}"', f'"{name}\\ud83d\\ude00"', 1)
+    assert lone != raw and pair != raw
+    (folder / "lone.json").write_text(lone, encoding="utf-8")
+    (folder / "pair.json").write_text(pair, encoding="utf-8")
+    code, env = _run(["assess", str(folder), "--out", str(tmp_path / "out")], capsys)
+    assert code == 0
+    assert [f["path"] for f in env["records"]["files"]] == ["pair.json"]
+    assert env["records"]["unrecognised"] == [
+        {
+            "path": "lone.json",
+            "reason": "invalid_encoding: a string holds a lone surrogate, which UTF-8 cannot carry",
+        }
+    ]
 
 
 def test_a_file_with_a_byte_order_mark_is_read(

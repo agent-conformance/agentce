@@ -162,14 +162,59 @@ class ScannedRecords:
 NO_GENAI_SPANS = "spans found, but none is a GenAI operation the adapter maps"
 
 
+#: The deepest ``[``/``{`` nesting a record document may have (counted on its raw bytes, outside JSON
+#: strings) and still be read: a fixed limit, so whether a file is read never depends on a parser's stack.
+MAX_RECORD_DEPTH = 256
+NESTED_TOO_DEEPLY = "nested too deeply to parse safely"
+
+#: The fixed detail each engine gives for a document it cannot parse or decode, in place of a parser's
+#: own wording, so every engine names the same file the same way.
+_FIXED_DETAIL = {
+    "invalid_json": "invalid_json: not valid JSON",
+    "invalid_encoding": "invalid_encoding: not valid UTF-8",
+}
+LONE_SURROGATE = (
+    "invalid_encoding: a string holds a lone surrogate, which UTF-8 cannot carry"
+)
+
+
+def _depth(payload: bytes) -> int:
+    """The deepest ``[``/``{`` nesting in ``payload``'s bytes, not counting brackets inside JSON strings."""
+    depth = deepest = 0
+    in_string = escaped = False
+    for byte in payload:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif byte == 0x5C:
+                escaped = True
+            elif byte == 0x22:
+                in_string = False
+        elif byte == 0x22:
+            in_string = True
+        elif byte in (0x5B, 0x7B):
+            depth += 1
+            deepest = max(deepest, depth)
+        elif byte in (0x5D, 0x7D):
+            depth -= 1
+    return deepest
+
+
 def _adapt(payload: bytes, subject: str) -> otel_genai.AdaptResult:
     """Adapt one OTLP/JSON document; raise ``ValueError`` when it is not a trace export."""
+    if _depth(payload) > MAX_RECORD_DEPTH:
+        raise ValueError(NESTED_TOO_DEEPLY)
     try:
         result = otel_genai.adapt(payload, subject=subject, source_class=SOURCE_CLASS)
     except otel_genai.AdapterError as exc:
-        raise ValueError(str(exc)) from exc
+        raise ValueError(_FIXED_DETAIL.get(exc.reason, str(exc))) from exc
     except RecursionError as exc:
-        raise ValueError("nested too deeply to parse safely") from exc
+        raise ValueError(NESTED_TOO_DEEPLY) from exc
+    for event in result.events:
+        try:
+            canonical_string(event).encode("utf-8")
+        except UnicodeEncodeError as exc:
+            raise ValueError(LONE_SURROGATE) from exc
     if not result.events:
         raise ValueError(
             "no spans: not an OpenTelemetry or OpenInference trace export"
