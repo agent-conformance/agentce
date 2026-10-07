@@ -1525,6 +1525,26 @@ def test_verify_report_expect_keyid_match_and_mismatch(
     assert envelope["error"]["key"] == "verify.report_keyid_mismatch"
 
 
+def test_verify_report_expect_keyid_with_non_list_envelope_signatures(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A claimant entry whose own `signatures` is not a list carries no keyid, so --expect-keyid
+    with the real keyid finds no candidate and refuses with the mismatch key rather than crashing
+    (the `_has_expect_keyid` branch VG-REPORT-BRANCH-COVERAGE holds to 100%, 18.75)."""
+    from agentce import signing
+
+    out, key = _packaged_and_signed(tmp_path)
+    claim = json.loads((out / "claim.json").read_text(encoding="utf-8"))
+    for entry in claim["signatures"]:
+        entry["signatures"] = "tampered"
+    (out / "claim.json").write_text(json.dumps(claim), encoding="utf-8")
+    code, envelope = _verify_report_json(
+        capsys, str(out), "--expect-keyid", signing.keyid_for(key.public_key())
+    )
+    assert code == 3
+    assert envelope["error"]["key"] == "verify.report_keyid_mismatch"
+
+
 def test_verify_report_forged_keyid_trust_root_is_refused(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
