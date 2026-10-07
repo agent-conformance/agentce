@@ -5,8 +5,10 @@
 
 : "${root:?test_files.sh needs root set to the repository root}"
 
-# One node --test run per file: node treats file arguments as globs and skips a missing one, so each
-# file is checked to exist and its TAP summary to count at least one test.
+# One node run per file, without --test: --test treats file arguments as globs (a missing file is
+# skipped) and reports a file that declares no tests as one passing test. Run directly, the file prints
+# a TAP "# tests N" summary only when it declares tests, so each file is checked to exist and to count
+# at least one.
 ts_tests() {
   local file out count
   for file in "$@"; do
@@ -14,7 +16,7 @@ ts_tests() {
       echo "typescript test file $file is missing" >&2
       return 1
     fi
-    if ! out="$(cd "$root/engines/typescript" && node --import tsx --test --test-reporter=tap "$file" 2>&1)"; then
+    if ! out="$(cd "$root/engines/typescript" && node --import tsx --test-reporter=tap "$file" 2>&1)"; then
       printf '%s\n' "$out" | tail -40 >&2
       return 1
     fi

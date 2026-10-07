@@ -1424,6 +1424,12 @@
           "file": "verification/gates/i18n_one_catalogue.sh",
           "search": "java_tests org.agentce.BundledDataTest org.agentce.MessagesTest",
           "replace": "java_tests org.agentce.BundledDataTest org.agentce.MessagesTestDeleted"
+        },
+        {
+          "description": "the gate's TypeScript leg names a file that exists but declares no tests (src/bundled.ts); node --test would count it as one passing test, the direct run counts none and fails it",
+          "file": "verification/gates/i18n_one_catalogue.sh",
+          "search": "ts_tests src/bundledData.test.ts src/messages.test.ts",
+          "replace": "ts_tests src/bundledData.test.ts src/bundled.ts"
         }
       ],
       "fix_hint": "Run verification/gates/i18n_one_catalogue.sh and read which engine's test or CLI leg failed; the loader lives in engines/typescript/src/messages.ts and engines/java/src/main/java/org/agentce/Messages.java, both reading engines/<lang>/.../i18n/, vendored from spec/i18n/."
@@ -1497,6 +1503,12 @@
           "file": "verification/gates/i18n_error_catalogue.sh",
           "search": "java_tests org.agentce.ErrorCatalogueTest",
           "replace": "java_tests org.agentce.ErrorCatalogueTestDeleted"
+        },
+        {
+          "description": "the gate's TypeScript leg names a file that exists but declares no tests (src/bundled.ts); node --test would count it as one passing test, the direct run counts none and fails it",
+          "file": "verification/gates/i18n_error_catalogue.sh",
+          "search": "ts_tests src/errorCatalogue.test.ts",
+          "replace": "ts_tests src/bundled.ts"
         }
       ],
       "fix_hint": "Run verification/gates/i18n_error_catalogue.sh and read which engine's test or CLI leg failed. The registries are engines/python/agentce/error_catalogue.py, engines/typescript/src/errorCatalogue.ts and engines/java/src/main/java/org/agentce/ErrorCatalogue.java; the trust-root causes are in signing.py, verify.ts and Verify.java; a new key goes into spec/i18n/messages.en.json, its three vendored copies and Python's _KINDS, then docs/errors.md is regenerated with agentce doctor --write-errors."
