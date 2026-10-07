@@ -766,7 +766,8 @@ export function adapt(payload: Uint8Array, opts: AdaptOptions): AdaptResult {
   }
   let document: unknown;
   try {
-    document = parseJson(text);
+    // Python's `json.loads` reads `NaN`, `Infinity` and `-Infinity`; so does this adapter.
+    document = parseJson(text, { pythonConstants: true });
   } catch (exc) {
     throw new OtelGenaiAdapterError(
       "invalid_json",

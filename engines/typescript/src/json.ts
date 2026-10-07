@@ -39,7 +39,10 @@ const NUMBER_TOKEN = /-?(?:0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?/y;
 class Reader {
   private pos = 0;
 
-  constructor(private readonly text: string) {}
+  constructor(
+    private readonly text: string,
+    private readonly pythonConstants = false,
+  ) {}
 
   fail(what: string): never {
     throw new SyntaxError(`${what} in JSON at position ${this.pos}`);
@@ -84,6 +87,16 @@ class Reader {
       if (this.text.startsWith(word, this.pos)) {
         this.pos += word.length;
         return result;
+      }
+    }
+    if (this.pythonConstants) {
+      // Python's `json.loads` reads these three words as floats; the canonical form refuses a float,
+      // so each is kept as a non-canonical number carrying Python's own `repr` of it.
+      for (const [word, repr] of PYTHON_CONSTANTS) {
+        if (this.text.startsWith(word, this.pos)) {
+          this.pos += word.length;
+          return new NonCanonicalNumber(repr, "non_integer_number");
+        }
       }
     }
     return this.number();
@@ -186,10 +199,26 @@ class Reader {
   }
 }
 
-/** Parse JSON text like `JSON.parse`, keeping a non-canonical number token as a marker value. */
-export function parseJson(text: string): unknown {
+/** The words Python's `json.loads` accepts beyond JSON, each with Python's `repr` of its float. */
+const PYTHON_CONSTANTS = [
+  ["NaN", "nan"],
+  ["Infinity", "inf"],
+  ["-Infinity", "-inf"],
+] as const;
+
+/** Parse JSON text like `JSON.parse`, keeping a non-canonical number token as a marker value. With
+ * `pythonConstants`, `NaN`, `Infinity` and `-Infinity` are read as Python's `json.loads` reads them
+ * (as non-canonical numbers) instead of being refused. */
+export function parseJson(text: string, options: { pythonConstants?: boolean } = {}): unknown {
+  const pythonConstants = options.pythonConstants ?? false;
   if (!NEEDS_TOKEN_SCAN.test(text)) {
-    return JSON.parse(text);
+    try {
+      return JSON.parse(text);
+    } catch (exc) {
+      if (!pythonConstants) {
+        throw exc;
+      }
+    }
   }
-  return new Reader(text).document();
+  return new Reader(text, pythonConstants).document();
 }
