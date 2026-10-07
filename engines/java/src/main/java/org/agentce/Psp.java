@@ -258,6 +258,7 @@ public final class Psp {
      * parses as ordinary Turtle and the reads above, which only ask for the predicates they name, drop it
      * silently: the shape would be evaluated as if the construct were not there. */
     private static final JsonNode TERMS = loadTerms();
+    private static final List<String> PRIORITY_DENY = textList(TERMS.get("priority_deny"));
     private static final Set<String> ALLOWED = textSet(TERMS.get("allowed"));
     private static final Set<String> RANGE_DATATYPES = textSet(TERMS.get("range_datatypes"));
     private static final String REGEX_META = TERMS.get("regex_meta").asText();
@@ -283,9 +284,14 @@ public final class Psp {
     }
 
     private static Set<String> textSet(JsonNode array) {
-        Set<String> out = new HashSet<>();
+        return new HashSet<>(textList(array));
+    }
+
+    /** The array's strings in file order (priority_deny's order decides which feature is reported). */
+    private static List<String> textList(JsonNode array) {
+        List<String> out = new ArrayList<>();
         array.forEach(item -> out.add(item.asText()));
-        return out;
+        return List.copyOf(out);
     }
 
     /** The excluded feature a property path uses, or null: a predicate, an inverse of a permitted path,
@@ -393,9 +399,9 @@ public final class Psp {
         for (String name : used) {
             folded.add(name.toLowerCase(Locale.ROOT));
         }
-        for (JsonNode term : TERMS.get("priority_deny")) {
-            if (folded.contains(term.asText().toLowerCase(Locale.ROOT))) {
-                return "sh:" + term.asText();
+        for (String term : PRIORITY_DENY) {
+            if (folded.contains(term.toLowerCase(Locale.ROOT))) {
+                return "sh:" + term;
             }
         }
         for (String name : used) {

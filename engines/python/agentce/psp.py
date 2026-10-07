@@ -343,9 +343,8 @@ def parse_shapes_ttl(text: str, shown: str = "(inline)") -> dict[str, Shape]:
     graph = Graph()
     try:
         graph.parse(data=text, format="turtle")
-    except (
-        Exception
-    ) as exc:  # rdflib raises BadSyntax, IndexError, AssertionError, ... on bad Turtle
+    # rdflib raises BadSyntax, IndexError, AssertionError, ... on bad Turtle.
+    except Exception as exc:
         raise _parse_error(
             shown, " ".join(str(exc).split())[:200] or type(exc).__name__
         ) from exc

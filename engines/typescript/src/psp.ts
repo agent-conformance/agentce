@@ -17,7 +17,7 @@ import { DataFactory, Parser, Store, type Term } from "n3";
 import { pspTermsPath } from "./bundled";
 import { InputError } from "./errors";
 import { errorCause, errorFix } from "./messages";
-import { byteCompare } from "./util";
+import { byteCompare, formatTemplate } from "./util";
 
 const { namedNode } = DataFactory;
 
@@ -406,10 +406,6 @@ export function profileFeature(store: Store): string | null {
   return null;
 }
 
-function fill(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (whole, name: string) => vars[name] ?? whole);
-}
-
 /** Parse PSP shapes from Turtle, refusing a file that will not parse or a shape outside the profile.
  * `shown` names the shape file in the message (a catalog-relative path). */
 export function parseShapesTtl(text: string, shown = "(inline)"): Map<string, Shape> {
@@ -423,14 +419,18 @@ export function parseShapesTtl(text: string, shown = "(inline)"): Map<string, Sh
       .join(" ");
     throw new InputError(
       PARSE_ERROR,
-      fill(errorCause(PARSE_ERROR), { path: shown, detail: detail.slice(0, 200) }),
+      formatTemplate(errorCause(PARSE_ERROR), { path: shown, detail: detail.slice(0, 200) }),
       errorFix(PARSE_ERROR),
     );
   }
   const feature = profileFeature(store);
   if (feature !== null) {
     const key = FEATURE_KEYS[feature] ?? OUTSIDE_PROFILE;
-    throw new InputError(key, fill(errorCause(key), { path: shown, feature }), errorFix(key));
+    throw new InputError(
+      key,
+      formatTemplate(errorCause(key), { path: shown, feature }),
+      errorFix(key),
+    );
   }
   return parseShapes(store);
 }

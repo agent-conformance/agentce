@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { test } from "node:test";
+import { pspTermsPath } from "./bundled";
 
 const ENGINE = join(__dirname, "..");
 const REPO = join(ENGINE, "..", "..");
@@ -65,6 +66,6 @@ test("the vendored data is byte-identical to the Python engine's copy", () => {
 test("the vendored psp-terms.json is byte-identical to spec/rules/psp-terms.json", () => {
   // The engine refuses exactly the shapes spec/rules/psp_check.py refuses only while both read the
   // same term list (18.78).
-  const vendored = readFileSync(join(ENGINE, "data", "psp-terms.json"));
+  const vendored = readFileSync(pspTermsPath());
   assert.ok(vendored.equals(readFileSync(join(REPO, "spec", "rules", "psp-terms.json"))));
 });

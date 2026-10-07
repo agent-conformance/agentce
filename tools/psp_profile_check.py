@@ -34,6 +34,8 @@ import tempfile
 import threading
 from pathlib import Path
 
+import readiness_parity_check
+
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = Path(__file__).with_name("psp_profile_expected.json")
 SOURCE_CATALOG = ROOT / "spec/catalogs/base/eu-ai-act"
@@ -198,10 +200,9 @@ def check_scenario(
         if row.get("surface") == "probe":
             problem = probe_problem(python_exe, str(row["ttl"]), expect, work)
             return problem and f"{name}: {problem}"
-        shapes = {
-            str(k): str(v)
-            for k, v in dict(row.get("shapes") or {"DAT-01": row["ttl"]}).items()
-        }
+        raw = row.get("shapes") or {"DAT-01": row["ttl"]}
+        assert isinstance(raw, dict)
+        shapes = {str(k): str(v) for k, v in raw.items()}
         python = engines["python/seed0"][0]
         if row.get("surface") == "lint-two-catalogs":
             parent = work / "catalogs"
@@ -248,10 +249,6 @@ def build_engines() -> None:
         )
 
 
-def newest_jar(directory: Path) -> Path:
-    return max(directory.glob("agentce-*-all.jar"), key=lambda p: p.stat().st_mtime)
-
-
 def gate() -> int:
     table = json.loads(EXPECTED.read_text(encoding="utf-8"))
     rows: dict[str, dict[str, object]] = table["scenarios"]
@@ -266,7 +263,7 @@ def gate() -> int:
     engines = engine_commands(
         [str(venv / "agentce")],
         ["node", str(ROOT / "engines/typescript/dist/cli.js")],
-        ["java", "-jar", str(newest_jar(ROOT / "engines/java/build/libs"))],
+        ["java", "-jar", str(readiness_parity_check.java_jar())],
     )
     ran = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:
@@ -315,12 +312,7 @@ def installed() -> int:
             check=True,
             capture_output=True,
         )
-        subprocess.run(
-            ["pnpm", "build"],
-            cwd=ROOT / "engines/typescript",
-            check=True,
-            capture_output=True,
-        )
+        build_engines()
         subprocess.run(
             ["pnpm", "pack", "--pack-destination", str(t)],
             cwd=ROOT / "engines/typescript",
@@ -333,15 +325,7 @@ def installed() -> int:
             check=True,
             capture_output=True,
         )
-        subprocess.run(
-            ["./gradlew", "--no-daemon", "-q", "runnableJar"],
-            cwd=ROOT / "engines/java",
-            check=True,
-            capture_output=True,
-        )
-        jar = shutil.copy(
-            newest_jar(ROOT / "engines/java/build/libs"), t / "agentce.jar"
-        )
+        jar = shutil.copy(readiness_parity_check.java_jar(), t / "agentce.jar")
         engines = engine_commands(
             [str(t / "venv/bin/agentce")],
             [str(t / "node/node_modules/.bin/agentce")],

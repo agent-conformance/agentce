@@ -64,7 +64,6 @@ import {
   blindSpotsCliLines,
   catalogProvenanceDigest,
   digestBytes,
-  formatTemplate,
   renderEvidencePack,
   renderOscal,
   renderReportHtml,
@@ -78,7 +77,15 @@ import { computeSecurityView } from "./securityView";
 import { INTOTO_STATEMENT_TYPE, KmsSigner, type Signer, signStatement, signSubjects } from "./sign";
 import { StateDir, windowEnd } from "./state";
 import { GraphStore } from "./store";
-import { byteCompare, jsonStringifyAscii, pyRepr, pyStr, sortKeysDeep, writeJsonl } from "./util";
+import {
+  byteCompare,
+  formatTemplate,
+  jsonStringifyAscii,
+  pyRepr,
+  pyStr,
+  sortKeysDeep,
+  writeJsonl,
+} from "./util";
 import { summarize } from "./verdict";
 import {
   type TrustRoot,

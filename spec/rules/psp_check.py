@@ -50,9 +50,8 @@ _TERMS = json.loads(
 )
 ALLOWED = frozenset(_TERMS["allowed"])
 PRIORITY_DENY = tuple(_TERMS["priority_deny"])
-MAX_PATH_LENGTH = int(
-    _TERMS["max_path_length"]
-)  # SPEC 7.2: sequence and alternative of at most three
+# SPEC 7.2: sequence and alternative of at most three.
+MAX_PATH_LENGTH = int(_TERMS["max_path_length"])
 # Regex metacharacters forbidden after the mandatory leading anchor (SPEC 7.2: "^<literal>").
 REGEX_META = frozenset(_TERMS["regex_meta"])
 RANGE_DATATYPES = frozenset(URIRef(iri) for iri in _TERMS["range_datatypes"])

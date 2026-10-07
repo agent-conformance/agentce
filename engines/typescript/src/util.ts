@@ -199,3 +199,8 @@ export function normalizePosixPath(raw: string): string {
   }
   return joined === "" ? "." : joined;
 }
+
+/** Fill the `{name}` slots in a message template; an unknown name is left as written. */
+export function formatTemplate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (whole, key: string) => vars[key] ?? whole);
+}

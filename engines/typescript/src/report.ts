@@ -29,7 +29,7 @@ import {
   computeProjectView,
   noPopulationBySubject,
 } from "./project";
-import { byteCompare, jsonStringifyAscii, pyStr, sortKeysDeep } from "./util";
+import { byteCompare, formatTemplate, jsonStringifyAscii, pyStr, sortKeysDeep } from "./util";
 import { gapText, summarize as summarizeVerdict } from "./verdict";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
@@ -678,10 +678,6 @@ function agentDirname(subjectId: string): string {
  * templates that need it -- `formatPlural` (verdict.ts) already covers the catalogue's one ICU
  * plural template, so this is deliberately narrower than a general formatter (mirrors the Python
  * reference's `i18n_format.format_message` for this non-plural case). */
-export function formatTemplate(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (whole, key: string) => vars[key] ?? whole);
-}
-
 interface ProjectAgentDisplayRow {
   id: string;
   dirname: string;
