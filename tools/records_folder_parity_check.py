@@ -44,12 +44,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import readiness_parity_check
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 FX = ROOT / "adapters" / "otel-genai" / "fixtures"
 TS_ENTRY = ROOT / "engines" / "typescript" / "bin" / "agentce.js"
-JAVA_LIBS = ROOT / "engines" / "java" / "build" / "libs"
 
 #: The number of scenarios this check runs; a scenario added or lost changes it on purpose.
 EXPECTED_SCENARIOS = 42
@@ -111,12 +111,7 @@ def _typescript_cmd() -> list[str]:
 
 
 def _java_cmd() -> list[str]:
-    jars = sorted(JAVA_LIBS.glob("agentce-*-all.jar"), key=lambda p: p.stat().st_mtime)
-    if not jars:
-        raise SystemExit(
-            "records-folder-parity: the Java jar is not built (./gradlew :assemble)"
-        )
-    return ["java", "-jar", str(jars[-1])]
+    return ["java", "-jar", str(readiness_parity_check.java_jar())]
 
 
 #: How to start each engine's CLI. Python is the reference and always runs; the others run when named.
@@ -311,18 +306,16 @@ def _nested(target: int, digit: str) -> bytes:
     return raw
 
 
-def _with_attr(digit: str, key: str, raw_value: str) -> bytes:
-    """A session document on its own trace with ``key`` set to ``raw_value`` (JSON string source)."""
-    doc = _retrace(_session(), digit)
-    _spans(doc)[1]["attributes"].append(_attr(key, "@@VALUE@@"))
-    return json.dumps(doc).replace('"@@VALUE@@"', raw_value).encode()
-
-
 def _with_value(digit: str, key: str, raw_value: str) -> bytes:
     """A session document on its own trace with ``key``'s whole value object set to ``raw_value``."""
     doc = _retrace(_session(), digit)
     _spans(doc)[1]["attributes"].append({"key": key, "value": "@@VALUE@@"})
     return json.dumps(doc).replace('"@@VALUE@@"', raw_value).encode()
+
+
+def _with_attr(digit: str, key: str, raw_value: str) -> bytes:
+    """A session document on its own trace with ``key`` set to ``raw_value`` (JSON string source)."""
+    return _with_value(digit, key, '{"stringValue": ' + raw_value + "}")
 
 
 def _replace_once(digit: str, old: str, new: str) -> bytes:

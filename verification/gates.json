@@ -2068,14 +2068,14 @@
         {
           "description": "(c) TypeScript returns exit 2 on a records run with a severity-high insufficient-evidence control, the exit Python scopes to a --bundle/--profile assessment (exit codes)",
           "file": "engines/typescript/src/cli.ts",
-          "search": "  const highInsufficient =\n    scanned !== undefined\n      ? []\n      : Array.from(",
-          "replace": "  const highInsufficient =\n    scanned !== undefined && false\n      ? []\n      : Array.from("
+          "search": "  let highInsufficient: string[] = [];\n  if (scanned === undefined) {\n",
+          "replace": "  let highInsufficient: string[] = [];\n  if (scanned === undefined || true) {\n"
         },
         {
           "description": "(d) a compressed file is offered to the adapter as a record file instead of being named as not read (the compressed scenario's pinned not-read lines and records summary)",
           "file": "engines/typescript/src/records.ts",
-          "search": "      if (COMPRESSED_SUFFIXES.has(suffix(name))) {\n        unread.push({\n          path: rel(path),\n          reason: \"compressed files are not read; decompress them first\",\n        });\n        continue;\n      }\n      if (!RECORD_SUFFIXES.has(suffix(name)) || !safeIsFile(path)) {\n",
-          "replace": "      if (\n        (!RECORD_SUFFIXES.has(suffix(name)) && !COMPRESSED_SUFFIXES.has(suffix(name))) ||\n        !safeIsFile(path)\n      ) {\n"
+          "search": "      if (COMPRESSED_SUFFIXES.has(suffix(name))) {\n        unread.push({\n          path: rel(path),\n          reason: \"compressed files are not read; decompress them first\",\n        });\n        continue;\n      }\n      if (!RECORD_SUFFIXES.has(suffix(name)) || !isFile(name)) {\n",
+          "replace": "      if (\n        (!RECORD_SUFFIXES.has(suffix(name)) && !COMPRESSED_SUFFIXES.has(suffix(name))) ||\n        !isFile(name)\n      ) {\n"
         },
         {
           "description": "(f) TypeScript writes records-bundle/ into the out folder before it raises input.records_out_collides, so a refused run leaves a bundle behind (the out-is-folder and out-inside refusals: out folder untouched, file list)",
