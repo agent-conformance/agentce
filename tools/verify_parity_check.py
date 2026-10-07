@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import functools
 import hashlib
 import json
 import os
@@ -461,6 +462,49 @@ def self_test() -> int:
     if list_digest_problem(digest, digest[:-1] + "0") is None:
         failures.append("list_digest_problem accepted a digest one hex digit off")
 
+    # reason_keys: a joined release reason with a nested wrapper rebuilds from its keys; a wrong
+    # key, a missing list, keys on a verified result and an unkeyed past-limit row are caught.
+    causes = load_causes()
+    joined = {
+        "verified": False,
+        "reason": "signature (kms; x\ny): no signature verified against the trust root: "
+        "signature does not verify; missing artifact a; b",
+        "reason_keys": [
+            "verify.release_signature",
+            "verify.no_signature_verified",
+            "verify.signature_invalid",
+            "verify.release_artifact_missing",
+        ],
+    }
+    if reason_keys_problems("self-test", json.dumps(joined), causes):
+        failures.append("reason_keys_problems refused a joined, nested reason")
+    deep = {
+        "verified": False,
+        "reason": "catalog.sig.json nests containers more than 1000 levels deep",
+        "reason_keys": ["verify.json_too_deep"],
+    }
+    if reason_keys_problems("self-test", json.dumps(deep), causes, past_limit=True):
+        failures.append("reason_keys_problems refused a keyed past-limit reason")
+    for bad, past_limit in (
+        ({**joined, "reason_keys": joined["reason_keys"][:2]}, False),
+        ({**joined, "reason_keys": ["verify.signature_invalid"]}, False),
+        ({**joined, "reason_keys": []}, False),
+        ({**joined, "reason_keys": ["verify.no_such_key"]}, False),
+        ({"verified": True, "reason_keys": ["verify.signature_invalid"]}, False),
+        (
+            {
+                "verified": False,
+                "reason": "catalog.sig.json is not readable JSON",
+                "reason_keys": ["verify.catalog_signature_unreadable"],
+            },
+            True,
+        ),
+    ):
+        if not reason_keys_problems(
+            "self-test", json.dumps(bad), causes, past_limit=past_limit
+        ):
+            failures.append(f"reason_keys_problems accepted {bad!r}")
+
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if not failures:
@@ -491,6 +535,114 @@ def _error_key(out: str) -> str | None:
     except json.JSONDecodeError:
         return None
     return error.get("key") if isinstance(error, dict) else None
+
+
+CATALOGUE = ROOT / "spec" / "i18n" / "messages.en.json"
+#: The certificate keys whose reason predates 18.64 and reads "<key>: <cause minus its final period>".
+KEY_PREFIXED = frozenset(
+    {
+        "verify.certificate_algorithm",
+        "verify.certificate_validity_malformed",
+        "verify.certificate_validity_inverted",
+    }
+)
+#: The census inputs that verify reads as JSON (18.64): a row nested past the limit must be keyed
+#: `verify.json_too_deep`.
+DEPTH_KEYED_INPUTS = (
+    "catalog-sig-file:",
+    "release-file:",
+    "manifest-file:",
+    "signatures-file:",
+    "catalog-statement:",
+    "release-statement:",
+    "report-statement:",
+)
+PAST_LIMIT_ROWS = (
+    ":nesting",
+    ":nesting-past-limit",
+    ":nesting-inside-past-limit",
+    ":nesting-inside",
+    ":payload-nesting",
+)
+_PARAM = re.compile(r"\{(\w+)\}")
+
+
+@functools.cache
+def load_causes() -> dict[str, str]:
+    """`<key> -> cause` for every error in the spec catalogue."""
+    flat = json.loads(CATALOGUE.read_text(encoding="utf-8"))
+    return {
+        name[len("errors.") : -len(".cause")]: text
+        for name, text in flat.items()
+        if name.startswith("errors.") and name.endswith(".cause")
+    }
+
+
+def refusal_pattern(keys: list[str], causes: dict[str, str]) -> str:
+    """The regex a reason built from `keys` must fullmatch: each key's cause, its `{inner}` filled
+    by the next key's refusal (wrappers nest), every other `{param}` a wildcard, and the top-level
+    refusals joined with "; "."""
+
+    def one(i: int) -> tuple[str, int]:
+        key = keys[i]
+        cause = causes[key]
+        if key in KEY_PREFIXED:
+            cause = f"{key}: {cause.removesuffix('.')}"
+        parts, pos, following = [], 0, i + 1
+        for match in _PARAM.finditer(cause):
+            parts.append(re.escape(cause[pos : match.start()]))
+            if match.group(1) != "inner":
+                parts.append(".*")
+            elif following < len(keys):
+                inner, following = one(following)
+                parts.append(inner)
+            else:
+                parts.append("(?!)")  # a wrapper with no inner key matches nothing
+            pos = match.end()
+        parts.append(re.escape(cause[pos:]))
+        return "".join(parts), following
+
+    pieces, i = [], 0
+    while i < len(keys):
+        piece, i = one(i)
+        pieces.append(piece)
+    return "; ".join(pieces)
+
+
+def reason_keys_problems(
+    label: str, out: str, causes: dict[str, str], *, past_limit: bool = False
+) -> list[str]:
+    """18.64: a verified:false result lists catalogue keys that rebuild its reason; a verified:true
+    one has none; a document nested past the limit is keyed `verify.json_too_deep`."""
+    try:
+        env = json.loads(out)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(env, dict) or "verified" not in env:
+        return []
+    keys = env.get("reason_keys")
+    if env["verified"] is not False:
+        return (
+            [f"{label}: verified result carries reason_keys {keys!r}"] if keys else []
+        )
+    if not isinstance(keys, list) or not keys:
+        return [f"{label}: verified:false with no reason_keys"]
+    unknown = [k for k in keys if k not in causes]
+    if unknown:
+        return [f"{label}: reason_keys not in the catalogue: {unknown!r}"]
+    problems = []
+    reason = env.get("reason")
+    if not isinstance(reason, str) or not re.fullmatch(
+        refusal_pattern(keys, causes), reason, re.DOTALL
+    ):
+        problems.append(f"{label}: reason {reason!r} is not the text of {keys!r}")
+    if past_limit and "verify.json_too_deep" not in keys:
+        problems.append(f"{label}: past the depth limit but keyed {keys!r}")
+    return problems
+
+
+def is_past_limit_row(name: str) -> bool:
+    return name.startswith(DEPTH_KEYED_INPUTS) and name.endswith(PAST_LIMIT_ROWS)
 
 
 def _normalized(out: str) -> str:
@@ -551,6 +703,8 @@ def _run_catalog_scenario(
         [_normalized(runs[e][0]) for e in ("python", "typescript", "java")],
         failures,
     )
+    for engine, (out, _code) in runs.items():
+        failures.extend(reason_keys_problems(f"{name}:{engine}", out, load_causes()))
     return runs
 
 
@@ -591,6 +745,8 @@ def _run_release_scenario(
         [_normalized(runs[e][0]) for e in ("python", "typescript", "java")],
         failures,
     )
+    for engine, (out, _code) in runs.items():
+        failures.extend(reason_keys_problems(f"{name}:{engine}", out, load_causes()))
     return runs
 
 
@@ -617,6 +773,8 @@ def _run_bundle_scenario(
         [_normalized(runs[e][0]) for e in ("python", "typescript", "java")],
         failures,
     )
+    for engine, (out, _code) in runs.items():
+        failures.extend(reason_keys_problems(f"{name}:{engine}", out, load_causes()))
     return runs
 
 
@@ -728,6 +886,15 @@ def run_census(
         if len(runs) > 1:
             outputs = [_census_view(*runs[e]) for e in runs]
             readiness_parity_check.compare_ports(label, outputs, failures)
+        for engine, (out, _code) in runs.items():
+            failures.extend(
+                reason_keys_problems(
+                    f"{label}:{engine}",
+                    out,
+                    load_causes(),
+                    past_limit=is_past_limit_row(mutation.name),
+                )
+            )
         expected = verify_flow_census.CERTIFICATE_FIELD_EXPECTED.get(mutation.name)
         if expected is not None:
             out, code = runs["python"]
@@ -962,7 +1129,7 @@ def run_scenarios(canonical: Path, tmp: Path, failures: list[str]) -> None:
         )
 
     # Scenario 9: one signatures.json entry replaced with an empty object (missing both
-    # `profile` and `envelope`) -- Python's exact `signature (None): 'envelope'`; TS/Java
+    # `profile` and `envelope`) -- Python's exact `signature (None): a signature entry has no envelope`; TS/Java
     # asserted only on shape (disclosed, narrower -- round-2 critic finding #9/round-1
     # correction #9).
     def _strip_envelope(d: Path) -> Path:
@@ -984,10 +1151,11 @@ def run_scenarios(canonical: Path, tmp: Path, failures: list[str]) -> None:
     )
     py_reason = _reason(runs["python"][0])
     _assert(
-        py_reason is not None and "signature (None): 'envelope'" in py_reason,
+        py_reason is not None
+        and "signature (None): a signature entry has no envelope" in py_reason,
         failures,
         f"s9-release-bundle-missing-envelope:python: reason={py_reason!r}, expected it to "
-        "contain \"signature (None): 'envelope'\"",
+        'contain "signature (None): a signature entry has no envelope"',
     )
 
     # Scenario 10: signatures.json replaced by a bare-string array -- byte-identical fixed text.

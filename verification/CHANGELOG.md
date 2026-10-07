@@ -3,6 +3,25 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.59.0
+
+- `VG-VERIFY-REFUSAL-KEYS` (18.64) is new. Every reason `agentce verify` gives for a catalog or release it
+  refuses now comes from a catalogue entry with a stable key and a fix in `docs/errors.md`, in Python,
+  TypeScript and Java. A `verified: false` result lists those keys in a new `reason_keys` field, in the
+  order their texts appear in `reason`. A wrapped refusal such as `no signature verified against the trust
+  root: signature does not verify` lists both keys. Two reasons were Python exception text and are
+  sentences now: `'sig'` reads `a signature entry has no sig field` and `'envelope'` reads `a signature
+  entry has no envelope`. A file nested more than 1000 levels deep was `not readable JSON`; it is now
+  `verify.json_too_deep`, which names the file, and all three engines find it before any other problem in
+  the same bytes. The gate runs each engine's unit tests, scans the engine sources for a hand-copied
+  cause, and runs the real CLIs on nine committed catalog signatures and five releases built from the
+  development keys. With `--marker-only` it runs each engine from a copy of its catalogue with every
+  `verify.*` cause marked, and checks that the marks in each reason match its keys. The verify census in
+  `tools/verify_parity_check.py` now also checks that every `verified: false` result has keys that are in
+  the catalogue and rebuild its reason, and that every row nested past the limit is `verify.json_too_deep`.
+  The demo has three seeded faults, one in each engine.
+- `VG-SIGN` and `VG-VERIFY` (18.64): three seeded faults follow the refusal code's new shape; what each one breaks is unchanged.
+
 ## 0.58.0
 
 - `VG-I18N-ERROR-CATALOGUE` (18.80) is new. TypeScript and Java now hold an error-key registry read from

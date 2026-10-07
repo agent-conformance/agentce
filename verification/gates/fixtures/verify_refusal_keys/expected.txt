@@ -1,0 +1,14 @@
+catalog-unsigned|--catalog|verify.catalog_unsigned
+catalog-flipped-payload|--catalog|verify.no_signature_verified,verify.signature_invalid
+catalog-depth-1000|--catalog|verify.envelope_malformed
+catalog-depth-1001|--catalog|verify.json_too_deep
+catalog-depth-1001-truncated|--catalog|verify.json_too_deep
+catalog-depth-100000-truncated|--catalog|verify.json_too_deep
+catalog-depth-1001-trailing-garbage|--catalog|verify.json_too_deep
+catalog-depth-1001-after-lone-surrogate|--catalog|verify.json_too_deep
+catalog-depth-1001-after-bom|--catalog|verify.json_too_deep
+release-tampered|--release|verify.no_signature_verified,verify.signature_invalid
+release-missing-artifact|--release|verify.release_artifact_missing
+release-bad-digest|--release|verify.release_artifact_digest
+release-no-envelope|--release|verify.release_signature,verify.release_envelope_missing
+release-joined|--release|verify.release_artifact_missing,verify.release_signature,verify.release_envelope_missing

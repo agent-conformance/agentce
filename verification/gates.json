@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.58.0",
+  "suite_version": "0.59.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -837,7 +837,7 @@
         {
           "description": "the signature check in verify_envelope always succeeds, so a tampered DSSE signature would be accepted",
           "file": "engines/python/agentce/signing.py",
-          "search": "            try:\n                sig_bytes = _b64d(sig)\n            except ValueError as exc:\n                raise VerificationError(SIG_NOT_BASE64) from exc\n            try:\n                public_key.verify(sig_bytes, pae)\n            except InvalidSignature as exc:\n                # InvalidSignature has no text of its own; give the reason a sentence (18.68).\n                raise VerificationError(SIGNATURE_INVALID) from exc\n",
+          "search": "            try:\n                sig_bytes = _b64d(sig)\n            except ValueError as exc:\n                raise VerificationError.refusal(\"verify.signature_not_base64\") from exc\n            try:\n                public_key.verify(sig_bytes, pae)\n            except InvalidSignature as exc:\n                # InvalidSignature has no text of its own; give the reason a sentence (18.68).\n                raise VerificationError.refusal(\"verify.signature_invalid\") from exc\n",
           "replace": ""
         }
       ],
@@ -983,14 +983,14 @@
         {
           "description": "Python: remove _verify_release's try/except around verify_envelope, reintroducing the named defect (an unresolvable-keyid signature crashes instead of soft-failing)",
           "file": "engines/python/agentce/commands/__init__.py",
-          "search": "        try:\n            verified = signing.verify_envelope(envelope, trust)\n        except signing.VerificationError as exc:\n            return _verify_release_soft_fail(result, release_path, str(exc))\n",
+          "search": "        try:\n            verified = signing.verify_envelope(envelope, trust)\n        except signing.VerificationError as exc:\n            return _verify_release_soft_fail(result, release_path, exc)\n",
           "replace": "        verified = signing.verify_envelope(envelope, trust)\n"
         },
         {
           "description": "TypeScript: verifyRelease always returns verified:true regardless of input, a stub that never actually checks the signature",
           "file": "engines/typescript/src/verify.ts",
-          "search": "export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseResult {\n  const stat = statSync(releasePath);\n",
-          "replace": "export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseResult {\n  return { release: releasePath, verified: true, signer: \"stub\" } as unknown as ReleaseResult;\n  const stat = statSync(releasePath);\n"
+          "search": "export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseResult {\n  const softFail = (exc: unknown): ReleaseSoftFail => ({\n",
+          "replace": "export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseResult {\n  return { release: releasePath, verified: true, signer: \"stub\" } as unknown as ReleaseResult;\n  const softFail = (exc: unknown): ReleaseSoftFail => ({\n"
         },
         {
           "description": "Java: verifyRelease always returns verified:true regardless of input, the same always-true stub as the TypeScript fault",
@@ -1036,6 +1036,50 @@
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines, each naming the engine whose leg failed; the reference implementation is engines/python/agentce/commands/__init__.py's _verify_release, ported in engines/typescript/src/verify.ts's verifyRelease and engines/java/src/main/java/org/agentce/Verify.java's verifyRelease."
+    },
+    {
+      "id": "VG-VERIFY-REFUSAL-KEYS",
+      "title": "Every verify refusal carries stable message keys: a verified:false result lists them in reason_keys, its reason is built from their catalogue causes in all three engines, and a document nested past the 1000-deep limit is refused as verify.json_too_deep",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/verify_refusal_keys.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 900,
+      "invariant": "Every error, warning, and skipped-evaluation reason carries a stable message key.",
+      "rubric": {
+        "pass": "Python's tests/test_verify_refusal_keys.py, TypeScript's src/verifyRefusalKeys.test.ts and Java's VerifyRefusalKeysTest each exist, run at least one test and pass (every verify.* key the engine names is in the catalogue; leaf, wrapper and joined keys; the two reworded texts; verify.json_too_deep one past MAX_JSON_DEPTH and not at it, found before truncation, trailing garbage, a lone surrogate or a byte-order mark); no engine source holds a verify.* cause by hand outside an error raised with its own key; and the real Python, TypeScript and Java CLIs give the same reason and the reason_keys in fixtures/verify_refusal_keys/expected.txt on every fixture",
+        "fail": "any engine's test file is missing, declares no tests or fails; an engine source quotes a verify.* cause instead of reading it from the catalogue; or any CLI gives other reason_keys than expected.txt, or the engines' reasons differ, on any fixture"
+      },
+      "faults": [
+        {
+          "description": "Python raises the invalid-signature refusal with a literal text instead of its key, so it carries no key and the text is a hand copy",
+          "file": "engines/python/agentce/signing.py",
+          "search": "                raise VerificationError.refusal(\"verify.signature_invalid\") from exc\n",
+          "replace": "                raise VerificationError(\"signature does not verify\") from exc\n"
+        },
+        {
+          "description": "TypeScript keys a digest mismatch as a missing artifact (a wrong key on one path)",
+          "file": "engines/typescript/src/verify.ts",
+          "search": "      problems.push(refusal(\"verify.release_artifact_digest\", { name }));",
+          "replace": "      problems.push(\n        new VerifyRefusal(errorCause(\"verify.release_artifact_digest\").replace(\"{name}\", name), [\"verify.release_artifact_missing\"]),\n      );"
+        },
+        {
+          "description": "Java folds a document nested past the limit back into the input's not readable JSON refusal",
+          "file": "engines/java/src/main/java/org/agentce/Verify.java",
+          "search": "        } catch (JsonTooDeep e) {\n            throw refusal(\"verify.json_too_deep\", \"what\", what, \"limit\", String.valueOf(MAX_JSON_DEPTH));\n        } catch (IllegalArgumentException e) {",
+          "replace": "        } catch (IllegalArgumentException e) {"
+        }
+      ],
+      "fix_hint": "Run verification/gates/verify_refusal_keys.sh and read which engine's test, source scan or CLI leg failed. Refusals are built by signing.VerificationError.refusal (engines/python/agentce/signing.py), refusal() in engines/typescript/src/verify.ts and Verify.refusal in engines/java/src/main/java/org/agentce/Verify.java; a new refusal key goes into spec/i18n/messages.en.json, its three vendored copies and Python's _KINDS, then docs/errors.md is regenerated with agentce doctor --write-errors."
     },
     {
       "id": "VG-OTEL-GENAI-PARITY",
@@ -1215,7 +1259,7 @@
     },
     {
       "id": "VG-QUICK-PATH",
-      "title": "The records-folder quick path (`agentce assess <folder>`, SPEC \u00a712, \u00a713.4 AX-1) proves the records-vs-bundle divergence, checks_unlocked on a real scan, and the derived profile's pilot_window still passing the skill's own lint",
+      "title": "The records-folder quick path (`agentce assess <folder>`, SPEC §12, §13.4 AX-1) proves the records-vs-bundle divergence, checks_unlocked on a real scan, and the derived profile's pilot_window still passing the skill's own lint",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -1671,8 +1715,8 @@
         {
           "description": "README swaps one Experimental name for one Roadmap name between the two tier lines (AuthZEN decisions <-> Cedar); both lines keep their real stated count, so only the per-name tier check can catch it",
           "file": "README.md",
-          "search": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, AuthZEN decisions.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, Cedar \u2014 help wanted.\n",
-          "replace": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, Cedar.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, AuthZEN decisions \u2014 help wanted.\n"
+          "search": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, AuthZEN decisions.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, Cedar — help wanted.\n",
+          "replace": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, Cedar.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, AuthZEN decisions — help wanted.\n"
         },
         {
           "description": "the trace-store connectors page's table claims Datadog LLM Observability is Supported, reviving the old overstated claim the matrix (Experimental) disagrees with",
@@ -1751,8 +1795,8 @@
         {
           "description": "README's \"Distinct products, deduplicated\" row is hand-edited to a number the matrix disagrees with, caught by the count-mismatch check",
           "file": "README.md",
-          "search": "| Distinct products, deduplicated | 408 (348 counting only self-managed Kubernetes) | 2026-09-29 | \u2014 |",
-          "replace": "| Distinct products, deduplicated | 409 (348 counting only self-managed Kubernetes) | 2026-09-29 | \u2014 |"
+          "search": "| Distinct products, deduplicated | 408 (348 counting only self-managed Kubernetes) | 2026-09-29 | — |",
+          "replace": "| Distinct products, deduplicated | 409 (348 counting only self-managed Kubernetes) | 2026-09-29 | — |"
         }
       ],
       "fix_hint": "Run verification/gates/reach_table.sh; it names the exact message key (reach.table.count_mismatch, .missing_provenance, .missing_section, .missing_headline, .duplicate_section or .floor_violated) and the offending row or surface."
@@ -2078,7 +2122,7 @@
           "replace": "    if (/\\s/u.test(c)) {\n"
         },
         {
-          "description": "Java's identifier continues with Character.isLetterOrDigit instead of Python's isalnum, so `a\u00b2` is an unexpected character rather than an unknown field (R24)",
+          "description": "Java's identifier continues with Character.isLetterOrDigit instead of Python's isalnum, so `a²` is an unexpected character rather than an unknown field (R24)",
           "file": "engines/java/src/main/java/org/agentce/FailOn.java",
           "search": "                while (j < n && (isPyAlnum(expr[j]) || expr[j] == '_')) {\n",
           "replace": "                while (j < n && (Character.isLetterOrDigit(expr[j]) || expr[j] == '_')) {\n"
@@ -2092,8 +2136,8 @@
         {
           "description": "Java's assess parses the --fail-on expression after the catalogs resolve, so a bad expression with an unknown --catalog is refused for the catalog (O3)",
           "file": "engines/java/src/main/java/org/agentce/Cli.java",
-          "search": "        FailOn.Expression failOn = options.failOn() != null ? FailOn.parse(options.failOn()) : null;\n        Path out = Paths.get(options.out());\n        // --state's writability is proved here, before any --out write below (writeQuarantineJsonl\n        // etc.), not only when state.save() finally writes at the end of this method: a run refused\n        // for an unwritable --state must leave nothing in --out that looks like a result either.\n        if (options.state() != null) {\n            StateDir.ensureWritable(Paths.get(options.state()));\n        }\n        // Resolved on every run, even with no --catalog-dir (python-reference.md \u00a79).\n        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());\n        Resolved resolved = resolveCatalogs(\n                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());\n",
-          "replace": "        Path out = Paths.get(options.out());\n        // --state's writability is proved here, before any --out write below (writeQuarantineJsonl\n        // etc.), not only when state.save() finally writes at the end of this method: a run refused\n        // for an unwritable --state must leave nothing in --out that looks like a result either.\n        if (options.state() != null) {\n            StateDir.ensureWritable(Paths.get(options.state()));\n        }\n        // Resolved on every run, even with no --catalog-dir (python-reference.md \u00a79).\n        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());\n        Resolved resolved = resolveCatalogs(\n                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());\n        FailOn.Expression failOn = options.failOn() != null ? FailOn.parse(options.failOn()) : null;\n"
+          "search": "        FailOn.Expression failOn = options.failOn() != null ? FailOn.parse(options.failOn()) : null;\n        Path out = Paths.get(options.out());\n        // --state's writability is proved here, before any --out write below (writeQuarantineJsonl\n        // etc.), not only when state.save() finally writes at the end of this method: a run refused\n        // for an unwritable --state must leave nothing in --out that looks like a result either.\n        if (options.state() != null) {\n            StateDir.ensureWritable(Paths.get(options.state()));\n        }\n        // Resolved on every run, even with no --catalog-dir (python-reference.md §9).\n        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());\n        Resolved resolved = resolveCatalogs(\n                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());\n",
+          "replace": "        Path out = Paths.get(options.out());\n        // --state's writability is proved here, before any --out write below (writeQuarantineJsonl\n        // etc.), not only when state.save() finally writes at the end of this method: a run refused\n        // for an unwritable --state must leave nothing in --out that looks like a result either.\n        if (options.state() != null) {\n            StateDir.ensureWritable(Paths.get(options.state()));\n        }\n        // Resolved on every run, even with no --catalog-dir (python-reference.md §9).\n        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());\n        Resolved resolved = resolveCatalogs(\n                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());\n        FailOn.Expression failOn = options.failOn() != null ? FailOn.parse(options.failOn()) : null;\n"
         },
         {
           "description": "Python evaluates the list of OR-groups with all() instead of any(), so `or` acts as `and` (F1, F4)",
@@ -2144,14 +2188,14 @@
         {
           "description": "the severity-high insufficient_evidence rule applies to records-folder runs too, so a first scan with evidence gaps exits 2 (G1, G3, G5)",
           "file": "engines/python/agentce/commands/__init__.py",
-          "search": "    if scanned is None:\n        # SPEC \u00a78.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n",
-          "replace": "    if True:\n        # SPEC \u00a78.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n"
+          "search": "    if scanned is None:\n        # SPEC §8.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n",
+          "replace": "    if True:\n        # SPEC §8.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n"
         },
         {
           "description": "a records-folder run with a declared --profile is treated as a formal assessment and exits 2 (G3)",
           "file": "engines/python/agentce/commands/__init__.py",
-          "search": "    if scanned is None:\n        # SPEC \u00a78.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n",
-          "replace": "    if scanned is None or _opt_str(ns, \"profile\") is not None:\n        # SPEC \u00a78.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n"
+          "search": "    if scanned is None:\n        # SPEC §8.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n",
+          "replace": "    if scanned is None or _opt_str(ns, \"profile\") is not None:\n        # SPEC §8.5's exit 2 is scoped to the formal --bundle/--profile assessment, not any\n"
         },
         {
           "description": "--fail-on is ignored for records-folder runs, so the opt-in neither reports fail_on nor fails CI on evidence gaps (G4, G6, G8)",
