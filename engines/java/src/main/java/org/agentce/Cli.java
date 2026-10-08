@@ -284,18 +284,6 @@ global options:
         return value == null || value.isEmpty() ? null : value;
     }
 
-    /** Every value following a (repeatable) {@code --name} in {@code args}, in order. */
-    private static List<String> flagValues(String[] args, String name) {
-        List<String> out = new ArrayList<>();
-        String flag = "--" + name;
-        for (int i = 0; i < args.length; i++) {
-            if (flag.equals(args[i]) && i + 1 < args.length) {
-                out.add(args[i + 1]);
-            }
-        }
-        return out;
-    }
-
     private static final List<String> VERIFY_TARGETS = List.of("bundle", "catalog", "release", "report");
 
     private record VerifyArgs(Map<String, List<String>> targets, String signerTrustRoot, String expectKeyid) {}
@@ -1643,7 +1631,6 @@ global options:
 
     /** argparse's {@code ^-\d+$|^-\d*\.\d+$} over a {@code str}: {@code \d} is any Unicode decimal
      * digit (Nd), and {@code $} also matches before one trailing newline. */
-    private static final Pattern NEGATIVE_NUMBER = Argv.NEGATIVE_NUMBER;
 
     /** A token argparse classifies as an option rather than a value: it starts with {@code -}, is not
      * a bare {@code -}, does not look like a negative number and holds no space
@@ -1651,7 +1638,7 @@ global options:
     private static boolean looksLikeOption(String token) {
         return token.startsWith("-")
                 && !"-".equals(token)
-                && !NEGATIVE_NUMBER.matcher(token).matches()
+                && !Argv.NEGATIVE_NUMBER.matcher(token).matches()
                 && !token.contains(" ");
     }
 

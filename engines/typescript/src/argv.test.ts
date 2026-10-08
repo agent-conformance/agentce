@@ -99,6 +99,8 @@ test("a missing value is refused at once: at the end, before an option-like toke
   assert.deepEqual(refusal(["--out", "--json=1"]), needsValue("--out"));
   assert.deepEqual(refusal(["--out", "--", "x"]), needsValue("--out"));
   assert.deepEqual(refusal(["--fail-on", "-h"]), needsValue("--fail-on", "<expression>"));
+  // a single-dash token led by a short option is option-like even with a space (`-h y`)
+  assert.deepEqual(refusal(["--out", "-h y"]), needsValue("--out"));
   assert.deepEqual(refusal(["--catalog-dir"]), needsValue("--catalog-dir"));
   // at once: ahead of an earlier unknown flag, which is deferred
   assert.deepEqual(refusal(["--nope", "--out"]), needsValue("--out"));

@@ -11,7 +11,7 @@ import { basename, join, relative, resolve as resolvePath, sep } from "node:path
 import { load } from "js-yaml";
 import { summarizeActivity } from "./activity";
 import { resolve as resolveApplicability } from "./applicability";
-import { type Grammar, scanArgv } from "./argv";
+import { type Grammar, NEGATIVE_NUMBER, scanArgv } from "./argv";
 import { type Assertion, aggregate, assertionFromJson, assertionToJson } from "./assertions";
 import { applyDeviations, assessSubjects, deviationsByControl, evaluatedNothing } from "./assess";
 import { computeBlindSpots } from "./blindSpots";
@@ -120,17 +120,6 @@ function flagValue(argv: string[], name: string): string | undefined {
  * equivalent. */
 function emptyToUndefined(value: string | undefined): string | undefined {
   return value === undefined || value === "" ? undefined : value;
-}
-
-/** Every value following a (repeatable) `--name` in argv, in order. */
-function flagValues(argv: string[], name: string): string[] {
-  const out: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === `--${name}` && i + 1 < argv.length) {
-      out.push(argv[i + 1] as string);
-    }
-  }
-  return out;
 }
 
 const VERIFY_TARGETS = ["bundle", "catalog", "release", "report"] as const;
@@ -1504,10 +1493,7 @@ interface ReadinessArgs {
  * number) and `$` also matches before one trailing newline. */
 function looksLikeOption(token: string): boolean {
   return (
-    token.startsWith("-") &&
-    token !== "-" &&
-    !/^-\p{Nd}+\n?$|^-\p{Nd}*\.\p{Nd}+\n?$/u.test(token) &&
-    !token.includes(" ")
+    token.startsWith("-") && token !== "-" && !NEGATIVE_NUMBER.test(token) && !token.includes(" ")
   );
 }
 

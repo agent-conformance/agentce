@@ -1290,14 +1290,12 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     # too: an unknown language would otherwise fall back to English, and the override with no
     # --catalog-dir would have nothing to apply to (18.109).
     report_language = _opt_str(ns, "report_language")
-    if (
-        report_language is not None
-        and report_language not in messages.available_languages()
-    ):
+    languages = messages.available_languages()
+    if report_language is not None and report_language not in languages:
         raise InputError(
             "input.report_language_unknown",
             f"--report-language {report_language!r} has no report catalogue.",
-            "choose one of: " + ", ".join(messages.available_languages()) + ".",
+            "choose one of: " + ", ".join(languages) + ".",
         )
     if _flag(ns, "allow_unverified_catalog") and not getattr(ns, "catalog_dir", None):
         raise InputError(

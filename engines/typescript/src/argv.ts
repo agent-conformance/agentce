@@ -46,7 +46,7 @@ export interface Scan {
 
 /** argparse's `_negative_number_matcher` (a str regex: `\d` is any Unicode decimal digit and `$` also
  * matches before one trailing newline). */
-const NEGATIVE_NUMBER = /^-\p{Nd}+\n?$|^-\p{Nd}*\.\p{Nd}+\n?$/u;
+export const NEGATIVE_NUMBER = /^-\p{Nd}+\n?$|^-\p{Nd}*\.\p{Nd}+\n?$/u;
 
 type Classified =
   | {
@@ -81,7 +81,10 @@ function classify(grammar: Grammar, token: string): Classified {
       return { kind: "option", spec, name, explicit: token.slice(eq + 1) };
     }
   }
-  if (NEGATIVE_NUMBER.test(token) || token.includes(" ")) {
+  // With allow_abbrev=False argparse still matches a single-dash token's first two characters
+  // against the short options (`-h y` is -h with a joined value), so it is never a positional.
+  const shortJoined = !token.startsWith("--") && lookup(grammar, token.slice(0, 2)) !== undefined;
+  if (!shortJoined && (NEGATIVE_NUMBER.test(token) || token.includes(" "))) {
     return { kind: "positional" };
   }
   return { kind: "unknown" };
