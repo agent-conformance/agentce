@@ -52,7 +52,7 @@ class _ArgvErrors:
     #: Keep argparse's own sentence as the cause of a value-less flag (assess: TypeScript and Java do).
     argparse_value_cause: bool = False
     #: A bad choice's error, by argparse's label for the argument (`--format`, `<action>`), given the value.
-    choice_errors: Mapping[str, Callable[[str], InputError]] = field(
+    choice_errors: Mapping[str, Callable[[str], tuple[str, str, str]]] = field(
         default_factory=dict
     )
 
@@ -84,8 +84,8 @@ class _ArgvErrors:
             label, raw = m.groups()
             value = raw[1:-1] if raw[:1] in "'\"" else raw
             if (choice_error := self.choice_errors.get(label)) is not None:
-                err = choice_error(value)
-                return self.error(err.cause, err.fix, err.key)
+                key, cause, fix = choice_error(value)
+                return self.error(cause, fix, key)
         return self.error(f"{message}.", self.flag_fix)
 
     def unknown(self, token: str) -> _ArgvError:
@@ -157,9 +157,16 @@ def _flag_fix(command: str) -> str:
     return f"run `agentce {command} --help` for the flags {command} takes, or drop the flag."
 
 
-def _action_error(make: Callable[[], InputError]) -> Callable[[str], InputError]:
+def _action_error(
+    make: Callable[[], InputError],
+) -> Callable[[str], tuple[str, str, str]]:
     """An unknown action is the error `cmd_<command>` gives for no action."""
-    return lambda _value: make()
+
+    def error(value: str) -> tuple[str, str, str]:
+        err = make()
+        return err.key, err.cause, err.fix
+
+    return error
 
 
 _TOP_FIX = "name a command: `agentce <command>`; run `agentce --help` for the commands agentce takes."
@@ -170,7 +177,7 @@ _TOP_ARGV = _ArgvErrors(
     "run `agentce --help` for the commands and global flags agentce takes.",
     "run `agentce --help` for the commands agentce takes.",
     choice_errors={
-        "<command>": lambda v: InputError(
+        "<command>": lambda v: (
             "input.unknown_command",
             f"unrecognized command '{v}'.",
             "run `agentce --help` for the commands agentce takes.",
@@ -243,8 +250,16 @@ _ARGV: dict[str, _ArgvErrors] = {
             "--validate": "input.validate_missing",
         },
         choice_errors={
-            "--format": commands.report_format_error,
-            "--role": commands.report_role_error,
+            "--format": lambda v: (
+                (err := commands.report_format_error(v)).key,
+                err.cause,
+                err.fix,
+            ),
+            "--role": lambda v: (
+                (err := commands.report_role_error(v)).key,
+                err.cause,
+                err.fix,
+            ),
         },
     ),
     "conformance": _ArgvErrors(
