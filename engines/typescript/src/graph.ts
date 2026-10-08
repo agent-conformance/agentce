@@ -359,7 +359,14 @@ class Builder {
       for (const [kind, name, pins] of declaredComponents(data)) {
         for (const family of families(kind)) {
           const known = this.declared[family];
-          known.set(name, new Set([...(known.get(name) ?? []), ...pins]));
+          let declaredPins = known.get(name);
+          if (!declaredPins) {
+            declaredPins = new Set();
+            known.set(name, declaredPins);
+          }
+          for (const pin of pins) {
+            declaredPins.add(pin);
+          }
         }
       }
     } else {

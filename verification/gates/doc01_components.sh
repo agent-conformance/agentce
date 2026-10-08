@@ -48,7 +48,8 @@ run() {
   case "$engine" in
     python) (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "$@") ;;
     typescript) (cd "$root/engines/typescript" && node bin/agentce.js "$@") ;;
-    java) "$root/engines/java/build/install/agentce/bin/agentce" "$@" ;;
+    # Tier-1 JIT and the serial collector cut each short CLI run's CPU (as VG-CLI-OPTIONS does).
+    java) JAVA_OPTS="-XX:TieredStopAtLevel=1 -XX:+UseSerialGC" "$root/engines/java/build/install/agentce/bin/agentce" "$@" ;;
   esac
 }
 

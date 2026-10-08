@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * Build the provenance graph from ingested events (SPEC §6.3, §7.2).
@@ -431,8 +432,6 @@ public final class Graph {
                 return;
             }
             if ("BundleLoaded".equals(ptype)) {
-                // The union of every pinned declaration; an unpinned one adds the name and no pins, so it never
-                // cancels another manifest's pin (empty: any version matches, 18.37j).
                 for (Declared component : declaredComponents(data)) {
                     for (String family : families(component.kind())) {
                         declared.get(family).computeIfAbsent(component.name(), k -> new LinkedHashSet<>())
@@ -627,14 +626,18 @@ public final class Graph {
          * record, so DOC-01 never reads conformant on it alone (18.37j).
          */
         private void declaredComponentsObserved(String node, JsonNode data) {
-            List<Declared> mustSee = declaredComponents(data).stream()
-                    .filter(component -> mustOperate(component.kind()) != null).toList();
+            List<Map.Entry<String, String>> mustSee = declaredComponents(data).stream()
+                    .flatMap(component -> {
+                        String family = mustOperate(component.kind());
+                        return family == null ? Stream.<Map.Entry<String, String>>empty()
+                                : Stream.of(Map.entry(family, component.name()));
+                    }).toList();
             if (!hasCalls && mustSee.isEmpty()) {
                 return;
             }
             store.addType(node, COMPONENT_RECORD);
             boolean observed = mustSee.stream()
-                    .allMatch(component -> operatedNames.get(mustOperate(component.kind())).contains(component.name()));
+                    .allMatch(entry -> operatedNames.get(entry.getKey()).contains(entry.getValue()));
             store.addLiteral(node, "agentce:declaredComponentsObserved", observed ? "true" : "false", BOOL);
         }
 
