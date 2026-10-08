@@ -50,12 +50,17 @@ golden="$root/verification/gates/project_view_golden.json"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-multi_args=(assess --bundle "$fixture/evidence" --profile "$fixture/applicability.yaml" \
-  --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" --for risk-lead \
+# TypeScript and Java refuse --for with input.emit_unsupported until 18.16b ports the presets (18.105).
+# They render the project view whenever the profile names more than one subject, which is what
+# --for risk-lead gives in Python, so their runs pass the same arguments without the flag.
+multi_core=(assess --bundle "$fixture/evidence" --profile "$fixture/applicability.yaml" \
+  --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" \
   --allow-unverified-catalog)
-one_args=(assess --bundle "$one_subject/evidence" --profile "$one_subject/applicability.yaml" \
-  --domain "$one_subject/domain.linkml.yaml" --catalog-dir "$one_subject/catalog" --for risk-lead \
+multi_args=("${multi_core[@]}" --for risk-lead)
+one_core=(assess --bundle "$one_subject/evidence" --profile "$one_subject/applicability.yaml" \
+  --domain "$one_subject/domain.linkml.yaml" --catalog-dir "$one_subject/catalog" \
   --allow-unverified-catalog)
+one_args=("${one_core[@]}" --for risk-lead)
 # Every engine verifies a --catalog-dir's signature (SPEC §8.7; TypeScript and Java since 18.36), and
 # both fixture catalogs are deliberately unsigned test-only catalogs, so every engine gets the explicit
 # override, matching blind_spots_engines.sh.
@@ -137,14 +142,14 @@ if [ "${1:-}" = "--write" ]; then
   cp "$work/python/project.json" "$golden"
   cp "$work/python/project.md" "$root/verification/gates/project_view_golden_python.md"
   set +e
-  (cd "$root/engines/typescript" && pnpm --silent agentce "${multi_args[@]}" --out "$work/typescript" >/dev/null)
+  (cd "$root/engines/typescript" && pnpm --silent agentce "${multi_core[@]}" --out "$work/typescript" >/dev/null)
   code=$?
   set -e
   assert_code "typescript (--write)" "$code"
   cp "$work/typescript/project.md" "$root/verification/gates/project_view_golden_typescript.md"
   (cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist)
   set +e
-  (cd "$root/engines/java" && ./build/install/agentce/bin/agentce "${multi_args[@]}" --out "$work/java" >/dev/null)
+  (cd "$root/engines/java" && ./build/install/agentce/bin/agentce "${multi_core[@]}" --out "$work/java" >/dev/null)
   code=$?
   set -e
   assert_code "java (--write)" "$code"
@@ -167,15 +172,15 @@ fi
 set +e
 (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${multi_args[@]}" --out "$work/python-multi" >/dev/null)
 code=$?; assert_code "python-multi" "$code"
-(cd "$root/engines/typescript" && pnpm --silent agentce "${multi_args[@]}" --out "$work/typescript-multi" >/dev/null)
+(cd "$root/engines/typescript" && pnpm --silent agentce "${multi_core[@]}" --out "$work/typescript-multi" >/dev/null)
 code=$?; assert_code "typescript-multi" "$code"
-(cd "$root/engines/java" && ./build/install/agentce/bin/agentce "${multi_args[@]}" --out "$work/java-multi" >/dev/null)
+(cd "$root/engines/java" && ./build/install/agentce/bin/agentce "${multi_core[@]}" --out "$work/java-multi" >/dev/null)
 code=$?; assert_code "java-multi" "$code"
 (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${one_args[@]}" --out "$work/python-one" >/dev/null)
 code=$?; assert_code "python-one" "$code"
-(cd "$root/engines/typescript" && pnpm --silent agentce "${one_args[@]}" --out "$work/typescript-one" >/dev/null)
+(cd "$root/engines/typescript" && pnpm --silent agentce "${one_core[@]}" --out "$work/typescript-one" >/dev/null)
 code=$?; assert_code "typescript-one" "$code"
-(cd "$root/engines/java" && ./build/install/agentce/bin/agentce "${one_args[@]}" --out "$work/java-one" >/dev/null)
+(cd "$root/engines/java" && ./build/install/agentce/bin/agentce "${one_core[@]}" --out "$work/java-one" >/dev/null)
 code=$?; assert_code "java-one" "$code"
 set -e
 

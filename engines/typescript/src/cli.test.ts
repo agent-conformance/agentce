@@ -445,6 +445,24 @@ test("assess bare --deviations is refused with input.assess_flag_needs_value", (
   });
 });
 
+test("assess refuses an unknown or abbreviated flag and a second positional (18.105)", () => {
+  for (const extra of [
+    ["--em", "md"],
+    ["--fo", "ci"],
+    ["--emitt", "md"],
+    ["--nonsense"],
+    ["x", "y"],
+  ]) {
+    withOut("assess-unknown-flag", (out) => {
+      const { exitCode, envelope } = runEnvelope([...auditorAssessArgs(out), ...extra]);
+      assert.equal(exitCode, 3, extra.join(" "));
+      const error = envelope.error as Record<string, string>;
+      assert.equal(error.message_key, "input.assess_unrecognized_flag", extra.join(" "));
+      assert.ok(!existsSync(join(out, "assertions.json")));
+    });
+  }
+});
+
 test("assess --deviations before another option is refused, never read as the path", () => {
   withOut("assess-deviations-mid", (out) => {
     const args = auditorAssessArgs(out);

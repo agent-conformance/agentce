@@ -311,6 +311,17 @@ class CliTest {
     }
 
     @Test
+    void assessRefusesAnUnknownOrAbbreviatedFlagAndASecondPositional(@TempDir Path out) {
+        for (String[] extra : new String[][] {
+                {"--em", "md"}, {"--fo", "ci"}, {"--emitt", "md"}, {"--nonsense"}, {"x", "y"}}) {
+            JsonNode env = runAssess(auditorAssessArgs(out), extra);
+            assertEquals(3, env.get("exit_code").asInt(), String.join(" ", extra));
+            assertEquals("input.assess_unrecognized_flag", env.get("error").get("message_key").asText());
+            assertFalse(Files.exists(out.resolve("assertions.json")));
+        }
+    }
+
+    @Test
     void assessDeviationsBareRefused(@TempDir Path out) {
         JsonNode env = runAssess(auditorAssessArgs(out), "--deviations");
         assertEquals(3, env.get("exit_code").asInt());

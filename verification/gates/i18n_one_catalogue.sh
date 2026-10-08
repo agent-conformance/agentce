@@ -58,9 +58,13 @@ if ! java_tests org.agentce.BundledDataTest org.agentce.MessagesTest; then
 fi
 
 # Real-CLI leg: the project_view fixture, the exact multi_args project_view_engines.sh already runs.
-multi_args=(assess --bundle "$fixture/evidence" --profile "$fixture/applicability.yaml" \
-  --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" --for risk-lead \
+# TypeScript and Java refuse --for with input.emit_unsupported until 18.16b ports the presets (18.105).
+# They render the project view whenever the profile names more than one subject, which is what
+# --for risk-lead gives in Python, so their runs pass the same arguments without the flag.
+multi_core=(assess --bundle "$fixture/evidence" --profile "$fixture/applicability.yaml" \
+  --domain "$fixture/domain.linkml.yaml" --catalog-dir "$fixture/catalog" \
   --allow-unverified-catalog)
+multi_args=("${multi_core[@]}" --for risk-lead)
 
 check_delegate_line() {
   python3 - "$1" <<'PY'
@@ -87,9 +91,9 @@ echo "i18n-one-catalogue: real CLI (project_view fixture), all three engines"
 set +e
 (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "${multi_args[@]}" --out "$work/python" >"$work/python.log" 2>&1)
 py_code=$?
-(cd "$root/engines/typescript" && pnpm --silent agentce "${multi_args[@]}" --out "$work/typescript" >"$work/typescript.log" 2>&1)
+(cd "$root/engines/typescript" && pnpm --silent agentce "${multi_core[@]}" --out "$work/typescript" >"$work/typescript.log" 2>&1)
 ts_code=$?
-(cd "$root/engines/java" && ./build/install/agentce/bin/agentce "${multi_args[@]}" --out "$work/java" >"$work/java.log" 2>&1)
+(cd "$root/engines/java" && ./build/install/agentce/bin/agentce "${multi_core[@]}" --out "$work/java" >"$work/java.log" 2>&1)
 java_code=$?
 set -e
 

@@ -661,6 +661,81 @@ interface AssessOptions {
   deviations?: string;
   /** `--fail-on`'s expression; `quickstart` never sets it. */
   failOn?: string;
+  /** `--emit`'s raw value as given (`""` included); `quickstart` never sets it. */
+  emit?: string;
+  /** `--for`'s preset as given; `quickstart` never sets it. */
+  forPreset?: string;
+}
+
+/** Every format Python's `assess --emit` accepts, in Python's order (`commands.EMIT_FORMATS`). */
+const EMIT_FORMATS = [
+  "md",
+  "html",
+  "oscal",
+  "sarif",
+  "public",
+  "pack",
+  "junit",
+  "csv",
+  "oscal_xml",
+  "pdf",
+  "remediation",
+  "skill",
+];
+
+/** Python's `assess --for` presets, in Python's order (`commands.PRESET_EMIT`). */
+const FOR_PRESETS = [
+  "engineering",
+  "compliance",
+  "security",
+  "ci",
+  "share",
+  "risk-lead",
+  "auditor",
+  "buyer",
+];
+
+/** Refuse `--emit`/`--for` before anything is written. Python's three refusals come first, in
+ * Python's order (an unknown format, then both flags, then an unknown preset); a well-formed value is
+ * then refused with `input.emit_unsupported`, because this engine writes only the core outputs and
+ * would otherwise ignore the flag (18.105, until 18.16b ports the formats and presets). */
+function refuseEmitAndFor(emit: string | undefined, forPreset: string | undefined): void {
+  if (emit !== undefined) {
+    const tokens = emit
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t !== "");
+    const invalid = tokens.filter((t) => !EMIT_FORMATS.includes(t));
+    if (invalid.length > 0) {
+      throw new InputError(
+        "input.emit_format",
+        `unknown --emit format(s): ${invalid.map((t) => `'${t}'`).join(", ")}.`,
+        `choose from: ${EMIT_FORMATS.join(", ")}.`,
+      );
+    }
+  }
+  if (forPreset !== undefined && emit !== undefined) {
+    throw new InputError(
+      "input.for_emit_ambiguous",
+      "both --for and --emit were given.",
+      "pass --for <preset> or --emit <formats>, not both.",
+    );
+  }
+  if (forPreset !== undefined && !FOR_PRESETS.includes(forPreset)) {
+    throw new InputError(
+      "input.for_preset",
+      `unknown --for preset '${forPreset}'.`,
+      `choose one of: ${FOR_PRESETS.join(", ")}.`,
+    );
+  }
+  if (forPreset !== undefined || emit !== undefined) {
+    const flag = forPreset !== undefined ? "--for" : "--emit";
+    throw new InputError(
+      "input.emit_unsupported",
+      `the TypeScript engine cannot write ${flag} output yet; it writes only the core outputs.`,
+      `drop ${flag} for the core outputs, or run assess with the Python engine for the role views and extra formats.`,
+    );
+  }
 }
 
 /** Run a full assessment (ingest, integrity, graph, coverage, applicability, evaluate, report) — the
@@ -716,6 +791,7 @@ function runAssess(options: AssessOptions): CommandResult {
       );
     }
   }
+  refuseEmitAndFor(options.emit, options.forPreset);
   // --fail-on is parsed (never eval'd) before any output is written: a hostile or malformed expression
   // is refused at exit 3 before any assertion is evaluated against it (SPEC §7), and before the
   // catalogs, --state or --deviations are looked at, in Python's order.
@@ -964,9 +1040,11 @@ function runAssess(options: AssessOptions): CommandResult {
 const ASSESS_VALUE_FLAGS = new Map([
   ["--deviations", "pass --deviations <file>."],
   ["--fail-on", "pass --fail-on <expression>."],
+  ["--emit", "pass --emit <formats>."],
+  ["--for", "pass --for <preset>."],
 ]);
 
-/** `--deviations` and `--fail-on` read in one left-to-right pass, the way Python's argparse reads a
+/** `--deviations`, `--fail-on`, `--emit` and `--for` read in one left-to-right pass, the way Python's argparse reads a
  * `store` option: `--x <v>` or `--x=<v>`, the last occurrence wins, and a flag with no value
  * (trailing, or followed by another option) is refused at once with argparse's own sentence rather
  * than silently taking the next flag as the value. The first value-less flag in argv order is the one
@@ -1013,8 +1091,56 @@ const ASSESS_OPTIONS_WITH_VALUE = new Set([
   "--emit",
   "--for",
   "--fail-on",
-  "--format",
 ]);
+
+/** Every assess flag that takes no value. `-h`/`--help` are passed through, not refused. */
+const ASSESS_FLAGS_WITHOUT_VALUE = new Set([
+  ...GLOBAL_BOOLEAN_FLAGS,
+  "--allow-unverified-catalog",
+  "--package-for-sharing",
+  "-h",
+  "--help",
+]);
+
+/** Refuse what Python's assess parser (argparse, `allow_abbrev=False`) refuses after reading the
+ * values: a flag it does not know, an abbreviated one included (`--em md` is never `--emit md`), and a
+ * second positional. Runs after `assessValueFlags`, so a missing value is named first, as argparse
+ * names it. */
+function refuseUnknownAssessArgs(argv: string[]): void {
+  let positionals = 0;
+  let optionsEnded = false;
+  for (let i = 1; i < argv.length; i++) {
+    const token = argv[i] as string;
+    if (!optionsEnded && token === "--") {
+      optionsEnded = true;
+      continue;
+    }
+    if (!optionsEnded && looksLikeOption(token)) {
+      const eq = token.indexOf("=");
+      if (ASSESS_OPTIONS_WITH_VALUE.has(eq >= 0 ? token.slice(0, eq) : token)) {
+        if (eq < 0) {
+          i++;
+        }
+        continue;
+      }
+      if (ASSESS_FLAGS_WITHOUT_VALUE.has(token)) {
+        continue;
+      }
+      throw new InputError(
+        "input.assess_unrecognized_flag",
+        `unrecognized flag '${token}'.`,
+        "run `agentce assess --help` for the flags assess takes, or drop the flag.",
+      );
+    }
+    if (++positionals > 1) {
+      throw new InputError(
+        "input.assess_unrecognized_flag",
+        `unrecognized argument '${token}'.`,
+        "pass at most one records folder: `agentce assess <folder>`.",
+      );
+    }
+  }
+}
 
 /** `assess`'s optional positional `<folder>`: the first token that is neither an option nor an
  * option's value, as argparse reads it. */
@@ -1032,11 +1158,14 @@ function assessFolder(argv: string[]): string | undefined {
 
 function cmdAssess(argv: string[]): CommandResult {
   const values = assessValueFlags(argv);
+  refuseUnknownAssessArgs(argv);
   return runAssess({
     folder: assessFolder(argv),
     packageForSharing: argv.includes("--package-for-sharing"),
     deviations: values.get("--deviations"),
     failOn: values.get("--fail-on"),
+    emit: values.get("--emit"),
+    forPreset: values.get("--for"),
     bundle: flagValue(argv, "bundle"),
     profile: flagValue(argv, "profile"),
     catalog: flagValue(argv, "catalog"),

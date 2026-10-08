@@ -10,8 +10,9 @@ engines implement the same commands (`assess`, `validate`, `report`, `report --v
 `assertions.json` files over the simulated corpus. They still differ from Python in these ways, so use the
 Python engine for any of them:
 
-- `assess --for <role>` and `assess --emit <format>` are accepted, and the run exits 0, but TypeScript and
-  Java write only the core outputs, not the role view or the extra formats.
+- TypeScript and Java write only the core outputs, so they refuse `assess --for <role>` and
+  `assess --emit <format>` with `input.emit_unsupported` (exit 3) and write nothing. An unknown format or
+  role, or both flags at once, gets the same refusal as in Python.
 - Java reads only an evidence bundle: `assess <folder>` on a folder of trace exports stops with
   `input.bundle_missing`. Pass `--bundle` and `--profile` to Java, or read the folder with Python.
 - At the end of `assess`, TypeScript and Java print a bare `verdict:` line where Python's summary also

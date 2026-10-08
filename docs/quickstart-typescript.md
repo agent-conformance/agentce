@@ -11,8 +11,8 @@ so you can assess an agent's own evidence with it directly. This includes `repor
 validation of the report artifacts); see the [main quickstart](quickstart.md). It reports the same
 problems as the Python engine when a report file can be read. A damaged file, such as one with bytes
 that are not valid UTF-8 or a CSV, XML or JSONL file in an unusual shape, can still get a different
-answer, so check it with the Python engine. `assess --for` and `assess --emit` are accepted but write
-nothing beyond the core outputs; [Running assessments](../website/src/content/docs/docs/running-assessments.md) lists every difference from the Python engine.
+answer, so check it with the Python engine. `assess` writes only the core outputs, so it refuses `--for` and
+`--emit` with `input.emit_unsupported`; [Running assessments](../website/src/content/docs/docs/running-assessments.md) lists every difference from the Python engine.
 
 ## Prerequisites
 

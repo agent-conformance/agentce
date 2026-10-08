@@ -29,6 +29,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.adapter_missing` | ingest needs an adapter. | pass --adapter, e.g. --adapter otel-genai. |
 | `input.adapter_not_found` | no adapter directory exists at the given adapters-root and adapter name. | pass --adapters-root pointing at the adapters checkout, or check the adapter name. |
 | `input.assess_flag_needs_value` | argument --deviations: expected one argument | pass --deviations <file>. |
+| `input.assess_unrecognized_flag` | assess was given a flag it does not recognize, or more than one records folder. | run `agentce assess --help` for the flags assess takes, or drop the flag. |
 | `input.bundle_manifest_entry` | a 'files' entry in the manifest is missing 'path' or 'sha256'. | each entry needs {"path": ..., "sha256": ...}. |
 | `input.bundle_manifest_file_too_large` | a manifest-listed file is over the per-file size limit. | split large evidence into more, smaller files, or reference bulk content by an opaque locator instead of inlining it (SPEC R12). |
 | `input.bundle_manifest_files` | manifest.json has no non-empty 'files' array. | the manifest must list every file with its path and sha256. |
@@ -58,6 +59,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.digest_unreadable` | assess could not read the deviation register, profile or domain file again to record its digest. | make the file readable, then re-run. |
 | `input.domain_binding_invalid` | the domain binding is not safe YAML: a disallowed construct, or a structure nested too deeply to parse safely. | remove custom YAML tags and flatten deep nesting in the domain binding file. |
 | `input.emit_format` | --emit named a format the engine does not write. | pass --emit with formats from the list the error names. |
+| `input.emit_unsupported` | this engine cannot write --emit or --for output yet; it writes only the core outputs. | drop the flag for the core outputs, or run assess with the Python engine for the role views and extra formats. |
 | `input.event_structure_too_deep` | an evidence event line is nested too deeply to parse safely. | flatten the event's structure; reference deeply nested content by an opaque locator instead (SPEC R12). |
 | `input.fail_on_invalid_expression` | the --fail-on expression could not be read. | use comparisons of the form field=="literal" joined by and/or, over the fields the error lists. |
 | `input.for_emit_ambiguous` | both --for and --emit were given. | pass --for <preset> or --emit <formats>, not both. |

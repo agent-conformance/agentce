@@ -51,6 +51,8 @@ _KINDS: dict[str, str] = {
     "input.event_structure_too_deep": "error",
     "input.for_emit_ambiguous": "error",
     "input.for_preset": "error",
+    "input.emit_unsupported": "error",
+    "input.assess_unrecognized_flag": "error",
     "input.catalog_missing": "error",
     "input.catalog_unresolved": "error",
     "input.catalog_mismatch": "error",

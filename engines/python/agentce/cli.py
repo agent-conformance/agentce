@@ -100,6 +100,16 @@ _sign_usage_error, _sign_unknown_error = _make_argv_errors(
     "pass exactly one report directory: `agentce sign <report-dir> --as claimant|assessor`.",
 )
 
+_ASSESS_FLAG_FIX = (
+    "run `agentce assess --help` for the flags assess takes, or drop the flag."
+)
+_, _assess_unknown_error = _make_argv_errors(
+    "input.assess_unrecognized_flag",
+    _ASSESS_FLAG_FIX,
+    "<value>",
+    "pass at most one records folder: `agentce assess <folder>`.",
+)
+
 _VERIFY_FLAG_FIX = (
     "pass --bundle, --catalog, --release, or --report (with --signer-trust-root or "
     "--expect-keyid for --report), or drop the flag."
@@ -213,6 +223,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="run a full assessment",
         description="Run a full assessment: `agentce assess <folder>` over a folder of trace "
         "exports, or `agentce assess --bundle <dir> --profile <file>` over an evidence bundle.",
+        # No prefix matching, as for `readiness`, `sign` and `verify`: `--em md` or `--fo ci` is an
+        # unrecognized flag in all three engines, never --emit or --for in Python alone (18.105).
+        allow_abbrev=False,
     )
     p.add_argument(
         "folder",
@@ -654,6 +667,7 @@ def _emit_error(err: AgentceError, *, command: str, want_json: bool) -> int:
 
 
 _UNKNOWN_ARGV_ERRORS: dict[str, Callable[[str], InputError]] = {
+    "assess": _assess_unknown_error,
     "readiness": _readiness_unknown_error,
     "sign": _sign_unknown_error,
     "verify": _verify_unknown_error,

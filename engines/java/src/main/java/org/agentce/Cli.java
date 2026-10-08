@@ -852,7 +852,62 @@ public final class Cli {
             /** {@code --deviations}' register path; {@code quickstart} has no such flag. */
             String deviations,
             /** {@code --fail-on}'s expression as given; {@code quickstart} never sets it. */
-            String failOn) {}
+            String failOn,
+            /** {@code --emit}'s raw value as given ({@code ""} included); {@code quickstart} never sets it. */
+            String emit,
+            /** {@code --for}'s preset as given; {@code quickstart} never sets it. */
+            String forPreset) {}
+
+    /** Every format Python's {@code assess --emit} accepts, in Python's order ({@code commands.EMIT_FORMATS}). */
+    private static final List<String> EMIT_FORMATS = List.of(
+            "md", "html", "oscal", "sarif", "public", "pack", "junit", "csv", "oscal_xml", "pdf", "remediation",
+            "skill");
+
+    /** Python's {@code assess --for} presets, in Python's order ({@code commands.PRESET_EMIT}). */
+    private static final List<String> FOR_PRESETS = List.of(
+            "engineering", "compliance", "security", "ci", "share", "risk-lead", "auditor", "buyer");
+
+    /** Refuse {@code --emit}/{@code --for} before anything is written. Python's three refusals come first,
+     * in Python's order (an unknown format, then both flags, then an unknown preset); a well-formed value
+     * is then refused with {@code input.emit_unsupported}, because this engine writes only the core
+     * outputs and would otherwise ignore the flag (18.105, until 18.16b ports the formats and presets). */
+    private static void refuseEmitAndFor(String emit, String forPreset) {
+        if (emit != null) {
+            List<String> invalid = new ArrayList<>();
+            for (String token : emit.split(",", -1)) {
+                String t = token.strip();
+                if (!t.isEmpty() && !EMIT_FORMATS.contains(t)) {
+                    invalid.add("'" + t + "'");
+                }
+            }
+            if (!invalid.isEmpty()) {
+                throw new InputError(
+                        "input.emit_format",
+                        "unknown --emit format(s): " + String.join(", ", invalid) + ".",
+                        "choose from: " + String.join(", ", EMIT_FORMATS) + ".");
+            }
+        }
+        if (forPreset != null && emit != null) {
+            throw new InputError(
+                    "input.for_emit_ambiguous",
+                    "both --for and --emit were given.",
+                    "pass --for <preset> or --emit <formats>, not both.");
+        }
+        if (forPreset != null && !FOR_PRESETS.contains(forPreset)) {
+            throw new InputError(
+                    "input.for_preset",
+                    "unknown --for preset '" + forPreset + "'.",
+                    "choose one of: " + String.join(", ", FOR_PRESETS) + ".");
+        }
+        if (forPreset != null || emit != null) {
+            String flag = forPreset != null ? "--for" : "--emit";
+            throw new InputError(
+                    "input.emit_unsupported",
+                    "the Java engine cannot write " + flag + " output yet; it writes only the core outputs.",
+                    "drop " + flag + " for the core outputs, or run assess with the Python engine for the role"
+                            + " views and extra formats.");
+        }
+    }
 
     /** Run a full assessment (ingest, integrity, graph, coverage, applicability, evaluate, report) — the
      * same pipeline {@code conformance run} exercises per corpus project, generalised to an arbitrary
@@ -862,6 +917,7 @@ public final class Cli {
         String bundleDir = requireDir(options.bundle(), "bundle", "the evidence bundle");
         String profilePath = requireFile(options.profile(), "profile", "the applicability profile");
         Profile profileObj = Profile.load(Paths.get(profilePath));
+        refuseEmitAndFor(options.emit(), options.forPreset());
         // --fail-on is parsed (never eval'd) right after the bundle and profile, as Python does: a
         // hostile or malformed expression is refused at exit 3 before the catalogs resolve, before
         // --state and --deviations are read, and before any output is written (SPEC §7).
@@ -1094,9 +1150,11 @@ public final class Cli {
     /** The fix each assess value flag's missing-value refusal names. */
     private static final Map<String, String> ASSESS_VALUE_FLAGS = Map.of(
             "--deviations", "pass --deviations <file>.",
-            "--fail-on", "pass --fail-on <expression>.");
+            "--fail-on", "pass --fail-on <expression>.",
+            "--emit", "pass --emit <formats>.",
+            "--for", "pass --for <preset>.");
 
-    /** {@code --deviations}' and {@code --fail-on}'s values, read in one left-to-right scan the way
+    /** {@code --deviations}', {@code --fail-on}'s, {@code --emit}'s and {@code --for}'s values, read in one left-to-right scan the way
      * Python's argparse reads a {@code store} option: {@code --x <value>} or {@code --x=<value>}, the
      * last occurrence of each wins, and the first flag with no value (trailing, or followed by another
      * option) is refused at once with argparse's own sentence rather than silently taking the next flag
@@ -1123,8 +1181,56 @@ public final class Cli {
         return values;
     }
 
+    /** Every assess option that takes a value. */
+    private static final Set<String> ASSESS_OPTIONS_WITH_VALUE = Set.of(
+            "--bundle", "--catalog", "--profile", "--deviations", "--domain", "--catalog-dir", "--trust-root",
+            "--manual", "--probes", "--out", "--state", "--report-language", "--emit", "--for", "--fail-on");
+
+    /** Every assess flag that takes no value. {@code -h}/{@code --help} are passed through, not refused. */
+    private static final Set<String> ASSESS_FLAGS_WITHOUT_VALUE = Set.of(
+            "--json", "--debug", "--quiet", "--allow-unverified-catalog", "--package-for-sharing", "-h", "--help");
+
+    /** Refuse what Python's assess parser (argparse, {@code allow_abbrev=False}) refuses after reading the
+     * values: a flag it does not know, an abbreviated one included ({@code --em md} is never
+     * {@code --emit md}), and a second positional. Runs after {@link #assessValueFlags}, so a missing value
+     * is named first, as argparse names it. */
+    private static void refuseUnknownAssessArgs(String[] args) {
+        int positionals = 0;
+        boolean optionsEnded = false;
+        for (int i = 1; i < args.length; i++) {
+            String token = args[i];
+            if (!optionsEnded && token.equals("--")) {
+                optionsEnded = true;
+                continue;
+            }
+            if (!optionsEnded && looksLikeOption(token)) {
+                int eq = token.indexOf('=');
+                if (ASSESS_OPTIONS_WITH_VALUE.contains(eq >= 0 ? token.substring(0, eq) : token)) {
+                    if (eq < 0) {
+                        i++;
+                    }
+                    continue;
+                }
+                if (ASSESS_FLAGS_WITHOUT_VALUE.contains(token)) {
+                    continue;
+                }
+                throw new InputError(
+                        "input.assess_unrecognized_flag",
+                        "unrecognized flag '" + token + "'.",
+                        "run `agentce assess --help` for the flags assess takes, or drop the flag.");
+            }
+            if (++positionals > 1) {
+                throw new InputError(
+                        "input.assess_unrecognized_flag",
+                        "unrecognized argument '" + token + "'.",
+                        "pass at most one records folder: `agentce assess <folder>`.");
+            }
+        }
+    }
+
     private static CommandResult cmdAssess(String[] args) {
         Map<String, String> valueFlags = assessValueFlags(args);
+        refuseUnknownAssessArgs(args);
         String outArg = flagValue(args, "out");
         return runAssess(new AssessOptions(
                 flagValue(args, "bundle"),
@@ -1138,7 +1244,9 @@ public final class Cli {
                 flagValue(args, "trust-root"),
                 Arrays.asList(args).contains("--allow-unverified-catalog"),
                 valueFlags.get("--deviations"),
-                valueFlags.get("--fail-on")));
+                valueFlags.get("--fail-on"),
+                valueFlags.get("--emit"),
+                valueFlags.get("--for")));
     }
 
     /** Assess the bundled quickstart project end to end — one command, offline (SPEC §13.4 AX-1). */
@@ -1165,6 +1273,8 @@ public final class Cli {
                 "quickstart",
                 null,
                 false,
+                null,
+                null,
                 null,
                 null));
         result.data.setAll(assess.data);

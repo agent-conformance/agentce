@@ -184,6 +184,23 @@ def test_for_case_and_list_negative_cases(
     assert not out.exists()
 
 
+@pytest.mark.parametrize(
+    "argv_extra",
+    [("--em", "md"), ("--fo", "ci"), ("--emitt", "md"), ("--nonsense",), ("x", "y")],
+)
+def test_assess_unknown_or_abbreviated_flag_is_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], argv_extra: tuple[str, ...]
+) -> None:
+    """No prefix matching: `--em md` is never `--emit md` in Python alone, as TypeScript and Java read
+    it (18.105); an unknown flag or a second positional gets the keyed refusal, and nothing is written."""
+    out = tmp_path / "o"
+    code = cli.main(_assess_argv(out, *argv_extra, "--json"))
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "input.assess_unrecognized_flag"
+    assert not out.exists()
+
+
 def test_for_absent_no_ci_env_unchanged(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
