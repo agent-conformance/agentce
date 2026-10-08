@@ -500,6 +500,169 @@ test("quickstart refuses a flag or argument it does not take, and -h prints the 
   });
 });
 
+/** `main(argv)` with stdout captured: its exit code and everything it wrote. */
+function runStdout(argv: string[]): { exitCode: number; stdout: string } {
+  const written: string[] = [];
+  const original = process.stdout.write;
+  process.stdout.write = ((chunk: string) =>
+    written.push(chunk) > 0) as typeof process.stdout.write;
+  let exitCode: number;
+  try {
+    exitCode = main(argv);
+  } finally {
+    process.stdout.write = original;
+  }
+  return { exitCode, stdout: written.join("") };
+}
+
+test("assess -h/--help prints Python's usage anywhere before `--`, beside --bundle too, and writes nothing (18.109)", () => {
+  for (const extra of [["-h"], ["--help"], ["--nope", "-h"], ["-h", "--nope"], ["--json", "-h"]]) {
+    withOut("assess-help", (out) => {
+      const { exitCode, stdout } = runStdout([
+        "assess",
+        "--bundle",
+        join(quickstartDir(), "evidence"),
+        "--out",
+        out,
+        ...extra,
+      ]);
+      assert.equal(exitCode, 0, extra.join(" "));
+      assert.ok(stdout.startsWith("usage: agentce assess [-h] [--json]"), extra.join(" "));
+      assert.ok(stdout.endsWith("  --quiet               log warnings and errors only\n"));
+      assert.deepEqual(readdirSync(out), []);
+    });
+  }
+});
+
+test("assess refuses --manual, --probes, packaging, an unknown language and a bare override before writing (18.109)", () => {
+  const cases: Array<[string[], string, string]> = [
+    [["--manual", "x"], "input.assess_unrecognized_flag", "unrecognized flag '--manual'."],
+    [["--probes", "x"], "input.assess_unrecognized_flag", "unrecognized flag '--probes'."],
+    [
+      ["--package-for-sharing"],
+      "input.package_unsupported",
+      "this engine does not yet write the shareable bundle that --package-for-sharing asks for.",
+    ],
+    [
+      ["--report-language", "xx"],
+      "input.report_language_unknown",
+      "--report-language 'xx' has no report catalogue.",
+    ],
+    [
+      ["--report-language="],
+      "input.report_language_unknown",
+      "--report-language '' has no report catalogue.",
+    ],
+    [
+      ["--report-language", "../x"],
+      "input.report_language_unknown",
+      "--report-language '../x' has no report catalogue.",
+    ],
+    [
+      ["--allow-unverified-catalog", "--emit", "bogus"],
+      "input.allow_unverified_requires_catalog_dir",
+      "--allow-unverified-catalog was given without --catalog-dir.",
+    ],
+    // Python's order: packaging, then the language, then the override, then --emit.
+    [
+      ["--report-language", "xx", "--package-for-sharing"],
+      "input.package_unsupported",
+      "this engine does not yet write the shareable bundle that --package-for-sharing asks for.",
+    ],
+    [
+      ["--allow-unverified-catalog", "--report-language", "xx"],
+      "input.report_language_unknown",
+      "--report-language 'xx' has no report catalogue.",
+    ],
+    [["--out"], "input.assess_flag_needs_value", "argument --out: expected one argument"],
+  ];
+  for (const [extra, key, cause] of cases) {
+    withOut("assess-refused", (out) => {
+      const { exitCode, envelope } = runEnvelope([
+        "assess",
+        "--json",
+        "--bundle",
+        join(quickstartDir(), "evidence"),
+        "--profile",
+        join(quickstartDir(), "applicability.yaml"),
+        "--out",
+        out,
+        ...extra,
+      ]);
+      assert.equal(exitCode, 3, extra.join(" "));
+      const error = envelope.error as Record<string, string>;
+      assert.equal(error.message_key, key, extra.join(" "));
+      assert.equal(error.detail, cause, extra.join(" "));
+      assert.deepEqual(readdirSync(out), [], extra.join(" "));
+    });
+  }
+  // A records folder with --package-for-sharing keeps Python's own refusal, ahead of the port's.
+  withOut("assess-records-package", (out) => {
+    const records = join(REPO, "verification", "gates", "fixtures", "quick_path", "records");
+    const { envelope } = runEnvelope([
+      "assess",
+      "--json",
+      records,
+      "--package-for-sharing",
+      "--out",
+      out,
+    ]);
+    assert.equal(
+      (envelope.error as Record<string, string>).message_key,
+      "input.package_requires_bundle",
+    );
+  });
+});
+
+test("assess --report-language de writes the German report and records the language (18.109)", () => {
+  withOut("assess-report-language", (out) => {
+    const reports: Record<string, string> = {};
+    for (const language of ["en", "de"]) {
+      const dir = join(out, language);
+      const { exitCode } = runEnvelope([
+        "assess",
+        "--json",
+        "--bundle",
+        join(quickstartDir(), "evidence"),
+        "--profile",
+        join(quickstartDir(), "applicability.yaml"),
+        `--report-language=${language}`,
+        "--out",
+        dir,
+      ]);
+      assert.notEqual(exitCode, 3);
+      reports[language] = readFileSync(join(dir, "report.md"), "utf-8");
+      const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
+      assert.equal(manifest.run.report_language, language);
+    }
+    const de = (reports.de as string).split("\n");
+    assert.notEqual(reports.de, reports.en);
+    assert.equal(de[0], "# AgentCE-Konformitätsbericht");
+    assert.ok(de.includes("## Ergebnisübersicht"));
+    assert.ok(de.includes("## Aussagen"));
+    const html = readFileSync(join(out, "de", "report.html"), "utf-8");
+    assert.ok(html.includes('<html lang="de">'));
+    assert.ok(html.includes("<title>AgentCE-Konformitätsbericht</title>"));
+  });
+});
+
+test("assess takes the last of a repeated value option and reads --<option>=<v> for every one (18.109)", () => {
+  withOut("assess-last-wins", (out) => {
+    const { exitCode, envelope } = runEnvelope([
+      "assess",
+      "--json",
+      "--bundle=nope",
+      `--bundle=${join(quickstartDir(), "evidence")}`,
+      `--profile=${join(quickstartDir(), "applicability.yaml")}`,
+      `--out=${join(out, "a")}`,
+      "--out",
+      join(out, "b"),
+    ]);
+    assert.notEqual(exitCode, 3, JSON.stringify(envelope.error));
+    assert.deepEqual(readdirSync(out), ["b"]);
+  });
+});
+
 test("assess --deviations before another option is refused, never read as the path", () => {
   withOut("assess-deviations-mid", (out) => {
     const args = auditorAssessArgs(out);

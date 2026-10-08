@@ -11,6 +11,7 @@ import { basename, join, relative, resolve as resolvePath, sep } from "node:path
 import { load } from "js-yaml";
 import { summarizeActivity } from "./activity";
 import { resolve as resolveApplicability } from "./applicability";
+import { type Grammar, scanArgv } from "./argv";
 import { type Assertion, aggregate, assertionFromJson, assertionToJson } from "./assertions";
 import { applyDeviations, assessSubjects, deviationsByControl, evaluatedNothing } from "./assess";
 import { computeBlindSpots } from "./blindSpots";
@@ -28,13 +29,14 @@ import {
   whatChanged,
 } from "./diff";
 import { DomainBinding } from "./domain";
+import { errorCause, errorFix } from "./errorCatalogue";
 import { AgentceError, InputError } from "./errors";
 import { ExitCode } from "./exitCodes";
 import { parseFailOn } from "./failOn";
 import { buildGraph } from "./graph";
 import { ingest } from "./ingest";
 import { integrityResultToJson, verifyBundle } from "./integrity";
-import { DEFAULT_LANGUAGE, catalogue } from "./messages";
+import { DEFAULT_LANGUAGE, availableLanguages, catalogue } from "./messages";
 import { evaluateInstalledNoMl, loadVendoredDenylist } from "./noMl";
 import { type Profile, loadProfile } from "./profile";
 import { writeQuarantine } from "./quarantine";
@@ -661,6 +663,8 @@ interface AssessOptions {
   emit?: string;
   /** `--for`'s preset as given; `quickstart` never sets it. */
   forPreset?: string;
+  /** `--report-language` as given; unset means `en`. `quickstart` never sets it. */
+  reportLanguage?: string;
 }
 
 /** Every format Python's `assess --emit` accepts, in Python's order (`commands.EMIT_FORMATS`). */
@@ -787,6 +791,33 @@ function runAssess(options: AssessOptions): CommandResult {
       );
     }
   }
+  // Then, in Python's order and before anything is written: packaging (not ported: refused rather
+  // than accepted and dropped), the report language, and the unverified-catalog override, which has
+  // nothing to apply to without a --catalog-dir (18.109).
+  if (options.packageForSharing) {
+    throw new InputError(
+      "input.package_unsupported",
+      errorCause("input.package_unsupported"),
+      errorFix("input.package_unsupported"),
+    );
+  }
+  const language = options.reportLanguage ?? DEFAULT_LANGUAGE;
+  const languages = availableLanguages();
+  if (!languages.includes(language)) {
+    throw new InputError(
+      "input.report_language_unknown",
+      `--report-language ${pyRepr(language)} has no report catalogue.`,
+      `choose one of: ${languages.join(", ")}.`,
+    );
+  }
+  const messages = catalogue(language);
+  if (options.allowUnverified && options.catalogDirs.length === 0) {
+    throw new InputError(
+      "input.allow_unverified_requires_catalog_dir",
+      "--allow-unverified-catalog was given without --catalog-dir.",
+      "add --catalog-dir <dir>, or drop --allow-unverified-catalog.",
+    );
+  }
   refuseEmitAndFor(options.emit, options.forPreset);
   // --fail-on is parsed (never eval'd) before any output is written: a hostile or malformed expression
   // is refused at exit 3 before any assertion is evaluated against it (SPEC §7), and before the
@@ -901,7 +932,7 @@ function runAssess(options: AssessOptions): CommandResult {
     const applied = applyDeviations(evaluated, deviations, newWindowEnd);
     evaluated = applied.assertions;
     const byControl = deviationsByControl(deviations);
-    const template = catalogue(DEFAULT_LANGUAGE)["readiness.deviation_expired_ignored"] as string;
+    const template = messages["readiness.deviation_expired_ignored"] as string;
     for (const control of applied.expired) {
       limitations.push(
         formatTemplate(template, { control, expiry: pyStr(byControl.get(control)?.expiry ?? "") }),
@@ -940,6 +971,7 @@ function runAssess(options: AssessOptions): CommandResult {
     deviationRegisterDigest,
     deviations,
     declaredSubjectIds,
+    reportLanguage: language,
   });
   if (state !== null) {
     state.record(bundle.digest, join(out, "manifest.json"), newWindowEnd);
@@ -1014,7 +1046,7 @@ function runAssess(options: AssessOptions): CommandResult {
   if (evaluatedNothing(evaluated)) {
     throw nothingEvaluated(profileObj, ingested.accepted, evaluated.length);
   }
-  for (const line of activityCliLines(activity, catalogue(DEFAULT_LANGUAGE))) {
+  for (const line of activityCliLines(activity, messages)) {
     result.note(line);
   }
   for (const line of blindSpotsCliLines(blindSpots)) {
@@ -1032,134 +1064,147 @@ function runAssess(options: AssessOptions): CommandResult {
   return result;
 }
 
-/** The fix each assess value flag names when it is given with no value. */
-const ASSESS_VALUE_FLAGS = new Map([
-  ["--deviations", "pass --deviations <file>."],
-  ["--fail-on", "pass --fail-on <expression>."],
-  ["--emit", "pass --emit <formats>."],
-  ["--for", "pass --for <preset>."],
-]);
+/** Python's `agentce assess --help` (COLUMNS=80), word for word. */
+const ASSESS_USAGE = `usage: agentce assess [-h] [--json] [--debug] [--quiet] [--bundle BUNDLE]
+                      [--catalog CATALOG] [--profile PROFILE]
+                      [--deviations DEVIATIONS] [--domain DOMAIN]
+                      [--catalog-dir CATALOG_DIR] [--trust-root TRUST_ROOT]
+                      [--allow-unverified-catalog] [--package-for-sharing]
+                      [--out OUT] [--state STATE]
+                      [--report-language REPORT_LANGUAGE] [--emit EMIT]
+                      [--for PRESET] [--fail-on FAIL_ON]
+                      [folder]
 
-/** `--deviations`, `--fail-on`, `--emit` and `--for` read in one left-to-right pass, the way Python's argparse reads a
- * `store` option: `--x <v>` or `--x=<v>`, the last occurrence wins, and a flag with no value
- * (trailing, or followed by another option) is refused at once with argparse's own sentence rather
- * than silently taking the next flag as the value. The first value-less flag in argv order is the one
- * named, as argparse names it. */
-function assessValueFlags(argv: string[]): Map<string, string> {
-  const values = new Map<string, string>();
-  for (let i = 1; i < argv.length; i++) {
-    const token = argv[i] as string;
-    const eq = token.indexOf("=");
-    const name = eq >= 0 ? token.slice(0, eq) : token;
-    const fix = ASSESS_VALUE_FLAGS.get(name);
-    if (fix === undefined) {
-      continue;
-    }
-    if (eq >= 0) {
-      values.set(name, token.slice(eq + 1));
-    } else if (i + 1 >= argv.length || looksLikeOption(argv[i + 1] as string)) {
-      throw new InputError(
-        "input.assess_flag_needs_value",
-        `argument ${name}: expected one argument`,
-        fix,
-      );
-    } else {
-      values.set(name, argv[++i] as string);
-    }
-  }
-  return values;
-}
+Run a full assessment: \`agentce assess <folder>\` over a folder of trace
+exports, or \`agentce assess --bundle <dir> --profile <file>\` over an evidence
+bundle.
 
-/** Every assess option that takes a value, so the positional `<folder>` is never mistaken for one. */
-const ASSESS_OPTIONS_WITH_VALUE = new Set([
-  "--bundle",
-  "--catalog",
-  "--profile",
-  "--deviations",
-  "--domain",
-  "--catalog-dir",
-  "--trust-root",
-  "--manual",
-  "--probes",
-  "--out",
-  "--state",
-  "--report-language",
-  "--emit",
-  "--for",
-  "--fail-on",
-]);
+positional arguments:
+  folder                a folder of OpenTelemetry GenAI or OpenInference trace
+                        exports (.json, .jsonl, .ndjson): assess reads it and
+                        writes a default profile, so no other flag is needed
 
-/** Every assess flag that takes no value. `-h`/`--help` are passed through, not refused. */
-const ASSESS_FLAGS_WITHOUT_VALUE = new Set([
-  ...GLOBAL_BOOLEAN_FLAGS,
-  "--allow-unverified-catalog",
-  "--package-for-sharing",
-  "-h",
-  "--help",
-]);
+options:
+  -h, --help            show this help message and exit
+  --bundle BUNDLE       the evidence bundle directory
+  --catalog CATALOG     catalog ids, comma-separated: <id@ver>[,<id@ver>...]
+                        (default: the profile's catalogs, else the baseline)
+  --profile PROFILE     the applicability profile file
+  --deviations DEVIATIONS
+                        the deviation register file: a lint-clean, unexpired
+                        entry flips its control's non-conformant outcome to
+                        partial
+  --domain DOMAIN       the domain ontology binding file
+  --catalog-dir CATALOG_DIR
+                        a catalog directory to evaluate (repeatable)
+  --trust-root TRUST_ROOT
+                        trust root every --catalog-dir signature is verified
+                        against (default: AGENTCE_TRUST_ROOT, else the
+                        vendored development root)
+  --allow-unverified-catalog
+                        assess a --catalog-dir catalog whose signature is
+                        absent or does not verify, recording the override as a
+                        limitation in the manifest and the claim (SPEC 8.7).
+                        Requires --catalog-dir.
+  --package-for-sharing
+                        copy the evidence bundle, profile, domain binding and
+                        every --catalog-dir into --out/bundle/ so the
+                        directory is self-contained: \`agentce sign\` then
+                        \`agentce verify --report\` re-runs it offline on
+                        another machine. Requires --bundle (not a records
+                        folder).
+  --out OUT             the output directory (default: ./out)
+  --state STATE         the incremental state directory
+  --report-language REPORT_LANGUAGE
+                        message-key catalogue for the report: de or en
+                        (default: en); does not affect assertions.json (SPEC
+                        9.3)
+  --emit EMIT           comma-separated report formats to render (default:
+                        html, md, oscal, pack, sarif, skill); one or more of:
+                        md, html, oscal, sarif, public, pack, junit, csv,
+                        oscal_xml, pdf, remediation, skill. Setting CI adds
+                        junit to the default automatically (see --for); an
+                        explicit --emit is never extended.
+  --for PRESET          report preset for an audience, in place of --emit:
+                        engineering (html, md, remediation, skill); compliance
+                        (csv, oscal, oscal_xml, pack, public); security (html,
+                        md, sarif); ci (junit, sarif); share (html, md, pack,
+                        pdf, public); risk-lead (html, md); auditor (oscal,
+                        oscal_xml, pack); buyer (pack). CI detected
+                        automatically (adds junit to the default) when neither
+                        --for nor --emit is given.
+  --fail-on FAIL_ON     gate the exit code on a tiny deterministic expression
+                        over assertion fields (control, subject, outcome,
+                        severity, family, rung, mode), e.g. 'outcome=="non-
+                        conformant" and severity=="high"' (comparisons joined
+                        by and/or; never a general expression language).
+                        Replaces the default any-non-conformant rule when
+                        given.
 
-/** `assess`'s optional positional `<folder>`, read the way Python's assess parser (argparse,
- * `allow_abbrev=False`) reads argv, refusing what it refuses: a flag it does not know, an abbreviated one
- * included (`--em md` is never `--emit md`), and a second positional. Runs after `assessValueFlags`, so a
- * missing value is named first, as argparse names it. */
-function assessFolder(argv: string[]): string | undefined {
-  let folder: string | undefined;
-  let optionsEnded = false;
-  for (let i = 1; i < argv.length; i++) {
-    const token = argv[i] as string;
-    if (!optionsEnded && token === "--") {
-      optionsEnded = true;
-      continue;
-    }
-    if (!optionsEnded && looksLikeOption(token)) {
-      const eq = token.indexOf("=");
-      if (ASSESS_OPTIONS_WITH_VALUE.has(eq >= 0 ? token.slice(0, eq) : token)) {
-        if (eq < 0) {
-          i++;
-        }
-        continue;
-      }
-      if (ASSESS_FLAGS_WITHOUT_VALUE.has(token)) {
-        continue;
-      }
-      throw new InputError(
-        "input.assess_unrecognized_flag",
-        `unrecognized flag '${token}'.`,
-        "run `agentce assess --help` for the flags assess takes, or drop the flag.",
-      );
-    }
-    if (folder !== undefined) {
-      throw new InputError(
-        "input.assess_unrecognized_flag",
-        `unrecognized argument '${token}'.`,
-        "pass at most one records folder: `agentce assess <folder>`.",
-      );
-    }
-    folder = token;
-  }
-  return folder;
-}
+global options:
+  --json                emit machine-readable JSON on stdout
+  --debug               verbose logs on stderr and a stack trace on unexpected
+                        errors
+  --quiet               log warnings and errors only
+`;
 
+/** assess's grammar (Python's assess subparser, global flags included): one table, read by `scanArgv`. */
+const ASSESS_GRAMMAR: Grammar = {
+  options: [
+    { names: ["-h", "--help"], kind: "help" },
+    { names: ["--json"], kind: "flag" },
+    { names: ["--debug"], kind: "flag" },
+    { names: ["--quiet"], kind: "flag" },
+    { names: ["--bundle"], kind: "value" },
+    { names: ["--catalog"], kind: "value" },
+    { names: ["--profile"], kind: "value" },
+    { names: ["--deviations"], kind: "value", valueHint: "<file>" },
+    { names: ["--domain"], kind: "value" },
+    { names: ["--catalog-dir"], kind: "append" },
+    { names: ["--trust-root"], kind: "value" },
+    { names: ["--allow-unverified-catalog"], kind: "flag" },
+    { names: ["--package-for-sharing"], kind: "flag" },
+    { names: ["--out"], kind: "value" },
+    { names: ["--state"], kind: "value" },
+    { names: ["--report-language"], kind: "value" },
+    { names: ["--emit"], kind: "value", valueHint: "<formats>" },
+    { names: ["--for"], kind: "value", valueHint: "<preset>" },
+    { names: ["--fail-on"], kind: "value", valueHint: "<expression>" },
+  ],
+  maxPositionals: 1,
+  unrecognizedKey: "input.assess_unrecognized_flag",
+  needsValueKey: "input.assess_flag_needs_value",
+  flagFix: "run `agentce assess --help` for the flags assess takes, or drop the flag.",
+  extraArgFix: "pass at most one records folder: `agentce assess <folder>`.",
+};
+
+/** `agentce assess`, read from its grammar's scan alone. */
 function cmdAssess(argv: string[]): CommandResult {
-  const values = assessValueFlags(argv);
-  const folder = assessFolder(argv);
+  const args = scanArgv(argv.slice(1), ASSESS_GRAMMAR);
+  if (args.help) {
+    const result = new CommandResult("assess");
+    result.usage = ASSESS_USAGE;
+    return result;
+  }
+  const v = args.values;
   return runAssess({
-    folder,
-    packageForSharing: argv.includes("--package-for-sharing"),
-    deviations: values.get("--deviations"),
-    failOn: values.get("--fail-on"),
-    emit: values.get("--emit"),
-    forPreset: values.get("--for"),
-    bundle: flagValue(argv, "bundle"),
-    profile: flagValue(argv, "profile"),
-    catalog: flagValue(argv, "catalog"),
-    domain: flagValue(argv, "domain"),
-    catalogDirs: flagValues(argv, "catalog-dir"),
-    out: flagValue(argv, "out") ?? DEFAULT_OUT_DIR,
-    state: flagValue(argv, "state"),
+    folder: args.positionals[0],
+    packageForSharing: args.flags.has("--package-for-sharing"),
+    deviations: v["--deviations"],
+    failOn: v["--fail-on"],
+    emit: v["--emit"],
+    forPreset: v["--for"],
+    bundle: v["--bundle"],
+    profile: v["--profile"],
+    catalog: v["--catalog"],
+    domain: v["--domain"],
+    catalogDirs: [...(args.lists["--catalog-dir"] ?? [])],
+    out: emptyToUndefined(v["--out"]) ?? DEFAULT_OUT_DIR,
+    state: v["--state"],
     invocationCommand: "assess",
-    trustRootFlag: flagValue(argv, "trust-root"),
-    allowUnverified: argv.includes("--allow-unverified-catalog"),
+    trustRootFlag: v["--trust-root"],
+    allowUnverified: args.flags.has("--allow-unverified-catalog"),
+    reportLanguage: v["--report-language"],
   });
 }
 

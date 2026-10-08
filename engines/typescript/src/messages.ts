@@ -11,7 +11,7 @@
  * (`engines/python/agentce/messages.py`, `i18n_format.py`); mirrors `engines/java/.../Messages.java`.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { i18nDir } from "./bundled";
 
@@ -61,6 +61,17 @@ function reportKeys(language: string): Record<string, string> {
   }
   reportKeyCache.set(language, out);
   return out;
+}
+
+/** Every language with a vendored catalogue, `en` always among them, sorted: Python's
+ * `messages.available_languages`, the values `assess --report-language` takes. */
+export function availableLanguages(): string[] {
+  const languages = new Set(["en"]);
+  for (const name of readdirSync(i18nDir())) {
+    const match = /^messages\.(.+)\.json$/.exec(name);
+    if (match) languages.add(match[1] as string);
+  }
+  return [...languages].sort();
 }
 
 /** The message catalogue for `language`, backed by `en` for any missing key. */
