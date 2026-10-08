@@ -128,8 +128,119 @@ public final class Conformance {
                 "en", cat.catalogs, activity, blindSpots);
     }
 
+    /** Python's {@code Path.resolve()} (non-strict): absolute, with every symbolic link in the part of
+     * the path that exists resolved and the rest appended as given, normalised. */
+    static Path pyResolve(Path path) {
+        Path absolute = path.toAbsolutePath().normalize();
+        Path existing = absolute;
+        while (existing != null && !Files.exists(existing)) {
+            existing = existing.getParent();
+        }
+        if (existing == null) {
+            return absolute;
+        }
+        try {
+            return existing.toRealPath().resolve(existing.relativize(absolute)).normalize();
+        } catch (IOException e) {
+            return absolute;
+        }
+    }
+
+    /** The adapters' own orchestrator, given the arguments after {@code python conformance.py}; returns
+     * its stdout and stderr. A seam so a test can stand in for {@code uv}. */
+    @FunctionalInterface
+    interface Orchestrator {
+        String[] run(Path adaptersDir, List<String> args) throws IOException, InterruptedException;
+    }
+
+    /** Python's {@code _adapter_conformance} subprocess: {@code uv run --quiet python conformance.py ...}
+     * in the adapters directory, its stdout and stderr captured as UTF-8 text. */
+    static final Orchestrator UV_ORCHESTRATOR = (adaptersDir, args) -> {
+        List<String> cmd = new ArrayList<>(List.of("uv", "run", "--quiet", "python", "conformance.py"));
+        cmd.addAll(args);
+        Path stderrFile = Files.createTempFile("agentce-adapters-", ".err");
+        try {
+            Process proc = new ProcessBuilder(cmd)
+                    .directory(adaptersDir.toFile())
+                    .redirectError(stderrFile.toFile())
+                    .redirectInput(ProcessBuilder.Redirect.PIPE)
+                    .start();
+            proc.getOutputStream().close();
+            String stdout = new String(proc.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            proc.waitFor();
+            return new String[] {stdout, Files.readString(stderrFile, StandardCharsets.UTF_8)};
+        } finally {
+            Files.deleteIfExists(stderrFile);
+        }
+    };
+
+    /** Run adapter conformance in the adapters directory's own environments (SPEC 11.5, 12.3), as Python's
+     * {@code _adapter_conformance}: the adapters' orchestrator with {@code --json}, and {@code --out} the
+     * resolved output directory when there is one. Stdout that is not JSON becomes the error record (no
+     * adapters, nothing identical, the last 800 characters of stderr, or of stdout when stderr is empty). */
+    static JsonNode adapterConformance(Path adaptersDir, Path outDir, Orchestrator orchestrator) {
+        List<String> args = new ArrayList<>(List.of("--json"));
+        if (outDir != null) {
+            args.add("--out");
+            args.add(pyResolve(outDir).toString());
+        }
+        String[] streams;
+        try {
+            streams = orchestrator.run(adaptersDir, args);
+        } catch (IOException e) {
+            // Python's subprocess.run raises FileNotFoundError when uv is missing: an unexpected error.
+            throw new IllegalStateException("cannot run the adapters' conformance: " + e.getMessage(), e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("interrupted running the adapters' conformance", e);
+        }
+        try {
+            return Json.parse(streams[0]);
+        } catch (IllegalArgumentException notJson) {
+            String text = (streams[1].isEmpty() ? streams[0] : streams[1]).strip();
+            int cps = text.codePointCount(0, text.length());
+            String tail = cps > 800 ? text.substring(text.offsetByCodePoints(0, cps - 800)) : text;
+            ObjectNode error = Json.nodes().objectNode();
+            error.putArray("adapters");
+            error.put("total", 0);
+            error.put("identical", 0);
+            error.put("round_trip", false);
+            error.put("error", tail);
+            return error;
+        }
+    }
+
+    /** Python's {@code _adapter_claim}: the adapter-conformance claim, mirroring the ECS claim scheme
+     * (SPEC §11.5). */
+    static String adapterClaim(JsonNode detail) {
+        if (!detail.isObject()) {
+            throw new IllegalStateException("the adapters' conformance printed JSON that is not an object");
+        }
+        long total = detail.has("total") ? detail.get("total").asLong() : 0;
+        long identical = detail.has("identical") ? detail.get("identical").asLong() : 0;
+        if (total > 0 && identical == total && Readiness.pyTruthy(detail.get("round_trip"))) {
+            return "full";
+        }
+        if (identical > 0) {
+            return "partial";
+        }
+        return "none";
+    }
+
     /** Run every corpus project through the engine and return the implementation report. */
     public static ObjectNode runEcs(Path enginePath, Path corpusDir, Path outDir) {
+        return runEcs(enginePath, corpusDir, outDir, null, UV_ORCHESTRATOR);
+    }
+
+    /** {@link #runEcs(Path, Path, Path)}; with {@code adaptersDir}, adapter conformance (byte identity and
+     * round trip over every adapter's fixtures) is run too and folded into the report under {@code
+     * adapter_conformance}, its claim under {@code adapters} (SPEC 11.5, 12.3). */
+    public static ObjectNode runEcs(Path enginePath, Path corpusDir, Path outDir, Path adaptersDir) {
+        return runEcs(enginePath, corpusDir, outDir, adaptersDir, UV_ORCHESTRATOR);
+    }
+
+    static ObjectNode runEcs(
+            Path enginePath, Path corpusDir, Path outDir, Path adaptersDir, Orchestrator orchestrator) {
         Path engine = enginePath.toAbsolutePath().normalize();
         Path repoRoot = engine.getParent().getParent();
         Catalogs cat = catalogsFor(repoRoot);
@@ -191,6 +302,11 @@ public final class Conformance {
         report.put("no_ml", scan.result);
         report.put("claim", claim);
         report.set("failures", failures);
+        if (adaptersDir != null) {
+            JsonNode detail = adapterConformance(adaptersDir, outDir, orchestrator);
+            report.set("adapter_conformance", detail);
+            report.put("adapters", adapterClaim(detail));
+        }
 
         if (outDir != null) {
             try {

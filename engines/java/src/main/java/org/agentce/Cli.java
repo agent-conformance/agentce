@@ -44,7 +44,7 @@ public final class Cli {
     private static final Set<String> VERDICT_OUTCOMES = Set.of("conformant", "non-conformant", "insufficient_evidence");
     /** The same four flags Python's own top-level parser accepts for every command ({@code
      * --debug}/{@code --quiet} are silently ignored here too, exactly as they are everywhere else in
-     * both engines today) -- skipped by {@link #positionalArgs}, never read as a positional. */
+     * both engines today). */
     private static final Set<String> GLOBAL_BOOLEAN_FLAGS = Set.of("--json", "--debug", "--quiet");
 
     public static void main(String[] args) {
@@ -217,7 +217,7 @@ global options:
             } else if ("quickstart".equals(command)) {
                 result = cmdQuickstart(args);
             } else if ("version".equals(command)) {
-                result = cmdVersion();
+                result = cmdVersion(args);
             } else {
                 result = notImplemented(commandName);
             }
@@ -274,11 +274,6 @@ global options:
                 System.out.println(line);
             }
         }
-    }
-
-    private static String flagValue(String[] args, String name) {
-        int index = Arrays.asList(args).indexOf("--" + name);
-        return index >= 0 && index + 1 < args.length ? args[index + 1] : null;
     }
 
     /** {@code null} stays {@code null}; an empty string becomes {@code null} too (Python's `if
@@ -432,35 +427,6 @@ global options:
                     "input." + key + "_not_a_file", what + " " + Readiness.pyRepr(raw) + " is not an existing file.", fix);
         }
         return raw;
-    }
-
-    /** A hardened positional-argument scanner for {@code diff} (the first CLI verb in this engine with
-     * positional, not {@code --flag}, arguments). {@code args[0]} is the command name and is not itself
-     * scanned. Skips exactly {@link #GLOBAL_BOOLEAN_FLAGS} and {@code --format <value>}, collecting every
-     * other token in order, but throws {@code input.diff_unrecognized_flag} on any other {@code
-     * --}-prefixed token instead of silently reading it as a positional. {@code --format=<value>}
-     * (single-token, {@code =}-joined) is out of scope, matching every other flag in both engines
-     * today. */
-    private static List<String> positionalArgs(String[] args) {
-        List<String> out = new ArrayList<>();
-        for (int i = 1; i < args.length; i++) {
-            String token = args[i];
-            if (GLOBAL_BOOLEAN_FLAGS.contains(token)) {
-                continue;
-            }
-            if ("--format".equals(token)) {
-                i++; // also skip the value token, if any
-                continue;
-            }
-            if (token.startsWith("--")) {
-                throw new InputError(
-                        "input.diff_unrecognized_flag",
-                        "unrecognized flag '" + token + "'.",
-                        "pass --format text|json|md, or drop the flag.");
-            }
-            out.add(token);
-        }
-        return out;
     }
 
     /**
@@ -787,17 +753,131 @@ global options:
                         + "catalog's controls apply to.");
     }
 
-    private static CommandResult cmdConformance(String[] args) {
-        CommandResult result = new CommandResult("conformance");
-        String action = args.length > 1 ? args[1] : null;
-        if (!"run".equals(action)) {
-            throw new InputError(
-                    "input.conformance_action", "the only conformance action is `run`.", "run `agentce conformance run ...`.");
+    /** A grammar of one of the small commands (validate, diff, version, conformance and its run): -h/--help,
+     * the three global flags, then {@code valueOptions}; a missing value is {@code flag '--x' needs a
+     * value.} with the command's unrecognized-flag key unless {@code needsValueKeys} names the option. */
+    private static Argv.Grammar utilityGrammar(
+            String command,
+            List<String> valueOptions,
+            int maxPositionals,
+            String flagFix,
+            String extraArgFix,
+            Map<String, String> needsValueKeys,
+            Argv.Action action) {
+        Map<String, Argv.Kind> options = new LinkedHashMap<>();
+        options.put("-h", Argv.Kind.HELP);
+        options.put("--help", Argv.Kind.HELP);
+        for (String flag : List.of("--json", "--debug", "--quiet")) {
+            options.put(flag, Argv.Kind.FLAG);
         }
-        String engine = requireDir(flagValue(args, "engine"), "engine", "the engine path");
-        String corpus = requireDir(flagValue(args, "corpus"), "corpus", "the corpus directory");
-        String out = flagValue(args, "out");
-        ObjectNode report = Conformance.runEcs(Paths.get(engine), Paths.get(corpus), out == null ? null : Paths.get(out));
+        for (String name : valueOptions) {
+            options.put(name, Argv.Kind.VALUE);
+        }
+        String key = "input." + command + "_unrecognized_flag";
+        return new Argv.Grammar(
+                Collections.unmodifiableMap(options), maxPositionals, key, key, flagFix, extraArgFix, Map.of(),
+                needsValueKeys, Map.of(), false, action);
+    }
+
+    /** Python's {@code _flag_fix}: the fix of an unknown flag. */
+    private static String flagFix(String command) {
+        return "run `agentce " + command + " --help` for the flags " + command + " takes, or drop the flag.";
+    }
+
+    /** Python's {@code COLUMNS=80 agentce conformance --help}, word for word. */
+    static final String CONFORMANCE_USAGE = """
+usage: agentce conformance [-h] [--json] [--debug] [--quiet] <action> ...
+
+positional arguments:
+  <action>
+    run       run the ECS and emit an implementation report
+
+options:
+  -h, --help  show this help message and exit
+
+global options:
+  --json      emit machine-readable JSON on stdout
+  --debug     verbose logs on stderr and a stack trace on unexpected errors
+  --quiet     log warnings and errors only
+""";
+
+    /** Python's {@code COLUMNS=80 agentce conformance run --help}, word for word. */
+    static final String CONFORMANCE_RUN_USAGE = """
+usage: agentce conformance run [-h] [--json] [--debug] [--quiet]
+                               [--engine ENGINE] [--corpus CORPUS] [--out OUT]
+                               [--adapters ADAPTERS]
+
+options:
+  -h, --help           show this help message and exit
+  --engine ENGINE      the engine path under test
+  --corpus CORPUS      the corpus directory
+  --out OUT            the output directory for the implementation report
+  --adapters ADAPTERS  the adapters directory; also run adapter conformance
+                       (SPEC 11.5, 12.3)
+
+global options:
+  --json               emit machine-readable JSON on stdout
+  --debug              verbose logs on stderr and a stack trace on unexpected
+                       errors
+  --quiet              log warnings and errors only
+""";
+
+    /** Python's {@code commands.conformance_action_error}: no action, or one conformance does not have. */
+    static InputError conformanceActionError() {
+        return new InputError(
+                "input.conformance_action", "the only conformance action is `run`.", "run `agentce conformance run ...`.");
+    }
+
+    /** conformance's declared grammar (Python's conformance parser and its {@code run} subparser): the
+     * action level names {@code run}, whose grammar reads --engine, --corpus, --out and --adapters, with
+     * --engine and --corpus's own missing-value keys; neither level takes a positional. */
+    static final Argv.Grammar CONFORMANCE_GRAMMAR = conformanceGrammar();
+
+    private static Argv.Grammar conformanceGrammar() {
+        String flagFix = flagFix("conformance run");
+        String extraArgFix =
+                "pass the inputs with their flags: `agentce conformance run --engine <dir> --corpus <dir>`.";
+        Argv.Grammar run = utilityGrammar(
+                "conformance", List.of("--engine", "--corpus", "--out", "--adapters"), 0, flagFix, extraArgFix,
+                Map.of("--engine", "input.engine_missing", "--corpus", "input.corpus_missing"), null);
+        return utilityGrammar("conformance", List.of(), 0, flagFix, extraArgFix, Map.of(),
+                new Argv.Action(Map.of("run", run), Cli::conformanceActionError));
+    }
+
+    /** Python's {@code _refuse_empty_out}: an empty --out names no directory, refused before anything is
+     * written or run. */
+    private static void refuseEmptyOut(String out) {
+        if (out != null && out.isEmpty()) {
+            throw new InputError(
+                    "input.out_dir_unwritable", "--out '' names no directory.", "choose a writable --out directory.");
+        }
+    }
+
+    /** {@code agentce conformance run}: reads its argv only through {@link #CONFORMANCE_GRAMMAR}, then makes
+     * Python's {@code cmd_conformance} checks in its order. */
+    private static CommandResult cmdConformance(String[] args) {
+        Argv.Result parsed = Argv.scan(Arrays.copyOfRange(args, 1, args.length), CONFORMANCE_GRAMMAR);
+        CommandResult result = new CommandResult("conformance");
+        if (parsed.help()) {
+            result.usage = parsed.action() == null ? CONFORMANCE_USAGE : CONFORMANCE_RUN_USAGE;
+            return result;
+        }
+        if (!"run".equals(parsed.action())) {
+            throw conformanceActionError();
+        }
+        String engine = requireDir(parsed.value("--engine"), "engine", "the engine path", "pass --engine <dir>.", true);
+        String corpus = requireDir(parsed.value("--corpus"), "corpus", "the corpus directory", "pass --corpus <dir>.", true);
+        String adapters = parsed.value("--adapters");
+        if (adapters != null) {
+            requireDir(adapters, "adapters", "the adapters directory", "pass --adapters <dir>.", true);
+        }
+        String out = parsed.value("--out");
+        refuseEmptyOut(out);
+        ObjectNode report = Conformance.runEcs(
+                Paths.get(engine),
+                Paths.get(corpus),
+                out == null ? null : Paths.get(out),
+                adapters == null ? null : Paths.get(adapters));
 
         result.data.put("action", "run");
         result.data.put("engine", engine);
@@ -809,15 +889,57 @@ global options:
         result.note("ECS: " + report.get("projects").get("identical").asInt() + "/"
                 + report.get("projects").get("total").asInt() + " identical; claim " + report.get("claim").asText()
                 + "; no_ml " + report.get("no_ml").asText());
+        JsonNode adaptersClaim = report.get("adapters");
+        JsonNode detail = report.get("adapter_conformance");
+        if (adaptersClaim != null && adaptersClaim.isTextual() && detail != null && detail.isObject()) {
+            result.note("adapters: " + Readiness.pyStr(detail.get("identical")) + "/"
+                    + Readiness.pyStr(detail.get("total")) + " identical; round_trip "
+                    + Readiness.pyStr(detail.get("round_trip")) + "; claim " + adaptersClaim.asText());
+        }
         if (!"full".equals(report.get("claim").asText())) {
+            result.addCode(ExitCode.FINDINGS.code);
+        }
+        if (adaptersClaim != null && !"full".equals(adaptersClaim.asText())) {
             result.addCode(ExitCode.FINDINGS.code);
         }
         return result;
     }
 
+    /** Python's {@code COLUMNS=80 agentce validate --help}, word for word. */
+    static final String VALIDATE_USAGE = """
+usage: agentce validate [-h] [--json] [--debug] [--quiet] [--bundle BUNDLE]
+                        [--out OUT]
+
+options:
+  -h, --help       show this help message and exit
+  --bundle BUNDLE  the evidence bundle directory
+  --out OUT        write quarantine.jsonl to this directory
+
+global options:
+  --json           emit machine-readable JSON on stdout
+  --debug          verbose logs on stderr and a stack trace on unexpected
+                   errors
+  --quiet          log warnings and errors only
+""";
+
+    /** validate's declared grammar (Python's validate subparser): --bundle (its own missing-value key) and
+     * --out, no positional. */
+    static final Argv.Grammar VALIDATE_GRAMMAR = utilityGrammar(
+            "validate", List.of("--bundle", "--out"), 0, flagFix("validate"),
+            "pass the bundle with its flag: `agentce validate --bundle <dir>`.",
+            Map.of("--bundle", "input.bundle_missing"), null);
+
+    /** {@code agentce validate}: reads its argv only through {@link #VALIDATE_GRAMMAR}. */
     private static CommandResult cmdValidate(String[] args) {
+        Argv.Result parsed = Argv.scan(Arrays.copyOfRange(args, 1, args.length), VALIDATE_GRAMMAR);
         CommandResult result = new CommandResult("validate");
-        String bundleDir = requireDir(flagValue(args, "bundle"), "bundle", "the evidence bundle");
+        if (parsed.help()) {
+            result.usage = VALIDATE_USAGE;
+            return result;
+        }
+        String bundleDir = requireDir(parsed.value("--bundle"), "bundle", "the evidence bundle", "pass --bundle <dir>.", true);
+        String out = parsed.value("--out");
+        refuseEmptyOut(out);
         Bundle bundle = Bundle.load(Paths.get(bundleDir)); // raises InputError (exit 3) on a missing/mismatching manifest
         Ingest.Result ingested = Ingest.ingest(bundle);
         result.data.put("bundle", bundleDir);
@@ -828,7 +950,6 @@ global options:
         for (Map.Entry<String, Integer> e : Quarantine.countsByReason(ingested.quarantined).entrySet()) {
             quarantineByReason.put(e.getKey(), e.getValue());
         }
-        String out = flagValue(args, "out");
         if (out != null) {
             Path quarantinePath = Paths.get(out, "quarantine.jsonl");
             writeQuarantineJsonl(ingested.quarantined, quarantinePath);
@@ -1698,11 +1819,43 @@ global options:
         return node;
     }
 
+    /** Python's {@code COLUMNS=80 agentce diff --help}, word for word. */
+    static final String DIFF_USAGE = """
+usage: agentce diff [-h] [--json] [--debug] [--quiet] [--format FORMAT]
+                    [report_a] [report_b]
+
+positional arguments:
+  report_a         the first assertions.json
+  report_b         the second assertions.json
+
+options:
+  -h, --help       show this help message and exit
+  --format FORMAT  how to render the diff (default: text)
+
+global options:
+  --json           emit machine-readable JSON on stdout
+  --debug          verbose logs on stderr and a stack trace on unexpected
+                   errors
+  --quiet          log warnings and errors only
+""";
+
+    /** diff's declared grammar (Python's diff subparser): --format with no choices ({@link #cmdDiff} keeps
+     * input.diff_format, checked after the two files), positionals unbounded so cmdDiff's own count check
+     * gives input.diff_extra_argument, and {@code --} makes the rest positional. */
+    static final Argv.Grammar DIFF_GRAMMAR = utilityGrammar(
+            "diff", List.of("--format"), Integer.MAX_VALUE, "pass --format text|json|md, or drop the flag.",
+            "pass two assertions files: `agentce diff <a> <b>`.", Map.of(), null);
+
     /** {@code agentce diff} (SPEC §9.3, item 18.6): a real, deterministic assertion-set diff, matching
      * the Python reference's {@code cmd_diff} (see {@link Diff}). */
     private static CommandResult cmdDiff(String[] args, boolean json) {
+        Argv.Result parsed = Argv.scan(Arrays.copyOfRange(args, 1, args.length), DIFF_GRAMMAR);
         CommandResult result = new CommandResult("diff");
-        List<String> positional = positionalArgs(args);
+        if (parsed.help()) {
+            result.usage = DIFF_USAGE;
+            return result;
+        }
+        List<String> positional = parsed.positionals();
         if (positional.size() > 2) {
             throw new InputError(
                     "input.diff_extra_argument",
@@ -1712,14 +1865,15 @@ global options:
         String fix = "pass two assertion files: `agentce diff <report-a> <report-b>`.";
         String reportA = requireFile(positional.size() > 0 ? positional.get(0) : null, "report_a", "the first assertion set", fix);
         String reportB = requireFile(positional.size() > 1 ? positional.get(1) : null, "report_b", "the second assertion set", fix);
-        String format = flagValue(args, "format");
+        String format = parsed.value("--format");
         if (format == null) {
             format = "text";
         }
         if (!Diff.DIFF_FORMATS.contains(format)) {
             throw new InputError(
                     "input.diff_format",
-                    "--format must be one of " + String.join(", ", Diff.DIFF_FORMATS) + ", not '" + format + "'.",
+                    "--format must be one of " + String.join(", ", Diff.DIFF_FORMATS) + ", not "
+                            + Readiness.pyRepr(format) + ".",
                     "pass --format text|json|md.");
         }
         result.data.put("report_a", Diff.normalizePosixPath(reportA));
@@ -2332,13 +2486,36 @@ global options:
         return notImplemented("verify");
     }
 
+    /** Python's {@code COLUMNS=80 agentce version --help}, word for word. */
+    static final String VERSION_USAGE = """
+usage: agentce version [-h] [--json] [--debug] [--quiet]
+
+options:
+  -h, --help  show this help message and exit
+
+global options:
+  --json      emit machine-readable JSON on stdout
+  --debug     verbose logs on stderr and a stack trace on unexpected errors
+  --quiet     log warnings and errors only
+""";
+
+    /** version's declared grammar (Python's version subparser): the four flags, no positional. */
+    static final Argv.Grammar VERSION_GRAMMAR = utilityGrammar(
+            "version", List.of(), 0, flagFix("version"), "version takes no argument: `agentce version`.",
+            Map.of(), null);
+
     /** {@code agentce version} (SPEC §8.5): the same structured envelope every other command returns,
      * with a real installed-artifact {@code no_ml} self-report (mirrors Python's {@code cmd_version}
      * and the TypeScript port's {@code cmdVersion}). Distinct from the bare {@code --version}/
      * {@code -V} flag, which stays a plain one-line shortcut (handled before this is ever reached,
      * {@link #run}). */
-    private static CommandResult cmdVersion() {
+    private static CommandResult cmdVersion(String[] args) {
+        Argv.Result parsed = Argv.scan(Arrays.copyOfRange(args, 1, args.length), VERSION_GRAMMAR);
         CommandResult result = new CommandResult("version");
+        if (parsed.help()) {
+            result.usage = VERSION_USAGE;
+            return result;
+        }
         NoMl.InstalledResult scan = NoMl.evaluateInstalled(NoMl.loadVendoredDenylist(), NoMl.loadRuntimeDeps());
         result.data.put("engine", Version.ENGINE_NAME);
         result.data.put("engine_version", Version.ENGINE_VERSION);

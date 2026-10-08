@@ -1987,4 +1987,134 @@ class CliTest {
             assertEquals(row[0], exc.reason);
         }
     }
+
+    // --- validate, diff, version and conformance read their argv through the grammar scanner (18.111):
+    // -h prints Python's usage, every option is read or refused with a key. ---
+
+    /** {@link Fixtures#runJson}, with --json right after the command so a `--` in {@code rest} leaves it
+     * an option. */
+    private static JsonNode runJsonEnvelope(String command, String... rest) {
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        PrintStream original = System.out;
+        System.setOut(new PrintStream(buf, true, StandardCharsets.UTF_8));
+        try {
+            String[] args = new String[rest.length + 2];
+            args[0] = command;
+            args[1] = "--json";
+            System.arraycopy(rest, 0, args, 2, rest.length);
+            Cli.run(args);
+        } finally {
+            System.setOut(original);
+        }
+        return Json.parse(buf.toString(StandardCharsets.UTF_8));
+    }
+
+    private static void assertKey(String key, JsonNode env) {
+        assertEquals(3, env.get("exit_code").asInt(), env.toString());
+        assertEquals(key, env.get("error").get("message_key").asText(), env.toString());
+    }
+
+    @Test
+    void helpPrintsPythonsUsageForEachUtilityCommandAnywhereBeforeTheSeparator(@TempDir Path dir) {
+        assertEquals(Cli.VALIDATE_USAGE, captureStdout("validate", "-h"));
+        assertEquals(Cli.VALIDATE_USAGE, captureStdout("validate", "--no-such-flag", "--help"));
+        assertEquals(Cli.DIFF_USAGE, captureStdout("diff", "--help"));
+        assertEquals(Cli.DIFF_USAGE, captureStdout("diff", "a", "-h", "b"));
+        assertEquals(Cli.VERSION_USAGE, captureStdout("version", "--no-such-flag", "-h"));
+        assertEquals(Cli.CONFORMANCE_USAGE, captureStdout("conformance", "-h", "run"));
+        assertEquals(Cli.CONFORMANCE_RUN_USAGE, captureStdout("conformance", "run", "--help"));
+        assertEquals(Cli.CONFORMANCE_RUN_USAGE, captureStdout("conformance", "--he", "run", "-h"));
+        assertTrue(Cli.VALIDATE_USAGE.startsWith("usage: agentce validate [-h] [--json] [--debug] [--quiet]"));
+        assertEquals(0, Cli.run(new String[] {"conformance", "run", "-h"}));
+    }
+
+    @Test
+    void validateRefusesUnknownEmptyAndValueLessOptionsWithKeys(@TempDir Path out) {
+        String bundle = QUICKSTART.resolve("evidence").toString();
+        assertKey("input.validate_unrecognized_flag", runJson("validate", "--bundle", bundle, "--no-such-flag"));
+        assertKey("input.validate_unrecognized_flag", runJson("validate", "--bun", bundle));
+        assertKey("input.validate_unrecognized_flag", runJson("validate", "-hx"));
+        assertKey("input.validate_unrecognized_flag", runJson("validate", "--bundle", bundle, "extra"));
+        assertKey("input.validate_unrecognized_flag", runJson("validate", "--bundle", bundle, "--out"));
+        assertKey("input.bundle_missing", runJson("validate", "--bundle"));
+        assertKey("input.bundle_not_a_directory", runJson("validate", "--bundle="));
+        assertKey("input.bundle_not_a_directory", runJson("validate", "--bundle", ""));
+        assertKey("input.bundle_not_a_directory", runJson("validate", "--bundle", bundle, "--bundle", "nope"));
+        assertKey("input.out_dir_unwritable", runJson("validate", "--bundle", bundle, "--out="));
+        assertKey("input.out_dir_unwritable", runJson("validate", "--bundle", bundle, "--out", ""));
+        // the = form is read, and the last --bundle wins
+        JsonNode env = runJson("validate", "--bundle", "nope", "--bundle=" + bundle, "--out=" + out);
+        assertEquals(1, env.get("exit_code").asInt());
+        assertTrue(Files.isRegularFile(out.resolve("quarantine.jsonl")));
+    }
+
+    @Test
+    void diffReadsIntermixedPositionalsTheLastFormatAndTheSeparator(@TempDir Path dir) {
+        Path a = diffFixture(dir, "a.json", "[{\"control\":\"C-01\",\"subject\":\"s1\",\"outcome\":\"non-conformant\"}]");
+        Path b = diffFixture(dir, "b.json", "[{\"control\":\"C-01\",\"subject\":\"s1\",\"outcome\":\"conformant\"}]");
+        String md = captureStdout("diff", a.toString(), "--format", "md", b.toString());
+        assertEquals(md, captureStdout("diff", a.toString(), b.toString(), "--format", "json", "--format=md"));
+        assertTrue(md.startsWith("## What changed"), md);
+        assertEquals(1, runJsonEnvelope("diff", "--", a.toString(), b.toString()).get("exit_code").asInt());
+        assertKey("input.report_b_not_a_file", runJsonEnvelope("diff", a.toString(), "--", "-h"));
+        assertKey("input.diff_extra_argument", runJsonEnvelope("diff", a.toString(), b.toString(), "--", "--format"));
+        assertKey("input.diff_extra_argument", runJson("diff", a.toString(), b.toString(), "--format", "md", "extra"));
+        assertKey("input.diff_unrecognized_flag", runJson("diff", a.toString(), b.toString(), "--format"));
+        assertKey("input.diff_unrecognized_flag", runJson("diff", a.toString(), b.toString(), "-hx"));
+        assertKey("input.diff_unrecognized_flag", runJson("diff", a.toString(), b.toString(), "--help=x"));
+        assertKey("input.diff_format", runJson("diff", a.toString(), b.toString(), "--format="));
+        assertKey("input.diff_format", runJson("diff", a.toString(), b.toString(), "--format", ""));
+        // --format is checked after the two files
+        assertKey("input.report_a_missing", runJson("diff", "--format", "nope"));
+    }
+
+    @Test
+    void versionTakesNoArgument() {
+        for (String[] argv : new String[][] {
+            {"--no-such-flag"}, {"--he"}, {"-hx"}, {"extra"}, {"--json=1"}, {"--help=x"}, {"--"}, {"-"}, {"-1"}
+        }) {
+            assertKey("input.version_unrecognized_flag", runJsonEnvelope("version", argv));
+        }
+        assertKey("input.version_unrecognized_flag", runJsonEnvelope("version", "--", "-h"));
+    }
+
+    @Test
+    void conformanceReadsItsActionAndRefusesEveryBadRunOption(@TempDir Path dir) {
+        String engine = REPO.resolve("engines/java").toString();
+        String corpus = REPO.resolve("verification/gates/fixtures/cli_options/conformance/corpus").toString();
+        assertKey("input.conformance_action", runJson("conformance"));
+        assertKey("input.conformance_action", runJson("conformance", "nope"));
+        assertKey("input.conformance_action", runJson("conformance", "--he", "nope"));
+        assertKey("input.conformance_action", runJsonEnvelope("conformance", "--", "run"));
+        assertKey("input.conformance_unrecognized_flag", runJson("conformance", "--he", "run", "--no-such"));
+        assertKey("input.conformance_unrecognized_flag", runJson("conformance", "run", "run"));
+        assertKey("input.conformance_unrecognized_flag", runJson("conformance", "run", "-hx"));
+        assertKey("input.engine_missing", runJson("conformance", "run", "--he", "--engine"));
+        assertKey("input.engine_missing", runJson("conformance", "run", "--adapters", "/nonexistent"));
+        assertKey("input.corpus_missing", runJson("conformance", "run", "--engine", engine, "--corpus"));
+        assertKey("input.conformance_unrecognized_flag",
+                runJson("conformance", "run", "--engine", engine, "--corpus", corpus, "--adapters"));
+        assertKey("input.conformance_unrecognized_flag",
+                runJson("conformance", "run", "--engine", engine, "--corpus", corpus, "--out"));
+        assertKey("input.engine_not_a_directory", runJson("conformance", "run", "--engine=", "--corpus", corpus));
+        assertKey("input.engine_not_a_directory",
+                runJson("conformance", "run", "--engine", engine, "--corpus", corpus, "--engine=nope"));
+        assertKey("input.corpus_not_a_directory", runJson("conformance", "run", "--engine", engine, "--corpus="));
+        for (String adapters : new String[] {"/nonexistent", ""}) {
+            assertKey("input.adapters_not_a_directory", runJsonEnvelope(
+                    "conformance", "run", "--engine", engine, "--corpus", corpus, "--adapters", adapters));
+        }
+        assertKey("input.adapters_not_a_directory",
+                runJson("conformance", "run", "--engine", engine, "--corpus", corpus, "--adapters="));
+        Path out = dir.resolve("out");
+        assertKey("input.out_dir_unwritable",
+                runJson("conformance", "run", "--engine", engine, "--corpus", corpus, "--out", ""));
+        assertFalse(Files.exists(out));
+        // `conformance --json run ...`, the gates' own placement, is read; the empty corpus claims none
+        JsonNode env = runJsonEnvelope("conformance", "run", "--engine", engine, "--corpus=" + corpus,
+                "--out=" + out);
+        assertEquals(1, env.get("exit_code").asInt(), env.toString());
+        assertEquals("none", env.get("claim").asText());
+        assertTrue(Files.isRegularFile(out.resolve("implementation-report.json")));
+    }
 }

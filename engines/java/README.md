@@ -28,6 +28,13 @@ in `gradle.lockfile`. The vendored `agentce-evidence.schema.json` is kept byte-i
 build/install/agentce/bin/agentce conformance run --engine . --corpus ../../corpus --json
 ```
 
+`--adapters <dir>` also runs adapter conformance (SPEC §11.5, §12.3) as the Python engine does. It runs
+the directory's own `conformance.py` through `uv run` and writes the result into the report under
+`adapter_conformance`, with the claim under `adapters`. The run exits 1 unless that claim is `full`.
+`conformance`, `validate`, `diff` and `version` read their command lines through the same declared
+grammar as `assess` (below), so `-h` prints the Python engine's usage and an unknown flag, an extra
+argument or an empty value exits 3 with a key.
+
 ## Assess a bundle, or try the bundled quickstart project
 
 ```
