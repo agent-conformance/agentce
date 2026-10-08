@@ -13,7 +13,8 @@ import argparse
 import json
 import re
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Any, NoReturn
 
 from . import __version__, commands, exit_codes, logsetup
@@ -25,105 +26,266 @@ from .safe_json import MAX_INT_STR_DIGITS
 _log = logsetup.get_logger()
 
 
-class _Parser(argparse.ArgumentParser):
-    """An ``ArgumentParser`` whose usage errors exit ``3`` (input error), per the CLI scheme.
+class _ArgvError(InputError):
+    """A usage error, carrying the command that refused it for the --json envelope's ``command``."""
 
-    A parser given ``on_error`` raises the keyed error it maps argparse's message to instead (the
-    English text: argparse is not localised here).
-    """
-
-    def __init__(
-        self,
-        *args: Any,
-        on_error: Callable[[str], AgentceError] | None = None,
-        **kwargs: Any,
-    ) -> None:
-        super().__init__(*args, **kwargs)
-        self._on_error = on_error
-
-    def error(self, message: str) -> NoReturn:
-        if self._on_error is not None:
-            raise self._on_error(message)
-        self.print_usage(sys.stderr)
-        self.exit(int(ExitCode.INPUT_ERROR), f"{self.prog}: error: {message}\n")
-        raise AssertionError("unreachable")  # pragma: no cover
+    def __init__(self, command: str, key: str, cause: str, fix: str) -> None:
+        super().__init__(key, cause, fix)
+        self.command = command
 
 
-def _make_argv_errors(
-    key: str, flag_fix: str, value_hint: str, extra_arg_hint: str
-) -> tuple[Callable[[str], InputError], Callable[[str], InputError]]:
-    """A `(usage_error, unknown_error)` pair translating argparse's own wording into the keyed
-    `InputError` TypeScript and Java raise, for a subcommand that opts into this treatment
-    (`readiness`, 18.25; `sign`, 18.26 round-2) instead of argparse's bare, unkeyed usage error."""
+@dataclass(frozen=True)
+class _ArgvErrors:
+    """How one command words its argv errors: every one is a keyed `_ArgvError` (exit 3), never
+    argparse's bare usage text. ``key`` is the default; ``value_keys`` and ``choice_errors`` reuse the
+    more specific key TypeScript and Java already give for the same argv (18.107)."""
 
-    def argv_error(cause: str, fix: str) -> InputError:
-        return InputError(key, cause, fix)
+    command: str
+    key: str
+    flag_fix: str
+    extra_arg_hint: str
+    value_hint: str = "<value>"
+    #: A value-less flag's key, by flag; "*" for every flag of the command.
+    value_keys: Mapping[str, str] = field(default_factory=dict)
+    #: Per-flag value hints for the fix ("pass --fail-on <expression>.").
+    value_hints: Mapping[str, str] = field(default_factory=dict)
+    #: Keep argparse's own sentence as the cause of a value-less flag (assess: TypeScript and Java do).
+    argparse_value_cause: bool = False
+    #: A bad choice's error, by argparse's label for the argument (`--format`, `<action>`), given the value.
+    choice_errors: Mapping[str, Callable[[str], tuple[str, str, str]]] = field(
+        default_factory=dict
+    )
 
-    def usage_error(message: str) -> InputError:
+    def error(self, cause: str, fix: str, key: str | None = None) -> _ArgvError:
+        return _ArgvError(self.command, key or self.key, cause, fix)
+
+    def usage(self, message: str) -> _ArgvError:
+        """Map argparse's own message to the keyed error."""
         if m := re.fullmatch(r"argument (--[\w-]+): expected one argument", message):
             flag = m.group(1)
-            return argv_error(
-                f"flag '{flag}' needs a value.", f"pass {flag} {value_hint}."
+            key = self.value_keys.get(flag, self.value_keys.get("*", self.key))
+            cause = (
+                message
+                if self.argparse_value_cause
+                else f"flag '{flag}' needs a value."
             )
+            hint = self.value_hints.get(flag, self.value_hint)
+            return self.error(cause, f"pass {flag} {hint}.", key)
         if m := re.fullmatch(
             r"argument (--[\w-]+): ignored explicit argument .*", message
         ):
             flag = m.group(1)
-            return argv_error(
+            return self.error(
                 f"flag '{flag}' takes no value.", f"drop the value: {flag}."
             )
-        return argv_error(f"{message}.", flag_fix)
+        if m := re.fullmatch(
+            r"argument (\S+): invalid choice: (.*?) \(choose from .*\)", message
+        ):
+            label, raw = m.groups()
+            value = raw[1:-1] if raw[:1] in "'\"" else raw
+            if (choice_error := self.choice_errors.get(label)) is not None:
+                key, cause, fix = choice_error(value)
+                return self.error(cause, fix, key)
+        return self.error(f"{message}.", self.flag_fix)
 
-    def unknown_error(token: str) -> InputError:
+    def unknown(self, token: str) -> _ArgvError:
+        """A token argparse left unparsed."""
         if token.startswith("-") and token != "-":
-            return argv_error(f"unrecognized flag '{token}'.", flag_fix)
-        return argv_error(f"unrecognized argument '{token}'.", extra_arg_hint)
-
-    return usage_error, unknown_error
+            return self.error(f"unrecognized flag '{token}'.", self.flag_fix)
+        return self.error(f"unrecognized argument '{token}'.", self.extra_arg_hint)
 
 
-_READINESS_FLAG_FIX = "pass --gaps, --deviations, or --catalog-dir, or drop the flag."
-_readiness_usage_error, _readiness_unknown_error = _make_argv_errors(
-    "input.readiness_unrecognized_flag",
-    _READINESS_FLAG_FIX,
-    "<path>",
-    "pass exactly one report directory: `agentce readiness <report-dir>`.",
+class _Parser(argparse.ArgumentParser):
+    """An ``ArgumentParser`` whose usage errors exit ``3`` (input error), per the CLI scheme, as the
+    command's keyed `_ArgvError` (English text: argparse is not localised here)."""
+
+    def __init__(
+        self, *args: Any, argv_errors: _ArgvErrors | None = None, **kwargs: Any
+    ) -> None:
+        # Exact flags only on every parser (TRADEOFFS 2026-10-06 18.50, option b; 18.107): `--bun x`
+        # is an unrecognized flag in all three engines, never --bundle in Python alone.
+        kwargs.setdefault("allow_abbrev", False)
+        super().__init__(*args, **kwargs)
+        self._argv_errors = argv_errors
+
+    def error(self, message: str) -> NoReturn:
+        if self._argv_errors is not None:
+            raise self._argv_errors.usage(message)
+        self.print_usage(sys.stderr)
+        self.exit(int(ExitCode.INPUT_ERROR), f"{self.prog}: error: {message}\n")
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    def parse_known_args(  # type: ignore[override]
+        self, args: Sequence[str] | None = None, namespace: Any = None
+    ) -> tuple[argparse.Namespace, list[str]]:
+        if self._argv_errors is not None and args is not None:
+            self._refuse_short_clusters(list(args))
+        return super().parse_known_args(args, namespace)
+
+    def _refuse_short_clusters(self, args: list[str]) -> None:
+        """agentce has no clustered short options, so `-hx` or `-hh` is refused with the command's key,
+        never read as -h with the rest dropped (KD-086). Scans this parser's own tokens: up to `--`, up
+        to the command or action name for a parser with subcommands, and not where the previous option
+        expects a value (argparse refuses that missing value first)."""
+        takes_value = False
+        for token in args:
+            if token == "--" or (takes_value and token.startswith("-")):
+                return
+            action = self._option_string_actions.get(token)
+            takes_value = action is not None and action.nargs != 0
+            if not token.startswith("-"):
+                if self._subparsers is not None:
+                    return
+            elif (
+                not token.startswith("--")
+                and len(token) > 2
+                and action is None
+                and not self._negative_number_matcher.match(token)
+            ):
+                assert self._argv_errors is not None
+                raise self._argv_errors.unknown(token)
+
+
+def _flag_fix(command: str) -> str:
+    return f"run `agentce {command} --help` for the flags {command} takes, or drop the flag."
+
+
+def _action_error(command: str) -> Callable[[str], tuple[str, str, str]]:
+    """An unknown action is the error `cmd_<command>` gives for no action."""
+
+    def error(value: str) -> tuple[str, str, str]:
+        err = {
+            "catalog": commands.catalog_action_error,
+            "conformance": commands.conformance_action_error,
+            "config": commands.config_action_error,
+        }[command]()
+        return err.key, err.cause, err.fix
+
+    return error
+
+
+_TOP_ARGV = _ArgvErrors(
+    "agentce",
+    "input.unknown_command",
+    "run `agentce --help` for the commands and global flags agentce takes.",
+    "run `agentce --help` for the commands agentce takes.",
+    choice_errors={
+        "<command>": lambda v: (
+            "input.unknown_command",
+            f"unrecognized command '{v}'.",
+            "run `agentce --help` for the commands agentce takes.",
+        )
+    },
 )
 
-_SIGN_FLAG_FIX = (
-    "pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag."
-)
-_sign_usage_error, _sign_unknown_error = _make_argv_errors(
-    "input.sign_unrecognized_flag",
-    _SIGN_FLAG_FIX,
-    "<value>",
-    "pass exactly one report directory: `agentce sign <report-dir> --as claimant|assessor`.",
-)
-
-_, _assess_unknown_error = _make_argv_errors(
-    "input.assess_unrecognized_flag",
-    "run `agentce assess --help` for the flags assess takes, or drop the flag.",
-    "<value>",
-    "pass at most one records folder: `agentce assess <folder>`.",
-)
-
-_quickstart_usage_error, _quickstart_unknown_error = _make_argv_errors(
-    "input.quickstart_unrecognized_flag",
-    "run `agentce quickstart --help` for the flags quickstart takes, or drop the flag.",
-    "<dir>",
-    "quickstart takes no other argument: `agentce quickstart --out <dir>`.",
-)
-
-_VERIFY_FLAG_FIX = (
-    "pass --bundle, --catalog, --release, or --report (with --signer-trust-root or "
-    "--expect-keyid for --report), or drop the flag."
-)
-_verify_usage_error, _verify_unknown_error = _make_argv_errors(
-    "input.verify_unrecognized_flag",
-    _VERIFY_FLAG_FIX,
-    "<value>",
-    "pass the target with its flag, e.g. `agentce verify --bundle <dir>`.",
-)
+_ARGV: dict[str, _ArgvErrors] = {
+    "readiness": _ArgvErrors(
+        "readiness",
+        "input.readiness_unrecognized_flag",
+        "pass --gaps, --deviations, or --catalog-dir, or drop the flag.",
+        "pass exactly one report directory: `agentce readiness <report-dir>`.",
+        value_hint="<path>",
+    ),
+    "sign": _ArgvErrors(
+        "sign",
+        "input.sign_unrecognized_flag",
+        "pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag.",
+        "pass exactly one report directory: `agentce sign <report-dir> --as claimant|assessor`.",
+    ),
+    "assess": _ArgvErrors(
+        "assess",
+        "input.assess_unrecognized_flag",
+        _flag_fix("assess"),
+        "pass at most one records folder: `agentce assess <folder>`.",
+        value_keys={"*": "input.assess_flag_needs_value"},
+        value_hints={
+            "--deviations": "<file>",
+            "--fail-on": "<expression>",
+            "--emit": "<formats>",
+            "--for": "<preset>",
+        },
+        argparse_value_cause=True,
+    ),
+    "quickstart": _ArgvErrors(
+        "quickstart",
+        "input.quickstart_unrecognized_flag",
+        _flag_fix("quickstart"),
+        "quickstart takes no other argument: `agentce quickstart --out <dir>`.",
+        value_hint="<dir>",
+    ),
+    "verify": _ArgvErrors(
+        "verify",
+        "input.verify_unrecognized_flag",
+        "pass --bundle, --catalog, --release, or --report (with --signer-trust-root or "
+        "--expect-keyid for --report), or drop the flag.",
+        "pass the target with its flag, e.g. `agentce verify --bundle <dir>`.",
+    ),
+    "diff": _ArgvErrors(
+        "diff",
+        "input.diff_unrecognized_flag",
+        "pass --format text|json|md, or drop the flag.",
+        "pass two assertions files: `agentce diff <a> <b>`.",
+    ),
+    "validate": _ArgvErrors(
+        "validate",
+        "input.validate_unrecognized_flag",
+        _flag_fix("validate"),
+        "pass the bundle with its flag: `agentce validate --bundle <dir>`.",
+        value_keys={"--bundle": "input.bundle_missing"},
+    ),
+    "report": _ArgvErrors(
+        "report",
+        "input.report_unrecognized_flag",
+        _flag_fix("report"),
+        "pass the input with its flag: `agentce report --from <file>` or `--validate <dir>`.",
+        value_keys={
+            "--from": "input.from_missing",
+            "--validate": "input.validate_missing",
+        },
+        choice_errors={
+            "--format": lambda v: (
+                "input.report_format",
+                f"unknown report format '{v}'.",
+                f"choose one of: {', '.join(commands.REPORT_FORMATS)}.",
+            )
+        },
+    ),
+    "conformance": _ArgvErrors(
+        "conformance",
+        "input.conformance_unrecognized_flag",
+        _flag_fix("conformance run"),
+        "pass the inputs with their flags: `agentce conformance run --engine <dir> --corpus <dir>`.",
+        value_keys={
+            "--engine": "input.engine_missing",
+            "--corpus": "input.corpus_missing",
+        },
+        choice_errors={"<action>": _action_error("conformance")},
+    ),
+    "catalog": _ArgvErrors(
+        "catalog",
+        "input.catalog_unrecognized_flag",
+        "run `agentce catalog <action> --help` for the flags it takes, or drop the flag.",
+        "pass one catalog directory: `agentce catalog <action> <dir>`.",
+        choice_errors={"<action>": _action_error("catalog")},
+    ),
+    "config": _ArgvErrors(
+        "config",
+        "input.config_unrecognized_flag",
+        _flag_fix("config show"),
+        "config show takes no argument: `agentce config show`.",
+        choice_errors={"<action>": _action_error("config")},
+    ),
+}
+for _name, _extra in (
+    ("collect", "pass the config with its flag: `agentce collect --config <file>`."),
+    ("ingest", "pass the export with its flag: `agentce ingest --in <file>`."),
+    ("doctor", "pass the project with its flag: `agentce doctor --project <dir>`."),
+    ("init", "init takes no positional argument: `agentce init --out <dir>`."),
+    ("version", "version takes no argument: `agentce version`."),
+):
+    _ARGV[_name] = _ArgvErrors(
+        _name, f"input.{_name}_unrecognized_flag", _flag_fix(_name), _extra
+    )
 
 
 def _common_flags() -> _Parser:
@@ -176,7 +338,6 @@ def build_parser() -> argparse.ArgumentParser:
         # with one declared grammar and refuse what argparse would refuse, so `--bun <dir>` is an
         # unrecognized flag in all three engines, not a bundle in Python alone (18.65 round 3).
         allow_abbrev=False,
-        on_error=_verify_usage_error,
         description="Integrity or signature verification. `--report <dir>` re-runs a shareable "
         "report bundle (`assess --package-for-sharing`) offline through nine stages, in order, "
         "each with its own message key: (1) the claim exists and is signed "
@@ -516,7 +677,6 @@ def build_parser() -> argparse.ArgumentParser:
         # No prefix matching, same as `readiness` (18.25): TS and Java refuse an abbreviated flag as
         # unrecognized, so Python does too, with the same keyed error (18.26 round-2 verifier fix).
         allow_abbrev=False,
-        on_error=_sign_usage_error,
     )
     p.add_argument("report_dir", nargs="?", help="the report directory")
     p.add_argument(
@@ -558,7 +718,6 @@ def build_parser() -> argparse.ArgumentParser:
         # No prefix matching (`--deviation` for `--deviations`): TS and Java refuse an abbreviated
         # flag as unrecognized, so Python does too, with the same keyed error.
         allow_abbrev=False,
-        on_error=_readiness_usage_error,
     )
     p.add_argument("report_dir", nargs="?", help="the report directory")
     p.add_argument(
@@ -596,7 +755,6 @@ def build_parser() -> argparse.ArgumentParser:
         # No prefix matching, as for `assess`: `--ou ./o` is an unrecognized flag in all three
         # engines, never --out in Python alone, and every argv error is keyed (18.106).
         allow_abbrev=False,
-        on_error=_quickstart_usage_error,
     )
     p.add_argument("--out", help="the output directory for the report (default: ./out)")
     p.set_defaults(func=commands.cmd_quickstart)
@@ -644,7 +802,28 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.set_defaults(func=commands.cmd_version)
 
+    _key_argv_errors(parser)
     return parser
+
+
+def _subparsers(parser: argparse.ArgumentParser) -> dict[str, Any]:
+    return next(
+        (
+            a.choices
+            for a in parser._actions
+            if isinstance(a, argparse._SubParsersAction)
+        ),
+        {},
+    )
+
+
+def _key_argv_errors(parser: argparse.ArgumentParser) -> None:
+    """Give every parser its command's keyed argv errors: the top level, each command and each
+    action under it (`catalog lint` answers with catalog's key)."""
+    parser._argv_errors = _TOP_ARGV  # type: ignore[attr-defined]
+    for name, command in _subparsers(parser).items():
+        for p in (command, *_subparsers(command).values()):
+            p._argv_errors = _ARGV[name]
 
 
 def _emit_result(result: CommandResult, *, want_json: bool) -> None:
@@ -676,15 +855,6 @@ def _emit_error(err: AgentceError, *, command: str, want_json: bool) -> int:
     return int(err.exit_code)
 
 
-_UNKNOWN_ARGV_ERRORS: dict[str, Callable[[str], InputError]] = {
-    "assess": _assess_unknown_error,
-    "quickstart": _quickstart_unknown_error,
-    "readiness": _readiness_unknown_error,
-    "sign": _sign_unknown_error,
-    "verify": _verify_unknown_error,
-}
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse ``argv`` (default ``sys.argv``), run the command, and return the process exit code."""
     # One integer rule for the whole run, whatever PYTHONINTMAXSTRDIGITS says: a literal JSON may hold
@@ -695,16 +865,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         ns, unknown = parser.parse_known_args(args)
         if unknown:
-            unknown_error = _UNKNOWN_ARGV_ERRORS.get(getattr(ns, "command", "") or "")
-            if unknown_error is None:
-                parser.error(f"unrecognized arguments: {' '.join(unknown)}")
-            raise unknown_error(unknown[0])
-    except SystemExit as exc:  # argparse: -h/--version exit 0; usage errors exit 3
+            errors = _ARGV.get(getattr(ns, "command", "") or "", _TOP_ARGV)
+            raise errors.unknown(unknown[0])
+    except SystemExit as exc:  # argparse: -h/--version exit 0
         return exc.code if isinstance(exc.code, int) else int(ExitCode.INPUT_ERROR)
-    # A keyed `readiness`/`sign`/`verify` usage error (`_Parser`).
-    except AgentceError as err:
-        command = err.key.removeprefix("input.").split("_", 1)[0]
-        return _emit_error(err, command=command, want_json="--json" in args)
+    # Every usage error is keyed (`_Parser`, 18.107).
+    except _ArgvError as err:
+        return _emit_error(err, command=err.command, want_json="--json" in args)
 
     debug = bool(getattr(ns, "debug", False))
     quiet = bool(getattr(ns, "quiet", False))

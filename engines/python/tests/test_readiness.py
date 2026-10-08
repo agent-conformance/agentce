@@ -630,9 +630,11 @@ def test_readiness_cli_usage_error_is_the_keyed_envelope(
     )
 
 
-def test_an_unknown_flag_on_another_command_is_still_argparse_usage(
+def test_an_unknown_flag_on_another_command_carries_that_command_s_key(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Only `readiness` reads its usage errors as keyed errors; other commands keep argparse's."""
+    """Every command keys its usage errors with its own key, not readiness's (18.107)."""
     assert cli.main(["diff", "a.json", "b.json", "--bogus"]) == 3
-    assert "unrecognized arguments: --bogus" in capsys.readouterr().err
+    assert "error [input.diff_unrecognized_flag]: unrecognized flag '--bogus'." in (
+        capsys.readouterr().err
+    )

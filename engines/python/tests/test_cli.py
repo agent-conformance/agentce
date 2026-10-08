@@ -1176,3 +1176,123 @@ def test_keyless_cert_window_ignores_the_clock(
     code = cli.main(["verify", "--release", str(release), "--json"])
     out = json.loads(capsys.readouterr().out)
     assert (code, out["verified"], out["keyless"]) == (0, True, True)
+
+
+@pytest.mark.parametrize(
+    ("argv", "command", "key"),
+    [
+        (["nope"], "agentce", "input.unknown_command"),
+        (["--no-such-flag"], "agentce", "input.unknown_command"),
+        (["-hx"], "agentce", "input.unknown_command"),
+        (
+            ["validate", "--no-such-flag"],
+            "validate",
+            "input.validate_unrecognized_flag",
+        ),
+        (["validate", "--bundle"], "validate", "input.bundle_missing"),
+        (["validate", "--he"], "validate", "input.validate_unrecognized_flag"),
+        (["validate", "--bun", "x"], "validate", "input.validate_unrecognized_flag"),
+        (["validate", "-hx"], "validate", "input.validate_unrecognized_flag"),
+        (
+            ["validate", "--bundle", "x", "extra"],
+            "validate",
+            "input.validate_unrecognized_flag",
+        ),
+        (["validate", "--json=1"], "validate", "input.validate_unrecognized_flag"),
+        (["assess", "--fail-on"], "assess", "input.assess_flag_needs_value"),
+        (
+            ["assess", "--fail-on", "--out", "o"],
+            "assess",
+            "input.assess_flag_needs_value",
+        ),
+        (["assess", "--he"], "assess", "input.assess_unrecognized_flag"),
+        (["assess", "-hh"], "assess", "input.assess_unrecognized_flag"),
+        (
+            ["report", "--from", "x", "--format", "nope"],
+            "report",
+            "input.report_format",
+        ),
+        (["report", "--from"], "report", "input.from_missing"),
+        (["report", "--validate"], "report", "input.validate_missing"),
+        (["report", "--he"], "report", "input.report_unrecognized_flag"),
+        (["report", "--form", "md"], "report", "input.report_unrecognized_flag"),
+        (["report", "-hx"], "report", "input.report_unrecognized_flag"),
+        (
+            ["report", "--from", "x", "extra"],
+            "report",
+            "input.report_unrecognized_flag",
+        ),
+        (["collect", "--no-such-flag"], "collect", "input.collect_unrecognized_flag"),
+        (["collect", "--he"], "collect", "input.collect_unrecognized_flag"),
+        (["collect", "-hx"], "collect", "input.collect_unrecognized_flag"),
+        (["ingest", "--no-such-flag"], "ingest", "input.ingest_unrecognized_flag"),
+        (["ingest", "-hx"], "ingest", "input.ingest_unrecognized_flag"),
+        (["catalog", "nope"], "catalog", "input.catalog_action"),
+        (["catalog", "--he"], "catalog", "input.catalog_unrecognized_flag"),
+        (
+            ["catalog", "lint", "--no-such-flag"],
+            "catalog",
+            "input.catalog_unrecognized_flag",
+        ),
+        (["catalog", "lint", "-hx"], "catalog", "input.catalog_unrecognized_flag"),
+        (["conformance", "nope"], "conformance", "input.conformance_action"),
+        (["conformance", "run", "--engine"], "conformance", "input.engine_missing"),
+        (["conformance", "run", "--corpus"], "conformance", "input.corpus_missing"),
+        (
+            ["conformance", "run", "--he"],
+            "conformance",
+            "input.conformance_unrecognized_flag",
+        ),
+        (["conformance", "-hx"], "conformance", "input.conformance_unrecognized_flag"),
+        (["doctor", "--no-such-flag"], "doctor", "input.doctor_unrecognized_flag"),
+        (["doctor", "-hx"], "doctor", "input.doctor_unrecognized_flag"),
+        (["init", "--no-such-flag"], "init", "input.init_unrecognized_flag"),
+        (["init", "-hx"], "init", "input.init_unrecognized_flag"),
+        (["config", "nope"], "config", "input.config_action"),
+        (["config", "--he"], "config", "input.config_unrecognized_flag"),
+        (["config", "-hx"], "config", "input.config_unrecognized_flag"),
+        (["version", "--no-such-flag"], "version", "input.version_unrecognized_flag"),
+        (["version", "-hx"], "version", "input.version_unrecognized_flag"),
+        (["version", "extra"], "version", "input.version_unrecognized_flag"),
+        (["diff", "--no-such-flag"], "diff", "input.diff_unrecognized_flag"),
+        (["diff", "--format"], "diff", "input.diff_unrecognized_flag"),
+        (["diff", "--he"], "diff", "input.diff_unrecognized_flag"),
+        (["diff", "-hx"], "diff", "input.diff_unrecognized_flag"),
+        (["readiness", "--he"], "readiness", "input.readiness_unrecognized_flag"),
+        (["quickstart", "--he"], "quickstart", "input.quickstart_unrecognized_flag"),
+        (["quickstart", "-hh"], "quickstart", "input.quickstart_unrecognized_flag"),
+        (
+            ["verify", "--bundle", "x", "-hx"],
+            "verify",
+            "input.verify_unrecognized_flag",
+        ),
+        (
+            ["sign", "x", "--as", "claimant", "-hx"],
+            "sign",
+            "input.sign_unrecognized_flag",
+        ),
+    ],
+)
+def test_every_argv_error_is_keyed(
+    capsys: pytest.CaptureFixture[str], argv: list[str], command: str, key: str
+) -> None:
+    """Every argparse usage error on every command is a keyed exit-3 envelope naming the command
+    typed: an unknown flag or command, a value-less flag, a bad choice, an extra argument, an
+    abbreviation and a clustered short option (18.107, KD-086)."""
+    head = (
+        ["--json", *argv] if argv[0].startswith("-") else [argv[0], "--json", *argv[1:]]
+    )
+    code, env = run(head, capsys)
+    assert (code, env["command"], env["error"]["key"]) == (3, command, key)
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [["assess", "-h"], ["assess", "--help"], ["diff", "-h"], ["version", "--help"]],
+)
+def test_help_still_prints_usage(
+    capsys: pytest.CaptureFixture[str], argv: list[str]
+) -> None:
+    """-h and --help are exact option strings, so the cluster refusal leaves them alone."""
+    assert cli.main(argv) == 0
+    assert f"usage: agentce {argv[0]}" in capsys.readouterr().out

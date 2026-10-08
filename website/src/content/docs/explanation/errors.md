@@ -46,11 +46,15 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.catalog_missing` | --catalog was given but names no catalog. | pass --catalog <id@version>, or leave --catalog out to assess against the baseline. |
 | `input.catalog_not_found` | no base catalog was found under the expected path. | run from the repository root or pass --catalog-dir to a catalog directory. |
 | `input.catalog_unreadable` | a file or folder in the catalog directory could not be read (permissions, or a non-UTF-8 file name). | make every file and folder in the catalog directory readable, then re-run. |
+| `input.catalog_unrecognized_flag` | catalog was given a flag it does not recognize, or an argument it does not take. | run `agentce catalog <action> --help` for the flags it takes, or drop the flag. |
 | `input.catalog_unresolved` | a requested catalog id@version does not resolve to any catalog directory. | use an available <id>@<version>, or pass --catalog-dir <dir> for a catalog on disk. |
 | `input.catalog_unverified` | a --catalog-dir catalog is unsigned, or its signature does not verify against the effective trust root. | point --catalog-dir at a catalog whose catalog.sig.json verifies, or pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) for the root that signed it; --allow-unverified-catalog assesses it anyway and records the override as a limitation. |
 | `input.collect_config` | the collect config could not be read, or does not have the expected shape. | fix the config file the error names, then re-run collect. |
+| `input.collect_unrecognized_flag` | collect was given a flag it does not recognize, or an argument it does not take. | run `agentce collect --help` for the flags collect takes, or drop the flag. |
 | `input.config_action` | the only config action is `show`. | run `agentce config show`. |
+| `input.config_unrecognized_flag` | config was given a flag it does not recognize, or an argument it does not take. | run `agentce config show --help` for the flags it takes, or drop the flag. |
 | `input.conformance_action` | the only conformance action is `run`. | run `agentce conformance run ...`. |
+| `input.conformance_unrecognized_flag` | conformance was given a flag it does not recognize, or an argument it does not take. | run `agentce conformance run --help` for the flags it takes, or drop the flag. |
 | `input.corpus_generate_failed` | the corpus generator did not produce a corpus-manifest.json. | check that the corpus generator runs: python corpus/generator/generate.py --out <dir>. |
 | `input.corpus_not_found` | the given directory has neither a corpus-manifest.json nor a generator/generate.py. | pass a generated corpus directory or the corpus source tree. |
 | `input.coverage_denominator_manifest_invalid` | a coverage denominator's manifest file is nested too deeply to parse safely. | flatten the denominator manifest's structure; it exceeds the engine's safe nesting depth. |
@@ -60,6 +64,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.diff_format` | --format must be one of text, json, or md. | pass --format text|json|md. |
 | `input.diff_unrecognized_flag` | diff was given a flag it does not recognize. | pass --format text|json|md, or drop the flag. |
 | `input.digest_unreadable` | assess could not read the deviation register, profile or domain file again to record its digest. | make the file readable, then re-run. |
+| `input.doctor_unrecognized_flag` | doctor was given a flag it does not recognize, or an argument it does not take. | run `agentce doctor --help` for the flags doctor takes, or drop the flag. |
 | `input.domain_binding_invalid` | the domain binding is not safe YAML: a disallowed construct, or a structure nested too deeply to parse safely. | remove custom YAML tags and flatten deep nesting in the domain binding file. |
 | `input.emit_format` | --emit named a format the engine does not write. | pass --emit with formats from the list the error names. |
 | `input.emit_unsupported` | this engine cannot write --emit or --for output yet; it writes only the core outputs. | drop the flag for the core outputs, or run assess with the Python engine for the role views and extra formats. |
@@ -69,8 +74,10 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.for_preset` | --for names a preset assess does not know. | choose one of: ci, compliance, engineering, security, share. |
 | `input.ingest_empty` | the adapter produced no events from the given export file. | check the export file actually contains records the adapter recognizes. |
 | `input.ingest_failed` | the adapter could not adapt the export, or printed something other than the expected JSON result. | check the export file matches the adapter's expected shape. |
+| `input.ingest_unrecognized_flag` | ingest was given a flag it does not recognize, or an argument it does not take. | run `agentce ingest --help` for the flags ingest takes, or drop the flag. |
 | `input.init_exists` | init would overwrite a profile or domain binding that already exists. | pass --force to overwrite, or --out <dir> to write somewhere else. |
 | `input.init_role` | --role must be one of deployer, provider, or both. | pass --role deployer|provider|both. |
+| `input.init_unrecognized_flag` | init was given a flag it does not recognize, or an argument it does not take. | run `agentce init --help` for the flags init takes, or drop the flag. |
 | `input.nothing_evaluated` | no control reached conformant, non-conformant, or insufficient_evidence, so the run judged nothing. | emit under the subject and source the profile declares (agentce-emit reads AGENTCE_EMIT_SUBJECT and AGENTCE_EMIT_SOURCE), and record the evidence the catalog's controls apply to. |
 | `input.out_dir_unwritable` | the --out directory of assess, quickstart, validate or init could not be created or written to. | choose a writable --out directory. |
 | `input.out_missing` | the command needs an output bundle path. | pass --out <bundle>. |
@@ -90,14 +97,18 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.release_missing` | the release artifact named on the command line does not exist. | pass --release <bundle-dir-or-envelope>. |
 | `input.release_unreadable` | the release artifact, or a file or folder inside it, could not be read (permissions). | make every file and folder in the release readable, then re-run. |
 | `input.report_format` | report was given a --format it does not know. | pass --format with one of the formats report lists. |
+| `input.report_unrecognized_flag` | report was given a flag it does not recognize, or an argument it does not take. | run `agentce report --help` for the flags report takes, or drop the flag. |
 | `input.sign_profile` | unknown signing profile. | choose one of: sigstore-public, sigstore-private, kms. |
 | `input.sign_role` | --as must be `claimant` or `assessor`. | pass --as claimant|assessor. |
 | `input.sign_unrecognized_flag` | sign was given a flag it does not recognize. | pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag. |
 | `input.state_dir_unwritable` | the --state directory could not be created or written to. | choose a writable --state directory. |
 | `input.state_version_incompatible` | the state directory was written by an incompatible state_version. | there is no migration command: move or delete the state directory and re-run with --state pointing at a fresh, empty directory (this discards the prior bundle/outcome history recorded there, so late-arriving evidence and drift are tracked only from that point forward). |
 | `input.trust_root_invalid` | the trust root supplied by --trust-root or AGENTCE_TRUST_ROOT could not be loaded. | pass --trust-root <file> pointing at a trust root in the form of the engine's vendored data/trust/dev-root.json. |
+| `input.unknown_command` | agentce was given a command or a global flag it does not recognize. | run `agentce --help` for the commands and global flags agentce takes. |
+| `input.validate_unrecognized_flag` | validate was given a flag it does not recognize, or an argument it does not take. | run `agentce validate --help` for the flags validate takes, or drop the flag. |
 | `input.verify_target` | verify's target flags were given more than once, none at all, or in a combination that isn't valid. | pass exactly one target, e.g. `agentce verify --bundle <dir>`. |
 | `input.verify_unrecognized_flag` | verify was given a flag it does not recognize. | pass --bundle, --catalog, --release, or --report (with --signer-trust-root or --expect-keyid for --report), or drop the flag. |
+| `input.version_unrecognized_flag` | version was given a flag it does not recognize, or an argument it does not take. | run `agentce version --help` for the flags version takes, or drop the flag. |
 | `internal.unexpected` | an unexpected internal error occurred. | re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate. |
 | `report.missing_evidence_pointer` | an assertion reached a conformant, non-conformant, or partial outcome with no evidence pointer. | every conformant, non-conformant, or partial outcome must cite evidence (DC-5). |
 | `sign.claim_malformed` | claim.json is not a JSON object whose signatures field, if present, is a list. | re-run the `agentce assess` command that wrote this report, then sign the new report. |

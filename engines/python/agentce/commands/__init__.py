@@ -2341,6 +2341,16 @@ def _reject_inside_catalog(
         )
 
 
+def catalog_action_error() -> InputError:
+    """No action, or one `catalog` does not have (the CLI reuses it for argparse's invalid choice)."""
+    return InputError(
+        "input.catalog_action",
+        "the catalog actions are `lint`, `coverage-matrix`, `init`, and `sign`.",
+        "run `agentce catalog lint <dir>`, `agentce catalog coverage-matrix <dir>`, "
+        "`agentce catalog init <dir>`, or `agentce catalog sign <dir>`.",
+    )
+
+
 def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="catalog")
     action = _opt_str(ns, "catalog_action")
@@ -2351,12 +2361,7 @@ def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
     if action == "sign":
         return _cmd_catalog_sign(ns)
     if action != "lint":
-        raise InputError(
-            "input.catalog_action",
-            "the catalog actions are `lint`, `coverage-matrix`, `init`, and `sign`.",
-            "run `agentce catalog lint <dir>`, `agentce catalog coverage-matrix <dir>`, "
-            "`agentce catalog init <dir>`, or `agentce catalog sign <dir>`.",
-        )
+        raise catalog_action_error()
     directory = _require_dir(
         _opt_str(ns, "dir"),
         key="dir",
@@ -2656,15 +2661,20 @@ def _cmd_coverage_matrix(ns: argparse.Namespace) -> CommandResult:
     return result
 
 
+def conformance_action_error() -> InputError:
+    """No action, or one `conformance` does not have (the CLI reuses it for argparse's invalid choice)."""
+    return InputError(
+        "input.conformance_action",
+        "the only conformance action is `run`.",
+        "run `agentce conformance run ...`.",
+    )
+
+
 def cmd_conformance(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="conformance")
     action = _opt_str(ns, "conformance_action")
     if action != "run":
-        raise InputError(
-            "input.conformance_action",
-            "the only conformance action is `run`.",
-            "run `agentce conformance run ...`.",
-        )
+        raise conformance_action_error()
     engine = _require_dir(_opt_str(ns, "engine"), key="engine", what="the engine path")
     corpus = _require_dir(
         _opt_str(ns, "corpus"), key="corpus", what="the corpus directory"
@@ -3618,16 +3628,21 @@ def _render_starter_profile(
     )
 
 
+def config_action_error() -> InputError:
+    """No action, or one `config` does not have (the CLI reuses it for argparse's invalid choice)."""
+    return InputError(
+        "input.config_action",
+        "the only config action is `show`.",
+        "run `agentce config show`.",
+    )
+
+
 def cmd_config(ns: argparse.Namespace) -> CommandResult:
     """Show the resolved engine configuration and each value's source (SPEC §13.4 AX-8)."""
     result = CommandResult(command="config")
     action = _opt_str(ns, "config_action")
     if action != "show":
-        raise InputError(
-            "input.config_action",
-            "the only config action is `show`.",
-            "run `agentce config show`.",
-        )
+        raise config_action_error()
     values = resolve_config()
     result.data["values"] = values
     for entry in values:
