@@ -147,7 +147,7 @@ class CliTest {
                 "--catalog-dir", CATALOG_DIR.toString(),
                 "--out", out.toString());
         Path assertionsFile = out.resolve("assertions.json");
-        for (String format : new String[] {"md", "html", "oscal", "sarif", "pack"}) {
+        for (String format : new String[] {"md", "html", "oscal", "sarif", "public", "pack"}) {
             JsonNode env = runJson("report", "--from", assertionsFile.toString(), "--format", format);
             assertEquals(0, env.get("exit_code").asInt(), "format " + format);
             assertTrue(env.get("rendering").asText().length() > 0, "format " + format);
@@ -222,6 +222,35 @@ class CliTest {
         JsonNode env = runJson("report", "--from", tmp.toString(), "--format", "xml");
         assertEquals(3, env.get("exit_code").asInt());
         assertEquals("input.report_format", env.get("error").get("message_key").asText());
+        assertEquals("choose one of: md, html, oscal, sarif, public, pack.", env.get("error").get("fix").asText());
+    }
+
+    @Test
+    void reportReadsRoleAndLanguageAndRefusesAnOptionTheFormatDoesNotRead() throws IOException {
+        Path tmp = Files.createTempFile("assertions", ".json");
+        Files.writeString(tmp, "[{\"control\":\"DAT-01\",\"control_version\":\"2026.09\",\"subject\":\"a\","
+                + "\"outcome\":\"conformant\",\"rung\":2,\"mode\":\"automated\",\"window\":{\"start\":"
+                + "\"2026-05-01T00:00:00Z\",\"end\":\"2026-08-29T00:00:00Z\"},\"population\":{\"applicable\":1,"
+                + "\"failed\":0},\"severity\":\"high\",\"family\":\"DAT\"}]");
+        String from = tmp.toString();
+        JsonNode pack = Json.parse(runJson("report", "--from", from, "--format", "pack", "--role", "provider")
+                .get("rendering").asText());
+        pack.forEach(p -> assertEquals("provider", p.get("role").asText()));
+        String de = runJson("report", "--from", from, "--language", "de").get("rendering").asText();
+        String en = runJson("report", "--from", from).get("rendering").asText();
+        assertFalse(de.lines().findFirst().equals(en.lines().findFirst()), de.lines().findFirst().orElse(""));
+        for (String[] argv : new String[][] {
+                {"--from", from, "--role", "provider"},
+                {"--from", from, "--format", "md", "--catalog", "eu-ai-act"},
+                {"--from", from, "--format", "oscal", "--language", "de"},
+                {"--validate", tmp.getParent().toString(), "--out", "x"}}) {
+            String[] full = new String[argv.length + 1];
+            full[0] = "report";
+            System.arraycopy(argv, 0, full, 1, argv.length);
+            JsonNode env = runJson(full);
+            assertEquals(3, env.get("exit_code").asInt(), String.join(" ", argv));
+            assertEquals("input.report_flag_unused", env.get("error").get("message_key").asText());
+        }
     }
 
     @Test

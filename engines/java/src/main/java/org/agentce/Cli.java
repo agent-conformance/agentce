@@ -37,7 +37,9 @@ public final class Cli {
     private static final String DEFAULT_OUT_DIR = "out";
     /** The catalog an assessment evaluates when nothing names one: the cross-standard baseline. */
     private static final String DEFAULT_LENS = "baseline@2026.09";
-    private static final List<String> REPORT_FORMATS = List.of("md", "html", "oscal", "sarif", "pack");
+    private static final List<String> REPORT_FORMATS = List.of("md", "html", "oscal", "sarif", "public", "pack");
+    /** The evidence-pack role variants {@code report --role} takes (SPEC §9.4). */
+    private static final List<String> REPORT_ROLES = List.of("provider", "deployer");
     private static final Set<String> VERDICT_OUTCOMES = Set.of("conformant", "non-conformant", "insufficient_evidence");
     /** The same four flags Python's own top-level parser accepts for every command ({@code
      * --debug}/{@code --quiet} are silently ignored here too, exactly as they are everywhere else in
@@ -395,11 +397,18 @@ global options:
      * default -- {@code readiness}'s positional {@code report_dir} (item 18.25) needs its own fix text,
      * mirroring {@link #requireFile}'s existing 4-arg overload. */
     private static String requireDir(String raw, String key, String what, String fix) {
+        return requireDir(raw, key, what, fix, false);
+    }
+
+    /** {@link #requireDir}; with {@code emptyIsNoDir} an empty value names no directory (Python's {@code
+     * empty_is_no_dir}: {@code Paths.get("")} is the working directory, which {@code --flag ''} must never
+     * quietly read). */
+    private static String requireDir(String raw, String key, String what, String fix, boolean emptyIsNoDir) {
         if (raw == null) {
             throw new InputError("input." + key + "_missing", what + " is required.", fix);
         }
         Path path = Paths.get(raw);
-        if (!Files.isDirectory(path)) {
+        if ((emptyIsNoDir && raw.isEmpty()) || !Files.isDirectory(path)) {
             throw new InputError(
                     "input." + key + "_not_a_directory", what + " " + Readiness.pyRepr(raw) + " is not an existing directory.", fix);
         }
@@ -1472,14 +1481,107 @@ global options:
         return result;
     }
 
+    /** Python's {@code COLUMNS=80 agentce report --help}, word for word. */
+    static final String REPORT_USAGE = """
+usage: agentce report [-h] [--json] [--debug] [--quiet] [--from FILE]
+                      [--format {md,html,oscal,sarif,public,pack}]
+                      [--role {provider,deployer}] [--catalog LABELS]
+                      [--language LANG] [--out FILE] [--validate DIR]
+
+options:
+  -h, --help            show this help message and exit
+  --from FILE           an assertions.json to re-render
+  --format {md,html,oscal,sarif,public,pack}
+                        the output format (default: md)
+  --role {provider,deployer}
+                        evidence-pack role variant; --format pack only
+  --catalog LABELS      catalog labels for the public statement, comma-
+                        separated; --format public only
+  --language LANG       message-key catalogue: de or en (default: en);
+                        --format md or html only (SPEC 9.3)
+  --out FILE            write the rendering to this file
+  --validate DIR        validate every artifact in a report directory; takes
+                        no other report option
+
+global options:
+  --json                emit machine-readable JSON on stdout
+  --debug               verbose logs on stderr and a stack trace on unexpected
+                        errors
+  --quiet               log warnings and errors only
+""";
+
+    /** Python's {@code commands.report_format_error}: a format report does not render. */
+    static InputError reportFormatError(String format) {
+        return new InputError(
+                "input.report_format",
+                "unknown report format " + Readiness.pyRepr(format) + ".",
+                "choose one of: " + String.join(", ", REPORT_FORMATS) + ".");
+    }
+
+    /** Python's {@code commands.report_role_error}: an evidence-pack role report does not know. */
+    static InputError reportRoleError(String role) {
+        return new InputError(
+                "input.report_role",
+                "unknown evidence-pack role " + Readiness.pyRepr(role) + ".",
+                "choose one of: " + String.join(", ", REPORT_ROLES) + ".");
+    }
+
+    /** report's declared grammar (Python's report subparser, {@code allow_abbrev=False}): every option the
+     * usage names and no positional; {@code --format} and {@code --role} are choices refused the moment
+     * they are read; {@code --from} and {@code --validate} have their own missing-value keys. */
+    static final Argv.Grammar REPORT_GRAMMAR = reportGrammar();
+
+    private static Argv.Grammar reportGrammar() {
+        Map<String, Argv.Kind> options = new LinkedHashMap<>();
+        options.put("-h", Argv.Kind.HELP);
+        options.put("--help", Argv.Kind.HELP);
+        for (String flag : List.of("--json", "--debug", "--quiet")) {
+            options.put(flag, Argv.Kind.FLAG);
+        }
+        for (String name : List.of("--from", "--format", "--role", "--catalog", "--language", "--out", "--validate")) {
+            options.put(name, Argv.Kind.VALUE);
+        }
+        return new Argv.Grammar(
+                Collections.unmodifiableMap(options),
+                0,
+                "input.report_unrecognized_flag",
+                "input.report_unrecognized_flag",
+                "run `agentce report --help` for the flags report takes, or drop the flag.",
+                "pass the input with its flag: `agentce report --from <file>` or `--validate <dir>`.",
+                Map.of(),
+                Map.of("--from", "input.from_missing", "--validate", "input.validate_missing"),
+                Map.of(
+                        "--format", new Argv.Choices(REPORT_FORMATS, Cli::reportFormatError),
+                        "--role", new Argv.Choices(REPORT_ROLES, Cli::reportRoleError)),
+                false);
+    }
+
+    /** The rendering options {@code --validate} refuses beside it, in the order they are checked. */
+    private static final List<String> REPORT_RENDER_FLAGS =
+            List.of("--from", "--format", "--role", "--catalog", "--language", "--out");
+
     /** Re-render a report from a committed {@code assertions.json} (SPEC §9.4), or, with {@code
-     * --validate}, schema-validate every artifact in a report directory at parity with the Python
-     * reference (item 18.27); the {@code public} format is not yet ported and is refused with a
-     * named, honest error rather than a silent guess. */
+     * --validate}, schema-validate every artifact in a report directory (item 18.27). Reads its argv only
+     * through {@link #REPORT_GRAMMAR}, then makes Python's {@code cmd_report} checks in its order (18.110):
+     * every option is read or refused with a key. */
     private static CommandResult cmdReport(String[] args) {
+        Argv.Result parsed = Argv.scan(Arrays.copyOfRange(args, 1, args.length), REPORT_GRAMMAR);
         CommandResult result = new CommandResult("report");
-        if (Arrays.asList(args).contains("--validate")) {
-            String reportDir = requireDir(flagValue(args, "validate"), "validate", "the report directory");
+        if (parsed.help()) {
+            result.usage = REPORT_USAGE;
+            return result;
+        }
+        String validate = parsed.value("--validate");
+        if (validate != null) {
+            for (String flag : REPORT_RENDER_FLAGS) {
+                if (parsed.value(flag) != null) {
+                    throw new InputError(
+                            "input.report_flag_unused",
+                            "--validate checks a report directory and does not read " + flag + ".",
+                            "drop " + flag + ", or drop --validate to re-render with --from.");
+                }
+            }
+            String reportDir = requireDir(validate, "validate", "the report directory", "pass --validate <dir>.", true);
             List<String> problems = ReportValidate.validateReport(Paths.get(reportDir));
             result.data.put("report_dir", reportDir);
             result.data.put("valid", problems.isEmpty());
@@ -1496,29 +1598,48 @@ global options:
             }
             return result;
         }
-        String source = requireFile(flagValue(args, "from"), "from", "the assertions file");
-        String formatArg = flagValue(args, "format");
-        String format = formatArg != null ? formatArg : "md";
-        if (!REPORT_FORMATS.contains(format)) {
+        String source = requireFile(parsed.value("--from"), "from", "the assertions file");
+        String format = parsed.value("--format") != null ? parsed.value("--format") : "md";
+        String role = parsed.value("--role");
+        String catalog = parsed.value("--catalog");
+        String language = parsed.value("--language");
+        refuseUnusedReportFlag(role, "--role", format, List.of("pack"), "add --format pack");
+        refuseUnusedReportFlag(catalog, "--catalog", format, List.of("public"), "add --format public");
+        refuseUnusedReportFlag(language, "--language", format, List.of("md", "html"), "add --format md or --format html");
+        if (language != null && !Messages.AVAILABLE_LANGUAGES.contains(language)) {
             throw new InputError(
-                    "input.report_format",
-                    "unknown or not-yet-implemented report format '" + format + "'.",
-                    "choose one of: " + String.join(", ", REPORT_FORMATS) + ".");
+                    "input.report_language_unknown",
+                    "--language " + Readiness.pyRepr(language) + " has no report catalogue.",
+                    "choose one of: " + String.join(", ", Messages.AVAILABLE_LANGUAGES) + ".");
         }
-        JsonNode parsed = Json.parseFile(Paths.get(source));
+        List<String> catalogs = null;
+        if (catalog != null) {
+            // Python's str.split(","): every label kept, an empty one included.
+            catalogs = Arrays.asList(catalog.split(",", -1));
+            if (catalogs.stream().anyMatch(label -> label.strip().isEmpty())) {
+                throw new InputError(
+                        "input.report_catalog_label_empty",
+                        "--catalog " + Readiness.pyRepr(catalog) + " holds an empty catalog label.",
+                        "pass the labels comma-separated with none empty, e.g. --catalog eu-ai-act,nist-ai-rmf.");
+            }
+        }
+        JsonNode parsedFile = Json.parseFile(Paths.get(source));
         List<Assertions.Assertion> assertions = new ArrayList<>();
-        if (parsed != null && parsed.isArray()) {
-            for (JsonNode node : parsed) {
+        if (parsedFile != null && parsedFile.isArray()) {
+            for (JsonNode node : parsedFile) {
                 assertions.add(Assertions.fromJson(node));
             }
         }
         Map<String, Integer> counts = Assertions.aggregate(assertions);
+        String lang = language != null ? language : Messages.DEFAULT_LANGUAGE;
         String rendering;
         switch (format) {
-            case "md" -> rendering = Report.renderReportMd(assertions, counts, Messages.DEFAULT_LANGUAGE, null, null);
-            case "html" -> rendering = Report.renderReportHtml(assertions, counts, Messages.DEFAULT_LANGUAGE, null, null);
+            case "md" -> rendering = Report.renderReportMd(assertions, counts, lang, null, null);
+            case "html" -> rendering = Report.renderReportHtml(assertions, counts, lang, null, null);
             case "oscal" -> rendering = Json.pretty(Report.renderOscal(assertions)) + "\n";
             case "sarif" -> rendering = Json.pretty(Report.renderSarif(assertions)) + "\n";
+            case "public" -> rendering = Report.renderPublicStatement(
+                    assertions, catalogs, Report.appliedDeviationIds(assertions));
             default -> {
                 Map<String, List<Assertions.Assertion>> bySubject = new LinkedHashMap<>();
                 for (Assertions.Assertion a : assertions) {
@@ -1528,15 +1649,15 @@ global options:
                 subjects.sort(Json::byteCompare);
                 ObjectNode packs = Json.nodes().objectNode();
                 for (String subject : subjects) {
-                    packs.set(subject, Report.renderEvidencePack(subject, bySubject.get(subject), null));
+                    packs.set(subject, Report.renderEvidencePack(subject, bySubject.get(subject), role));
                 }
-                rendering = Json.pretty(packs) + "\n";
+                rendering = Json.pretty(packs);
             }
         }
         result.data.put("from", source);
         result.data.put("format", format);
         result.data.put("rendering", rendering);
-        String out = flagValue(args, "out");
+        String out = parsed.value("--out");
         if (out != null) {
             try {
                 Files.write(Paths.get(out), rendering.getBytes(StandardCharsets.UTF_8));
@@ -1547,6 +1668,18 @@ global options:
         }
         result.note(rendering);
         return result;
+    }
+
+    /** Python's {@code cmd_report} refusal of a rendering option the chosen format does not read. */
+    private static void refuseUnusedReportFlag(
+            String value, String flag, String format, List<String> reads, String add) {
+        if (value != null && !reads.contains(format)) {
+            throw new InputError(
+                    "input.report_flag_unused",
+                    flag + " is read only with --format " + String.join(" or ", reads) + "; this run renders "
+                            + format + ".",
+                    add + ", or drop " + flag + ".");
+        }
     }
 
     private static ObjectNode changeToJson(Diff.Change change) {

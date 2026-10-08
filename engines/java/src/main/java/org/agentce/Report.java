@@ -19,6 +19,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -1178,6 +1179,86 @@ public final class Report {
             pack.put("role", role);
         }
         return pack;
+    }
+
+    private static final String STATEMENT_NON_DETERMINATION =
+            "This statement reports conformance to the named catalog as evaluated by the Agent Conformance "
+                    + "Engine over the named evidence and observation window. It is not a legal compliance "
+                    + "determination.";
+    private static final String STATEMENT_CONDUCT_LINE =
+            "Over the observation window, the named subjects acted within their declared boundaries and on "
+                    + "authorised instructions as evidenced by the Conduct overlay controls listed.";
+    private static final List<String> STATEMENT_OUTCOMES = List.of(
+            "conformant", "non-conformant", "partial", "not_applicable", "not_assessed", "insufficient_evidence");
+
+    /** The sorted, deduplicated ids of every control a deviation was applied to (Python's {@code
+     * applied_deviation_ids}; SPEC §9.1): each assertion's non-empty {@code deviation}. */
+    public static List<String> appliedDeviationIds(List<Assertions.Assertion> assertions) {
+        TreeSet<String> ids = new TreeSet<>(Json::byteCompare);
+        for (Assertions.Assertion a : assertions) {
+            if (a.deviation != null && !a.deviation.isEmpty()) {
+                ids.add(a.deviation);
+            }
+        }
+        return List.copyOf(ids);
+    }
+
+    /** The optional public conformance statement (SPEC §9.5), byte-identical to Python's {@code
+     * render_public_statement} with no statement date: scope, catalogs and date, a six-outcome summary per
+     * family, accepted deviations by control id only, the Conduct line when the CND overlay is present,
+     * how affected persons raise concerns, and the fixed non-determination line. Every record-derived
+     * string goes through {@link #sanitizeForMarkdown}. {@code catalogs} may be {@code null}. */
+    public static String renderPublicStatement(
+            List<Assertions.Assertion> assertions, List<String> catalogs, List<String> deviations) {
+        TreeSet<String> subjects = new TreeSet<>(Json::byteCompare);
+        Map<String, Map<String, Integer>> families = new TreeMap<>(Json::byteCompare);
+        for (Assertions.Assertion a : assertions) {
+            subjects.add(a.subject);
+            String family = a.control.split("-", 2)[0];
+            Map<String, Integer> row = families.computeIfAbsent(family, k -> {
+                Map<String, Integer> zero = new LinkedHashMap<>();
+                STATEMENT_OUTCOMES.forEach(o -> zero.put(o, 0));
+                return zero;
+            });
+            row.computeIfPresent(a.outcome, (k, n) -> n + 1);
+        }
+        List<String> lines = new ArrayList<>(List.of("# Public conformance statement", "", "## Scope"));
+        lines.add(subjects.isEmpty()
+                ? "Subjects: (none)"
+                : "Subjects: " + subjects.stream().map(s -> "`" + sanitizeForMarkdown(s) + "`")
+                        .collect(Collectors.joining(", ")));
+        lines.add(catalogs == null || catalogs.isEmpty()
+                ? "Catalogs: (unspecified)"
+                : "Catalogs: " + catalogs.stream().map(Report::sanitizeForMarkdown).collect(Collectors.joining(", ")));
+        lines.add("Date: (unspecified)");
+        lines.add("");
+        lines.add("## Outcomes by family");
+        lines.add("");
+        lines.add("| Family | " + String.join(" | ", STATEMENT_OUTCOMES) + " |");
+        lines.add("|---|" + STATEMENT_OUTCOMES.stream().map(o -> "---").collect(Collectors.joining("|")) + "|");
+        families.forEach((family, row) -> lines.add("| " + sanitizeForMarkdown(family) + " | "
+                + STATEMENT_OUTCOMES.stream().map(o -> String.valueOf(row.get(o))).collect(Collectors.joining(" | "))
+                + " |"));
+        lines.add("");
+        lines.add("## Accepted deviations");
+        if (deviations == null || deviations.isEmpty()) {
+            lines.add("None.");
+        } else {
+            lines.add(deviations.stream().sorted(Json::byteCompare).map(d -> "`" + sanitizeForMarkdown(d) + "`")
+                    .collect(Collectors.joining(", ")));
+        }
+        if (families.containsKey("CND")) {
+            lines.addAll(List.of("", "## Conduct", STATEMENT_CONDUCT_LINE));
+        }
+        lines.addAll(List.of(
+                "",
+                "## Affected persons",
+                "Affected persons may obtain an explanation of a decision and raise concerns through the "
+                        + "deployer's published contact channel (EU AI Act Arts. 26(11), 85, 86).",
+                "",
+                "## Basis",
+                STATEMENT_NON_DETERMINATION));
+        return String.join("\n", lines) + "\n";
     }
 
     private static String now() {

@@ -7,6 +7,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -22,10 +23,13 @@ import java.util.stream.Collectors;
  *       {@code _refuse_short_clusters};
  *   <li>left to right, a token is an option when it is a known name, or {@code name=value} with a known
  *       name; else it is positional when it is {@code -}, a negative number or holds a space; else it is
- *       an unknown flag. {@code --} makes every later token positional;
+ *       an unknown flag. {@code --} makes every later token positional (and, for a command that takes
+ *       no positional, is itself an extra argument, as argparse leaves it);
  *   <li>a VALUE or APPEND option takes its {@code =} rest, or the next token unless there is none or it
- *       is option-like (then it is refused at once); HELP returns at once; a FLAG or HELP with {@code =}
- *       is refused at once;
+ *       is option-like (then it is refused at once, with the option's own needs-value key where it has
+ *       one); a value outside the option's {@link Choices} is refused at once, by its own error, the
+ *       moment it is read (argparse checks a choice as it consumes the value, so before a later unknown
+ *       flag or missing value); HELP returns at once; a FLAG or HELP with {@code =} is refused at once;
  *   <li>unknown flags and positionals past the maximum are kept, and the first in argv order is refused
  *       once the scan ends.
  * </ol>
@@ -46,17 +50,31 @@ public final class Argv {
     }
 
     /**
+     * An option's allowed values (argparse {@code choices}) and the keyed refusal of any other value.
+     *
+     * @param values the values the option takes
+     * @param error the refusal of a value outside {@code values}, given that value
+     */
+    public record Choices(List<String> values, Function<String, InputError> error) {}
+
+    /**
      * A command's declared grammar.
      *
      * @param options option name to kind, in declaration order (the HELP names join, in this order,
      *     into argparse's label for them: {@code -h/--help})
      * @param maxPositionals the most positional arguments the command takes
      * @param unrecognizedKey the key of an unknown flag, an extra argument, or a value on a FLAG/HELP
-     * @param needsValueKey the key of a VALUE/APPEND option given no value
+     * @param needsValueKey the key of a VALUE/APPEND option given no value, unless {@code needsValueKeys}
+     *     names the option
      * @param flagFix the fix of an unknown flag (and of a value on HELP)
      * @param extraArgFix the fix of a positional past {@code maxPositionals}
      * @param valueHints per-option hint for a missing value's fix ({@code pass --emit <formats>.}); an
      *     option not named here gets {@code <value>}
+     * @param needsValueKeys per-option key of a missing value, in place of {@code needsValueKey} (Python's
+     *     {@code _ArgvErrors.value_keys}: report's {@code --from} gives {@code input.from_missing})
+     * @param choices per-option allowed values and their refusal (argparse {@code choices})
+     * @param argparseValueCause whether a missing value's cause is argparse's own sentence ({@code
+     *     argument --x: expected one argument}, as assess keeps) or {@code flag '--x' needs a value.}
      */
     public record Grammar(
             Map<String, Kind> options,
@@ -65,7 +83,24 @@ public final class Argv {
             String needsValueKey,
             String flagFix,
             String extraArgFix,
-            Map<String, String> valueHints) {}
+            Map<String, String> valueHints,
+            Map<String, String> needsValueKeys,
+            Map<String, Choices> choices,
+            boolean argparseValueCause) {
+        /** A grammar with no per-option needs-value key and no choices, whose missing-value cause is
+         * argparse's own sentence (assess's). */
+        public Grammar(
+                Map<String, Kind> options,
+                int maxPositionals,
+                String unrecognizedKey,
+                String needsValueKey,
+                String flagFix,
+                String extraArgFix,
+                Map<String, String> valueHints) {
+            this(options, maxPositionals, unrecognizedKey, needsValueKey, flagFix, extraArgFix, valueHints,
+                    Map.of(), Map.of(), true);
+        }
+    }
 
     /** What the scan read: VALUE options' last values, APPEND options' values, the FLAGs given, the
      * positionals in order, and whether HELP was reached. */
@@ -109,6 +144,10 @@ public final class Argv {
             String token = argv[i];
             if (!optionsEnded && token.equals("--")) {
                 optionsEnded = true;
+                if (grammar.maxPositionals() == 0) {
+                    // No positional can take it, so argparse leaves `--` itself among the extras.
+                    extras.add(token);
+                }
                 continue;
             }
             String name = token;
@@ -145,9 +184,15 @@ public final class Argv {
                     } else {
                         String hint = grammar.valueHints().getOrDefault(name, "<value>");
                         throw new InputError(
-                                grammar.needsValueKey(),
-                                "argument " + name + ": expected one argument",
+                                grammar.needsValueKeys().getOrDefault(name, grammar.needsValueKey()),
+                                grammar.argparseValueCause()
+                                        ? "argument " + name + ": expected one argument"
+                                        : "flag '" + name + "' needs a value.",
                                 "pass " + name + " " + hint + ".");
+                    }
+                    Choices choices = grammar.choices().get(name);
+                    if (choices != null && !choices.values().contains(value)) {
+                        throw choices.error().apply(value);
                     }
                     if (kind == Kind.VALUE) {
                         values.put(name, value);
