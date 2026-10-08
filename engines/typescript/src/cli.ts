@@ -59,10 +59,12 @@ import {
 } from "./records";
 import {
   activityCliLines,
+  appliedDeviationIds,
   blindSpotsCliLines,
   digestBytes,
   renderEvidencePack,
   renderOscal,
+  renderPublicStatement,
   renderReportHtml,
   renderReportMd,
   renderSarif,
@@ -94,7 +96,8 @@ import {
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
 const DEFAULT_OUT_DIR = "out";
-const REPORT_FORMATS = ["md", "html", "oscal", "sarif", "pack"] as const;
+const REPORT_FORMATS = ["md", "html", "oscal", "sarif", "public", "pack"] as const;
+const REPORT_ROLES = ["provider", "deployer"] as const;
 
 function emit(result: CommandResult, json: boolean): void {
   if (result.usage !== undefined) {
@@ -1312,14 +1315,121 @@ function cmdQuickstart(argv: string[]): CommandResult {
   return result;
 }
 
+/** Python's `agentce report --help` (COLUMNS=80), word for word. */
+const REPORT_USAGE = `usage: agentce report [-h] [--json] [--debug] [--quiet] [--from FILE]
+                      [--format {md,html,oscal,sarif,public,pack}]
+                      [--role {provider,deployer}] [--catalog LABELS]
+                      [--language LANG] [--out FILE] [--validate DIR]
+
+options:
+  -h, --help            show this help message and exit
+  --from FILE           an assertions.json to re-render
+  --format {md,html,oscal,sarif,public,pack}
+                        the output format (default: md)
+  --role {provider,deployer}
+                        evidence-pack role variant; --format pack only
+  --catalog LABELS      catalog labels for the public statement, comma-
+                        separated; --format public only
+  --language LANG       message-key catalogue: de or en (default: en);
+                        --format md or html only (SPEC 9.3)
+  --out FILE            write the rendering to this file
+  --validate DIR        validate every artifact in a report directory; takes
+                        no other report option
+
+global options:
+  --json                emit machine-readable JSON on stdout
+  --debug               verbose logs on stderr and a stack trace on unexpected
+                        errors
+  --quiet               log warnings and errors only
+`;
+
+/** report's grammar (Python's report subparser, global flags included): one table, read by `scanArgv`. */
+const REPORT_GRAMMAR: Grammar = {
+  options: [
+    { names: ["-h", "--help"], kind: "help" },
+    { names: ["--json"], kind: "flag" },
+    { names: ["--debug"], kind: "flag" },
+    { names: ["--quiet"], kind: "flag" },
+    { names: ["--from"], kind: "value", needsValueKey: "input.from_missing" },
+    {
+      names: ["--format"],
+      kind: "value",
+      choices: REPORT_FORMATS,
+      choiceError: (value) =>
+        new InputError(
+          "input.report_format",
+          `unknown report format ${pyRepr(value)}.`,
+          `choose one of: ${REPORT_FORMATS.join(", ")}.`,
+        ),
+    },
+    {
+      names: ["--role"],
+      kind: "value",
+      choices: REPORT_ROLES,
+      choiceError: (value) =>
+        new InputError(
+          "input.report_role",
+          `unknown evidence-pack role ${pyRepr(value)}.`,
+          `choose one of: ${REPORT_ROLES.join(", ")}.`,
+        ),
+    },
+    { names: ["--catalog"], kind: "value" },
+    { names: ["--language"], kind: "value" },
+    { names: ["--out"], kind: "value" },
+    { names: ["--validate"], kind: "value", needsValueKey: "input.validate_missing" },
+  ],
+  maxPositionals: 0,
+  unrecognizedKey: "input.report_unrecognized_flag",
+  needsValueKey: "input.report_unrecognized_flag",
+  needsValueCause: "plain",
+  flagFix: "run `agentce report --help` for the flags report takes, or drop the flag.",
+  extraArgFix:
+    "pass the input with its flag: `agentce report --from <file>` or `--validate <dir>`.",
+};
+
+/** The rendering options `report --validate` never reads, in the order the refusal names the first. */
+const REPORT_RENDER_FLAGS = ["--from", "--format", "--role", "--catalog", "--language", "--out"];
+
+/** Each rendering option a format may not read: the formats that read it and the fix's first step. */
+const REPORT_FORMAT_ONLY: readonly (readonly [string, readonly string[], string])[] = [
+  ["--role", ["pack"], "add --format pack"],
+  ["--catalog", ["public"], "add --format public"],
+  ["--language", ["md", "html"], "add --format md or --format html"],
+];
+
+/** Python's `str.isspace()` code points (JavaScript's `\s` adds U+FEFF and lacks U+001C-U+001F and
+ * U+0085), so a label `str.strip()` leaves empty is empty here too. */
+const PY_SPACE = new Set([
+  0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x85, 0xa0, 0x1680, 0x2000, 0x2001,
+  0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200a, 0x2028, 0x2029, 0x202f,
+  0x205f, 0x3000,
+]);
+const isBlank = (text: string): boolean =>
+  [...text].every((ch) => PY_SPACE.has(ch.codePointAt(0) as number));
+
 /** Re-render a report from a committed `assertions.json` (SPEC §9.4), or, with `--validate`, schema-
- * validate every artifact in a report directory at parity with the Python reference (item 18.27); the
- * `public` format is not yet ported and is refused with a named, honest error rather than a silent
- * guess. */
+ * validate every artifact in a report directory at parity with the Python reference (item 18.27).
+ * Read from its grammar's scan alone; every option is either read or refused with a key, in
+ * Python's `cmd_report` order (18.110). */
 function cmdReport(argv: string[]): CommandResult {
+  const args = scanArgv(argv.slice(1), REPORT_GRAMMAR);
   const result = new CommandResult("report");
-  if (argv.includes("--validate")) {
-    const reportDir = requireDir(flagValue(argv, "validate"), "validate", "the report directory");
+  if (args.help) {
+    result.usage = REPORT_USAGE;
+    return result;
+  }
+  const v = args.values;
+  const validate = v["--validate"];
+  if (validate !== undefined) {
+    const unused = REPORT_RENDER_FLAGS.find((flag) => v[flag] !== undefined);
+    if (unused !== undefined) {
+      throw new InputError(
+        "input.report_flag_unused",
+        `--validate checks a report directory and does not read ${unused}.`,
+        `drop ${unused}, or drop --validate to re-render with --from.`,
+      );
+    }
+    const reportDir = requireDir(validate, "validate", "the report directory");
     const problems = validateReport(reportDir);
     result.data.report_dir = reportDir;
     result.data.valid = problems.length === 0;
@@ -1332,28 +1442,55 @@ function cmdReport(argv: string[]): CommandResult {
     }
     return result;
   }
-  const source = requireFile(flagValue(argv, "from"), "from", "the assertions file");
-  const format = flagValue(argv, "format") ?? "md";
-  if (!(REPORT_FORMATS as readonly string[]).includes(format)) {
+  const source = requireFile(v["--from"], "from", "the assertions file");
+  const format = v["--format"] || "md";
+  for (const [flag, reads, add] of REPORT_FORMAT_ONLY) {
+    if (v[flag] !== undefined && !reads.includes(format)) {
+      throw new InputError(
+        "input.report_flag_unused",
+        `${flag} is read only with --format ${reads.join(" or ")}; this run renders ${format}.`,
+        `${add}, or drop ${flag}.`,
+      );
+    }
+  }
+  const languages = availableLanguages();
+  const languageFlag = v["--language"];
+  if (languageFlag !== undefined && !languages.includes(languageFlag)) {
     throw new InputError(
-      "input.report_format",
-      `unknown or not-yet-implemented report format '${format}'.`,
-      `choose one of: ${REPORT_FORMATS.join(", ")}.`,
+      "input.report_language_unknown",
+      `--language ${pyRepr(languageFlag)} has no report catalogue.`,
+      `choose one of: ${languages.join(", ")}.`,
     );
+  }
+  const catalogFlag = v["--catalog"];
+  let catalogs: string[] | undefined;
+  if (catalogFlag !== undefined) {
+    catalogs = catalogFlag.split(",");
+    if (catalogs.some(isBlank)) {
+      throw new InputError(
+        "input.report_catalog_label_empty",
+        `--catalog ${pyRepr(catalogFlag)} holds an empty catalog label.`,
+        "pass the labels comma-separated with none empty, e.g. --catalog eu-ai-act,nist-ai-rmf.",
+      );
+    }
   }
   const parsed = JSON.parse(readFileSync(source, "utf-8"));
   const assertions: Assertion[] = Array.isArray(parsed) ? parsed.map(assertionFromJson) : [];
   const counts = aggregate(assertions);
-  const language = flagValue(argv, "language") ?? DEFAULT_LANGUAGE;
+  const language = languageFlag || DEFAULT_LANGUAGE;
+  // json.dumps(..., sort_keys=True, indent=2), as Python renders oscal, sarif and pack.
+  const pyJson = (value: unknown): string => jsonStringifyAscii(sortKeysDeep(value), 2);
   let rendering: string;
   if (format === "md") {
     rendering = renderReportMd(assertions, counts, language);
   } else if (format === "html") {
     rendering = renderReportHtml(assertions, counts, language);
   } else if (format === "oscal") {
-    rendering = `${JSON.stringify(sortKeysDeep(renderOscal(assertions)), null, 2)}\n`;
+    rendering = pyJson(renderOscal(assertions));
   } else if (format === "sarif") {
-    rendering = `${JSON.stringify(sortKeysDeep(renderSarif(assertions)), null, 2)}\n`;
+    rendering = pyJson(renderSarif(assertions));
+  } else if (format === "public") {
+    rendering = renderPublicStatement(assertions, catalogs, appliedDeviationIds(assertions));
   } else {
     // pack
     const bySubject = new Map<string, Assertion[]>();
@@ -1367,14 +1504,18 @@ function cmdReport(argv: string[]): CommandResult {
     }
     const packs: Record<string, unknown> = {};
     for (const subject of [...bySubject.keys()].sort(byteCompare)) {
-      packs[subject] = renderEvidencePack(subject, bySubject.get(subject) as Assertion[]);
+      packs[subject] = renderEvidencePack(
+        subject,
+        bySubject.get(subject) as Assertion[],
+        v["--role"],
+      );
     }
-    rendering = `${JSON.stringify(sortKeysDeep(packs), null, 2)}\n`;
+    rendering = pyJson(packs);
   }
   result.data.from = source;
   result.data.format = format;
   result.data.rendering = rendering;
-  const out = flagValue(argv, "out");
+  const out = v["--out"];
   if (out !== undefined) {
     writeFileSync(out, rendering);
     result.data.out = out;
@@ -2254,5 +2395,6 @@ function logDebug(command: string, event: string, extra: Record<string, unknown>
 }
 
 if (require.main === module) {
-  process.exit(main(process.argv.slice(2)));
+  // exitCode, not exit(): a piped stdout drains before the process ends.
+  process.exitCode = main(process.argv.slice(2));
 }

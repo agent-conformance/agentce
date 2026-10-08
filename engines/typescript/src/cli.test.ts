@@ -854,7 +854,7 @@ test("validate quarantines the vendored quickstart bundle's known-bad events", (
   }
 });
 
-test("report re-renders a committed assertions.json to every supported format", () => {
+test("report re-renders a committed assertions.json to every format and refuses what it does not read", () => {
   const out = mkdtempSync(join(tmpdir(), "agentce-cli-report-"));
   try {
     const quickstart = quickstartDir();
@@ -870,10 +870,44 @@ test("report re-renders a committed assertions.json to every supported format", 
       out,
     ]);
     const from = join(out, "assertions.json");
-    for (const format of ["md", "html", "oscal", "sarif", "pack"]) {
+    for (const format of ["md", "html", "oscal", "sarif", "public", "pack"]) {
       const { exitCode, envelope } = runJson(["report", "--from", from, "--format", format]);
       assert.equal(exitCode, 0, format);
       assert.ok((envelope.rendering as string).length > 0, format);
+    }
+    // --role names the evidence-pack variant (18.110); without it the pack names no role.
+    for (const role of ["provider", "deployer"]) {
+      const { envelope } = runJson([
+        "report",
+        "--from",
+        from,
+        "--format",
+        "pack",
+        `--role=${role}`,
+      ]);
+      const packs = JSON.parse(envelope.rendering as string) as Record<string, { role?: string }>;
+      assert.ok(
+        Object.values(packs).every((pack) => pack.role === role),
+        role,
+      );
+    }
+    const plain = runJson(["report", "--from", from, "--format", "pack"]).envelope;
+    assert.ok(!(plain.rendering as string).includes('"role"'));
+    // Every option is read or refused with a key (18.110).
+    for (const [argv, key] of [
+      [["--format", "pack", "--role", "nope"], "input.report_role"],
+      [["--format", "nope"], "input.report_format"],
+      [["--role", "provider"], "input.report_flag_unused"],
+      [["--format", "md", "--catalog", "eu-ai-act"], "input.report_flag_unused"],
+      [["--format", "oscal", "--language", "de"], "input.report_flag_unused"],
+      [["--language", "xx"], "input.report_language_unknown"],
+      [["--format", "public", "--catalog", "a, ,b"], "input.report_catalog_label_empty"],
+      [["--no-such-flag"], "input.report_unrecognized_flag"],
+      [["--validate", out], "input.report_flag_unused"],
+    ] as const) {
+      const { exitCode, envelope } = runJson(["report", "--from", from, ...argv]);
+      assert.equal(exitCode, 3, argv.join(" "));
+      assert.equal((envelope.error as { message_key: string }).message_key, key, argv.join(" "));
     }
   } finally {
     rmSync(out, { recursive: true, force: true });

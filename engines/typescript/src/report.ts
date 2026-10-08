@@ -1025,9 +1025,11 @@ export function renderSarif(
   };
 }
 
+/** A subject's evidence pack; given a `role`, the provider or deployer variant names it (SPEC §9.4). */
 export function renderEvidencePack(
   subject: string,
   assertions: Assertion[],
+  role?: string,
 ): Record<string, unknown> {
   const refs = new Set<string>();
   for (const a of assertions) {
@@ -1036,6 +1038,7 @@ export function renderEvidencePack(
     }
   }
   return {
+    ...(role !== undefined ? { role } : {}),
     subject,
     assertions: assertions.map((a) => ({
       control: a.control,
@@ -1046,6 +1049,97 @@ export function renderEvidencePack(
     })),
     evidence: [...refs].sort(byteCompare),
   };
+}
+
+const NON_DETERMINATION =
+  "This statement reports conformance to the named catalog as evaluated by the Agent Conformance " +
+  "Engine over the named evidence and observation window. It is not a legal compliance " +
+  "determination.";
+const CONDUCT_LINE =
+  "Over the observation window, the named subjects acted within their declared boundaries and on " +
+  "authorised instructions as evidenced by the Conduct overlay controls listed.";
+const STATEMENT_OUTCOMES = [
+  "conformant",
+  "non-conformant",
+  "partial",
+  "not_applicable",
+  "not_assessed",
+  "insufficient_evidence",
+] as const;
+
+/** The ids of every control a deviation was applied to, sorted and deduplicated (SPEC §9.1). */
+export function appliedDeviationIds(assertions: readonly Assertion[]): string[] {
+  return [...new Set(assertions.flatMap((a) => (a.deviation ? [a.deviation] : [])))].sort(
+    byteCompare,
+  );
+}
+
+/** The public conformance statement (SPEC §9.5): scope, catalogs and date, a six-outcome summary
+ * per family, accepted deviations by control id only, the Conduct line when the overlay is present,
+ * how affected persons raise concerns, and the fixed non-determination line. Byte-identical to
+ * Python's `render_public_statement` (no statement date: re-rendering has none). */
+export function renderPublicStatement(
+  assertions: readonly Assertion[],
+  catalogs?: readonly string[],
+  deviations?: readonly string[],
+): string {
+  const subjects = [...new Set(assertions.map((a) => a.subject))].sort(byteCompare);
+  const families = new Map<string, Map<string, number>>();
+  for (const a of assertions) {
+    const dash = a.control.indexOf("-");
+    const family = dash >= 0 ? a.control.slice(0, dash) : a.control;
+    let row = families.get(family);
+    if (row === undefined) {
+      row = new Map(STATEMENT_OUTCOMES.map((o) => [o, 0]));
+      families.set(family, row);
+    }
+    const count = row.get(a.outcome);
+    if (count !== undefined) {
+      row.set(a.outcome, count + 1);
+    }
+  }
+  const lines = ["# Public conformance statement", "", "## Scope"];
+  lines.push(
+    subjects.length > 0
+      ? `Subjects: ${subjects.map((s) => `\`${sanitizeForMarkdown(s)}\``).join(", ")}`
+      : "Subjects: (none)",
+  );
+  lines.push(
+    catalogs !== undefined && catalogs.length > 0
+      ? `Catalogs: ${catalogs.map((c) => sanitizeForMarkdown(c)).join(", ")}`
+      : "Catalogs: (unspecified)",
+  );
+  lines.push("Date: (unspecified)");
+  lines.push("", "## Outcomes by family", "", `| Family | ${STATEMENT_OUTCOMES.join(" | ")} |`);
+  lines.push(`|---|${STATEMENT_OUTCOMES.map(() => "---").join("|")}|`);
+  for (const family of [...families.keys()].sort(byteCompare)) {
+    const row = families.get(family) as Map<string, number>;
+    lines.push(
+      `| ${sanitizeForMarkdown(family)} | ${STATEMENT_OUTCOMES.map((o) => String(row.get(o))).join(" | ")} |`,
+    );
+  }
+  lines.push("", "## Accepted deviations");
+  lines.push(
+    deviations !== undefined && deviations.length > 0
+      ? [...deviations]
+          .sort(byteCompare)
+          .map((d) => `\`${sanitizeForMarkdown(d)}\``)
+          .join(", ")
+      : "None.",
+  );
+  if (families.has("CND")) {
+    lines.push("", "## Conduct", CONDUCT_LINE);
+  }
+  lines.push(
+    "",
+    "## Affected persons",
+    "Affected persons may obtain an explanation of a decision and raise concerns through the " +
+      "deployer's published contact channel (EU AI Act Arts. 26(11), 85, 86).",
+    "",
+    "## Basis",
+    NON_DETERMINATION,
+  );
+  return `${lines.join("\n")}\n`;
 }
 
 function now(): string {
@@ -1394,9 +1488,7 @@ export function buildClaim(
   if (limitations?.length) {
     body.limitations = limitations;
   }
-  const deviations = [
-    ...new Set(assertions.flatMap((a) => (a.deviation ? [a.deviation] : []))),
-  ].sort(byteCompare);
+  const deviations = appliedDeviationIds(assertions);
   if (deviations.length > 0) {
     body.deviations = deviations;
   }

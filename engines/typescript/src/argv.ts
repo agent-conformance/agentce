@@ -3,7 +3,9 @@
  * option's names and kind, the most positionals it takes, its refusal keys and fix texts) and
  * {@link scanArgv} reads argv the way Python's argparse reads it for that command (`allow_abbrev=False`,
  * plus Python's `_refuse_short_clusters`), returning a plain record. `assess` is the first command on
- * it (18.109); the others move onto it with 18.50. Mirrors `engines/java/.../Argv.java`.
+ * it (18.109) and `report` the second (18.110); the others move onto it with 18.50. An option may
+ * declare its `choices` (refused with its own error the moment its value is read, in argv order, as
+ * argparse checks a choice) and its own needs-value key. Mirrors `engines/java/.../Argv.java`.
  */
 
 import { InputError } from "./errors";
@@ -19,6 +21,13 @@ export interface OptionSpec {
   readonly kind: OptionKind;
   /** What the missing-value fix names after the flag (default `<value>`). */
   readonly valueHint?: string;
+  /** The values a VALUE option accepts; any other is refused with {@link OptionSpec.choiceError} at
+   * once, the moment the value is read (argparse's invalid choice), whether given as `--x=v` or `--x v`. */
+  readonly choices?: readonly string[];
+  /** The error for a value outside {@link OptionSpec.choices}. */
+  readonly choiceError?: (value: string) => InputError;
+  /** This option's key when given no value, in place of {@link Grammar.needsValueKey}. */
+  readonly needsValueKey?: string;
 }
 
 export interface Grammar {
@@ -27,8 +36,11 @@ export interface Grammar {
   readonly maxPositionals: number;
   /** The key for an unknown flag, an extra argument, a cluster and a value on a flag. */
   readonly unrecognizedKey: string;
-  /** The key for a VALUE/APPEND option given no value. */
+  /** The key for a VALUE/APPEND option given no value, unless the option names its own. */
   readonly needsValueKey: string;
+  /** How a missing value's cause reads: argparse's own sentence (`argument --x: expected one
+   * argument`, assess) or Python's plain one (`flag '--x' needs a value.`); default argparse. */
+  readonly needsValueCause?: "argparse" | "plain";
   /** The fix for an unknown flag. */
   readonly flagFix: string;
   /** The fix for an argument past {@link Grammar.maxPositionals}. */
@@ -157,9 +169,11 @@ function takesNoValue(grammar: Grammar, spec: OptionSpec, value: string): InputE
 }
 
 /** Read `argv` (the tokens after the command name) against `grammar`, in argparse's order: a short
- * cluster first; then left to right, a missing value or a value on a flag is refused at once, HELP
+ * cluster first; then left to right, a missing value, a value outside an option's choices or a value
+ * on a flag is refused at once, HELP
  * returns at once, and an unknown flag or an argument past the maximum is kept and the first of them in
- * argv order is refused once the scan ends. `--` makes every later token positional. */
+ * argv order is refused once the scan ends. `--` makes every later token positional; to a command that
+ * takes none, `--` is itself an unrecognized flag. */
 export function scanArgv(argv: readonly string[], grammar: Grammar): Scan {
   refuseShortClusters(argv, grammar);
   const values: Record<string, string> = {};
@@ -182,6 +196,10 @@ export function scanArgv(argv: readonly string[], grammar: Grammar): Scan {
       continue;
     }
     if (token === "--") {
+      // A command with no positionals leaves `--` itself unparsed, as argparse does (Python 3.12).
+      if (grammar.maxPositionals === 0) {
+        deferred ??= token;
+      }
       ended = true;
       continue;
     }
@@ -211,13 +229,25 @@ export function scanArgv(argv: readonly string[], grammar: Grammar): Scan {
       const next = argv[i + 1];
       if (next === undefined || next === "--" || classify(grammar, next).kind !== "positional") {
         throw new InputError(
-          grammar.needsValueKey,
-          `argument ${label(spec)}: expected one argument`,
+          spec.needsValueKey ?? grammar.needsValueKey,
+          grammar.needsValueCause === "plain"
+            ? `flag '${label(spec)}' needs a value.`
+            : `argument ${label(spec)}: expected one argument`,
           `pass ${label(spec)} ${spec.valueHint ?? "<value>"}.`,
         );
       }
       value = next;
       i++;
+    }
+    if (spec.choices !== undefined && !spec.choices.includes(value)) {
+      throw (
+        spec.choiceError?.(value) ??
+        new InputError(
+          grammar.unrecognizedKey,
+          `argument ${label(spec)}: invalid choice: ${pyRepr(value)} (choose from ${spec.choices.map(pyRepr).join(", ")}).`,
+          grammar.flagFix,
+        )
+      );
     }
     if (spec.kind === "value") {
       values[key] = value;
