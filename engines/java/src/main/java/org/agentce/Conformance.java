@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -224,18 +226,45 @@ public final class Conformance {
         return text.substring(start, end);
     }
 
+    /** Python's {@code int()} over a JSON value: an integer at full size, a float truncated (an
+     * infinite one refused), a bool as 0 or 1, a string by {@code int(str)}'s grammar; anything else,
+     * {@code null} included, refused as Python raises. */
+    static BigInteger pyInt(JsonNode value) {
+        if (value.isIntegralNumber()) {
+            return value.bigIntegerValue();
+        }
+        if (value.isNumber()) {
+            double d = value.doubleValue();
+            if (Double.isInfinite(d)) {
+                throw new IllegalStateException("cannot convert float " + value + " to integer");
+            }
+            return new BigDecimal(d).toBigInteger();
+        }
+        if (value.isBoolean()) {
+            return value.booleanValue() ? BigInteger.ONE : BigInteger.ZERO;
+        }
+        if (value.isTextual()) {
+            JsonNode parsed = OtelGenai.parsePythonIntGrammar(value.textValue());
+            if (parsed != null) {
+                return parsed.bigIntegerValue();
+            }
+            throw new IllegalStateException("invalid literal for int(): " + value);
+        }
+        throw new IllegalStateException("int() argument must be a string or a number, not " + value.getNodeType());
+    }
+
     /** Python's {@code _adapter_claim}: the adapter-conformance claim, mirroring the ECS claim scheme
      * (SPEC §11.5). */
     static String adapterClaim(JsonNode detail) {
         if (!detail.isObject()) {
             throw new IllegalStateException("the adapters' conformance printed JSON that is not an object");
         }
-        long total = detail.has("total") ? detail.get("total").asLong() : 0;
-        long identical = detail.has("identical") ? detail.get("identical").asLong() : 0;
-        if (total > 0 && identical == total && Readiness.pyTruthy(detail.get("round_trip"))) {
+        BigInteger total = detail.has("total") ? pyInt(detail.get("total")) : BigInteger.ZERO;
+        BigInteger identical = detail.has("identical") ? pyInt(detail.get("identical")) : BigInteger.ZERO;
+        if (total.signum() > 0 && identical.equals(total) && Readiness.pyTruthy(detail.get("round_trip"))) {
             return "full";
         }
-        if (identical > 0) {
+        if (identical.signum() > 0) {
             return "partial";
         }
         return "none";

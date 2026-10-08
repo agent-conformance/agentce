@@ -2791,8 +2791,20 @@
         {
           "description": "TypeScript's adapters claim ignores round_trip, so adapters identical without their round trip claim full",
           "file": "engines/typescript/src/conformance.ts",
-          "search": "  if (total > 0n && identical === total && pyTruthy(detail.round_trip)) {\n",
+          "search": "  if (total > 0n && identical === total && pyTruthy(asParsed(detail.round_trip))) {\n",
           "replace": "  if (total > 0n && identical === total) {\n"
+        },
+        {
+          "description": "Java reads the adapters' counts with asLong, which wraps a count past 2**63 and parses the string \"1.0\", where Python's int() reads them exactly or refuses",
+          "file": "engines/java/src/main/java/org/agentce/Conformance.java",
+          "search": "        BigInteger total = detail.has(\"total\") ? pyInt(detail.get(\"total\")) : BigInteger.ZERO;\n        BigInteger identical = detail.has(\"identical\") ? pyInt(detail.get(\"identical\")) : BigInteger.ZERO;\n",
+          "replace": "        BigInteger total = detail.has(\"total\") ? BigInteger.valueOf(detail.get(\"total\").asLong()) : BigInteger.ZERO;\n        BigInteger identical = detail.has(\"identical\") ? BigInteger.valueOf(detail.get(\"identical\").asLong()) : BigInteger.ZERO;\n"
+        },
+        {
+          "description": "TypeScript reads the adapters' report with JSON.parse again, rounding counts past 2**53 so two that differ by one compare equal",
+          "file": "engines/typescript/src/conformance.ts",
+          "search": "    parsed = parseJson(proc.stdout, { pythonConstants: true });\n",
+          "replace": "    parsed = JSON.parse(proc.stdout);\n"
         }
       ]
     }

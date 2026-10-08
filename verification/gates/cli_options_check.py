@@ -38,7 +38,9 @@ CONFORMANCE = FIXTURES / "conformance"
 #: {B} as a whole token is the case file's B list). {A} and {A2} are the diff fixture's two assertion
 #: sets; under conformance/, {C} an empty corpus, {C1} a one-project corpus whose ECS claim is full, and
 #: three sample adapters directories whose conformance.py reports one adapter: {S} identical with its
-#: round trip (claim full), {Sp} identical without it (claim partial), {Sn} no JSON at all (18.111).
+#: round trip (claim full), {Sp} identical without it (claim partial), {Sn} no JSON at all (18.111);
+#: and four that print counts as Python's int() reads them: {Sb} past 2**64 and one apart (partial),
+#: {Ss} the string "1.0" and {Sz} null (both refused), {Sf} round_trip 0.0 (partial).
 PLACES = {
     "{root}": str(ROOT),
     "{A}": str(ROOT / "verification/gates/fixtures/diff/before/assertions.json"),
@@ -48,6 +50,10 @@ PLACES = {
     "{S}": str(CONFORMANCE / "adapters-pass"),
     "{Sp}": str(CONFORMANCE / "adapters-partial"),
     "{Sn}": str(CONFORMANCE / "adapters-nojson"),
+    "{Sb}": str(CONFORMANCE / "adapters-bigcount"),
+    "{Ss}": str(CONFORMANCE / "adapters-strcount"),
+    "{Sz}": str(CONFORMANCE / "adapters-nullcount"),
+    "{Sf}": str(CONFORMANCE / "adapters-floatrt"),
 }
 #: The fields of each --debug record, as Python's logsetup.JsonFormatter writes them.
 DEBUG_RECORDS = [

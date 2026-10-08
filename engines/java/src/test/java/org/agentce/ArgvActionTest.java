@@ -176,4 +176,22 @@ class ArgvActionTest {
         assertEquals("none", Conformance.adapterClaim(Json.parse("{\"total\": 0, \"identical\": 0, \"round_trip\": true}")));
         assertEquals("none", Conformance.adapterClaim(Json.parse("{}")));
     }
+
+    /** Python's int() reads each count: exact past 2**63, a float truncated, a bool as 0 or 1, a string by
+     * int(str)'s grammar; "1.0", "1e0", null and an infinite float are refused. */
+    @Test
+    void theAdaptersCountsAreReadAsPythonsIntReadsThem() {
+        assertEquals("partial", Conformance.adapterClaim(Json.parse(
+                "{\"total\": 18446744073709551617, \"identical\": 18446744073709551616, \"round_trip\": true}")));
+        assertEquals("partial", Conformance.adapterClaim(Json.parse(
+                "{\"total\": 18446744073709551617, \"identical\": 1, \"round_trip\": true}")));
+        assertEquals("full", Conformance.adapterClaim(Json.parse("{\"total\": 1.9, \"identical\": 1, \"round_trip\": true}")));
+        assertEquals("full", Conformance.adapterClaim(Json.parse("{\"total\": \" 1_0 \", \"identical\": 10, \"round_trip\": true}")));
+        assertEquals("full", Conformance.adapterClaim(Json.parse("{\"total\": true, \"identical\": true, \"round_trip\": 1}")));
+        assertEquals("partial", Conformance.adapterClaim(Json.parse("{\"total\": 1, \"identical\": 1, \"round_trip\": 0.0}")));
+        for (String bad : List.of("\"1.0\"", "\"1e0\"", "null", "1e400", "[]")) {
+            assertThrows(IllegalStateException.class, () -> Conformance.adapterClaim(
+                    Json.parse("{\"total\": " + bad + ", \"identical\": 1, \"round_trip\": true}")), bad);
+        }
+    }
 }

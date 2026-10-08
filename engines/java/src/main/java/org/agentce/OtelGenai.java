@@ -94,7 +94,7 @@ public final class OtelGenai {
      * recursing once per character, so a few thousand digits overflowed the stack before the digit
      * cap was ever checked (18.29 verifier round 2, F3).
      */
-    private static JsonNode parsePythonIntGrammar(String raw) {
+    static JsonNode parsePythonIntGrammar(String raw) {
         int start = 0;
         int end = raw.length();
         while (start < end && isAsciiSpace(raw.charAt(start))) {
