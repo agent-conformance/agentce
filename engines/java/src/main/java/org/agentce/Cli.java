@@ -1187,8 +1187,10 @@ public final class Cli {
             "--manual", "--probes", "--out", "--state", "--report-language", "--emit", "--for", "--fail-on");
 
     /** Every assess flag that takes no value. {@code -h}/{@code --help} are passed through, not refused. */
-    private static final Set<String> ASSESS_FLAGS_WITHOUT_VALUE = Set.of(
-            "--json", "--debug", "--quiet", "--allow-unverified-catalog", "--package-for-sharing", "-h", "--help");
+    private static final Set<String> ASSESS_FLAGS_WITHOUT_VALUE = Stream.concat(
+                    GLOBAL_BOOLEAN_FLAGS.stream(),
+                    Stream.of("--allow-unverified-catalog", "--package-for-sharing", "-h", "--help"))
+            .collect(Collectors.toUnmodifiableSet());
 
     /** Refuse what Python's assess parser (argparse, {@code allow_abbrev=False}) refuses after reading the
      * values: a flag it does not know, an abbreviated one included ({@code --em md} is never

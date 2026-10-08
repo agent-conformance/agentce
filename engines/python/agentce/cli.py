@@ -100,12 +100,9 @@ _sign_usage_error, _sign_unknown_error = _make_argv_errors(
     "pass exactly one report directory: `agentce sign <report-dir> --as claimant|assessor`.",
 )
 
-_ASSESS_FLAG_FIX = (
-    "run `agentce assess --help` for the flags assess takes, or drop the flag."
-)
 _, _assess_unknown_error = _make_argv_errors(
     "input.assess_unrecognized_flag",
-    _ASSESS_FLAG_FIX,
+    "run `agentce assess --help` for the flags assess takes, or drop the flag.",
     "<value>",
     "pass at most one records folder: `agentce assess <folder>`.",
 )

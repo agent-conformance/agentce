@@ -1102,12 +1102,12 @@ const ASSESS_FLAGS_WITHOUT_VALUE = new Set([
   "--help",
 ]);
 
-/** Refuse what Python's assess parser (argparse, `allow_abbrev=False`) refuses after reading the
- * values: a flag it does not know, an abbreviated one included (`--em md` is never `--emit md`), and a
- * second positional. Runs after `assessValueFlags`, so a missing value is named first, as argparse
- * names it. */
-function refuseUnknownAssessArgs(argv: string[]): void {
-  let positionals = 0;
+/** `assess`'s optional positional `<folder>`, read the way Python's assess parser (argparse,
+ * `allow_abbrev=False`) reads argv, refusing what it refuses: a flag it does not know, an abbreviated one
+ * included (`--em md` is never `--emit md`), and a second positional. Runs after `assessValueFlags`, so a
+ * missing value is named first, as argparse names it. */
+function assessFolder(argv: string[]): string | undefined {
+  let folder: string | undefined;
   let optionsEnded = false;
   for (let i = 1; i < argv.length; i++) {
     const token = argv[i] as string;
@@ -1132,35 +1132,23 @@ function refuseUnknownAssessArgs(argv: string[]): void {
         "run `agentce assess --help` for the flags assess takes, or drop the flag.",
       );
     }
-    if (++positionals > 1) {
+    if (folder !== undefined) {
       throw new InputError(
         "input.assess_unrecognized_flag",
         `unrecognized argument '${token}'.`,
         "pass at most one records folder: `agentce assess <folder>`.",
       );
     }
+    folder = token;
   }
-}
-
-/** `assess`'s optional positional `<folder>`: the first token that is neither an option nor an
- * option's value, as argparse reads it. */
-function assessFolder(argv: string[]): string | undefined {
-  for (let i = 1; i < argv.length; i++) {
-    const token = argv[i] as string;
-    if (ASSESS_OPTIONS_WITH_VALUE.has(token)) {
-      i++;
-    } else if (!looksLikeOption(token)) {
-      return token;
-    }
-  }
-  return undefined;
+  return folder;
 }
 
 function cmdAssess(argv: string[]): CommandResult {
   const values = assessValueFlags(argv);
-  refuseUnknownAssessArgs(argv);
+  const folder = assessFolder(argv);
   return runAssess({
-    folder: assessFolder(argv),
+    folder,
     packageForSharing: argv.includes("--package-for-sharing"),
     deviations: values.get("--deviations"),
     failOn: values.get("--fail-on"),

@@ -26,17 +26,19 @@ ENGINES = ("python", "typescript", "java")
 ENV = {k: v for k, v in os.environ.items() if k not in ("VIRTUAL_ENV", "CI")}
 
 
-def engine_cmd(name: str) -> list[str]:
-    if name == "python":
-        return ["uv", "run", "--frozen", "--project", "engines/python", "agentce"]
-    if name == "typescript":
-        return ["node", "engines/typescript/dist/cli.js"]
+def engine_cmds() -> dict[str, list[str]]:
+    """Each engine's command line. Python is this interpreter's own `agentce` script (the check runs in
+    engines/python's environment), so no case pays for a `uv run`."""
     jars = sorted((ROOT / "engines/java/build/libs").glob("agentce-*-all.jar"))
     if not jars:
         sys.exit(
             "cli_options_check: no Java jar under engines/java/build/libs (run cli_options.sh)"
         )
-    return ["java", "-jar", str(jars[-1])]
+    return {
+        "python": [str(Path(sys.executable).parent / "agentce")],
+        "typescript": ["node", "engines/typescript/dist/cli.js"],
+        "java": ["java", "-jar", str(jars[-1])],
+    }
 
 
 def refusal_key(stdout: str) -> str | None:
@@ -51,7 +53,7 @@ def refusal_key(stdout: str) -> str | None:
     return error.get("key") or error.get("message_key")
 
 
-def run(case: dict, engine: str, bundle_args: list[str]) -> str | None:
+def run(case: dict, engine: str, cmd: list[str], bundle_args: list[str]) -> str | None:
     """Run one case in one engine; return a failure line, or None when it behaves as expected."""
     want = case.get("engines", {}).get(
         engine, {"exit": case["exit"], "key": case["key"]}
@@ -65,7 +67,7 @@ def run(case: dict, engine: str, bundle_args: list[str]) -> str | None:
             )
         # --json goes after the command: TypeScript and Java read it only there.
         p = subprocess.run(
-            [*engine_cmd(engine), *argv, "--json"],
+            [*cmd, *argv, "--json"],
             cwd=ROOT,
             capture_output=True,
             text=True,
@@ -104,9 +106,12 @@ def main() -> int:
         ):
             print(f"FAIL {c['id']}: an override must name a known engine and say why")
             return 1
+    cmds = engine_cmds()
     jobs = [(c, e) for c in cases for e in ENGINES]
     with ThreadPoolExecutor(max_workers=8) as pool:
-        results = list(pool.map(lambda job: run(job[0], job[1], spec["B"]), jobs))
+        results = list(
+            pool.map(lambda job: run(job[0], job[1], cmds[job[1]], spec["B"]), jobs)
+        )
     failures = [r for r in results if r]
     for line in failures:
         print(line)
