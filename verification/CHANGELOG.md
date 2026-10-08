@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.65.0
+
+- `VG-CLI-OPTIONS` (18.107) grows from 45 to 77 rows and from nine to eleven seeded faults. Python
+  answered most mistyped command lines with argparse's usage text and no message key, read an
+  abbreviation such as `--bun x` as `--bundle x`, and took `-hx` as `-h`, printing the usage and
+  dropping the `x`. Every Python argv error now exits 3 with a key, the one TypeScript and Java give where
+  they give one; every Python parser refuses an abbreviation and a clustered short option. The new rows
+  cover `-hx` and `-hh` on six commands, a `-h` cluster after a real target, unknown flags, value-less
+  flags, a bad choice and an unknown action; where TypeScript or Java still answer another way, the row's
+  override names the item that changes it (18.108 to 18.111). `VG-FAIL-ON-PARITY` and
+  `VG-DEVIATIONS-PARITY` now expect Python's key for a value-less flag. The gate's helper skips a build
+  whose inputs hash the same as at its last build, and a red run stops at its first failure, so the
+  seeded-fault demo stays inside its CI lane.
+
 ## 0.64.0
 
 - `VG-DOC01-COMPONENTS` (18.37j) grows from 15 to 20 cases and from three to seven seeded faults. DOC-01

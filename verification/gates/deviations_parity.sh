@@ -216,15 +216,14 @@ for s in REFUSALS:
         check(not os.path.exists(f"{work}/{engine}/{s}/assertions.json"), f"{s}: {engine} wrote assertions.json")
 
 for s in ("S16", "S23"):
-    check(SENTENCE in read(f"{work}/python/{s}.err"), f"{s}: python's usage error does not say {SENTENCE!r}")
     for engine in ENGINES:
         check(code(engine, s) == 3, f"{s}: {engine} exited {code(engine, s)}, not 3")
         check(not os.path.exists(f"{work}/{engine}/{s}/assertions.json"), f"{s}: {engine} wrote assertions.json")
-    for engine in ENGINES[1:]:
+    # Python keys it too since 18.107, with argparse's own sentence as the cause.
+    for engine in ENGINES:
         e = error(engine, s)
         check(e["key"] == "input.assess_flag_needs_value" and e["cause"] == SENTENCE,
               f"{s}: {engine} refused with {e}")
-    check(error("typescript", s) == error("java", s), f"{s}: typescript and java refuse differently")
 
 for s in SUCCESSES:
     ref_code = code("python", s)

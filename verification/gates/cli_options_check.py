@@ -18,6 +18,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -162,19 +163,38 @@ def main() -> int:
     jobs = sorted(
         ((c, e) for c in cases for e in ENGINES), key=lambda job: job[0]["exit"] != 0
     )
+    # The first failing run stops the runs not yet started: the gate is red either way, and the
+    # seeded-fault demo, which runs it once per fault, stays inside its CI lane (18.107).
+    stop = threading.Event()
+
+    def run_unless_stopped(job: tuple[dict, str]) -> tuple[str | None, str] | None:
+        if stop.is_set():
+            return None
+        result = run(job[0], job[1], cmds[job[1]], spec["B"])
+        if result[0]:
+            stop.set()
+        return result
+
     with ThreadPoolExecutor(max_workers=8) as pool:
-        results = list(
-            pool.map(lambda job: run(job[0], job[1], cmds[job[1]], spec["B"]), jobs)
-        )
-    failures = [failure for failure, _ in results if failure]
+        results = list(pool.map(run_unless_stopped, jobs))
+    failures = [r[0] for r in results if r and r[0]]
+    skipped = results.count(None)
     stdouts: dict[str, set[str]] = {}
-    for (case, _), (_, out) in zip(jobs, results):
-        stdouts.setdefault(case["id"], set()).add(out)
-    for case in cases:
-        if case.get("same_stdout") and len(stdouts[case["id"]]) != 1:
-            failures.append(f"FAIL {case['id']}: stdout differs across engines")
-    for line in failures:
+    for (case, _), result in zip(jobs, results):
+        if result:
+            stdouts.setdefault(case["id"], set()).add(result[1])
+    if not failures:
+        failures = [
+            f"FAIL {case['id']}: stdout differs across engines"
+            for case in cases
+            if case.get("same_stdout") and len(stdouts[case["id"]]) != 1
+        ]
+    for line in sorted(failures):
         print(line)
+    if skipped:
+        print(
+            f"(stopped at the first failure: {skipped} run(s) not yet started were skipped)"
+        )
     print(
         f"{'FAIL' if failures else 'OK'} VG-CLI-OPTIONS: {len(cases)} cases x {len(ENGINES)} engines, "
         f"{len(failures)} failure(s)"

@@ -378,13 +378,12 @@ for s, (key, tail) in REFUSALS.items():
 for s, flag in NEEDS_VALUE.items():
     fix = FLAG_FIX[flag]
     sentence = f"argument {flag}: expected one argument"
-    check(read(f"{work}/python/{s}.err").rstrip().endswith(sentence),
-          f"{s}: python's usage error does not end {sentence!r}")
     for engine in ENGINES:
         code = run(engine, s)[0]
         check(code == 3, f"{s}: {engine} exited {code}, not 3")
         check(not wrote(engine, s), f"{s}: {engine} wrote assertions.json")
-    for engine in ENGINES[1:]:
+    # Python keys it too since 18.107, with argparse's own sentence as the cause.
+    for engine in ENGINES:
         e = run(engine, s)[3]
         check(e == {"key": "input.assess_flag_needs_value", "cause": sentence, "fix": fix},
               f"{s}: {engine} refused with {e}, not argparse's {sentence!r}")

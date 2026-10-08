@@ -231,6 +231,12 @@ allow:
     class: legitimate
     justification: "The TypeScript engine's documented scope is conformance/assess/report/validate/quickstart on the existing ECS path; every other verb returns a stable input_error envelope rather than a guess, which is the honest §8.5 boundary, not an open gap. No engine-parity work commits TypeScript to the remaining Python-only verbs (verify, collect, ingest, catalog, diff, sign, readiness, doctor, init, config)."
 
+  - path: verification/gates/fixtures/cli_options/cases.json
+    pattern: not-implemented
+    count: 1
+    class: legitimate
+    justification: "VG-CLI-OPTIONS's unknown-command row records the key TypeScript and Java give today (cli.not_implemented) in an override that names 18.108, the item that moves all three engines to one shared key; it is an expected value, not an open gap in the gate."
+
   - path: engines/typescript/src/report.test.ts
     pattern: todo
     count: 2
