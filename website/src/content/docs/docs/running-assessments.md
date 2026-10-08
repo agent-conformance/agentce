@@ -13,8 +13,11 @@ Python engine for any of them:
 - TypeScript and Java write only the core outputs, so they refuse `assess --for <role>` and
   `assess --emit <format>` with `input.emit_unsupported` (exit 3) and write nothing. An unknown format or
   role, or both flags at once, gets the same refusal as in Python.
+- TypeScript and Java do not yet package a run for sharing: `assess --package-for-sharing` stops with
+  `input.package_unsupported` (exit 3) and writes nothing.
 - Java reads only an evidence bundle: `assess <folder>` on a folder of trace exports stops with
-  `input.bundle_missing`. Pass `--bundle` and `--profile` to Java, or read the folder with Python.
+  `input.records_unsupported` (exit 3). Pass `--bundle` and `--profile` to Java, or read the folder with
+  Python or TypeScript.
 - At the end of `assess`, TypeScript and Java print a bare `verdict:` line where Python's summary also
   gives the outcomes, the top gaps and the next step.
 - A profile with a repeated key (`profile_version` twice, for example) stops TypeScript with

@@ -12,7 +12,8 @@ validation of the report artifacts); see the [main quickstart](quickstart.md). I
 problems as the Python engine when a report file can be read. A damaged file, such as one with bytes
 that are not valid UTF-8 or a CSV, XML or JSONL file in an unusual shape, can still get a different
 answer, so check it with the Python engine. `assess` writes only the core outputs, so it refuses `--for` and
-`--emit` with `input.emit_unsupported`; [Running assessments](../website/src/content/docs/docs/running-assessments.md) lists every difference from the Python engine.
+`--emit` with `input.emit_unsupported` and `--package-for-sharing` with `input.package_unsupported`;
+[Running assessments](../website/src/content/docs/docs/running-assessments.md) lists every difference from the Python engine.
 
 ## Prerequisites
 
