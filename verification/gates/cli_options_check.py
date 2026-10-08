@@ -5,8 +5,10 @@ TypeScript and Java CLIs and require each case's exit code and refusal key, with
 A command-line option an engine ignores, drops or reads differently is a defect even when the verdict
 is unaffected (MAINTAINER-INBOX row 153), so the table holds one row per option behaviour, and later
 CLI items add their rows. A case may override the expectation for named engines; every override says
-why and which item removes it. The TypeScript and Java engines must already be built (cli_options.sh
-builds them). Runs from the repository root, eight engine runs at a time.
+why and which item removes it. Each run starts in a fresh empty working directory, so a case can check
+what a default path writes; a case can also require what the run writes, a token it names, stdout
+identical across engines (usage text) and Python's --debug log records (18.106). The TypeScript and Java
+engines must already be built (cli_options.sh builds them). Eight engine runs at a time.
 """
 
 from __future__ import annotations
@@ -22,8 +24,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CASES = ROOT / "verification/gates/fixtures/cli_options/cases.json"
 ENGINES = ("python", "typescript", "java")
-#: CI is cleared so Python's automatic junit (CI detected, no --emit/--for) never changes a row.
-ENV = {k: v for k, v in os.environ.items() if k not in ("VIRTUAL_ENV", "CI")}
+#: CI is cleared so Python's automatic junit (CI detected, no --emit/--for) never changes a row, and
+#: COLUMNS fixed so argparse wraps its help text the same way on every terminal.
+ENV = {k: v for k, v in os.environ.items() if k not in ("VIRTUAL_ENV", "CI")} | {
+    "COLUMNS": "80"
+}
+#: The fields of each --debug record, as Python's logsetup.JsonFormatter writes them.
+DEBUG_RECORDS = [
+    ("command.start", ["command", "event", "level", "logger", "ts"]),
+    ("command.end", ["command", "event", "exit_code", "level", "logger", "ts"]),
+]
 
 
 def engine_cmds() -> dict[str, list[str]]:
@@ -36,7 +46,7 @@ def engine_cmds() -> dict[str, list[str]]:
         )
     return {
         "python": [str(Path(sys.executable).parent / "agentce")],
-        "typescript": ["node", "engines/typescript/dist/cli.js"],
+        "typescript": ["node", str(ROOT / "engines/typescript/dist/cli.js")],
         "java": ["java", "-jar", str(jars[-1])],
     }
 
@@ -53,8 +63,25 @@ def refusal_key(stdout: str) -> str | None:
     return error.get("key") or error.get("message_key")
 
 
-def run(case: dict, engine: str, cmd: list[str], bundle_args: list[str]) -> str | None:
-    """Run one case in one engine; return a failure line, or None when it behaves as expected."""
+def debug_log_problem(stderr: str) -> str | None:
+    """Why stderr does not hold exactly Python's two --debug records, or None when it does."""
+    records = []
+    for line in stderr.splitlines():
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(record, dict) and record.get("logger") == "agentce":
+            records.append((record.get("event"), list(record)))
+    if records != DEBUG_RECORDS:
+        return f"--debug records {records}, want {DEBUG_RECORDS}"
+    return None
+
+
+def run(
+    case: dict, engine: str, cmd: list[str], bundle_args: list[str]
+) -> tuple[str | None, str]:
+    """Run one case in one engine; return a failure line (None when it behaves as expected) and stdout."""
     want = case.get("engines", {}).get(
         engine, {"exit": case["exit"], "key": case["key"]}
     )
@@ -62,13 +89,15 @@ def run(case: dict, engine: str, cmd: list[str], bundle_args: list[str]) -> str 
         out = Path(tmp) / "out"
         argv: list[str] = []
         for token in case["argv"]:
-            argv += (
-                bundle_args if token == "{B}" else [token.replace("{out}", str(out))]
-            )
-        # --json goes after the command: TypeScript and Java read it only there.
+            argv += [
+                t.replace("{root}", str(ROOT)).replace("{out}", str(out))
+                for t in (bundle_args if token == "{B}" else [token])
+            ]
+        # --json goes right after the command: TypeScript and Java read it only after the command, and
+        # a case can then end on a value-less flag or put tokens after `--`.
         p = subprocess.run(
-            [*cmd, *argv, "--json"],
-            cwd=ROOT,
+            [*cmd, argv[0], "--json", *argv[1:]],
+            cwd=tmp,
             capture_output=True,
             text=True,
             env=ENV,
@@ -78,8 +107,22 @@ def run(case: dict, engine: str, cmd: list[str], bundle_args: list[str]) -> str 
             if out.is_dir()
             else []
         )
+        entries = sorted(e.name for e in Path(tmp).iterdir())
+        filled = [
+            e for e in entries if any(f.is_file() for f in (Path(tmp) / e).rglob("*"))
+        ]
     key = refusal_key(p.stdout)
     problems = []
+    if "writes" in case:
+        want_entries = [] if case["writes"] is None else [case["writes"]]
+        if entries != want_entries or filled != want_entries:
+            problems.append(
+                f"wrote {entries} (with files: {filled}), want {want_entries}"
+            )
+    if "says" in case and case["says"] not in p.stdout + p.stderr:
+        problems.append(f"output does not name {case['says']!r}")
+    if case.get("debug_log") and (problem := debug_log_problem(p.stderr)):
+        problems.append(problem)
     if p.returncode != want["exit"]:
         problems.append(f"exit {p.returncode}, want {want['exit']}")
     if key != want["key"]:
@@ -89,8 +132,8 @@ def run(case: dict, engine: str, cmd: list[str], bundle_args: list[str]) -> str 
             f"a refused run wrote {len(written)} file(s) under --out: {written[:3]}"
         )
     if not problems:
-        return None
-    return f"FAIL {case['id']} [{engine}]: " + "; ".join(problems)
+        return None, p.stdout
+    return f"FAIL {case['id']} [{engine}]: " + "; ".join(problems), p.stdout
 
 
 def main() -> int:
@@ -112,7 +155,11 @@ def main() -> int:
         results = list(
             pool.map(lambda job: run(job[0], job[1], cmds[job[1]], spec["B"]), jobs)
         )
-    failures = [r for r in results if r]
+    failures = [failure for failure, _ in results if failure]
+    for i, case in enumerate(cases):
+        stdouts = {out for _, out in results[i * len(ENGINES) : (i + 1) * len(ENGINES)]}
+        if case.get("same_stdout") and len(stdouts) != 1:
+            failures.append(f"FAIL {case['id']}: stdout differs across engines")
     for line in failures:
         print(line)
     print(

@@ -1,6 +1,6 @@
 {
-  "about": "VG-CLI-OPTIONS: one command line per case, run in all three engines; each must give the expected exit code and refusal key, and a refused run writes nothing under --out. {B} expands to the quickstart bundle and profile, {out} to a fresh directory per engine. 'engines' overrides the expectation for named engines, with the reason; every override names the item that removes it.",
-  "B": ["--bundle", "corpus/quickstart/evidence", "--profile", "corpus/quickstart/applicability.yaml"],
+  "about": "VG-CLI-OPTIONS: one command line per case, run in all three engines; each must give the expected exit code and refusal key, and a refused run writes nothing under --out. --json goes right after the command. Each run starts in a fresh empty working directory: {root} expands to the repository root, {B} to the quickstart bundle and profile, {out} to <cwd>/out. Optional: 'writes' names the one entry the run leaves in its working directory (null: none); 'says' must appear on stdout or stderr; 'same_stdout' requires byte-identical stdout across engines; 'debug_log' requires exactly Python's command.start and command.end records on stderr. 'engines' overrides the expectation for named engines, with the reason; every override names the item that removes it.",
+  "B": ["--bundle", "{root}/corpus/quickstart/evidence", "--profile", "{root}/corpus/quickstart/applicability.yaml"],
   "cases": [
     {"id": "assess-for-emit", "argv": ["assess", "{B}", "--for", "auditor", "--emit", "md", "--out", "{out}"], "exit": 3, "key": "input.for_emit_ambiguous"},
     {"id": "assess-for-emit-equals", "argv": ["assess", "{B}", "--for=auditor", "--emit=md", "--out", "{out}"], "exit": 3, "key": "input.for_emit_ambiguous"},
@@ -12,7 +12,7 @@
     {"id": "assess-for-emit-unknown", "argv": ["assess", "{B}", "--for", "auditor", "--emit", "bogus", "--out", "{out}"], "exit": 3, "key": "input.emit_format"},
     {"id": "assess-for-unknown", "argv": ["assess", "{B}", "--for", "bogus", "--out", "{out}"], "exit": 3, "key": "input.for_preset"},
     {"id": "assess-for-empty", "argv": ["assess", "{B}", "--for=", "--out", "{out}"], "exit": 3, "key": "input.for_preset"},
-    {"id": "assess-missing-bundle-first", "argv": ["assess", "--bundle", "corpus/quickstart/no-such-dir", "--profile", "corpus/quickstart/applicability.yaml", "--for", "auditor", "--emit", "md", "--out", "{out}"], "exit": 3, "key": "input.bundle_not_a_directory"},
+    {"id": "assess-missing-bundle-first", "argv": ["assess", "--bundle", "{root}/corpus/quickstart/no-such-dir", "--profile", "{root}/corpus/quickstart/applicability.yaml", "--for", "auditor", "--emit", "md", "--out", "{out}"], "exit": 3, "key": "input.bundle_not_a_directory"},
     {"id": "assess-emit-no-value", "argv": ["assess", "{B}", "--emit", "--out", "{out}"], "exit": 3, "key": null,
      "engines": {"typescript": {"exit": 3, "key": "input.assess_flag_needs_value"}, "java": {"exit": 3, "key": "input.assess_flag_needs_value"}},
      "why": "Python's argparse prints its unkeyed sentence; TypeScript and Java key it, as VG-FAIL-ON-PARITY already pins for --deviations and --fail-on (18.50a gives Python the key)"},
@@ -38,6 +38,26 @@
     {"id": "assess-unknown-flag", "argv": ["assess", "{B}", "--nonsense", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag"},
     {"id": "assess-out-abbreviated", "argv": ["assess", "{B}", "--ou", "o", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag"},
     {"id": "assess-format-not-an-assess-flag", "argv": ["assess", "{B}", "--format", "md", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag"},
-    {"id": "assess-second-positional", "argv": ["assess", "{B}", "x", "y", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag"}
+    {"id": "assess-second-positional", "argv": ["assess", "{B}", "x", "y", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag"},
+    {"id": "quickstart-no-options", "argv": ["quickstart"], "exit": 0, "key": null, "writes": "out"},
+    {"id": "quickstart-out", "argv": ["quickstart", "--out", "d"], "exit": 0, "key": null, "writes": "d"},
+    {"id": "quickstart-out-equals", "argv": ["quickstart", "--out=d"], "exit": 0, "key": null, "writes": "d"},
+    {"id": "quickstart-out-empty", "argv": ["quickstart", "--out="], "exit": 0, "key": null, "writes": "out"},
+    {"id": "quickstart-out-repeated", "argv": ["quickstart", "--out", "a", "--out", "b"], "exit": 0, "key": null, "writes": "b"},
+    {"id": "quickstart-quiet", "argv": ["quickstart", "--quiet"], "exit": 0, "key": null, "writes": "out"},
+    {"id": "quickstart-debug", "argv": ["quickstart", "--debug"], "exit": 0, "key": null, "writes": "out", "debug_log": true},
+    {"id": "quickstart-help-short", "argv": ["quickstart", "-h"], "exit": 0, "key": null, "writes": null, "says": "usage: agentce quickstart", "same_stdout": true},
+    {"id": "quickstart-help-long", "argv": ["quickstart", "--help"], "exit": 0, "key": null, "writes": null, "says": "usage: agentce quickstart", "same_stdout": true},
+    {"id": "quickstart-help-after-unknown", "argv": ["quickstart", "--no-such-flag", "-h"], "exit": 0, "key": null, "writes": null, "says": "usage: agentce quickstart", "same_stdout": true},
+    {"id": "quickstart-out-under-a-file", "argv": ["quickstart", "--out", "{root}/AGENTS.md/out"], "exit": 3, "key": "input.out_dir_unwritable", "writes": null},
+    {"id": "quickstart-out-no-value", "argv": ["quickstart", "--out"], "exit": 3, "key": "input.quickstart_unrecognized_flag", "writes": null, "says": "--out"},
+    {"id": "quickstart-out-no-value-before-flag", "argv": ["quickstart", "--out", "--quiet"], "exit": 3, "key": "input.quickstart_unrecognized_flag", "writes": null, "says": "--out"},
+    {"id": "quickstart-out-abbreviated", "argv": ["quickstart", "--ou", "o"], "exit": 3, "key": "input.quickstart_unrecognized_flag", "writes": null, "says": "--ou"},
+    {"id": "quickstart-unknown-flag", "argv": ["quickstart", "--no-such-flag"], "exit": 3, "key": "input.quickstart_unrecognized_flag", "writes": null, "says": "--no-such-flag"},
+    {"id": "quickstart-trust-root", "argv": ["quickstart", "--trust-root", "{root}/corpus/quickstart/applicability.yaml"], "exit": 3, "key": "input.quickstart_unrecognized_flag", "writes": null, "says": "--trust-root"},
+    {"id": "quickstart-positional", "argv": ["quickstart", "extra"], "exit": 3, "key": "input.quickstart_unrecognized_flag", "writes": null, "says": "extra"},
+    {"id": "quickstart-json-with-value", "argv": ["quickstart", "--json=1"], "exit": 3, "key": "input.quickstart_unrecognized_flag", "writes": null, "says": "--json"},
+    {"id": "quickstart-bare-double-dash", "argv": ["quickstart", "--"], "exit": 3, "key": "input.quickstart_unrecognized_flag", "writes": null},
+    {"id": "quickstart-double-dash-argument", "argv": ["quickstart", "--", "x"], "exit": 3, "key": "input.quickstart_unrecognized_flag", "writes": null}
   ]
 }

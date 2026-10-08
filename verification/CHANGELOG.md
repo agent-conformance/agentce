@@ -3,6 +3,18 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.63.0
+
+- `VG-CLI-OPTIONS` (18.106) gains 20 `quickstart` rows. TypeScript and Java used to read quickstart's
+  argv by looking for `--out` alone: they ran the quickstart and exited 0 on any unknown flag
+  (`--trust-root` among them), a positional, `--out=<dir>`, a value-less `--out` and `-h`, took the first
+  of two `--out`s, and printed nothing for `--debug`. Every engine now refuses a flag or argument
+  quickstart does not take with `input.quickstart_unrecognized_flag` (Python included, which stops
+  reading `--ou` as `--out`), reads `--out` as Python does, prints the usage for `-h`/`--help` and writes
+  Python's two `--debug` records. Each case now runs in a fresh working directory with `--json` right
+  after the command, and a case can require what the run writes, a token the output names, identical
+  stdout across engines and the `--debug` records. The demo has four more seeded faults, nine in all.
+
 ## 0.62.0
 
 - `VG-CLI-OPTIONS` (18.105) is new: one shared table of command lines, each run through the real Python,

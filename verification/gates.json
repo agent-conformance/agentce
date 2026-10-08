@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.62.0",
+  "suite_version": "0.63.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -2414,7 +2414,7 @@
     },
     {
       "id": "VG-CLI-OPTIONS",
-      "title": "Command-line options are never ignored: every command line in the shared table gives its expected exit code and refusal key in the real Python, TypeScript and Java CLIs, and a refused run writes nothing (starting with assess --for and --emit)",
+      "title": "Command-line options are never ignored: every command line in the shared table gives its expected exit code and refusal key in the real Python, TypeScript and Java CLIs, and a refused run writes nothing (assess --for and --emit, unknown assess flags, and every quickstart option)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -2430,7 +2430,7 @@
       "timeout_s": 900,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/cli_options/cases.json gives its expected exit code and --json refusal key in each engine (an engine override only where the case says why and names the item that removes it), and no refused run writes a file under --out; the 25 assess rows cover --for with --emit in both spellings and with an empty --emit, unknown, partly unknown and repeated --emit, unknown and empty --for, the bundle refusal before both, a missing --emit or --for value, a known --emit, an empty --emit, a known --for, a repeated --for, no flag, and an unknown, abbreviated (--em, --fo, --ou) or misspelled flag, a flag assess does not take (--format) and a second positional, each refused with input.assess_unrecognized_flag in every engine (TypeScript and Java refuse every well-formed --emit/--for with input.emit_unsupported until 18.16b)",
+        "pass": "every case in verification/gates/fixtures/cli_options/cases.json gives its expected exit code and --json refusal key in each engine (an engine override only where the case says why and names the item that removes it), and no refused run writes a file under --out; the 25 assess rows cover --for with --emit in both spellings and with an empty --emit, unknown, partly unknown and repeated --emit, unknown and empty --for, the bundle refusal before both, a missing --emit or --for value, a known --emit, an empty --emit, a known --for, a repeated --for, no flag, and an unknown, abbreviated (--em, --fo, --ou) or misspelled flag, a flag assess does not take (--format) and a second positional, each refused with input.assess_unrecognized_flag in every engine (TypeScript and Java refuse every well-formed --emit/--for with input.emit_unsupported until 18.16b); the 20 quickstart rows run in a fresh working directory and cover no option, --out d, --out=d, --out= and a repeated --out (each writes only the expected directory), --quiet, --debug (Python's command.start and command.end records on stderr), -h, --help and -h after an unknown flag (usage, byte-identical across engines, nothing written), --out under a file, and the refusals with input.quickstart_unrecognized_flag that name the token and write nothing: a value-less --out at the end and before a flag, --ou, --no-such-flag, --trust-root, an extra positional, --json=1, a bare -- and -- x",
         "fail": "any engine gives another exit code or key for a case, accepts an option it then ignores, or a refused run leaves files under --out"
       },
       "faults": [
@@ -2463,9 +2463,33 @@
           "file": "engines/java/src/main/java/org/agentce/Cli.java",
           "search": "        refuseUnknownAssessArgs(args);\n",
           "replace": ""
+        },
+        {
+          "description": "Python's quickstart parser prefix-matches again, so --ou o runs as --out o in Python alone",
+          "file": "engines/python/agentce/cli.py",
+          "search": "never --out in Python alone, and every argv error is keyed (18.106).\n        allow_abbrev=False,\n",
+          "replace": "never --out in Python alone, and every argv error is keyed (18.106).\n        allow_abbrev=True,\n"
+        },
+        {
+          "description": "TypeScript quickstart stops refusing an unknown flag or argument and runs without it (the state before 18.106)",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "  if (unknown !== undefined) {\n    throw unknown.startsWith(\"-\") && unknown !== \"-\"\n      ? quickstartUnrecognized(",
+          "replace": "  if (unknown !== undefined && false) {\n    throw unknown.startsWith"
+        },
+        {
+          "description": "Java quickstart takes the first of a repeated --out, where Python takes the last",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "                    out = args[++i];\n",
+          "replace": "                    out = out != null ? out : args[i + 1];\n                    i++;\n"
+        },
+        {
+          "description": "Java quickstart runs the assessment for -h/--help instead of printing the usage (the state before 18.106)",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "                if (help) {\n                    return new QuickstartArgs(true, null);\n                }\n",
+          "replace": ""
         }
       ],
-      "fix_hint": "run verification/gates/cli_options.sh and read the FAIL lines (case, engine, exit and key). The reference is _parse_emit and _resolve_emit in engines/python/agentce/commands/__init__.py; TypeScript and Java refuse in refuseEmitAndFor (engines/typescript/src/cli.ts, engines/java/src/main/java/org/agentce/Cli.java) and read the values in assessValueFlags. An unknown or abbreviated flag is refused in refuseUnknownAssessArgs (TypeScript, Java) and by allow_abbrev=False plus _assess_unknown_error in engines/python/agentce/cli.py."
+      "fix_hint": "run verification/gates/cli_options.sh and read the FAIL lines (case, engine, exit and key). The reference is _parse_emit and _resolve_emit in engines/python/agentce/commands/__init__.py; TypeScript and Java refuse in refuseEmitAndFor (engines/typescript/src/cli.ts, engines/java/src/main/java/org/agentce/Cli.java) and read the values in assessValueFlags. An unknown or abbreviated flag is refused in refuseUnknownAssessArgs (TypeScript, Java) and by allow_abbrev=False plus _assess_unknown_error in engines/python/agentce/cli.py. quickstart: allow_abbrev=False plus _quickstart_usage_error/_quickstart_unknown_error in engines/python/agentce/cli.py, parseQuickstartArgv in TypeScript and Java, --debug records in logDebug (main), -h usage through CommandResult.usage."
     }
   ]
 }
