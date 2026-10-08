@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -24,6 +25,11 @@ public final class Messages {
     private Messages() {}
 
     public static final String DEFAULT_LANGUAGE = "en";
+
+    /** The languages a report can be rendered in: one per vendored {@code messages.<lang>.json}, sorted,
+     * as Python's {@code messages.available_languages()} globs them ({@code CliTest} holds this list to
+     * the vendored files). */
+    public static final List<String> AVAILABLE_LANGUAGES = List.of("de", "en");
 
     /** Which of the catalogue's keys this module renders. Their text lives in the vendored catalogue,
      * never hardcoded in this module. */

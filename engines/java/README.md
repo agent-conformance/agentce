@@ -39,6 +39,14 @@ build/install/agentce/bin/agentce quickstart --json
 build/install/agentce/bin/agentce report --from ./out/assertions.json --format md
 ```
 
+`assess` reads its command line through one declared grammar (`Argv.java`, SPEC §8.5) the way the
+Python engine's argparse does: `--<option>=<value>` works for every value option, the last of a repeated
+option wins, `-h`/`--help` prints the usage wherever it sits before `--`, and an unknown flag exits 3
+with `input.assess_unrecognized_flag`. `--report-language de|en` sets the report language (SPEC §9.3).
+Until they are ported, `--package-for-sharing` is refused with `input.package_unsupported` and a
+records folder (`agentce assess <folder>`) with `input.records_unsupported`; pass `--bundle` and
+`--profile`, or use the Python engine.
+
 ## Test seams
 
 The cross-engine checks call a few computation seams (`numerics`, `digest-tree`, `security-view`,

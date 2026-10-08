@@ -322,6 +322,184 @@ class CliTest {
         }
     }
 
+    private static final Path RECORDS = REPO.resolve("verification/gates/fixtures/quick_path/records");
+
+    /** The quickstart bundle and profile, then {@code extra}: the assess line every 18.109 row builds on. */
+    private static JsonNode assessQuickstart(String... extra) {
+        List<String> all = new ArrayList<>(List.of(
+                "assess",
+                "--bundle", QUICKSTART.resolve("evidence").toString(),
+                "--profile", QUICKSTART.resolve("applicability.yaml").toString()));
+        all.addAll(Arrays.asList(extra));
+        return runJson(all.toArray(String[]::new));
+    }
+
+    /** Asserts {@code env} is the refusal {@code key} with {@code cause} (when not null), and nothing in {@code out}. */
+    private static void assertRefusedNothingWritten(JsonNode env, String key, String cause, Path out) {
+        assertEquals(3, env.get("exit_code").asInt(), env.toString());
+        assertEquals(key, env.get("error").get("message_key").asText(), env.toString());
+        if (cause != null) {
+            assertEquals(cause, env.get("error").get("detail").asText());
+        }
+        assertFalse(Files.exists(out), out.toString());
+    }
+
+    @Test
+    void assessHelpPrintsTheUsageAnywhereBeforeTheSeparatorAndWritesNothing(@TempDir Path dir) {
+        Path out = dir.resolve("o");
+        String bundle = QUICKSTART.resolve("evidence").toString();
+        String profile = QUICKSTART.resolve("applicability.yaml").toString();
+        for (String[] argv : new String[][] {
+                {"assess", "-h"},
+                {"assess", "--help"},
+                {"assess", "--json", "--bundle", bundle, "--profile", profile, "-h", "--out", out.toString()},
+                {"assess", "--bundle", bundle, "--profile", profile, "--help", "--out", out.toString()},
+                {"assess", "--no-such-flag", "-h"},
+                {"assess", "-h", "--no-such-flag"}}) {
+            assertEquals(Cli.ASSESS_USAGE, captureStdout(argv), String.join(" ", argv));
+            assertEquals(0, Cli.run(argv));
+        }
+        assertTrue(Cli.ASSESS_USAGE.startsWith("usage: agentce assess [-h] [--json] [--debug] [--quiet]"));
+        assertFalse(Files.exists(out));
+    }
+
+    @Test
+    void assessRefusesManualProbesAClusterAndAValueOnAFlag(@TempDir Path dir) {
+        Path out = dir.resolve("o");
+        for (String[] extra : new String[][] {
+                {"--manual", "/nonexistent-agentce-dir"}, {"--probes", "x"}, {"--records", "x"}, {"--format", "md"},
+                {"--ou", "o"}, {"-hx"}, {"--help=x"}, {"--json=1"}, {"--allow-unverified-catalog=1"},
+                {"--package-for-sharing=1"}, {"--", "-h"}}) {
+            List<String> all = new ArrayList<>(Arrays.asList(extra));
+            all.addAll(List.of("--out", out.toString()));
+            JsonNode env = assessQuickstart(all.toArray(String[]::new));
+            assertRefusedNothingWritten(env, "input.assess_unrecognized_flag", null, out);
+        }
+    }
+
+    @Test
+    void assessRefusesAValueOptionWithNoValue(@TempDir Path dir) {
+        Path out = dir.resolve("o");
+        boolean defaultOutBefore = Files.exists(Path.of("out")); // the refusal must not create ./out
+        JsonNode bare = assessQuickstart("--out");
+        assertRefusedNothingWritten(bare, "input.assess_flag_needs_value", "argument --out: expected one argument", out);
+        assertEquals("pass --out <value>.", bare.get("error").get("fix").asText());
+        assertRefusedNothingWritten(assessQuickstart("--report-language", "--out", out.toString()),
+                "input.assess_flag_needs_value", "argument --report-language: expected one argument", out);
+        assertRefusedNothingWritten(assessQuickstart("--out", "--", "x"), "input.assess_flag_needs_value",
+                "argument --out: expected one argument", out);
+        assertEquals(defaultOutBefore, Files.exists(Path.of("out")));
+    }
+
+    @Test
+    void assessReadsTheEqualsFormAndTheLastOfARepeatedValue(@TempDir Path dir) {
+        Path a = dir.resolve("a");
+        Path b = dir.resolve("b");
+        JsonNode env = runJson("assess",
+                "--bundle=" + QUICKSTART.resolve("evidence"), "--profile=" + QUICKSTART.resolve("applicability.yaml"),
+                "--out=" + a, "--out", b.toString());
+        assertEquals(0, env.get("exit_code").asInt(), env.toString());
+        assertTrue(Files.isRegularFile(b.resolve("manifest.json")));
+        assertFalse(Files.exists(a));
+        JsonNode bad = assessQuickstart("--bundle", dir.resolve("nope").toString(), "--out", a.toString());
+        assertRefusedNothingWritten(bad, "input.bundle_not_a_directory", null, a);
+        assertRefusedNothingWritten(assessQuickstart("--catalog-dir=" + dir.resolve("nope"), "--out", a.toString()),
+                "input.catalog-dir_not_a_directory", null, a);
+    }
+
+    @Test
+    void assessRefusesAReportLanguageWithNoCatalogue(@TempDir Path dir) {
+        Path out = dir.resolve("o");
+        for (String language : new String[] {"xx", "", "../x"}) {
+            JsonNode env = assessQuickstart("--report-language", language, "--out", out.toString());
+            assertRefusedNothingWritten(env, "input.report_language_unknown",
+                    "--report-language " + Readiness.pyRepr(language) + " has no report catalogue.", out);
+            assertEquals("choose one of: de, en.", env.get("error").get("fix").asText());
+        }
+    }
+
+    @Test
+    void assessAvailableLanguagesAreTheVendoredCatalogues() throws IOException {
+        List<String> vendored;
+        try (Stream<Path> files = Files.list(REPO.resolve("engines/java/src/main/resources/i18n"))) {
+            vendored = files.map(p -> p.getFileName().toString())
+                    .filter(n -> n.startsWith("messages.") && n.endsWith(".json"))
+                    .map(n -> n.substring("messages.".length(), n.length() - ".json".length()))
+                    .sorted()
+                    .toList();
+        }
+        assertEquals(vendored, Messages.AVAILABLE_LANGUAGES);
+    }
+
+    @Test
+    void assessReportLanguageDeLocalisesTheReportAndTheManifest(@TempDir Path dir) throws IOException {
+        Path en = dir.resolve("en");
+        Path de = dir.resolve("de");
+        assertEquals(0, assessQuickstart("--report-language", "en", "--out", en.toString()).get("exit_code").asInt());
+        assertEquals(0, assessQuickstart("--report-language", "de", "--out", de.toString()).get("exit_code").asInt());
+        String md = Files.readString(de.resolve("report.md"));
+        assertTrue(md.startsWith("# AgentCE-Konformitätsbericht\n"), md.lines().findFirst().orElse(""));
+        assertTrue(md.lines().anyMatch("## Ergebnisübersicht"::equals));
+        assertTrue(md.lines().anyMatch("## Aussagen"::equals));
+        assertFalse(md.equals(Files.readString(en.resolve("report.md"))));
+        String html = Files.readString(de.resolve("report.html"));
+        assertTrue(html.contains("lang=\"de\"") && html.contains("Konformitätsbericht"));
+        assertEquals("de", Json.parseFile(de.resolve("manifest.json")).get("run").get("report_language").asText());
+        assertEquals("en", Json.parseFile(en.resolve("manifest.json")).get("run").get("report_language").asText());
+    }
+
+    @Test
+    void assessRefusesABareAllowUnverifiedCatalogAndPackageForSharing(@TempDir Path dir) {
+        Path out = dir.resolve("o");
+        assertRefusedNothingWritten(assessQuickstart("--allow-unverified-catalog", "--out", out.toString()),
+                "input.allow_unverified_requires_catalog_dir",
+                "--allow-unverified-catalog was given without --catalog-dir.", out);
+        JsonNode env = assessQuickstart("--package-for-sharing", "--out", out.toString());
+        assertRefusedNothingWritten(env, "input.package_unsupported",
+                ErrorCatalogue.errorCause("input.package_unsupported"), out);
+        assertEquals(ErrorCatalogue.errorFix("input.package_unsupported"), env.get("error").get("fix").asText());
+        // packaging comes before the language and the override, as in Python
+        assertRefusedNothingWritten(
+                assessQuickstart("--allow-unverified-catalog", "--report-language", "xx", "--package-for-sharing",
+                        "--out", out.toString()),
+                "input.package_unsupported", null, out);
+        assertRefusedNothingWritten(
+                assessQuickstart("--allow-unverified-catalog", "--report-language", "xx", "--out", out.toString()),
+                "input.report_language_unknown", null, out);
+        // and all of them before --emit/--for
+        assertRefusedNothingWritten(
+                assessQuickstart("--allow-unverified-catalog", "--emit", "md", "--out", out.toString()),
+                "input.allow_unverified_requires_catalog_dir", null, out);
+    }
+
+    @Test
+    void assessRefusesARecordsFolderInPythonsOrder(@TempDir Path dir) {
+        Path out = dir.resolve("o");
+        String bundle = QUICKSTART.resolve("evidence").toString();
+        JsonNode env = runJson("assess", RECORDS.toString(), "--out", out.toString());
+        assertRefusedNothingWritten(env, "input.records_unsupported",
+                ErrorCatalogue.errorCause("input.records_unsupported"), out);
+        assertRefusedNothingWritten(
+                runJson("assess", RECORDS.toString(), "--fail-on", "severity == 'high'", "--out", out.toString()),
+                "input.records_unsupported", null, out);
+        String missing = dir.resolve("nope").toString();
+        env = runJson("assess", missing, "--out", out.toString());
+        assertRefusedNothingWritten(env, "input.records_not_a_directory",
+                "the records folder " + Readiness.pyRepr(missing) + " is not an existing directory.", out);
+        assertEquals("pass a folder of OpenTelemetry GenAI or OpenInference trace exports.",
+                env.get("error").get("fix").asText());
+        assertRefusedNothingWritten(runJson("assess", RECORDS.toString(), "--bundle", bundle, "--out", out.toString()),
+                "input.records_source_ambiguous", "both a records folder and --bundle were given.", out);
+        assertRefusedNothingWritten(
+                runJson("assess", RECORDS.toString(), "--package-for-sharing", "--out", out.toString()),
+                "input.package_requires_bundle", null, out);
+        // `-1` and a token holding a space are positionals, so beside --bundle they are a records folder
+        assertRefusedNothingWritten(assessQuickstart("-1", "--out", out.toString()),
+                "input.records_source_ambiguous", null, out);
+        assertRefusedNothingWritten(assessQuickstart("--x y", "--out", out.toString()),
+                "input.records_source_ambiguous", null, out);
+    }
+
     @Test
     void quickstartRefusesAFlagOrArgumentItDoesNotTakeAndHelpPrintsUsage(@TempDir Path out) {
         for (String[] extra : new String[][] {

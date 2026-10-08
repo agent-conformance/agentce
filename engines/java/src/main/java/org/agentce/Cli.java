@@ -14,7 +14,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -862,7 +862,13 @@ global options:
             /** {@code --emit}'s raw value as given ({@code ""} included); {@code quickstart} never sets it. */
             String emit,
             /** {@code --for}'s preset as given; {@code quickstart} never sets it. */
-            String forPreset) {}
+            String forPreset,
+            /** assess's positional records folder; {@code quickstart} never sets it. */
+            String folder,
+            /** {@code --package-for-sharing}; {@code quickstart} never sets it. */
+            boolean packageForSharing,
+            /** {@code --report-language} as given ({@code ""} included); {@code null} reports in English. */
+            String reportLanguage) {}
 
     /** Every format Python's {@code assess --emit} accepts, in Python's order ({@code commands.EMIT_FORMATS}). */
     private static final List<String> EMIT_FORMATS = List.of(
@@ -915,14 +921,65 @@ global options:
         }
     }
 
+    /** The keyed error whose cause and fix are the catalogue's documented text for {@code key}. */
+    private static InputError catalogued(String key) {
+        return new InputError(key, ErrorCatalogue.errorCause(key), ErrorCatalogue.errorFix(key));
+    }
+
+    /** A records folder, refused in Python's order until this engine reads one (18.30, KD-074): beside
+     * --bundle; a folder that does not exist; a bad --profile; --package-for-sharing (which needs a
+     * bundle in every engine); and otherwise the folder itself, with input.records_unsupported. */
+    private static void refuseRecordsFolder(AssessOptions options) {
+        if (options.bundle() != null) {
+            throw new InputError(
+                    "input.records_source_ambiguous",
+                    "both a records folder and --bundle were given.",
+                    "pass either a folder of trace exports or --bundle <dir>, not both.");
+        }
+        requireDir(options.folder(), "records", "the records folder",
+                "pass a folder of OpenTelemetry GenAI or OpenInference trace exports.");
+        if (options.profile() != null) {
+            Profile.load(Paths.get(requireFile(options.profile(), "profile", "the applicability profile")));
+        }
+        if (options.packageForSharing()) {
+            throw new InputError(
+                    "input.package_requires_bundle",
+                    "--package-for-sharing works only with --bundle/--profile, not a records folder.",
+                    "pass --bundle and --profile instead of a records folder, or drop --package-for-sharing.");
+        }
+        throw catalogued("input.records_unsupported");
+    }
+
     /** Run a full assessment (ingest, integrity, graph, coverage, applicability, evaluate, report) — the
      * same pipeline {@code conformance run} exercises per corpus project, generalised to an arbitrary
      * bundle. */
     private static CommandResult runAssess(AssessOptions options) {
         CommandResult result = new CommandResult("assess");
+        if (options.folder() != null) {
+            refuseRecordsFolder(options);
+        }
         String bundleDir = requireDir(options.bundle(), "bundle", "the evidence bundle");
         String profilePath = requireFile(options.profile(), "profile", "the applicability profile");
         Profile profileObj = Profile.load(Paths.get(profilePath));
+        // Python's order (18.109): packaging, the report language and the unverified-catalog override
+        // are refused after the bundle and profile and before --emit/--for, before anything is written.
+        if (options.packageForSharing()) {
+            throw catalogued("input.package_unsupported");
+        }
+        String language = options.reportLanguage() != null ? options.reportLanguage() : Messages.DEFAULT_LANGUAGE;
+        if (!Messages.AVAILABLE_LANGUAGES.contains(language)) {
+            throw new InputError(
+                    "input.report_language_unknown",
+                    "--report-language " + Readiness.pyRepr(language) + " has no report catalogue.",
+                    "choose one of: " + String.join(", ", Messages.AVAILABLE_LANGUAGES) + ".");
+        }
+        if (options.allowUnverified() && options.catalogDirs().isEmpty()) {
+            throw new InputError(
+                    "input.allow_unverified_requires_catalog_dir",
+                    "--allow-unverified-catalog was given without --catalog-dir.",
+                    "add --catalog-dir <dir>, or drop --allow-unverified-catalog.");
+        }
+        Map<String, String> catalogue = Messages.catalogue(language);
         refuseEmitAndFor(options.emit(), options.forPreset());
         // --fail-on is parsed (never eval'd) right after the bundle and profile, as Python does: a
         // hostile or malformed expression is refused at exit 3 before the catalogs resolve, before
@@ -1031,7 +1088,7 @@ global options:
             Assess.Applied applied = Assess.applyDeviations(evaluated, deviations, newWindowEnd);
             evaluated = applied.assertions();
             Map<String, JsonNode> byControl = Assess.deviationsByControl(deviations);
-            String template = Messages.catalogue(Messages.DEFAULT_LANGUAGE).get("readiness.deviation_expired_ignored");
+            String template = catalogue.get("readiness.deviation_expired_ignored");
             for (String control : applied.expired()) {
                 limitations.add(template
                         .replace("{control}", control)
@@ -1050,7 +1107,7 @@ global options:
                 out, evaluated, bundle.digest(), resolved.labels(),
                 // config.py's operator default (SPEC §8.4); agentce.toml is not read here (Python only).
                 operatorEnv != null ? operatorEnv : "unset",
-                invocation, supersedes, Messages.DEFAULT_LANGUAGE, resolved.catalogs(), activity, blindSpots,
+                invocation, supersedes, language, resolved.catalogs(), activity, blindSpots,
                 profileObj, null, ingested.accepted, limitations,
                 applicabilityProfileDigest, domainBindingDigest, deviationRegisterDigest, deviations);
         if (state != null) {
@@ -1124,7 +1181,7 @@ global options:
             result.addCode(ExitCode.FINDINGS.code);
         }
         // SPEC.md:1076 (SPEC Sec.8.5): exit 2 whenever any assertion is both insufficient_evidence and
-        // severity: high. Java's assess has no records-folder entrypoint (Python-only, 18.30
+        // severity: high. Java's assess refuses a records folder (input.records_unsupported, 18.30
         // Dispositions), so this check applies unconditionally, unlike Python's `scanned is None`
         // scoping.
         TreeSet<String> highInsufficient = new TreeSet<>();
@@ -1139,7 +1196,7 @@ global options:
         if (evaluatedNothing(evaluated)) {
             throw nothingEvaluated(profileObj, ingested.accepted, evaluated.size());
         }
-        for (String line : Report.activityCliLines(activity, Messages.catalogue(Messages.DEFAULT_LANGUAGE))) {
+        for (String line : Report.activityCliLines(activity, catalogue)) {
             result.note(line);
         }
         for (String line : Report.blindSpotsCliLines(blindSpots)) {
@@ -1153,108 +1210,148 @@ global options:
         return result;
     }
 
-    /** The fix each assess value flag's missing-value refusal names. */
-    private static final Map<String, String> ASSESS_VALUE_FLAGS = Map.of(
-            "--deviations", "pass --deviations <file>.",
-            "--fail-on", "pass --fail-on <expression>.",
-            "--emit", "pass --emit <formats>.",
-            "--for", "pass --for <preset>.");
+    /** Python's {@code COLUMNS=80 agentce assess --help}, word for word. */
+    static final String ASSESS_USAGE = """
+usage: agentce assess [-h] [--json] [--debug] [--quiet] [--bundle BUNDLE]
+                      [--catalog CATALOG] [--profile PROFILE]
+                      [--deviations DEVIATIONS] [--domain DOMAIN]
+                      [--catalog-dir CATALOG_DIR] [--trust-root TRUST_ROOT]
+                      [--allow-unverified-catalog] [--package-for-sharing]
+                      [--out OUT] [--state STATE]
+                      [--report-language REPORT_LANGUAGE] [--emit EMIT]
+                      [--for PRESET] [--fail-on FAIL_ON]
+                      [folder]
 
-    /** {@code --deviations}', {@code --fail-on}'s, {@code --emit}'s and {@code --for}'s values, read in one left-to-right scan the way
-     * Python's argparse reads a {@code store} option: {@code --x <value>} or {@code --x=<value>}, the
-     * last occurrence of each wins, and the first flag with no value (trailing, or followed by another
-     * option) is refused at once with argparse's own sentence rather than silently taking the next flag
-     * as its value or ignoring it. */
-    private static Map<String, String> assessValueFlags(String[] args) {
-        Map<String, String> values = new HashMap<>();
-        for (int i = 1; i < args.length; i++) {
-            String token = args[i];
-            int eq = token.indexOf('=');
-            String name = eq >= 0 ? token.substring(0, eq) : token;
-            String fix = ASSESS_VALUE_FLAGS.get(name);
-            if (fix == null) {
-                continue;
-            }
-            if (eq >= 0) {
-                values.put(name, token.substring(eq + 1));
-            } else if (i + 1 >= args.length || looksLikeOption(args[i + 1])) {
-                throw new InputError(
-                        "input.assess_flag_needs_value", "argument " + name + ": expected one argument", fix);
-            } else {
-                values.put(name, args[++i]);
-            }
+Run a full assessment: `agentce assess <folder>` over a folder of trace
+exports, or `agentce assess --bundle <dir> --profile <file>` over an evidence
+bundle.
+
+positional arguments:
+  folder                a folder of OpenTelemetry GenAI or OpenInference trace
+                        exports (.json, .jsonl, .ndjson): assess reads it and
+                        writes a default profile, so no other flag is needed
+
+options:
+  -h, --help            show this help message and exit
+  --bundle BUNDLE       the evidence bundle directory
+  --catalog CATALOG     catalog ids, comma-separated: <id@ver>[,<id@ver>...]
+                        (default: the profile's catalogs, else the baseline)
+  --profile PROFILE     the applicability profile file
+  --deviations DEVIATIONS
+                        the deviation register file: a lint-clean, unexpired
+                        entry flips its control's non-conformant outcome to
+                        partial
+  --domain DOMAIN       the domain ontology binding file
+  --catalog-dir CATALOG_DIR
+                        a catalog directory to evaluate (repeatable)
+  --trust-root TRUST_ROOT
+                        trust root every --catalog-dir signature is verified
+                        against (default: AGENTCE_TRUST_ROOT, else the
+                        vendored development root)
+  --allow-unverified-catalog
+                        assess a --catalog-dir catalog whose signature is
+                        absent or does not verify, recording the override as a
+                        limitation in the manifest and the claim (SPEC 8.7).
+                        Requires --catalog-dir.
+  --package-for-sharing
+                        copy the evidence bundle, profile, domain binding and
+                        every --catalog-dir into --out/bundle/ so the
+                        directory is self-contained: `agentce sign` then
+                        `agentce verify --report` re-runs it offline on
+                        another machine. Requires --bundle (not a records
+                        folder).
+  --out OUT             the output directory (default: ./out)
+  --state STATE         the incremental state directory
+  --report-language REPORT_LANGUAGE
+                        message-key catalogue for the report: de or en
+                        (default: en); does not affect assertions.json (SPEC
+                        9.3)
+  --emit EMIT           comma-separated report formats to render (default:
+                        html, md, oscal, pack, sarif, skill); one or more of:
+                        md, html, oscal, sarif, public, pack, junit, csv,
+                        oscal_xml, pdf, remediation, skill. Setting CI adds
+                        junit to the default automatically (see --for); an
+                        explicit --emit is never extended.
+  --for PRESET          report preset for an audience, in place of --emit:
+                        engineering (html, md, remediation, skill); compliance
+                        (csv, oscal, oscal_xml, pack, public); security (html,
+                        md, sarif); ci (junit, sarif); share (html, md, pack,
+                        pdf, public); risk-lead (html, md); auditor (oscal,
+                        oscal_xml, pack); buyer (pack). CI detected
+                        automatically (adds junit to the default) when neither
+                        --for nor --emit is given.
+  --fail-on FAIL_ON     gate the exit code on a tiny deterministic expression
+                        over assertion fields (control, subject, outcome,
+                        severity, family, rung, mode), e.g. 'outcome=="non-
+                        conformant" and severity=="high"' (comparisons joined
+                        by and/or; never a general expression language).
+                        Replaces the default any-non-conformant rule when
+                        given.
+
+global options:
+  --json                emit machine-readable JSON on stdout
+  --debug               verbose logs on stderr and a stack trace on unexpected
+                        errors
+  --quiet               log warnings and errors only
+""";
+
+    /** assess's declared grammar (Python's assess subparser, {@code allow_abbrev=False}): every option the
+     * usage names, and at most one positional, the records folder. */
+    static final Argv.Grammar ASSESS_GRAMMAR = assessGrammar();
+
+    private static Argv.Grammar assessGrammar() {
+        Map<String, Argv.Kind> options = new LinkedHashMap<>();
+        options.put("-h", Argv.Kind.HELP);
+        options.put("--help", Argv.Kind.HELP);
+        for (String flag : List.of("--json", "--debug", "--quiet")) {
+            options.put(flag, Argv.Kind.FLAG);
         }
-        return values;
+        for (String name : List.of(
+                "--bundle", "--catalog", "--profile", "--deviations", "--domain", "--trust-root", "--out",
+                "--state", "--report-language", "--emit", "--for", "--fail-on")) {
+            options.put(name, Argv.Kind.VALUE);
+        }
+        options.put("--catalog-dir", Argv.Kind.APPEND);
+        options.put("--allow-unverified-catalog", Argv.Kind.FLAG);
+        options.put("--package-for-sharing", Argv.Kind.FLAG);
+        return new Argv.Grammar(
+                Collections.unmodifiableMap(options),
+                1,
+                "input.assess_unrecognized_flag",
+                "input.assess_flag_needs_value",
+                "run `agentce assess --help` for the flags assess takes, or drop the flag.",
+                "pass at most one records folder: `agentce assess <folder>`.",
+                Map.of("--deviations", "<file>", "--fail-on", "<expression>", "--emit", "<formats>", "--for",
+                        "<preset>"));
     }
 
-    /** Every assess option that takes a value. */
-    private static final Set<String> ASSESS_OPTIONS_WITH_VALUE = Set.of(
-            "--bundle", "--catalog", "--profile", "--deviations", "--domain", "--catalog-dir", "--trust-root",
-            "--manual", "--probes", "--out", "--state", "--report-language", "--emit", "--for", "--fail-on");
-
-    /** Every assess flag that takes no value. {@code -h}/{@code --help} are passed through, not refused. */
-    private static final Set<String> ASSESS_FLAGS_WITHOUT_VALUE = Stream.concat(
-                    GLOBAL_BOOLEAN_FLAGS.stream(),
-                    Stream.of("--allow-unverified-catalog", "--package-for-sharing", "-h", "--help"))
-            .collect(Collectors.toUnmodifiableSet());
-
-    /** Refuse what Python's assess parser (argparse, {@code allow_abbrev=False}) refuses after reading the
-     * values: a flag it does not know, an abbreviated one included ({@code --em md} is never
-     * {@code --emit md}), and a second positional. Runs after {@link #assessValueFlags}, so a missing value
-     * is named first, as argparse names it. */
-    private static void refuseUnknownAssessArgs(String[] args) {
-        int positionals = 0;
-        boolean optionsEnded = false;
-        for (int i = 1; i < args.length; i++) {
-            String token = args[i];
-            if (!optionsEnded && token.equals("--")) {
-                optionsEnded = true;
-                continue;
-            }
-            if (!optionsEnded && looksLikeOption(token)) {
-                int eq = token.indexOf('=');
-                if (ASSESS_OPTIONS_WITH_VALUE.contains(eq >= 0 ? token.substring(0, eq) : token)) {
-                    if (eq < 0) {
-                        i++;
-                    }
-                    continue;
-                }
-                if (ASSESS_FLAGS_WITHOUT_VALUE.contains(token)) {
-                    continue;
-                }
-                throw new InputError(
-                        "input.assess_unrecognized_flag",
-                        "unrecognized flag '" + token + "'.",
-                        "run `agentce assess --help` for the flags assess takes, or drop the flag.");
-            }
-            if (++positionals > 1) {
-                throw new InputError(
-                        "input.assess_unrecognized_flag",
-                        "unrecognized argument '" + token + "'.",
-                        "pass at most one records folder: `agentce assess <folder>`.");
-            }
-        }
-    }
-
+    /** {@code agentce assess}: reads its argv only through {@link #ASSESS_GRAMMAR}. */
     private static CommandResult cmdAssess(String[] args) {
-        Map<String, String> valueFlags = assessValueFlags(args);
-        refuseUnknownAssessArgs(args);
-        String outArg = flagValue(args, "out");
+        Argv.Result parsed = Argv.scan(Arrays.copyOfRange(args, 1, args.length), ASSESS_GRAMMAR);
+        if (parsed.help()) {
+            CommandResult result = new CommandResult("assess");
+            result.usage = ASSESS_USAGE;
+            return result;
+        }
+        String outArg = emptyToNull(parsed.value("--out"));
         return runAssess(new AssessOptions(
-                flagValue(args, "bundle"),
-                flagValue(args, "profile"),
-                flagValue(args, "catalog"),
-                flagValue(args, "domain"),
-                flagValues(args, "catalog-dir"),
+                parsed.value("--bundle"),
+                parsed.value("--profile"),
+                parsed.value("--catalog"),
+                parsed.value("--domain"),
+                parsed.list("--catalog-dir"),
                 outArg != null ? outArg : DEFAULT_OUT_DIR,
-                flagValue(args, "state"),
+                parsed.value("--state"),
                 "assess",
-                flagValue(args, "trust-root"),
-                Arrays.asList(args).contains("--allow-unverified-catalog"),
-                valueFlags.get("--deviations"),
-                valueFlags.get("--fail-on"),
-                valueFlags.get("--emit"),
-                valueFlags.get("--for")));
+                parsed.value("--trust-root"),
+                parsed.flag("--allow-unverified-catalog"),
+                parsed.value("--deviations"),
+                parsed.value("--fail-on"),
+                parsed.value("--emit"),
+                parsed.value("--for"),
+                parsed.positionals().isEmpty() ? null : parsed.positionals().get(0),
+                parsed.flag("--package-for-sharing"),
+                parsed.value("--report-language")));
     }
 
     /** Python's {@code agentce quickstart --help}, word for word. */
@@ -1368,6 +1465,9 @@ global options:
                 null,
                 null,
                 null,
+                null,
+                null,
+                false,
                 null));
         result.data.setAll(assess.data);
         result.data.put("quickstart", "ok");
@@ -1543,7 +1643,7 @@ global options:
 
     /** argparse's {@code ^-\d+$|^-\d*\.\d+$} over a {@code str}: {@code \d} is any Unicode decimal
      * digit (Nd), and {@code $} also matches before one trailing newline. */
-    private static final Pattern NEGATIVE_NUMBER = Pattern.compile("-\\p{Nd}+\n?|-\\p{Nd}*\\.\\p{Nd}+\n?");
+    private static final Pattern NEGATIVE_NUMBER = Argv.NEGATIVE_NUMBER;
 
     /** A token argparse classifies as an option rather than a value: it starts with {@code -}, is not
      * a bare {@code -}, does not look like a negative number and holds no space
