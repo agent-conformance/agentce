@@ -23,7 +23,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CASES = ROOT / "verification/gates/fixtures/cli_options/cases.json"
+#: The case table: cases.json (VG-CLI-OPTIONS) unless the gate names another file in this folder
+#: (top_level.json, VG-CLI-TOP-LEVEL), so each gate's seeded-fault demo stays inside its CI lane.
+FIXTURES = ROOT / "verification/gates/fixtures/cli_options"
 ENGINES = ("python", "typescript", "java")
 #: CI is cleared so Python's automatic junit (CI detected, no --emit/--for) never changes a row, and
 #: COLUMNS fixed so argparse wraps its help text the same way on every terminal.
@@ -172,7 +174,9 @@ def run(
 
 
 def main() -> int:
-    spec = json.loads(CASES.read_text(encoding="utf-8"))
+    spec = json.loads(
+        (FIXTURES / (sys.argv[1:] or ["cases.json"])[0]).read_text(encoding="utf-8")
+    )
     cases = spec["cases"]
     ids = [c["id"] for c in cases]
     if len(ids) != len(set(ids)):
@@ -222,7 +226,7 @@ def main() -> int:
             f"(stopped at the first failure: {skipped} run(s) not yet started were skipped)"
         )
     print(
-        f"{'FAIL' if failures else 'OK'} VG-CLI-OPTIONS: {len(cases)} cases x {len(ENGINES)} engines, "
+        f"{'FAIL' if failures else 'OK'} {spec['about'].split(':', 1)[0]}: {len(cases)} cases x {len(ENGINES)} engines, "
         f"{len(failures)} failure(s)"
     )
     return 1 if failures else 0

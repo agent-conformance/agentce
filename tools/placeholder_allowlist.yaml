@@ -241,7 +241,7 @@ allow:
     pattern: not-implemented
     count: 1
     class: legitimate
-    justification: "A VG-CLI-OPTIONS seeded fault's description names the state before 18.108, when TypeScript answered an unknown command with cli.not_implemented; it describes the fault the gate must catch, not an unfinished part of the check."
+    justification: "A VG-CLI-TOP-LEVEL seeded fault's description names the state before 18.108, when TypeScript answered an unknown command with cli.not_implemented; it describes the fault the gate must catch, not an unfinished part of the check."
 
   - path: engines/typescript/src/report.test.ts
     pattern: todo

@@ -5,16 +5,17 @@ fails if a gate in `gates.json` is not named in this file.
 
 ## 0.66.0
 
-- `VG-CLI-OPTIONS` (18.108) grows from 79 to 119 rows and from eleven to seventeen seeded faults. The
-  rows cover the top-level command line. TypeScript and Java answered `agentce`, `agentce --help`, an
-  unknown command and `agentce --json version` with "not yet implemented", and ran the test seam
-  `digest-tree` as if it were a command. All three engines now read the tokens before the command the
-  same way. They print the same usage screen, and refuse an unknown command or flag with
-  `input.unknown_command` at exit 3. Every engine refuses `--version` with anything else on the line;
-  Python used to drop the rest. The six test seams move out of the TypeScript and Java CLIs
-  into their own entry points (`dist/seams.js`, `org.agentce.Seams`), and `VG-SECURITY-VIEW`,
-  `VG-DEVIATIONS-PARITY` and `VG-FAIL-ON-PARITY` call them there. The gate now runs TypeScript through
-  the npm bin, so it also covers the bin's `--version` shortcut.
+- `VG-CLI-TOP-LEVEL` (18.108) is new, with 40 rows and six seeded faults, and covers the top-level command
+  line. TypeScript and Java answered `agentce`, `agentce --help`, an unknown command and `agentce --json
+  version` with "not yet implemented", and ran the test seam `digest-tree` as if it were a command. All
+  three engines now read the tokens before the command the same way. They print the same usage screen,
+  and refuse an unknown command or flag with `input.unknown_command` at exit 3. Every engine refuses
+  `--version` with anything else on the line; Python used to drop the rest. The gate runs the same helper
+  as `VG-CLI-OPTIONS` on its own case file, so each gate's seeded-fault demo fits in its CI lane.
+- `VG-CLI-OPTIONS` (18.108) now runs TypeScript through the npm bin, so it covers the command npm users
+  run, and its unknown-command row no longer needs a TypeScript or Java override.
+- `VG-SECURITY-VIEW`, `VG-DEVIATIONS-PARITY` and `VG-FAIL-ON-PARITY` (18.108) call the test seams from
+  their new entry points (`dist/seams.js`, `org.agentce.Seams`): the seams are no longer CLI commands.
 
 ## 0.65.0
 
