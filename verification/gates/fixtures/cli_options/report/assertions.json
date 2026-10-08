@@ -1,0 +1,1474 @@
+[
+  {
+    "control": "DAT-01",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 10",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "deviation": "DEV-001",
+    "family": "DAT",
+    "mode": "automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "DAT-02",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 10",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "deviation": "DEV-002",
+    "family": "DAT",
+    "mode": "semi-automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "DAT-03",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 10",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "DAT",
+    "mode": "semi-automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "DAT-04",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 10",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "DAT",
+    "mode": "manual",
+    "outcome": "not_assessed",
+    "population": {
+      "applicable": 0,
+      "failed": 0
+    },
+    "rung": 3,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "CND-01",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 11 / Annex IV",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:09108d99699a54d6e5e3c12182270932ccda7b0c06bfd00d0b284a7fca8f321d",
+        "ref": "agentce:event/langgraph-known-pass-bundle1",
+        "source_class": "self_report"
+      },
+      {
+        "digest": "sha256:3823bc193f2bb88cf554c085d22fa9aebb6cebaa71796139c6ba353e69eb0cbd",
+        "ref": "agentce:event/langgraph-known-pass-tc1",
+        "source_class": "enforcement_point"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "CND",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 2,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "high",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "DOC-02",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 13",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:74cc4ab165bdeefa19ad96ebe96b00061b2538d9dbfe33659fdf7b16f29f1283",
+        "ref": "agentce:event/langgraph-known-pass-dec1",
+        "source_class": "self_report"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "DOC",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "source_class_satisfied": true,
+    "subject": "agent|`x`*y",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "DOC-03",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 11 / Annex IV",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:3823bc193f2bb88cf554c085d22fa9aebb6cebaa71796139c6ba353e69eb0cbd",
+        "ref": "agentce:event/langgraph-known-pass-tc1",
+        "source_class": "enforcement_point"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "DOC",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "DOC-04",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 13",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:74cc4ab165bdeefa19ad96ebe96b00061b2538d9dbfe33659fdf7b16f29f1283",
+        "ref": "agentce:event/langgraph-known-pass-dec1",
+        "source_class": "self_report"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "DOC",
+    "mode": "semi-automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "DOC-05",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 11 / Annex IV",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "DOC",
+    "mode": "manual",
+    "outcome": "not_assessed",
+    "population": {
+      "applicable": 0,
+      "failed": 0
+    },
+    "rung": 3,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "INC-01",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 72",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "INC",
+    "mode": "automated",
+    "outcome": "not_applicable",
+    "population": {
+      "applicable": 0,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "INC-02",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 73",
+        "framework": "eu-ai-act",
+        "verified": false
+      },
+      {
+        "clause": "Art. 26(5)",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:2d65230bba6babd22f4bd4cf13f90caad862c650d7acbfc339f8dfb3e9ae2269",
+        "ref": "agentce:event/langgraph-known-pass-inc1",
+        "source_class": "independent_system"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "INC",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "high",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "INC-03",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 26(5)",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "INC",
+    "mode": "automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "INC-04",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 73",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:3823bc193f2bb88cf554c085d22fa9aebb6cebaa71796139c6ba353e69eb0cbd",
+        "ref": "agentce:event/langgraph-known-pass-tc1",
+        "source_class": "enforcement_point"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "INC",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "high",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "INT-01",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 12",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:3823bc193f2bb88cf554c085d22fa9aebb6cebaa71796139c6ba353e69eb0cbd",
+        "ref": "agentce:event/langgraph-known-pass-tc1",
+        "source_class": "enforcement_point"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "INT",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "high",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "INT-02",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "engine integrity",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:376215af05348d440cf105962ebf78579da0360e3b035dbb3eb5649dfca84a4f",
+        "ref": "agentce:event/langgraph-known-pass-del1",
+        "source_class": "enforcement_point"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "INT",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "high",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "INT-03",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "engine integrity",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:3823bc193f2bb88cf554c085d22fa9aebb6cebaa71796139c6ba353e69eb0cbd",
+        "ref": "agentce:event/langgraph-known-pass-tc1",
+        "source_class": "enforcement_point"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "INT",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "high",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "INT-04",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "engine integrity",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:3823bc193f2bb88cf554c085d22fa9aebb6cebaa71796139c6ba353e69eb0cbd",
+        "ref": "agentce:event/langgraph-known-pass-tc1",
+        "source_class": "enforcement_point"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "INT",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "high",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "OVS-01",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 14(4)(a)",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "OVS",
+    "mode": "automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "OVS-02",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 14(1)-(3)",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:74cc4ab165bdeefa19ad96ebe96b00061b2538d9dbfe33659fdf7b16f29f1283",
+        "ref": "agentce:event/langgraph-known-pass-dec1",
+        "source_class": "self_report"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "OVS",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "high",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "OVS-03",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 14",
+        "framework": "eu-ai-act",
+        "verified": false
+      },
+      {
+        "clause": "Art. 26(2)",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:3823bc193f2bb88cf554c085d22fa9aebb6cebaa71796139c6ba353e69eb0cbd",
+        "ref": "agentce:event/langgraph-known-pass-tc1",
+        "source_class": "enforcement_point"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "OVS",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "high",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "OVS-04",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 14(4)(c)-(d)",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:3823bc193f2bb88cf554c085d22fa9aebb6cebaa71796139c6ba353e69eb0cbd",
+        "ref": "agentce:event/langgraph-known-pass-tc1",
+        "source_class": "enforcement_point"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "OVS",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "high",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "OVS-05",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 26(2)",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "OVS",
+    "mode": "automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "OVS-06",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 14(4)(e)",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:3823bc193f2bb88cf554c085d22fa9aebb6cebaa71796139c6ba353e69eb0cbd",
+        "ref": "agentce:event/langgraph-known-pass-tc1",
+        "source_class": "enforcement_point"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "OVS",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "high",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "OVS-07",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 14(4)(b)",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "OVS",
+    "mode": "semi-automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "OVS-08",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 14(5)",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "OVS",
+    "mode": "semi-automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "OVS-09",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 14(1)-(3)",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "OVS",
+    "mode": "manual",
+    "outcome": "not_assessed",
+    "population": {
+      "applicable": 0,
+      "failed": 0
+    },
+    "rung": 3,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "REC-01",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 12(1)-(2)",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:74cc4ab165bdeefa19ad96ebe96b00061b2538d9dbfe33659fdf7b16f29f1283",
+        "ref": "agentce:event/langgraph-known-pass-dec1",
+        "source_class": "self_report"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "REC",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "high",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "REC-02",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 12(1)-(2)",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:74cc4ab165bdeefa19ad96ebe96b00061b2538d9dbfe33659fdf7b16f29f1283",
+        "ref": "agentce:event/langgraph-known-pass-dec1",
+        "source_class": "self_report"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "REC",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "REC-03",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 12(2)",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "REC",
+    "mode": "automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "REC-04",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 12",
+        "framework": "eu-ai-act",
+        "verified": false
+      },
+      {
+        "clause": "Art. 19",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:74cc4ab165bdeefa19ad96ebe96b00061b2538d9dbfe33659fdf7b16f29f1283",
+        "ref": "agentce:event/langgraph-known-pass-dec1",
+        "source_class": "self_report"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "REC",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "REC-05",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 26(6)",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "REC",
+    "mode": "automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "REC-06",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 19",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:3823bc193f2bb88cf554c085d22fa9aebb6cebaa71796139c6ba353e69eb0cbd",
+        "ref": "agentce:event/langgraph-known-pass-tc1",
+        "source_class": "enforcement_point"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "REC",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "high",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "ROB-01",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 15",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:3823bc193f2bb88cf554c085d22fa9aebb6cebaa71796139c6ba353e69eb0cbd",
+        "ref": "agentce:event/langgraph-known-pass-tc1",
+        "source_class": "enforcement_point"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "ROB",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "high",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "ROB-02",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 15",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "ROB",
+    "mode": "automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "ROB-03",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 15",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:3823bc193f2bb88cf554c085d22fa9aebb6cebaa71796139c6ba353e69eb0cbd",
+        "ref": "agentce:event/langgraph-known-pass-tc1",
+        "source_class": "enforcement_point"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "ROB",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "ROB-04",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 15",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:3823bc193f2bb88cf554c085d22fa9aebb6cebaa71796139c6ba353e69eb0cbd",
+        "ref": "agentce:event/langgraph-known-pass-tc1",
+        "source_class": "enforcement_point"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "ROB",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "high",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "ROB-05",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 15",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:3823bc193f2bb88cf554c085d22fa9aebb6cebaa71796139c6ba353e69eb0cbd",
+        "ref": "agentce:event/langgraph-known-pass-tc1",
+        "source_class": "enforcement_point"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "ROB",
+    "mode": "semi-automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "ROB-06",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 15",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:3823bc193f2bb88cf554c085d22fa9aebb6cebaa71796139c6ba353e69eb0cbd",
+        "ref": "agentce:event/langgraph-known-pass-tc1",
+        "source_class": "enforcement_point"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "ROB",
+    "mode": "semi-automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "ROB-07",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 15",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "ROB",
+    "mode": "semi-automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "RSK-01",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 9",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "RSK",
+    "mode": "automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "RSK-02",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 9",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "RSK",
+    "mode": "automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "RSK-03",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 9",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "RSK",
+    "mode": "semi-automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "RSK-04",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 27",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "RSK",
+    "mode": "manual",
+    "outcome": "not_assessed",
+    "population": {
+      "applicable": 0,
+      "failed": 0
+    },
+    "rung": 3,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "RSK-05",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 49 / 71",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "RSK",
+    "mode": "manual",
+    "outcome": "not_assessed",
+    "population": {
+      "applicable": 0,
+      "failed": 0
+    },
+    "rung": 3,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "TRN-01",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 26(11) / 86",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "TRN",
+    "mode": "automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "TRN-02",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 86",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:74cc4ab165bdeefa19ad96ebe96b00061b2538d9dbfe33659fdf7b16f29f1283",
+        "ref": "agentce:event/langgraph-known-pass-dec1",
+        "source_class": "self_report"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "TRN",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "high",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "TRN-03",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 26(11) / 86",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "TRN",
+    "mode": "semi-automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "TRN-04",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 50",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "evidence": [
+      {
+        "digest": "sha256:74cc4ab165bdeefa19ad96ebe96b00061b2538d9dbfe33659fdf7b16f29f1283",
+        "ref": "agentce:event/langgraph-known-pass-dec1",
+        "source_class": "self_report"
+      }
+    ],
+    "evidence_strength": "strong",
+    "family": "TRN",
+    "mode": "automated",
+    "outcome": "conformant",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "source_class_satisfied": true,
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  },
+  {
+    "control": "TRN-05",
+    "control_version": "2026.09",
+    "crosswalk": [
+      {
+        "clause": "Art. 50",
+        "framework": "eu-ai-act",
+        "verified": false
+      }
+    ],
+    "family": "TRN",
+    "mode": "semi-automated",
+    "outcome": "insufficient_evidence",
+    "population": {
+      "applicable": 1,
+      "failed": 0
+    },
+    "rung": 2,
+    "severity": "medium",
+    "subject": "spiffe://corp/agents/credit-langgraph",
+    "window": {
+      "end": "2026-08-29T00:00:00Z",
+      "start": "2026-05-01T00:00:00Z"
+    }
+  }
+]

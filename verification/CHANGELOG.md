@@ -3,6 +3,22 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.68.0
+
+- `VG-CLI-REPORT` (18.110) is new, with 83 rows and seven seeded faults, and covers `report`'s command
+  line. TypeScript and Java refused `--format public`, wrote the same pack with or without `--role` and
+  accepted `--role nope`. They said the assertions file was missing for `report -h`, ran past unknown
+  flags, ignored the `=` form and took the first of a repeated `--from`. Java wrote English for
+  `--language de`, and TypeScript cut a piped rendering at 64 KiB. All three engines accepted any
+  `--language`, an empty `--catalog` label, `--role`, `--catalog` or `--language` with a format that
+  never reads it, and any rendering option beside `--validate`. Each engine now reads report's options
+  from one declared table and refuses those lines with a key at exit 3; `--format public` and the role
+  packs are byte-identical across the three. The rows read a committed `assertions.json` with two
+  deviations, a Conduct control and a subject with Markdown-special characters. A case's `says` can now
+  list several tokens.
+- `VG-CLI-OPTIONS` (18.110): its three `report` rows (`--he`, `--form md`, `--no-such-flag`) no longer
+  need a TypeScript or Java override.
+
 ## 0.67.0
 
 - `VG-CLI-ASSESS` (18.109) is new, with 55 rows and seven seeded faults, and covers `assess`'s command

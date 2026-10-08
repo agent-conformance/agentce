@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.67.0",
+  "suite_version": "0.68.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -2653,6 +2653,73 @@
           "file": "engines/typescript/src/cli.ts",
           "search": "    reportLanguage: v[\"--report-language\"],\n",
           "replace": "    reportLanguage: undefined,\n"
+        }
+      ]
+    },
+    {
+      "id": "VG-CLI-REPORT",
+      "title": "report's command line is read the same way in all three engines: -h and --help print the same usage anywhere before --, every value option takes its = form and its last repeat, an unknown flag, a missing value, a bad choice, an unknown --language, an empty --catalog label and an option the format does not read are refused with a key, and --format public, the --role packs and --language render as Python does",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/cli_options.sh",
+        "report.json"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 600,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/cli_options/report.json gives its expected exit code and --json refusal key in the real Python, TypeScript (through the npm bin) and Java CLIs over the committed report/assertions.json, and a refused run writes nothing: -h and --help alone, beside --from and after an unknown flag print a byte-identical usage; -h after --, a cluster, a value on a flag, an unknown or abbreviated flag and an extra positional get input.report_unrecognized_flag; a value-less --from or --validate gets input.from_missing or input.validate_missing and every other value-less option input.report_unrecognized_flag; the = form of every value option is read, and its empty form gets that option's own key (--out= and --out '' get internal.unexpected in all three); the last of a repeated --from, --format, --role, --language and --validate wins, and a bad --role is refused the moment it is read; --format nope and '' get input.report_format naming public, before --from is checked and before a later unknown flag; --role nope and '' get input.report_role; --format public is byte-identical across engines, with and without --catalog, and names both deviations, the Conduct section and the sanitised subject; an empty, whitespace-only or trailing-comma --catalog label gets input.report_catalog_label_empty; --format pack is byte-identical with no role and with --role provider and deployer, each naming its role; --language de writes the German title to --out and html names lang=\"de\"; --language xx, '' and ../x get input.report_language_unknown; --role, --catalog and --language with a format that does not read them, and every rendering option beside --validate, get input.report_flag_unused; --validate '' gets input.validate_not_a_directory; a rendering over 64 KiB (--format oscal --json) reaches a pipe as one whole --json envelope",
+        "fail": "any engine gives another exit code or key for a case, prints another usage, public statement or pack, writes under --out on a refused run, takes the first of a repeated option, ignores an = form, accepts an unknown --role or --language or an option its format does not read, writes English for --language de, or cuts a piped rendering"
+      },
+      "faults": [
+        {
+          "description": "TypeScript's report grammar drops --role's choices, so --role nope is accepted",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "      choices: REPORT_ROLES,\n",
+          "replace": ""
+        },
+        {
+          "description": "Java's public statement drops the Conduct section, so --format public no longer matches Python's",
+          "file": "engines/java/src/main/java/org/agentce/Report.java",
+          "search": "        if (families.containsKey(\"CND\")) {\n",
+          "replace": "        if (false) {\n"
+        },
+        {
+          "description": "Python reads --role with --format md again instead of refusing it",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "        (role, \"--role\", (\"pack\",), \"add --format pack\"),\n",
+          "replace": ""
+        },
+        {
+          "description": "TypeScript reads an unknown --language again instead of refusing it",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "  if (languageFlag !== undefined && !languages.includes(languageFlag)) {\n",
+          "replace": "  if (false) {\n"
+        },
+        {
+          "description": "Java ignores --language again and renders English for de",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "        String lang = language != null ? language : Messages.DEFAULT_LANGUAGE;\n",
+          "replace": "        String lang = Messages.DEFAULT_LANGUAGE;\n"
+        },
+        {
+          "description": "TypeScript's npm bin goes back to process.exit, which ends the process before a piped stdout drains (a rendering cut at 64 KiB)",
+          "file": "engines/typescript/bin/agentce.js",
+          "search": "process.exitCode = main(args);\n",
+          "replace": "process.exit(main(args));\n"
+        },
+        {
+          "description": "Java's scanner stops refusing an unknown flag, so report --no-such-flag is dropped and the rendering goes ahead",
+          "file": "engines/java/src/main/java/org/agentce/Argv.java",
+          "search": "                } else {\n                    extras.add(token);\n                }\n                continue;\n",
+          "replace": "                }\n                continue;\n"
         }
       ]
     }

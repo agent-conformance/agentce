@@ -24,7 +24,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 #: The case table: cases.json (VG-CLI-OPTIONS) unless the gate names another file in this folder
-#: (top_level.json, VG-CLI-TOP-LEVEL), so each gate's seeded-fault demo stays inside its CI lane.
+#: (top_level.json, assess.json, report.json: one per gate), so each gate's seeded-fault demo stays
+#: inside its CI lane.
 FIXTURES = ROOT / "verification/gates/fixtures/cli_options"
 ENGINES = ("python", "typescript", "java")
 #: CI is cleared so Python's automatic junit (CI detected, no --emit/--for) never changes a row, and
@@ -166,8 +167,11 @@ def run(
         problems.append(
             f"{case['first_line']['file']} starts {line!r}, want {case['first_line']['line']!r}"
         )
-    if "says" in case and case["says"] not in p.stdout + p.stderr:
-        problems.append(f"output does not name {case['says']!r}")
+    # 'says' is one token or a list of tokens, each of which must appear (18.110).
+    says = case.get("says", [])
+    for token in [says] if isinstance(says, str) else says:
+        if token not in p.stdout + p.stderr:
+            problems.append(f"output does not name {token!r}")
     if case.get("debug_log") and (
         problem := debug_log_problem(p.stderr, case["debug_log"])
     ):
