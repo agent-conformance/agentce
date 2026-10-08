@@ -5,7 +5,7 @@ fails if a gate in `gates.json` is not named in this file.
 
 ## 0.67.0
 
-- `VG-CLI-ASSESS` (18.109) is new, with 54 rows and seven seeded faults, and covers `assess`'s command
+- `VG-CLI-ASSESS` (18.109) is new, with 55 rows and seven seeded faults, and covers `assess`'s command
   line. TypeScript and Java said the bundle was missing for `assess -h`, ran the assessment when `-h` sat
   beside `--bundle`, ignored the `=` form of most options, took the first of a repeated option, and wrote
   an English report for `--report-language de`. All three engines accepted `--manual` and `--probes`

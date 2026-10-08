@@ -2645,8 +2645,8 @@
         {
           "description": "Python accepts an unknown --report-language again and writes an English report",
           "file": "engines/python/agentce/commands/__init__.py",
-          "search": "        and report_language not in messages.available_languages()\n",
-          "replace": "        and False\n"
+          "search": "    if report_language is not None and report_language not in languages:\n",
+          "replace": "    if False:\n"
         },
         {
           "description": "TypeScript ignores --report-language again and writes an English report.md for de",

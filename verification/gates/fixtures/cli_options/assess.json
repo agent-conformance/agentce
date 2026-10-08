@@ -23,6 +23,7 @@
     {"id": "assess-second-folder", "argv": ["assess", "{root}/verification/gates/fixtures/quick_path/records", "{root}/verification/gates/fixtures/quick_path/records", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag", "writes": null},
     {"id": "assess-out-no-value", "argv": ["assess", "{B}", "--out"], "exit": 3, "key": "input.assess_flag_needs_value", "writes": null},
     {"id": "assess-report-language-no-value", "argv": ["assess", "{B}", "--out", "{out}", "--report-language"], "exit": 3, "key": "input.assess_flag_needs_value", "writes": null},
+    {"id": "assess-out-before-short-joined", "argv": ["assess", "{B}", "--out", "-h y"], "exit": 3, "key": "input.assess_flag_needs_value", "writes": null},
     {"id": "assess-out-before-dashdash", "argv": ["assess", "{B}", "--out", "--"], "exit": 3, "key": "input.assess_flag_needs_value", "writes": null},
     {"id": "assess-bundle-equals-bad", "argv": ["assess", "--bundle={root}/no-such-dir", "--profile", "{root}/corpus/quickstart/applicability.yaml", "--out", "{out}"], "exit": 3, "key": "input.bundle_not_a_directory", "writes": null},
     {"id": "assess-profile-equals-bad", "argv": ["assess", "--bundle", "{root}/corpus/quickstart/evidence", "--profile={root}/no-such-file", "--out", "{out}"], "exit": 3, "key": "input.profile_not_a_file", "writes": null},
