@@ -59,6 +59,9 @@ class _ArgvErrors:
     def error(self, cause: str, fix: str, key: str | None = None) -> _ArgvError:
         return _ArgvError(self.command, key or self.key, cause, fix)
 
+    def no_value(self, flag: str) -> _ArgvError:
+        return self.error(f"flag '{flag}' takes no value.", f"drop the value: {flag}.")
+
     def usage(self, message: str) -> _ArgvError:
         """Map argparse's own message to the keyed error."""
         if m := re.fullmatch(r"argument (--[\w-]+): expected one argument", message):
@@ -74,10 +77,7 @@ class _ArgvErrors:
         if m := re.fullmatch(
             r"argument (--[\w-]+): ignored explicit argument .*", message
         ):
-            flag = m.group(1)
-            return self.error(
-                f"flag '{flag}' takes no value.", f"drop the value: {flag}."
-            )
+            return self.no_value(m.group(1))
         if m := re.fullmatch(
             r"argument (\S+): invalid choice: (.*?) \(choose from .*\)", message
         ):
@@ -168,6 +168,8 @@ def _action_error(
 
     return error
 
+
+_TOP_FIX = "name a command: `agentce <command>`; run `agentce --help` for the commands agentce takes."
 
 _TOP_ARGV = _ArgvErrors(
     "agentce",
@@ -860,6 +862,50 @@ def _emit_error(err: AgentceError, *, command: str, want_json: bool) -> int:
     return int(err.exit_code)
 
 
+_GLOBAL_FLAGS = ("--json", "--debug", "--quiet")
+
+
+def _scan_top_level(args: Sequence[str]) -> str | None:
+    """Read the tokens before the command the way the TypeScript and Java engines do (18.108); return
+    "help" or "version" when one of those answers the line, None when argparse should run it. Raises the
+    shared top-level error (input.unknown_command) for a short cluster, a value on a flag that takes none,
+    an unknown flag before the command, -V/--version with anything else on the line, a `--` with nothing
+    after it, or global flags with no command. -h/--help win when reached, as in argparse."""
+    unknown: str | None = None
+    has_command = False
+    for i, token in enumerate(args):
+        if token == "--":
+            if i + 1 == len(args):
+                raise _TOP_ARGV.error("no command given after '--'.", _TOP_FIX)
+            has_command = True
+            break
+        if not token.startswith("-") or token == "-":
+            has_command = True
+            break
+        name = token.split("=", 1)[0]
+        if not token.startswith("--") and len(token) > 2:
+            raise _TOP_ARGV.unknown(token)
+        known = name in ("-h", "--help", "-V", "--version", *_GLOBAL_FLAGS)
+        if known and "=" in token:
+            raise _TOP_ARGV.no_value(name)
+        if name in ("-h", "--help"):
+            return "help"
+        if name in ("-V", "--version"):
+            if len(args) != 1:
+                raise _TOP_ARGV.error(
+                    f"'{name}' takes no other arguments.",
+                    "run `agentce --version` alone, or `agentce version --json` for the JSON envelope.",
+                )
+            return "version"
+        if not known and unknown is None:
+            unknown = token
+    if unknown is not None:
+        raise _TOP_ARGV.unknown(unknown)
+    if not has_command and args:
+        raise _TOP_ARGV.error("no command given.", _TOP_FIX)
+    return None if args else "help"
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse ``argv`` (default ``sys.argv``), run the command, and return the process exit code."""
     # One integer rule for the whole run, whatever PYTHONINTMAXSTRDIGITS says: a literal JSON may hold
@@ -868,6 +914,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = list(sys.argv[1:] if argv is None else argv)
     try:
+        if _scan_top_level(args) == "help":
+            parser.print_help()
+            return int(ExitCode.OK)
         ns, unknown = parser.parse_known_args(args)
         if unknown:
             errors = _ARGV.get(getattr(ns, "command", "") or "", _TOP_ARGV)

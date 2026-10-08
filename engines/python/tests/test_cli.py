@@ -35,6 +35,65 @@ def test_help_lists_commands(capsys: pytest.CaptureFixture[str]) -> None:
         assert name in out
 
 
+@pytest.mark.parametrize(
+    ("argv", "cause"),
+    [
+        (["nope"], "unrecognized command 'nope'."),
+        (["numerics", "x"], "unrecognized command 'numerics'."),
+        (["--no-such-flag", "version"], "unrecognized flag '--no-such-flag'."),
+        (["--JSON", "version"], "unrecognized flag '--JSON'."),
+        (["-hx", "assess"], "unrecognized flag '-hx'."),
+        (["--json=1", "version"], "flag '--json' takes no value."),
+        (["--help=x"], "flag '--help' takes no value."),
+        (["--version", "-hx"], "'--version' takes no other arguments."),
+        (["--version", "nope"], "'--version' takes no other arguments."),
+        (["-V", "-h"], "'-V' takes no other arguments."),
+        (["--json", "--version"], "'--version' takes no other arguments."),
+        (["--"], "no command given after '--'."),
+        (["--quiet"], "no command given."),
+        (["--json"], "no command given."),
+        (["--", "--json", "version"], "unrecognized command '--json'."),
+    ],
+)
+def test_top_level_refusals_share_one_key(
+    argv: list[str], cause: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """18.108: the tokens before the command are read the way the TypeScript and Java engines read
+    them; every refusal is input.unknown_command with the agentce envelope."""
+    code, out = run(["--json", *argv], capsys)
+    assert (code, out["command"], out["error"]["key"]) == (
+        3,
+        "agentce",
+        "input.unknown_command",
+    )
+    assert out["error"]["cause"] == cause
+
+
+@pytest.mark.parametrize(
+    "argv", [["-h", "-V"], ["--no-such-flag", "-h"], ["--json", "-h"], []]
+)
+def test_top_level_help_wins_when_reached(
+    argv: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert cli.main(argv) == 0
+    assert capsys.readouterr().out.startswith("usage: agentce ")
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--json", "version"],
+        ["--quiet", "--json", "version"],
+        ["--", "version", "--json"],
+    ],
+)
+def test_global_flags_before_the_command(
+    argv: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    code, out = run(argv, capsys)
+    assert (code, out["command"]) == (0, "version")
+
+
 def test_top_level_version_flag(capsys: pytest.CaptureFixture[str]) -> None:
     assert cli.main(["--version"]) == 0
     assert "agentce" in capsys.readouterr().out
