@@ -87,6 +87,36 @@ allow:
     class: legitimate
     justification: "Genesis all-zero prev pointer in the corpus evidence hash chain (no predecessor block)."
 
+  - path: verification/gates/fixtures/cli_options/conformance/corpus-one/projects/credit/claude-agent-sdk/known-pass/evidence/events/_benign-quarantine.jsonl
+    pattern: zero-digest
+    count: 2
+    class: legitimate
+    justification: "Genesis all-zero prev pointer in the hash chain of VG-CLI-UTILITY's one-project corpus, written by the corpus generator (no predecessor block)."
+
+  - path: verification/gates/fixtures/cli_options/conformance/corpus-one/projects/credit/claude-agent-sdk/known-pass/evidence/events/urn-agentce-source-claude-agent-sdk-gateway-eu-1.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Genesis all-zero prev pointer in the hash chain of VG-CLI-UTILITY's one-project corpus, written by the corpus generator (no predecessor block)."
+
+  - path: verification/gates/fixtures/cli_options/conformance/corpus-one/projects/credit/claude-agent-sdk/known-pass/evidence/events/urn-agentce-source-claude-agent-sdk-runtime-eu-1.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Genesis all-zero prev pointer in the hash chain of VG-CLI-UTILITY's one-project corpus, written by the corpus generator (no predecessor block)."
+
+  - path: verification/gates/fixtures/cli_options/conformance/corpus-one/projects/credit/claude-agent-sdk/known-pass/evidence/events/urn-agentce-source-incident-register-corp.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Genesis all-zero prev pointer in the hash chain of VG-CLI-UTILITY's one-project corpus, written by the corpus generator (no predecessor block)."
+
+  - path: verification/gates/fixtures/cli_options/conformance/corpus-one/projects/credit/claude-agent-sdk/known-pass/evidence/events/urn-agentce-source-workload-idp-eu-1.jsonl
+    pattern: zero-digest
+    count: 1
+    class: legitimate
+    justification: "Genesis all-zero prev pointer in the hash chain of VG-CLI-UTILITY's one-project corpus, written by the corpus generator (no predecessor block)."
+
   - path: docs/adr/0000-template.md
     pattern: empty-md-section
     count: 4

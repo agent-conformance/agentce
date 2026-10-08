@@ -24,14 +24,30 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 #: The case table: cases.json (VG-CLI-OPTIONS) unless the gate names another file in this folder
-#: (top_level.json, assess.json, report.json: one per gate), so each gate's seeded-fault demo stays
-#: inside its CI lane.
+#: (top_level.json, assess.json, report.json, utility.json: one per gate), so each gate's seeded-fault
+#: demo stays inside its CI lane.
 FIXTURES = ROOT / "verification/gates/fixtures/cli_options"
 ENGINES = ("python", "typescript", "java")
 #: CI is cleared so Python's automatic junit (CI detected, no --emit/--for) never changes a row, and
 #: COLUMNS fixed so argparse wraps its help text the same way on every terminal.
 ENV = {k: v for k, v in os.environ.items() if k not in ("VIRTUAL_ENV", "CI")} | {
     "COLUMNS": "80"
+}
+CONFORMANCE = FIXTURES / "conformance"
+#: Paths a case names inside a token, so its = form reads them too ({engine} and {out} are per run;
+#: {B} as a whole token is the case file's B list). {A} and {A2} are the diff fixture's two assertion
+#: sets; under conformance/, {C} an empty corpus, {C1} a one-project corpus whose ECS claim is full, and
+#: three sample adapters directories whose conformance.py reports one adapter: {S} identical with its
+#: round trip (claim full), {Sp} identical without it (claim partial), {Sn} no JSON at all (18.111).
+PLACES = {
+    "{root}": str(ROOT),
+    "{A}": str(ROOT / "verification/gates/fixtures/diff/before/assertions.json"),
+    "{A2}": str(ROOT / "verification/gates/fixtures/diff/after/assertions.json"),
+    "{C}": str(CONFORMANCE / "corpus"),
+    "{C1}": str(CONFORMANCE / "corpus-one"),
+    "{S}": str(CONFORMANCE / "adapters-pass"),
+    "{Sp}": str(CONFORMANCE / "adapters-partial"),
+    "{Sn}": str(CONFORMANCE / "adapters-nojson"),
 }
 #: The fields of each --debug record, as Python's logsetup.JsonFormatter writes them.
 DEBUG_RECORDS = [
@@ -140,12 +156,16 @@ def run(
     )
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "out"
+        places = PLACES | {
+            "{engine}": str(ROOT / "engines" / engine),
+            "{out}": str(out),
+        }
         argv: list[str] = []
         for token in case["argv"]:
-            argv += [
-                t.replace("{root}", str(ROOT)).replace("{out}", str(out))
-                for t in (bundle_args if token == "{B}" else [token])
-            ]
+            for t in bundle_args if token == "{B}" else [token]:
+                for place, value in places.items():
+                    t = t.replace(place, value)
+                argv.append(t)
         # --json goes right after the first token by default, so a case can end on a value-less flag or
         # put tokens after `--`; "front" puts it first, "none" leaves it out (18.108, top-level rows).
         placed = {
@@ -162,12 +182,24 @@ def run(
         entries = sorted(e.name for e in Path(tmp).iterdir())
         # 'has' and 'first_line' judge an engine that runs as the case expects (no override), 18.109.
         own = engine not in case.get("engines", {})
-        missing = own and "has" in case and not (Path(tmp) / case["has"]).exists()
+        # 'has' is one path or a list of paths, each of which the run must write (18.111).
+        has = case.get("has", [])
+        missing = [
+            h
+            for h in ([has] if isinstance(has, str) else has)
+            if own and not (Path(tmp) / h).exists()
+        ]
         line = None
         if own and "first_line" in case:
             target = Path(tmp) / case["first_line"]["file"]
             text = target.read_text("utf-8") if target.is_file() else ""
             line = text.splitlines()[0] if text else ""
+        # 'file_says' names a file the run writes and a token it must hold (18.111).
+        unsaid = None
+        if own and "file_says" in case:
+            target = Path(tmp) / case["file_says"]["file"]
+            text = target.read_text("utf-8") if target.is_file() else ""
+            unsaid = case["file_says"]["says"] not in text
         filled = [
             e for e in entries if any(f.is_file() for f in (Path(tmp) / e).rglob("*"))
         ]
@@ -180,7 +212,11 @@ def run(
                 f"wrote {entries} (with files: {filled}), want {want_entries}"
             )
     if missing:
-        problems.append(f"did not write {case['has']}")
+        problems.append(f"did not write {missing}")
+    if unsaid:
+        problems.append(
+            f"{case['file_says']['file']} does not name {case['file_says']['says']!r}"
+        )
     if line is not None and line != case["first_line"]["line"]:
         problems.append(
             f"{case['first_line']['file']} starts {line!r}, want {case['first_line']['line']!r}"

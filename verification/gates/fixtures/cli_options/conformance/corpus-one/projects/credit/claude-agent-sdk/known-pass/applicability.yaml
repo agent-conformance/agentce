@@ -1,0 +1,36 @@
+# Applicability profile (SPEC §6.5): what the adopter declares about the assessed system.
+profile_version: 1
+observation_window:
+  start: "2026-05-01T00:00:00Z"
+  end: "2026-08-29T00:00:00Z"
+catalogs:
+  - "eu-ai-act@2026.09"
+subjects:
+  - id: "spiffe://corp/agents/credit-claude-agent-sdk"
+    name: "credit-underwriter-claude-agent-sdk"
+    role: "both"
+    declared_decision_types:
+      - "dom:CreditDecision"
+    declared_oversight:
+      "dom:CreditDecision": "review_before"
+    third_party_components:
+      - kind: "mcp_server"
+        name: "mcp://credit-core.internal"
+        controls_affected: ["DOC-01"]
+    evidence_sources:
+      - adapter: "agent"
+        source: "urn:agentce:source:claude-agent-sdk-runtime:eu-1"
+        class: "self_report"
+        class_justification: "emitted by the agent runtime itself"
+      - adapter: "gateway"
+        source: "urn:agentce:source:claude-agent-sdk-gateway:eu-1"
+        class: "enforcement_point"
+        class_justification: "the gateway sits on the only egress path and the agent holds no direct tool credential"
+      - adapter: "idp"
+        source: "urn:agentce:source:workload-idp:eu-1"
+        class: "enforcement_point"
+        class_justification: "the workload identity provider issues and verifies every agent credential"
+      - adapter: "register"
+        source: "urn:agentce:source:incident-register:corp"
+        class: "independent_system"
+        class_justification: "records kept by the incident register, which agent identities cannot write"

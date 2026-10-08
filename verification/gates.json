@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.68.0",
+  "suite_version": "0.69.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -2454,7 +2454,7 @@
       "timeout_s": 900,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/cli_options/cases.json gives its expected exit code and --json refusal key in each engine (TypeScript run through the npm bin; an engine override only where the case says why and names the item that removes it), and no refused run writes a file under --out; the 25 assess rows cover --for with --emit in both spellings and with an empty --emit, unknown, partly unknown and repeated --emit, unknown and empty --for, the bundle refusal before both, a missing --emit or --for value, a known --emit, an empty --emit, a known --for, a repeated --for, no flag, and an unknown, abbreviated (--em, --fo, --ou) or misspelled flag, a flag assess does not take (--format) and a second positional, each refused with input.assess_unrecognized_flag in every engine (TypeScript and Java refuse every well-formed --emit/--for with input.emit_unsupported until 18.16b); the 20 quickstart rows run in a fresh working directory and cover no option, --out d, --out=d, --out= and a repeated --out (each writes only the expected directory), --quiet, --debug (Python's command.start and command.end records on stderr), -h, --help and -h after an unknown flag (usage, byte-identical across engines, nothing written), --out under a file, and the refusals with input.quickstart_unrecognized_flag that name the token and write nothing: a value-less --out at the end and before a flag, --ou, --no-such-flag, --trust-root, an extra positional, --json=1, a bare -- and -- x; the 34 argv-error rows (18.107) cover -hx and -hh on quickstart, assess, readiness, sign, verify and diff, a -h cluster after a real target (verify --bundle <dir> -hx, sign <dir> --as claimant -hx) and after a dash-led value (assess --out -1 -hx, quickstart --out - -hx), diff --no-such-flag and diff --he, conformance nope, report --format nope, a value-less report --validate, assess --fail-on and assess --out, and, keyed in Python where TypeScript or Java still differ (each override names 18.109, 18.110 or 18.111), validate --he and --bun x, report --he, --form md and --no-such-flag, conformance --he and conformance run --he, version --no-such-flag, -hx and --he, and an unknown command; a red run stops at its first failure and skips the runs not yet started",
+        "pass": "every case in verification/gates/fixtures/cli_options/cases.json gives its expected exit code and --json refusal key in each engine (TypeScript run through the npm bin; an engine override only where the case says why and names the item that removes it), and no refused run writes a file under --out; the 25 assess rows cover --for with --emit in both spellings and with an empty --emit, unknown, partly unknown and repeated --emit, unknown and empty --for, the bundle refusal before both, a missing --emit or --for value, a known --emit, an empty --emit, a known --for, a repeated --for, no flag, and an unknown, abbreviated (--em, --fo, --ou) or misspelled flag, a flag assess does not take (--format) and a second positional, each refused with input.assess_unrecognized_flag in every engine (TypeScript and Java refuse every well-formed --emit/--for with input.emit_unsupported until 18.16b); the 20 quickstart rows run in a fresh working directory and cover no option, --out d, --out=d, --out= and a repeated --out (each writes only the expected directory), --quiet, --debug (Python's command.start and command.end records on stderr), -h, --help and -h after an unknown flag (usage, byte-identical across engines, nothing written), --out under a file, and the refusals with input.quickstart_unrecognized_flag that name the token and write nothing: a value-less --out at the end and before a flag, --ou, --no-such-flag, --trust-root, an extra positional, --json=1, a bare -- and -- x; the 34 argv-error rows (18.107) cover -hx and -hh on quickstart, assess, readiness, sign, verify and diff, a -h cluster after a real target (verify --bundle <dir> -hx, sign <dir> --as claimant -hx) and after a dash-led value (assess --out -1 -hx, quickstart --out - -hx), diff --no-such-flag and diff --he, conformance nope, report --format nope, a value-less report --validate, assess --fail-on and assess --out, validate --he and --bun x, report --he, --form md and --no-such-flag, conformance --he and conformance run --he, version --no-such-flag, -hx and --he, and an unknown command, each keyed the same in all three engines; a red run stops at its first failure and skips the runs not yet started",
         "fail": "any engine gives another exit code or key for a case, accepts an option it then ignores, or a refused run leaves files under --out"
       },
       "faults": [
@@ -2485,8 +2485,8 @@
         {
           "description": "Java stops refusing an unknown or abbreviated assess flag and runs the assessment without it (the state before 18.105)",
           "file": "engines/java/src/main/java/org/agentce/Argv.java",
-          "search": "        if (!extras.isEmpty()) {\n",
-          "replace": "        if (false) {\n"
+          "search": "        if (command.actionAt() < 0) {\n            if (!command.extras().isEmpty()) {\n",
+          "replace": "        if (command.actionAt() < 0) {\n            if (false) {\n"
         },
         {
           "description": "Python's quickstart parser prefix-matches again, so --ou o runs as --out o in Python alone",
@@ -2627,14 +2627,14 @@
         {
           "description": "TypeScript stops printing the usage when it reaches -h, so -h beside --bundle runs the assessment (KD-078)",
           "file": "engines/typescript/src/argv.ts",
-          "search": "      if (spec.kind === \"help\") {\n        return { help: true, values, lists, flags, positionals };\n      }\n",
+          "search": "      if (spec.kind === \"help\") {\n        return { scan: { help: true, values, lists, flags, positionals } };\n      }\n",
           "replace": ""
         },
         {
           "description": "Java stops refusing an unknown flag, so --no-such-flag is dropped and the run goes ahead",
           "file": "engines/java/src/main/java/org/agentce/Argv.java",
-          "search": "        if (!extras.isEmpty()) {\n",
-          "replace": "        if (false) {\n"
+          "search": "        if (command.actionAt() < 0) {\n            if (!command.extras().isEmpty()) {\n",
+          "replace": "        if (command.actionAt() < 0) {\n            if (false) {\n"
         },
         {
           "description": "Python accepts --manual again and never reads it",
@@ -2720,6 +2720,79 @@
           "file": "engines/java/src/main/java/org/agentce/Argv.java",
           "search": "                } else {\n                    extras.add(token);\n                }\n                continue;\n",
           "replace": "                }\n                continue;\n"
+        }
+      ]
+    },
+    {
+      "id": "VG-CLI-UTILITY",
+      "title": "validate, diff, version and conformance read their command lines the same way in all three engines: -h and --help print the same usage anywhere before --, every value option takes its = form and its last repeat, an unknown flag, an extra argument, a missing or empty value and an unknown conformance action are refused with a key, diff reads its two files on either side of --format, and conformance run --adapters runs the adapters' own orchestrator and folds its claim into the exit code",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/cli_options.sh",
+        "utility.json"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 600,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/cli_options/utility.json gives its expected exit code and --json refusal key in the real Python, TypeScript (through the npm bin) and Java CLIs, and a refused run writes nothing: for validate, diff, version, conformance and conformance run, -h and --help alone, after an unknown flag and beside good options print a byte-identical usage (conformance -h run the command's, conformance --he run -h the action's); -h after -- is refused as Python refuses it (diff reads it as the second file); a cluster, --he, an unknown flag, --help=x, --json=1 and an extra positional get the command's unrecognized-flag key, and a third diff file, before or after -- or after --format, input.diff_extra_argument; a value-less validate --bundle gets input.bundle_missing, conformance run --engine input.engine_missing (checked before --corpus), --corpus input.corpus_missing, and every other value-less option the command's unrecognized-flag key; the = form of every value option is read (validate --out= writes quarantine.jsonl, conformance run --out= the implementation report); an empty --bundle, --engine, --corpus or --adapters gets that option's not-a-directory key, an empty --out input.out_dir_unwritable and an empty diff --format input.diff_format; the last of a repeated --bundle, --format and --engine wins; diff reads its files around --format and after --, rendering the same Markdown in all three; conformance with no action, an unknown action (also after an unknown flag, after a value-taking flag it does not have, and after --) gets input.conformance_action, an unknown flag before the action is refused before the action's own, and conformance --json run is read; conformance run --adapters /nonexistent gets input.adapters_not_a_directory; over the empty corpus the run exits 1 with claim none, and with the sample adapters directory it prints `adapters: 1/1 identical; round_trip True; claim full`, writes out/implementation-report.json naming adapter_conformance and the orchestrator's out/adapters/sample/implementation-report.json, also for a relative --out, which resolves under the working directory; over the one-project corpus (ECS claim full) the run exits 0 with the passing adapters, and exits 1 with claim partial for adapters identical without their round trip and claim none for an orchestrator that prints no JSON; version alone prints its --json envelope; a red run stops at its first failure and skips the runs not yet started",
+        "fail": "any engine gives another exit code or key for a case, prints another usage, diff rendering or conformance summary, writes under --out on a refused run, takes the first of a repeated option, ignores an = form, reads an empty value as the working directory, accepts an unknown flag, argument or action, ignores --adapters or its claim, or writes the adapters' reports anywhere but under --out"
+      },
+      "faults": [
+        {
+          "description": "Python reads an empty --adapters as the working directory again",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "            what=\"the adapters directory\",\n            empty_is_no_dir=True,\n",
+          "replace": "            what=\"the adapters directory\",\n"
+        },
+        {
+          "description": "TypeScript's validate grammar drops --bundle's needs-value key, so a value-less --bundle gets the unrecognized-flag key",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "    ...COMMON_OPTIONS,\n    { names: [\"--bundle\"], kind: \"value\", needsValueKey: \"input.bundle_missing\" },\n    { names: [\"--out\"], kind: \"value\" },\n  ],\n  maxPositionals: 0,\n  unrecognizedKey: \"input.validate_unrecognized_flag\",\n",
+          "replace": "    ...COMMON_OPTIONS,\n    { names: [\"--bundle\"], kind: \"value\" },\n    { names: [\"--out\"], kind: \"value\" },\n  ],\n  maxPositionals: 0,\n  unrecognizedKey: \"input.validate_unrecognized_flag\",\n"
+        },
+        {
+          "description": "Java's version grammar takes a positional again, so version extra prints the version",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "            \"version\", List.of(), 0, flagFix(\"version\"),",
+          "replace": "            \"version\", List.of(), 1, flagFix(\"version\"),"
+        },
+        {
+          "description": "TypeScript's scanner stops refusing an unknown action, so an unknown flag before it is refused first",
+          "file": "engines/typescript/src/argv.ts",
+          "search": "    if (actionGrammar === undefined) {\n      throw actions.error();\n    }\n",
+          "replace": "    if (actionGrammar === undefined) {\n      return { scan: { help: false, values, lists, flags, positionals }, leftover: leftover() };\n    }\n"
+        },
+        {
+          "description": "Java's runEcs ignores --adapters again: no adapters line, no adapter_conformance and no adapters claim",
+          "file": "engines/java/src/main/java/org/agentce/Conformance.java",
+          "search": "        if (adaptersDir != null) {\n            JsonNode detail = adapterConformance(adaptersDir, outDir, orchestrator);\n",
+          "replace": "        if (false) {\n            JsonNode detail = adapterConformance(adaptersDir, outDir, orchestrator);\n"
+        },
+        {
+          "description": "TypeScript's diff takes the first --format again, reading argv instead of the scan",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "  const format = args.values[\"--format\"] ?? \"text\";\n",
+          "replace": "  const format = argv.includes(\"--format\")\n    ? (argv[argv.indexOf(\"--format\") + 1] as string)\n    : (args.values[\"--format\"] ?? \"text\");\n"
+        },
+        {
+          "description": "Java sets the exit code from the ECS claim only, so a partial or empty adapters claim exits 0",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "        if (adaptersClaim != null && !\"full\".equals(adaptersClaim.asText())) {\n            result.addCode(ExitCode.FINDINGS.code);\n        }\n",
+          "replace": ""
+        },
+        {
+          "description": "TypeScript's adapters claim ignores round_trip, so adapters identical without their round trip claim full",
+          "file": "engines/typescript/src/conformance.ts",
+          "search": "  if (total > 0 && identical === total && pyTruthy(detail.round_trip)) {\n",
+          "replace": "  if (total > 0 && identical === total) {\n"
         }
       ]
     }

@@ -1,0 +1,49 @@
+{
+  "agentce_bundle_version": 1,
+  "domain": "credit",
+  "files": [
+    {
+      "path": "events/_benign-quarantine.jsonl",
+      "sha256": "0e8564fd316aa35bb4d3546b6f93313b8a3caf89964dedb3d6dbce02f2bb9005"
+    },
+    {
+      "path": "events/urn-agentce-source-claude-agent-sdk-gateway-eu-1.jsonl",
+      "sha256": "bd9eca5a1fa90a91eaa552496c2061af65a8220f93be5ce773d00b7cc27564e6"
+    },
+    {
+      "path": "events/urn-agentce-source-claude-agent-sdk-runtime-eu-1.jsonl",
+      "sha256": "8c3d33e0eb67c89e8e06c48a865006489ba78771955e0319b99a171ab6c5ff5e"
+    },
+    {
+      "path": "events/urn-agentce-source-incident-register-corp.jsonl",
+      "sha256": "9a234227ba7bf5cd470bc2b5ca3dfa2e476cb794f83cf37f2d227b015404ef4b"
+    },
+    {
+      "path": "events/urn-agentce-source-workload-idp-eu-1.jsonl",
+      "sha256": "f01c2e8072eca5a8979168df9da1e9bb5fad229016e7c4068f45174c74a6f089"
+    }
+  ],
+  "sources": [
+    {
+      "class": "enforcement_point",
+      "id": "urn:agentce:source:claude-agent-sdk-gateway:eu-1"
+    },
+    {
+      "id": "urn:agentce:source:claude-agent-sdk-runtime-bulk:eu-1"
+    },
+    {
+      "id": "urn:agentce:source:claude-agent-sdk-runtime:eu-1"
+    },
+    {
+      "id": "urn:agentce:source:claude-agent-sdk-session:eu-1"
+    },
+    {
+      "class": "independent_system",
+      "id": "urn:agentce:source:incident-register:corp"
+    },
+    {
+      "class": "enforcement_point",
+      "id": "urn:agentce:source:workload-idp:eu-1"
+    }
+  ]
+}

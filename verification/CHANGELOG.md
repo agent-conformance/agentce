@@ -3,6 +3,26 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.69.0
+
+- `VG-CLI-UTILITY` (18.111) is new, with 115 rows and eight seeded faults, and covers the command lines of `validate`, `diff`,
+  `version`, `conformance` and `conformance run`. TypeScript and Java said the bundle was missing for
+  `validate -h`, read `diff -h` as a file, printed the version for `version --help` and for any argument, and
+  refused `conformance -h` as an unknown action. They ran past unknown flags and extra arguments, ignored the
+  `=` form, took the first of a repeated `--bundle` or `--format`, and accepted `conformance run --adapters`
+  without reading it, even for a directory that does not exist. Python read an empty `--bundle`, `--engine`,
+  `--corpus` or `--adapters` as the working directory, wrote `validate --out ''` into it, dropped an empty
+  `conformance run --out`, took an empty `diff --format` as text, and refused `diff A --format md B`. The rows
+  check that each engine refuses those lines with a key at exit 3, prints the same usage for `-h`, reads diff's
+  files on either side of `--format`, and runs the adapters' own orchestrator for `--adapters`. The
+  orchestrator's claim goes into the report and sets the exit code. They read a committed empty corpus, a one-project corpus written
+  by the corpus generator, and three sample adapters directories (claim full, partial and none). A case's
+  `has` can now list several paths, and its `file_says` names a token a written file must hold.
+- `VG-CLI-OPTIONS` (18.111): its `validate`, `diff`, `conformance` and `version` rows no longer need a
+  TypeScript or Java override, and its Java unknown-flag fault seeds the same fault in the rewritten scanner.
+- `VG-CLI-ASSESS` (18.111): its TypeScript `-h` fault and Java unknown-flag fault seed the same faults in the
+  rewritten scanners.
+
 ## 0.68.0
 
 - `VG-CLI-REPORT` (18.110) is new, with 85 rows and seven seeded faults, and covers `report`'s command line.

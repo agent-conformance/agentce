@@ -1,0 +1,28 @@
+{
+  "corpus_version": "2026.09",
+  "domain": "credit",
+  "generator_version": "2",
+  "projects": [
+    {
+      "bundle_digest": "sha256:e47c3cbb1e3f67ba9c523adb3f055a1cc0cdd0926c2e77f8ae24a2ed363d3ce7",
+      "deviations_digest": "sha256:84dae01fc9c99b506d0fc9f1ff331e129648790c575f0fee0a40a8ebca153c40",
+      "domain": "credit",
+      "domain_digest": "sha256:45556caa63e42510103293fe8405d5965dcafe924de8440c502213c6926571bd",
+      "events": 8,
+      "expected": {
+        "INC-02": "conformant",
+        "INT-01": "conformant",
+        "OVS-03": "conformant",
+        "REC-04": "conformant"
+      },
+      "ground_truth_digest": "sha256:3020466379110bbc0adb7a8fbe5ee0260321e59a7d4ef92070a4ec5c2160c0ea",
+      "id": "credit/claude-agent-sdk/known-pass",
+      "profile_digest": "sha256:7497a0ce7004712122f13b60beb8812fb9d7ee26737fd3befe9662821c8a3120",
+      "seeded_faults": 0,
+      "style": "claude-agent-sdk",
+      "subject": "spiffe://corp/agents/credit-claude-agent-sdk",
+      "variant": "known-pass"
+    }
+  ],
+  "set": "v1"
+}

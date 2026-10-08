@@ -1,0 +1,3 @@
+# Deviation register (SPEC §6.5). Empty for the Phase-1 variants; the partial variant that
+# exercises deviation records lands with deviation handling in a later phase.
+deviations: []

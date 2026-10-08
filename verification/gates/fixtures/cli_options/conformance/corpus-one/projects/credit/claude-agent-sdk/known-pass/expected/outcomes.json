@@ -1,0 +1,27 @@
+{
+  "outcomes": [
+    {
+      "control": "INC-02",
+      "outcome": "conformant",
+      "subject": "spiffe://corp/agents/credit-claude-agent-sdk"
+    },
+    {
+      "control": "INT-01",
+      "outcome": "conformant",
+      "subject": "spiffe://corp/agents/credit-claude-agent-sdk"
+    },
+    {
+      "control": "OVS-03",
+      "outcome": "conformant",
+      "subject": "spiffe://corp/agents/credit-claude-agent-sdk"
+    },
+    {
+      "control": "REC-04",
+      "outcome": "conformant",
+      "subject": "spiffe://corp/agents/credit-claude-agent-sdk"
+    }
+  ],
+  "seeded_faults": [],
+  "subject": "spiffe://corp/agents/credit-claude-agent-sdk",
+  "variant": "known-pass"
+}

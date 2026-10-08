@@ -1,0 +1,9 @@
+# Domain ontology binding (SPEC §6.5): the credit domain's decision classes.
+decision_types:
+  - id: "dom:CreditDecision"
+    subclass_of: "agentce:ConsequentialDecision"
+    consequential: true
+    required_oversight_modality: "review_before"
+  - id: "dom:MinorInquiry"
+    subclass_of: "agentce:Decision"
+    consequential: false
