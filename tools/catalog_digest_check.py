@@ -16,7 +16,7 @@ algorithm, not merely independently non-zero.
 * The real invocation (a real catalog directory, e.g. ``spec/catalogs/base/baseline``) shells to each
   engine's real implementation -- the Python engine's own ``catalog_provenance_digest`` (via
   ``uv run --project engines/python``, so this script's own environment never needs ``agentce``
-  installed), the built TypeScript ``dist/cli.js``'s ``digest-tree`` verb, and the built Java runnable
+  installed), the built TypeScript ``dist/seams.js``'s ``digest-tree`` seam, and the built Java runnable
   jar's ``digest-tree`` verb -- and asserts all three sha256 strings are byte-identical.
 
 Usage:
@@ -104,7 +104,7 @@ def python_engine_digest(directory: Path) -> str:
 
 def typescript_digest(directory: Path) -> str:
     """The built TypeScript engine's `digest-tree` verb (`pnpm build` must have run first)."""
-    entry = TS_ENGINE / "dist" / "cli.js"
+    entry = TS_ENGINE / "dist" / "seams.js"
     if not entry.is_file():
         raise SystemExit(
             f"typescript dist is not built: {entry} is missing "
@@ -127,7 +127,7 @@ def java_digest(directory: Path) -> str:
             "(run `./gradlew :assemble --offline -q` in engines/java first)"
         )
     return _run_or_die(
-        ["java", "-jar", str(jars[-1]), "digest-tree", str(directory)],
+        ["java", "-cp", str(jars[-1]), "org.agentce.Seams", "digest-tree", str(directory)],
         "java digest-tree",
     )
 

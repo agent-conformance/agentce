@@ -35,6 +35,7 @@
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "test:cov": "node --import tsx --test --experimental-test-coverage --test-coverage-lines=90 \"src/**/*.test.ts\"",
     "agentce": "tsx src/cli.ts",
+    "seams": "tsx src/seams.ts",
     "prepublishOnly": "pnpm build"
   },
   "keywords": [

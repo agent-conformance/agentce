@@ -269,10 +269,10 @@ with open(sys.argv[2], "w", encoding="utf-8", newline="\n") as f:
     f.write("".join(lines))
 PY
 ) &
-(cd "$root/engines/typescript" && pnpm --silent agentce fail-on-check "$fixture") > "$work/corpus.typescript" 2> "$work/corpus.typescript.err" &
+(cd "$root/engines/typescript" && pnpm --silent seams fail-on-check "$fixture") > "$work/corpus.typescript" 2> "$work/corpus.typescript.err" &
 # The seam prints with System.out, whose encoding follows the locale; macOS has no C.UTF-8 locale, so
 # UTF-8 is named here rather than left to the platform.
-(cd "$root/engines/java" && JAVA_OPTS=-Dstdout.encoding=UTF-8 ./build/install/agentce/bin/agentce fail-on-check "$fixture") \
+(cd "$root/engines/java" && java -Dstdout.encoding=UTF-8 -cp "$root/engines/java/build/install/agentce/lib/*" org.agentce.Seams fail-on-check "$fixture") \
   > "$work/corpus.java" 2> "$work/corpus.java.err" &
 wait
 

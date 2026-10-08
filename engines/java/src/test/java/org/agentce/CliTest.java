@@ -666,6 +666,19 @@ class CliTest {
         return buf.toString(StandardCharsets.UTF_8);
     }
 
+    /** The same capture for the test seams' own entry point (18.108: they are not CLI commands). */
+    private static String captureSeamsStdout(String... args) {
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        PrintStream original = System.out;
+        System.setOut(new PrintStream(buf, true, StandardCharsets.UTF_8));
+        try {
+            Seams.run(args);
+        } finally {
+            System.setOut(original);
+        }
+        return buf.toString(StandardCharsets.UTF_8);
+    }
+
     @Test
     void versionJsonEnvelopeMatchesTheOtherCommandsShape() {
         JsonNode env = runJson("version");
@@ -697,13 +710,13 @@ class CliTest {
     void digestTreeVerbPrintsTheDirectorysRealContentDigest() {
         Path fixture = REPO.resolve("spec/model/test-vectors/digest-tree");
         String expected = Catalog.digestTree(fixture, Set.of("catalog.sig.json", "catalog.yaml"));
-        assertEquals(expected + "\n", captureStdout("digest-tree", fixture.toString()));
+        assertEquals(expected + "\n", captureSeamsStdout("digest-tree", fixture.toString()));
     }
 
     @Test
     void securityViewVerbRunsTheFixtureAndPrintsAStandardsCitationsArray() {
         Path fixture = REPO.resolve("verification/gates/fixtures/security_view/activity_and_assertions.json");
-        String out = captureStdout("security-view", fixture.toString());
+        String out = captureSeamsStdout("security-view", fixture.toString());
         JsonNode citations = Json.parse(out).get("standards_citations");
         assertTrue(citations.isArray());
         Set<String> frameworks = new HashSet<>();
@@ -714,11 +727,17 @@ class CliTest {
     }
 
     @Test
-    void anUnknownVerbReturnsTheStableNotImplementedEnvelope() {
-        JsonNode env = runJson("frobnicate");
-        assertEquals(3, env.get("exit_code").asInt());
+    void anUnknownVerbIsRefusedAndAnUnbuiltCommandIsNotImplemented() {
+        // 18.108: an unknown command (a test seam's name included) is input.unknown_command, as in
+        // Python; a documented command this engine has not built still answers cli.not_implemented.
+        for (String verb : List.of("frobnicate", "digest-tree")) {
+            JsonNode env = runJson(verb);
+            assertEquals(3, env.get("exit_code").asInt());
+            assertEquals("input.unknown_command", env.get("error").get("message_key").asText());
+        }
+        JsonNode env = runJson("doctor");
         assertEquals("cli.not_implemented", env.get("error").get("message_key").asText());
-        assertEquals("frobnicate", env.get("error").get("command").asText());
+        assertEquals("doctor", env.get("error").get("command").asText());
     }
 
     // --- `diff` (item 18.24): a real, deterministic assertion-set diff, matching the Python
@@ -1728,5 +1747,37 @@ class CliTest {
         assertRefusal(env, "input.trust_root_invalid",
                 "the trust root '" + root + "' could not be loaded: " + root + " does not hold a trust-root object",
                 TRUST_ROOT_FIX);
+    }
+
+    @Test
+    void scanTopLevelReadsTheTokensBeforeTheCommandAsPythonDoes() {
+        // 18.108: every branch of Python's _scan_top_level.
+        assertTrue(Cli.scanTopLevel(new String[] {}).help());
+        assertTrue(Cli.scanTopLevel(new String[] {"--no-such-flag", "-h"}).help());
+        assertTrue(Cli.scanTopLevel(new String[] {"-h", "-V"}).help());
+        assertTrue(Cli.scanTopLevel(new String[] {"--version"}).version());
+        Cli.TopLevel run = Cli.scanTopLevel(new String[] {"--json", "--debug", "version", "--quiet"});
+        assertEquals("version", run.command());
+        assertArrayEquals(new String[] {"--quiet"}, run.rest());
+        assertEquals(Set.of("--json", "--debug"), run.globals());
+        assertEquals("version", Cli.scanTopLevel(new String[] {"--", "version"}).command());
+        String[][] refusals = {
+            {"'-V' takes no other arguments.", "-V", "extra"},
+            {"'--version' takes no other arguments.", "--json", "--version"},
+            {"unrecognized flag '-hx'.", "-hx", "assess"},
+            {"flag '--json' takes no value.", "--json=1", "version"},
+            {"unrecognized flag '--no-such-flag'.", "--no-such-flag", "version"},
+            {"no command given after '--'.", "--"},
+            {"no command given.", "--json"},
+            {"unrecognized command 'nope'.", "nope"},
+            {"unrecognized command 'digest-tree'.", "digest-tree", "x"},
+        };
+        for (String[] row : refusals) {
+            String[] argv = Arrays.copyOfRange(row, 1, row.length);
+            InputError exc = org.junit.jupiter.api.Assertions.assertThrows(
+                    InputError.class, () -> Cli.scanTopLevel(argv), String.join(" ", argv));
+            assertEquals("input.unknown_command", exc.key);
+            assertEquals(row[0], exc.reason);
+        }
     }
 }

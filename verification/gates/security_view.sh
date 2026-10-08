@@ -182,9 +182,9 @@ data = json.load(open(sys.argv[1], encoding='utf-8'))
 assertions = [Assertion.from_json(a) for a in data['assertions']]
 print(json.dumps(compute_security_view(data['activity'], assertions)))
 " "$combined" > "$py_raw")
-(cd "$root/engines/typescript" && pnpm --silent agentce security-view "$combined" > "$ts_raw")
+(cd "$root/engines/typescript" && pnpm --silent seams security-view "$combined" > "$ts_raw")
 (cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist)
-"$root/engines/java/build/install/agentce/bin/agentce" security-view "$combined" > "$java_raw"
+java -cp "$root/engines/java/build/install/agentce/lib/*" org.agentce.Seams security-view "$combined" > "$java_raw"
 
 normalize() { python3 -c "import json,sys; print(json.dumps(json.load(open(sys.argv[1])), separators=(',',':')))" "$1"; }
 py_norm="$(normalize "$py_raw")"

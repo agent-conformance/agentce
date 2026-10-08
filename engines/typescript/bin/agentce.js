@@ -2,10 +2,10 @@
 const { version } = require("../package.json");
 const args = process.argv.slice(2);
 
-// The bare `--version`/`-V` flag stays a plain one-line shortcut that never loads the engine; the
-// `version` subcommand is a real command (structured `--json` envelope, a no_ml self-report) and
-// must reach `cli.js`'s `main`, not be shadowed here.
-if (args[0] === "--version" || args[0] === "-V") {
+// The bare `--version`/`-V` flag stays a plain one-line shortcut that never loads the engine, but only
+// as the whole command line: anything else with it goes to `cli.js`'s `main`, which refuses it (18.108).
+// The `version` subcommand is a real command (structured `--json` envelope, a no_ml self-report).
+if (args.length === 1 && (args[0] === "--version" || args[0] === "-V")) {
   console.log(`agentce ${version}`);
   process.exit(0);
 }

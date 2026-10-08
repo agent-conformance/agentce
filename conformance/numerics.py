@@ -81,7 +81,7 @@ def _expected(algorithm: str, case: dict[str, Any]) -> Any:
 
 def _ts_results(casefile: Path) -> dict[str, Any]:
     proc = subprocess.run(
-        ["pnpm", "--silent", "agentce", "numerics", str(casefile.resolve())],
+        ["pnpm", "--silent", "seams", "numerics", str(casefile.resolve())],
         cwd=str(TS_ENGINE),
         capture_output=True,
         text=True,
@@ -98,7 +98,15 @@ def _ts_results(casefile: Path) -> dict[str, Any]:
 
 def _java_results(launcher: Path, casefile: Path) -> dict[str, Any]:
     proc = subprocess.run(
-        [str(launcher), "numerics", str(casefile.resolve())],
+        # The seams entry point (18.108), from the same installDist the launcher runs.
+        [
+            "java",
+            "-cp",
+            str(launcher.parent.parent / "lib" / "*"),
+            "org.agentce.Seams",
+            "numerics",
+            str(casefile.resolve()),
+        ],
         capture_output=True,
         text=True,
         check=False,

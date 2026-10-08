@@ -2230,7 +2230,17 @@ def _npm_run_problems(
         problems.append(
             _fail("conformance run --json did not return a stable error envelope", proc)
         )
-    problems += _numerics_problems(exe, empty, runner)
+    # The test seams ship in the package but are not `agentce` commands (18.108).
+    seams = [
+        "node",
+        str(
+            empty / "node_modules" / "@agent-conformance" / "cli" / "dist" / "seams.js"
+        ),
+    ]
+    problems += _numerics_problems(seams, empty, runner)
+    proc = runner.run([*exe, "--version", "-hx"], empty, offline=True)
+    if proc.returncode != 3:
+        problems.append(_fail("--version -hx was not refused with exit 3", proc))
     problems += [
         f"npm: {p}"
         for p in _version_problems(exe, runner, empty, "agentce-ts", spec_version)
@@ -2239,7 +2249,9 @@ def _npm_run_problems(
     problems += [f"npm: {p}" for p in _readiness_problems(exe, runner, empty)]
     problems += [f"npm: {p}" for p in _sign_problems(exe, runner, empty)]
     problems += [f"npm: {p}" for p in _verify_problems(exe, runner, empty)]
-    problems += [f"npm: {p}" for p in _otel_genai_fixture_problems(exe, runner, empty)]
+    problems += [
+        f"npm: {p}" for p in _otel_genai_fixture_problems(seams, runner, empty)
+    ]
     package = empty / "node_modules" / "@agent-conformance" / "cli"
     for rel in (
         "schema/agentce-evidence.schema.json",
@@ -2352,7 +2364,10 @@ def check_jar_file(runner: Runner, built: Path) -> list[str]:
         problems += [f"jar: {p}" for p in _sign_problems(exe, runner, empty)]
         problems += [f"jar: {p}" for p in _verify_problems(exe, runner, empty)]
         problems += [
-            f"jar: {p}" for p in _otel_genai_fixture_problems(exe, runner, empty)
+            f"jar: {p}"
+            for p in _otel_genai_fixture_problems(
+                ["java", "-cp", str(jar), "org.agentce.Seams"], runner, empty
+            )
         ]
         with zipfile.ZipFile(jar) as zf:
             names = set(zf.namelist())

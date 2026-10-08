@@ -48,167 +48,147 @@ public final class Cli {
         System.exit(run(args));
     }
 
-    static int run(String[] args) {
-        String command = args.length > 0 ? args[0] : null;
-        if ("--version".equals(command) || "-V".equals(command)) {
+    /** Python's {@code agentce --help} (COLUMNS=80), word for word. */
+    private static final String TOP_USAGE = """
+usage: agentce [-h] [--json] [--debug] [--quiet] [-V] <command> ...
+
+Agent Conformance Engine — deterministic conformance evidence for AI agents.
+
+positional arguments:
+  <command>
+    validate     schema-validate a bundle
+    verify       integrity or signature verification
+    assess       run a full assessment
+    report       re-render a report, or validate one
+    collect      run a scheduled collection job over sources with a local
+                 export, or plan one
+    ingest       adapt a real adapter export into an evidence bundle
+    catalog      catalog tools
+    conformance  engine conformance suite
+    diff         deterministic diff of two assertion sets
+    sign         sign a report as claimant or assessor
+    readiness    compute the report-readiness verdict (SPEC 13.3.4)
+    doctor       diagnose a project and name the exact fix (SPEC 13.4)
+    quickstart   assess the bundled quickstart project
+    init         write a starter applicability profile
+    config       show engine configuration
+    version      print engine, spec, and no_ml information
+
+options:
+  -h, --help     show this help message and exit
+  -V, --version  show program's version number and exit
+
+global options:
+  --json         emit machine-readable JSON on stdout
+  --debug        verbose logs on stderr and a stack trace on unexpected errors
+  --quiet        log warnings and errors only
+""";
+
+    /** The commands Python's parser takes; the ones this engine has not built answer cli.not_implemented. */
+    private static final Set<String> COMMANDS = Set.of(
+            "validate", "verify", "assess", "report", "collect", "ingest", "catalog", "conformance",
+            "diff", "sign", "readiness", "doctor", "quickstart", "init", "config", "version");
+
+    private static final String TOP_FIX =
+            "name a command: `agentce <command>`; run `agentce --help` for the commands agentce takes.";
+    private static final String TOP_FLAG_FIX =
+            "run `agentce --help` for the commands and global flags agentce takes.";
+
+    /** What the tokens before the command ask for: {@code command == null} with {@code help} or
+     * {@code version}, or a command to run with its own arguments and the global flags seen before it. */
+    record TopLevel(boolean help, boolean version, String command, String[] rest, Set<String> globals) {}
+
+    private static InputError topRefusal(String cause, String fix) {
+        return new InputError("input.unknown_command", cause, fix);
+    }
+
+    /** The tokens before the command, read as Python's {@code _scan_top_level} reads them (18.108): a
+     * short cluster or a value on a flag that takes none is refused at once; -h/--help win when reached;
+     * -V/--version answer only a line of their own; --json/--debug/--quiet are recorded; any other flag
+     * is refused once the scan ends; {@code --} makes the next token the command. Every refusal is
+     * input.unknown_command. */
+    static TopLevel scanTopLevel(String[] argv) {
+        Set<String> globals = new LinkedHashSet<>();
+        String unknown = null;
+        for (int i = 0; i < argv.length; i++) {
+            String token = argv[i];
+            if (token.equals("--") || !token.startsWith("-") || token.equals("-")) {
+                int at = token.equals("--") ? i + 1 : i;
+                if (at == argv.length) {
+                    throw topRefusal("no command given after '--'.", TOP_FIX);
+                }
+                if (unknown != null) {
+                    break;
+                }
+                String command = argv[at];
+                if (!COMMANDS.contains(command)) {
+                    throw topRefusal("unrecognized command '" + command + "'.",
+                            "run `agentce --help` for the commands agentce takes.");
+                }
+                return new TopLevel(false, false, command,
+                        Arrays.copyOfRange(argv, at + 1, argv.length), globals);
+            }
+            String name = token.split("=", 2)[0];
+            if (!token.startsWith("--") && token.length() > 2) {
+                throw topRefusal("unrecognized flag '" + token + "'.", TOP_FLAG_FIX);
+            }
+            boolean help = name.equals("-h") || name.equals("--help");
+            boolean version = name.equals("-V") || name.equals("--version");
+            boolean known = help || version || GLOBAL_BOOLEAN_FLAGS.contains(name);
+            if (known && token.contains("=")) {
+                throw topRefusal("flag '" + name + "' takes no value.", "drop the value: " + name + ".");
+            }
+            if (help) {
+                return new TopLevel(true, false, null, null, globals);
+            }
+            if (version) {
+                if (argv.length != 1) {
+                    throw topRefusal("'" + name + "' takes no other arguments.",
+                            "run `agentce --version` alone, or `agentce version --json` for the JSON envelope.");
+                }
+                return new TopLevel(false, true, null, null, globals);
+            }
+            if (known) {
+                globals.add(name);
+            } else if (unknown == null) {
+                unknown = token;
+            }
+        }
+        if (unknown != null) {
+            throw topRefusal("unrecognized flag '" + unknown + "'.", TOP_FLAG_FIX);
+        }
+        if (argv.length > 0) {
+            throw topRefusal("no command given.", TOP_FIX);
+        }
+        return new TopLevel(true, false, null, null, globals);
+    }
+
+    static int run(String[] rawArgs) {
+        TopLevel top;
+        try {
+            top = scanTopLevel(rawArgs);
+        } catch (InputError exc) {
+            CommandResult refused = errorResult("agentce", exc);
+            emit(refused, Arrays.asList(rawArgs).contains("--json"));
+            return refused.exitCode();
+        }
+        if (top.help()) {
+            // UTF-8 bytes whatever the platform encoding: the usage holds an em dash.
+            byte[] usage = TOP_USAGE.getBytes(StandardCharsets.UTF_8);
+            System.out.write(usage, 0, usage.length);
+            System.out.flush();
+            return 0;
+        }
+        if (top.version()) {
             System.out.println("agentce " + Version.ENGINE_VERSION);
             return 0;
         }
+        String command = top.command();
+        String[] args = Stream.concat(Stream.of(command), Arrays.stream(top.rest())).toArray(String[]::new);
 
-        // The numerics verb is a plain computation seam for the cross-engine vector check: it reads a
-        // numerics-vectors case file and prints {caseName: result} as plain JSON, not the envelope.
-        if ("numerics".equals(command)) {
-            if (args.length < 2) {
-                System.err.println("numerics: a case file path is required");
-                return ExitCode.INPUT_ERROR.code;
-            }
-            System.out.println(Json.pretty(Numerics.computeVectorFile(java.nio.file.Path.of(args[1]))));
-            return 0;
-        }
-
-        // digest-tree is a plain computation seam (the same pattern as `numerics` above), driven from
-        // outside the repo's Java sources by `tools/catalog_digest_check.py` against the built jar: it
-        // prints one catalog directory's real content digest, nothing else.
-        if ("digest-tree".equals(command)) {
-            if (args.length < 2) {
-                System.err.println("digest-tree: a directory path is required");
-                return ExitCode.INPUT_ERROR.code;
-            }
-            System.out.println(Catalog.provenanceDigest(Paths.get(args[1])));
-            return 0;
-        }
-
-        // security-view is a plain computation seam (the same pattern as `numerics`/`digest-tree`
-        // above), driven by the security-view build gate's cross-engine diff (18.16, C5): it reads a
-        // fixture file with {activity, assertions}, runs SecurityView.compute, and prints the result
-        // as JSON -- not part of the public `assess` command surface (no engine here has
-        // `--for`/multi-format `write_report` yet, TRADEOFFS row 8).
-        if ("security-view".equals(command)) {
-            if (args.length < 2) {
-                System.err.println("security-view: a fixture file path is required");
-                return ExitCode.INPUT_ERROR.code;
-            }
-            JsonNode data = Json.parseFile(Paths.get(args[1]));
-            ObjectNode activity = (ObjectNode) data.get("activity");
-            List<Assertions.Assertion> assertions = new ArrayList<>();
-            for (JsonNode a : data.get("assertions")) {
-                assertions.add(Assertions.fromJson(a));
-            }
-            System.out.println(SecurityView.compute(activity, assertions).toString());
-            return 0;
-        }
-
-        // auditor-view is the same kind of test-only seam (18.17a, VG-DEVIATIONS-PARITY): it reads a
-        // fixture file with {assertions, deviations}, runs AuditorView.computeAuditorView, and prints
-        // canonical JSON, the bytes Python's auditor.json holds -- not part of the public command surface.
-        if ("auditor-view".equals(command)) {
-            if (args.length < 2) {
-                System.err.println("auditor-view: a fixture file path is required");
-                return ExitCode.INPUT_ERROR.code;
-            }
-            JsonNode data = Json.parseFile(Paths.get(args[1]));
-            List<Assertions.Assertion> assertions = new ArrayList<>();
-            for (JsonNode a : data.get("assertions")) {
-                assertions.add(Assertions.fromJson(a));
-            }
-            JsonNode deviationsNode = data.get("deviations");
-            List<JsonNode> deviations = null;
-            if (deviationsNode != null && !deviationsNode.isNull()) {
-                deviations = new ArrayList<>();
-                deviationsNode.forEach(deviations::add);
-            }
-            System.out.println(Canonical.canonicalString(AuditorView.computeAuditorView(assertions, deviations)));
-            return 0;
-        }
-
-        // fail-on-check is the same kind of test-only seam (18.73): it reads a fixture file with
-        // {assertions, expressions} and, per expression in order, prints one canonical JSON line:
-        // {"error": {key, cause, fix}} on refusal, else {"matched": [one boolean per assertion]} --
-        // not part of the public command surface.
-        if ("fail-on-check".equals(command)) {
-            if (args.length < 2) {
-                System.err.println("fail-on-check: a fixture file path is required");
-                return ExitCode.INPUT_ERROR.code;
-            }
-            JsonNode data = Json.parseFile(Paths.get(args[1]));
-            List<Assertions.Assertion> assertions = new ArrayList<>();
-            for (JsonNode a : data.get("assertions")) {
-                assertions.add(Assertions.fromJson(a));
-            }
-            for (JsonNode expression : data.get("expressions")) {
-                ObjectNode line = Json.nodes().objectNode();
-                try {
-                    FailOn.Expression parsed = FailOn.parse(expression.textValue());
-                    ArrayNode matched = line.putArray("matched");
-                    for (Assertions.Assertion a : assertions) {
-                        matched.add(parsed.matches(a));
-                    }
-                } catch (AgentceError exc) {
-                    ObjectNode error = line.putObject("error");
-                    error.put("key", exc.key);
-                    error.put("cause", exc.reason);
-                    error.put("fix", exc.fix);
-                }
-                System.out.println(Canonical.canonicalString(line));
-            }
-            return 0;
-        }
-
-        // otel-genai-fixture is a plain computation seam (the same pattern as `security-view`
-        // above), driven by the otel-genai adapter's cross-engine parity check (18.29, C3/C4): it
-        // reads `<dir>/input.json` and `<dir>/adapt.json` the same way the Python reference's
-        // fixtures module does, calls `adapt`, and for each emitted event (in the adapter's own
-        // pinned time/id order) attempts `canonicalString`; on success prints `EVENT <result>`. On
-        // a `CanonicalizationError`, nothing further goes to stdout -- `ERROR canonical:<reason>`
-        // goes to stderr and the process exits 1, so the check can tell "the adapter accepted this
-        // but the event cannot be serialised" apart from "the adapter refused the whole document"
-        // (an `OtelGenaiAdapterError`, printed the same way without the `canonical:` prefix). On a
-        // clean run, one final `REPORT <json>` line follows every `EVENT` line.
-        if ("otel-genai-fixture".equals(command)) {
-            if (args.length < 2) {
-                System.err.println("otel-genai-fixture: a directory path is required");
-                return ExitCode.INPUT_ERROR.code;
-            }
-            Path dir = Paths.get(args[1]);
-            byte[] inputBytes;
-            JsonNode adaptArgs;
-            try {
-                inputBytes = Files.readAllBytes(dir.resolve("input.json"));
-                adaptArgs = Json.parseFile(dir.resolve("adapt.json"));
-            } catch (IOException | RuntimeException e) {
-                System.err.println("otel-genai-fixture: " + e.getMessage());
-                return ExitCode.INPUT_ERROR.code;
-            }
-            String subject = adaptArgs.has("subject") ? adaptArgs.get("subject").asText() : null;
-            String sourceClass = adaptArgs.has("source_class") && !adaptArgs.get("source_class").isNull()
-                    ? adaptArgs.get("source_class").asText()
-                    : null;
-            String source = adaptArgs.has("source") && !adaptArgs.get("source").isNull()
-                    ? adaptArgs.get("source").asText()
-                    : null;
-            try {
-                OtelGenai.AdaptResult result = OtelGenai.adapt(inputBytes, subject, sourceClass, source);
-                for (JsonNode event : result.events()) {
-                    String line;
-                    try {
-                        line = Canonical.canonicalString(event);
-                    } catch (Canonical.CanonicalizationError exc) {
-                        System.err.println("ERROR canonical:" + exc.reason);
-                        return 1;
-                    }
-                    System.out.println("EVENT " + line);
-                }
-                System.out.println("REPORT " + otelGenaiReportLine(result.report()));
-                return 0;
-            } catch (OtelGenai.OtelGenaiAdapterError exc) {
-                System.err.println("ERROR " + exc.reason);
-                return 1;
-            }
-        }
-
-        boolean json = Arrays.asList(args).contains("--json");
-        boolean debug = Arrays.asList(args).contains("--debug");
-        String commandName = command == null ? "" : command;
+        boolean json = top.globals().contains("--json") || Arrays.asList(args).contains("--json");
+        boolean debug = top.globals().contains("--debug") || Arrays.asList(args).contains("--debug");
+        String commandName = command;
         if (debug) {
             logDebug(commandName, "command.start", null);
         }
@@ -224,7 +204,7 @@ public final class Cli {
             } else if ("report".equals(command)) {
                 result = cmdReport(args);
             } else if ("diff".equals(command)) {
-                result = cmdDiff(args);
+                result = cmdDiff(args, json);
             } else if ("readiness".equals(command)) {
                 result = cmdReadiness(args);
             } else if ("sign".equals(command)) {
@@ -1493,7 +1473,7 @@ public final class Cli {
 
     /** {@code agentce diff} (SPEC §9.3, item 18.6): a real, deterministic assertion-set diff, matching
      * the Python reference's {@code cmd_diff} (see {@link Diff}). */
-    private static CommandResult cmdDiff(String[] args) {
+    private static CommandResult cmdDiff(String[] args, boolean json) {
         CommandResult result = new CommandResult("diff");
         List<String> positional = positionalArgs(args);
         if (positional.size() > 2) {
@@ -1536,7 +1516,7 @@ public final class Cli {
         if (!changes.isEmpty()) {
             result.addCode(ExitCode.FINDINGS.code);
         }
-        if (Arrays.asList(args).contains("--json")) {
+        if (json) {
             // Never render a format only --json will discard -- mirrors Python's early return before
             // any result.note call.
             return result;
@@ -2150,27 +2130,6 @@ public final class Cli {
             result.addCode(ExitCode.INPUT_ERROR.code);
         }
         return result;
-    }
-
-    /**
-     * The {@code otel-genai-fixture} seam's {@code REPORT} line: compact JSON, field order fixed
-     * to match TypeScript's {@code JSON.stringify} output byte for byte (18.29, C3).
-     */
-    private static String otelGenaiReportLine(OtelGenai.AdapterReport report) {
-        ObjectNode node = Json.nodes().objectNode();
-        node.put("adapter", report.adapter());
-        ArrayNode conventions = node.putArray("conventions");
-        report.conventions().forEach(conventions::add);
-        node.put("spans_seen", report.spansSeen());
-        node.put("events_emitted", report.eventsEmitted());
-        ArrayNode skipped = node.putArray("skipped");
-        for (OtelGenai.SkippedSpan s : report.skipped()) {
-            ObjectNode entry = skipped.addObject();
-            entry.put("name", s.name());
-            entry.put("reason", s.reason());
-            entry.put("span_id", s.spanId());
-        }
-        return Json.compact(node);
     }
 
     private static CommandResult notImplemented(String command) {

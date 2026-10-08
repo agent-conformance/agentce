@@ -144,9 +144,9 @@ PY
   )
   for order in run reversed; do
     fixture="$work/seam-$name-$order.fixture.json"
-    (cd "$root/engines/typescript" && pnpm --silent agentce auditor-view "$fixture") \
+    (cd "$root/engines/typescript" && pnpm --silent seams auditor-view "$fixture") \
       > "$work/seam-$name-$order.typescript" || true
-    (cd "$root/engines/java" && ./build/install/agentce/bin/agentce auditor-view "$fixture") \
+    (cd "$root/engines/java" && java -cp "$root/engines/java/build/install/agentce/lib/*" org.agentce.Seams auditor-view "$fixture") \
       > "$work/seam-$name-$order.java" || true
   done
 done

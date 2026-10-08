@@ -13,7 +13,7 @@ Python's own adapter (`agentce.records.otel_genai`, the engine's vendored copy C
 called directly, in process -- this script is meant to run under `engines/python`'s own `uv`
 environment (`uv run --project engines/python --frozen python tools/otel_genai_adapter_check.py`),
 exactly as `--self-test` and the real invocation's `cmd` in the contract pin. TypeScript and Java
-are driven as built artifacts (`engines/typescript/dist/cli.js`, the Java runnable jar), each
+are driven as built artifacts (`engines/typescript/dist/seams.js`, the Java runnable jar's `org.agentce.Seams`), each
 through the shared `otel-genai-fixture <dir>` seam verb (`cli.ts`/`Cli.java`).
 
 * `--self-test` needs no TypeScript/Java build: it proves two things about this checker itself, not
@@ -31,7 +31,7 @@ through the shared `otel-genai-fixture <dir>` seam verb (`cli.ts`/`Cli.java`).
   for each of the 30 vectors, a fresh temporary directory holding only that vector's own
   `input.json` and `adapt.json` (never its `expected*.json*`, so a seam that merely echoes the
   directory it is given cannot pass) through Python's `adapt` directly, the built TypeScript
-  `dist/cli.js otel-genai-fixture <dir>`, and the built Java jar's `otel-genai-fixture <dir>`, and
+  `dist/seams.js otel-genai-fixture <dir>`, and the built Java jar's `org.agentce.Seams otel-genai-fixture <dir>`, and
   asserts all three engines' stdout/stderr and exit code agree. Each TypeScript and Java run has a
   fixed 30 s limit; a run that exceeds it fails naming the vector and the engine (the
   `long-slash-run-schema-url` vector exists to catch a super-linear scan this way).
@@ -148,7 +148,7 @@ def python_fixture_lines(vector_dir: Path) -> tuple[list[str], list[str], int]:
 def _typescript_entry() -> Path:
     """The built TypeScript CLI entry point, resolved once -- every one of the 30 vectors drives
     the same build, so there is exactly one entry point to find, not one lookup per vector."""
-    entry = TS_ENGINE / "dist" / "cli.js"
+    entry = TS_ENGINE / "dist" / "seams.js"
     if not entry.is_file():
         raise SystemExit(
             f"typescript dist is not built: {entry} is missing (run `pnpm build` in engines/typescript first)"
@@ -192,7 +192,7 @@ def typescript_fixture(vector_dir: Path) -> tuple[str, str, int]:
 
 def java_fixture(vector_dir: Path) -> tuple[str, str, int]:
     return _run_engine(
-        ["java", "-jar", str(_java_jar()), "otel-genai-fixture", str(vector_dir)]
+        ["java", "-cp", str(_java_jar()), "org.agentce.Seams", "otel-genai-fixture", str(vector_dir)]
     )
 
 

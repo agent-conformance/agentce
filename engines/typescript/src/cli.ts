@@ -9,15 +9,13 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { homedir } from "node:os";
 import { basename, join, relative, resolve as resolvePath, sep } from "node:path";
 import { load } from "js-yaml";
-import { type Activity, summarizeActivity } from "./activity";
+import { summarizeActivity } from "./activity";
 import { resolve as resolveApplicability } from "./applicability";
 import { type Assertion, aggregate, assertionFromJson, assertionToJson } from "./assertions";
 import { applyDeviations, assessSubjects, deviationsByControl, evaluatedNothing } from "./assess";
-import { computeAuditorView } from "./auditorView";
 import { computeBlindSpots } from "./blindSpots";
 import { loadBundle } from "./bundle";
 import { DEFAULT_LENS, catalogsDir as bundledCatalogsDir, quickstartDir } from "./bundled";
-import { CanonicalizationError, canonicalString } from "./canonical";
 import { type Catalog, loadCatalog } from "./catalog";
 import { runEcs } from "./conformance";
 import { computeCoverage } from "./coverage";
@@ -38,8 +36,6 @@ import { ingest } from "./ingest";
 import { integrityResultToJson, verifyBundle } from "./integrity";
 import { DEFAULT_LANGUAGE, catalogue } from "./messages";
 import { evaluateInstalledNoMl, loadVendoredDenylist } from "./noMl";
-import { computeVectorFile } from "./numerics";
-import { OtelGenaiAdapterError, adapt as adaptOtelGenai } from "./otelGenai";
 import { type Profile, loadProfile } from "./profile";
 import { writeQuarantine } from "./quarantine";
 import {
@@ -62,7 +58,6 @@ import {
 import {
   activityCliLines,
   blindSpotsCliLines,
-  catalogProvenanceDigest,
   digestBytes,
   renderEvidencePack,
   renderOscal,
@@ -73,7 +68,6 @@ import {
 } from "./report";
 import { validateReport } from "./reportValidate";
 import { CommandResult } from "./result";
-import { computeSecurityView } from "./securityView";
 import { INTOTO_STATEMENT_TYPE, KmsSigner, type Signer, signStatement, signSubjects } from "./sign";
 import { StateDir, windowEnd } from "./state";
 import { GraphStore } from "./store";
@@ -1357,7 +1351,7 @@ function cmdReport(argv: string[]): CommandResult {
 
 /** `agentce diff` (SPEC §9.3, item 18.6): a real, deterministic assertion-set diff, matching the
  * Python reference's `cmd_diff` byte for byte (see `diff.ts`). */
-function cmdDiff(argv: string[]): CommandResult {
+function cmdDiff(argv: string[], json: boolean): CommandResult {
   const result = new CommandResult("diff");
   const positional = positionalArgs(argv);
   if (positional.length > 2) {
@@ -1390,7 +1384,7 @@ function cmdDiff(argv: string[]): CommandResult {
   if (changes.length > 0) {
     result.addCode(ExitCode.FINDINGS);
   }
-  if (argv.includes("--json")) {
+  if (json) {
     // Never render a format only --json will discard (the same rule 18.22's C1(h) established for
     // `version`) -- mirrors Python's early return before any `result.note` call.
     return result;
@@ -2001,163 +1995,165 @@ function errorResult(command: string, error: AgentceError): CommandResult {
   return result;
 }
 
-export function main(argv: string[]): number {
-  const command = argv[0];
-  if (command === "--version" || command === "-V") {
+/** Python's `agentce --help` (COLUMNS=80), word for word. */
+const TOP_USAGE = `usage: agentce [-h] [--json] [--debug] [--quiet] [-V] <command> ...
+
+Agent Conformance Engine — deterministic conformance evidence for AI agents.
+
+positional arguments:
+  <command>
+    validate     schema-validate a bundle
+    verify       integrity or signature verification
+    assess       run a full assessment
+    report       re-render a report, or validate one
+    collect      run a scheduled collection job over sources with a local
+                 export, or plan one
+    ingest       adapt a real adapter export into an evidence bundle
+    catalog      catalog tools
+    conformance  engine conformance suite
+    diff         deterministic diff of two assertion sets
+    sign         sign a report as claimant or assessor
+    readiness    compute the report-readiness verdict (SPEC 13.3.4)
+    doctor       diagnose a project and name the exact fix (SPEC 13.4)
+    quickstart   assess the bundled quickstart project
+    init         write a starter applicability profile
+    config       show engine configuration
+    version      print engine, spec, and no_ml information
+
+options:
+  -h, --help     show this help message and exit
+  -V, --version  show program's version number and exit
+
+global options:
+  --json         emit machine-readable JSON on stdout
+  --debug        verbose logs on stderr and a stack trace on unexpected errors
+  --quiet        log warnings and errors only
+`;
+
+/** The commands Python's parser takes; the ones this engine has not built answer cli.not_implemented. */
+const COMMANDS = new Set([
+  "validate",
+  "verify",
+  "assess",
+  "report",
+  "collect",
+  "ingest",
+  "catalog",
+  "conformance",
+  "diff",
+  "sign",
+  "readiness",
+  "doctor",
+  "quickstart",
+  "init",
+  "config",
+  "version",
+]);
+
+const TOP_FIX =
+  "name a command: `agentce <command>`; run `agentce --help` for the commands agentce takes.";
+const TOP_FLAG_FIX = "run `agentce --help` for the commands and global flags agentce takes.";
+
+function topRefusal(cause: string, fix = TOP_FIX): InputError {
+  return new InputError("input.unknown_command", cause, fix);
+}
+
+type TopLevel =
+  | { kind: "help" }
+  | { kind: "version" }
+  | { kind: "run"; command: string; rest: string[]; globals: Set<string> };
+
+/** The tokens before the command, read as Python's `_scan_top_level` reads them (18.108): a short
+ * cluster or a value on a flag that takes none is refused at once; -h/--help win when reached;
+ * -V/--version answer only a line of their own; --json/--debug/--quiet are recorded; any other flag is
+ * refused once the scan ends; `--` makes the next token the command. Every refusal is
+ * input.unknown_command. */
+export function scanTopLevel(argv: string[]): TopLevel {
+  const globals = new Set<string>();
+  let unknown: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i] as string;
+    if (token === "--" || !token.startsWith("-") || token === "-") {
+      const at = token === "--" ? i + 1 : i;
+      if (at === argv.length) {
+        throw topRefusal("no command given after '--'.");
+      }
+      if (unknown !== undefined) {
+        break;
+      }
+      const command = argv[at] as string;
+      if (!COMMANDS.has(command)) {
+        throw topRefusal(
+          `unrecognized command '${command}'.`,
+          "run `agentce --help` for the commands agentce takes.",
+        );
+      }
+      return { kind: "run", command, rest: argv.slice(at + 1), globals };
+    }
+    const name = token.split("=", 1)[0] as string;
+    if (!token.startsWith("--") && token.length > 2) {
+      throw topRefusal(`unrecognized flag '${token}'.`, TOP_FLAG_FIX);
+    }
+    const help = name === "-h" || name === "--help";
+    const version = name === "-V" || name === "--version";
+    const known = help || version || GLOBAL_BOOLEAN_FLAGS.has(name);
+    if (known && token.includes("=")) {
+      throw topRefusal(`flag '${name}' takes no value.`, `drop the value: ${name}.`);
+    }
+    if (help) {
+      return { kind: "help" };
+    }
+    if (version) {
+      if (argv.length !== 1) {
+        throw topRefusal(
+          `'${name}' takes no other arguments.`,
+          "run `agentce --version` alone, or `agentce version --json` for the JSON envelope.",
+        );
+      }
+      return { kind: "version" };
+    }
+    if (known) {
+      globals.add(name);
+    } else {
+      unknown ??= token;
+    }
+  }
+  if (unknown !== undefined) {
+    throw topRefusal(`unrecognized flag '${unknown}'.`, TOP_FLAG_FIX);
+  }
+  if (argv.length > 0) {
+    throw topRefusal("no command given.");
+  }
+  return { kind: "help" };
+}
+
+export function main(rawArgv: string[]): number {
+  let top: TopLevel;
+  try {
+    top = scanTopLevel(rawArgv);
+  } catch (exc) {
+    if (!(exc instanceof InputError)) {
+      throw exc;
+    }
+    const refused = errorResult("agentce", exc);
+    emit(refused, rawArgv.includes("--json"));
+    return refused.exitCode;
+  }
+  if (top.kind === "help") {
+    process.stdout.write(TOP_USAGE);
+    return 0;
+  }
+  if (top.kind === "version") {
     console.log(`agentce ${engineVersion()}`);
     return 0;
   }
+  const command = top.command;
+  const argv = [command, ...top.rest];
 
-  // The numerics verb is a plain computation seam for the two-engine vector check (P3.1): it reads a
-  // `numerics-vectors` case file and prints {caseName: result} as plain JSON, not the envelope.
-  if (command === "numerics") {
-    const casefile = argv[1];
-    if (casefile === undefined) {
-      console.error("numerics: a case file path is required");
-      return ExitCode.INPUT_ERROR;
-    }
-    const data = JSON.parse(readFileSync(casefile, "utf-8"));
-    console.log(JSON.stringify(computeVectorFile(data)));
-    return 0;
-  }
-
-  // digest-tree is a plain computation seam (the same pattern as `numerics` above), driven from
-  // outside the repo's TypeScript sources by `tools/catalog_digest_check.py` against the built
-  // `dist/`: it prints one catalog directory's real content digest, nothing else.
-  if (command === "digest-tree") {
-    const dir = argv[1];
-    if (dir === undefined) {
-      console.error("digest-tree: a directory path is required");
-      return ExitCode.INPUT_ERROR;
-    }
-    console.log(catalogProvenanceDigest(dir));
-    return 0;
-  }
-
-  // security-view is a plain computation seam (the same pattern as `numerics`/`digest-tree` above),
-  // driven by the security-view build gate's cross-engine diff (18.16, C5): it reads a fixture file
-  // with `{activity, assertions}`, runs `computeSecurityView`, and prints the result as JSON -- not
-  // part of the public `assess` command surface (no engine here has `--for`/multi-format
-  // `write_report` yet, TRADEOFFS row 8).
-  if (command === "security-view") {
-    const fixturePath = argv[1];
-    if (fixturePath === undefined) {
-      console.error("security-view: a fixture file path is required");
-      return ExitCode.INPUT_ERROR;
-    }
-    const data = JSON.parse(readFileSync(fixturePath, "utf-8"));
-    const activity = data.activity as Activity;
-    const assertions = (data.assertions as unknown[]).map(assertionFromJson);
-    console.log(JSON.stringify(computeSecurityView(activity, assertions)));
-    return 0;
-  }
-
-  // auditor-view is the same kind of test-only seam (18.17a, VG-DEVIATIONS-PARITY): it reads a fixture
-  // file with `{assertions, deviations}`, runs `computeAuditorView`, and prints canonical JSON, the
-  // bytes Python's `auditor.json` holds -- not part of the public command surface.
-  if (command === "auditor-view") {
-    const fixturePath = argv[1];
-    if (fixturePath === undefined) {
-      console.error("auditor-view: a fixture file path is required");
-      return ExitCode.INPUT_ERROR;
-    }
-    const data = JSON.parse(readFileSync(fixturePath, "utf-8"));
-    const assertions = (data.assertions as unknown[]).map(assertionFromJson);
-    console.log(canonicalString(computeAuditorView(assertions, data.deviations ?? null)));
-    return 0;
-  }
-
-  // fail-on-check is the same kind of test-only seam (18.73): it reads a fixture file with
-  // `{assertions, expressions}` and, per expression in order, prints one canonical JSON line -- the
-  // refusal's `{error: {key, cause, fix}}`, or `{matched: [...]}` with one boolean per assertion --
-  // the objects Python's `parse_fail_on` gives. Not part of the public command surface.
-  if (command === "fail-on-check") {
-    const fixturePath = argv[1];
-    if (fixturePath === undefined) {
-      console.error("fail-on-check: a fixture file path is required");
-      return ExitCode.INPUT_ERROR;
-    }
-    const data = JSON.parse(readFileSync(fixturePath, "utf-8"));
-    const assertions = (data.assertions as unknown[]).map(assertionFromJson);
-    for (const expression of data.expressions as string[]) {
-      let line: Record<string, unknown>;
-      try {
-        line = { matched: assertions.map(parseFailOn(expression)) };
-      } catch (exc) {
-        if (!(exc instanceof InputError)) {
-          throw exc;
-        }
-        line = { error: { key: exc.key, cause: exc.cause, fix: exc.fix } };
-      }
-      console.log(canonicalString(line));
-    }
-    return 0;
-  }
-
-  // otel-genai-fixture is a plain computation seam (the same pattern as `security-view` above),
-  // driven by the otel-genai adapter's cross-engine parity check (18.29, C3/C4): it reads
-  // `<dir>/input.json` and `<dir>/adapt.json` the same way the Python reference's fixtures module
-  // does, calls `adapt`, and for each emitted event (in the adapter's own pinned time/id order)
-  // attempts `canonicalString`; on success prints `EVENT <result>`. On a `CanonicalizationError`,
-  // nothing further goes to stdout -- `ERROR canonical:<reason>` goes to stderr and the process exits
-  // 1, so the check can tell "the adapter accepted this but the event cannot be serialised" apart
-  // from "the adapter refused the whole document" (an `OtelGenaiAdapterError`, printed the same way
-  // without the `canonical:` prefix). On a clean run, one final `REPORT <json>` line follows every
-  // `EVENT` line.
-  if (command === "otel-genai-fixture") {
-    const dir = argv[1];
-    if (dir === undefined) {
-      console.error("otel-genai-fixture: a directory path is required");
-      return ExitCode.INPUT_ERROR;
-    }
-    const inputBytes = readFileSync(join(dir, "input.json"));
-    const adaptArgs = JSON.parse(readFileSync(join(dir, "adapt.json"), "utf-8"));
-    try {
-      const result = adaptOtelGenai(inputBytes, {
-        subject: adaptArgs.subject,
-        sourceClass: adaptArgs.source_class,
-        source: adaptArgs.source,
-      });
-      for (const event of result.events) {
-        let line: string;
-        try {
-          line = canonicalString(event);
-        } catch (exc) {
-          if (exc instanceof CanonicalizationError) {
-            console.error(`ERROR canonical:${exc.reason}`);
-            return 1;
-          }
-          throw exc;
-        }
-        console.log(`EVENT ${line}`);
-      }
-      console.log(
-        `REPORT ${JSON.stringify({
-          adapter: result.report.adapter,
-          conventions: result.report.conventions,
-          spans_seen: result.report.spansSeen,
-          events_emitted: result.report.eventsEmitted,
-          skipped: result.report.skipped.map((s) => ({
-            name: s.name,
-            reason: s.reason,
-            span_id: s.spanId,
-          })),
-        })}`,
-      );
-      return 0;
-    } catch (exc) {
-      if (exc instanceof OtelGenaiAdapterError) {
-        console.error(`ERROR ${exc.reason}`);
-        return 1;
-      }
-      throw exc;
-    }
-  }
-
-  const json = argv.includes("--json");
-  const debug = argv.includes("--debug");
+  const json = top.globals.has("--json") || argv.includes("--json");
+  const debug = top.globals.has("--debug") || argv.includes("--debug");
   if (debug) {
-    logDebug(command ?? "", "command.start");
+    logDebug(command, "command.start");
   }
   let result: CommandResult;
   let failed = false;
@@ -2171,7 +2167,7 @@ export function main(argv: string[]): number {
     } else if (command === "report") {
       result = cmdReport(argv);
     } else if (command === "diff") {
-      result = cmdDiff(argv);
+      result = cmdDiff(argv, json);
     } else if (command === "readiness") {
       result = cmdReadiness(argv);
     } else if (command === "sign") {
@@ -2183,12 +2179,12 @@ export function main(argv: string[]): number {
     } else if (command === "version") {
       result = cmdVersion();
     } else {
-      result = notImplemented(command ?? "");
+      result = notImplemented(command);
     }
   } catch (exc) {
     failed = true;
     if (exc instanceof AgentceError) {
-      result = errorResult(command ?? "", exc);
+      result = errorResult(command, exc);
     } else if (debug) {
       // Matches Python's own `--debug` behaviour (`cli.py:562-564`, `if debug: raise`): let the
       // exception propagate to the runtime's default handler (a full stack trace on stderr), rather
@@ -2202,7 +2198,7 @@ export function main(argv: string[]): number {
       // pre-existing, engine-wide difference this does not close).
       const message = exc instanceof Error ? exc.message : String(exc);
       result = errorResult(
-        command ?? "",
+        command,
         new AgentceError(
           "internal.unexpected",
           message,
@@ -2213,7 +2209,7 @@ export function main(argv: string[]): number {
   }
   emit(result, json);
   if (debug && !failed && result.usage === undefined) {
-    logDebug(command ?? "", "command.end", { exit_code: result.exitCode });
+    logDebug(command, "command.end", { exit_code: result.exitCode });
   }
   return result.exitCode;
 }

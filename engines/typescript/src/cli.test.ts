@@ -26,8 +26,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { quickstartDir } from "./bundled";
-import { main } from "./cli";
+import { main, scanTopLevel } from "./cli";
+import { InputError } from "./errors";
 import { digestBytes, digestTree } from "./report";
+import { main as seamsMain } from "./seams";
 import { keyidFor, signStatement } from "./sign";
 import { runJson } from "./testSupport";
 
@@ -840,7 +842,7 @@ test("digest-tree prints one catalog directory's real content digest", () => {
   console.log = (line: string) => lines.push(line);
   let exitCode: number;
   try {
-    exitCode = main([
+    exitCode = seamsMain([
       "digest-tree",
       join(__dirname, "..", "..", "..", "spec", "model", "test-vectors", "digest-tree"),
     ]);
@@ -855,13 +857,13 @@ test("digest-tree prints one catalog directory's real content digest", () => {
   assert.equal(lines[0], expected);
 });
 
-test("security-view CLI verb runs the fixture and prints a standards_citations array", () => {
+test("security-view seam runs the fixture and prints a standards_citations array", () => {
   const lines: string[] = [];
   const original = console.log;
   console.log = (line: string) => lines.push(line);
   let exitCode: number;
   try {
-    exitCode = main([
+    exitCode = seamsMain([
       "security-view",
       join(
         __dirname,
@@ -2212,4 +2214,42 @@ test("assess refuses a trust root whose top level is not an object (18.36 §11)"
       fix: TRUST_ROOT_FIX,
     });
   });
+});
+
+test("scanTopLevel reads the tokens before the command as Python's _scan_top_level does (18.108)", () => {
+  assert.deepEqual(scanTopLevel([]), { kind: "help" });
+  assert.deepEqual(scanTopLevel(["--no-such-flag", "-h"]), { kind: "help" });
+  assert.deepEqual(scanTopLevel(["-h", "-V"]), { kind: "help" });
+  assert.deepEqual(scanTopLevel(["--version"]), { kind: "version" });
+  assert.deepEqual(scanTopLevel(["--json", "--debug", "version", "--quiet"]), {
+    kind: "run",
+    command: "version",
+    rest: ["--quiet"],
+    globals: new Set(["--json", "--debug"]),
+  });
+  assert.deepEqual(scanTopLevel(["--", "version"]), {
+    kind: "run",
+    command: "version",
+    rest: [],
+    globals: new Set(),
+  });
+  const refusals: [string[], string][] = [
+    [["-V", "extra"], "'-V' takes no other arguments."],
+    [["--json", "--version"], "'--version' takes no other arguments."],
+    [["-hx", "assess"], "unrecognized flag '-hx'."],
+    [["--json=1", "version"], "flag '--json' takes no value."],
+    [["--no-such-flag", "version"], "unrecognized flag '--no-such-flag'."],
+    [["--"], "no command given after '--'."],
+    [["--json"], "no command given."],
+    [["nope"], "unrecognized command 'nope'."],
+    [["digest-tree", "x"], "unrecognized command 'digest-tree'."],
+  ];
+  for (const [argv, cause] of refusals) {
+    assert.throws(
+      () => scanTopLevel(argv),
+      (exc: unknown) =>
+        exc instanceof InputError && exc.key === "input.unknown_command" && exc.cause === cause,
+      argv.join(" "),
+    );
+  }
 });
