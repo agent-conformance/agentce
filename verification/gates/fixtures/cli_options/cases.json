@@ -86,6 +86,8 @@
     {"id": "version-unknown-flag", "argv": ["version", "--no-such-flag"], "exit": 3, "key": "input.version_unrecognized_flag", "engines": {"typescript": {"exit": 0, "key": null}, "java": {"exit": 0, "key": null}}, "why": "TypeScript and Java's version ignores every argument; 18.111 refuses them"},
     {"id": "version-hx", "argv": ["version", "-hx"], "exit": 3, "key": "input.version_unrecognized_flag", "engines": {"typescript": {"exit": 0, "key": null}, "java": {"exit": 0, "key": null}}, "why": "as version-unknown-flag (18.111)"},
     {"id": "version-abbreviated-help", "argv": ["version", "--he"], "exit": 3, "key": "input.version_unrecognized_flag", "engines": {"typescript": {"exit": 0, "key": null}, "java": {"exit": 0, "key": null}}, "why": "as version-unknown-flag (18.111)"},
-    {"id": "unknown-command", "argv": ["nope"], "exit": 3, "key": "input.unknown_command", "engines": {"typescript": {"exit": 3, "key": "cli.not_implemented"}, "java": {"exit": 3, "key": "cli.not_implemented"}}, "why": "TypeScript and Java answer an unknown command as not implemented; 18.108 gives all three engines one shared key"}
+    {"id": "unknown-command", "argv": ["nope"], "exit": 3, "key": "input.unknown_command", "engines": {"typescript": {"exit": 3, "key": "cli.not_implemented"}, "java": {"exit": 3, "key": "cli.not_implemented"}}, "why": "TypeScript and Java answer an unknown command as not implemented; 18.108 gives all three engines one shared key"},
+    {"id": "assess-hx-after-dash-value", "argv": ["assess", "{B}", "--out", "-1", "-hx"], "exit": 3, "key": "input.assess_unrecognized_flag", "says": "-hx"},
+    {"id": "quickstart-hx-after-dash-value", "argv": ["quickstart", "--out", "-", "-hx"], "exit": 3, "key": "input.quickstart_unrecognized_flag", "writes": null, "says": "-hx"}
   ]
 }

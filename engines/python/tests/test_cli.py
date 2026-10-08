@@ -1271,6 +1271,22 @@ def test_keyless_cert_window_ignores_the_clock(
             "sign",
             "input.sign_unrecognized_flag",
         ),
+        (["assess", "--out", "-1", "-hx"], "assess", "input.assess_unrecognized_flag"),
+        (
+            ["assess", "--out", "-a b", "-hh"],
+            "assess",
+            "input.assess_unrecognized_flag",
+        ),
+        (
+            ["quickstart", "--out", "-", "-hx"],
+            "quickstart",
+            "input.quickstart_unrecognized_flag",
+        ),
+        (
+            ["readiness", "--gaps", "-1", "-hx"],
+            "readiness",
+            "input.readiness_unrecognized_flag",
+        ),
     ],
 )
 def test_every_argv_error_is_keyed(

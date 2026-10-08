@@ -123,15 +123,23 @@ class _Parser(argparse.ArgumentParser):
 
     def _refuse_short_clusters(self, args: list[str]) -> None:
         """agentce has no clustered short options, so `-hx` or `-hh` is refused with the command's key,
-        never read as -h with the rest dropped (KD-086). Scans this parser's own tokens: up to `--`, up
-        to the command or action name for a parser with subcommands, and not where the previous option
-        expects a value (argparse refuses that missing value first)."""
-        takes_value = False
+        never read as -h with the rest dropped (KD-086). Scans this parser's own tokens up to `--`, and
+        up to the command or action name for a parser with subcommands. A token argparse itself takes
+        as an option's value (`--out -1`, `--out -`) is skipped; where an option needs a value and the
+        next token is an option, argparse refuses the missing value first."""
+        pending: argparse.Action | None = None
         for token in args:
-            if token == "--" or (takes_value and token.startswith("-")):
+            if token == "--":
                 return
+            if pending is not None:
+                needs_value, pending = pending.nargs not in ("?", "*"), None
+                if self._parse_optional(token) is None:
+                    continue
+                if needs_value:
+                    return
             action = self._option_string_actions.get(token)
-            takes_value = action is not None and action.nargs != 0
+            if action is not None and action.nargs != 0:
+                pending = action
             if not token.startswith("-"):
                 if self._subparsers is not None:
                     return
