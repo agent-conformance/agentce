@@ -53,7 +53,7 @@ export function pyTruthy(value: unknown): boolean {
 /** Python's `dict.get(key, default)`: substitutes `default` only when `key` is *absent*, never when
  * it is present with a falsy or `null` value -- the distinction a naive `obj[key] ?? default` or
  * `obj[key] || default` collapses. */
-function pyGet(obj: Record<string, unknown>, key: string, defaultValue: unknown): unknown {
+export function pyGet(obj: Record<string, unknown>, key: string, defaultValue: unknown): unknown {
   return key in obj ? obj[key] : defaultValue;
 }
 

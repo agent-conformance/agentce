@@ -232,7 +232,7 @@ function asInt(value: unknown): IntValue | null {
   return null;
 }
 
-function toBigIntFromInt(value: IntValue): bigint {
+export function toBigIntFromInt(value: IntValue): bigint {
   return typeof value === "number" ? BigInt(value) : BigInt(value.source);
 }
 

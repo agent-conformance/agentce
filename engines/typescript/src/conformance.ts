@@ -35,10 +35,11 @@ import { InputError } from "./errors";
 import { isPySpace } from "./failOn";
 import { ingest } from "./ingest";
 import { verifyBundle } from "./integrity";
+import { NonCanonicalNumber, parseJson } from "./json";
 import { evaluateNoMl } from "./noMl";
-import { parsePythonIntGrammar } from "./otelGenai";
+import { parsePythonIntGrammar, toBigIntFromInt } from "./otelGenai";
 import { loadProfile } from "./profile";
-import { pyTruthy } from "./readiness";
+import { pyGet, pyTruthy } from "./readiness";
 import { writeReport } from "./report";
 import { byteCompare, jsonStringifyAscii, sortKeysDeep } from "./util";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
@@ -205,7 +206,7 @@ export function adapterConformance(
   const proc = run("uv", args, adaptersDir);
   let parsed: unknown;
   try {
-    parsed = JSON.parse(proc.stdout);
+    parsed = parseJson(proc.stdout, { pythonConstants: true });
   } catch {
     // the last 800 characters (code points, as Python counts them) of stderr, else stdout
     const error = [...pyStrip(proc.stderr || proc.stdout)].slice(-800).join("");
@@ -219,9 +220,30 @@ export function adapterConformance(
   return parsed as AdapterDetail;
 }
 
+/** `value` as `JSON.parse` reads it: a number token {@link parseJson} kept exact becomes the double
+ * `JSON.parse` would give, in nested arrays and objects too. */
+function asParsed(value: unknown): unknown {
+  if (value instanceof NonCanonicalNumber) {
+    return value.toNumber();
+  }
+  if (Array.isArray(value)) {
+    return value.map(asParsed);
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, asParsed(item)]));
+  }
+  return value;
+}
+
 /** Python's `int()` of a report count (a number, a boolean or an integer string), exact at any
- * size: a string goes through the same `int(str)` grammar the OTel adapter reader uses. */
-function pyInt(value: unknown): bigint {
+ * size: an integer token past 2^53 is read from its source text, a float token truncated (an
+ * infinite or NaN one refused), and a string goes through the same `int(str)` grammar the OTel
+ * adapter reader uses. */
+function pyInt(raw: unknown): bigint {
+  if (raw instanceof NonCanonicalNumber && raw.reason === "integer_out_of_range") {
+    return toBigIntFromInt(raw);
+  }
+  const value = raw instanceof NonCanonicalNumber ? raw.toNumber() : raw;
   if (typeof value === "number" && Number.isFinite(value)) {
     return BigInt(Math.trunc(value));
   }
@@ -231,7 +253,7 @@ function pyInt(value: unknown): bigint {
   if (typeof value === "string") {
     const parsed = parsePythonIntGrammar(value);
     if (parsed !== null) {
-      return typeof parsed === "number" ? BigInt(parsed) : BigInt(parsed.source);
+      return toBigIntFromInt(parsed);
     }
   }
   throw new Error(`int() argument is not a number: ${JSON.stringify(value)}`);
@@ -240,9 +262,9 @@ function pyInt(value: unknown): bigint {
 /** The adapter-conformance claim, mirroring the ECS claim scheme (Python's `_adapter_claim`, SPEC
  * §11.5): full needs every adapter identical and the round trip holding. */
 export function adapterClaim(detail: AdapterDetail): string {
-  const total = pyInt(detail.total ?? 0);
-  const identical = pyInt(detail.identical ?? 0);
-  if (total > 0n && identical === total && pyTruthy(detail.round_trip)) {
+  const total = pyInt(pyGet(detail, "total", 0));
+  const identical = pyInt(pyGet(detail, "identical", 0));
+  if (total > 0n && identical === total && pyTruthy(asParsed(detail.round_trip))) {
     return "full";
   }
   if (identical > 0n) {
@@ -316,7 +338,7 @@ export function runEcs(options: RunEcsOptions): EcsReport {
   };
   if (options.adaptersDir !== undefined && options.adaptersDir !== null) {
     const detail = adapterConformance(options.adaptersDir, options.outDir, options.runAdapters);
-    report.adapter_conformance = detail;
+    report.adapter_conformance = asParsed(detail) as AdapterDetail;
     report.adapters = adapterClaim(detail);
   }
   if (options.outDir !== null) {

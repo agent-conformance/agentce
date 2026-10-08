@@ -189,6 +189,32 @@ test("the adapters claim: full needs every adapter identical and the round trip"
   assert.equal(adapterClaim({}), "none");
 });
 
+test("the adapters' counts are read as Python's int() reads them, from the orchestrator's exact JSON", () => {
+  const claimOf = (stdout: string) =>
+    adapterClaim(adapterConformance("/adapters", null, fakeRunner(stdout).run));
+  const big =
+    '{"total": 18446744073709551617, "identical": 18446744073709551616, "round_trip": true}';
+  assert.equal(claimOf(big), "partial");
+  assert.equal(
+    claimOf(
+      '{"total": 18446744073709551617, "identical": 18446744073709551617, "round_trip": true}',
+    ),
+    "full",
+  );
+  assert.equal(claimOf('{"total": 1.9, "identical": 1, "round_trip": true}'), "full");
+  assert.equal(claimOf('{"total": " 1_0 ", "identical": 10, "round_trip": true}'), "full");
+  assert.equal(claimOf('{"total": true, "identical": true, "round_trip": 1}'), "full");
+  assert.equal(claimOf('{"total": 1, "identical": 1, "round_trip": 0.0}'), "partial");
+  assert.equal(claimOf('{"total": 1, "identical": 1, "round_trip": NaN}'), "full");
+  for (const bad of ['"1.0"', '"1e0"', "null", "1e400", "NaN", "[]"]) {
+    assert.throws(
+      () => claimOf(`{"total": ${bad}, "identical": 1, "round_trip": true}`),
+      Error,
+      bad,
+    );
+  }
+});
+
 test("stdout that is not JSON becomes Python's error record: no adapters, claim none", () => {
   const fromStderr = adapterConformance("/a", null, fakeRunner("not json", "  boom\n").run);
   assert.deepEqual(fromStderr, {

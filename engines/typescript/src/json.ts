@@ -24,6 +24,11 @@ export class NonCanonicalNumber {
   toString(): string {
     return this.source;
   }
+
+  /** The double `JSON.parse` gives for this token (Python's `inf` and `-inf`, read from `Infinity`, too). */
+  toNumber(): number {
+    return Number(this.source.replace(/inf$/, "Infinity"));
+  }
 }
 
 // A number token only needs the slow path when it has a fraction or exponent, or enough digits to
