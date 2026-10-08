@@ -99,8 +99,11 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.release_bundle` | the given directory has no release-manifest.json or signatures.json, so it is not a release bundle. | pass the --out directory produced by the release tooling. |
 | `input.release_missing` | the release artifact named on the command line does not exist. | pass --release <bundle-dir-or-envelope>. |
 | `input.release_unreadable` | the release artifact, or a file or folder inside it, could not be read (permissions). | make every file and folder in the release readable, then re-run. |
+| `input.report_catalog_label_empty` | --catalog holds an empty catalog label. | pass the labels comma-separated with none empty, e.g. --catalog eu-ai-act,nist-ai-rmf. |
+| `input.report_flag_unused` | report was given an option the run does not read: a rendering option beside --validate, or an option the chosen --format does not use. | drop the option, or pick the --format that reads it. |
 | `input.report_format` | report was given a --format it does not know. | pass --format with one of the formats report lists. |
-| `input.report_language_unknown` | --report-language names a language the engine has no report catalogue for. | choose one of: de, en. |
+| `input.report_language_unknown` | --report-language (assess) or --language (report) names a language the engine has no report catalogue for. | choose one of: de, en. |
+| `input.report_role` | report was given a --role it does not know. | choose one of: provider, deployer. |
 | `input.report_unrecognized_flag` | report was given a flag it does not recognize, or an argument it does not take. | run `agentce report --help` for the flags report takes, or drop the flag. |
 | `input.sign_profile` | unknown signing profile. | choose one of: sigstore-public, sigstore-private, kms. |
 | `input.sign_role` | --as must be `claimant` or `assessor`. | pass --as claimant|assessor. |

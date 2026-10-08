@@ -6,23 +6,25 @@ description: re-render a report, or validate one
 Re-render a report, or validate one.
 
 ```text
-usage: agentce report [-h] [--json] [--debug] [--quiet] [--from FROM_]
+usage: agentce report [-h] [--json] [--debug] [--quiet] [--from FILE]
                       [--format {md,html,oscal,sarif,public,pack}]
-                      [--role {provider,deployer}] [--catalog CATALOG]
-                      [--language LANGUAGE] [--out OUT] [--validate VALIDATE]
+                      [--role {provider,deployer}] [--catalog LABELS]
+                      [--language LANG] [--out FILE] [--validate DIR]
 
 options:
   -h, --help            show this help message and exit
-  --from FROM_          an assertions.json to re-render
+  --from FILE           an assertions.json to re-render
   --format {md,html,oscal,sarif,public,pack}
-                        the output format
+                        the output format (default: md)
   --role {provider,deployer}
-                        evidence-pack role variant
-  --catalog CATALOG     catalog labels for the public statement, comma-
-                        separated
-  --language LANGUAGE   message-key catalogue for md/html rendering (SPEC 9.3)
-  --out OUT             write the rendering to this file
-  --validate VALIDATE   validate every artifact in a report directory
+                        evidence-pack role variant; --format pack only
+  --catalog LABELS      catalog labels for the public statement, comma-
+                        separated; --format public only
+  --language LANG       message-key catalogue: de or en (default: en);
+                        --format md or html only (SPEC 9.3)
+  --out FILE            write the rendering to this file
+  --validate DIR        validate every artifact in a report directory; takes
+                        no other report option
 
 global options:
   --json                emit machine-readable JSON on stdout

@@ -199,13 +199,20 @@ def _flag(ns: argparse.Namespace, name: str) -> bool:
 
 
 def _require_dir(
-    raw: str | None, *, key: str, what: str, fix: str | None = None
+    raw: str | None,
+    *,
+    key: str,
+    what: str,
+    fix: str | None = None,
+    empty_is_no_dir: bool = False,
 ) -> Path:
+    """``empty_is_no_dir``: an empty value names no directory (``Path("")`` is the working
+    directory, so without it ``--flag ''`` would quietly read the working directory)."""
     fix = fix or f"pass --{key.replace('_', '-')} <dir>."
     if raw is None:
         raise InputError(f"input.{key}_missing", f"{what} is required.", fix)
     path = Path(raw)
-    if not path.is_dir():
+    if (empty_is_no_dir and raw == "") or not path.is_dir():
         raise InputError(
             f"input.{key}_not_a_directory",
             f"{what} {raw!r} is not an existing directory.",
@@ -2054,11 +2061,30 @@ def _scrub_path(path: str | Path) -> str:
     return p.name
 
 
+#: The rendering options `report --validate` never reads, in the order the refusal names the first.
+_REPORT_RENDER_FLAGS = (
+    ("from_", "--from"),
+    ("format", "--format"),
+    ("role", "--role"),
+    ("catalog", "--catalog"),
+    ("language", "--language"),
+    ("out", "--out"),
+)
+
+
 def cmd_report(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="report")
-    if _flag(ns, "validate"):
+    validate = _opt_str(ns, "validate")
+    if validate is not None:
+        for dest, flag in _REPORT_RENDER_FLAGS:
+            if _opt_str(ns, dest) is not None:
+                raise InputError(
+                    "input.report_flag_unused",
+                    f"--validate checks a report directory and does not read {flag}.",
+                    f"drop {flag}, or drop --validate to re-render with --from.",
+                )
         report_dir = _require_dir(
-            _opt_str(ns, "validate"), key="validate", what="the report directory"
+            validate, key="validate", what="the report directory", empty_is_no_dir=True
         )
         problems = validate_report(report_dir)
         result.data.update(
@@ -2076,10 +2102,41 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
     fmt = _opt_str(ns, "format") or "md"
     if fmt not in REPORT_FORMATS:
         raise report_format_error(fmt)
+    role = _opt_str(ns, "role")
+    catalog = _opt_str(ns, "catalog")
+    language = _opt_str(ns, "language")
+    for value, flag, reads, add in (
+        (role, "--role", ("pack",), "add --format pack"),
+        (catalog, "--catalog", ("public",), "add --format public"),
+        (language, "--language", ("md", "html"), "add --format md or --format html"),
+    ):
+        if value is not None and fmt not in reads:
+            raise InputError(
+                "input.report_flag_unused",
+                f"{flag} is read only with --format {' or '.join(reads)}; "
+                f"this run renders {fmt}.",
+                f"{add}, or drop {flag}.",
+            )
+    languages = messages.available_languages()
+    if language is not None and language not in languages:
+        raise InputError(
+            "input.report_language_unknown",
+            f"--language {language!r} has no report catalogue.",
+            "choose one of: " + ", ".join(languages) + ".",
+        )
+    catalogs: list[str] | None = None
+    if catalog is not None:
+        catalogs = catalog.split(",")
+        if any(not label.strip() for label in catalogs):
+            raise InputError(
+                "input.report_catalog_label_empty",
+                f"--catalog {catalog!r} holds an empty catalog label.",
+                "pass the labels comma-separated with none empty, "
+                "e.g. --catalog eu-ai-act,nist-ai-rmf.",
+            )
     assertions = [Assertion.from_json(a) for a in json.loads(source.read_text("utf-8"))]
     counts = aggregate(assertions)
-    catalogs = [c for c in (_opt_str(ns, "catalog") or "").split(",") if c] or None
-    language = _opt_str(ns, "language") or "en"
+    language = language or "en"
     rendering: str
     if fmt == "md":
         rendering = render_report_md(assertions, counts, language=language)
@@ -2096,7 +2153,6 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
             deviations=applied_deviation_ids(assertions),
         )
     else:  # pack
-        role = _opt_str(ns, "role")
         by_subject: dict[str, list[Assertion]] = {}
         for assertion in assertions:
             by_subject.setdefault(assertion.subject, []).append(assertion)
@@ -2352,6 +2408,16 @@ def _reject_inside_catalog(
             f"{flag} {value!r} resolves inside the catalog directory {shown_dir}.",
             f"write the {noun} outside the catalog directory.",
         )
+
+
+def report_role_error(role: str) -> InputError:
+    """An evidence-pack role `report --role` does not know (the CLI reuses it for argparse's invalid
+    choice)."""
+    return InputError(
+        "input.report_role",
+        f"unknown evidence-pack role {role!r}.",
+        "choose one of: provider, deployer.",
+    )
 
 
 def report_format_error(fmt: str) -> InputError:

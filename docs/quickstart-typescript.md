@@ -57,5 +57,5 @@ node bin/agentce.js assess \
 The profile's `catalogs:` list names what to assess against; each `id@version` resolves to a catalog that
 ships inside the engine, or pass `--catalog-dir <dir>` for one on disk. `node bin/agentce.js validate
 --bundle <dir>` reports what an evidence bundle would ingest and quarantine without assessing it, and
-`node bin/agentce.js report --from ./out/assertions.json --format {md,html,oscal,sarif,pack}` re-renders a
+`node bin/agentce.js report --from ./out/assertions.json --format {md,html,oscal,sarif,public,pack}` re-renders a
 report from a committed `assertions.json`.

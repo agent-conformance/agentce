@@ -254,7 +254,12 @@ _ARGV: dict[str, _ArgvErrors] = {
                 (err := commands.report_format_error(v)).key,
                 err.cause,
                 err.fix,
-            )
+            ),
+            "--role": lambda v: (
+                (err := commands.report_role_error(v)).key,
+                err.cause,
+                err.fix,
+            ),
         },
     ),
     "conformance": _ArgvErrors(
@@ -488,21 +493,36 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser(
         "report", parents=[common], help="re-render a report, or validate one"
     )
-    p.add_argument("--from", dest="from_", help="an assertions.json to re-render")
     p.add_argument(
-        "--format", choices=commands.REPORT_FORMATS, help="the output format"
+        "--from", dest="from_", metavar="FILE", help="an assertions.json to re-render"
     )
     p.add_argument(
-        "--role", choices=("provider", "deployer"), help="evidence-pack role variant"
+        "--format",
+        choices=commands.REPORT_FORMATS,
+        help="the output format (default: md)",
     )
     p.add_argument(
-        "--catalog", help="catalog labels for the public statement, comma-separated"
+        "--role",
+        choices=("provider", "deployer"),
+        help="evidence-pack role variant; --format pack only",
     )
     p.add_argument(
-        "--language", help="message-key catalogue for md/html rendering (SPEC 9.3)"
+        "--catalog",
+        metavar="LABELS",
+        help="catalog labels for the public statement, comma-separated; --format public only",
     )
-    p.add_argument("--out", help="write the rendering to this file")
-    p.add_argument("--validate", help="validate every artifact in a report directory")
+    p.add_argument(
+        "--language",
+        metavar="LANG",
+        help="message-key catalogue: de or en (default: en); --format md or html only "
+        "(SPEC 9.3)",
+    )
+    p.add_argument("--out", metavar="FILE", help="write the rendering to this file")
+    p.add_argument(
+        "--validate",
+        metavar="DIR",
+        help="validate every artifact in a report directory; takes no other report option",
+    )
     p.set_defaults(func=commands.cmd_report)
 
     p = sub.add_parser(

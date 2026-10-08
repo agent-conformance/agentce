@@ -329,6 +329,126 @@ def test_report_validate_empty_dir_is_invalid(
     assert env["problems"]
 
 
+@pytest.mark.parametrize(
+    ("extra", "key"),
+    [
+        (["--format", "pack", "--role", "nope"], "input.report_role"),
+        (["--format", "pack", "--role="], "input.report_role"),
+        (["--role", "provider"], "input.report_flag_unused"),
+        (["--format", "md", "--role", "provider"], "input.report_flag_unused"),
+        (["--format", "public", "--role", "provider"], "input.report_flag_unused"),
+        (["--format", "md", "--catalog", "eu-ai-act"], "input.report_flag_unused"),
+        (["--format", "pack", "--catalog", "eu-ai-act"], "input.report_flag_unused"),
+        (["--format", "oscal", "--language", "de"], "input.report_flag_unused"),
+        (["--format", "public", "--language", "en"], "input.report_flag_unused"),
+        (["--language", "xx"], "input.report_language_unknown"),
+        (["--language="], "input.report_language_unknown"),
+        (["--format", "html", "--language", "../x"], "input.report_language_unknown"),
+        (["--format", "public", "--catalog="], "input.report_catalog_label_empty"),
+        (["--format", "public", "--catalog", "a,"], "input.report_catalog_label_empty"),
+        (["--format", "public", "--catalog", " "], "input.report_catalog_label_empty"),
+        (
+            ["--format", "public", "--catalog", "a, ,b"],
+            "input.report_catalog_label_empty",
+        ),
+    ],
+)
+def test_report_refuses_an_option_it_does_not_read(
+    extra: list[str], key: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    src = tmp_path / "assertions.json"
+    src.write_text("[]", encoding="utf-8")
+    out = tmp_path / "out.md"
+    code, env = run(
+        ["report", "--from", str(src), *extra, "--out", str(out), "--json"], capsys
+    )
+    assert code == 3
+    assert env["error"]["key"] == key
+    assert not out.exists()
+
+
+def test_report_flag_unused_names_the_flag_and_format(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    src = tmp_path / "assertions.json"
+    src.write_text("[]", encoding="utf-8")
+    code, env = run(
+        [
+            "report",
+            "--from",
+            str(src),
+            "--format",
+            "oscal",
+            "--language",
+            "de",
+            "--json",
+        ],
+        capsys,
+    )
+    assert code == 3
+    assert env["error"]["cause"] == (
+        "--language is read only with --format md or html; this run renders oscal."
+    )
+    assert env["error"]["fix"] == (
+        "add --format md or --format html, or drop --language."
+    )
+
+
+@pytest.mark.parametrize(
+    "flag", ["--from", "--format", "--role", "--catalog", "--language", "--out"]
+)
+def test_report_validate_reads_no_rendering_option(
+    flag: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    value = {"--format": "md", "--role": "provider", "--language": "en"}.get(flag, "x")
+    code, env = run(
+        ["report", "--validate", str(tmp_path), flag, value, "--json"], capsys
+    )
+    assert code == 3
+    assert env["error"]["key"] == "input.report_flag_unused"
+    assert env["error"]["cause"] == (
+        f"--validate checks a report directory and does not read {flag}."
+    )
+
+
+def test_report_format_fix_lists_every_format(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    code, env = run(["report", "--format", "nope", "--json"], capsys)
+    assert code == 3
+    assert env["error"]["key"] == "input.report_format"
+    assert env["error"]["fix"] == "choose one of: md, html, oscal, sarif, public, pack."
+
+
+@pytest.mark.parametrize("argv", [["--validate", ""], ["--validate="]])
+def test_report_empty_validate_is_not_a_directory(
+    argv: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    code, env = run(["report", *argv, "--json"], capsys)
+    assert code == 3
+    assert env["error"]["key"] == "input.validate_not_a_directory"
+
+
+def test_report_public_reads_catalog_equals_form(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    src = tmp_path / "assertions.json"
+    src.write_text("[]", encoding="utf-8")
+    code, env = run(
+        [
+            "report",
+            f"--from={src}",
+            "--format=public",
+            "--catalog=eu-ai-act",
+            "--json",
+        ],
+        capsys,
+    )
+    assert code == 0
+    assert env["format"] == "public"
+    assert "eu-ai-act" in env["rendering"]
+
+
 def test_report_validate_after_assess(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -1270,6 +1390,11 @@ def test_keyless_cert_window_ignores_the_clock(
             ["report", "--from", "x", "--format", "nope"],
             "report",
             "input.report_format",
+        ),
+        (
+            ["report", "--format", "pack", "--role", "nope", "--from", "x"],
+            "report",
+            "input.report_role",
         ),
         (["report", "--from"], "report", "input.from_missing"),
         (["report", "--validate"], "report", "input.validate_missing"),

@@ -58,5 +58,5 @@ The profile's `catalogs:` list names what to assess against; each `id@version` r
 ships inside the engine, or pass `--catalog-dir <dir>` for one on disk.
 `build/install/agentce/bin/agentce validate --bundle <dir>` reports what an evidence bundle would ingest
 and quarantine without assessing it, and `build/install/agentce/bin/agentce report --from
-./out/assertions.json --format {md,html,oscal,sarif,pack}` re-renders a report from a committed
+./out/assertions.json --format {md,html,oscal,sarif,public,pack}` re-renders a report from a committed
 `assertions.json`.
