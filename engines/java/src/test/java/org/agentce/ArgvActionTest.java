@@ -32,7 +32,7 @@ class ArgvActionTest {
 
     private static final Argv.Grammar RUN = new Argv.Grammar(
             options("--engine", "--out"), 0, "input.run_flag", "input.run_flag", "RUN-FIX", "RUN-EXTRA", Map.of(),
-            Map.of("--engine", "input.engine_missing"), Map.of(), false);
+            Map.of("--engine", "input.engine_missing"), Map.of(), false, null);
 
     private static final Argv.Grammar CMD = new Argv.Grammar(
             options(), 0, "input.cmd_flag", "input.cmd_flag", "CMD-FIX", "CMD-EXTRA", Map.of(), Map.of(), Map.of(),

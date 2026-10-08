@@ -36,7 +36,9 @@ import { isPySpace } from "./failOn";
 import { ingest } from "./ingest";
 import { verifyBundle } from "./integrity";
 import { evaluateNoMl } from "./noMl";
+import { parsePythonIntGrammar } from "./otelGenai";
 import { loadProfile } from "./profile";
+import { pyTruthy } from "./readiness";
 import { writeReport } from "./report";
 import { byteCompare, jsonStringifyAscii, sortKeysDeep } from "./util";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
@@ -217,29 +219,22 @@ export function adapterConformance(
   return parsed as AdapterDetail;
 }
 
-/** Python's `int()` of a report count (a number, a boolean or a decimal string). */
-function pyInt(value: unknown): number {
+/** Python's `int()` of a report count (a number, a boolean or an integer string), exact at any
+ * size: a string goes through the same `int(str)` grammar the OTel adapter reader uses. */
+function pyInt(value: unknown): bigint {
   if (typeof value === "number" && Number.isFinite(value)) {
-    return Math.trunc(value);
+    return BigInt(Math.trunc(value));
   }
   if (typeof value === "boolean") {
-    return value ? 1 : 0;
+    return value ? 1n : 0n;
   }
-  if (typeof value === "string" && /^\s*[+-]?\d+\s*$/.test(value)) {
-    return Number.parseInt(value, 10);
+  if (typeof value === "string") {
+    const parsed = parsePythonIntGrammar(value);
+    if (parsed !== null) {
+      return typeof parsed === "number" ? BigInt(parsed) : BigInt(parsed.source);
+    }
   }
   throw new Error(`int() argument is not a number: ${JSON.stringify(value)}`);
-}
-
-/** Python's truthiness of a JSON value. */
-function pyTruthy(value: unknown): boolean {
-  if (Array.isArray(value)) {
-    return value.length > 0;
-  }
-  if (value !== null && typeof value === "object") {
-    return Object.keys(value).length > 0;
-  }
-  return Boolean(value);
 }
 
 /** The adapter-conformance claim, mirroring the ECS claim scheme (Python's `_adapter_claim`, SPEC
@@ -247,10 +242,10 @@ function pyTruthy(value: unknown): boolean {
 export function adapterClaim(detail: AdapterDetail): string {
   const total = pyInt(detail.total ?? 0);
   const identical = pyInt(detail.identical ?? 0);
-  if (total > 0 && identical === total && pyTruthy(detail.round_trip)) {
+  if (total > 0n && identical === total && pyTruthy(detail.round_trip)) {
     return "full";
   }
-  if (identical > 0) {
+  if (identical > 0n) {
     return "partial";
   }
   return "none";

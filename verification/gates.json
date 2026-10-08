@@ -2485,8 +2485,8 @@
         {
           "description": "Java stops refusing an unknown or abbreviated assess flag and runs the assessment without it (the state before 18.105)",
           "file": "engines/java/src/main/java/org/agentce/Argv.java",
-          "search": "        if (command.actionAt() < 0) {\n            if (!command.extras().isEmpty()) {\n",
-          "replace": "        if (command.actionAt() < 0) {\n            if (false) {\n"
+          "search": "        if (!command.extras().isEmpty()) {\n",
+          "replace": "        if (false) {\n"
         },
         {
           "description": "Python's quickstart parser prefix-matches again, so --ou o runs as --out o in Python alone",
@@ -2633,8 +2633,8 @@
         {
           "description": "Java stops refusing an unknown flag, so --no-such-flag is dropped and the run goes ahead",
           "file": "engines/java/src/main/java/org/agentce/Argv.java",
-          "search": "        if (command.actionAt() < 0) {\n            if (!command.extras().isEmpty()) {\n",
-          "replace": "        if (command.actionAt() < 0) {\n            if (false) {\n"
+          "search": "        if (!command.extras().isEmpty()) {\n",
+          "replace": "        if (false) {\n"
         },
         {
           "description": "Python accepts --manual again and never reads it",
@@ -2753,22 +2753,10 @@
           "replace": "            what=\"the adapters directory\",\n"
         },
         {
-          "description": "TypeScript's validate grammar drops --bundle's needs-value key, so a value-less --bundle gets the unrecognized-flag key",
-          "file": "engines/typescript/src/cli.ts",
-          "search": "    ...COMMON_OPTIONS,\n    { names: [\"--bundle\"], kind: \"value\", needsValueKey: \"input.bundle_missing\" },\n    { names: [\"--out\"], kind: \"value\" },\n  ],\n  maxPositionals: 0,\n  unrecognizedKey: \"input.validate_unrecognized_flag\",\n",
-          "replace": "    ...COMMON_OPTIONS,\n    { names: [\"--bundle\"], kind: \"value\" },\n    { names: [\"--out\"], kind: \"value\" },\n  ],\n  maxPositionals: 0,\n  unrecognizedKey: \"input.validate_unrecognized_flag\",\n"
-        },
-        {
           "description": "Java's version grammar takes a positional again, so version extra prints the version",
           "file": "engines/java/src/main/java/org/agentce/Cli.java",
           "search": "            \"version\", List.of(), 0, flagFix(\"version\"),",
           "replace": "            \"version\", List.of(), 1, flagFix(\"version\"),"
-        },
-        {
-          "description": "TypeScript's scanner stops refusing an unknown action, so an unknown flag before it is refused first",
-          "file": "engines/typescript/src/argv.ts",
-          "search": "    if (actionGrammar === undefined) {\n      throw actions.error();\n    }\n",
-          "replace": "    if (actionGrammar === undefined) {\n      return { scan: { help: false, values, lists, flags, positionals }, leftover: leftover() };\n    }\n"
         },
         {
           "description": "Java's runEcs ignores --adapters again: no adapters line, no adapter_conformance and no adapters claim",
@@ -2777,22 +2765,34 @@
           "replace": "        if (false) {\n            JsonNode detail = adapterConformance(adaptersDir, outDir, orchestrator);\n"
         },
         {
-          "description": "TypeScript's diff takes the first --format again, reading argv instead of the scan",
-          "file": "engines/typescript/src/cli.ts",
-          "search": "  const format = args.values[\"--format\"] ?? \"text\";\n",
-          "replace": "  const format = argv.includes(\"--format\")\n    ? (argv[argv.indexOf(\"--format\") + 1] as string)\n    : (args.values[\"--format\"] ?? \"text\");\n"
-        },
-        {
           "description": "Java sets the exit code from the ECS claim only, so a partial or empty adapters claim exits 0",
           "file": "engines/java/src/main/java/org/agentce/Cli.java",
           "search": "        if (adaptersClaim != null && !\"full\".equals(adaptersClaim.asText())) {\n            result.addCode(ExitCode.FINDINGS.code);\n        }\n",
           "replace": ""
         },
         {
+          "description": "TypeScript's validate grammar drops --bundle's needs-value key, so a value-less --bundle gets the unrecognized-flag key",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "  { \"--bundle\": \"input.bundle_missing\" },\n);\n",
+          "replace": "  {},\n);\n"
+        },
+        {
+          "description": "TypeScript's scanner stops refusing an unknown action, so an unknown flag before it is refused first",
+          "file": "engines/typescript/src/argv.ts",
+          "search": "    if (actionGrammar === undefined) {\n      throw actions.error();\n    }\n",
+          "replace": "    if (actionGrammar === undefined) {\n      return { scan: { help: false, values, lists, flags, positionals }, leftover: leftover() };\n    }\n"
+        },
+        {
+          "description": "TypeScript's diff takes the first --format again, reading argv instead of the scan",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "  const format = args.values[\"--format\"] ?? \"text\";\n",
+          "replace": "  const format = argv.includes(\"--format\")\n    ? (argv[argv.indexOf(\"--format\") + 1] as string)\n    : (args.values[\"--format\"] ?? \"text\");\n"
+        },
+        {
           "description": "TypeScript's adapters claim ignores round_trip, so adapters identical without their round trip claim full",
           "file": "engines/typescript/src/conformance.ts",
-          "search": "  if (total > 0 && identical === total && pyTruthy(detail.round_trip)) {\n",
-          "replace": "  if (total > 0 && identical === total) {\n"
+          "search": "  if (total > 0n && identical === total && pyTruthy(detail.round_trip)) {\n",
+          "replace": "  if (total > 0n && identical === total) {\n"
         }
       ]
     }

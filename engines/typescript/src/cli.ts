@@ -538,6 +538,38 @@ const COMMON_OPTIONS: Grammar["options"] = [
 const flagFix = (command: string): string =>
   `run \`agentce ${command} --help\` for the flags ${command} takes, or drop the flag.`;
 
+/** A grammar of one of the small commands (validate, diff, version, conformance and its run), as
+ * Java's `Cli.utilityGrammar` builds it: -h/--help, the three global flags, then `valueOptions`; an
+ * unknown flag and a missing value both take the command's unrecognized-flag key (unless
+ * `needsValueKeys` names the option's own) with Python's plain needs-value cause. */
+function utilityGrammar(
+  command: string,
+  valueOptions: readonly string[],
+  maxPositionals: number,
+  fixes: { flagFix: string; extraArgFix: string },
+  needsValueKeys: Readonly<Record<string, string>> = {},
+  action?: Grammar["action"],
+): Grammar {
+  const key = `input.${command}_unrecognized_flag`;
+  return {
+    options: [
+      ...COMMON_OPTIONS,
+      ...valueOptions.map((name) => {
+        const needsValueKey = needsValueKeys[name];
+        return needsValueKey === undefined
+          ? { names: [name], kind: "value" as const }
+          : { names: [name], kind: "value" as const, needsValueKey };
+      }),
+    ],
+    maxPositionals,
+    ...(action === undefined ? {} : { action }),
+    unrecognizedKey: key,
+    needsValueKey: key,
+    needsValueCause: "plain",
+    ...fixes,
+  };
+}
+
 /** Python's `agentce conformance --help` (COLUMNS=80), word for word. */
 const CONFORMANCE_USAGE = `usage: agentce conformance [-h] [--json] [--debug] [--quiet] <action> ...
 
@@ -584,38 +616,33 @@ function conformanceActionError(): InputError {
 }
 
 /** Both conformance levels word their refusals alike, as Python's one `_ArgvErrors` table does. */
-const CONFORMANCE_REFUSALS = {
-  unrecognizedKey: "input.conformance_unrecognized_flag",
-  needsValueKey: "input.conformance_unrecognized_flag",
-  needsValueCause: "plain",
+const CONFORMANCE_FIXES = {
   flagFix: flagFix("conformance run"),
   extraArgFix:
     "pass the inputs with their flags: `agentce conformance run --engine <dir> --corpus <dir>`.",
-} as const;
+};
 
 /** conformance's grammar (Python's conformance parser and its `run` subparser): one table, read by
  * `scanArgv`. */
-const CONFORMANCE_GRAMMAR: Grammar = {
-  options: COMMON_OPTIONS,
-  maxPositionals: 0,
-  action: {
+const CONFORMANCE_GRAMMAR: Grammar = utilityGrammar(
+  "conformance",
+  [],
+  0,
+  CONFORMANCE_FIXES,
+  {},
+  {
     grammars: {
-      run: {
-        options: [
-          ...COMMON_OPTIONS,
-          { names: ["--engine"], kind: "value", needsValueKey: "input.engine_missing" },
-          { names: ["--corpus"], kind: "value", needsValueKey: "input.corpus_missing" },
-          { names: ["--out"], kind: "value" },
-          { names: ["--adapters"], kind: "value" },
-        ],
-        maxPositionals: 0,
-        ...CONFORMANCE_REFUSALS,
-      },
+      run: utilityGrammar(
+        "conformance",
+        ["--engine", "--corpus", "--out", "--adapters"],
+        0,
+        CONFORMANCE_FIXES,
+        { "--engine": "input.engine_missing", "--corpus": "input.corpus_missing" },
+      ),
     },
     error: conformanceActionError,
   },
-  ...CONFORMANCE_REFUSALS,
-};
+);
 
 /** Python's `commands._refuse_empty_out`: an empty --out names no directory, refused before anything
  * is written or run. */
@@ -638,8 +665,8 @@ function cmdConformance(argv: string[]): CommandResult {
     result.usage = args.action === "run" ? CONFORMANCE_RUN_USAGE : CONFORMANCE_USAGE;
     return result;
   }
-  if (args.action !== "run") {
-    throw conformanceActionError();
+  if (args.action === undefined) {
+    throw conformanceActionError(); // the scanner refuses any action but run itself
   }
   const v = args.values;
   const engine = requireDir(v["--engine"], "engine", "the engine path");
@@ -701,19 +728,16 @@ global options:
 
 /** validate's grammar (Python's validate subparser, global flags included): one table, read by
  * `scanArgv`. */
-const VALIDATE_GRAMMAR: Grammar = {
-  options: [
-    ...COMMON_OPTIONS,
-    { names: ["--bundle"], kind: "value", needsValueKey: "input.bundle_missing" },
-    { names: ["--out"], kind: "value" },
-  ],
-  maxPositionals: 0,
-  unrecognizedKey: "input.validate_unrecognized_flag",
-  needsValueKey: "input.validate_unrecognized_flag",
-  needsValueCause: "plain",
-  flagFix: flagFix("validate"),
-  extraArgFix: "pass the bundle with its flag: `agentce validate --bundle <dir>`.",
-};
+const VALIDATE_GRAMMAR: Grammar = utilityGrammar(
+  "validate",
+  ["--bundle", "--out"],
+  0,
+  {
+    flagFix: flagFix("validate"),
+    extraArgFix: "pass the bundle with its flag: `agentce validate --bundle <dir>`.",
+  },
+  { "--bundle": "input.bundle_missing" },
+);
 
 function cmdValidate(argv: string[]): CommandResult {
   const args = scanArgv(argv.slice(1), VALIDATE_GRAMMAR);
@@ -1675,15 +1699,10 @@ global options:
 /** diff's grammar (Python's diff subparser, global flags included): one table, read by `scanArgv`.
  * Positionals are unbounded (Python's hidden `extra`), so `cmdDiff` counts them itself, and --format
  * has no choices: `cmdDiff` checks it after the two files, as Python's `cmd_diff` does. */
-const DIFF_GRAMMAR: Grammar = {
-  options: [...COMMON_OPTIONS, { names: ["--format"], kind: "value" }],
-  maxPositionals: Number.POSITIVE_INFINITY,
-  unrecognizedKey: "input.diff_unrecognized_flag",
-  needsValueKey: "input.diff_unrecognized_flag",
-  needsValueCause: "plain",
+const DIFF_GRAMMAR: Grammar = utilityGrammar("diff", ["--format"], Number.POSITIVE_INFINITY, {
   flagFix: "pass --format text|json|md, or drop the flag.",
   extraArgFix: "pass two assertions files: `agentce diff <a> <b>`.",
-};
+});
 
 /** `agentce diff` (SPEC §9.3, item 18.6): a real, deterministic assertion-set diff, matching the
  * Python reference's `cmd_diff` byte for byte (see `diff.ts`). Read from its grammar's scan alone. */
@@ -2312,14 +2331,10 @@ global options:
 `;
 
 /** version's grammar (Python's version subparser): the global flags, no positionals. */
-const VERSION_GRAMMAR: Grammar = {
-  options: COMMON_OPTIONS,
-  maxPositionals: 0,
-  unrecognizedKey: "input.version_unrecognized_flag",
-  needsValueKey: "input.version_unrecognized_flag",
+const VERSION_GRAMMAR: Grammar = utilityGrammar("version", [], 0, {
   flagFix: flagFix("version"),
   extraArgFix: "version takes no argument: `agentce version`.",
-};
+});
 
 /** `agentce version` (SPEC §8.5): the same structured envelope every other command returns, with a
  * real installed-artifact `no_ml` self-report (mirrors Python's `cmd_version`). Distinct from the

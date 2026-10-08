@@ -147,6 +147,11 @@ def run_cli(
     return subprocess.CompletedProcess(argv, proc.returncode, stdout, stderr)
 
 
+def read_or_empty(path: Path) -> str:
+    """The file's text, or '' when the run did not write it."""
+    return path.read_text("utf-8") if path.is_file() else ""
+
+
 def run(
     case: dict, engine: str, cmd: list[str], bundle_args: list[str]
 ) -> tuple[str | None, str]:
@@ -182,24 +187,25 @@ def run(
         entries = sorted(e.name for e in Path(tmp).iterdir())
         # 'has' and 'first_line' judge an engine that runs as the case expects (no override), 18.109.
         own = engine not in case.get("engines", {})
-        # 'has' is one path or a list of paths, each of which the run must write (18.111).
-        has = case.get("has", [])
-        missing = [
-            h
-            for h in ([has] if isinstance(has, str) else has)
-            if own and not (Path(tmp) / h).exists()
-        ]
+        missing: list[str] = []
         line = None
-        if own and "first_line" in case:
-            target = Path(tmp) / case["first_line"]["file"]
-            text = target.read_text("utf-8") if target.is_file() else ""
-            line = text.splitlines()[0] if text else ""
-        # 'file_says' names a file the run writes and a token it must hold (18.111).
         unsaid = None
-        if own and "file_says" in case:
-            target = Path(tmp) / case["file_says"]["file"]
-            text = target.read_text("utf-8") if target.is_file() else ""
-            unsaid = case["file_says"]["says"] not in text
+        if own:
+            # 'has' is one path or a list of paths, each of which the run must write (18.111).
+            has = case.get("has", [])
+            missing = [
+                h
+                for h in ([has] if isinstance(has, str) else has)
+                if not (Path(tmp) / h).exists()
+            ]
+            if "first_line" in case:
+                text = read_or_empty(Path(tmp) / case["first_line"]["file"])
+                line = text.splitlines()[0] if text else ""
+            # 'file_says' names a file the run writes and a token it must hold (18.111).
+            if "file_says" in case:
+                unsaid = case["file_says"]["says"] not in read_or_empty(
+                    Path(tmp) / case["file_says"]["file"]
+                )
         filled = [
             e for e in entries if any(f.is_file() for f in (Path(tmp) / e).rglob("*"))
         ]

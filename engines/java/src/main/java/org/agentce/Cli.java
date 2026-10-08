@@ -386,7 +386,13 @@ global options:
     }
 
     private static String requireDir(String raw, String key, String what) {
-        return requireDir(raw, key, what, "pass --" + key + " <dir>.");
+        return requireDir(raw, key, what, false);
+    }
+
+    /** {@link #requireDir} with the computed {@code --key}-style fix; with {@code emptyIsNoDir} an empty
+     * value names no directory. */
+    private static String requireDir(String raw, String key, String what, boolean emptyIsNoDir) {
+        return requireDir(raw, key, what, "pass --" + key + " <dir>.", emptyIsNoDir);
     }
 
     /** {@link #requireDir}, with an explicit {@code fix} rather than the computed {@code --key}-style
@@ -862,14 +868,14 @@ global options:
             result.usage = parsed.action() == null ? CONFORMANCE_USAGE : CONFORMANCE_RUN_USAGE;
             return result;
         }
-        if (!"run".equals(parsed.action())) {
-            throw conformanceActionError();
+        if (parsed.action() == null) {
+            throw conformanceActionError(); // the scanner refuses any action but run itself
         }
-        String engine = requireDir(parsed.value("--engine"), "engine", "the engine path", "pass --engine <dir>.", true);
-        String corpus = requireDir(parsed.value("--corpus"), "corpus", "the corpus directory", "pass --corpus <dir>.", true);
+        String engine = requireDir(parsed.value("--engine"), "engine", "the engine path", true);
+        String corpus = requireDir(parsed.value("--corpus"), "corpus", "the corpus directory", true);
         String adapters = parsed.value("--adapters");
         if (adapters != null) {
-            requireDir(adapters, "adapters", "the adapters directory", "pass --adapters <dir>.", true);
+            requireDir(adapters, "adapters", "the adapters directory", true);
         }
         String out = parsed.value("--out");
         refuseEmptyOut(out);
@@ -937,7 +943,7 @@ global options:
             result.usage = VALIDATE_USAGE;
             return result;
         }
-        String bundleDir = requireDir(parsed.value("--bundle"), "bundle", "the evidence bundle", "pass --bundle <dir>.", true);
+        String bundleDir = requireDir(parsed.value("--bundle"), "bundle", "the evidence bundle", true);
         String out = parsed.value("--out");
         refuseEmptyOut(out);
         Bundle bundle = Bundle.load(Paths.get(bundleDir)); // raises InputError (exit 3) on a missing/mismatching manifest
@@ -1686,7 +1692,8 @@ global options:
                 Map.of(
                         "--format", new Argv.Choices(REPORT_FORMATS, Cli::reportFormatError),
                         "--role", new Argv.Choices(REPORT_ROLES, Cli::reportRoleError)),
-                false);
+                false,
+                null);
     }
 
     /** Re-render a report from a committed {@code assertions.json} (SPEC §9.4), or, with {@code
@@ -1710,7 +1717,7 @@ global options:
                             "drop " + flag + ", or drop --validate to re-render with --from.");
                 }
             }
-            String reportDir = requireDir(validate, "validate", "the report directory", "pass --validate <dir>.", true);
+            String reportDir = requireDir(validate, "validate", "the report directory", true);
             List<String> problems = ReportValidate.validateReport(Paths.get(reportDir));
             result.data.put("report_dir", reportDir);
             result.data.put("valid", problems.isEmpty());

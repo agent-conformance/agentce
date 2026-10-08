@@ -49,7 +49,7 @@ export interface AdaptOptions {
   source?: string;
 }
 
-type IntValue = number | NonCanonicalNumber;
+export type IntValue = number | NonCanonicalNumber;
 
 interface Span {
   traceId: string;
@@ -81,7 +81,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * or doubled), and no more than `sys.int_max_str_digits` digits. Shared by `_anyValue`'s `intValue`
  * string case and `_asInt`'s string case -- the same Python `int()` call in the reference.
  */
-function parsePythonIntGrammar(raw: string): IntValue | null {
+export function parsePythonIntGrammar(raw: string): IntValue | null {
   // One linear pass, never a regex: an anchored trailing-whitespace regex rescans from every start
   // position, so it is quadratic on a long whitespace run (18.29 verifier round 2, F3's class).
   let start = 0;

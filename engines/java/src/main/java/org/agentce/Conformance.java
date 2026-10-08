@@ -197,7 +197,7 @@ public final class Conformance {
         try {
             return Json.parse(streams[0]);
         } catch (IllegalArgumentException notJson) {
-            String text = (streams[1].isEmpty() ? streams[0] : streams[1]).strip();
+            String text = pyStrip(streams[1].isEmpty() ? streams[0] : streams[1]);
             int cps = text.codePointCount(0, text.length());
             String tail = cps > 800 ? text.substring(text.offsetByCodePoints(0, cps - 800)) : text;
             ObjectNode error = Json.nodes().objectNode();
@@ -208,6 +208,20 @@ public final class Conformance {
             error.put("error", tail);
             return error;
         }
+    }
+
+    /** Python's {@code str.strip()}: trims exactly {@link FailOn#isPySpace} code points, where
+     * {@link String#strip()} uses the JVM's own whitespace set. */
+    private static String pyStrip(String text) {
+        int start = 0;
+        int end = text.length();
+        while (start < end && FailOn.isPySpace(text.codePointAt(start))) {
+            start += Character.charCount(text.codePointAt(start));
+        }
+        while (end > start && FailOn.isPySpace(text.codePointBefore(end))) {
+            end -= Character.charCount(text.codePointBefore(end));
+        }
+        return text.substring(start, end);
     }
 
     /** Python's {@code _adapter_claim}: the adapter-conformance claim, mirroring the ECS claim scheme

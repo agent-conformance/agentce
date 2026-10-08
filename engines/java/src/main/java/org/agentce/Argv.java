@@ -108,22 +108,6 @@ public final class Argv {
             Map<String, Choices> choices,
             boolean argparseValueCause,
             Action action) {
-        /** A grammar with no action. */
-        public Grammar(
-                Map<String, Kind> options,
-                int maxPositionals,
-                String unrecognizedKey,
-                String needsValueKey,
-                String flagFix,
-                String extraArgFix,
-                Map<String, String> valueHints,
-                Map<String, String> needsValueKeys,
-                Map<String, Choices> choices,
-                boolean argparseValueCause) {
-            this(options, maxPositionals, unrecognizedKey, needsValueKey, flagFix, extraArgFix, valueHints,
-                    needsValueKeys, choices, argparseValueCause, null);
-        }
-
         /** A grammar with no per-option needs-value key and no choices, whose missing-value cause is
          * argparse's own sentence (assess's). */
         public Grammar(
@@ -176,23 +160,25 @@ public final class Argv {
         if (command.help()) {
             return helpResult(null);
         }
-        if (command.actionAt() < 0) {
-            if (!command.extras().isEmpty()) {
-                throw unrecognized(command.extras().get(0), grammar);
+        String name = null;
+        Grammar actionGrammar = null;
+        Level action = null;
+        if (command.actionAt() >= 0) {
+            name = argv[command.actionAt()];
+            actionGrammar = grammar.action().grammars().get(name);
+            if (actionGrammar == null) {
+                throw grammar.action().error().get();
             }
-            return command.result(null, null);
-        }
-        String name = argv[command.actionAt()];
-        Grammar actionGrammar = grammar.action().grammars().get(name);
-        if (actionGrammar == null) {
-            throw grammar.action().error().get();
-        }
-        Level action = scanLevel(Arrays.copyOfRange(argv, command.actionAt() + 1, argv.length), actionGrammar);
-        if (action.help()) {
-            return helpResult(name);
+            action = scanLevel(Arrays.copyOfRange(argv, command.actionAt() + 1, argv.length), actionGrammar);
+            if (action.help()) {
+                return helpResult(name);
+            }
         }
         if (!command.extras().isEmpty()) {
             throw unrecognized(command.extras().get(0), grammar);
+        }
+        if (action == null) {
+            return command.result(null, null);
         }
         if (!action.extras().isEmpty()) {
             throw unrecognized(action.extras().get(0), actionGrammar);
