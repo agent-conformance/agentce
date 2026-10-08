@@ -223,6 +223,17 @@ def _require_dir(
     return path
 
 
+def _refuse_empty_out(raw: str | None) -> None:
+    """An empty --out names no directory (``Path("")`` is the working directory): refused before
+    anything is written or run, never read as the working directory or as no --out."""
+    if raw == "":
+        raise InputError(
+            "input.out_dir_unwritable",
+            "--out '' names no directory.",
+            "choose a writable --out directory.",
+        )
+
+
 def _require_file(
     raw: str | None, *, key: str, what: str, fix: str | None = None
 ) -> Path:
@@ -263,8 +274,13 @@ def _write_jsonl(records: Iterable[dict[str, Any]], path: Path) -> None:
 def cmd_validate(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="validate")
     bundle_dir = _require_dir(
-        _opt_str(ns, "bundle"), key="bundle", what="the evidence bundle"
+        _opt_str(ns, "bundle"),
+        key="bundle",
+        what="the evidence bundle",
+        empty_is_no_dir=True,
     )
+    out = _opt_str(ns, "out")
+    _refuse_empty_out(out)
     bundle = load_bundle(
         bundle_dir
     )  # raises InputError (exit 3) on a missing/mismatching manifest
@@ -278,7 +294,6 @@ def cmd_validate(ns: argparse.Namespace) -> CommandResult:
             "quarantine_by_reason": counts_by_reason(ingested.quarantined),
         }
     )
-    out = _opt_str(ns, "out")
     if out is not None:
         quarantine_path = Path(out) / "quarantine.jsonl"
         write_quarantine(ingested.quarantined, quarantine_path)
@@ -2767,17 +2782,31 @@ def cmd_conformance(ns: argparse.Namespace) -> CommandResult:
     action = _opt_str(ns, "conformance_action")
     if action != "run":
         raise conformance_action_error()
-    engine = _require_dir(_opt_str(ns, "engine"), key="engine", what="the engine path")
-    corpus = _require_dir(
-        _opt_str(ns, "corpus"), key="corpus", what="the corpus directory"
+    engine = _require_dir(
+        _opt_str(ns, "engine"),
+        key="engine",
+        what="the engine path",
+        empty_is_no_dir=True,
     )
-    out = _opt_str(ns, "out")
+    corpus = _require_dir(
+        _opt_str(ns, "corpus"),
+        key="corpus",
+        what="the corpus directory",
+        empty_is_no_dir=True,
+    )
     adapters = _opt_str(ns, "adapters")
     adapters_dir = (
-        _require_dir(adapters, key="adapters", what="the adapters directory")
+        _require_dir(
+            adapters,
+            key="adapters",
+            what="the adapters directory",
+            empty_is_no_dir=True,
+        )
         if adapters is not None
         else None
     )
+    out = _opt_str(ns, "out")
+    _refuse_empty_out(out)
     report = run_ecs(
         engine_path=engine,
         corpus_dir=corpus,
@@ -2941,7 +2970,9 @@ def cmd_diff(ns: argparse.Namespace) -> CommandResult:
         what="the second assertion set",
         fix=fix,
     )
-    fmt = _opt_str(ns, "format") or "text"
+    fmt = _opt_str(ns, "format")
+    if fmt is None:
+        fmt = "text"
     if fmt not in DIFF_FORMATS:
         raise InputError(
             "input.diff_format",

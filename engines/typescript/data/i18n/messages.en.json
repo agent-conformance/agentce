@@ -327,7 +327,7 @@
   "errors.input.verify_target.fix": "pass exactly one target, e.g. `agentce verify --bundle <dir>`.",
   "errors.input.out_missing.cause": "the command needs an output bundle path.",
   "errors.input.out_missing.fix": "pass --out <bundle>.",
-  "errors.input.out_dir_unwritable.cause": "the --out directory of assess, quickstart, validate or init could not be created or written to.",
+  "errors.input.out_dir_unwritable.cause": "the --out directory of assess, quickstart, validate, conformance or init could not be created or written to, or --out was empty.",
   "errors.input.out_dir_unwritable.fix": "choose a writable --out directory.",
   "next.conformant": "No gaps. Run the assessment again when the agent, its evidence, or the catalog changes.",
   "next.incomplete": "Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.",

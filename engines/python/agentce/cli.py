@@ -934,6 +934,27 @@ def _scan_top_level(args: Sequence[str]) -> list[str] | None:
     return list(args) if args else None
 
 
+def _take_diff_positionals(
+    parser: argparse.ArgumentParser, ns: argparse.Namespace, leftover: list[str]
+) -> list[str]:
+    """argparse (3.12) leaves a positional after an option over (`diff A --format md B` leaves B);
+    read such tokens, in order, as report_a, report_b, then extra, as TypeScript and Java do
+    (18.111). Returns what is still left over (an unrecognized flag). A newer argparse that assigns
+    intermixed positionals itself leaves nothing over here."""
+    diff = _subparsers(parser)["diff"]
+    rest: list[str] = []
+    for token in leftover:
+        if diff._parse_optional(token) is not None:
+            rest.append(token)
+        elif ns.report_a is None:
+            ns.report_a = token
+        elif ns.report_b is None:
+            ns.report_b = token
+        else:
+            ns.extra = [*(ns.extra or []), token]
+    return rest
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse ``argv`` (default ``sys.argv``), run the command, and return the process exit code."""
     # One integer rule for the whole run, whatever PYTHONINTMAXSTRDIGITS says: a literal JSON may hold
@@ -947,6 +968,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             parser.print_help()
             return int(ExitCode.OK)
         ns, unknown = parser.parse_known_args(parse)
+        if getattr(ns, "command", None) == "diff":
+            unknown = _take_diff_positionals(parser, ns, unknown)
         if unknown:
             errors = _ARGV.get(getattr(ns, "command", "") or "", _TOP_ARGV)
             raise errors.unknown(unknown[0])

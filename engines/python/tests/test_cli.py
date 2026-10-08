@@ -179,6 +179,37 @@ def test_validate_writes_quarantine_file(
     assert env["quarantine_file"] == str(out / "quarantine.jsonl")
 
 
+@pytest.mark.parametrize("argv", [["--bundle", ""], ["--bundle="]])
+def test_validate_empty_bundle_is_not_a_directory(
+    argv: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An empty --bundle names no directory, never the working directory (18.111)."""
+    code, env = run(["validate", *argv, "--json"], capsys)
+    assert code == 3
+    assert env["error"]["key"] == "input.bundle_not_a_directory"
+
+
+@pytest.mark.parametrize("out", [["--out", ""], ["--out="]])
+def test_validate_empty_out_is_refused_before_writing(
+    out: list[str],
+    make_bundle: Callable[..., Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """An empty --out is input.out_dir_unwritable, not ./quarantine.jsonl (18.111)."""
+    bundle = make_bundle(["{not json"])
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    monkeypatch.chdir(cwd)
+    code, env = run(["validate", "--bundle", str(bundle), *out, "--json"], capsys)
+    assert code == 3
+    assert env["error"]["key"] == "input.out_dir_unwritable"
+    assert env["error"]["cause"] == "--out '' names no directory."
+    assert env["error"]["fix"] == "choose a writable --out directory."
+    assert list(cwd.iterdir()) == []
+
+
 def test_verify_requires_exactly_one_target(capsys: pytest.CaptureFixture[str]) -> None:
     code, env = run(["verify", "--json"], capsys)
     assert code == 3
@@ -905,6 +936,43 @@ def test_conformance_run_missing_corpus(
     assert env["error"]["key"] == "input.corpus_missing"
 
 
+@pytest.mark.parametrize("flag", ["--engine", "--corpus", "--adapters"])
+@pytest.mark.parametrize("equals", [False, True])
+def test_conformance_run_empty_directory_is_not_a_directory(
+    flag: str, equals: bool, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An empty --engine, --corpus or --adapters names no directory (18.111)."""
+    dirs = {"--engine": str(tmp_path), "--corpus": str(tmp_path)}
+    dirs[flag] = ""
+    argv = ["conformance", "run", "--json"]
+    for name, value in dirs.items():
+        argv += [f"{name}={value}"] if equals else [name, value]
+    code, env = run(argv, capsys)
+    assert code == 3
+    assert env["error"]["key"] == f"input.{flag[2:]}_not_a_directory"
+
+
+@pytest.mark.parametrize("out", [["--out", ""], ["--out="]])
+def test_conformance_run_empty_out_is_refused_before_the_run(
+    out: list[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """An empty --out is input.out_dir_unwritable, not a run without a report (18.111)."""
+    from agentce import commands
+
+    def no_run(**_: object) -> None:
+        raise AssertionError("the run started")
+
+    monkeypatch.setattr(commands, "run_ecs", no_run)
+    argv = ["conformance", "run", "--engine", str(tmp_path), "--corpus", str(tmp_path)]
+    code, env = run([*argv, *out, "--json"], capsys)
+    assert code == 3
+    assert env["error"]["key"] == "input.out_dir_unwritable"
+    assert env["error"]["cause"] == "--out '' names no directory."
+
+
 def test_diff_ok(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     left = tmp_path / "a.json"
     right = tmp_path / "b.json"
@@ -959,6 +1027,49 @@ def test_diff_extra_argument_is_keyed(
     code, env = run(["diff", str(left), str(right), str(left), "--json"], capsys)
     assert code == 3
     assert env["error"]["key"] == "input.diff_extra_argument"
+
+
+@pytest.mark.parametrize("fmt", [["--format", ""], ["--format="]])
+def test_diff_empty_format_is_keyed(
+    fmt: list[str], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An empty --format is input.diff_format, never text (18.111)."""
+    left, right = _diff_pair(tmp_path, [], [])
+    code, env = run(["diff", str(left), str(right), *fmt, "--json"], capsys)
+    assert code == 3
+    assert env["error"]["key"] == "input.diff_format"
+
+
+def test_diff_reads_positionals_around_format(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`diff A --format md B` reads B as the second report (18.111)."""
+    left, right = _diff_pair(tmp_path, [], [])
+    code, env = run(["diff", str(left), "--format", "md", str(right), "--json"], capsys)
+    assert code == 0
+    assert (env["report_a"], env["report_b"]) == (str(left), str(right))
+    code, env = run(["diff", "--format", "md", str(left), "--json", str(right)], capsys)
+    assert code == 0
+    assert (env["report_a"], env["report_b"]) == (str(left), str(right))
+
+
+@pytest.mark.parametrize(
+    ("tail", "key"),
+    [
+        (["--format", "md", "extra"], "input.diff_extra_argument"),
+        (["--format", "md", "extra", "--no-such-flag"], "input.diff_unrecognized_flag"),
+        (["--no-such-flag", "--format", "md", "extra"], "input.diff_unrecognized_flag"),
+    ],
+)
+def test_diff_leftover_after_format(
+    tail: list[str], key: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A third positional after --format is input.diff_extra_argument, as `diff A B extra` is; an
+    unknown flag anywhere is still refused with diff's unrecognized-flag key (18.111)."""
+    left, right = _diff_pair(tmp_path, [], [])
+    code, env = run(["diff", str(left), str(right), *tail, "--json"], capsys)
+    assert code == 3
+    assert env["error"]["key"] == key
 
 
 def test_diff_field_not_string_is_keyed(
