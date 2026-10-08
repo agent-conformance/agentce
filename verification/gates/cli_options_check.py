@@ -107,6 +107,30 @@ def envelope_problem(stdout: str, command: str) -> str | None:
     return None
 
 
+def run_cli(
+    argv: list[str], cwd: str, late_reader: float
+) -> subprocess.CompletedProcess:
+    """Run one command line. With late_reader > 0 nothing reads its stdout until it exits or that many
+    seconds pass, so a pipe it leaves undrained at exit is cut whatever the machine's speed (18.110: a
+    reader racing the writer let a cut rendering arrive whole on Linux)."""
+    if not late_reader:
+        return subprocess.run(argv, cwd=cwd, capture_output=True, text=True, env=ENV)
+    with subprocess.Popen(
+        argv,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=ENV,
+    ) as proc:
+        try:
+            proc.wait(timeout=late_reader)
+        except subprocess.TimeoutExpired:
+            pass  # still writing into a full pipe: it is waiting for its reader, as it should
+        stdout, stderr = proc.communicate()
+    return subprocess.CompletedProcess(argv, proc.returncode, stdout, stderr)
+
+
 def run(
     case: dict, engine: str, cmd: list[str], bundle_args: list[str]
 ) -> tuple[str | None, str]:
@@ -129,13 +153,7 @@ def run(
             "front": ["--json", *argv],
             "none": argv,
         }[case.get("json", "after")]
-        p = subprocess.run(
-            [*cmd, *placed],
-            cwd=tmp,
-            capture_output=True,
-            text=True,
-            env=ENV,
-        )
+        p = run_cli([*cmd, *placed], tmp, case.get("late_reader", 0))
         written = (
             sorted(str(f.relative_to(out)) for f in out.rglob("*") if f.is_file())
             if out.is_dir()

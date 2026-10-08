@@ -15,7 +15,9 @@ fails if a gate in `gates.json` is not named in this file.
   reads it, and any rendering option beside `--validate`. Each engine now reads report's options from one
   declared table and refuses those lines with a key at exit 3; `--format public` and the role packs are
   byte-identical across the three. The rows read a committed `assertions.json` with two deviations, a Conduct
-  control and a subject with Markdown-special characters. A case's `says` can now list several tokens.
+  control and a subject with Markdown-special characters. A case's `says` can now list several tokens, and a
+  case's `late_reader` holds stdout unread until the command exits, so a piped rendering cut at exit is caught
+  on any machine.
 - `VG-CLI-OPTIONS` (18.110): its three `report` rows (`--he`, `--form md`, `--no-such-flag`) no longer
   need a TypeScript or Java override.
 

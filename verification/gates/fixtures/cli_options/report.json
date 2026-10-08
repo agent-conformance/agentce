@@ -86,6 +86,6 @@
     {"id": "report-validate-beside-language", "argv": ["report", "--validate", "{root}/verification", "--language", "de"], "exit": 3, "key": "input.report_flag_unused", "says": "--language", "writes": null},
     {"id": "report-validate-beside-out", "argv": ["report", "--validate", "{root}/verification", "--out", "{out}"], "exit": 3, "key": "input.report_flag_unused", "says": "--out", "writes": null},
     {"id": "report-validate-empty", "argv": ["report", "--validate", ""], "exit": 3, "key": "input.validate_not_a_directory", "writes": null},
-    {"id": "report-oscal-piped-whole", "argv": ["report", "--from", "{root}/verification/gates/fixtures/cli_options/report/assertions.json", "--format", "oscal"], "exit": 0, "key": null, "envelope": "report", "writes": null}
+    {"id": "report-oscal-piped-whole", "argv": ["report", "--from", "{root}/verification/gates/fixtures/cli_options/report/assertions.json", "--format", "oscal"], "exit": 0, "key": null, "envelope": "report", "late_reader": 2, "writes": null}
   ]
 }
