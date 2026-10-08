@@ -99,14 +99,13 @@ class _Parser(argparse.ArgumentParser):
     """An ``ArgumentParser`` whose usage errors exit ``3`` (input error), per the CLI scheme, as the
     command's keyed `_ArgvError` (English text: argparse is not localised here)."""
 
-    def __init__(
-        self, *args: Any, argv_errors: _ArgvErrors | None = None, **kwargs: Any
-    ) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         # Exact flags only on every parser (TRADEOFFS 2026-10-06 18.50, option b; 18.107): `--bun x`
         # is an unrecognized flag in all three engines, never --bundle in Python alone.
         kwargs.setdefault("allow_abbrev", False)
         super().__init__(*args, **kwargs)
-        self._argv_errors = argv_errors
+        # Set per command by `_key_argv_errors` once the tree is built.
+        self._argv_errors: _ArgvErrors | None = None
 
     def error(self, message: str) -> NoReturn:
         if self._argv_errors is not None:
@@ -150,15 +149,13 @@ def _flag_fix(command: str) -> str:
     return f"run `agentce {command} --help` for the flags {command} takes, or drop the flag."
 
 
-def _action_error(command: str) -> Callable[[str], tuple[str, str, str]]:
+def _action_error(
+    make: Callable[[], InputError],
+) -> Callable[[str], tuple[str, str, str]]:
     """An unknown action is the error `cmd_<command>` gives for no action."""
 
     def error(value: str) -> tuple[str, str, str]:
-        err = {
-            "catalog": commands.catalog_action_error,
-            "conformance": commands.conformance_action_error,
-            "config": commands.config_action_error,
-        }[command]()
+        err = make()
         return err.key, err.cause, err.fix
 
     return error
@@ -244,9 +241,9 @@ _ARGV: dict[str, _ArgvErrors] = {
         },
         choice_errors={
             "--format": lambda v: (
-                "input.report_format",
-                f"unknown report format '{v}'.",
-                f"choose one of: {', '.join(commands.REPORT_FORMATS)}.",
+                (err := commands.report_format_error(v)).key,
+                err.cause,
+                err.fix,
             )
         },
     ),
@@ -259,21 +256,21 @@ _ARGV: dict[str, _ArgvErrors] = {
             "--engine": "input.engine_missing",
             "--corpus": "input.corpus_missing",
         },
-        choice_errors={"<action>": _action_error("conformance")},
+        choice_errors={"<action>": _action_error(commands.conformance_action_error)},
     ),
     "catalog": _ArgvErrors(
         "catalog",
         "input.catalog_unrecognized_flag",
         "run `agentce catalog <action> --help` for the flags it takes, or drop the flag.",
         "pass one catalog directory: `agentce catalog <action> <dir>`.",
-        choice_errors={"<action>": _action_error("catalog")},
+        choice_errors={"<action>": _action_error(commands.catalog_action_error)},
     ),
     "config": _ArgvErrors(
         "config",
         "input.config_unrecognized_flag",
         _flag_fix("config show"),
         "config show takes no argument: `agentce config show`.",
-        choice_errors={"<action>": _action_error("config")},
+        choice_errors={"<action>": _action_error(commands.config_action_error)},
     ),
 }
 for _name, _extra in (

@@ -2058,11 +2058,7 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
     )
     fmt = _opt_str(ns, "format") or "md"
     if fmt not in REPORT_FORMATS:
-        raise InputError(
-            "input.report_format",
-            f"unknown report format {fmt!r}.",
-            f"choose one of: {', '.join(REPORT_FORMATS)}.",
-        )
+        raise report_format_error(fmt)
     assertions = [Assertion.from_json(a) for a in json.loads(source.read_text("utf-8"))]
     counts = aggregate(assertions)
     catalogs = [c for c in (_opt_str(ns, "catalog") or "").split(",") if c] or None
@@ -2339,6 +2335,15 @@ def _reject_inside_catalog(
             f"{flag} {value!r} resolves inside the catalog directory {shown_dir}.",
             f"write the {noun} outside the catalog directory.",
         )
+
+
+def report_format_error(fmt: str) -> InputError:
+    """A report format `report` does not render (the CLI reuses it for argparse's invalid choice)."""
+    return InputError(
+        "input.report_format",
+        f"unknown report format {fmt!r}.",
+        f"choose one of: {', '.join(REPORT_FORMATS)}.",
+    )
 
 
 def catalog_action_error() -> InputError:
