@@ -1286,6 +1286,25 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             "--package-for-sharing works only with --bundle/--profile, not a records folder.",
             "pass --bundle and --profile instead of a records folder, or drop --package-for-sharing.",
         )
+    # The report language and the unverified-catalog override are checked before anything is written
+    # too: an unknown language would otherwise fall back to English, and the override with no
+    # --catalog-dir would have nothing to apply to (18.109).
+    report_language = _opt_str(ns, "report_language")
+    if (
+        report_language is not None
+        and report_language not in messages.available_languages()
+    ):
+        raise InputError(
+            "input.report_language_unknown",
+            f"--report-language {report_language!r} has no report catalogue.",
+            "choose one of: " + ", ".join(messages.available_languages()) + ".",
+        )
+    if _flag(ns, "allow_unverified_catalog") and not getattr(ns, "catalog_dir", None):
+        raise InputError(
+            "input.allow_unverified_requires_catalog_dir",
+            "--allow-unverified-catalog was given without --catalog-dir.",
+            "add --catalog-dir <dir>, or drop --allow-unverified-catalog.",
+        )
     # --emit/--for/CI-detection are all resolved and validated before any output is written (below,
     # before ingest/quarantine): an unknown token, a bad flag combination, or an unknown preset must
     # never leave a partial or misleading result behind.

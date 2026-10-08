@@ -28,6 +28,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `environment.python_unsupported` | the running Python is older than the interpreter the engine supports. | run the engine under Python 3.12 or newer (`uv python install 3.12`). |
 | `input.adapter_missing` | ingest needs an adapter. | pass --adapter, e.g. --adapter otel-genai. |
 | `input.adapter_not_found` | no adapter directory exists at the given adapters-root and adapter name. | pass --adapters-root pointing at the adapters checkout, or check the adapter name. |
+| `input.allow_unverified_requires_catalog_dir` | --allow-unverified-catalog was given without --catalog-dir, so there is no catalog for it to apply to. | add --catalog-dir <dir>, or drop --allow-unverified-catalog. |
 | `input.assess_flag_needs_value` | argument --deviations: expected one argument | pass --deviations <file>. |
 | `input.assess_unrecognized_flag` | assess was given a flag it does not recognize, or more than one records folder. | run `agentce assess --help` for the flags assess takes, or drop the flag. |
 | `input.bundle_manifest_entry` | a 'files' entry in the manifest is missing 'path' or 'sha256'. | each entry needs {"path": ..., "sha256": ...}. |
@@ -80,6 +81,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.out_missing` | the command needs an output bundle path. | pass --out <bundle>. |
 | `input.package_path_overlap` | --out overlaps --bundle, --profile, --domain, or a --catalog-dir: packaging would read from or write into the tree it is producing. | point --out somewhere outside every input path, then re-run. |
 | `input.package_requires_bundle` | --package-for-sharing works only with --bundle/--profile; a records-folder run cannot be reproduced from a --bundle re-run. | pass --bundle and --profile instead of a records folder, or drop --package-for-sharing. |
+| `input.package_unsupported` | this engine does not yet write the shareable bundle that --package-for-sharing asks for. | run assess with the Python engine for --package-for-sharing, or drop the flag. |
 | `input.profile_invalid` | the applicability profile is not safe YAML: a disallowed construct, or a structure nested too deeply to parse safely. | remove custom YAML tags and flatten deep nesting; regenerate the profile from `agentce init`. |
 | `input.profile_missing` | the applicability profile was not supplied. | pass --profile agentce/applicability.yaml (start from agentce init). |
 | `input.quickstart_missing` | the bundled quickstart project is missing from the installed package. | reinstall the engine: the quickstart project ships inside the package. |
@@ -90,10 +92,12 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.records_not_a_directory` | the records folder does not exist or is not a directory. | pass a folder of OpenTelemetry GenAI or OpenInference trace exports. |
 | `input.records_out_collides` | the output folder would overwrite records: it is the records folder, holds them, or lies inside that folder with files that are not a previous run's output. | choose an output folder outside the records folder with --out, or an empty one. |
 | `input.records_source_ambiguous` | both a records folder and --bundle were given. | pass either a folder of trace exports or --bundle <dir>, not both. |
+| `input.records_unsupported` | this engine does not yet read a folder of trace exports. | run assess with the Python or TypeScript engine on the folder, or pass --bundle <dir> --profile <file>. |
 | `input.release_bundle` | the given directory has no release-manifest.json or signatures.json, so it is not a release bundle. | pass the --out directory produced by the release tooling. |
 | `input.release_missing` | the release artifact named on the command line does not exist. | pass --release <bundle-dir-or-envelope>. |
 | `input.release_unreadable` | the release artifact, or a file or folder inside it, could not be read (permissions). | make every file and folder in the release readable, then re-run. |
 | `input.report_format` | report was given a --format it does not know. | pass --format with one of the formats report lists. |
+| `input.report_language_unknown` | --report-language names a language the engine has no report catalogue for. | choose one of: de, en. |
 | `input.report_unrecognized_flag` | report was given a flag it does not recognize, or an argument it does not take. | run `agentce report --help` for the flags report takes, or drop the flag. |
 | `input.sign_profile` | unknown signing profile. | choose one of: sigstore-public, sigstore-private, kms. |
 | `input.sign_role` | --as must be `claimant` or `assessor`. | pass --as claimant|assessor. |

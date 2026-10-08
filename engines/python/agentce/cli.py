@@ -434,10 +434,9 @@ def build_parser() -> argparse.ArgumentParser:
         dest="allow_unverified_catalog",
         action="store_true",
         help="assess a --catalog-dir catalog whose signature is absent or does not verify, "
-        "recording the override as a limitation in the manifest and the claim (SPEC 8.7)",
+        "recording the override as a limitation in the manifest and the claim (SPEC 8.7). "
+        "Requires --catalog-dir.",
     )
-    p.add_argument("--manual", help="the manual-records directory")
-    p.add_argument("--probes", help="the probe-results directory")
     p.add_argument(
         "--package-for-sharing",
         dest="package_for_sharing",
@@ -452,7 +451,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--report-language",
         dest="report_language",
-        help="message-key catalogue for the report; does not affect assertions.json (SPEC 9.3)",
+        help="message-key catalogue for the report: de or en (default: en); does not affect "
+        "assertions.json (SPEC 9.3)",
     )
     p.add_argument(
         "--emit",

@@ -38,8 +38,9 @@ appears in the manifest with its trust class; catalog and engine versions satisf
 
 ## Stage 2 — Run
 
-`agentce verify` then `agentce assess` with `--manual` and `--deviations` pointed at the records from
-stage 3. A first run without them is allowed, to discover which manual controls apply.
+`agentce verify` then `agentce assess` with `--deviations` pointed at the deviation register from
+stage 3. assess does not read the stage-3 checklist records; keep them with the report for whoever
+reviews it. A first run without a register is allowed, to discover which manual controls apply.
 
 ### Preparing a report for an audience
 

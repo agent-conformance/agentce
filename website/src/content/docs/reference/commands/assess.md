@@ -10,10 +10,10 @@ usage: agentce assess [-h] [--json] [--debug] [--quiet] [--bundle BUNDLE]
                       [--catalog CATALOG] [--profile PROFILE]
                       [--deviations DEVIATIONS] [--domain DOMAIN]
                       [--catalog-dir CATALOG_DIR] [--trust-root TRUST_ROOT]
-                      [--allow-unverified-catalog] [--manual MANUAL]
-                      [--probes PROBES] [--package-for-sharing] [--out OUT]
-                      [--state STATE] [--report-language REPORT_LANGUAGE]
-                      [--emit EMIT] [--for PRESET] [--fail-on FAIL_ON]
+                      [--allow-unverified-catalog] [--package-for-sharing]
+                      [--out OUT] [--state STATE]
+                      [--report-language REPORT_LANGUAGE] [--emit EMIT]
+                      [--for PRESET] [--fail-on FAIL_ON]
                       [folder]
 
 Run a full assessment: `agentce assess <folder>` over a folder of trace
@@ -45,9 +45,8 @@ options:
   --allow-unverified-catalog
                         assess a --catalog-dir catalog whose signature is
                         absent or does not verify, recording the override as a
-                        limitation in the manifest and the claim (SPEC 8.7)
-  --manual MANUAL       the manual-records directory
-  --probes PROBES       the probe-results directory
+                        limitation in the manifest and the claim (SPEC 8.7).
+                        Requires --catalog-dir.
   --package-for-sharing
                         copy the evidence bundle, profile, domain binding and
                         every --catalog-dir into --out/bundle/ so the
@@ -58,8 +57,9 @@ options:
   --out OUT             the output directory (default: ./out)
   --state STATE         the incremental state directory
   --report-language REPORT_LANGUAGE
-                        message-key catalogue for the report; does not affect
-                        assertions.json (SPEC 9.3)
+                        message-key catalogue for the report: de or en
+                        (default: en); does not affect assertions.json (SPEC
+                        9.3)
   --emit EMIT           comma-separated report formats to render (default:
                         html, md, oscal, pack, sarif, skill); one or more of:
                         md, html, oscal, sarif, public, pack, junit, csv,
