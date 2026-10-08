@@ -11,7 +11,7 @@
  * across machines but for `run.started_at` and `run.host_fingerprint`. This is a faithful port.
  */
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -32,12 +32,13 @@ import { type Catalog, loadCatalog } from "./catalog";
 import { computeCoverage } from "./coverage";
 import { DomainBinding } from "./domain";
 import { InputError } from "./errors";
+import { isPySpace } from "./failOn";
 import { ingest } from "./ingest";
 import { verifyBundle } from "./integrity";
 import { evaluateNoMl } from "./noMl";
 import { loadProfile } from "./profile";
 import { writeReport } from "./report";
-import { byteCompare, sortKeysDeep } from "./util";
+import { byteCompare, jsonStringifyAscii, sortKeysDeep } from "./util";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
 /** Stable provenance for ECS assessments, so per-project manifests are identical across machines. */
@@ -147,12 +148,122 @@ export interface EcsReport {
   no_ml: string;
   claim: string;
   failures: Array<{ project: string; error: string }>;
+  /** The adapters' own orchestrator's report, with --adapters only. */
+  adapter_conformance?: AdapterDetail;
+  /** The adapter-conformance claim, with --adapters only. */
+  adapters?: string;
+}
+
+/** What the adapters' orchestrator printed (its JSON object, kept as given), or Python's error record
+ * when it printed no JSON. */
+export type AdapterDetail = Record<string, unknown>;
+
+/** How the orchestrator is run: its stdout and stderr, as text. A test passes a sample runner. */
+export type AdapterRunner = (
+  command: string,
+  args: readonly string[],
+  cwd: string,
+) => { stdout: string; stderr: string };
+
+const runProcess: AdapterRunner = (command, args, cwd) => {
+  const proc = spawnSync(command, args, { cwd, encoding: "utf-8", maxBuffer: 1 << 30 });
+  if (proc.error !== undefined) {
+    throw proc.error; // uv missing from PATH: internal.unexpected, as Python's FileNotFoundError
+  }
+  return { stdout: proc.stdout, stderr: proc.stderr };
+};
+
+/** Python's `str.strip()` (JavaScript's `trim` differs on a few code points). */
+function pyStrip(text: string): string {
+  const chars = [...text];
+  let start = 0;
+  let end = chars.length;
+  while (start < end && isPySpace(chars[start]?.codePointAt(0) as number)) {
+    start++;
+  }
+  while (end > start && isPySpace(chars[end - 1]?.codePointAt(0) as number)) {
+    end--;
+  }
+  return chars.slice(start, end).join("");
+}
+
+/** Run adapter conformance in the adapters directory's own environments (SPEC 11.5, 12.3), as
+ * Python's `_adapter_conformance` does: each adapter is a separate environment, so the adapters' own
+ * orchestrator runs as a subprocess in that directory, given the absolute --out (a relative one
+ * resolves against the working directory, never the adapters directory). */
+export function adapterConformance(
+  adaptersDir: string,
+  outDir: string | null,
+  run: AdapterRunner = runProcess,
+): AdapterDetail {
+  const args = ["run", "--quiet", "python", "conformance.py", "--json"];
+  if (outDir !== null) {
+    args.push("--out", resolve(outDir));
+  }
+  const proc = run("uv", args, adaptersDir);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(proc.stdout);
+  } catch {
+    // the last 800 characters (code points, as Python counts them) of stderr, else stdout
+    const error = [...pyStrip(proc.stderr || proc.stdout)].slice(-800).join("");
+    return { adapters: [], total: 0, identical: 0, round_trip: false, error };
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    // Python's `_adapter_claim` calls `.get` on it and fails: internal.unexpected
+    const kind = Array.isArray(parsed) ? "list" : parsed === null ? "NoneType" : typeof parsed;
+    throw new Error(`'${kind}' object has no attribute 'get'`);
+  }
+  return parsed as AdapterDetail;
+}
+
+/** Python's `int()` of a report count (a number, a boolean or a decimal string). */
+function pyInt(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+  if (typeof value === "boolean") {
+    return value ? 1 : 0;
+  }
+  if (typeof value === "string" && /^\s*[+-]?\d+\s*$/.test(value)) {
+    return Number.parseInt(value, 10);
+  }
+  throw new Error(`int() argument is not a number: ${JSON.stringify(value)}`);
+}
+
+/** Python's truthiness of a JSON value. */
+function pyTruthy(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.keys(value).length > 0;
+  }
+  return Boolean(value);
+}
+
+/** The adapter-conformance claim, mirroring the ECS claim scheme (Python's `_adapter_claim`, SPEC
+ * §11.5): full needs every adapter identical and the round trip holding. */
+export function adapterClaim(detail: AdapterDetail): string {
+  const total = pyInt(detail.total ?? 0);
+  const identical = pyInt(detail.identical ?? 0);
+  if (total > 0 && identical === total && pyTruthy(detail.round_trip)) {
+    return "full";
+  }
+  if (identical > 0) {
+    return "partial";
+  }
+  return "none";
 }
 
 export interface RunEcsOptions {
   enginePath: string;
   corpusDir: string;
   outDir: string | null;
+  /** Also run adapter conformance over this directory and fold it into the report. */
+  adaptersDir?: string | null;
+  /** How the adapters' orchestrator is run (default: a real subprocess). */
+  runAdapters?: AdapterRunner;
 }
 
 /** Run every corpus project through the engine and return the implementation report. */
@@ -208,11 +319,17 @@ export function runEcs(options: RunEcsOptions): EcsReport {
     claim,
     failures,
   };
+  if (options.adaptersDir !== undefined && options.adaptersDir !== null) {
+    const detail = adapterConformance(options.adaptersDir, options.outDir, options.runAdapters);
+    report.adapter_conformance = detail;
+    report.adapters = adapterClaim(detail);
+  }
   if (options.outDir !== null) {
     mkdirSync(options.outDir, { recursive: true });
+    // json.dumps(report, sort_keys=True, indent=2): Python's ensure_ascii default included
     writeFileSync(
       join(options.outDir, "implementation-report.json"),
-      `${JSON.stringify(sortKeysDeep(report), null, 2)}\n`,
+      `${jsonStringifyAscii(sortKeysDeep(report), 2)}\n`,
     );
   }
   return report;

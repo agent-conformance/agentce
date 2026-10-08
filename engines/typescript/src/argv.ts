@@ -3,9 +3,12 @@
  * option's names and kind, the most positionals it takes, its refusal keys and fix texts) and
  * {@link scanArgv} reads argv the way Python's argparse reads it for that command (`allow_abbrev=False`,
  * plus Python's `_refuse_short_clusters`), returning a plain record. `assess` is the first command on
- * it (18.109) and `report` the second (18.110); the others move onto it with 18.50. An option may
- * declare its `choices` (refused with its own error the moment its value is read, in argv order, as
- * argparse checks a choice) and its own needs-value key. Mirrors `engines/java/.../Argv.java`.
+ * it (18.109), `report` the second (18.110), then `validate`, `diff`, `version` and `conformance`
+ * (18.111); the others move onto it with 18.50. An option may declare its `choices` (refused with its
+ * own error the moment its value is read, in argv order, as argparse checks a choice) and its own
+ * needs-value key. A grammar may declare an ACTION level (argparse's subparsers, `conformance run`):
+ * the first positional names the action, whose own grammar reads the rest. Mirrors
+ * `engines/java/.../Argv.java`.
  */
 
 import { InputError } from "./errors";
@@ -31,10 +34,21 @@ export interface OptionSpec {
   readonly needsValueKey?: string;
 }
 
+/** argparse's subparsers: the actions a command takes, each with its own grammar. */
+export interface ActionLevel {
+  readonly grammars: Readonly<Record<string, Grammar>>;
+  /** The refusal for an action that is not named, given at once (argparse's invalid choice). */
+  readonly error: () => InputError;
+}
+
 export interface Grammar {
   readonly options: readonly OptionSpec[];
-  /** The most positionals the command takes; a further one is refused as an unrecognized argument. */
+  /** The most positionals the command takes (`Infinity`: no bound); a further one is refused as an
+   * unrecognized argument. With an {@link action} level the first positional is the action instead. */
   readonly maxPositionals: number;
+  /** The command's actions: the first positional token, or `--`, names one, and its grammar reads
+   * every later token. */
+  readonly action?: ActionLevel;
   /** The key for an unknown flag, an extra argument, a cluster and a value on a flag. */
   readonly unrecognizedKey: string;
   /** The key for a VALUE/APPEND option given no value, unless the option names its own. */
@@ -48,9 +62,12 @@ export interface Grammar {
   readonly extraArgFix: string;
 }
 
-/** What a scan read: by each option's key (its last name), and the positionals in order. */
+/** What a scan read: by each option's key (its last name), and the positionals in order. With an
+ * action level, `action` is the action read (set only once one is); on `help` it names whose usage to
+ * print (unset: the command's). */
 export interface Scan {
   readonly help: boolean;
+  readonly action?: string;
   readonly values: Readonly<Record<string, string>>;
   readonly lists: Readonly<Record<string, readonly string[]>>;
   readonly flags: ReadonlySet<string>;
@@ -117,8 +134,10 @@ function unrecognized(grammar: Grammar, token: string): InputError {
 
 /** Python's `_refuse_short_clusters`: agentce has no clustered short options, so a one-dash token of
  * three or more characters that is neither an option nor a negative number (`-hx`) is refused before
- * anything else, up to `--`. A token taken as an option's value is skipped; where a value is missing
- * (the next token is option-like) the scan stops, so the missing value is refused first. */
+ * anything else, up to `--` (and, for a grammar with actions, up to the first token that does not
+ * start with `-`: the action's own scan checks the rest). A token taken as an option's value is
+ * skipped; where a value is missing (the next token is option-like) the scan stops, so the missing
+ * value is refused first. */
 function refuseShortClusters(argv: readonly string[], grammar: Grammar): void {
   let pending = false;
   for (const token of argv) {
@@ -135,6 +154,9 @@ function refuseShortClusters(argv: readonly string[], grammar: Grammar): void {
     const spec = lookup(grammar, token);
     if (spec !== undefined && (spec.kind === "value" || spec.kind === "append")) {
       pending = true;
+    }
+    if (!token.startsWith("-") && grammar.action !== undefined) {
+      return;
     }
     if (
       token.startsWith("-") &&
@@ -169,13 +191,30 @@ function takesNoValue(grammar: Grammar, spec: OptionSpec, value: string): InputE
   );
 }
 
+/** One level's scan: what it read, and the refusal for the first token it left unparsed (an unknown
+ * flag or an argument past the maximum), which waits until the whole line has been scanned. */
+interface LevelScan {
+  readonly scan: Scan;
+  readonly leftover?: InputError;
+}
+
 /** Read `argv` (the tokens after the command name) against `grammar`, in argparse's order: a short
  * cluster first; then left to right, a missing value, a value outside an option's choices or a value
- * on a flag is refused at once, HELP
- * returns at once, and an unknown flag or an argument past the maximum is kept and the first of them in
- * argv order is refused once the scan ends. `--` makes every later token positional; to a command that
- * takes none, `--` is itself an unrecognized flag. */
+ * on a flag is refused at once, HELP returns at once, and an unknown flag or an argument past the
+ * maximum is kept and the first of them in argv order is refused once the scan ends. `--` makes every
+ * later token positional; to a command that takes none, `--` is itself an unrecognized flag. With an
+ * action level, the first positional token (or `--`) is the action: one that is not named is refused
+ * at once, and a named one's grammar scans every later token the same way (its HELP, too, returns at
+ * once, naming the action); a token the command level left unparsed is refused before the action's. */
 export function scanArgv(argv: readonly string[], grammar: Grammar): Scan {
+  const { scan, leftover } = scanLevel(argv, grammar);
+  if (leftover !== undefined) {
+    throw leftover;
+  }
+  return scan;
+}
+
+function scanLevel(argv: readonly string[], grammar: Grammar): LevelScan {
   refuseShortClusters(argv, grammar);
   const values: Record<string, string> = {};
   const lists: Record<string, string[]> = {};
@@ -183,12 +222,38 @@ export function scanArgv(argv: readonly string[], grammar: Grammar): Scan {
   const positionals: string[] = [];
   let deferred: string | undefined;
   let ended = false;
+  const leftover = (): InputError | undefined =>
+    deferred === undefined ? undefined : unrecognized(grammar, deferred);
   const positional = (token: string): void => {
     if (positionals.length < grammar.maxPositionals) {
       positionals.push(token);
     } else {
       deferred ??= token;
     }
+  };
+  /** The action `token` names reads every later token; its scan joins this level's record. */
+  const takeAction = (token: string, rest: readonly string[]): LevelScan => {
+    const actions = grammar.action as ActionLevel;
+    const actionGrammar = Object.hasOwn(actions.grammars, token)
+      ? actions.grammars[token]
+      : undefined;
+    if (actionGrammar === undefined) {
+      throw actions.error();
+    }
+    const sub = scanLevel(rest, actionGrammar);
+    const merged: Record<string, string[]> = { ...lists };
+    for (const [key, list] of Object.entries(sub.scan.lists)) {
+      merged[key] = [...(merged[key] ?? []), ...list];
+    }
+    const scan: Scan = {
+      help: sub.scan.help,
+      action: token,
+      values: { ...values, ...sub.scan.values },
+      lists: merged,
+      flags: new Set([...flags, ...sub.scan.flags]),
+      positionals: [...positionals, ...sub.scan.positionals],
+    };
+    return sub.scan.help ? { scan } : { scan, leftover: leftover() ?? sub.leftover };
   };
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i] as string;
@@ -197,6 +262,9 @@ export function scanArgv(argv: readonly string[], grammar: Grammar): Scan {
       continue;
     }
     if (token === "--") {
+      if (grammar.action !== undefined) {
+        return takeAction(token, argv.slice(i + 1));
+      }
       // A command with no positionals leaves `--` itself unparsed, as argparse does (Python 3.12).
       if (grammar.maxPositionals === 0) {
         deferred ??= token;
@@ -206,6 +274,9 @@ export function scanArgv(argv: readonly string[], grammar: Grammar): Scan {
     }
     const c = classify(grammar, token);
     if (c.kind === "positional") {
+      if (grammar.action !== undefined) {
+        return takeAction(token, argv.slice(i + 1));
+      }
       positional(token);
       continue;
     }
@@ -220,7 +291,7 @@ export function scanArgv(argv: readonly string[], grammar: Grammar): Scan {
         throw takesNoValue(grammar, spec, c.explicit);
       }
       if (spec.kind === "help") {
-        return { help: true, values, lists, flags, positionals };
+        return { scan: { help: true, values, lists, flags, positionals } };
       }
       flags.add(key);
       continue;
@@ -251,8 +322,5 @@ export function scanArgv(argv: readonly string[], grammar: Grammar): Scan {
       lists[key] = list;
     }
   }
-  if (deferred !== undefined) {
-    throw unrecognized(grammar, deferred);
-  }
-  return { help: false, values, lists, flags, positionals };
+  return { scan: { help: false, values, lists, flags, positionals }, leftover: leftover() };
 }

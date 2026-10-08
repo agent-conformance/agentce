@@ -2450,3 +2450,193 @@ test("scanTopLevel reads the tokens before the command as Python's _scan_top_lev
     );
   }
 });
+
+/** `main(["<command>", "--json", ...rest])`: the refusal key and exit code, --json after the command. */
+function refusalKey(argv: string[]): { exitCode: number; key: unknown } {
+  const { exitCode, envelope } = runEnvelope([argv[0] as string, "--json", ...argv.slice(1)]);
+  return { exitCode, key: (envelope.error as Record<string, unknown> | undefined)?.message_key };
+}
+
+test("validate, diff, version and conformance print Python's usage on -h/--help anywhere before `--` (18.111)", () => {
+  const bundle = join(quickstartDir(), "evidence");
+  const cases: Array<[string[], string, string]> = [
+    [
+      ["validate", "-h"],
+      "usage: agentce validate [-h]",
+      "  --quiet          log warnings and errors only\n",
+    ],
+    [["validate", "--help"], "usage: agentce validate [-h]", "only\n"],
+    [
+      ["validate", "--bundle", bundle, "--no-such-flag", "-h"],
+      "usage: agentce validate [-h]",
+      "only\n",
+    ],
+    [
+      ["diff", "-h"],
+      "usage: agentce diff [-h]",
+      "  --quiet          log warnings and errors only\n",
+    ],
+    [["diff", "a", "b", "--help"], "usage: agentce diff [-h]", "only\n"],
+    [["diff", "--no-such-flag", "a", "-h", "b"], "usage: agentce diff [-h]", "only\n"],
+    [
+      ["version", "-h"],
+      "usage: agentce version [-h]",
+      "  --quiet     log warnings and errors only\n",
+    ],
+    [["version", "--no-such-flag", "--help"], "usage: agentce version [-h]", "only\n"],
+    [
+      ["conformance", "-h"],
+      "usage: agentce conformance [-h]",
+      "  --quiet     log warnings and errors only\n",
+    ],
+    [["conformance", "-h", "run"], "usage: agentce conformance [-h]", "only\n"],
+    [
+      ["conformance", "run", "-h"],
+      "usage: agentce conformance run [-h]",
+      "  --quiet              log warnings and errors only\n",
+    ],
+    [["conformance", "--he", "run", "--help"], "usage: agentce conformance run [-h]", "only\n"],
+    [
+      ["conformance", "--json", "run", "--engine", "x", "-h"],
+      "usage: agentce conformance run [-h]",
+      "only\n",
+    ],
+  ];
+  for (const [argv, start, end] of cases) {
+    const { exitCode, stdout } = runStdout(argv);
+    assert.equal(exitCode, 0, argv.join(" "));
+    assert.ok(stdout.startsWith(start), argv.join(" "));
+    assert.ok(stdout.endsWith(end), argv.join(" "));
+  }
+});
+
+test("validate, diff, version and conformance refuse what Python refuses, with its key (18.111)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-utility-"));
+  try {
+    const bundle = join(quickstartDir(), "evidence");
+    const a = diffFixture(dir, "a.json", []);
+    const b = diffFixture(dir, "b.json", []);
+    const engine = join(__dirname, "..");
+    const corpus = join(dir, "corpus");
+    mkdirSync(corpus);
+    const run = ["conformance", "run", "--engine", engine, "--corpus", corpus];
+    const cases: Array<[string[], string]> = [
+      [["validate", "--no-such-flag"], "input.validate_unrecognized_flag"],
+      [["validate", "--bundle", bundle, "--no-such-flag"], "input.validate_unrecognized_flag"],
+      [["validate", "--he"], "input.validate_unrecognized_flag"],
+      [["validate", "--bun", bundle], "input.validate_unrecognized_flag"],
+      [["validate", "-hx"], "input.validate_unrecognized_flag"],
+      [["validate", "--bundle", bundle, "extra"], "input.validate_unrecognized_flag"],
+      [["validate", "--json=1"], "input.validate_unrecognized_flag"],
+      [["validate", "--help=x"], "input.validate_unrecognized_flag"],
+      [["validate", "--bundle", bundle, "--", "-h"], "input.validate_unrecognized_flag"],
+      [["validate", "--bundle"], "input.bundle_missing"],
+      [["validate", "--bundle", bundle, "--out"], "input.validate_unrecognized_flag"],
+      [["validate", "--bundle="], "input.bundle_not_a_directory"],
+      [["validate", "--bundle", ""], "input.bundle_not_a_directory"],
+      [["validate", "--bundle", bundle, "--bundle", "nope"], "input.bundle_not_a_directory"],
+      [["validate", "--bundle", bundle, "--out="], "input.out_dir_unwritable"],
+      [["validate", "--bundle", bundle, "--out", ""], "input.out_dir_unwritable"],
+      [["diff", "--no-such-flag"], "input.diff_unrecognized_flag"],
+      [["diff", "-hx"], "input.diff_unrecognized_flag"],
+      [["diff", "--he"], "input.diff_unrecognized_flag"],
+      [["diff", "--help=x"], "input.diff_unrecognized_flag"],
+      [["diff", a, b, "--json=1"], "input.diff_unrecognized_flag"],
+      [["diff", a, b, "--format"], "input.diff_unrecognized_flag"],
+      [["diff", a, b, "--format="], "input.diff_format"],
+      [["diff", a, b, "--format", ""], "input.diff_format"],
+      [["diff", a, b, "--format", "nope"], "input.diff_format"],
+      [["diff", a, b, "extra"], "input.diff_extra_argument"],
+      [["diff", a, b, "--format", "md", "extra"], "input.diff_extra_argument"],
+      [["diff", a, b, "--", "--format"], "input.diff_extra_argument"],
+      [["diff", a, "--", "-h"], "input.report_b_not_a_file"],
+      [["diff", "--", "-h"], "input.report_a_not_a_file"],
+      [["diff", "--format", "nope"], "input.report_a_missing"],
+      [["version", "--no-such-flag"], "input.version_unrecognized_flag"],
+      [["version", "--he"], "input.version_unrecognized_flag"],
+      [["version", "-hx"], "input.version_unrecognized_flag"],
+      [["version", "extra"], "input.version_unrecognized_flag"],
+      [["version", "-"], "input.version_unrecognized_flag"],
+      [["version", "--help=x"], "input.version_unrecognized_flag"],
+      [["version", "--"], "input.version_unrecognized_flag"],
+      [["version", "--", "x"], "input.version_unrecognized_flag"],
+      [["conformance"], "input.conformance_action"],
+      [["conformance", "nope"], "input.conformance_action"],
+      [["conformance", "--he", "nope"], "input.conformance_action"],
+      [["conformance", "--", "run"], "input.conformance_action"],
+      [["conformance", "--he"], "input.conformance_unrecognized_flag"],
+      [["conformance", "-hx", "run"], "input.conformance_unrecognized_flag"],
+      [["conformance", "--he", "run", "--no-such"], "input.conformance_unrecognized_flag"],
+      [["conformance", "run", "run"], "input.conformance_unrecognized_flag"],
+      [["conformance", "run", "-hx"], "input.conformance_unrecognized_flag"],
+      [["conformance", "run"], "input.engine_missing"],
+      [["conformance", "run", "--engine"], "input.engine_missing"],
+      [["conformance", "run", "--he", "--engine"], "input.engine_missing"],
+      [["conformance", "run", "--corpus", "/nonexistent"], "input.engine_missing"],
+      [["conformance", "run", "--engine", engine, "--corpus"], "input.corpus_missing"],
+      [["conformance", "run", "--engine=", "--corpus", corpus], "input.engine_not_a_directory"],
+      [[...run, "--engine=nope"], "input.engine_not_a_directory"],
+      [["conformance", "run", "--engine", engine, "--corpus="], "input.corpus_not_a_directory"],
+      [[...run, "--no-such-flag"], "input.conformance_unrecognized_flag"],
+      [[...run, "extra"], "input.conformance_unrecognized_flag"],
+      [[...run, "--out"], "input.conformance_unrecognized_flag"],
+      [[...run, "--adapters"], "input.conformance_unrecognized_flag"],
+      [[...run, "--adapters", "/nonexistent"], "input.adapters_not_a_directory"],
+      [[...run, "--adapters", ""], "input.adapters_not_a_directory"],
+      [[...run, "--adapters="], "input.adapters_not_a_directory"],
+      [[...run, "--out", ""], "input.out_dir_unwritable"],
+      [[...run, "--out="], "input.out_dir_unwritable"],
+    ];
+    for (const [argv, key] of cases) {
+      assert.deepEqual(refusalKey(argv), { exitCode: 3, key }, argv.join(" "));
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("validate, diff and conformance read = forms, the last repeat and intermixed diff positionals (18.111)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-utility-read-"));
+  try {
+    const bundle = join(quickstartDir(), "evidence");
+    const out = join(dir, "q");
+    const validated = refusalKey(["validate", `--bundle=${bundle}`, `--out=${out}`]);
+    assert.deepEqual(validated, { exitCode: 1, key: undefined });
+    assert.ok(existsSync(join(out, "quarantine.jsonl")));
+    assert.equal(refusalKey(["validate", "--bundle", "nope", "--bundle", bundle]).exitCode, 1);
+
+    const a = diffFixture(dir, "a.json", [{ control: "C-1", subject: "s", outcome: "conformant" }]);
+    const b = diffFixture(dir, "b.json", [
+      { control: "C-1", subject: "s", outcome: "non-conformant" },
+    ]);
+    for (const argv of [
+      ["diff", a, "--format", "md", b],
+      ["diff", "--format", "md", a, b],
+      ["diff", a, b, "--format=md"],
+      ["diff", a, b, "--format", "json", "--format", "md"],
+      ["diff", "--", a, b],
+    ]) {
+      const { exitCode, lines } = runText(argv);
+      assert.equal(exitCode, 1, argv.join(" "));
+      const md = argv.includes("md") || argv.includes("--format=md");
+      assert.equal(lines[0] === "## What changed", md, argv.join(" "));
+    }
+
+    // `conformance --json run`: the global flag before the action is read, as the gates place it
+    const corpus = join(dir, "corpus");
+    mkdirSync(corpus);
+    writeFileSync(join(corpus, "corpus-manifest.json"), JSON.stringify({ projects: [] }));
+    const { exitCode, envelope } = runEnvelope([
+      "conformance",
+      "--json",
+      "run",
+      `--engine=${join(__dirname, "..")}`,
+      `--corpus=${corpus}`,
+    ]);
+    assert.equal(exitCode, 1); // an empty corpus: claim none
+    assert.equal(envelope.claim, "none");
+    assert.equal(envelope.action, "run");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

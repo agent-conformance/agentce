@@ -112,12 +112,6 @@ function emit(result: CommandResult, json: boolean): void {
   }
 }
 
-/** The value following the first `--name` in argv, or undefined. */
-function flagValue(argv: string[], name: string): string | undefined {
-  const index = argv.indexOf(`--${name}`);
-  return index >= 0 && index + 1 < argv.length ? argv[index + 1] : undefined;
-}
-
 /** `undefined` stays `undefined`; an empty string becomes `undefined` too, matching the Python
  * reference's `if value` truthiness check (`commands/__init__.py:261-269`), which has no TypeScript
  * equivalent. */
@@ -293,38 +287,6 @@ function requireFile(
 
 /** The global flags every command accepts, none of which takes a value. */
 const GLOBAL_BOOLEAN_FLAGS = new Set(["--json", "--debug", "--quiet"]);
-
-/** A hardened positional-argument scanner for `diff` (the first CLI verb in this engine with
- * positional, not `--flag`, arguments). `argv[0]` is the command name and is not itself scanned.
- * Skips exactly `--json`, `--format <value>`, `--debug`, and `--quiet` (the same four flags Python's
- * own top-level parser accepts for every command; `--debug`/`--quiet` are silently ignored here too,
- * exactly as they are everywhere else in both engines today) and collects every other token in order,
- * but throws `input.diff_unrecognized_flag` on any other `--`-prefixed token instead of silently
- * reading it as a positional (catches a genuine typo without inventing new behaviour for a flag
- * Python's diff actually accepts). `--format=<value>` (single-token, `=`-joined) is out of scope,
- * matching every other flag in both engines today. */
-function positionalArgs(argv: string[]): string[] {
-  const out: string[] = [];
-  for (let i = 1; i < argv.length; i++) {
-    const token = argv[i] as string;
-    if (GLOBAL_BOOLEAN_FLAGS.has(token)) {
-      continue;
-    }
-    if (token === "--format") {
-      i++; // also skip the value token, if any
-      continue;
-    }
-    if (token.startsWith("--")) {
-      throw new InputError(
-        "input.diff_unrecognized_flag",
-        `unrecognized flag '${token}'.`,
-        "pass --format text|json|md, or drop the flag.",
-      );
-    }
-    out.push(token);
-  }
-  return out;
-}
 
 /**
  * A path safe to write into a shared artifact (SPEC §8.4: `invocation` records paths, never a person
@@ -564,25 +526,140 @@ function nothingEvaluated(
   );
 }
 
-function cmdConformance(argv: string[]): CommandResult {
-  const result = new CommandResult("conformance");
-  const action = argv[1];
-  if (action !== "run") {
+/** The global flags every grammar declares, as Python's `common` parent parser adds them. */
+const COMMON_OPTIONS: Grammar["options"] = [
+  { names: ["-h", "--help"], kind: "help" },
+  { names: ["--json"], kind: "flag" },
+  { names: ["--debug"], kind: "flag" },
+  { names: ["--quiet"], kind: "flag" },
+];
+
+/** Python's `_flag_fix`: the fix for an unknown flag, naming the command's help. */
+const flagFix = (command: string): string =>
+  `run \`agentce ${command} --help\` for the flags ${command} takes, or drop the flag.`;
+
+/** Python's `agentce conformance --help` (COLUMNS=80), word for word. */
+const CONFORMANCE_USAGE = `usage: agentce conformance [-h] [--json] [--debug] [--quiet] <action> ...
+
+positional arguments:
+  <action>
+    run       run the ECS and emit an implementation report
+
+options:
+  -h, --help  show this help message and exit
+
+global options:
+  --json      emit machine-readable JSON on stdout
+  --debug     verbose logs on stderr and a stack trace on unexpected errors
+  --quiet     log warnings and errors only
+`;
+
+/** Python's `agentce conformance run --help` (COLUMNS=80), word for word. */
+const CONFORMANCE_RUN_USAGE = `usage: agentce conformance run [-h] [--json] [--debug] [--quiet]
+                               [--engine ENGINE] [--corpus CORPUS] [--out OUT]
+                               [--adapters ADAPTERS]
+
+options:
+  -h, --help           show this help message and exit
+  --engine ENGINE      the engine path under test
+  --corpus CORPUS      the corpus directory
+  --out OUT            the output directory for the implementation report
+  --adapters ADAPTERS  the adapters directory; also run adapter conformance
+                       (SPEC 11.5, 12.3)
+
+global options:
+  --json               emit machine-readable JSON on stdout
+  --debug              verbose logs on stderr and a stack trace on unexpected
+                       errors
+  --quiet              log warnings and errors only
+`;
+
+/** Python's `commands.conformance_action_error`: no action, or one conformance does not have. */
+function conformanceActionError(): InputError {
+  return new InputError(
+    "input.conformance_action",
+    "the only conformance action is `run`.",
+    "run `agentce conformance run ...`.",
+  );
+}
+
+/** Both conformance levels word their refusals alike, as Python's one `_ArgvErrors` table does. */
+const CONFORMANCE_REFUSALS = {
+  unrecognizedKey: "input.conformance_unrecognized_flag",
+  needsValueKey: "input.conformance_unrecognized_flag",
+  needsValueCause: "plain",
+  flagFix: flagFix("conformance run"),
+  extraArgFix:
+    "pass the inputs with their flags: `agentce conformance run --engine <dir> --corpus <dir>`.",
+} as const;
+
+/** conformance's grammar (Python's conformance parser and its `run` subparser): one table, read by
+ * `scanArgv`. */
+const CONFORMANCE_GRAMMAR: Grammar = {
+  options: COMMON_OPTIONS,
+  maxPositionals: 0,
+  action: {
+    grammars: {
+      run: {
+        options: [
+          ...COMMON_OPTIONS,
+          { names: ["--engine"], kind: "value", needsValueKey: "input.engine_missing" },
+          { names: ["--corpus"], kind: "value", needsValueKey: "input.corpus_missing" },
+          { names: ["--out"], kind: "value" },
+          { names: ["--adapters"], kind: "value" },
+        ],
+        maxPositionals: 0,
+        ...CONFORMANCE_REFUSALS,
+      },
+    },
+    error: conformanceActionError,
+  },
+  ...CONFORMANCE_REFUSALS,
+};
+
+/** Python's `commands._refuse_empty_out`: an empty --out names no directory, refused before anything
+ * is written or run. */
+function refuseEmptyOut(out: string | undefined): void {
+  if (out === "") {
     throw new InputError(
-      "input.conformance_action",
-      "the only conformance action is `run`.",
-      "run `agentce conformance run ...`.",
+      "input.out_dir_unwritable",
+      "--out '' names no directory.",
+      "choose a writable --out directory.",
     );
   }
-  const engine = requireDir(flagValue(argv, "engine"), "engine", "the engine path");
-  const corpus = requireDir(flagValue(argv, "corpus"), "corpus", "the corpus directory");
-  const out = flagValue(argv, "out") ?? null;
-  const report = runEcs({ enginePath: engine, corpusDir: corpus, outDir: out });
+}
+
+/** `agentce conformance run`, read from its grammar's scan alone. An empty --engine, --corpus or
+ * --adapters names no directory (Node's stat of `""` fails, as Python's `empty_is_no_dir` refuses). */
+function cmdConformance(argv: string[]): CommandResult {
+  const args = scanArgv(argv.slice(1), CONFORMANCE_GRAMMAR);
+  const result = new CommandResult("conformance");
+  if (args.help) {
+    result.usage = args.action === "run" ? CONFORMANCE_RUN_USAGE : CONFORMANCE_USAGE;
+    return result;
+  }
+  if (args.action !== "run") {
+    throw conformanceActionError();
+  }
+  const v = args.values;
+  const engine = requireDir(v["--engine"], "engine", "the engine path");
+  const corpus = requireDir(v["--corpus"], "corpus", "the corpus directory");
+  const adapters = v["--adapters"];
+  const adaptersDir =
+    adapters !== undefined ? requireDir(adapters, "adapters", "the adapters directory") : null;
+  const out = v["--out"];
+  refuseEmptyOut(out);
+  const report = runEcs({
+    enginePath: engine,
+    corpusDir: corpus,
+    outDir: out ?? null,
+    adaptersDir,
+  });
 
   result.data.action = "run";
   result.data.engine = engine;
   result.data.corpus = corpus;
-  if (out !== null) {
+  if (out !== undefined) {
     result.data.out = out;
   }
   Object.assign(result.data, report); // report.engine (impl/version) overwrites the engine path, as in the reference
@@ -590,15 +667,64 @@ function cmdConformance(argv: string[]): CommandResult {
     `ECS: ${report.projects.identical}/${report.projects.total} identical; ` +
       `claim ${report.claim}; no_ml ${report.no_ml}`,
   );
+  const detail = report.adapter_conformance;
+  if (report.adapters !== undefined && detail !== undefined) {
+    result.note(
+      `adapters: ${pyStr(detail.identical)}/${pyStr(detail.total)} identical; ` +
+        `round_trip ${pyStr(detail.round_trip)}; claim ${report.adapters}`,
+    );
+  }
   if (report.claim !== "full") {
+    result.addCode(ExitCode.FINDINGS);
+  }
+  if (report.adapters !== undefined && report.adapters !== "full") {
     result.addCode(ExitCode.FINDINGS);
   }
   return result;
 }
 
+/** Python's `agentce validate --help` (COLUMNS=80), word for word. */
+const VALIDATE_USAGE = `usage: agentce validate [-h] [--json] [--debug] [--quiet] [--bundle BUNDLE]
+                        [--out OUT]
+
+options:
+  -h, --help       show this help message and exit
+  --bundle BUNDLE  the evidence bundle directory
+  --out OUT        write quarantine.jsonl to this directory
+
+global options:
+  --json           emit machine-readable JSON on stdout
+  --debug          verbose logs on stderr and a stack trace on unexpected
+                   errors
+  --quiet          log warnings and errors only
+`;
+
+/** validate's grammar (Python's validate subparser, global flags included): one table, read by
+ * `scanArgv`. */
+const VALIDATE_GRAMMAR: Grammar = {
+  options: [
+    ...COMMON_OPTIONS,
+    { names: ["--bundle"], kind: "value", needsValueKey: "input.bundle_missing" },
+    { names: ["--out"], kind: "value" },
+  ],
+  maxPositionals: 0,
+  unrecognizedKey: "input.validate_unrecognized_flag",
+  needsValueKey: "input.validate_unrecognized_flag",
+  needsValueCause: "plain",
+  flagFix: flagFix("validate"),
+  extraArgFix: "pass the bundle with its flag: `agentce validate --bundle <dir>`.",
+};
+
 function cmdValidate(argv: string[]): CommandResult {
+  const args = scanArgv(argv.slice(1), VALIDATE_GRAMMAR);
   const result = new CommandResult("validate");
-  const bundleDir = requireDir(flagValue(argv, "bundle"), "bundle", "the evidence bundle");
+  if (args.help) {
+    result.usage = VALIDATE_USAGE;
+    return result;
+  }
+  const bundleDir = requireDir(args.values["--bundle"], "bundle", "the evidence bundle");
+  const out = args.values["--out"];
+  refuseEmptyOut(out);
   const bundle = loadBundle(bundleDir); // raises InputError (exit 3) on a missing/mismatching manifest
   const ingested = ingest(bundle);
   result.data.bundle = bundleDir;
@@ -614,7 +740,6 @@ function cmdValidate(argv: string[]): CommandResult {
     quarantineByReason[reason] = byReason.get(reason) as number;
   }
   result.data.quarantine_by_reason = quarantineByReason;
-  const out = flagValue(argv, "out");
   if (out !== undefined) {
     const quarantinePath = join(out, "quarantine.jsonl");
     writeQuarantine(ingested.quarantined, quarantinePath);
@@ -1528,11 +1653,48 @@ function cmdReport(argv: string[]): CommandResult {
   return result;
 }
 
+/** Python's `agentce diff --help` (COLUMNS=80), word for word. */
+const DIFF_USAGE = `usage: agentce diff [-h] [--json] [--debug] [--quiet] [--format FORMAT]
+                    [report_a] [report_b]
+
+positional arguments:
+  report_a         the first assertions.json
+  report_b         the second assertions.json
+
+options:
+  -h, --help       show this help message and exit
+  --format FORMAT  how to render the diff (default: text)
+
+global options:
+  --json           emit machine-readable JSON on stdout
+  --debug          verbose logs on stderr and a stack trace on unexpected
+                   errors
+  --quiet          log warnings and errors only
+`;
+
+/** diff's grammar (Python's diff subparser, global flags included): one table, read by `scanArgv`.
+ * Positionals are unbounded (Python's hidden `extra`), so `cmdDiff` counts them itself, and --format
+ * has no choices: `cmdDiff` checks it after the two files, as Python's `cmd_diff` does. */
+const DIFF_GRAMMAR: Grammar = {
+  options: [...COMMON_OPTIONS, { names: ["--format"], kind: "value" }],
+  maxPositionals: Number.POSITIVE_INFINITY,
+  unrecognizedKey: "input.diff_unrecognized_flag",
+  needsValueKey: "input.diff_unrecognized_flag",
+  needsValueCause: "plain",
+  flagFix: "pass --format text|json|md, or drop the flag.",
+  extraArgFix: "pass two assertions files: `agentce diff <a> <b>`.",
+};
+
 /** `agentce diff` (SPEC §9.3, item 18.6): a real, deterministic assertion-set diff, matching the
- * Python reference's `cmd_diff` byte for byte (see `diff.ts`). */
+ * Python reference's `cmd_diff` byte for byte (see `diff.ts`). Read from its grammar's scan alone. */
 function cmdDiff(argv: string[], json: boolean): CommandResult {
+  const args = scanArgv(argv.slice(1), DIFF_GRAMMAR);
   const result = new CommandResult("diff");
-  const positional = positionalArgs(argv);
+  if (args.help) {
+    result.usage = DIFF_USAGE;
+    return result;
+  }
+  const positional = args.positionals;
   if (positional.length > 2) {
     throw new InputError(
       "input.diff_extra_argument",
@@ -1543,11 +1705,11 @@ function cmdDiff(argv: string[], json: boolean): CommandResult {
   const fix = "pass two assertion files: `agentce diff <report-a> <report-b>`.";
   const reportA = requireFile(positional[0], "report_a", "the first assertion set", fix);
   const reportB = requireFile(positional[1], "report_b", "the second assertion set", fix);
-  const format = flagValue(argv, "format") ?? "text";
+  const format = args.values["--format"] ?? "text";
   if (!(DIFF_FORMATS as readonly string[]).includes(format)) {
     throw new InputError(
       "input.diff_format",
-      `--format must be one of ${DIFF_FORMATS.join(", ")}, not '${format}'.`,
+      `--format must be one of ${DIFF_FORMATS.join(", ")}, not ${pyRepr(format)}.`,
       "pass --format text|json|md.",
     );
   }
@@ -2137,12 +2299,39 @@ function notImplemented(command: string): CommandResult {
   return result;
 }
 
+/** Python's `agentce version --help` (COLUMNS=80), word for word. */
+const VERSION_USAGE = `usage: agentce version [-h] [--json] [--debug] [--quiet]
+
+options:
+  -h, --help  show this help message and exit
+
+global options:
+  --json      emit machine-readable JSON on stdout
+  --debug     verbose logs on stderr and a stack trace on unexpected errors
+  --quiet     log warnings and errors only
+`;
+
+/** version's grammar (Python's version subparser): the global flags, no positionals. */
+const VERSION_GRAMMAR: Grammar = {
+  options: COMMON_OPTIONS,
+  maxPositionals: 0,
+  unrecognizedKey: "input.version_unrecognized_flag",
+  needsValueKey: "input.version_unrecognized_flag",
+  flagFix: flagFix("version"),
+  extraArgFix: "version takes no argument: `agentce version`.",
+};
+
 /** `agentce version` (SPEC §8.5): the same structured envelope every other command returns, with a
  * real installed-artifact `no_ml` self-report (mirrors Python's `cmd_version`). Distinct from the
  * bare `--version`/`-V` flag, which stays a plain one-line shortcut (handled before this is ever
  * reached, `main` below). */
-function cmdVersion(): CommandResult {
+function cmdVersion(argv: string[]): CommandResult {
+  const args = scanArgv(argv.slice(1), VERSION_GRAMMAR);
   const result = new CommandResult("version");
+  if (args.help) {
+    result.usage = VERSION_USAGE;
+    return result;
+  }
   const resolveFrom = join(__dirname, "..");
   const scan = evaluateInstalledNoMl(loadVendoredDenylist(), resolveFrom);
   result.data.engine = ENGINE_NAME;
@@ -2353,7 +2542,7 @@ export function main(rawArgv: string[]): number {
     } else if (command === "quickstart") {
       result = cmdQuickstart(argv);
     } else if (command === "version") {
-      result = cmdVersion();
+      result = cmdVersion(argv);
     } else {
       result = notImplemented(command);
     }
