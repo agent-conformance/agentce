@@ -41,6 +41,9 @@ const PY_WHITESPACE = new Set([
   0x205f, 0x3000,
 ]);
 
+/** Whether code point `cp` is one Python's `str.isspace()` (and so `str.strip()`) treats as space. */
+export const isPySpace = (cp: number): boolean => PY_WHITESPACE.has(cp);
+
 /** A parsed expression: OR-groups, each a list of AND-ed `[field, literal]` comparisons. */
 type FailOnGroups = Array<Array<[Field, string]>>;
 

@@ -19,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.TreeSet;
@@ -965,10 +966,7 @@ global options:
         }
         String language = options.reportLanguage() != null ? options.reportLanguage() : Messages.DEFAULT_LANGUAGE;
         if (!Messages.AVAILABLE_LANGUAGES.contains(language)) {
-            throw new InputError(
-                    "input.report_language_unknown",
-                    "--report-language " + Readiness.pyRepr(language) + " has no report catalogue.",
-                    "choose one of: " + String.join(", ", Messages.AVAILABLE_LANGUAGES) + ".");
+            throw reportLanguageError("--report-language", language);
         }
         if (options.allowUnverified() && options.catalogDirs().isEmpty()) {
             throw new InputError(
@@ -1526,6 +1524,19 @@ global options:
                 "choose one of: " + String.join(", ", REPORT_ROLES) + ".");
     }
 
+    /** The error Python's {@code commands.refuse_unknown_report_language} raises: {@code flag} names a
+     * report language with no catalogue (assess's {@code --report-language}, report's {@code --language}). */
+    static InputError reportLanguageError(String flag, String language) {
+        return new InputError(
+                "input.report_language_unknown",
+                flag + " " + Readiness.pyRepr(language) + " has no report catalogue.",
+                "choose one of: " + String.join(", ", Messages.AVAILABLE_LANGUAGES) + ".");
+    }
+
+    /** The rendering options {@code --validate} refuses beside it, in the order they are checked. */
+    private static final List<String> REPORT_RENDER_FLAGS =
+            List.of("--from", "--format", "--role", "--catalog", "--language", "--out");
+
     /** report's declared grammar (Python's report subparser, {@code allow_abbrev=False}): every option the
      * usage names and no positional; {@code --format} and {@code --role} are choices refused the moment
      * they are read; {@code --from} and {@code --validate} have their own missing-value keys. */
@@ -1538,9 +1549,10 @@ global options:
         for (String flag : List.of("--json", "--debug", "--quiet")) {
             options.put(flag, Argv.Kind.FLAG);
         }
-        for (String name : List.of("--from", "--format", "--role", "--catalog", "--language", "--out", "--validate")) {
+        for (String name : REPORT_RENDER_FLAGS) {
             options.put(name, Argv.Kind.VALUE);
         }
+        options.put("--validate", Argv.Kind.VALUE);
         return new Argv.Grammar(
                 Collections.unmodifiableMap(options),
                 0,
@@ -1555,10 +1567,6 @@ global options:
                         "--role", new Argv.Choices(REPORT_ROLES, Cli::reportRoleError)),
                 false);
     }
-
-    /** The rendering options {@code --validate} refuses beside it, in the order they are checked. */
-    private static final List<String> REPORT_RENDER_FLAGS =
-            List.of("--from", "--format", "--role", "--catalog", "--language", "--out");
 
     /** Re-render a report from a committed {@code assertions.json} (SPEC §9.4), or, with {@code
      * --validate}, schema-validate every artifact in a report directory (item 18.27). Reads its argv only
@@ -1599,7 +1607,7 @@ global options:
             return result;
         }
         String source = requireFile(parsed.value("--from"), "from", "the assertions file");
-        String format = parsed.value("--format") != null ? parsed.value("--format") : "md";
+        String format = Objects.requireNonNullElse(parsed.value("--format"), "md");
         String role = parsed.value("--role");
         String catalog = parsed.value("--catalog");
         String language = parsed.value("--language");
@@ -1607,16 +1615,14 @@ global options:
         refuseUnusedReportFlag(catalog, "--catalog", format, List.of("public"), "add --format public");
         refuseUnusedReportFlag(language, "--language", format, List.of("md", "html"), "add --format md or --format html");
         if (language != null && !Messages.AVAILABLE_LANGUAGES.contains(language)) {
-            throw new InputError(
-                    "input.report_language_unknown",
-                    "--language " + Readiness.pyRepr(language) + " has no report catalogue.",
-                    "choose one of: " + String.join(", ", Messages.AVAILABLE_LANGUAGES) + ".");
+            throw reportLanguageError("--language", language);
         }
         List<String> catalogs = null;
         if (catalog != null) {
-            // Python's str.split(","): every label kept, an empty one included.
+            // Python's str.split(","): every label kept, an empty one included; a label is empty when
+            // Python's str.strip() would leave nothing (its whitespace, not the JVM's).
             catalogs = Arrays.asList(catalog.split(",", -1));
-            if (catalogs.stream().anyMatch(label -> label.strip().isEmpty())) {
+            if (catalogs.stream().anyMatch(label -> label.codePoints().allMatch(FailOn::isPySpace))) {
                 throw new InputError(
                         "input.report_catalog_label_empty",
                         "--catalog " + Readiness.pyRepr(catalog) + " holds an empty catalog label.",
@@ -1636,8 +1642,8 @@ global options:
         switch (format) {
             case "md" -> rendering = Report.renderReportMd(assertions, counts, lang, null, null);
             case "html" -> rendering = Report.renderReportHtml(assertions, counts, lang, null, null);
-            case "oscal" -> rendering = Json.pretty(Report.renderOscal(assertions)) + "\n";
-            case "sarif" -> rendering = Json.pretty(Report.renderSarif(assertions)) + "\n";
+            case "oscal" -> rendering = Json.pretty(Report.renderOscal(assertions));
+            case "sarif" -> rendering = Json.pretty(Report.renderSarif(assertions));
             case "public" -> rendering = Report.renderPublicStatement(
                     assertions, catalogs, Report.appliedDeviationIds(assertions));
             default -> {

@@ -15,7 +15,7 @@ import { arch, platform } from "node:os";
 import { dirname, join } from "node:path";
 import type { Activity } from "./activity";
 import { DENIED_KINDS, RECORDER_CLASSES, summarizeActivity } from "./activity";
-import { type Assertion, aggregate, assertionToJson, checkDc5 } from "./assertions";
+import { type Assertion, OUTCOMES, aggregate, assertionToJson, checkDc5 } from "./assertions";
 import { deviationsByControl, indexBySubject } from "./assess";
 import type { BlindSpot, BlindSpots, CheckRef } from "./blindSpots";
 import { canonicalize, sha256Hex } from "./canonical";
@@ -1058,14 +1058,6 @@ const NON_DETERMINATION =
 const CONDUCT_LINE =
   "Over the observation window, the named subjects acted within their declared boundaries and on " +
   "authorised instructions as evidenced by the Conduct overlay controls listed.";
-const STATEMENT_OUTCOMES = [
-  "conformant",
-  "non-conformant",
-  "partial",
-  "not_applicable",
-  "not_assessed",
-  "insufficient_evidence",
-] as const;
 
 /** The ids of every control a deviation was applied to, sorted and deduplicated (SPEC §9.1). */
 export function appliedDeviationIds(assertions: readonly Assertion[]): string[] {
@@ -1090,7 +1082,7 @@ export function renderPublicStatement(
     const family = dash >= 0 ? a.control.slice(0, dash) : a.control;
     let row = families.get(family);
     if (row === undefined) {
-      row = new Map(STATEMENT_OUTCOMES.map((o) => [o, 0]));
+      row = new Map(OUTCOMES.map((o) => [o, 0]));
       families.set(family, row);
     }
     const count = row.get(a.outcome);
@@ -1110,12 +1102,12 @@ export function renderPublicStatement(
       : "Catalogs: (unspecified)",
   );
   lines.push("Date: (unspecified)");
-  lines.push("", "## Outcomes by family", "", `| Family | ${STATEMENT_OUTCOMES.join(" | ")} |`);
-  lines.push(`|---|${STATEMENT_OUTCOMES.map(() => "---").join("|")}|`);
+  lines.push("", "## Outcomes by family", "", `| Family | ${OUTCOMES.join(" | ")} |`);
+  lines.push(`|---|${OUTCOMES.map(() => "---").join("|")}|`);
   for (const family of [...families.keys()].sort(byteCompare)) {
     const row = families.get(family) as Map<string, number>;
     lines.push(
-      `| ${sanitizeForMarkdown(family)} | ${STATEMENT_OUTCOMES.map((o) => String(row.get(o))).join(" | ")} |`,
+      `| ${sanitizeForMarkdown(family)} | ${OUTCOMES.map((o) => String(row.get(o))).join(" | ")} |`,
     );
   }
   lines.push("", "## Accepted deviations");

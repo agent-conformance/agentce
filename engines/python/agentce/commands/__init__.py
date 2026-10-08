@@ -109,6 +109,8 @@ from ..verdict import GAP_OUTCOMES
 _log = get_logger()
 
 REPORT_FORMATS = ("md", "html", "oscal", "sarif", "public", "pack")
+#: The evidence-pack roles `report --role` takes (`--format pack` only).
+REPORT_ROLES = ("provider", "deployer")
 #: Every token `assess --emit` accepts: the six `report --format` has always rendered one at a time,
 #: plus report.py's newer renderers (SPEC §9). Kept identical to `report.EMIT_FORMATS`; a test holds
 #: the two equal. `remediation` and `skill` are assess-only (Appendix A2 (C)) -- deliberately not in
@@ -1297,13 +1299,8 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     # too: an unknown language would otherwise fall back to English, and the override with no
     # --catalog-dir would have nothing to apply to (18.109).
     report_language = _opt_str(ns, "report_language")
-    languages = messages.available_languages()
-    if report_language is not None and report_language not in languages:
-        raise InputError(
-            "input.report_language_unknown",
-            f"--report-language {report_language!r} has no report catalogue.",
-            "choose one of: " + ", ".join(languages) + ".",
-        )
+    if report_language is not None:
+        refuse_unknown_report_language("--report-language", report_language)
     if _flag(ns, "allow_unverified_catalog") and not getattr(ns, "catalog_dir", None):
         raise InputError(
             "input.allow_unverified_requires_catalog_dir",
@@ -2117,13 +2114,8 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
                 f"this run renders {fmt}.",
                 f"{add}, or drop {flag}.",
             )
-    languages = messages.available_languages()
-    if language is not None and language not in languages:
-        raise InputError(
-            "input.report_language_unknown",
-            f"--language {language!r} has no report catalogue.",
-            "choose one of: " + ", ".join(languages) + ".",
-        )
+    if language is not None:
+        refuse_unknown_report_language("--language", language)
     catalogs: list[str] | None = None
     if catalog is not None:
         catalogs = catalog.split(",")
@@ -2416,8 +2408,20 @@ def report_role_error(role: str) -> InputError:
     return InputError(
         "input.report_role",
         f"unknown evidence-pack role {role!r}.",
-        "choose one of: provider, deployer.",
+        f"choose one of: {', '.join(REPORT_ROLES)}.",
     )
+
+
+def refuse_unknown_report_language(flag: str, language: str) -> None:
+    """Refuse a report language `flag` names that has no catalogue (assess's `--report-language`,
+    report's `--language`); the language list is read only when a language was given."""
+    languages = messages.available_languages()
+    if language not in languages:
+        raise InputError(
+            "input.report_language_unknown",
+            f"{flag} {language!r} has no report catalogue.",
+            "choose one of: " + ", ".join(languages) + ".",
+        )
 
 
 def report_format_error(fmt: str) -> InputError:

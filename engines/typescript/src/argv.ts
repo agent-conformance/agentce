@@ -21,11 +21,12 @@ export interface OptionSpec {
   readonly kind: OptionKind;
   /** What the missing-value fix names after the flag (default `<value>`). */
   readonly valueHint?: string;
-  /** The values a VALUE option accepts; any other is refused with {@link OptionSpec.choiceError} at
-   * once, the moment the value is read (argparse's invalid choice), whether given as `--x=v` or `--x v`. */
-  readonly choices?: readonly string[];
-  /** The error for a value outside {@link OptionSpec.choices}. */
-  readonly choiceError?: (value: string) => InputError;
+  /** The values a VALUE option accepts; any other is refused with its `error` at once, the moment the
+   * value is read (argparse's invalid choice), whether given as `--x=v` or `--x v`. */
+  readonly choices?: {
+    readonly values: readonly string[];
+    readonly error: (value: string) => InputError;
+  };
   /** This option's key when given no value, in place of {@link Grammar.needsValueKey}. */
   readonly needsValueKey?: string;
 }
@@ -239,15 +240,8 @@ export function scanArgv(argv: readonly string[], grammar: Grammar): Scan {
       value = next;
       i++;
     }
-    if (spec.choices !== undefined && !spec.choices.includes(value)) {
-      throw (
-        spec.choiceError?.(value) ??
-        new InputError(
-          grammar.unrecognizedKey,
-          `argument ${label(spec)}: invalid choice: ${pyRepr(value)} (choose from ${spec.choices.map(pyRepr).join(", ")}).`,
-          grammar.flagFix,
-        )
-      );
+    if (spec.choices !== undefined && !spec.choices.values.includes(value)) {
+      throw spec.choices.error(value);
     }
     if (spec.kind === "value") {
       values[key] = value;

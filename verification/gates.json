@@ -2645,7 +2645,7 @@
         {
           "description": "Python accepts an unknown --report-language again and writes an English report",
           "file": "engines/python/agentce/commands/__init__.py",
-          "search": "    if report_language is not None and report_language not in languages:\n",
+          "search": "    if report_language is not None:\n",
           "replace": "    if False:\n"
         },
         {
@@ -2680,10 +2680,28 @@
       },
       "faults": [
         {
+          "description": "Python reads --role with --format md again instead of refusing it",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "        (role, \"--role\", (\"pack\",), \"add --format pack\"),\n",
+          "replace": ""
+        },
+        {
           "description": "TypeScript's report grammar drops --role's choices, so --role nope is accepted",
           "file": "engines/typescript/src/cli.ts",
-          "search": "      choices: REPORT_ROLES,\n",
+          "search": "      choices: { values: REPORT_ROLES, error: reportRoleError },\n",
           "replace": ""
+        },
+        {
+          "description": "TypeScript reads an unknown --language again instead of refusing it",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "  if (languageFlag !== undefined && !availableLanguages().includes(languageFlag)) {\n",
+          "replace": "  if (false) {\n"
+        },
+        {
+          "description": "TypeScript's npm bin goes back to process.exit, which ends the process before a piped stdout drains (a rendering cut at 64 KiB)",
+          "file": "engines/typescript/bin/agentce.js",
+          "search": "process.exitCode = main(args);\n",
+          "replace": "process.exit(main(args));\n"
         },
         {
           "description": "Java's public statement drops the Conduct section, so --format public no longer matches Python's",
@@ -2692,28 +2710,10 @@
           "replace": "        if (false) {\n"
         },
         {
-          "description": "Python reads --role with --format md again instead of refusing it",
-          "file": "engines/python/agentce/commands/__init__.py",
-          "search": "        (role, \"--role\", (\"pack\",), \"add --format pack\"),\n",
-          "replace": ""
-        },
-        {
-          "description": "TypeScript reads an unknown --language again instead of refusing it",
-          "file": "engines/typescript/src/cli.ts",
-          "search": "  if (languageFlag !== undefined && !languages.includes(languageFlag)) {\n",
-          "replace": "  if (false) {\n"
-        },
-        {
           "description": "Java ignores --language again and renders English for de",
           "file": "engines/java/src/main/java/org/agentce/Cli.java",
           "search": "        String lang = language != null ? language : Messages.DEFAULT_LANGUAGE;\n",
           "replace": "        String lang = Messages.DEFAULT_LANGUAGE;\n"
-        },
-        {
-          "description": "TypeScript's npm bin goes back to process.exit, which ends the process before a piped stdout drains (a rendering cut at 64 KiB)",
-          "file": "engines/typescript/bin/agentce.js",
-          "search": "process.exitCode = main(args);\n",
-          "replace": "process.exit(main(args));\n"
         },
         {
           "description": "Java's scanner stops refusing an unknown flag, so report --no-such-flag is dropped and the rendering goes ahead",

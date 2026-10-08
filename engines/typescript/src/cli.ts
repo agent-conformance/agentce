@@ -32,7 +32,7 @@ import { DomainBinding } from "./domain";
 import { errorCause, errorFix } from "./errorCatalogue";
 import { AgentceError, InputError } from "./errors";
 import { ExitCode } from "./exitCodes";
-import { parseFailOn } from "./failOn";
+import { isPySpace, parseFailOn } from "./failOn";
 import { buildGraph } from "./graph";
 import { ingest } from "./ingest";
 import { integrityResultToJson, verifyBundle } from "./integrity";
@@ -794,13 +794,8 @@ function runAssess(options: AssessOptions): CommandResult {
     );
   }
   const language = options.reportLanguage ?? DEFAULT_LANGUAGE;
-  const languages = availableLanguages();
-  if (!languages.includes(language)) {
-    throw new InputError(
-      "input.report_language_unknown",
-      `--report-language ${pyRepr(language)} has no report catalogue.`,
-      `choose one of: ${languages.join(", ")}.`,
-    );
+  if (!availableLanguages().includes(language)) {
+    throw reportLanguageError("--report-language", language);
   }
   const messages = catalogue(language);
   if (options.allowUnverified && options.catalogDirs.length === 0) {
@@ -1343,6 +1338,34 @@ global options:
   --quiet               log warnings and errors only
 `;
 
+/** Python's `commands.report_format_error`: a format report does not render. */
+function reportFormatError(format: string): InputError {
+  return new InputError(
+    "input.report_format",
+    `unknown report format ${pyRepr(format)}.`,
+    `choose one of: ${REPORT_FORMATS.join(", ")}.`,
+  );
+}
+
+/** Python's `commands.report_role_error`: an evidence-pack role report does not know. */
+function reportRoleError(role: string): InputError {
+  return new InputError(
+    "input.report_role",
+    `unknown evidence-pack role ${pyRepr(role)}.`,
+    `choose one of: ${REPORT_ROLES.join(", ")}.`,
+  );
+}
+
+/** The error Python's `commands.refuse_unknown_report_language` raises: `flag` names a report
+ * language with no catalogue (assess's `--report-language`, report's `--language`). */
+function reportLanguageError(flag: string, language: string): InputError {
+  return new InputError(
+    "input.report_language_unknown",
+    `${flag} ${pyRepr(language)} has no report catalogue.`,
+    `choose one of: ${availableLanguages().join(", ")}.`,
+  );
+}
+
 /** report's grammar (Python's report subparser, global flags included): one table, read by `scanArgv`. */
 const REPORT_GRAMMAR: Grammar = {
   options: [
@@ -1354,24 +1377,12 @@ const REPORT_GRAMMAR: Grammar = {
     {
       names: ["--format"],
       kind: "value",
-      choices: REPORT_FORMATS,
-      choiceError: (value) =>
-        new InputError(
-          "input.report_format",
-          `unknown report format ${pyRepr(value)}.`,
-          `choose one of: ${REPORT_FORMATS.join(", ")}.`,
-        ),
+      choices: { values: REPORT_FORMATS, error: reportFormatError },
     },
     {
       names: ["--role"],
       kind: "value",
-      choices: REPORT_ROLES,
-      choiceError: (value) =>
-        new InputError(
-          "input.report_role",
-          `unknown evidence-pack role ${pyRepr(value)}.`,
-          `choose one of: ${REPORT_ROLES.join(", ")}.`,
-        ),
+      choices: { values: REPORT_ROLES, error: reportRoleError },
     },
     { names: ["--catalog"], kind: "value" },
     { names: ["--language"], kind: "value" },
@@ -1387,8 +1398,11 @@ const REPORT_GRAMMAR: Grammar = {
     "pass the input with its flag: `agentce report --from <file>` or `--validate <dir>`.",
 };
 
-/** The rendering options `report --validate` never reads, in the order the refusal names the first. */
-const REPORT_RENDER_FLAGS = ["--from", "--format", "--role", "--catalog", "--language", "--out"];
+/** The rendering options `report --validate` never reads, in the order the refusal names the first:
+ * every value option of the grammar but --validate itself. */
+const REPORT_RENDER_FLAGS = REPORT_GRAMMAR.options
+  .filter((spec) => spec.kind === "value" && spec.names[0] !== "--validate")
+  .map((spec) => spec.names[0] as string);
 
 /** Each rendering option a format may not read: the formats that read it and the fix's first step. */
 const REPORT_FORMAT_ONLY: readonly (readonly [string, readonly string[], string])[] = [
@@ -1397,15 +1411,10 @@ const REPORT_FORMAT_ONLY: readonly (readonly [string, readonly string[], string]
   ["--language", ["md", "html"], "add --format md or --format html"],
 ];
 
-/** Python's `str.isspace()` code points (JavaScript's `\s` adds U+FEFF and lacks U+001C-U+001F and
- * U+0085), so a label `str.strip()` leaves empty is empty here too. */
-const PY_SPACE = new Set([
-  0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x85, 0xa0, 0x1680, 0x2000, 0x2001,
-  0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200a, 0x2028, 0x2029, 0x202f,
-  0x205f, 0x3000,
-]);
+/** Whether `text` is empty once Python's `str.strip()` has run (JavaScript's `\s` adds U+FEFF and
+ * lacks U+001C-U+001F and U+0085). */
 const isBlank = (text: string): boolean =>
-  [...text].every((ch) => PY_SPACE.has(ch.codePointAt(0) as number));
+  [...text].every((ch) => isPySpace(ch.codePointAt(0) as number));
 
 /** Re-render a report from a committed `assertions.json` (SPEC §9.4), or, with `--validate`, schema-
  * validate every artifact in a report directory at parity with the Python reference (item 18.27).
@@ -1453,14 +1462,9 @@ function cmdReport(argv: string[]): CommandResult {
       );
     }
   }
-  const languages = availableLanguages();
   const languageFlag = v["--language"];
-  if (languageFlag !== undefined && !languages.includes(languageFlag)) {
-    throw new InputError(
-      "input.report_language_unknown",
-      `--language ${pyRepr(languageFlag)} has no report catalogue.`,
-      `choose one of: ${languages.join(", ")}.`,
-    );
+  if (languageFlag !== undefined && !availableLanguages().includes(languageFlag)) {
+    throw reportLanguageError("--language", languageFlag);
   }
   const catalogFlag = v["--catalog"];
   let catalogs: string[] | undefined;

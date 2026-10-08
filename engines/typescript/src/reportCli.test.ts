@@ -19,8 +19,10 @@ const G: Grammar = {
     {
       names: ["--format"],
       kind: "value",
-      choices: ["md", "public"],
-      choiceError: (value) => new InputError("input.t_format", `bad format '${value}'.`, "FMT-FIX"),
+      choices: {
+        values: ["md", "public"],
+        error: (value) => new InputError("input.t_format", `bad format '${value}'.`, "FMT-FIX"),
+      },
     },
     { names: ["--out"], kind: "value" },
   ],
@@ -91,24 +93,6 @@ test("a grammar without needsValueCause keeps argparse's own sentence (assess)",
     assert.ok(exc instanceof InputError);
     assert.equal(exc.key, "input.from_missing");
     assert.equal(exc.cause, "argument --from: expected one argument");
-  }
-});
-
-test("a choice without its own error falls back to argparse's sentence and the default key", () => {
-  const plain: Grammar = {
-    ...G,
-    options: [{ names: ["--role"], kind: "value", choices: ["provider", "deployer"] }],
-  };
-  try {
-    scanArgv(["--role", "x"], plain);
-    assert.fail("no refusal");
-  } catch (exc) {
-    assert.ok(exc instanceof InputError);
-    assert.equal(exc.key, "input.t_unrecognized_flag");
-    assert.equal(
-      exc.cause,
-      "argument --role: invalid choice: 'x' (choose from 'provider', 'deployer').",
-    );
   }
 });
 

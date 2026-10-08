@@ -1181,15 +1181,9 @@ public final class Report {
         return pack;
     }
 
-    private static final String STATEMENT_NON_DETERMINATION =
-            "This statement reports conformance to the named catalog as evaluated by the Agent Conformance "
-                    + "Engine over the named evidence and observation window. It is not a legal compliance "
-                    + "determination.";
     private static final String STATEMENT_CONDUCT_LINE =
             "Over the observation window, the named subjects acted within their declared boundaries and on "
                     + "authorised instructions as evidenced by the Conduct overlay controls listed.";
-    private static final List<String> STATEMENT_OUTCOMES = List.of(
-            "conformant", "non-conformant", "partial", "not_applicable", "not_assessed", "insufficient_evidence");
 
     /** The sorted, deduplicated ids of every control a deviation was applied to (Python's {@code
      * applied_deviation_ids}; SPEC §9.1): each assertion's non-empty {@code deviation}. */
@@ -1217,7 +1211,7 @@ public final class Report {
             String family = a.control.split("-", 2)[0];
             Map<String, Integer> row = families.computeIfAbsent(family, k -> {
                 Map<String, Integer> zero = new LinkedHashMap<>();
-                STATEMENT_OUTCOMES.forEach(o -> zero.put(o, 0));
+                Assertions.OUTCOMES.forEach(o -> zero.put(o, 0));
                 return zero;
             });
             row.computeIfPresent(a.outcome, (k, n) -> n + 1);
@@ -1234,10 +1228,10 @@ public final class Report {
         lines.add("");
         lines.add("## Outcomes by family");
         lines.add("");
-        lines.add("| Family | " + String.join(" | ", STATEMENT_OUTCOMES) + " |");
-        lines.add("|---|" + STATEMENT_OUTCOMES.stream().map(o -> "---").collect(Collectors.joining("|")) + "|");
+        lines.add("| Family | " + String.join(" | ", Assertions.OUTCOMES) + " |");
+        lines.add("|---|" + Assertions.OUTCOMES.stream().map(o -> "---").collect(Collectors.joining("|")) + "|");
         families.forEach((family, row) -> lines.add("| " + sanitizeForMarkdown(family) + " | "
-                + STATEMENT_OUTCOMES.stream().map(o -> String.valueOf(row.get(o))).collect(Collectors.joining(" | "))
+                + Assertions.OUTCOMES.stream().map(o -> String.valueOf(row.get(o))).collect(Collectors.joining(" | "))
                 + " |"));
         lines.add("");
         lines.add("## Accepted deviations");
@@ -1257,7 +1251,7 @@ public final class Report {
                         + "deployer's published contact channel (EU AI Act Arts. 26(11), 85, 86).",
                 "",
                 "## Basis",
-                STATEMENT_NON_DETERMINATION));
+                NON_DETERMINATION));
         return String.join("\n", lines) + "\n";
     }
 
