@@ -91,8 +91,8 @@ for dir in "$work"/*/; do
   done
 done
 count="$(ls -d "$work"/*/ | wc -l | tr -d ' ')"
-if [ "$count" -lt 15 ]; then
-  echo "doc01-components: only $count cases in cases.json, expected at least 15" >&2
+if [ "$count" -lt 20 ]; then
+  echo "doc01-components: only $count cases in cases.json, expected at least 20" >&2
   status=1
 fi
 [ "$status" -eq 0 ] && echo "doc01-components: $count cases, three engines agree with the expected DOC-01 outcome"

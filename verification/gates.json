@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.63.0",
+  "suite_version": "0.64.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -1127,7 +1127,7 @@
     },
     {
       "id": "VG-DOC01-COMPONENTS",
-      "title": "DOC-01 checks what its title says in all three engines: the tools and models a subject's calls exercise must be declared in its BundleLoaded manifests (with matching pinned versions), and every model and MCP server a manifest declares must be exercised",
+      "title": "DOC-01 checks what its title says in all three engines: the tools and models a subject's calls exercise must be declared in its BundleLoaded manifests (with matching pinned versions), and every model and MCP server a manifest declares must be exercised; an unpinned declaration never cancels another manifest's pin, a manifest with nothing to compare never reads conformant, and a component record missing its literal fails (18.37j)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -1144,8 +1144,8 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/doc01_components/cases.json (at least 15: all declared; undeclared tool; undeclared model; model version drift; unpinned call; declared model unseen; declared MCP server unseen; skill and prompt need not be seen; tool declared by name; manifest after calls; two manifests; model call naming nothing; a consequential decision naming its agent with an undeclared tool; calls without a manifest; no component records) gives the expected DOC-01 outcome, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined",
-        "fail": "any case gives another DOC-01 outcome, another set of failing events or another exit code in any engine, quarantines a record, or the case file has fewer than 15 cases"
+        "pass": "every case in verification/gates/fixtures/doc01_components/cases.json (at least 20: all declared; undeclared tool; undeclared model; model version drift; unpinned call; declared model unseen; declared MCP server unseen; skill and prompt need not be seen; tool declared by name; manifest after calls; two manifests; model call naming nothing; a consequential decision naming its agent with an undeclared tool; calls without a manifest; no component records; an unpinned declaration after a pinned one; an unpinned declaration before a pinned one; two pins where a call matches either; a manifest with nothing to compare, which reads not_applicable; a manifest declaring a model and an MCP server with no call) gives the expected DOC-01 outcome, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined",
+        "fail": "any case gives another DOC-01 outcome, another set of failing events or another exit code in any engine, quarantines a record, or the case file has fewer than 20 cases"
       },
       "faults": [
         {
@@ -1165,9 +1165,33 @@
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "store.addLiteral(node, \"agentce:componentDeclared\", isDeclared ? \"true\" : \"false\", BOOL);",
           "replace": "store.addLiteral(node, \"agentce:componentDeclared\", \"true\", BOOL);"
+        },
+        {
+          "description": "Python lets an unpinned declaration cancel the pins another manifest declared for the same component, so a call on a version no manifest pins reads DOC-01 conformant (KD-069)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                    self.declared[family].setdefault(name, set()).update(pins)",
+          "replace": "                    self.declared[family][name] = (\n                        self.declared[family].get(name, set()) | pins if pins else set()\n                    )"
+        },
+        {
+          "description": "TypeScript types a manifest with nothing to compare as a component record again, so a subject with no call and no model or MCP server declared reads DOC-01 conformant (KD-064)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "    if (!this.hasCalls && mustSee.length === 0) {\n      return;\n    }\n",
+          "replace": ""
+        },
+        {
+          "description": "Java writes a call's componentDeclared literal only when it is false, so a declared call carries no literal; only DOC-01's S0 minCount catches the missing value (KD-066)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "store.addLiteral(node, \"agentce:componentDeclared\", isDeclared ? \"true\" : \"false\", BOOL);",
+          "replace": "if (!isDeclared) store.addLiteral(node, \"agentce:componentDeclared\", \"false\", BOOL);"
+        },
+        {
+          "description": "TypeScript writes a manifest's declaredComponentsObserved literal only when it is false, so a manifest whose components are all seen carries no literal; only DOC-01's S0 minCount catches the missing value (KD-066)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "    this.store.addLiteral(\n      node,\n      \"agentce:declaredComponentsObserved\",\n      observed ? \"true\" : \"false\",\n      BOOL,\n    );",
+          "replace": "    if (!observed) {\n      this.store.addLiteral(node, \"agentce:declaredComponentsObserved\", \"false\", BOOL);\n    }"
         }
       ],
-      "fix_hint": "Run verification/gates/doc01_components.sh and read which case and engine it names. The two literals are materialised by _component_declared and _declared_components_observed in engines/python/agentce/graph.py, ported as componentDeclared and declaredComponentsObserved in engines/typescript/src/graph.ts and engines/java/src/main/java/org/agentce/Graph.java; the shape is spec/catalogs/base/baseline/shapes/DOC-01.ttl."
+      "fix_hint": "Run verification/gates/doc01_components.sh and read which case and engine it names. The two literals are materialised by _component_declared and _declared_components_observed in engines/python/agentce/graph.py, ported as componentDeclared and declaredComponentsObserved in engines/typescript/src/graph.ts and engines/java/src/main/java/org/agentce/Graph.java; the shape is spec/catalogs/base/baseline/shapes/DOC-01.ttl; S0 there requires one of the two literals on every component record."
     },
     {
       "id": "VG-OTEL-GENAI-PARITY",

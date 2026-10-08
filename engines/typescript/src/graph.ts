@@ -185,13 +185,15 @@ class Builder {
   private readonly decisionNotice = new Map<string, Set<string>>(); // Decision IRI -> every notifying Notice IRI (order-independent)
   private readonly danglingNodes = new Set<string>(); // event IRI -> has >=1 agentce:danglingRef literal
   private readonly instructionUntrusted = new Map<string, boolean>(); // Instruction IRI -> untrusted flag
-  // DOC-01: family -> declared name -> declared pins, null when any version matches; the union of every
-  // BundleLoaded manifest in the subject's records, so event order does not matter.
-  private readonly declared: Record<Family, Map<string, Set<string> | null>> = {
+  // DOC-01: family -> declared name -> the union of its declared pins over every BundleLoaded manifest in
+  // the subject's records (empty: any version matches), so event order does not matter and an unpinned
+  // declaration never cancels another manifest's pin (18.37j).
+  private readonly declared: Record<Family, Map<string, Set<string>>> = {
     tool: new Map(),
     model: new Map(),
   };
   private readonly operated: Record<Family, Set<string>> = { tool: new Set(), model: new Set() };
+  private hasCalls = false;
 
   constructor(
     private readonly store: GraphStore,
@@ -353,21 +355,16 @@ class Builder {
     if (!COMPONENT_RECORD_TYPES.has(ptype)) {
       return;
     }
-    this.store.addType(node, COMPONENT_RECORD);
     if (ptype === "BundleLoaded") {
       for (const [kind, name, pins] of declaredComponents(data)) {
         for (const family of families(kind)) {
           const known = this.declared[family];
-          if (known.has(name) && known.get(name) === null) {
-            continue;
-          }
-          known.set(
-            name,
-            pins.length === 0 ? null : new Set([...(known.get(name) ?? []), ...pins]),
-          );
+          known.set(name, new Set([...(known.get(name) ?? []), ...pins]));
         }
       }
     } else {
+      this.store.addType(node, COMPONENT_RECORD);
+      this.hasCalls = true;
       const [family, names] = operated(ptype, data);
       for (const name of names) {
         this.operated[family].add(name);
@@ -550,18 +547,25 @@ class Builder {
     const known = this.declared[family];
     const declared = names.some((name) => {
       const pins = known.get(name);
-      return pins !== undefined && (pins === null || version === null || pins.has(version));
+      return pins !== undefined && (pins.size === 0 || version === null || pins.has(version));
     });
     this.store.addLiteral(node, "agentce:componentDeclared", declared ? "true" : "false", BOOL);
   }
 
   // DOC-01 S2: every model and MCP server this manifest declares is exercised by at least one call in
-  // the subject's records (declared but never seen is drift too).
+  // the subject's records (declared but never seen is drift too). A manifest with nothing to compare -- no
+  // call in the records and no model or MCP server to see -- is not a component record, so DOC-01 never
+  // reads conformant on it alone (18.37j).
   private declaredComponentsObserved(node: string, data: Record<string, unknown>): void {
-    const observed = declaredComponents(data).every(([kind, name]) => {
+    const mustSee = declaredComponents(data).flatMap(([kind, name]) => {
       const family = mustOperate(kind);
-      return family === null || this.operated[family].has(name);
+      return family === null ? [] : [[family, name] as const];
     });
+    if (!this.hasCalls && mustSee.length === 0) {
+      return;
+    }
+    this.store.addType(node, COMPONENT_RECORD);
+    const observed = mustSee.every(([family, name]) => this.operated[family].has(name));
     this.store.addLiteral(
       node,
       "agentce:declaredComponentsObserved",

@@ -258,12 +258,13 @@ public final class Graph {
         private final Map<String, Set<String>> decisionNotice = new LinkedHashMap<>(); // Decision IRI -> every notifying Notice IRI (order-independent)
         private final Set<String> danglingNodes = new LinkedHashSet<>(); // event IRI -> has >=1 agentce:danglingRef literal
         private final Map<String, Boolean> instructionUntrusted = new LinkedHashMap<>(); // Instruction IRI -> untrusted flag
-        // DOC-01: family -> declared name -> declared pins, null when any version matches; the union of every
-        // BundleLoaded manifest in the subject's records, so event order does not matter.
+        // DOC-01: family -> declared name -> the union of its declared pins over every BundleLoaded manifest in the
+        // subject's records (empty: any version matches), so event order does not matter.
         private final Map<String, Map<String, Set<String>>> declared =
                 Map.of("tool", new LinkedHashMap<>(), "model", new LinkedHashMap<>());
         private final Map<String, Set<String>> operatedNames =
                 Map.of("tool", new LinkedHashSet<>(), "model", new LinkedHashSet<>());
+        private boolean hasCalls;
 
         Builder(GraphStore store, DomainBinding domain, byte[] key) {
             this.store = store;
@@ -429,22 +430,18 @@ public final class Graph {
             if (!COMPONENT_RECORD_TYPES.contains(ptype)) {
                 return;
             }
-            store.addType(node, COMPONENT_RECORD);
             if ("BundleLoaded".equals(ptype)) {
+                // The union of every pinned declaration; an unpinned one adds the name and no pins, so it never
+                // cancels another manifest's pin (empty: any version matches, 18.37j).
                 for (Declared component : declaredComponents(data)) {
                     for (String family : families(component.kind())) {
-                        Map<String, Set<String>> known = declared.get(family);
-                        if (known.containsKey(component.name()) && known.get(component.name()) == null) {
-                            continue;
-                        }
-                        if (component.pins().isEmpty()) {
-                            known.put(component.name(), null);
-                        } else {
-                            known.computeIfAbsent(component.name(), k -> new LinkedHashSet<>()).addAll(component.pins());
-                        }
+                        declared.get(family).computeIfAbsent(component.name(), k -> new LinkedHashSet<>())
+                                .addAll(component.pins());
                     }
                 }
             } else {
+                store.addType(node, COMPONENT_RECORD);
+                hasCalls = true;
                 Operated call = operated(ptype, data);
                 operatedNames.get(call.family()).addAll(call.names());
             }
@@ -620,16 +617,24 @@ public final class Graph {
             Operated call = operated(ptype, data);
             Map<String, Set<String>> known = declared.get(call.family());
             boolean isDeclared = call.names().stream().anyMatch(name -> known.containsKey(name)
-                    && (known.get(name) == null || call.version() == null || known.get(name).contains(call.version())));
+                    && (known.get(name).isEmpty() || call.version() == null || known.get(name).contains(call.version())));
             store.addLiteral(node, "agentce:componentDeclared", isDeclared ? "true" : "false", BOOL);
         }
 
-        /** DOC-01 S2: every model and MCP server this manifest declares is exercised by at least one call. */
+        /**
+         * DOC-01 S2: every model and MCP server this manifest declares is exercised by at least one call. A manifest
+         * with nothing to compare -- no call in the records and no model or MCP server to see -- is not a component
+         * record, so DOC-01 never reads conformant on it alone (18.37j).
+         */
         private void declaredComponentsObserved(String node, JsonNode data) {
-            boolean observed = declaredComponents(data).stream().allMatch(component -> {
-                String family = mustOperate(component.kind());
-                return family == null || operatedNames.get(family).contains(component.name());
-            });
+            List<Declared> mustSee = declaredComponents(data).stream()
+                    .filter(component -> mustOperate(component.kind()) != null).toList();
+            if (!hasCalls && mustSee.isEmpty()) {
+                return;
+            }
+            store.addType(node, COMPONENT_RECORD);
+            boolean observed = mustSee.stream()
+                    .allMatch(component -> operatedNames.get(mustOperate(component.kind())).contains(component.name()));
             store.addLiteral(node, "agentce:declaredComponentsObserved", observed ? "true" : "false", BOOL);
         }
 

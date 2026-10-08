@@ -184,10 +184,12 @@ class _Builder:
         self.dangling_nodes: set[str] = (
             set()
         )  # event IRI -> has >=1 agentce:danglingRef literal
-        # DOC-01: family -> declared name -> declared pins, None when any version matches; the union
-        # of every BundleLoaded manifest in the subject's records, so event order does not matter.
-        self.declared: dict[str, dict[str, set[str] | None]] = {"tool": {}, "model": {}}
+        # DOC-01: family -> declared name -> the union of its declared pins over every BundleLoaded
+        # manifest in the subject's records (empty: any version matches), so event order does not
+        # matter and an unpinned declaration never cancels another manifest's pin (18.37j).
+        self.declared: dict[str, dict[str, set[str]]] = {"tool": {}, "model": {}}
         self.operated: dict[str, set[str]] = {"tool": set(), "model": set()}
+        self.has_calls = False
 
     def build(self, events: list[dict[str, Any]]) -> GraphStore:
         used_classes: set[str] = set(BASE_SUBCLASS) | {
@@ -340,17 +342,13 @@ class _Builder:
         are set in the second pass, once every event is mapped."""
         if ptype not in _COMPONENT_RECORD_TYPES:
             return
-        self.store.add_type(node, COMPONENT_RECORD)
         if ptype == "BundleLoaded":
             for kind, name, pins in _declared_components(data):
                 for family in _FAMILIES.get(kind, ()):
-                    known = self.declared[family]
-                    if name in known and known[name] is None:
-                        continue
-                    known[name] = (
-                        None if not pins else (known.get(name) or set()) | pins
-                    )
+                    self.declared[family].setdefault(name, set()).update(pins)
         else:
+            self.store.add_type(node, COMPONENT_RECORD)
+            self.has_calls = True
             family, names, _version = _operated(ptype, data)
             self.operated[family].update(names)
 
@@ -538,7 +536,7 @@ class _Builder:
         known = self.declared[family]
         declared = any(
             name in known
-            and ((pins := known[name]) is None or version is None or version in pins)
+            and (not (pins := known[name]) or version is None or version in pins)
             for name in names
         )
         self.store.add_literal(
@@ -547,12 +545,18 @@ class _Builder:
 
     def _declared_components_observed(self, node: str, data: dict[str, Any]) -> None:
         """DOC-01 S2: every model and MCP server this manifest declares is exercised by at least one
-        call in the subject's records (declared but never seen is drift too)."""
-        observed = all(
-            name in self.operated[_MUST_OPERATE[kind]]
+        call in the subject's records (declared but never seen is drift too). A manifest with nothing
+        to compare -- no call in the records and no model or MCP server to see -- is not a component
+        record, so DOC-01 never reads conformant on it alone (18.37j)."""
+        must_operate = [
+            (_MUST_OPERATE[kind], name)
             for kind, name, _pins in _declared_components(data)
             if kind in _MUST_OPERATE
-        )
+        ]
+        if not (self.has_calls or must_operate):
+            return
+        self.store.add_type(node, COMPONENT_RECORD)
+        observed = all(name in self.operated[family] for family, name in must_operate)
         self.store.add_literal(
             node,
             "agentce:declaredComponentsObserved",

@@ -3,6 +3,18 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.64.0
+
+- `VG-DOC01-COMPONENTS` (18.37j) grows from 15 to 20 cases and from three to seven seeded faults. DOC-01
+  read conformant in three cases where nothing, or the wrong thing, had been compared. An unpinned
+  declaration of a model in one manifest cancelled another manifest's pin, so a call on a version no
+  manifest pins passed; a component's pins are now the union of every pinned declaration, in either
+  order. A manifest that declares only skills or prompts, with no call recorded, read conformant; it is no
+  longer a component record, so DOC-01 reads not applicable under a declared profile. And a component
+  record missing its `componentDeclared` or `declaredComponentsObserved` literal passed `sh:in`; DOC-01's
+  shape gains S0, which requires one of the two on every record. Two of the new faults drop only a `true`
+  literal, so only S0 turns the gate red.
+
 ## 0.63.0
 
 - `VG-CLI-OPTIONS` (18.106) gains 20 `quickstart` rows. TypeScript and Java used to read quickstart's

@@ -16,6 +16,7 @@ evaluation:
     - {event: BundleLoaded, class: self_report}
   shape: shapes/DOC-01.ttl
 expectations:
+  - {id: S0, text: "Every component record carries the declared or observed result it is checked on."}
   - {id: S1, text: "Every tool and model the agent calls is declared in a loaded bundle manifest."}
   - {id: S2, text: "Every model and MCP server a loaded bundle manifest declares is seen operating."}
 severity: high

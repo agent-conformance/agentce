@@ -1,1048 +1,1342 @@
 {
- "_description": "VG-DOC01-COMPONENTS cases (18.37a): each case is one bundle for the fixture subject; expected is DOC-01's outcome, the failing event ids and the assess exit code, with nothing quarantined, the same in Python, TypeScript and Java.",
- "cases": {
-  "all-declared": {
-   "why": "every call is declared and every declared model and MCP server is seen",
-   "expected": {
-    "outcome": "conformant",
-    "failing": [],
-    "exit": 0
-   },
-   "events": [
-    {
-     "id": "e1",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.BundleLoaded.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:01Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "BundleLoaded",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "bundle_digest": "sha256:0b1",
-      "components": [
-       {
-        "kind": "model",
-        "name": "m-large",
-        "version": "2026-01"
-       },
-       {
-        "kind": "mcp_server",
-        "name": "search-server"
-       }
+  "_description": "VG-DOC01-COMPONENTS cases (18.37a): each case is one bundle for the fixture subject; expected is DOC-01's outcome, the failing event ids and the assess exit code, with nothing quarantined, the same in Python, TypeScript and Java.",
+  "cases": {
+    "all-declared": {
+      "why": "every call is declared and every declared model and MCP server is seen",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 0
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-01"
+              },
+              {
+                "kind": "mcp_server",
+                "name": "search-server"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "model": {
+              "provider": "p",
+              "name": "m-large",
+              "version_or_digest": "2026-01"
+            }
+          }
+        },
+        {
+          "id": "e3",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "tool": {
+              "name": "web_search",
+              "server": "search-server"
+            }
+          }
+        }
       ]
-     }
     },
-    {
-     "id": "e2",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ModelCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:02Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ModelCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "model": {
-       "provider": "p",
-       "name": "m-large",
-       "version_or_digest": "2026-01"
-      }
-     }
-    },
-    {
-     "id": "e3",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ToolCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:03Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ToolCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "tool": {
-       "name": "web_search",
-       "server": "search-server"
-      }
-     }
-    }
-   ]
-  },
-  "undeclared-tool": {
-   "why": "a tool call names neither a declared tool nor a declared server (S1)",
-   "expected": {
-    "outcome": "non-conformant",
-    "failing": [
-     "e4"
-    ],
-    "exit": 1
-   },
-   "events": [
-    {
-     "id": "e1",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.BundleLoaded.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:01Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "BundleLoaded",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "bundle_digest": "sha256:0b1",
-      "components": [
-       {
-        "kind": "model",
-        "name": "m-large",
-        "version": "2026-01"
-       },
-       {
-        "kind": "mcp_server",
-        "name": "search-server"
-       }
+    "undeclared-tool": {
+      "why": "a tool call names neither a declared tool nor a declared server (S1)",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "e4"
+        ],
+        "exit": 1
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-01"
+              },
+              {
+                "kind": "mcp_server",
+                "name": "search-server"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "model": {
+              "provider": "p",
+              "name": "m-large",
+              "version_or_digest": "2026-01"
+            }
+          }
+        },
+        {
+          "id": "e3",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "tool": {
+              "name": "web_search",
+              "server": "search-server"
+            }
+          }
+        },
+        {
+          "id": "e4",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "tool": {
+              "name": "shell_exec"
+            }
+          }
+        }
       ]
-     }
     },
-    {
-     "id": "e2",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ModelCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:02Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ModelCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "model": {
-       "provider": "p",
-       "name": "m-large",
-       "version_or_digest": "2026-01"
-      }
-     }
-    },
-    {
-     "id": "e3",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ToolCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:03Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ToolCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "tool": {
-       "name": "web_search",
-       "server": "search-server"
-      }
-     }
-    },
-    {
-     "id": "e4",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ToolCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:04Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ToolCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "tool": {
-       "name": "shell_exec"
-      }
-     }
-    }
-   ]
-  },
-  "undeclared-model": {
-   "why": "a model call names a model no manifest declares (S1)",
-   "expected": {
-    "outcome": "non-conformant",
-    "failing": [
-     "e4"
-    ],
-    "exit": 1
-   },
-   "events": [
-    {
-     "id": "e1",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.BundleLoaded.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:01Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "BundleLoaded",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "bundle_digest": "sha256:0b1",
-      "components": [
-       {
-        "kind": "model",
-        "name": "m-large",
-        "version": "2026-01"
-       },
-       {
-        "kind": "mcp_server",
-        "name": "search-server"
-       }
+    "undeclared-model": {
+      "why": "a model call names a model no manifest declares (S1)",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "e4"
+        ],
+        "exit": 1
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-01"
+              },
+              {
+                "kind": "mcp_server",
+                "name": "search-server"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "model": {
+              "provider": "p",
+              "name": "m-large",
+              "version_or_digest": "2026-01"
+            }
+          }
+        },
+        {
+          "id": "e3",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "tool": {
+              "name": "web_search",
+              "server": "search-server"
+            }
+          }
+        },
+        {
+          "id": "e4",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "model": {
+              "provider": "p",
+              "name": "m-other"
+            }
+          }
+        }
       ]
-     }
     },
-    {
-     "id": "e2",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ModelCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:02Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ModelCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "model": {
-       "provider": "p",
-       "name": "m-large",
-       "version_or_digest": "2026-01"
-      }
-     }
-    },
-    {
-     "id": "e3",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ToolCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:03Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ToolCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "tool": {
-       "name": "web_search",
-       "server": "search-server"
-      }
-     }
-    },
-    {
-     "id": "e4",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ModelCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:04Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ModelCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "model": {
-       "provider": "p",
-       "name": "m-other"
-      }
-     }
-    }
-   ]
-  },
-  "model-version-drift": {
-   "why": "the call's model version differs from the version the manifest pins (S1)",
-   "expected": {
-    "outcome": "non-conformant",
-    "failing": [
-     "e2"
-    ],
-    "exit": 1
-   },
-   "events": [
-    {
-     "id": "e1",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.BundleLoaded.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:01Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "BundleLoaded",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "bundle_digest": "sha256:0b1",
-      "components": [
-       {
-        "kind": "model",
-        "name": "m-large",
-        "version": "2026-01"
-       },
-       {
-        "kind": "mcp_server",
-        "name": "search-server"
-       }
+    "model-version-drift": {
+      "why": "the call's model version differs from the version the manifest pins (S1)",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "e2"
+        ],
+        "exit": 1
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-01"
+              },
+              {
+                "kind": "mcp_server",
+                "name": "search-server"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "model": {
+              "provider": "p",
+              "name": "m-large",
+              "version_or_digest": "2026-02"
+            }
+          }
+        },
+        {
+          "id": "e3",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "tool": {
+              "name": "web_search",
+              "server": "search-server"
+            }
+          }
+        }
       ]
-     }
     },
-    {
-     "id": "e2",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ModelCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:02Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ModelCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "model": {
-       "provider": "p",
-       "name": "m-large",
-       "version_or_digest": "2026-02"
-      }
-     }
-    },
-    {
-     "id": "e3",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ToolCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:03Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ToolCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "tool": {
-       "name": "web_search",
-       "server": "search-server"
-      }
-     }
-    }
-   ]
-  },
-  "model-unpinned-call": {
-   "why": "a call that states no version is not drift",
-   "expected": {
-    "outcome": "conformant",
-    "failing": [],
-    "exit": 0
-   },
-   "events": [
-    {
-     "id": "e1",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.BundleLoaded.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:01Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "BundleLoaded",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "bundle_digest": "sha256:0b1",
-      "components": [
-       {
-        "kind": "model",
-        "name": "m-large",
-        "version": "2026-01"
-       },
-       {
-        "kind": "mcp_server",
-        "name": "search-server"
-       }
+    "model-unpinned-call": {
+      "why": "a call that states no version is not drift",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 0
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-01"
+              },
+              {
+                "kind": "mcp_server",
+                "name": "search-server"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "model": {
+              "provider": "p",
+              "name": "m-large"
+            }
+          }
+        },
+        {
+          "id": "e3",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "tool": {
+              "name": "web_search",
+              "server": "search-server"
+            }
+          }
+        }
       ]
-     }
     },
-    {
-     "id": "e2",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ModelCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:02Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ModelCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "model": {
-       "provider": "p",
-       "name": "m-large"
-      }
-     }
-    },
-    {
-     "id": "e3",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ToolCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:03Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ToolCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "tool": {
-       "name": "web_search",
-       "server": "search-server"
-      }
-     }
-    }
-   ]
-  },
-  "declared-model-unseen": {
-   "why": "the manifest declares a model no call uses (S2)",
-   "expected": {
-    "outcome": "non-conformant",
-    "failing": [
-     "e1"
-    ],
-    "exit": 1
-   },
-   "events": [
-    {
-     "id": "e1",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.BundleLoaded.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:01Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "BundleLoaded",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "bundle_digest": "sha256:0b1",
-      "components": [
-       {
-        "kind": "model",
-        "name": "m-large",
-        "version": "2026-01"
-       },
-       {
-        "kind": "mcp_server",
-        "name": "search-server"
-       }
+    "declared-model-unseen": {
+      "why": "the manifest declares a model no call uses (S2)",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "e1"
+        ],
+        "exit": 1
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-01"
+              },
+              {
+                "kind": "mcp_server",
+                "name": "search-server"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "tool": {
+              "name": "web_search",
+              "server": "search-server"
+            }
+          }
+        }
       ]
-     }
     },
-    {
-     "id": "e2",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ToolCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:02Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ToolCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "tool": {
-       "name": "web_search",
-       "server": "search-server"
-      }
-     }
-    }
-   ]
-  },
-  "declared-mcp-server-unseen": {
-   "why": "the manifest declares an MCP server no call uses (S2)",
-   "expected": {
-    "outcome": "non-conformant",
-    "failing": [
-     "e1"
-    ],
-    "exit": 1
-   },
-   "events": [
-    {
-     "id": "e1",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.BundleLoaded.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:01Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "BundleLoaded",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "bundle_digest": "sha256:0b1",
-      "components": [
-       {
-        "kind": "model",
-        "name": "m-large",
-        "version": "2026-01"
-       },
-       {
-        "kind": "mcp_server",
-        "name": "search-server"
-       }
+    "declared-mcp-server-unseen": {
+      "why": "the manifest declares an MCP server no call uses (S2)",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "e1"
+        ],
+        "exit": 1
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-01"
+              },
+              {
+                "kind": "mcp_server",
+                "name": "search-server"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "model": {
+              "provider": "p",
+              "name": "m-large",
+              "version_or_digest": "2026-01"
+            }
+          }
+        }
       ]
-     }
     },
-    {
-     "id": "e2",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ModelCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:02Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ModelCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "model": {
-       "provider": "p",
-       "name": "m-large",
-       "version_or_digest": "2026-01"
-      }
-     }
-    }
-   ]
-  },
-  "skill-and-prompt-need-not-be-seen": {
-   "why": "skills and prompts are not required to be seen operating",
-   "expected": {
-    "outcome": "conformant",
-    "failing": [],
-    "exit": 0
-   },
-   "events": [
-    {
-     "id": "e1",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.BundleLoaded.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:01Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "BundleLoaded",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "bundle_digest": "sha256:0b1",
-      "components": [
-       {
-        "kind": "model",
-        "name": "m-large",
-        "version": "2026-01"
-       },
-       {
-        "kind": "skill",
-        "name": "summarise"
-       },
-       {
-        "kind": "prompt",
-        "name": "system-v3"
-       }
+    "skill-and-prompt-need-not-be-seen": {
+      "why": "skills and prompts are not required to be seen operating",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 0
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-01"
+              },
+              {
+                "kind": "skill",
+                "name": "summarise"
+              },
+              {
+                "kind": "prompt",
+                "name": "system-v3"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "model": {
+              "provider": "p",
+              "name": "m-large",
+              "version_or_digest": "2026-01"
+            }
+          }
+        }
       ]
-     }
     },
-    {
-     "id": "e2",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ModelCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:02Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ModelCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "model": {
-       "provider": "p",
-       "name": "m-large",
-       "version_or_digest": "2026-01"
-      }
-     }
-    }
-   ]
-  },
-  "tool-declared-by-name": {
-   "why": "a tool call matches a declared skill by its tool name",
-   "expected": {
-    "outcome": "conformant",
-    "failing": [],
-    "exit": 0
-   },
-   "events": [
-    {
-     "id": "e1",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.BundleLoaded.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:01Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "BundleLoaded",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "bundle_digest": "sha256:0b1",
-      "components": [
-       {
-        "kind": "model",
-        "name": "m-large",
-        "version": "2026-01"
-       },
-       {
-        "kind": "skill",
-        "name": "summarise"
-       }
+    "tool-declared-by-name": {
+      "why": "a tool call matches a declared skill by its tool name",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 0
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-01"
+              },
+              {
+                "kind": "skill",
+                "name": "summarise"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "model": {
+              "provider": "p",
+              "name": "m-large",
+              "version_or_digest": "2026-01"
+            }
+          }
+        },
+        {
+          "id": "e3",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "tool": {
+              "name": "summarise"
+            }
+          }
+        }
       ]
-     }
     },
-    {
-     "id": "e2",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ModelCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:02Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ModelCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "model": {
-       "provider": "p",
-       "name": "m-large",
-       "version_or_digest": "2026-01"
-      }
-     }
-    },
-    {
-     "id": "e3",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ToolCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:03Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ToolCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "tool": {
-       "name": "summarise"
-      }
-     }
-    }
-   ]
-  },
-  "manifest-after-calls": {
-   "why": "the manifest may come after the calls in the records",
-   "expected": {
-    "outcome": "conformant",
-    "failing": [],
-    "exit": 0
-   },
-   "events": [
-    {
-     "id": "e1",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ModelCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:01Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ModelCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "model": {
-       "provider": "p",
-       "name": "m-large",
-       "version_or_digest": "2026-01"
-      }
-     }
-    },
-    {
-     "id": "e2",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ToolCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:02Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ToolCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "tool": {
-       "name": "web_search",
-       "server": "search-server"
-      }
-     }
-    },
-    {
-     "id": "e3",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.BundleLoaded.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:03Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "BundleLoaded",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "bundle_digest": "sha256:0b1",
-      "components": [
-       {
-        "kind": "model",
-        "name": "m-large",
-        "version": "2026-01"
-       },
-       {
-        "kind": "mcp_server",
-        "name": "search-server"
-       }
+    "manifest-after-calls": {
+      "why": "the manifest may come after the calls in the records",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 0
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "model": {
+              "provider": "p",
+              "name": "m-large",
+              "version_or_digest": "2026-01"
+            }
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "tool": {
+              "name": "web_search",
+              "server": "search-server"
+            }
+          }
+        },
+        {
+          "id": "e3",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-01"
+              },
+              {
+                "kind": "mcp_server",
+                "name": "search-server"
+              }
+            ]
+          }
+        }
       ]
-     }
-    }
-   ]
-  },
-  "two-manifests": {
-   "why": "the declared set is every manifest in the subject's records",
-   "expected": {
-    "outcome": "conformant",
-    "failing": [],
-    "exit": 0
-   },
-   "events": [
-    {
-     "id": "e1",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.BundleLoaded.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:01Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "BundleLoaded",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "bundle_digest": "sha256:0b1",
-      "components": [
-       {
-        "kind": "model",
-        "name": "m-large",
-        "version": "2026-01"
-       }
+    },
+    "two-manifests": {
+      "why": "the declared set is every manifest in the subject's records",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 0
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-01"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "model": {
+              "provider": "p",
+              "name": "m-large",
+              "version_or_digest": "2026-01"
+            }
+          }
+        },
+        {
+          "id": "e3",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "mcp_server",
+                "name": "search-server"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e4",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "tool": {
+              "name": "web_search",
+              "server": "search-server"
+            }
+          }
+        }
       ]
-     }
     },
-    {
-     "id": "e2",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ModelCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:02Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ModelCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "model": {
-       "provider": "p",
-       "name": "m-large",
-       "version_or_digest": "2026-01"
-      }
-     }
-    },
-    {
-     "id": "e3",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.BundleLoaded.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:03Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "BundleLoaded",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "bundle_digest": "sha256:0b1",
-      "components": [
-       {
-        "kind": "mcp_server",
-        "name": "search-server"
-       }
+    "model-call-names-nothing": {
+      "why": "a call that names no model cannot be shown declared (S1)",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "e2"
+        ],
+        "exit": 1
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-01"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "operation": "chat"
+          }
+        },
+        {
+          "id": "e3",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "model": {
+              "provider": "p",
+              "name": "m-large",
+              "version_or_digest": "2026-01"
+            }
+          }
+        }
       ]
-     }
     },
-    {
-     "id": "e4",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ToolCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:04Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ToolCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "tool": {
-       "name": "web_search",
-       "server": "search-server"
-      }
-     }
-    }
-   ]
-  },
-  "model-call-names-nothing": {
-   "why": "a call that names no model cannot be shown declared (S1)",
-   "expected": {
-    "outcome": "non-conformant",
-    "failing": [
-     "e2"
-    ],
-    "exit": 1
-   },
-   "events": [
-    {
-     "id": "e1",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.BundleLoaded.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:01Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "BundleLoaded",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "bundle_digest": "sha256:0b1",
-      "components": [
-       {
-        "kind": "model",
-        "name": "m-large",
-        "version": "2026-01"
-       }
+    "decision-names-agent-tool-undeclared": {
+      "why": "a consequential decision names its agent (the old REC-01 rule read this conformant) but a tool call is undeclared (S1)",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "e4"
+        ],
+        "exit": 1
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "affects_natural_person": true,
+            "legal_or_significant_effect": true,
+            "agent": {
+              "id": "spiffe://corp/agents/doc01-fixture"
+            }
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "mcp_server",
+                "name": "search-server"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e3",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "tool": {
+              "name": "web_search",
+              "server": "search-server"
+            }
+          }
+        },
+        {
+          "id": "e4",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "tool": {
+              "name": "shell_exec"
+            }
+          }
+        }
       ]
-     }
     },
-    {
-     "id": "e2",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ModelCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:02Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ModelCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "operation": "chat"
-     }
-    },
-    {
-     "id": "e3",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ModelCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:03Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ModelCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "model": {
-       "provider": "p",
-       "name": "m-large",
-       "version_or_digest": "2026-01"
-      }
-     }
-    }
-   ]
-  },
-  "decision-names-agent-tool-undeclared": {
-   "why": "a consequential decision names its agent (the old REC-01 rule read this conformant) but a tool call is undeclared (S1)",
-   "expected": {
-    "outcome": "non-conformant",
-    "failing": [
-     "e4"
-    ],
-    "exit": 1
-   },
-   "events": [
-    {
-     "id": "e1",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.Decision.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:01Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "Decision",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "decision_type": "dom:CreditDecision",
-      "affects_natural_person": true,
-      "legal_or_significant_effect": true,
-      "agent": {
-       "id": "spiffe://corp/agents/doc01-fixture"
-      }
-     }
-    },
-    {
-     "id": "e2",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.BundleLoaded.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:02Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "BundleLoaded",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "bundle_digest": "sha256:0b1",
-      "components": [
-       {
-        "kind": "mcp_server",
-        "name": "search-server"
-       }
+    "calls-without-manifest": {
+      "why": "calls but no manifest: the records cannot show what was declared",
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "model": {
+              "provider": "p",
+              "name": "m-large",
+              "version_or_digest": "2026-01"
+            }
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "tool": {
+              "name": "web_search",
+              "server": "search-server"
+            }
+          }
+        }
       ]
-     }
     },
-    {
-     "id": "e3",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ToolCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:03Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ToolCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "tool": {
-       "name": "web_search",
-       "server": "search-server"
-      }
-     }
+    "no-component-records": {
+      "why": "no manifest and no calls: nothing for DOC-01 to compare",
+      "expected": {
+        "outcome": "not_applicable",
+        "failing": [],
+        "exit": 3
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:Minor",
+            "agent": {
+              "id": "spiffe://corp/agents/doc01-fixture"
+            }
+          }
+        }
+      ]
     },
-    {
-     "id": "e4",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ToolCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:04Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ToolCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "tool": {
-       "name": "shell_exec"
-      }
-     }
-    }
-   ]
-  },
-  "calls-without-manifest": {
-   "why": "calls but no manifest: the records cannot show what was declared",
-   "expected": {
-    "outcome": "insufficient_evidence",
-    "failing": [],
-    "exit": 2
-   },
-   "events": [
-    {
-     "id": "e1",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ModelCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:01Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ModelCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "model": {
-       "provider": "p",
-       "name": "m-large",
-       "version_or_digest": "2026-01"
-      }
-     }
+    "pin-relaxed-by-unpinned": {
+      "why": "KD-069: one manifest pins m-large to 2026-01 and another declares it with no version; the unpinned declaration does not cancel the pin, so a call on 2026-09 breaks it",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "e3"
+        ],
+        "exit": 1
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-01"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b2",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e3",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "model": {
+              "provider": "p",
+              "name": "m-large",
+              "version_or_digest": "2026-09"
+            }
+          }
+        }
+      ]
     },
-    {
-     "id": "e2",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.ToolCall.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:02Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "ToolCall",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "tool": {
-       "name": "web_search",
-       "server": "search-server"
-      }
-     }
+    "unpinned-before-pinned": {
+      "why": "KD-069 in the other order: the unpinned declaration comes first, the pin second; a call on 2026-09 still breaks the pin",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "e3"
+        ],
+        "exit": 1
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b2",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-01"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e3",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "model": {
+              "provider": "p",
+              "name": "m-large",
+              "version_or_digest": "2026-09"
+            }
+          }
+        }
+      ]
+    },
+    "two-pins-either-matches": {
+      "why": "two manifests pin m-large to 2026-01 and 2026-02; a call on 2026-02 matches a declared pin",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 0
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-01"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b2",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-02"
+              }
+            ]
+          }
+        },
+        {
+          "id": "e3",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.ModelCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ModelCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "model": {
+              "provider": "p",
+              "name": "m-large",
+              "version_or_digest": "2026-02"
+            }
+          }
+        }
+      ]
+    },
+    "manifest-without-calls": {
+      "why": "KD-064: a manifest declares only a skill and a prompt, and no call is recorded; nothing is compared, so DOC-01 never reads conformant (not_applicable under this declared profile)",
+      "expected": {
+        "outcome": "not_applicable",
+        "failing": [],
+        "exit": 3
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "skill",
+                "name": "summarise"
+              },
+              {
+                "kind": "prompt",
+                "name": "triage"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "declared-model-no-calls": {
+      "why": "the other branch of the population rule: a manifest declares a model and an MCP server and no call is recorded; it is a component record because it declares components that must be seen, and S2 fails it",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "e1"
+        ],
+        "exit": 1
+      },
+      "events": [
+        {
+          "id": "e1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/doc01-fixture",
+          "type": "org.agent-conformance.evidence.BundleLoaded.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "BundleLoaded",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "bundle_digest": "sha256:0b1",
+            "components": [
+              {
+                "kind": "model",
+                "name": "m-large",
+                "version": "2026-01"
+              },
+              {
+                "kind": "mcp_server",
+                "name": "search-server"
+              }
+            ]
+          }
+        }
+      ]
     }
-   ]
-  },
-  "no-component-records": {
-   "why": "no manifest and no calls: nothing for DOC-01 to compare",
-   "expected": {
-    "outcome": "not_applicable",
-    "failing": [],
-    "exit": 3
-   },
-   "events": [
-    {
-     "id": "e1",
-     "source": "urn:src:self_report",
-     "subject": "spiffe://corp/agents/doc01-fixture",
-     "type": "org.agent-conformance.evidence.Decision.v1",
-     "agentcesourceclass": "self_report",
-     "time": "2026-01-02T00:00:01Z",
-     "specversion": "1.0",
-     "datacontenttype": "application/ld+json",
-     "data": {
-      "@type": "Decision",
-      "@context": "https://agent-conformance.org/contexts/evidence/v1",
-      "decision_type": "dom:Minor",
-      "agent": {
-       "id": "spiffe://corp/agents/doc01-fixture"
-      }
-     }
-    }
-   ]
   }
- }
 }
