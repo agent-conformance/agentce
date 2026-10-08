@@ -865,9 +865,10 @@ def _emit_error(err: AgentceError, *, command: str, want_json: bool) -> int:
 _GLOBAL_FLAGS = ("--json", "--debug", "--quiet")
 
 
-def _scan_top_level(args: Sequence[str]) -> str | None:
+def _scan_top_level(args: Sequence[str]) -> list[str] | None:
     """Read the tokens before the command the way the TypeScript and Java engines do (18.108); return
-    "help" or "version" when one of those answers the line, None when argparse should run it. Raises the
+    None when the line asks for the usage, otherwise the line for argparse, without the `--` that may
+    come before the command (the argparse in Python 3.12.3, which CI runs, takes it as the command). Raises the
     shared top-level error (input.unknown_command) for a short cluster, a value on a flag that takes none,
     an unknown flag before the command, -V/--version with anything else on the line, a `--` with nothing
     after it, or global flags with no command. -h/--help win when reached, as in argparse."""
@@ -877,7 +878,14 @@ def _scan_top_level(args: Sequence[str]) -> str | None:
         if token == "--":
             if i + 1 == len(args):
                 raise _TOP_ARGV.error("no command given after '--'.", _TOP_FIX)
+            if args[i + 1].startswith("-"):
+                # No command starts with a dash; argparse would read the token as a flag.
+                raise _TOP_ARGV.error(
+                    f"unrecognized command '{args[i + 1]}'.",
+                    "run `agentce --help` for the commands agentce takes.",
+                )
             has_command = True
+            args = [*args[:i], *args[i + 1 :]]
             break
         if not token.startswith("-") or token == "-":
             has_command = True
@@ -889,21 +897,21 @@ def _scan_top_level(args: Sequence[str]) -> str | None:
         if known and "=" in token:
             raise _TOP_ARGV.no_value(name)
         if name in ("-h", "--help"):
-            return "help"
+            return None
         if name in ("-V", "--version"):
             if len(args) != 1:
                 raise _TOP_ARGV.error(
                     f"'{name}' takes no other arguments.",
                     "run `agentce --version` alone, or `agentce version --json` for the JSON envelope.",
                 )
-            return "version"
+            return list(args)
         if not known and unknown is None:
             unknown = token
     if unknown is not None:
         raise _TOP_ARGV.unknown(unknown)
     if not has_command and args:
         raise _TOP_ARGV.error("no command given.", _TOP_FIX)
-    return None if args else "help"
+    return list(args) if args else None
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -914,10 +922,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = list(sys.argv[1:] if argv is None else argv)
     try:
-        if _scan_top_level(args) == "help":
+        parse = _scan_top_level(args)
+        if parse is None:
             parser.print_help()
             return int(ExitCode.OK)
-        ns, unknown = parser.parse_known_args(args)
+        ns, unknown = parser.parse_known_args(parse)
         if unknown:
             errors = _ARGV.get(getattr(ns, "command", "") or "", _TOP_ARGV)
             raise errors.unknown(unknown[0])
