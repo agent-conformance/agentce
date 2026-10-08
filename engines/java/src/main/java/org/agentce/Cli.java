@@ -236,11 +236,11 @@ public final class Cli {
             } else if ("version".equals(command)) {
                 result = cmdVersion();
             } else {
-                result = notImplemented(command == null ? "" : command);
+                result = notImplemented(commandName);
             }
         } catch (AgentceError exc) {
             failed = true;
-            result = errorResult(command == null ? "" : command, exc);
+            result = errorResult(commandName, exc);
         } catch (RuntimeException exc) {
             failed = true;
             if (debug) {
@@ -257,7 +257,7 @@ public final class Cli {
             // shape (a real, pre-existing, engine-wide difference this does not close).
             String message = exc.getMessage() != null ? exc.getMessage() : exc.getClass().getName();
             result = errorResult(
-                    command == null ? "" : command,
+                    commandName,
                     new AgentceError(
                             "internal.unexpected",
                             message,

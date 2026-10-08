@@ -150,15 +150,20 @@ def main() -> int:
             print(f"FAIL {c['id']}: an override must name a known engine and say why")
             return 1
     cmds = engine_cmds()
-    jobs = [(c, e) for c in cases for e in ENGINES]
+    # The slow runs (a case expected to exit 0 runs a whole assessment) start first.
+    jobs = sorted(
+        ((c, e) for c in cases for e in ENGINES), key=lambda job: job[0]["exit"] != 0
+    )
     with ThreadPoolExecutor(max_workers=8) as pool:
         results = list(
             pool.map(lambda job: run(job[0], job[1], cmds[job[1]], spec["B"]), jobs)
         )
     failures = [failure for failure, _ in results if failure]
-    for i, case in enumerate(cases):
-        stdouts = {out for _, out in results[i * len(ENGINES) : (i + 1) * len(ENGINES)]}
-        if case.get("same_stdout") and len(stdouts) != 1:
+    stdouts: dict[str, set[str]] = {}
+    for (case, _), (_, out) in zip(jobs, results):
+        stdouts.setdefault(case["id"], set()).add(out)
+    for case in cases:
+        if case.get("same_stdout") and len(stdouts[case["id"]]) != 1:
             failures.append(f"FAIL {case['id']}: stdout differs across engines")
     for line in failures:
         print(line)

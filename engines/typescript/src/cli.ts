@@ -1192,8 +1192,8 @@ function quickstartUnrecognized(cause: string, fix: string): InputError {
  * usage. A value-less `--out` or a value on a flag that takes none is refused at once; any other token
  * (an unknown or abbreviated flag, a positional, a bare `--` and all after it) is refused after the scan,
  * so `-h` after an unknown flag is still help, as in argparse. Every refusal is
- * `input.quickstart_unrecognized_flag`. Returns undefined for `-h`/`--help`, else `--out`'s value. */
-function parseQuickstartArgv(argv: string[]): { out: string | undefined } | undefined {
+ * `input.quickstart_unrecognized_flag`. */
+function parseQuickstartArgv(argv: string[]): { help: boolean; out: string | undefined } {
   const flagFix =
     "run `agentce quickstart --help` for the flags quickstart takes, or drop the flag.";
   let out: string | undefined;
@@ -1210,6 +1210,7 @@ function parseQuickstartArgv(argv: string[]): { out: string | undefined } | unde
     }
     const eq = token.indexOf("=");
     const name = eq >= 0 ? token.slice(0, eq) : token;
+    const help = name === "-h" || name === "--help";
     if (name === "--out") {
       if (eq >= 0) {
         out = token.slice(eq + 1);
@@ -1221,12 +1222,12 @@ function parseQuickstartArgv(argv: string[]): { out: string | undefined } | unde
         out = next;
         i++;
       }
-    } else if (GLOBAL_BOOLEAN_FLAGS.has(name) || name === "-h" || name === "--help") {
+    } else if (help || GLOBAL_BOOLEAN_FLAGS.has(name)) {
       if (eq >= 0) {
         throw quickstartUnrecognized(`flag '${name}' takes no value.`, `drop the value: ${name}.`);
       }
-      if (name === "-h" || name === "--help") {
-        return undefined;
+      if (help) {
+        return { help, out: undefined };
       }
     } else {
       unknown ??= token;
@@ -1240,14 +1241,14 @@ function parseQuickstartArgv(argv: string[]): { out: string | undefined } | unde
           "quickstart takes no other argument: `agentce quickstart --out <dir>`.",
         );
   }
-  return { out };
+  return { help: false, out };
 }
 
 /** Assess the bundled quickstart project end to end — one command, offline (SPEC §13.4 AX-1). */
 function cmdQuickstart(argv: string[]): CommandResult {
   const result = new CommandResult("quickstart");
   const args = parseQuickstartArgv(argv);
-  if (args === undefined) {
+  if (args.help) {
     result.usage = QUICKSTART_USAGE;
     return result;
   }
