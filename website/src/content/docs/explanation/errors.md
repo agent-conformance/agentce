@@ -79,6 +79,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.profile_invalid` | the applicability profile is not safe YAML: a disallowed construct, or a structure nested too deeply to parse safely. | remove custom YAML tags and flatten deep nesting; regenerate the profile from `agentce init`. |
 | `input.profile_missing` | the applicability profile was not supplied. | pass --profile agentce/applicability.yaml (start from agentce init). |
 | `input.quickstart_missing` | the bundled quickstart project is missing from the installed package. | reinstall the engine: the quickstart project ships inside the package. |
+| `input.quickstart_unrecognized_flag` | quickstart was given a flag it does not recognize, or an argument it does not take. | run `agentce quickstart --help` for the flags quickstart takes, or drop the flag. |
 | `input.readiness_unrecognized_flag` | readiness was given a flag it does not recognize. | pass --gaps, --deviations, or --catalog-dir, or drop the flag. |
 | `input.records_no_genai_spans` | the folder holds OpenTelemetry traces, but none of their spans is a GenAI operation the engine maps. | ask the agent's developer to instrument it with OpenTelemetry GenAI or OpenInference, then export its traces. |
 | `input.records_none_recognised` | the records folder holds no OpenTelemetry GenAI or OpenInference trace export the engine can read. | point assess at a folder of OTLP/JSON trace exports (.json, .jsonl or .ndjson); compressed files are not read, so decompress them first. |

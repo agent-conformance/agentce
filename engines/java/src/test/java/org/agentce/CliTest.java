@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.stream.Stream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -319,6 +320,23 @@ class CliTest {
             assertEquals("input.assess_unrecognized_flag", env.get("error").get("message_key").asText());
             assertFalse(Files.exists(out.resolve("assertions.json")));
         }
+    }
+
+    @Test
+    void quickstartRefusesAFlagOrArgumentItDoesNotTakeAndHelpPrintsUsage(@TempDir Path out) {
+        for (String[] extra : new String[][] {
+                {"--ou", "o"}, {"--no-such-flag"}, {"--trust-root", "x"}, {"extra"}, {"--json=1"}, {"--"}}) {
+            String[] args = Stream.concat(
+                            Stream.of("quickstart", "--json", "--out", out.resolve("q").toString()), Stream.of(extra))
+                    .toArray(String[]::new);
+            JsonNode env = Json.parse(captureStdout(args));
+            assertEquals(3, env.get("exit_code").asInt(), String.join(" ", extra));
+            assertEquals("input.quickstart_unrecognized_flag", env.get("error").get("message_key").asText());
+            assertFalse(Files.exists(out.resolve("q")));
+        }
+        String usage = captureStdout("quickstart", "--out", out.resolve("q").toString(), "--no-such-flag", "-h");
+        assertTrue(usage.startsWith("usage: agentce quickstart [-h]"));
+        assertFalse(Files.exists(out.resolve("q")));
     }
 
     @Test

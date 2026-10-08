@@ -201,6 +201,34 @@ def test_assess_unknown_or_abbreviated_flag_is_refused(
     assert not out.exists()
 
 
+@pytest.mark.parametrize(
+    "argv_extra",
+    [
+        ("--ou", "o"),
+        ("--no-such-flag",),
+        ("--trust-root", "x"),
+        ("extra",),
+        ("--out",),
+        ("--json=1",),
+        ("--",),
+    ],
+)
+def test_quickstart_unknown_or_abbreviated_flag_is_refused(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    argv_extra: tuple[str, ...],
+) -> None:
+    """Every quickstart argv error is keyed and nothing runs: no prefix matching (`--ou` is never
+    `--out`), an unknown flag, a positional, a value-less `--out` or a value on `--json` (18.106)."""
+    monkeypatch.chdir(tmp_path)
+    code = cli.main(["quickstart", "--json", *argv_extra])
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert envelope["error"]["key"] == "input.quickstart_unrecognized_flag"
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_for_absent_no_ci_env_unchanged(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

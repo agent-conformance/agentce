@@ -17,6 +17,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -461,6 +462,40 @@ test("assess refuses an unknown or abbreviated flag and a second positional (18.
       assert.ok(!existsSync(join(out, "assertions.json")));
     });
   }
+});
+
+test("quickstart refuses a flag or argument it does not take, and -h prints the usage (18.106)", () => {
+  for (const extra of [
+    ["--ou", "o"],
+    ["--no-such-flag"],
+    ["--trust-root", "x"],
+    ["extra"],
+    ["--json=1"],
+    ["--"],
+  ]) {
+    withOut("quickstart-unknown-flag", (out) => {
+      const { exitCode, envelope } = runEnvelope(["quickstart", "--json", "--out", out, ...extra]);
+      assert.equal(exitCode, 3, extra.join(" "));
+      const error = envelope.error as Record<string, string>;
+      assert.equal(error.message_key, "input.quickstart_unrecognized_flag", extra.join(" "));
+      assert.deepEqual(readdirSync(out), []);
+    });
+  }
+  withOut("quickstart-help", (out) => {
+    const written: string[] = [];
+    const original = process.stdout.write;
+    process.stdout.write = ((chunk: string) =>
+      written.push(chunk) > 0) as typeof process.stdout.write;
+    let exitCode: number;
+    try {
+      exitCode = main(["quickstart", "--out", out, "--no-such-flag", "-h"]);
+    } finally {
+      process.stdout.write = original;
+    }
+    assert.equal(exitCode, 0);
+    assert.ok(written.join("").startsWith("usage: agentce quickstart [-h]"));
+    assert.deepEqual(readdirSync(out), []);
+  });
 });
 
 test("assess --deviations before another option is refused, never read as the path", () => {

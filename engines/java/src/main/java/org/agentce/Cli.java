@@ -9,6 +9,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -205,7 +208,12 @@ public final class Cli {
 
         boolean json = Arrays.asList(args).contains("--json");
         boolean debug = Arrays.asList(args).contains("--debug");
+        String commandName = command == null ? "" : command;
+        if (debug) {
+            logDebug(commandName, "command.start", null);
+        }
         CommandResult result;
+        boolean failed = false;
         try {
             if ("conformance".equals(command)) {
                 result = cmdConformance(args);
@@ -231,8 +239,10 @@ public final class Cli {
                 result = notImplemented(command == null ? "" : command);
             }
         } catch (AgentceError exc) {
+            failed = true;
             result = errorResult(command == null ? "" : command, exc);
         } catch (RuntimeException exc) {
+            failed = true;
             if (debug) {
                 // Matches Python's own `--debug` behaviour (`cli.py:562-564`, `if debug: raise`): let
                 // the exception propagate to the JVM's default handler (a full stack trace on
@@ -254,11 +264,27 @@ public final class Cli {
                             "re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate."));
         }
         emit(result, json);
+        if (debug && !failed && result.usage == null) {
+            logDebug(commandName, "command.end", result.exitCode());
+        }
         return result.exitCode();
     }
 
+    private static final DateTimeFormatter LOG_TS =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'+00:00'").withZone(ZoneOffset.UTC);
+
+    /** One of Python's {@code --debug} log records ({@code logsetup.JsonFormatter}): one sorted-key,
+     * compact JSON line on stderr, its timestamp in Python's {@code isoformat()} shape. */
+    private static void logDebug(String command, String event, Integer exitCode) {
+        System.err.println("{\"command\":" + Json.quote(command) + ",\"event\":" + Json.quote(event)
+                + (exitCode == null ? "" : ",\"exit_code\":" + exitCode)
+                + ",\"level\":\"debug\",\"logger\":\"agentce\",\"ts\":\"" + LOG_TS.format(Instant.now()) + "\"}");
+    }
+
     private static void emit(CommandResult result, boolean json) {
-        if (json) {
+        if (result.usage != null) {
+            System.out.print(result.usage);
+        } else if (json) {
             System.out.println(Json.pretty(result.envelope()));
         } else {
             for (String line : result.humanLines) {
@@ -1251,10 +1277,94 @@ public final class Cli {
                 valueFlags.get("--for")));
     }
 
+    /** Python's {@code agentce quickstart --help}, word for word. */
+    private static final String QUICKSTART_USAGE = String.join("\n",
+            "usage: agentce quickstart [-h] [--json] [--debug] [--quiet] [--out OUT]",
+            "",
+            "options:",
+            "  -h, --help  show this help message and exit",
+            "  --out OUT   the output directory for the report (default: ./out)",
+            "",
+            "global options:",
+            "  --json      emit machine-readable JSON on stdout",
+            "  --debug     verbose logs on stderr and a stack trace on unexpected errors",
+            "  --quiet     log warnings and errors only",
+            "");
+
+    private static InputError quickstartUnrecognized(String cause, String fix) {
+        return new InputError("input.quickstart_unrecognized_flag", cause, fix);
+    }
+
+    /** The parsed quickstart argv: {@code help} for {@code -h}/{@code --help}, else {@code --out}'s value. */
+    private record QuickstartArgs(boolean help, String out) {}
+
+    /**
+     * {@code agentce quickstart}'s argv, read the way Python's quickstart subparser (argparse,
+     * {@code allow_abbrev=False}) reads it, left to right: {@code --out} takes one value (separate or
+     * {@code =}-joined, the last one wins), {@code --json}/{@code --debug}/{@code --quiet} take none,
+     * {@code -h}/{@code --help} stop the scan and ask for the usage. A value-less {@code --out} or a value on
+     * a flag that takes none is refused at once; any other token (an unknown or abbreviated flag, a
+     * positional, a bare {@code --} and all after it) is refused after the scan, so {@code -h} after an
+     * unknown flag is still help, as in argparse. Every refusal is {@code input.quickstart_unrecognized_flag}.
+     */
+    private static QuickstartArgs parseQuickstartArgv(String[] args) {
+        String out = null;
+        String unknown = null;
+        for (int i = 1; i < args.length; i++) {
+            String token = args[i];
+            if (token.equals("--")) {
+                unknown = unknown != null ? unknown : token;
+                break;
+            }
+            if (!looksLikeOption(token)) {
+                unknown = unknown != null ? unknown : token;
+                continue;
+            }
+            int eq = token.indexOf('=');
+            String name = eq >= 0 ? token.substring(0, eq) : token;
+            boolean help = name.equals("-h") || name.equals("--help");
+            if (name.equals("--out")) {
+                if (eq >= 0) {
+                    out = token.substring(eq + 1);
+                } else if (i + 1 >= args.length || looksLikeOption(args[i + 1])) {
+                    throw quickstartUnrecognized("flag '--out' needs a value.", "pass --out <dir>.");
+                } else {
+                    out = args[++i];
+                }
+            } else if (help || GLOBAL_BOOLEAN_FLAGS.contains(name)) {
+                if (eq >= 0) {
+                    throw quickstartUnrecognized(
+                            "flag '" + name + "' takes no value.", "drop the value: " + name + ".");
+                }
+                if (help) {
+                    return new QuickstartArgs(true, null);
+                }
+            } else {
+                unknown = unknown != null ? unknown : token;
+            }
+        }
+        if (unknown == null) {
+            return new QuickstartArgs(false, out);
+        }
+        if (unknown.startsWith("-") && !unknown.equals("-")) {
+            throw quickstartUnrecognized(
+                    "unrecognized flag '" + unknown + "'.",
+                    "run `agentce quickstart --help` for the flags quickstart takes, or drop the flag.");
+        }
+        throw quickstartUnrecognized(
+                "unrecognized argument '" + unknown + "'.",
+                "quickstart takes no other argument: `agentce quickstart --out <dir>`.");
+    }
+
     /** Assess the bundled quickstart project end to end — one command, offline (SPEC §13.4 AX-1). */
     private static CommandResult cmdQuickstart(String[] args) {
         CommandResult result = new CommandResult("quickstart");
-        String outArg = flagValue(args, "out");
+        QuickstartArgs parsed = parseQuickstartArgv(args);
+        if (parsed.help()) {
+            result.usage = QUICKSTART_USAGE;
+            return result;
+        }
+        String outArg = emptyToNull(parsed.out());
         String out = outArg != null ? outArg : DEFAULT_OUT_DIR;
         Path quickstart = Bundled.quickstartDir();
         if (!Files.isDirectory(quickstart)) {

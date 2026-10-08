@@ -17,6 +17,9 @@ public final class CommandResult {
     private final Set<Integer> codes = new LinkedHashSet<>();
     public final ObjectNode data = Json.nodes().objectNode();
     public final List<String> humanLines = new ArrayList<>();
+    /** Usage text printed verbatim to stdout in place of the envelope ({@code -h}/{@code --help}), as
+     * argparse prints help whatever {@code --json} says; null for every run that does the command's work. */
+    public String usage;
 
     public CommandResult(String command) {
         this.command = command;

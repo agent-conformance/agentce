@@ -21,6 +21,9 @@ export class CommandResult {
   readonly codes = new Set<number>();
   data: Record<string, unknown> = {};
   readonly humanLines: string[] = [];
+  /** Usage text printed verbatim to stdout in place of the envelope (`-h`/`--help`), as argparse prints
+   * help whatever `--json` says; unset for every run that does the command's work. */
+  usage: string | undefined;
 
   constructor(command: string) {
     this.command = command;

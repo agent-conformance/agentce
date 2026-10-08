@@ -101,7 +101,9 @@ const DEFAULT_OUT_DIR = "out";
 const REPORT_FORMATS = ["md", "html", "oscal", "sarif", "pack"] as const;
 
 function emit(result: CommandResult, json: boolean): void {
-  if (json) {
+  if (result.usage !== undefined) {
+    process.stdout.write(result.usage);
+  } else if (json) {
     // json.dumps(envelope, sort_keys=True, indent=2, ensure_ascii=True), matching the Python reference
     console.log(jsonStringifyAscii(sortKeysDeep(result.envelope()), 2));
   } else {
@@ -1167,10 +1169,89 @@ function cmdAssess(argv: string[]): CommandResult {
   });
 }
 
+/** Python's `agentce quickstart --help`, word for word. */
+const QUICKSTART_USAGE = `usage: agentce quickstart [-h] [--json] [--debug] [--quiet] [--out OUT]
+
+options:
+  -h, --help  show this help message and exit
+  --out OUT   the output directory for the report (default: ./out)
+
+global options:
+  --json      emit machine-readable JSON on stdout
+  --debug     verbose logs on stderr and a stack trace on unexpected errors
+  --quiet     log warnings and errors only
+`;
+
+function quickstartUnrecognized(cause: string, fix: string): InputError {
+  return new InputError("input.quickstart_unrecognized_flag", cause, fix);
+}
+
+/** `agentce quickstart`'s argv, read the way Python's quickstart subparser (argparse,
+ * `allow_abbrev=False`) reads it, left to right: `--out` takes one value (separate or `=`-joined, the
+ * last one wins), `--json`/`--debug`/`--quiet` take none, `-h`/`--help` stop the scan and ask for the
+ * usage. A value-less `--out` or a value on a flag that takes none is refused at once; any other token
+ * (an unknown or abbreviated flag, a positional, a bare `--` and all after it) is refused after the scan,
+ * so `-h` after an unknown flag is still help, as in argparse. Every refusal is
+ * `input.quickstart_unrecognized_flag`. Returns undefined for `-h`/`--help`, else `--out`'s value. */
+function parseQuickstartArgv(argv: string[]): { out: string | undefined } | undefined {
+  const flagFix =
+    "run `agentce quickstart --help` for the flags quickstart takes, or drop the flag.";
+  let out: string | undefined;
+  let unknown: string | undefined;
+  for (let i = 1; i < argv.length; i++) {
+    const token = argv[i] as string;
+    if (token === "--") {
+      unknown ??= token;
+      break;
+    }
+    if (!looksLikeOption(token)) {
+      unknown ??= token;
+      continue;
+    }
+    const eq = token.indexOf("=");
+    const name = eq >= 0 ? token.slice(0, eq) : token;
+    if (name === "--out") {
+      if (eq >= 0) {
+        out = token.slice(eq + 1);
+      } else {
+        const next = argv[i + 1];
+        if (next === undefined || looksLikeOption(next)) {
+          throw quickstartUnrecognized("flag '--out' needs a value.", "pass --out <dir>.");
+        }
+        out = next;
+        i++;
+      }
+    } else if (GLOBAL_BOOLEAN_FLAGS.has(name) || name === "-h" || name === "--help") {
+      if (eq >= 0) {
+        throw quickstartUnrecognized(`flag '${name}' takes no value.`, `drop the value: ${name}.`);
+      }
+      if (name === "-h" || name === "--help") {
+        return undefined;
+      }
+    } else {
+      unknown ??= token;
+    }
+  }
+  if (unknown !== undefined) {
+    throw unknown.startsWith("-") && unknown !== "-"
+      ? quickstartUnrecognized(`unrecognized flag '${unknown}'.`, flagFix)
+      : quickstartUnrecognized(
+          `unrecognized argument '${unknown}'.`,
+          "quickstart takes no other argument: `agentce quickstart --out <dir>`.",
+        );
+  }
+  return { out };
+}
+
 /** Assess the bundled quickstart project end to end — one command, offline (SPEC §13.4 AX-1). */
 function cmdQuickstart(argv: string[]): CommandResult {
   const result = new CommandResult("quickstart");
-  const out = flagValue(argv, "out") ?? DEFAULT_OUT_DIR;
+  const args = parseQuickstartArgv(argv);
+  if (args === undefined) {
+    result.usage = QUICKSTART_USAGE;
+    return result;
+  }
+  const out = emptyToUndefined(args.out) ?? DEFAULT_OUT_DIR;
   const quickstart = quickstartDir();
   if (!statSync(quickstart, { throwIfNoEntry: false })?.isDirectory()) {
     throw new InputError(
@@ -2074,7 +2155,11 @@ export function main(argv: string[]): number {
 
   const json = argv.includes("--json");
   const debug = argv.includes("--debug");
+  if (debug) {
+    logDebug(command ?? "", "command.start");
+  }
   let result: CommandResult;
+  let failed = false;
   try {
     if (command === "conformance") {
       result = cmdConformance(argv);
@@ -2100,6 +2185,7 @@ export function main(argv: string[]): number {
       result = notImplemented(command ?? "");
     }
   } catch (exc) {
+    failed = true;
     if (exc instanceof AgentceError) {
       result = errorResult(command ?? "", exc);
     } else if (debug) {
@@ -2125,7 +2211,18 @@ export function main(argv: string[]): number {
     }
   }
   emit(result, json);
+  if (debug && !failed && result.usage === undefined) {
+    logDebug(command ?? "", "command.end", { exit_code: result.exitCode });
+  }
   return result.exitCode;
+}
+
+/** One of Python's `--debug` log records (`logsetup.JsonFormatter`): one sorted-key, compact JSON line
+ * on stderr, its timestamp in Python's `isoformat()` shape. */
+function logDebug(command: string, event: string, extra: Record<string, unknown> = {}): void {
+  const ts = new Date().toISOString().replace("Z", "000+00:00");
+  const record = { command, event, level: "debug", logger: "agentce", ts, ...extra };
+  process.stderr.write(`${jsonStringifyAscii(sortKeysDeep(record))}\n`);
 }
 
 if (require.main === module) {

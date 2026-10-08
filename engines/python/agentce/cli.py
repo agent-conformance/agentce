@@ -107,6 +107,13 @@ _, _assess_unknown_error = _make_argv_errors(
     "pass at most one records folder: `agentce assess <folder>`.",
 )
 
+_quickstart_usage_error, _quickstart_unknown_error = _make_argv_errors(
+    "input.quickstart_unrecognized_flag",
+    "run `agentce quickstart --help` for the flags quickstart takes, or drop the flag.",
+    "<dir>",
+    "quickstart takes no other argument: `agentce quickstart --out <dir>`.",
+)
+
 _VERIFY_FLAG_FIX = (
     "pass --bundle, --catalog, --release, or --report (with --signer-trust-root or "
     "--expect-keyid for --report), or drop the flag."
@@ -583,7 +590,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=commands.cmd_doctor)
 
     p = sub.add_parser(
-        "quickstart", parents=[common], help="assess the bundled quickstart project"
+        "quickstart",
+        parents=[common],
+        help="assess the bundled quickstart project",
+        # No prefix matching, as for `assess`: `--ou ./o` is an unrecognized flag in all three
+        # engines, never --out in Python alone, and every argv error is keyed (18.106).
+        allow_abbrev=False,
+        on_error=_quickstart_usage_error,
     )
     p.add_argument("--out", help="the output directory for the report (default: ./out)")
     p.set_defaults(func=commands.cmd_quickstart)
@@ -665,6 +678,7 @@ def _emit_error(err: AgentceError, *, command: str, want_json: bool) -> int:
 
 _UNKNOWN_ARGV_ERRORS: dict[str, Callable[[str], InputError]] = {
     "assess": _assess_unknown_error,
+    "quickstart": _quickstart_unknown_error,
     "readiness": _readiness_unknown_error,
     "sign": _sign_unknown_error,
     "verify": _verify_unknown_error,

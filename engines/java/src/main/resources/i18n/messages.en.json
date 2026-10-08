@@ -73,6 +73,8 @@
   "errors.input.diff_extra_argument.fix": "pass exactly two files: `agentce diff <report-a> <report-b>`.",
   "errors.input.diff_unrecognized_flag.cause": "diff was given a flag it does not recognize.",
   "errors.input.diff_unrecognized_flag.fix": "pass --format text|json|md, or drop the flag.",
+  "errors.input.quickstart_unrecognized_flag.cause": "quickstart was given a flag it does not recognize, or an argument it does not take.",
+  "errors.input.quickstart_unrecognized_flag.fix": "run `agentce quickstart --help` for the flags quickstart takes, or drop the flag.",
   "errors.input.readiness_unrecognized_flag.cause": "readiness was given a flag it does not recognize.",
   "errors.input.readiness_unrecognized_flag.fix": "pass --gaps, --deviations, or --catalog-dir, or drop the flag.",
   "errors.input.trust_root_invalid.cause": "the trust root supplied by --trust-root or AGENTCE_TRUST_ROOT could not be loaded.",
