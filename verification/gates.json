@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.61.0",
+  "suite_version": "0.62.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -2411,6 +2411,61 @@
         }
       ],
       "fix_hint": "run verification/gates/records_folder_parity.sh and read the MISMATCH, REFUSAL and PIN lines, each naming the scenario, step, mode and engine; the reference is engines/python/agentce/records/__init__.py (scan) and cmd_assess's records branch in engines/python/agentce/commands/__init__.py, ported in engines/typescript/src/records.ts, engines/typescript/src/cli.ts (runAssess) and engines/typescript/src/pyyaml.ts; the scenarios and pins are in tools/records_folder_parity_check.py."
+    },
+    {
+      "id": "VG-CLI-OPTIONS",
+      "title": "Command-line options are never ignored: every command line in the shared table gives its expected exit code and refusal key in the real Python, TypeScript and Java CLIs, and a refused run writes nothing (starting with assess --for and --emit)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/cli_options.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 900,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/cli_options/cases.json gives its expected exit code and --json refusal key in each engine (an engine override only where the case says why and names the item that removes it), and no refused run writes a file under --out; the 25 assess rows cover --for with --emit in both spellings and with an empty --emit, unknown, partly unknown and repeated --emit, unknown and empty --for, the bundle refusal before both, a missing --emit or --for value, a known --emit, an empty --emit, a known --for, a repeated --for, no flag, and an unknown, abbreviated (--em, --fo, --ou) or misspelled flag, a flag assess does not take (--format) and a second positional, each refused with input.assess_unrecognized_flag in every engine (TypeScript and Java refuse every well-formed --emit/--for with input.emit_unsupported until 18.16b)",
+        "fail": "any engine gives another exit code or key for a case, accepts an option it then ignores, or a refused run leaves files under --out"
+      },
+      "faults": [
+        {
+          "description": "Python accepts --for together with --emit and lets --for win, so one flag is silently ignored",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    if for_preset is not None and emit_raw is not None:\n",
+          "replace": "    if False:\n"
+        },
+        {
+          "description": "TypeScript accepts a well-formed --emit or --for and writes only the core outputs, ignoring the flag again (the state before 18.105)",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "  if (forPreset !== undefined || emit !== undefined) {\n",
+          "replace": "  if (false) {\n"
+        },
+        {
+          "description": "Java accepts --for together with --emit and refuses only the unsupported flag, so the pair gets another key than Python's",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "        if (forPreset != null && emit != null) {\n",
+          "replace": "        if (false) {\n"
+        },
+        {
+          "description": "Python's assess parser prefix-matches again, so --em md runs as --emit md in Python alone",
+          "file": "engines/python/agentce/cli.py",
+          "search": "never --emit or --for in Python alone (18.105).\n        allow_abbrev=False,\n",
+          "replace": "never --emit or --for in Python alone (18.105).\n        allow_abbrev=True,\n"
+        },
+        {
+          "description": "Java stops refusing an unknown or abbreviated assess flag and runs the assessment without it (the state before 18.105)",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "        refuseUnknownAssessArgs(args);\n",
+          "replace": ""
+        }
+      ],
+      "fix_hint": "run verification/gates/cli_options.sh and read the FAIL lines (case, engine, exit and key). The reference is _parse_emit and _resolve_emit in engines/python/agentce/commands/__init__.py; TypeScript and Java refuse in refuseEmitAndFor (engines/typescript/src/cli.ts, engines/java/src/main/java/org/agentce/Cli.java) and read the values in assessValueFlags. An unknown or abbreviated flag is refused in refuseUnknownAssessArgs (TypeScript, Java) and by allow_abbrev=False plus _assess_unknown_error in engines/python/agentce/cli.py."
     }
   ]
 }

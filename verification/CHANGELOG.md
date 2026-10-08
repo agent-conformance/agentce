@@ -3,6 +3,21 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.62.0
+
+- `VG-CLI-OPTIONS` (18.105) is new: one shared table of command lines, each run through the real Python,
+  TypeScript and Java CLIs, with the exit code and refusal key each engine must give. A refused run must
+  write nothing under `--out`. It starts with 18 `assess --for`/`--emit` rows. TypeScript and Java used to
+  exit 0 and ignore both flags, even an unknown format or the two flags together. They now give Python's
+  refusals in Python's order, and refuse any other `--emit` or `--for` with `input.emit_unsupported` until
+  18.16b ports the formats and presets. Seven more rows cover an unknown flag, a shortened one (`--em`,
+  `--fo`, `--ou`), a misspelling, another command's flag (`--format`) and a second positional, each refused
+  with `input.assess_unrecognized_flag` in every engine. Later command-line items add their rows. The demo
+  has five seeded faults, at least one per engine.
+- `VG-PROJECT-VIEW` and `VG-I18N-ONE-CATALOGUE` (18.105): the TypeScript and Java runs drop
+  `--for risk-lead`, which those engines now refuse. They render the project view whenever the profile
+  names more than one subject, so the files the gates compare are unchanged.
+
 ## 0.61.0
 
 - `VG-DOC01-COMPONENTS` (18.37a) is new. DOC-01, "Operating components match the declared documentation",
