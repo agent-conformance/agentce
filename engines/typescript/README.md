@@ -14,6 +14,13 @@ the same folders and compares their output.
 One known difference: on Linux, a file name that is not valid UTF-8 is shown with Python's surrogate
 escape by the Python engine and with U+FFFD by this one. macOS does not allow such names.
 
+## Test seams
+
+The cross-engine checks call a few computation seams (`numerics`, `digest-tree`, `security-view`,
+`auditor-view`, `fail-on-check`, `otel-genai-fixture`). They are not `agentce` commands, and
+`agentce digest-tree` is refused as an unknown command. They run from their own entry point:
+`node dist/seams.js <seam> ...`, or `pnpm seams <seam> ...` in a checkout.
+
 - Repository: https://github.com/agent-conformance/agentce
 - Website: https://agent-conformance.org
 

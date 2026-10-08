@@ -38,3 +38,13 @@ build/install/agentce/bin/agentce assess \
 build/install/agentce/bin/agentce quickstart --json
 build/install/agentce/bin/agentce report --from ./out/assertions.json --format md
 ```
+
+## Test seams
+
+The cross-engine checks call a few computation seams (`numerics`, `digest-tree`, `security-view`,
+`auditor-view`, `fail-on-check`, `otel-genai-fixture`). They are not `agentce` commands, and
+`agentce digest-tree` is refused as an unknown command. They run from their own class in the same jar:
+
+```
+java -cp 'build/install/agentce/lib/*' org.agentce.Seams digest-tree path/to/catalog
+```
