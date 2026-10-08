@@ -44,10 +44,18 @@ def engine_cmds() -> dict[str, list[str]]:
         sys.exit(
             "cli_options_check: no Java jar under engines/java/build/libs (run cli_options.sh)"
         )
+    # The JIT flags cut each short-lived JVM's CPU about threefold, which the seeded-fault demo pays
+    # once per case per fault; they change compilation only, never what the jar does.
     return {
         "python": [str(Path(sys.executable).parent / "agentce")],
         "typescript": ["node", str(ROOT / "engines/typescript/dist/cli.js")],
-        "java": ["java", "-jar", str(jars[-1])],
+        "java": [
+            "java",
+            "-XX:TieredStopAtLevel=1",
+            "-XX:+UseSerialGC",
+            "-jar",
+            str(jars[-1]),
+        ],
     }
 
 
