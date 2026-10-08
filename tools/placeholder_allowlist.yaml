@@ -231,11 +231,17 @@ allow:
     class: legitimate
     justification: "The TypeScript engine's documented scope is conformance/assess/report/validate/quickstart on the existing ECS path; every other verb returns a stable input_error envelope rather than a guess, which is the honest §8.5 boundary, not an open gap. No engine-parity work commits TypeScript to the remaining Python-only verbs (verify, collect, ingest, catalog, diff, sign, readiness, doctor, init, config)."
 
-  - path: verification/gates/fixtures/cli_options/cases.json
+  - path: verification/CHANGELOG.md
     pattern: not-implemented
     count: 1
     class: legitimate
-    justification: "VG-CLI-OPTIONS's unknown-command row records the key TypeScript and Java give today (cli.not_implemented) in an override that names 18.108, the item that moves all three engines to one shared key; it is an expected value, not an open gap in the gate."
+    justification: "VG-CLI-OPTIONS's 0.66.0 entry quotes what TypeScript and Java answered before 18.108 (\"not yet implemented\" for an unknown command); it records the fixed defect, not an open gap."
+
+  - path: verification/gates.json
+    pattern: not-implemented
+    count: 1
+    class: legitimate
+    justification: "A VG-CLI-OPTIONS seeded fault's description names the state before 18.108, when TypeScript answered an unknown command with cli.not_implemented; it describes the fault the gate must catch, not an unfinished part of the check."
 
   - path: engines/typescript/src/report.test.ts
     pattern: todo

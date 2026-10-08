@@ -3,6 +3,19 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.66.0
+
+- `VG-CLI-OPTIONS` (18.108) grows from 79 to 119 rows and from eleven to seventeen seeded faults. The
+  rows cover the top-level command line. TypeScript and Java answered `agentce`, `agentce --help`, an
+  unknown command and `agentce --json version` with "not yet implemented", and ran the test seam
+  `digest-tree` as if it were a command. All three engines now read the tokens before the command the
+  same way. They print the same usage screen, and refuse an unknown command or flag with
+  `input.unknown_command` at exit 3. `--version` with anything else on the line is refused in every
+  engine, where Python used to drop the rest. The six test seams move out of the TypeScript and Java CLIs
+  into their own entry points (`dist/seams.js`, `org.agentce.Seams`), and `VG-SECURITY-VIEW`,
+  `VG-DEVIATIONS-PARITY` and `VG-FAIL-ON-PARITY` call them there. The gate now runs TypeScript through
+  the npm bin, so its `--version` shortcut is covered too.
+
 ## 0.65.0
 
 - `VG-CLI-OPTIONS` (18.107) grows from 45 to 79 rows and from nine to eleven seeded faults. Python

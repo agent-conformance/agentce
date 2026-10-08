@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.65.0",
+  "suite_version": "0.66.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -2438,7 +2438,7 @@
     },
     {
       "id": "VG-CLI-OPTIONS",
-      "title": "Command-line options are never ignored: every command line in the shared table gives its expected exit code and refusal key in the real Python, TypeScript and Java CLIs, and a refused run writes nothing (assess --for and --emit, unknown assess flags, every quickstart option, and every command's keyed argv errors)",
+      "title": "Command-line options are never ignored: every command line in the shared table gives its expected exit code and refusal key in the real Python, TypeScript and Java CLIs, and a refused run writes nothing (assess --for and --emit, unknown assess flags, every quickstart option, every command's keyed argv errors, and the top-level command line: usage, --version, global flags before the command, unknown commands and the test seams)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -2454,7 +2454,7 @@
       "timeout_s": 900,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/cli_options/cases.json gives its expected exit code and --json refusal key in each engine (an engine override only where the case says why and names the item that removes it), and no refused run writes a file under --out; the 25 assess rows cover --for with --emit in both spellings and with an empty --emit, unknown, partly unknown and repeated --emit, unknown and empty --for, the bundle refusal before both, a missing --emit or --for value, a known --emit, an empty --emit, a known --for, a repeated --for, no flag, and an unknown, abbreviated (--em, --fo, --ou) or misspelled flag, a flag assess does not take (--format) and a second positional, each refused with input.assess_unrecognized_flag in every engine (TypeScript and Java refuse every well-formed --emit/--for with input.emit_unsupported until 18.16b); the 20 quickstart rows run in a fresh working directory and cover no option, --out d, --out=d, --out= and a repeated --out (each writes only the expected directory), --quiet, --debug (Python's command.start and command.end records on stderr), -h, --help and -h after an unknown flag (usage, byte-identical across engines, nothing written), --out under a file, and the refusals with input.quickstart_unrecognized_flag that name the token and write nothing: a value-less --out at the end and before a flag, --ou, --no-such-flag, --trust-root, an extra positional, --json=1, a bare -- and -- x; the 34 argv-error rows (18.107) cover -hx and -hh on quickstart, assess, readiness, sign, verify and diff, a -h cluster after a real target (verify --bundle <dir> -hx, sign <dir> --as claimant -hx) and after a dash-led value (assess --out -1 -hx, quickstart --out - -hx), diff --no-such-flag and diff --he, conformance nope, report --format nope, a value-less report --validate, assess --fail-on and assess --out, and, keyed in Python where TypeScript or Java still differ (each override names 18.108, 18.109, 18.110 or 18.111), validate --he and --bun x, report --he, --form md and --no-such-flag, conformance --he and conformance run --he, version --no-such-flag, -hx and --he, and an unknown command; a red run stops at its first failure and skips the runs not yet started",
+        "pass": "every case in verification/gates/fixtures/cli_options/cases.json gives its expected exit code and --json refusal key in each engine (an engine override only where the case says why and names the item that removes it), and no refused run writes a file under --out; the 25 assess rows cover --for with --emit in both spellings and with an empty --emit, unknown, partly unknown and repeated --emit, unknown and empty --for, the bundle refusal before both, a missing --emit or --for value, a known --emit, an empty --emit, a known --for, a repeated --for, no flag, and an unknown, abbreviated (--em, --fo, --ou) or misspelled flag, a flag assess does not take (--format) and a second positional, each refused with input.assess_unrecognized_flag in every engine (TypeScript and Java refuse every well-formed --emit/--for with input.emit_unsupported until 18.16b); the 20 quickstart rows run in a fresh working directory and cover no option, --out d, --out=d, --out= and a repeated --out (each writes only the expected directory), --quiet, --debug (Python's command.start and command.end records on stderr), -h, --help and -h after an unknown flag (usage, byte-identical across engines, nothing written), --out under a file, and the refusals with input.quickstart_unrecognized_flag that name the token and write nothing: a value-less --out at the end and before a flag, --ou, --no-such-flag, --trust-root, an extra positional, --json=1, a bare -- and -- x; the 34 argv-error rows (18.107) cover -hx and -hh on quickstart, assess, readiness, sign, verify and diff, a -h cluster after a real target (verify --bundle <dir> -hx, sign <dir> --as claimant -hx) and after a dash-led value (assess --out -1 -hx, quickstart --out - -hx), diff --no-such-flag and diff --he, conformance nope, report --format nope, a value-less report --validate, assess --fail-on and assess --out, and, keyed in Python where TypeScript or Java still differ (each override names 18.109, 18.110 or 18.111), validate --he and --bun x, report --he, --form md and --no-such-flag, conformance --he and conformance run --he, version --no-such-flag, -hx and --he, and an unknown command; the 40 top-level rows (18.108, TypeScript run through the npm bin) cover no arguments, -h, --help and -h after an unknown flag or before -V (the usage, byte-identical across engines), -V and --version alone (the same version line), --json, --quiet and --debug before a command (the --json envelope names the command, the --debug records name it) and `-- version`, and refuse with input.unknown_command at exit 3: a short cluster (-hx, -hh, -Vx, -hx assess), an abbreviation (--he), an unknown or empty command, each of the six test seams, an unknown flag alone or before a command, a value on a flag that takes none, `--` with nothing or a flag after it, global flags with no command, and -V or --version with anything else on the line; a red run stops at its first failure and skips the runs not yet started",
         "fail": "any engine gives another exit code or key for a case, accepts an option it then ignores, or a refused run leaves files under --out"
       },
       "faults": [
@@ -2523,9 +2523,45 @@
           "file": "engines/python/agentce/cli.py",
           "search": "            p._argv_errors = _ARGV[name]\n",
           "replace": "            p._argv_errors = None if name == \"diff\" else _ARGV[name]\n"
+        },
+        {
+          "description": "TypeScript answers an unknown command as not yet implemented again (cli.not_implemented), not with input.unknown_command (the state before 18.108)",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "      if (!COMMANDS.has(command)) {\n",
+          "replace": "      if (false) {\n"
+        },
+        {
+          "description": "Java's --version prints the version and drops the rest of the line again, so --version -hx exits 0 (inbox row 162)",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "                if (argv.length != 1) {\n",
+          "replace": "                if (false) {\n"
+        },
+        {
+          "description": "Python stops refusing an unknown flag before the command, so --no-such-flag version gets the version command's key in Python alone",
+          "file": "engines/python/agentce/cli.py",
+          "search": "    if unknown is not None:\n        raise _TOP_ARGV.unknown(unknown)\n",
+          "replace": ""
+        },
+        {
+          "description": "the npm bin's --version shortcut fires on any first --version again, so the installed command prints the version for --version -hx where dist/cli.js refuses it",
+          "file": "engines/typescript/bin/agentce.js",
+          "search": "if (args.length === 1 && (args[0] === \"--version\" || args[0] === \"-V\")) {\n",
+          "replace": "if (args[0] === \"--version\" || args[0] === \"-V\") {\n"
+        },
+        {
+          "description": "TypeScript drops a --json given before the command, so agentce --json version prints text, not the envelope",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "  const json = top.globals.has(\"--json\") || argv.includes(\"--json\");\n",
+          "replace": "  const json = argv.includes(\"--json\");\n"
+        },
+        {
+          "description": "TypeScript's --debug start record names the first token on the line (--debug), not the command it runs",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "    logDebug(command, \"command.start\");\n",
+          "replace": "    logDebug(rawArgv[0] as string, \"command.start\");\n"
         }
       ],
-      "fix_hint": "run verification/gates/cli_options.sh and read the FAIL lines (case, engine, exit and key). The reference is _parse_emit and _resolve_emit in engines/python/agentce/commands/__init__.py; TypeScript and Java refuse in refuseEmitAndFor (engines/typescript/src/cli.ts, engines/java/src/main/java/org/agentce/Cli.java) and read the values in assessValueFlags. An unknown or abbreviated flag is refused in refuseUnknownAssessArgs (TypeScript, Java) and by allow_abbrev=False plus _assess_unknown_error in engines/python/agentce/cli.py. quickstart: allow_abbrev=False plus _quickstart_usage_error/_quickstart_unknown_error in engines/python/agentce/cli.py, parseQuickstartArgv in TypeScript and Java, --debug records in logDebug (main), -h usage through CommandResult.usage."
+      "fix_hint": "run verification/gates/cli_options.sh and read the FAIL lines (case, engine, exit and key). The reference is _parse_emit and _resolve_emit in engines/python/agentce/commands/__init__.py; TypeScript and Java refuse in refuseEmitAndFor (engines/typescript/src/cli.ts, engines/java/src/main/java/org/agentce/Cli.java) and read the values in assessValueFlags. An unknown or abbreviated flag is refused in refuseUnknownAssessArgs (TypeScript, Java) and by allow_abbrev=False plus _assess_unknown_error in engines/python/agentce/cli.py. quickstart: allow_abbrev=False plus _quickstart_usage_error/_quickstart_unknown_error in engines/python/agentce/cli.py, parseQuickstartArgv in TypeScript and Java, --debug records in logDebug (main), -h usage through CommandResult.usage. The top level: _scan_top_level in engines/python/agentce/cli.py, scanTopLevel in engines/typescript/src/cli.ts and Cli.java, the --version shortcut in engines/typescript/bin/agentce.js; the test seams live in engines/typescript/src/seams.ts and org.agentce.Seams, never the CLI."
     }
   ]
 }

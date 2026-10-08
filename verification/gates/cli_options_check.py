@@ -49,7 +49,8 @@ def engine_cmds() -> dict[str, list[str]]:
     # once per case per fault; they change compilation only, never what the jar does.
     return {
         "python": [str(Path(sys.executable).parent / "agentce")],
-        "typescript": ["node", str(ROOT / "engines/typescript/dist/cli.js")],
+        # The npm bin, which loads dist/cli.js: the entry point npm users run (18.108).
+        "typescript": ["node", str(ROOT / "engines/typescript/bin/agentce.js")],
         "java": [
             "java",
             "-XX:TieredStopAtLevel=1",
@@ -72,8 +73,8 @@ def refusal_key(stdout: str) -> str | None:
     return error.get("key") or error.get("message_key")
 
 
-def debug_log_problem(stderr: str) -> str | None:
-    """Why stderr does not hold exactly Python's two --debug records, or None when it does."""
+def debug_log_problem(stderr: str, command: str) -> str | None:
+    """Why stderr does not hold exactly Python's two --debug records naming the command, or None."""
     records = []
     for line in stderr.splitlines():
         try:
@@ -81,9 +82,25 @@ def debug_log_problem(stderr: str) -> str | None:
         except ValueError:
             continue
         if isinstance(record, dict) and record.get("logger") == "agentce":
+            if record.get("command") != command:
+                return f"--debug record names command {record.get('command')!r}, want {command!r}"
             records.append((record.get("event"), list(record)))
     if records != DEBUG_RECORDS:
         return f"--debug records {records}, want {DEBUG_RECORDS}"
+    return None
+
+
+def envelope_problem(stdout: str, command: str) -> str | None:
+    """Why stdout is not the --json envelope of a successful run of the command, or None."""
+    try:
+        envelope = json.loads(stdout)
+    except ValueError:
+        return "stdout is not a --json envelope"
+    if not isinstance(envelope, dict) or (
+        envelope.get("command"),
+        envelope.get("exit_code"),
+    ) != (command, 0):
+        return f"envelope is not command {command!r} with exit_code 0"
     return None
 
 
@@ -102,10 +119,15 @@ def run(
                 t.replace("{root}", str(ROOT)).replace("{out}", str(out))
                 for t in (bundle_args if token == "{B}" else [token])
             ]
-        # --json goes right after the command: TypeScript and Java read it only after the command, and
-        # a case can then end on a value-less flag or put tokens after `--`.
+        # --json goes right after the first token by default, so a case can end on a value-less flag or
+        # put tokens after `--`; "front" puts it first, "none" leaves it out (18.108, top-level rows).
+        placed = {
+            "after": argv[:1] + ["--json"] + argv[1:],
+            "front": ["--json", *argv],
+            "none": argv,
+        }[case.get("json", "after")]
         p = subprocess.run(
-            [*cmd, argv[0], "--json", *argv[1:]],
+            [*cmd, *placed],
             cwd=tmp,
             capture_output=True,
             text=True,
@@ -130,7 +152,11 @@ def run(
             )
     if "says" in case and case["says"] not in p.stdout + p.stderr:
         problems.append(f"output does not name {case['says']!r}")
-    if case.get("debug_log") and (problem := debug_log_problem(p.stderr)):
+    if case.get("debug_log") and (
+        problem := debug_log_problem(p.stderr, case["debug_log"])
+    ):
+        problems.append(problem)
+    if "envelope" in case and (problem := envelope_problem(p.stdout, case["envelope"])):
         problems.append(problem)
     if p.returncode != want["exit"]:
         problems.append(f"exit {p.returncode}, want {want['exit']}")
