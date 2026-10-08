@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.66.0",
+  "suite_version": "0.67.0",
   "gates": [
     {
       "id": "VG-SUITE-SELFTEST",
@@ -723,9 +723,9 @@
         },
         {
           "description": "Java's assess reads only the two-token --deviations <path> spelling, so --deviations=<path> (S15) silently applies nothing",
-          "file": "engines/java/src/main/java/org/agentce/Cli.java",
-          "search": "                values.put(name, token.substring(eq + 1));\n",
-          "replace": "                if (!name.equals(\"--deviations\")) values.put(name, token.substring(eq + 1));\n"
+          "file": "engines/java/src/main/java/org/agentce/Argv.java",
+          "search": "                        values.put(name, value);\n",
+          "replace": "                        if (explicit == null || !name.equals(\"--deviations\")) values.put(name, value);\n"
         },
         {
           "description": "TypeScript's loadDeviationRegister decodes the register lossily instead of refusing non-UTF-8 bytes (S17)",
@@ -741,9 +741,9 @@
         },
         {
           "description": "Java's --deviations lookup keeps the first value when the flag is given twice (S22, S22b)",
-          "file": "engines/java/src/main/java/org/agentce/Cli.java",
-          "search": "                values.put(name, args[++i]);\n",
-          "replace": "                values.putIfAbsent(name, args[++i]);\n"
+          "file": "engines/java/src/main/java/org/agentce/Argv.java",
+          "search": "                        values.put(name, value);\n",
+          "replace": "                        values.putIfAbsent(name, value);\n"
         },
         {
           "description": "TypeScript's loadDeviationRegister names the register by the path as typed, not as Python's pathlib renders it, so a `.` segment (S6D) changes the cause",
@@ -2241,9 +2241,9 @@
         },
         {
           "description": "Java's assess value-flag scan keeps the first value when --fail-on is given twice (F8, F8b)",
-          "file": "engines/java/src/main/java/org/agentce/Cli.java",
-          "search": "                values.put(name, args[++i]);\n",
-          "replace": "                if (!values.containsKey(name)) values.put(name, args[i + 1]);\n                i++;\n"
+          "file": "engines/java/src/main/java/org/agentce/Argv.java",
+          "search": "                        values.put(name, value);\n",
+          "replace": "                        values.putIfAbsent(name, value);\n"
         },
         {
           "description": "Java's assess parses the --fail-on expression after the catalogs resolve, so a bad expression with an unknown --catalog is refused for the catalog (O3)",
@@ -2271,9 +2271,9 @@
         },
         {
           "description": "TypeScript's assess reads only the two-token --fail-on <expression> spelling, so --fail-on=<expression> is ignored (F7)",
-          "file": "engines/typescript/src/cli.ts",
-          "search": "      values.set(name, token.slice(eq + 1));\n",
-          "replace": "      if (name !== \"--fail-on\") values.set(name, token.slice(eq + 1));\n"
+          "file": "engines/typescript/src/argv.ts",
+          "search": "      values[key] = value;\n",
+          "replace": "      if (c.explicit === undefined || key !== \"--fail-on\") values[key] = value;\n"
         }
       ],
       "fix_hint": "run verification/gates/fail_on_parity.sh and read the FAIL lines; the reference is engines/python/agentce/fail_on.py (parse_fail_on) and cmd_assess's --fail-on handling in engines/python/agentce/commands/__init__.py, ported in engines/typescript/src/failOn.ts and cli.ts (runAssess, assessValueFlags) and engines/java/src/main/java/org/agentce/FailOn.java and Cli.java (runAssess, assessValueFlags)."
@@ -2484,9 +2484,9 @@
         },
         {
           "description": "Java stops refusing an unknown or abbreviated assess flag and runs the assessment without it (the state before 18.105)",
-          "file": "engines/java/src/main/java/org/agentce/Cli.java",
-          "search": "        refuseUnknownAssessArgs(args);\n",
-          "replace": ""
+          "file": "engines/java/src/main/java/org/agentce/Argv.java",
+          "search": "        if (!extras.isEmpty()) {\n",
+          "replace": "        if (false) {\n"
         },
         {
           "description": "Python's quickstart parser prefix-matches again, so --ou o runs as --out o in Python alone",
@@ -2588,6 +2588,73 @@
         }
       ],
       "fix_hint": "run `bash verification/gates/cli_options.sh top_level.json` and read the FAIL lines (case, engine, exit and key). The top level is read by _scan_top_level in engines/python/agentce/cli.py, scanTopLevel in engines/typescript/src/cli.ts and Cli.java, and the --version shortcut in engines/typescript/bin/agentce.js; the test seams live in engines/typescript/src/seams.ts and org.agentce.Seams, never the CLI."
+    },
+    {
+      "id": "VG-CLI-ASSESS",
+      "title": "assess's command line is read the same way in all three engines: -h and --help print the same usage anywhere before --, every value option takes its = form and its last repeat, an unknown or removed flag, a missing value and a value on a flag are refused with a key, --report-language is read or refused, and Java refuses a records folder with its own key",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/cli_options.sh",
+        "assess.json"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 600,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/cli_options/assess.json gives its expected exit code and --json refusal key in the real Python, TypeScript (through the npm bin) and Java CLIs, and a refused run writes nothing: -h and --help alone, beside --bundle and --out, and before or after an unknown flag print a byte-identical usage and write nothing; -h after -- and a cluster are refused; --manual, --probes, --records, --format, --ou, a value on a flag and a second folder get input.assess_unrecognized_flag; a value-less --out or --report-language gets input.assess_flag_needs_value; the = form of all 13 value options gets each option's own refusal for a bad value and runs for a good one; the last of a repeated --out, --bundle and --profile wins; --report-language xx, '' and ../x get input.report_language_unknown and de writes the German report.md; a bare --allow-unverified-catalog gets input.allow_unverified_requires_catalog_dir; --package-for-sharing writes bundle/ in Python and gets input.package_unsupported in TypeScript and Java; the records-folder rows give Python's keys (Java: input.records_unsupported for an existing folder)",
+        "fail": "any engine gives another exit code or key for a case, prints another usage, writes under --out on a refused run, takes the first of a repeated option, ignores an = form, or writes an English report for --report-language de"
+      },
+      "faults": [
+        {
+          "description": "TypeScript's scanner takes the first of a repeated value again (first wins), so --out a --out b writes a",
+          "file": "engines/typescript/src/argv.ts",
+          "search": "      values[key] = value;\n",
+          "replace": "      values[key] ??= value;\n"
+        },
+        {
+          "description": "Java's scanner drops the = form again, so --bundle=<dir> is an unknown flag",
+          "file": "engines/java/src/main/java/org/agentce/Argv.java",
+          "search": "                if (joined != null) {\n",
+          "replace": "                if (false) {\n"
+        },
+        {
+          "description": "TypeScript stops printing the usage when it reaches -h, so -h beside --bundle runs the assessment (KD-078)",
+          "file": "engines/typescript/src/argv.ts",
+          "search": "      if (spec.kind === \"help\") {\n        return { help: true, values, lists, flags, positionals };\n      }\n",
+          "replace": ""
+        },
+        {
+          "description": "Java stops refusing an unknown flag, so --no-such-flag is dropped and the run goes ahead",
+          "file": "engines/java/src/main/java/org/agentce/Argv.java",
+          "search": "        if (!extras.isEmpty()) {\n",
+          "replace": "        if (false) {\n"
+        },
+        {
+          "description": "Python accepts --manual again and never reads it",
+          "file": "engines/python/agentce/cli.py",
+          "search": "    p.add_argument(\n        \"--package-for-sharing\",\n",
+          "replace": "    p.add_argument(\"--manual\")\n    p.add_argument(\n        \"--package-for-sharing\",\n"
+        },
+        {
+          "description": "Python accepts an unknown --report-language again and writes an English report",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "        and report_language not in messages.available_languages()\n",
+          "replace": "        and False\n"
+        },
+        {
+          "description": "TypeScript ignores --report-language again and writes an English report.md for de",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "    reportLanguage: v[\"--report-language\"],\n",
+          "replace": "    reportLanguage: undefined,\n"
+        }
+      ]
     }
   ]
 }

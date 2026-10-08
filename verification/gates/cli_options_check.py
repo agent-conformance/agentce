@@ -141,6 +141,14 @@ def run(
             else []
         )
         entries = sorted(e.name for e in Path(tmp).iterdir())
+        # 'has' and 'first_line' judge an engine that runs as the case expects (no override), 18.109.
+        own = engine not in case.get("engines", {})
+        missing = own and "has" in case and not (Path(tmp) / case["has"]).exists()
+        line = None
+        if own and "first_line" in case:
+            target = Path(tmp) / case["first_line"]["file"]
+            text = target.read_text("utf-8") if target.is_file() else ""
+            line = text.splitlines()[0] if text else ""
         filled = [
             e for e in entries if any(f.is_file() for f in (Path(tmp) / e).rglob("*"))
         ]
@@ -152,6 +160,12 @@ def run(
             problems.append(
                 f"wrote {entries} (with files: {filled}), want {want_entries}"
             )
+    if missing:
+        problems.append(f"did not write {case['has']}")
+    if line is not None and line != case["first_line"]["line"]:
+        problems.append(
+            f"{case['first_line']['file']} starts {line!r}, want {case['first_line']['line']!r}"
+        )
     if "says" in case and case["says"] not in p.stdout + p.stderr:
         problems.append(f"output does not name {case['says']!r}")
     if case.get("debug_log") and (

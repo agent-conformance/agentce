@@ -3,6 +3,21 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.67.0
+
+- `VG-CLI-ASSESS` (18.109) is new, with 54 rows and seven seeded faults, and covers `assess`'s command
+  line. TypeScript and Java said the bundle was missing for `assess -h`, ran the assessment when `-h` sat
+  beside `--bundle`, ignored the `=` form of most options, took the first of a repeated option, and wrote
+  an English report for `--report-language de`. All three engines accepted `--manual` and `--probes`
+  without reading them, any `--report-language`, and `--allow-unverified-catalog` with no `--catalog-dir`.
+  Each engine now reads assess's options from one declared table. All three refuse those lines with a key
+  at exit 3, and Java refuses a records folder with `input.records_unsupported`, not
+  `input.bundle_missing`. The gate runs the same helper as `VG-CLI-OPTIONS` on its own case file, which
+  can now also require a path the run writes (`has`) and a file's first line (`first_line`).
+- `VG-CLI-OPTIONS` (18.109): the value-less `assess --out` row no longer needs a TypeScript or Java override, and its
+  Java unknown-flag fault, with the Java and TypeScript `--deviations` and `--fail-on` faults of
+  `VG-DEVIATIONS-PARITY` and `VG-FAIL-ON-PARITY`, now seeds the new scanners (`Argv.java`, `argv.ts`).
+
 ## 0.66.0
 
 - `VG-CLI-TOP-LEVEL` (18.108) is new, with 40 rows and six seeded faults, and covers the top-level command
