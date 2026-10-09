@@ -280,3 +280,107 @@ test("ROB-02: an untrusted origin class with no ruling taints", () => {
   });
   assert.deepEqual(robust([marked, used]), ["true"]);
 });
+
+function instructionEvent(id: string, sourceClass: string, refs: Record<string, string> = {}) {
+  const named = Object.fromEntries(
+    Object.entries(refs).map(([key, ref]) => [key, `agentce:event/${ref}`]),
+  );
+  return memoryEvent(id, "Instruction", {
+    source_class: sourceClass,
+    ...(Object.keys(named).length > 0 ? { refs: named } : {}),
+  });
+}
+
+function callEvent(id = "tc1", instruction = "i1") {
+  return memoryEvent(id, "ToolCall", { refs: { instruction: `agentce:event/${instruction}` } });
+}
+
+/** CND-05's flag on `acting`, a ToolCall or Decision that acts on an instruction. */
+function acts(events: Record<string, unknown>[], acting = "tc1"): string[] {
+  const store = buildGraph(events, { domain: MINOR_DOMAIN });
+  return store.literalValues(`agentce:event/${acting}`, "agentce:actsOnUntrusted");
+}
+
+test("CND-05: an action on an instruction reads the instruction's own class", () => {
+  assert.deepEqual(acts([instructionEvent("i1", "tool_output"), callEvent()]), ["true"]);
+  assert.deepEqual(acts([instructionEvent("i1", "user"), callEvent()]), ["false"]);
+});
+
+test("CND-05: the parent chain is followed for any number of hops, in any order", () => {
+  for (const [root, expected] of [
+    ["retrieved", "true"],
+    ["service", "false"],
+  ]) {
+    const events = [
+      instructionEvent("i3", root),
+      instructionEvent("i2", "operator", { parent: "i3" }),
+      instructionEvent("i1", "user", { parent: "i2" }),
+      callEvent(),
+    ];
+    assert.deepEqual(acts(events), [expected], root);
+    assert.deepEqual(acts([...events].reverse()), [expected], root);
+  }
+});
+
+test("CND-05: an origin tool call or resource access produced untrusted content", () => {
+  const call = callEvent("tc0", "i0");
+  const access = memoryEvent("ra0", "ResourceAccess", { operation: "read" });
+  for (const origin of ["tc0", "ra0"]) {
+    const events = [instructionEvent("i0", "user"), call, access];
+    events.push(instructionEvent("i1", "user", { origin }), callEvent());
+    assert.deepEqual(acts(events), ["true"], origin);
+  }
+  assert.deepEqual(acts([instructionEvent("i0", "user"), call], "tc0"), ["false"]);
+});
+
+test("CND-05: an origin read the guard marked untrusted taints the chain", () => {
+  const write = memoryEvent("w1", "MemoryWrite", { record_ref: "mem:r1", trust: "trusted" });
+  for (const [trustMin, expected] of [
+    ["untrusted", "true"],
+    ["trusted", "false"],
+  ]) {
+    const read = memoryEvent("m1", "MemoryRead", { record_refs: ["mem:r1"], trust_min: trustMin });
+    const events = [write, read, instructionEvent("i1", "memory_trusted", { origin: "m1" })];
+    assert.deepEqual(acts([...events, callEvent()]), [expected], trustMin);
+  }
+  const bad = memoryEvent("w1", "MemoryWrite", { record_ref: "mem:r1", trust: "untrusted" });
+  const read = memoryEvent("m1", "MemoryRead", { record_refs: ["mem:r1"], trust_min: "trusted" });
+  const events = [bad, read, instructionEvent("i1", "memory_trusted", { origin: "m1" })];
+  assert.deepEqual(acts([...events, callEvent()]), ["true"]);
+});
+
+test("CND-05: the walk ends on cycles and never walks down the chain", () => {
+  const cycle = [
+    instructionEvent("i1", "user", { parent: "i2" }),
+    instructionEvent("i2", "user", { parent: "i1" }),
+    callEvent(),
+  ];
+  assert.deepEqual(acts(cycle), ["false"]);
+  const child = [
+    instructionEvent("i1", "user"),
+    instructionEvent("i2", "tool_output", { parent: "i1" }),
+  ];
+  assert.deepEqual(acts([...child, callEvent()]), ["false"]);
+});
+
+test("CND-05: a decision acting on a derived untrusted instruction is flagged", () => {
+  const decision = {
+    ...decisionEvent("d1"),
+    data: { ...decisionEvent("d1").data, refs: { instruction: "agentce:event/i1" } },
+  };
+  const events = [
+    instructionEvent("i0", "tool_output"),
+    instructionEvent("i1", "user", { parent: "i0" }),
+  ];
+  assert.deepEqual(acts([...events, decision], "d1"), ["true"]);
+});
+
+test("CND-05: a parent or origin the bundle does not hold fails closed", () => {
+  for (const key of ["parent", "origin"]) {
+    assert.deepEqual(
+      acts([instructionEvent("i1", "user", { [key]: "gone" }), callEvent()]),
+      ["true"],
+      key,
+    );
+  }
+});

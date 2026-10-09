@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.72.0",
+  "suite_version": "0.73.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2954,6 +2954,50 @@
           "replace": "    if False:\n"
         }
       ]
+    },
+    {
+      "id": "VG-CND05-CHAIN",
+      "title": "CND-05 follows an instruction's chain in all three engines: a tool call acting on an instruction whose refs.parent or refs.origin lineage passes through an untrusted source class, by any number of hops, is non-conformant, where the chain passes through an untrusted source class at an instruction of an untrusted Appendix F class, at a tool call or resource access that produced the content, at a memory read the guard marked untrusted, or at a parent or origin the bundle does not hold; trusted chains, cycles and untrusted instructions off the chain do not fail it (18.37l)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/cnd05_chain.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/cnd05_chain/cases.json (a direct tool_output instruction and a direct user one; a user instruction whose refs.parent is a tool_output instruction; two refs.parent hops to a retrieved instruction; three hops to a memory_untrusted one; refs.origin a guard read at trust_min untrusted, or a read of a record the guard wrote untrusted; refs.origin a tool call or a resource access; a parent then an origin hop; the instruction after the call in the file; a parent cycle with and without a tool_output instruction on it; two calls, one on an untrusted chain; a parent or origin the bundle does not hold; each with trusted twins: an operator parent, a two-hop service chain, a trusted read origin, an untrusted child of the acted-on instruction, an untrusted instruction off the chain) gives the expected CND-05 outcome, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined",
+        "fail": "any case gives another CND-05 outcome, another set of failing events or another exit code in any engine, or quarantines a record"
+      },
+      "faults": [
+        {
+          "description": "Python reads only the acted-on instruction's own source class, so a user instruction derived from a tool_output instruction passes CND-05",
+          "file": "engines/python/agentce/graph.py",
+          "search": "            acts = isinstance(instruction, str) and instruction in untrusted\n",
+          "replace": "            acts = isinstance(instruction, str) and self.instruction_untrusted.get(instruction, False)\n"
+        },
+        {
+          "description": "TypeScript reads only the acted-on instruction's own source class, so a user instruction derived from a tool_output instruction passes CND-05",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "const acts = typeof instruction === \"string\" && untrusted.has(instruction);",
+          "replace": "const acts = typeof instruction === \"string\" && (this.instructionUntrusted.get(instruction) ?? false);"
+        },
+        {
+          "description": "Java reads only the acted-on instruction's own source class, so a user instruction derived from a tool_output instruction passes CND-05",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "boolean acts = instruction != null && untrusted.contains(instruction);",
+          "replace": "boolean acts = instruction != null && instructionUntrusted.getOrDefault(instruction, false);"
+        }
+      ],
+      "fix_hint": "Run verification/gates/cnd05_chain.sh; it names the engine, the case, the CND-05 outcome and failing events it gave and the ones expected. The rule is actsOnUntrusted in each engine's graph builder: the refs.parent / refs.origin closure over instructions, seeded with tool calls, resource accesses and ROB-02's tainted set."
     }
   ]
 }

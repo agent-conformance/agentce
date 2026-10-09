@@ -464,21 +464,65 @@ class Builder {
     }
   }
 
-  /** Flag every ToolCall/Decision that acts on an untrusted instruction (SPEC §7.7, CND-05). Runs
-   * after every event is mapped so the acting event may precede its instruction. */
-  private actsOnUntrusted(events: Event[]): void {
+  /** Flag every ToolCall/Decision that acts on an instruction whose chain passes through an untrusted
+   * source class (SPEC §7.7.4, CND-05). The chain is the instruction's `refs.parent` and `refs.origin`
+   * lineage (`agentce:derivedFrom`, SPEC §6.3) for as many hops as the records show. It passes through
+   * an untrusted source class at an instruction of an untrusted Appendix F class, at a tool call or
+   * resource access (the content they produce is `tool_output` or `retrieved`), at a parent or origin the
+   * bundle does not hold, and at anything ROB-02's taint closure reached (`tainted`: an untrusted memory
+   * read or write, or content that used one). A closure over all events, so the acting event may
+   * precede its instruction and cycles end. */
+  private actsOnUntrusted(events: Event[], tainted: Set<string>): void {
+    const untrusted = new Set(tainted);
+    const derived = new Map<string, Set<string>>();
+    const held = new Set<string>();
+    for (const event of events) {
+      const ptype = this.ptype(event);
+      const node = eventIri(String(event.id));
+      held.add(node);
+      if (ptype === "ToolCall" || ptype === "ResourceAccess") {
+        untrusted.add(node);
+      } else if (ptype === "Instruction") {
+        const refs = refsOf(event);
+        for (const key of ["parent", "origin"]) {
+          const source = refs[key];
+          if (typeof source === "string") {
+            let children = derived.get(source);
+            if (children === undefined) {
+              children = new Set();
+              derived.set(source, children);
+            }
+            children.add(node);
+          }
+        }
+      }
+    }
+    // A lineage the bundle does not hold cannot show a trusted root, so it fails closed.
+    for (const source of derived.keys()) {
+      if (!held.has(source)) {
+        untrusted.add(source);
+      }
+    }
+    const pending = [...untrusted];
+    while (pending.length > 0) {
+      for (const child of derived.get(pending.pop() as string) ?? []) {
+        if (!untrusted.has(child)) {
+          untrusted.add(child);
+          pending.push(child);
+        }
+      }
+    }
     for (const event of events) {
       const ptype = this.ptype(event);
       if (ptype !== "ToolCall" && ptype !== "Decision") {
         continue;
       }
       const instruction = refsOf(event).instruction;
-      const untrusted =
-        typeof instruction === "string" && (this.instructionUntrusted.get(instruction) ?? false);
+      const acts = typeof instruction === "string" && untrusted.has(instruction);
       this.store.addLiteral(
         eventIri(String(event.id)),
         "agentce:actsOnUntrusted",
-        untrusted ? "true" : "false",
+        acts ? "true" : "false",
         BOOL,
       );
     }
@@ -495,8 +539,9 @@ class Builder {
    * write and no enforcement-point read with a `trust_min` covers, and a ref the bundle does not hold.
    * Both flow along every edge that carries content into an event (CONTENT_IN, CONTENT_OUT, a read to
    * its consumer, a record to and from its writes) for as many hops as the records show. Closures over
-   * all events, so order and cycles never matter. */
-  private robustToUntrusted(events: Event[]): void {
+   * all events, so order and cycles never matter. Returns the tainted closure, which CND-05's
+   * instruction chain also reads (`actsOnUntrusted`). */
+  private robustToUntrusted(events: Event[]): Set<string> {
     const flows = new Map<string, Set<string>>();
     const tainted = new Set<string>();
     const unruled = new Set<string>();
@@ -617,6 +662,7 @@ class Builder {
         );
       }
     }
+    return tainted;
   }
 
   private materialise(events: Event[]): void {
@@ -645,8 +691,7 @@ class Builder {
       }
       this.chainTerminus(node, data);
     }
-    this.actsOnUntrusted(events);
-    this.robustToUntrusted(events);
+    this.actsOnUntrusted(events, this.robustToUntrusted(events));
     this.conductScopeBudget(events);
     this.precededBy();
   }

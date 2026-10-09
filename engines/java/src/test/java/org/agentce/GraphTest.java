@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -135,7 +136,7 @@ class GraphTest {
 
     @Test
     void rob02TaintFollowsContentThroughAnyNumberOfHopsInAnyOrder() {
-        List<JsonNode> events = new java.util.ArrayList<>(List.of(
+        List<JsonNode> events = new ArrayList<>(List.of(
                 event("w1", "MemoryWrite", "\"record_ref\": \"mem:r1\", \"trust\": \"untrusted\""),
                 event("tc1", "ToolCall", "\"used\": [\"mem:r1\"], \"result_ref\": \"content:t1\""),
                 event("mc1", "ModelCall", "\"input_ref\": \"content:t1\", \"output_ref\": \"content:o1\""),
@@ -143,7 +144,7 @@ class GraphTest {
                 decisionWith("d1", "\"inputs\": [\"agentce:event/d0\"]")));
         assertEquals(List.of("false"), robust(events, "d0"));
         assertEquals(List.of("false"), robust(events, "d1"));
-        java.util.Collections.reverse(events);
+        Collections.reverse(events);
         assertEquals(List.of("false"), robust(events, "d1"));
     }
 
@@ -226,9 +227,9 @@ class GraphTest {
     @Test
     void rob02RuledOnIsIndependentOfEventOrder() {
         JsonNode write = selfReport(event("w1", "MemoryWrite", "\"record_ref\": \"mem:r1\""));
-        List<JsonNode> events = new java.util.ArrayList<>(List.of(write, decisionWith("d1", "\"inputs\": [\"mem:r1\"]")));
+        List<JsonNode> events = new ArrayList<>(List.of(write, decisionWith("d1", "\"inputs\": [\"mem:r1\"]")));
         assertEquals(List.of("false"), ruled(events));
-        java.util.Collections.reverse(events);
+        Collections.reverse(events);
         assertEquals(List.of("false"), ruled(events));
     }
 
@@ -243,5 +244,97 @@ class GraphTest {
         JsonNode marked = event("w1", "MemoryWrite",
                 "\"record_ref\": \"mem:r1\", \"provenance_origin_class\": \"tool_output\", \"trust\": \"trusted\"");
         assertEquals(List.of("true"), robust(List.of(marked, used), "d1"));
+    }
+
+    private static JsonNode instruction(String id, String sourceClass, String refsJson) {
+        String refs = refsJson.isEmpty() ? "" : ", \"refs\": {" + refsJson + "}";
+        return event(id, "Instruction", "\"source_class\": \"" + sourceClass + "\"" + refs);
+    }
+
+    private static JsonNode call(String id, String instruction) {
+        return event(id, "ToolCall", "\"refs\": {\"instruction\": \"agentce:event/" + instruction + "\"}");
+    }
+
+    /** CND-05's flag on {@code acting}, a ToolCall or Decision that acts on an instruction. */
+    private static List<String> acts(List<JsonNode> events, String acting) {
+        GraphStore store = Graph.buildGraph(events, DomainBinding.fromDict(CREDIT_DOMAIN));
+        return store.literalValues("agentce:event/" + acting, "agentce:actsOnUntrusted");
+    }
+
+    @Test
+    void cnd05ReadsTheInstructionsOwnClass() {
+        assertEquals(List.of("true"), acts(List.of(instruction("i1", "tool_output", ""), call("tc1", "i1")), "tc1"));
+        assertEquals(List.of("false"), acts(List.of(instruction("i1", "user", ""), call("tc1", "i1")), "tc1"));
+    }
+
+    @Test
+    void cnd05FollowsTheParentChainForAnyNumberOfHopsInAnyOrder() {
+        for (String[] pair : List.of(new String[] {"retrieved", "true"}, new String[] {"service", "false"})) {
+            List<JsonNode> events = new ArrayList<>(List.of(
+                    instruction("i3", pair[0], ""),
+                    instruction("i2", "operator", "\"parent\": \"agentce:event/i3\""),
+                    instruction("i1", "user", "\"parent\": \"agentce:event/i2\""),
+                    call("tc1", "i1")));
+            assertEquals(List.of(pair[1]), acts(events, "tc1"), pair[0]);
+            Collections.reverse(events);
+            assertEquals(List.of(pair[1]), acts(events, "tc1"), pair[0]);
+        }
+    }
+
+    @Test
+    void cnd05AnOriginToolCallOrResourceAccessProducedUntrustedContent() {
+        JsonNode origin = call("tc0", "i0");
+        JsonNode access = event("ra0", "ResourceAccess", "\"operation\": \"read\"");
+        for (String id : List.of("tc0", "ra0")) {
+            List<JsonNode> events = List.of(instruction("i0", "user", ""), origin, access,
+                    instruction("i1", "user", "\"origin\": \"agentce:event/" + id + "\""), call("tc1", "i1"));
+            assertEquals(List.of("true"), acts(events, "tc1"), id);
+        }
+        assertEquals(List.of("false"), acts(List.of(instruction("i0", "user", ""), origin), "tc0"));
+    }
+
+    @Test
+    void cnd05AnOriginReadTheGuardMarkedUntrustedTaintsTheChain() {
+        JsonNode write = event("w1", "MemoryWrite", "\"record_ref\": \"mem:r1\", \"trust\": \"trusted\"");
+        JsonNode derived = instruction("i1", "memory_trusted", "\"origin\": \"agentce:event/m1\"");
+        for (String[] pair : List.of(new String[] {"untrusted", "true"}, new String[] {"trusted", "false"})) {
+            JsonNode read = event("m1", "MemoryRead",
+                    "\"record_refs\": [\"mem:r1\"], \"trust_min\": \"" + pair[0] + "\"");
+            assertEquals(List.of(pair[1]), acts(List.of(write, read, derived, call("tc1", "i1")), "tc1"), pair[0]);
+        }
+        JsonNode bad = event("w1", "MemoryWrite", "\"record_ref\": \"mem:r1\", \"trust\": \"untrusted\"");
+        JsonNode read = event("m1", "MemoryRead", "\"record_refs\": [\"mem:r1\"], \"trust_min\": \"trusted\"");
+        assertEquals(List.of("true"), acts(List.of(bad, read, derived, call("tc1", "i1")), "tc1"));
+    }
+
+    @Test
+    void cnd05EndsOnCyclesAndNeverWalksDownTheChain() {
+        List<JsonNode> cycle = List.of(
+                instruction("i1", "user", "\"parent\": \"agentce:event/i2\""),
+                instruction("i2", "user", "\"parent\": \"agentce:event/i1\""),
+                call("tc1", "i1"));
+        assertEquals(List.of("false"), acts(cycle, "tc1"));
+        List<JsonNode> child = List.of(
+                instruction("i1", "user", ""),
+                instruction("i2", "tool_output", "\"parent\": \"agentce:event/i1\""),
+                call("tc1", "i1"));
+        assertEquals(List.of("false"), acts(child, "tc1"));
+    }
+
+    @Test
+    void cnd05FlagsADecisionActingOnADerivedUntrustedInstruction() {
+        List<JsonNode> events = List.of(
+                instruction("i0", "tool_output", ""),
+                instruction("i1", "user", "\"parent\": \"agentce:event/i0\""),
+                decisionWith("d1", "\"refs\": {\"instruction\": \"agentce:event/i1\"}"));
+        assertEquals(List.of("true"), acts(events, "d1"));
+    }
+
+    @Test
+    void cnd05AParentOrOriginTheBundleDoesNotHoldFailsClosed() {
+        for (String key : List.of("parent", "origin")) {
+            JsonNode derived = instruction("i1", "user", "\"" + key + "\": \"agentce:event/gone\"");
+            assertEquals(List.of("true"), acts(List.of(derived, call("tc1", "i1")), "tc1"), key);
+        }
     }
 }

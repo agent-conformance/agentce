@@ -523,20 +523,53 @@ public final class Graph {
             }
         }
 
-        /** Flag every ToolCall/Decision that acts on an untrusted instruction (SPEC §7.7, CND-05).
-         * Runs after every event is mapped so the acting event may precede its instruction. */
-        private void actsOnUntrusted(List<JsonNode> events) {
+        /** Flag every ToolCall/Decision that acts on an instruction whose chain passes through an
+         * untrusted source class (SPEC §7.7.4, CND-05). The chain is the instruction's {@code refs.parent}
+         * and {@code refs.origin} lineage ({@code agentce:derivedFrom}, SPEC §6.3) for as many hops as the
+         * records show. It passes through an untrusted source class at an instruction of an untrusted
+         * Appendix F class, at a tool call or resource access (the content they produce is
+         * {@code tool_output} or {@code retrieved}), at a parent or origin the bundle does not hold, and at
+         * anything ROB-02's taint closure reached
+         * ({@code tainted}: an untrusted memory read or write, or content that used one). A closure over
+         * all events, so the acting event may precede its instruction and cycles end. */
+        private void actsOnUntrusted(List<JsonNode> events, Set<String> tainted) {
+            Set<String> untrusted = new LinkedHashSet<>(tainted);
+            Map<String, Set<String>> derived = new LinkedHashMap<>();
+            Set<String> held = new LinkedHashSet<>();
+            for (JsonNode event : events) {
+                String ptype = ptype(event);
+                String node = Iri.eventIri(event.get("id").asText());
+                held.add(node);
+                if ("ToolCall".equals(ptype) || "ResourceAccess".equals(ptype)) {
+                    untrusted.add(node);
+                } else if ("Instruction".equals(ptype)) {
+                    JsonNode refs = refsOf(event);
+                    for (String key : List.of("parent", "origin")) {
+                        flow(derived, str(refs.get(key)), node);
+                    }
+                }
+            }
+            // A lineage the bundle does not hold cannot show a trusted root, so it fails closed.
+            derived.keySet().stream().filter(source -> !held.contains(source)).forEach(untrusted::add);
+            List<String> pending = new ArrayList<>(untrusted);
+            while (!pending.isEmpty()) {
+                for (String child : derived.getOrDefault(pending.remove(pending.size() - 1), Set.of())) {
+                    if (untrusted.add(child)) {
+                        pending.add(child);
+                    }
+                }
+            }
             for (JsonNode event : events) {
                 String ptype = ptype(event);
                 if (!"ToolCall".equals(ptype) && !"Decision".equals(ptype)) {
                     continue;
                 }
                 String instruction = str(refsOf(event).get("instruction"));
-                boolean untrusted = instruction != null && instructionUntrusted.getOrDefault(instruction, false);
+                boolean acts = instruction != null && untrusted.contains(instruction);
                 store.addLiteral(
                         Iri.eventIri(event.get("id").asText()),
                         "agentce:actsOnUntrusted",
-                        untrusted ? "true" : "false",
+                        acts ? "true" : "false",
                         BOOL);
             }
         }
@@ -553,8 +586,9 @@ public final class Graph {
          * with a {@code trust_min} covers, and a ref the bundle does not hold. Both flow along every
          * edge that carries content into an event (CONTENT_IN, CONTENT_OUT, a read to its consumer, a
          * record to and from its writes) for as many hops as the records show. Closures over all
-         * events, so order and cycles never matter. */
-        private void robustToUntrusted(List<JsonNode> events) {
+         * events, so order and cycles never matter. Returns the tainted closure, which CND-05's
+         * instruction chain also reads ({@link #actsOnUntrusted}). */
+        private Set<String> robustToUntrusted(List<JsonNode> events) {
             Map<String, Set<String>> flows = new LinkedHashMap<>();
             Set<String> tainted = new LinkedHashSet<>();
             Set<String> unruled = new LinkedHashSet<>();
@@ -662,6 +696,7 @@ public final class Graph {
                             node, "agentce:untrustedContentRuledOn", unruled.contains(node) ? "false" : "true", BOOL);
                 }
             }
+            return tainted;
         }
 
         private static void flow(Map<String, Set<String>> flows, String source, String target) {
@@ -696,8 +731,7 @@ public final class Graph {
                 }
                 chainTerminus(node, data);
             }
-            actsOnUntrusted(events);
-            robustToUntrusted(events);
+            actsOnUntrusted(events, robustToUntrusted(events));
             conductScopeBudget(events);
             precededBy();
         }

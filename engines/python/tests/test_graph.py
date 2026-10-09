@@ -664,3 +664,96 @@ def test_an_untrusted_origin_class_with_no_ruling_taints() -> None:
     )
     used = _with_inputs(decision("d1", "t"), ["mem:r1"])
     assert _robust([ruled, used]) == ["true"]
+
+
+def _instruction(event_id: str, source_class: str, **refs: str) -> dict[str, Any]:
+    data: dict[str, Any] = {"source_class": source_class}
+    if refs:
+        data["refs"] = {key: f"agentce:event/{ref}" for key, ref in refs.items()}
+    return _event(event_id, "Instruction", data)
+
+
+def _acts(events: list[dict[str, Any]], acting: str = "tc1") -> list[str]:
+    """CND-05's flag on ``acting``, a ToolCall or Decision that acts on instruction ``i1``."""
+    store = build_graph(events, domain=DOMAIN)
+    return store.literal_values(event_iri(acting), "agentce:actsOnUntrusted")
+
+
+def _call(event_id: str = "tc1", instruction: str = "i1") -> dict[str, Any]:
+    return _event(
+        event_id, "ToolCall", {"refs": {"instruction": f"agentce:event/{instruction}"}}
+    )
+
+
+def test_acts_on_untrusted_reads_the_instruction_s_own_class() -> None:
+    for source_class, expected in (("tool_output", "true"), ("user", "false")):
+        assert _acts([_instruction("i1", source_class), _call()]) == [expected]
+
+
+def test_acts_on_untrusted_follows_the_parent_chain_for_any_number_of_hops() -> None:
+    for root, expected in (("retrieved", "true"), ("service", "false")):
+        events = [
+            _instruction("i3", root),
+            _instruction("i2", "operator", parent="i3"),
+            _instruction("i1", "user", parent="i2"),
+            _call(),
+        ]
+        assert _acts(events) == [expected], root
+        assert _acts(list(reversed(events))) == [expected], root
+
+
+def test_acts_on_untrusted_when_the_origin_produced_tool_output_or_retrieved_content() -> (
+    None
+):
+    call = _call("tc0", "i0")
+    access = _event("ra0", "ResourceAccess", {"operation": "read"})
+    for origin in ("tc0", "ra0"):
+        events = [_instruction("i0", "user"), call, access]
+        events += [_instruction("i1", "user", origin=origin), _call()]
+        assert _acts(events) == ["true"], origin
+    assert _acts([_instruction("i0", "user"), call], acting="tc0") == ["false"]
+
+
+def test_acts_on_untrusted_when_the_origin_read_is_untrusted() -> None:
+    write = _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "trusted"})
+    for trust_min, expected in (("untrusted", "true"), ("trusted", "false")):
+        read = _event(
+            "m1", "MemoryRead", {"record_refs": ["mem:r1"], "trust_min": trust_min}
+        )
+        events = [write, read, _instruction("i1", "memory_trusted", origin="m1")]
+        assert _acts([*events, _call()]) == [expected], trust_min
+    bad = _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "untrusted"})
+    read = _event(
+        "m1", "MemoryRead", {"record_refs": ["mem:r1"], "trust_min": "trusted"}
+    )
+    events = [bad, read, _instruction("i1", "memory_trusted", origin="m1"), _call()]
+    assert _acts(events) == ["true"]
+
+
+def test_acts_on_untrusted_ends_on_cycles_and_never_walks_down_the_chain() -> None:
+    cycle = [
+        _instruction("i1", "user", parent="i2"),
+        _instruction("i2", "user", parent="i1"),
+        _call(),
+    ]
+    assert _acts(cycle) == ["false"]
+    child = [_instruction("i1", "user"), _instruction("i2", "tool_output", parent="i1")]
+    assert _acts([*child, _call()]) == ["false"]
+
+
+def test_a_decision_acting_on_a_derived_untrusted_instruction_is_flagged() -> None:
+    dec = decision("d1", "t")
+    dec["data"]["refs"] = {"instruction": "agentce:event/i1"}
+    events = [
+        _instruction("i0", "tool_output"),
+        _instruction("i1", "user", parent="i0"),
+    ]
+    assert _acts([*events, dec], acting="d1") == ["true"]
+
+
+def test_acts_on_untrusted_when_the_lineage_names_a_record_the_bundle_does_not_hold() -> (
+    None
+):
+    for key in ("parent", "origin"):
+        events = [_instruction("i1", "user", **{key: "gone"}), _call()]
+        assert _acts(events) == ["true"], key

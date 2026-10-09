@@ -421,25 +421,54 @@ class _Builder:
                 BOOL,
             )
 
-    def _acts_on_untrusted(self, events: list[dict[str, Any]]) -> None:
-        """Flag every ToolCall/Decision that acts on an untrusted instruction (SPEC §7.7, CND-05).
-        Runs after every event is mapped so the acting event may precede its instruction."""
+    def _acts_on_untrusted(
+        self, events: list[dict[str, Any]], tainted: set[str]
+    ) -> None:
+        """Flag every ToolCall/Decision that acts on an instruction whose chain passes through an
+        untrusted source class (SPEC §7.7.4, CND-05). The chain is the instruction's ``refs.parent``
+        and ``refs.origin`` lineage (``agentce:derivedFrom``, SPEC §6.3) for as many hops as the
+        records show. It passes through an untrusted source class at an instruction of an untrusted
+        Appendix F class, at a tool call or resource access (the content they produce is
+        ``tool_output`` or ``retrieved``), at a parent or origin the bundle does not hold, and at
+        anything ROB-02's taint closure reached (``tainted``: an untrusted memory read or write, or
+        content that used one). A closure over
+        all events, so the acting event may precede its instruction and cycles end."""
+        untrusted = set(tainted)
+        derived: dict[str, set[str]] = {}
+        held: set[str] = set()
+        for event in events:
+            ptype = self._ptype(event)
+            node = event_iri(str(event["id"]))
+            held.add(node)
+            if ptype in ("ToolCall", "ResourceAccess"):
+                untrusted.add(node)
+            elif ptype == "Instruction":
+                refs = _refs(event)
+                for key in ("parent", "origin"):
+                    if isinstance(refs.get(key), str):
+                        derived.setdefault(refs[key], set()).add(node)
+        # A lineage the bundle does not hold cannot show a trusted root, so it fails closed.
+        untrusted |= set(derived) - held
+        pending = list(untrusted)
+        while pending:
+            for child in derived.get(pending.pop(), ()):
+                if child not in untrusted:
+                    untrusted.add(child)
+                    pending.append(child)
         for event in events:
             ptype = self._ptype(event)
             if ptype not in ("ToolCall", "Decision"):
                 continue
             instruction = _refs(event).get("instruction")
-            untrusted = isinstance(instruction, str) and self.instruction_untrusted.get(
-                instruction, False
-            )
+            acts = isinstance(instruction, str) and instruction in untrusted
             self.store.add_literal(
                 event_iri(str(event["id"])),
                 "agentce:actsOnUntrusted",
-                "true" if untrusted else "false",
+                "true" if acts else "false",
                 BOOL,
             )
 
-    def _robust_to_untrusted(self, events: list[dict[str, Any]]) -> None:
+    def _robust_to_untrusted(self, events: list[dict[str, Any]]) -> set[str]:
         """Flag whether each Decision kept untrusted content out, and whether the memory guard
         ruled on all it used (SPEC §7.4, ROB-02).
 
@@ -453,7 +482,8 @@ class _Builder:
         every edge that carries content into an event (``_CONTENT_IN``, ``_CONTENT_OUT``, a read
         to its consumer, a record to and from its writes) for as many hops as the records show,
         so a decision is reached through another decision, a tool call or a model call. Closures
-        over all events, so order and cycles never matter."""
+        over all events, so order and cycles never matter. Returns the tainted closure, which
+        CND-05's instruction chain also reads (:meth:`_acts_on_untrusted`)."""
         flows: dict[str, set[str]] = {}
         tainted: set[str] = set()
         unruled: set[str] = set()
@@ -541,6 +571,7 @@ class _Builder:
                     "false" if node in unruled else "true",
                     BOOL,
                 )
+        return tainted
 
     # --- materialised (glue) edges (SPEC §7.2) ---
 
@@ -563,8 +594,7 @@ class _Builder:
             if ptype == "BundleLoaded":
                 self._declared_components_observed(node, data)
             self._chain_terminus(node, data)
-        self._acts_on_untrusted(events)
-        self._robust_to_untrusted(events)
+        self._acts_on_untrusted(events, self._robust_to_untrusted(events))
         self._conduct_scope_budget(events)
         self._preceded_by()
 
