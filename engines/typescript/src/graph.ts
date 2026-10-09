@@ -89,6 +89,30 @@ function isOneOf(value: unknown, values: Set<string>): boolean {
   return typeof value === "string" && values.has(value);
 }
 
+function flow(edges: Map<string, Set<string>>, source: unknown, target: unknown): void {
+  if (typeof source === "string" && typeof target === "string") {
+    let targets = edges.get(source);
+    if (targets === undefined) {
+      targets = new Set();
+      edges.set(source, targets);
+    }
+    targets.add(target);
+  }
+}
+
+/** Grow `seeds` in place to everything reachable along `edges` (order- and cycle-free). */
+function reach(seeds: Set<string>, edges: Map<string, Set<string>>): void {
+  const pending = [...seeds];
+  while (pending.length > 0) {
+    for (const target of edges.get(pending.pop() as string) ?? []) {
+      if (!seeds.has(target)) {
+        seeds.add(target);
+        pending.push(target);
+      }
+    }
+  }
+}
+
 /** A field the record leaves out or sets to null (Python's None). */
 function isAbsent(value: unknown): boolean {
   return value === undefined || value === null;
@@ -485,15 +509,7 @@ class Builder {
       } else if (ptype === "Instruction") {
         const refs = refsOf(event);
         for (const key of ["parent", "origin"]) {
-          const source = refs[key];
-          if (typeof source === "string") {
-            let children = derived.get(source);
-            if (children === undefined) {
-              children = new Set();
-              derived.set(source, children);
-            }
-            children.add(node);
-          }
+          flow(derived, refs[key], node);
         }
       }
     }
@@ -503,15 +519,7 @@ class Builder {
         untrusted.add(source);
       }
     }
-    const pending = [...untrusted];
-    while (pending.length > 0) {
-      for (const child of derived.get(pending.pop() as string) ?? []) {
-        if (!untrusted.has(child)) {
-          untrusted.add(child);
-          pending.push(child);
-        }
-      }
-    }
+    reach(untrusted, derived);
     for (const event of events) {
       const ptype = this.ptype(event);
       if (ptype !== "ToolCall" && ptype !== "Decision") {
@@ -548,16 +556,6 @@ class Builder {
     const held = new Set<string>();
     const records = new Set<string>();
     const guarded = new Set<string>();
-    const flow = (source: unknown, target: unknown): void => {
-      if (typeof source === "string" && typeof target === "string") {
-        let targets = flows.get(source);
-        if (targets === undefined) {
-          targets = new Set();
-          flows.set(source, targets);
-        }
-        targets.add(target);
-      }
-    };
     for (const event of events) {
       const ptype = this.ptype(event);
       const data = dataOf(event);
@@ -568,23 +566,23 @@ class Builder {
       for (const key of CONTENT_IN) {
         const value = data[key];
         for (const ref of Array.isArray(value) ? value : [value]) {
-          flow(ref, node);
+          flow(flows, ref, node);
         }
       }
       for (const key of REFS_IN) {
-        flow(refs[key], node);
+        flow(flows, refs[key], node);
       }
       for (const key of CONTENT_OUT) {
-        flow(node, data[key]);
+        flow(flows, node, data[key]);
         if (typeof data[key] === "string") {
           held.add(data[key] as string);
         }
       }
-      flow(node, refs.consumer);
+      flow(flows, node, refs.consumer);
       if (ptype === "MemoryWrite") {
         const record = data.record_ref;
         // A record and each write of it stand for the same content.
-        flow(record, node);
+        flow(flows, record, node);
         const unmarked = isAbsent(data.trust) && isAbsent(data.guard_verdict);
         if (typeof record === "string") {
           records.add(record);
@@ -634,17 +632,8 @@ class Builder {
         unruled.add(ref);
       }
     }
-    for (const seeds of [tainted, unruled]) {
-      const pending = [...seeds];
-      while (pending.length > 0) {
-        for (const target of flows.get(pending.pop() as string) ?? []) {
-          if (!seeds.has(target)) {
-            seeds.add(target);
-            pending.push(target);
-          }
-        }
-      }
-    }
+    reach(tainted, flows);
+    reach(unruled, flows);
     for (const event of events) {
       if (this.ptype(event) === "Decision") {
         const node = eventIri(String(event.id));

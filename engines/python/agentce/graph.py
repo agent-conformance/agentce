@@ -97,6 +97,21 @@ def _is_one_of(value: Any, values: frozenset[str]) -> bool:
     return isinstance(value, str) and value in values
 
 
+def _flow(edges: dict[str, set[str]], source: Any, target: Any) -> None:
+    if isinstance(source, str) and isinstance(target, str):
+        edges.setdefault(source, set()).add(target)
+
+
+def _reach(seeds: set[str], edges: dict[str, set[str]]) -> None:
+    """Grow ``seeds`` in place to everything reachable along ``edges`` (order- and cycle-free)."""
+    pending = list(seeds)
+    while pending:
+        for target in edges.get(pending.pop(), ()):
+            if target not in seeds:
+                seeds.add(target)
+                pending.append(target)
+
+
 def _closure(subclass: dict[str, str], classes: set[str]) -> set[tuple[str, str]]:
     nodes = set(classes) | set(subclass) | set(subclass.values())
     pairs: set[tuple[str, str]] = {(node, node) for node in nodes}  # reflexive
@@ -445,16 +460,10 @@ class _Builder:
             elif ptype == "Instruction":
                 refs = _refs(event)
                 for key in ("parent", "origin"):
-                    if isinstance(refs.get(key), str):
-                        derived.setdefault(refs[key], set()).add(node)
+                    _flow(derived, refs.get(key), node)
         # A lineage the bundle does not hold cannot show a trusted root, so it fails closed.
         untrusted |= set(derived) - held
-        pending = list(untrusted)
-        while pending:
-            for child in derived.get(pending.pop(), ()):
-                if child not in untrusted:
-                    untrusted.add(child)
-                    pending.append(child)
+        _reach(untrusted, derived)
         for event in events:
             ptype = self._ptype(event)
             if ptype not in ("ToolCall", "Decision"):
@@ -490,11 +499,6 @@ class _Builder:
         held: set[str] = set()
         records: set[str] = set()
         guarded: set[str] = set()
-
-        def flow(source: Any, target: Any) -> None:
-            if isinstance(source, str) and isinstance(target, str):
-                flows.setdefault(source, set()).add(target)
-
         for event in events:
             ptype = self._ptype(event)
             data = _data(event)
@@ -505,18 +509,18 @@ class _Builder:
             for key in _CONTENT_IN:
                 value = data.get(key)
                 for ref in value if isinstance(value, list) else [value]:
-                    flow(ref, node)
+                    _flow(flows, ref, node)
             for key in _REFS_IN:
-                flow(refs.get(key), node)
+                _flow(flows, refs.get(key), node)
             for key in _CONTENT_OUT:
-                flow(node, data.get(key))
+                _flow(flows, node, data.get(key))
                 if isinstance(data.get(key), str):
                     held.add(data[key])
-            flow(node, refs.get("consumer"))
+            _flow(flows, node, refs.get("consumer"))
             if ptype == "MemoryWrite":
                 record = data.get("record_ref")
                 # A record and each write of it stand for the same content.
-                flow(record, node)
+                _flow(flows, record, node)
                 trust, verdict = data.get("trust"), data.get("guard_verdict")
                 unmarked = trust is None and verdict is None
                 if isinstance(record, str):
@@ -549,13 +553,8 @@ class _Builder:
             iri for iri, untrusted in self.instruction_untrusted.items() if untrusted
         }
         unruled |= (records - guarded) | (set(flows) - held - records)
-        for seeds in (tainted, unruled):
-            pending = list(seeds)
-            while pending:
-                for target in flows.get(pending.pop(), ()):
-                    if target not in seeds:
-                        seeds.add(target)
-                        pending.append(target)
+        _reach(tainted, flows)
+        _reach(unruled, flows)
         for event in events:
             if self._ptype(event) == "Decision":
                 node = event_iri(str(event["id"]))

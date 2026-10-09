@@ -551,14 +551,7 @@ public final class Graph {
             }
             // A lineage the bundle does not hold cannot show a trusted root, so it fails closed.
             derived.keySet().stream().filter(source -> !held.contains(source)).forEach(untrusted::add);
-            List<String> pending = new ArrayList<>(untrusted);
-            while (!pending.isEmpty()) {
-                for (String child : derived.getOrDefault(pending.remove(pending.size() - 1), Set.of())) {
-                    if (untrusted.add(child)) {
-                        pending.add(child);
-                    }
-                }
-            }
+            reach(untrusted, derived);
             for (JsonNode event : events) {
                 String ptype = ptype(event);
                 if (!"ToolCall".equals(ptype) && !"Decision".equals(ptype)) {
@@ -677,16 +670,8 @@ public final class Graph {
                     unruled.add(ref);
                 }
             }
-            for (Set<String> seeds : List.of(tainted, unruled)) {
-                List<String> pending = new ArrayList<>(seeds);
-                while (!pending.isEmpty()) {
-                    for (String target : flows.getOrDefault(pending.remove(pending.size() - 1), Set.of())) {
-                        if (seeds.add(target)) {
-                            pending.add(target);
-                        }
-                    }
-                }
-            }
+            reach(tainted, flows);
+            reach(unruled, flows);
             for (JsonNode event : events) {
                 if ("Decision".equals(ptype(event))) {
                     String node = Iri.eventIri(event.get("id").asText());
@@ -702,6 +687,18 @@ public final class Graph {
         private static void flow(Map<String, Set<String>> flows, String source, String target) {
             if (source != null && target != null) {
                 flows.computeIfAbsent(source, k -> new LinkedHashSet<>()).add(target);
+            }
+        }
+
+        /** Grows {@code seeds} in place to everything reachable along {@code edges} (order- and cycle-free). */
+        private static void reach(Set<String> seeds, Map<String, Set<String>> edges) {
+            List<String> pending = new ArrayList<>(seeds);
+            while (!pending.isEmpty()) {
+                for (String target : edges.getOrDefault(pending.remove(pending.size() - 1), Set.of())) {
+                    if (seeds.add(target)) {
+                        pending.add(target);
+                    }
+                }
             }
         }
 

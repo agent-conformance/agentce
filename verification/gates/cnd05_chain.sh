@@ -68,8 +68,8 @@ cnd05() {
 
 # One engine over every case; returns non-zero on any mismatch. The three engines run side by side (each writes only
 # its own out-<engine> and err-<engine>), so the gate's wall time is the slowest engine's, not the sum. The first
-# mismatch in any engine stops all three (the $work/.stop marker), and the refusal sub-check is skipped: the gate has
-# already failed, and a seeded-fault run turns red without assessing every case.
+# mismatch in any engine stops all three (the $work/.stop marker): the gate has already failed, and a seeded-fault run
+# turns red without assessing every case.
 check_cases() {
   local engine="$1" status=0 dir name want want_exit out code got
   for dir in "$work"/*/; do
