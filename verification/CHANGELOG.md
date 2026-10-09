@@ -3,6 +3,16 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.75.0
+
+- `VG-CND05-CHAIN` (18.123) adds six cases (37 in all) and six seeded faults, two in each engine's graph builder.
+  CND-05 counted an instruction as trusted when its records did not establish a trusted class: one with no
+  `source_class`, and a `memory_trusted` one whose origin is a memory read the guard never ruled on (a self-report
+  read with no `trust_min`). Both read conformant. Each engine now fails such a chain closed: an instruction that
+  declares no trusted source class, and content ROB-02 already reads as never ruled on, mark the chain untrusted. A
+  tool call or decision acting on one, directly or through a parent, reads non-conformant; the guard's read at
+  `trust_min` trusted stays conformant, and `VG-ROB02-UNTRUSTED` is unchanged.
+
 ## 0.74.0
 
 - `VG-CND05-CHAIN` (18.121) adds eight decision cases (31 in all) and three seeded faults, one in each engine's shape

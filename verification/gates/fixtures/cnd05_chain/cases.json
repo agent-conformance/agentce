@@ -1,5 +1,5 @@
 {
-  "_description": "VG-CND05-CHAIN cases (18.37l, 18.121): each case is one bundle for the fixture subject; expected is CND-05's outcome, the failing event ids and the assess exit code, with nothing quarantined, the same in Python, TypeScript and Java. A tool call or decision fails when the instruction it acts on, or any instruction or activity on that instruction's refs.parent / refs.origin lineage, is untrusted (SPEC \u00a77.7.4, \u00a76.2, Appendix F).",
+  "_description": "VG-CND05-CHAIN cases (18.37l, 18.121, 18.123): each case is one bundle for the fixture subject; expected is CND-05's outcome, the failing event ids and the assess exit code, with nothing quarantined, the same in Python, TypeScript and Java. A tool call or decision fails when the instruction it acts on, or any instruction or activity on that instruction's refs.parent / refs.origin lineage, is untrusted or not shown to be trusted: no declared trusted source class, or content the memory guard never ruled on (SPEC \u00a77.7.4, \u00a76.2, Appendix F).",
   "cases": {
     "direct-tool-output": {
       "why": "the call acts on a tool_output instruction (the direct check, unchanged)",
@@ -2408,6 +2408,442 @@
             "@context": "https://agent-conformance.org/contexts/evidence/v1",
             "agent": {
               "id": "spiffe://corp/agents/cnd05-fixture"
+            },
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ]
+    },
+    "instruction-no-source-class": {
+      "why": "a tool call acts on an instruction with no source_class: the records do not establish a trusted class, so it fails closed",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1"
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/cnd05-fixture"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ]
+    },
+    "decision-instruction-no-source-class": {
+      "why": "a consequential decision acts on an instruction with no source_class; a tool call on a user instruction sits beside it",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "id": "i0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1"
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user"
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/cnd05-fixture"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:06Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/cnd05-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i0"
+            }
+          }
+        }
+      ]
+    },
+    "instruction-parent-no-source-class": {
+      "why": "a user instruction derived (refs.parent) from an instruction with no source_class",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "id": "i0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:07Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1"
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:08Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "refs": {
+              "parent": "agentce:event/i0"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:09Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/cnd05-fixture"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ]
+    },
+    "instruction-origin-memory-trusted-unruled-read": {
+      "why": "a memory_trusted instruction whose origin is a self-report memory read with no trust_min of a record never written: the guard never ruled on it, so the trusted class is not established",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "id": "m1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:03:10Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r9"
+            ]
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:11Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "memory_trusted",
+            "refs": {
+              "origin": "agentce:event/m1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:12Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/cnd05-fixture"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ]
+    },
+    "instruction-origin-self-report-read-of-trusted-write": {
+      "why": "a memory_trusted instruction whose origin is a self-report read (no trust_min) of a record the guard wrote trusted: the read is not the guard's, so, as ROB-02 reads it, the guard did not rule on what was read",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:13Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted"
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:03:14Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ]
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:15Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "memory_trusted",
+            "refs": {
+              "origin": "agentce:event/m1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:16Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/cnd05-fixture"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ]
+    },
+    "instruction-origin-guard-read-unwritten-record": {
+      "why": "twin: a memory_trusted instruction whose origin is the guard's read at trust_min trusted of a record no write shows: the guard filtered it",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      },
+      "events": [
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:17Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r9"
+            ],
+            "trust_min": "trusted"
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:18Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "memory_trusted",
+            "refs": {
+              "origin": "agentce:event/m1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:03:19Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/cnd05-fixture"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
             },
             "refs": {
               "instruction": "agentce:event/i1"

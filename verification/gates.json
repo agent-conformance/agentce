@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.74.0",
+  "suite_version": "0.75.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2957,7 +2957,7 @@
     },
     {
       "id": "VG-CND05-CHAIN",
-      "title": "CND-05 follows an instruction's chain in all three engines: a tool call or a decision acting on an instruction whose refs.parent or refs.origin lineage passes through an untrusted source class, by any number of hops, is non-conformant, where the chain passes through an untrusted source class at an instruction of an untrusted Appendix F class, at a tool call or resource access that produced the content, at a memory read the guard marked untrusted, or at a parent or origin the bundle does not hold; trusted chains, cycles and untrusted instructions off the chain do not fail it; a decision acting on such an instruction fails the same way, since each engine reads every sh:targetClass of CND-05's shape, ToolCall and Decision (18.37l, 18.121)",
+      "title": "CND-05 follows an instruction's chain in all three engines: a tool call or a decision acting on an instruction whose refs.parent or refs.origin lineage passes through an untrusted source class, by any number of hops, is non-conformant, where the chain passes through an untrusted source class at an instruction of an untrusted Appendix F class, at a tool call or resource access that produced the content, at a memory read the guard marked untrusted or never ruled on, at an instruction that declares no source class, or at a parent or origin the bundle does not hold; trusted chains, cycles and untrusted instructions off the chain do not fail it; a decision acting on such an instruction fails the same way, since each engine reads every sh:targetClass of CND-05's shape, ToolCall and Decision (18.37l, 18.121, 18.123)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -2974,7 +2974,7 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/cnd05_chain/cases.json (a direct tool_output instruction and a direct user one; a user instruction whose refs.parent is a tool_output instruction; two refs.parent hops to a retrieved instruction; three hops to a memory_untrusted one; refs.origin a guard read at trust_min untrusted, or a read of a record the guard wrote untrusted; refs.origin a tool call or a resource access; a parent then an origin hop; the instruction after the call in the file; a parent cycle with and without a tool_output instruction on it; two calls, one on an untrusted chain; a parent or origin the bundle does not hold, or named by a bare event id beside a held tool_output instruction of that id; each with trusted twins: an operator parent, a two-hop service chain, a trusted read origin, an untrusted child of the acted-on instruction, an untrusted instruction off the chain; and decisions, typed and untyped, on a direct tool_output instruction, on one derived by refs.parent or by a refs.origin tool call, a decision and a call on one tool_output instruction, a decision with no tool call in the records (insufficient_evidence, never conformant), with trusted twins for a typed and an untyped decision) gives the expected CND-05 outcome, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined",
+        "pass": "every case in verification/gates/fixtures/cnd05_chain/cases.json (a direct tool_output instruction and a direct user one; a user instruction whose refs.parent is a tool_output instruction; two refs.parent hops to a retrieved instruction; three hops to a memory_untrusted one; refs.origin a guard read at trust_min untrusted, or a read of a record the guard wrote untrusted; refs.origin a tool call or a resource access; a parent then an origin hop; the instruction after the call in the file; a parent cycle with and without a tool_output instruction on it; two calls, one on an untrusted chain; a parent or origin the bundle does not hold, or named by a bare event id beside a held tool_output instruction of that id; an instruction with no source_class, acted on directly by a tool call or a decision, or as the parent of a user instruction; a memory_trusted instruction whose origin is a self-report read with no trust_min, of a record never written or of one the guard wrote trusted; each with trusted twins: an operator parent, a two-hop service chain, a trusted read origin, the guard's read at trust_min trusted of a record no write shows, an untrusted child of the acted-on instruction, an untrusted instruction off the chain; and decisions, typed and untyped, on a direct tool_output instruction, on one derived by refs.parent or by a refs.origin tool call, a decision and a call on one tool_output instruction, a decision with no tool call in the records (insufficient_evidence, never conformant), with trusted twins for a typed and an untyped decision) gives the expected CND-05 outcome, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined",
         "fail": "any case gives another CND-05 outcome, another set of failing events or another exit code in any engine, or quarantines a record"
       },
       "faults": [
@@ -3013,9 +3013,45 @@
           "file": "engines/java/src/main/java/org/agentce/Psp.java",
           "search": "            shape.targetClasses.sort(Json::byteCompare);\n",
           "replace": "            shape.targetClasses.sort(Json::byteCompare);\n            shape.targetClasses = new ArrayList<>(shape.targetClasses.subList(0, Math.min(1, shape.targetClasses.size())));\n"
+        },
+        {
+          "description": "Python: an instruction that declares no source class counts as trusted, so a tool call on it reads CND-05 conformant",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                if not _is_one_of(source_class, _TRUSTED_INSTRUCTION):\n",
+          "replace": "                if _untrusted_source_class(source_class):\n"
+        },
+        {
+          "description": "Python: content the memory guard never ruled on does not reach CND-05's chain, so a memory_trusted instruction whose origin is a self-report read reads CND-05 conformant",
+          "file": "engines/python/agentce/graph.py",
+          "search": "        return tainted | unruled\n",
+          "replace": "        return tainted\n"
+        },
+        {
+          "description": "TypeScript: an instruction that declares no source class counts as trusted, so a tool call on it reads CND-05 conformant",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "if (!isOneOf(dataOf(event).source_class, TRUSTED_INSTRUCTION)) {",
+          "replace": "if (untrustedSourceClass(dataOf(event).source_class)) {"
+        },
+        {
+          "description": "TypeScript: content the memory guard never ruled on does not reach CND-05's chain, so a memory_trusted instruction whose origin is a self-report read reads CND-05 conformant",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "return new Set([...tainted, ...unruled]);",
+          "replace": "return tainted;"
+        },
+        {
+          "description": "Java: an instruction that declares no source class counts as trusted, so a tool call on it reads CND-05 conformant",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "if (!isOneOf(dataOf(event).get(\"source_class\"), TRUSTED_INSTRUCTION)) {",
+          "replace": "if (untrustedSourceClass(str(dataOf(event).get(\"source_class\")))) {"
+        },
+        {
+          "description": "Java: content the memory guard never ruled on does not reach CND-05's chain, so a memory_trusted instruction whose origin is a self-report read reads CND-05 conformant",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "            tainted.addAll(unruled);\n",
+          "replace": ""
         }
       ],
-      "fix_hint": "Run verification/gates/cnd05_chain.sh; it names the engine, the case, the CND-05 outcome and failing events it gave and the ones expected. The rule is actsOnUntrusted in each engine's graph builder: the refs.parent / refs.origin closure over instructions, seeded with tool calls, resource accesses and ROB-02's tainted set. A decision case that reads conformant points at the PSP parser (psp.py, psp.ts, Psp.java): every sh:targetClass of a shape is read, as a union."
+      "fix_hint": "Run verification/gates/cnd05_chain.sh; it names the engine, the case, the CND-05 outcome and failing events it gave and the ones expected. The rule is actsOnUntrusted in each engine's graph builder: the refs.parent / refs.origin closure over instructions, seeded with tool calls, resource accesses, instructions that declare no trusted source class and ROB-02's two closures (tainted, and never ruled on by the guard). A decision case that reads conformant points at the PSP parser (psp.py, psp.ts, Psp.java): every sh:targetClass of a shape is read, as a union."
     }
   ]
 }
