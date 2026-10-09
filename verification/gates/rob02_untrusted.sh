@@ -58,9 +58,10 @@ run() {
   esac
 }
 
-# ROB-02's outcome, then the event ids of its failing focus nodes ("<outcome> <id,id>").
+# ROB-02's outcome for the fixture subject (the one that decides; the profile's other subject only holds memory
+# writes in the cross-subject cases), then the event ids of its failing focus nodes ("<outcome> <id,id>").
 rob02() {
-  jq -r '[.[]? // .assertions[] | select(.control == "ROB-02")][0]
+  jq -r '[.[]? // .assertions[] | select(.control == "ROB-02" and .subject == "spiffe://corp/agents/rob02-fixture")][0]
     | "\(.outcome) \([.violations[]?.focus | sub("^agentce:event/"; "")] | unique | join(","))"' "$1"
 }
 
@@ -166,8 +167,8 @@ for engine in python typescript java; do
 done
 
 count="$(ls -d "$work"/*/ | wc -l | tr -d ' ')"
-if [ "$count" -lt 47 ]; then
-  echo "rob02-untrusted: only $count cases in cases.json, expected at least 47" >&2
+if [ "$count" -lt 50 ]; then
+  echo "rob02-untrusted: only $count cases in cases.json, expected at least 50" >&2
   status=1
 fi
 [ "$status" -eq 0 ] && echo "rob02-untrusted: $count cases, three engines agree with the expected ROB-02 outcome"

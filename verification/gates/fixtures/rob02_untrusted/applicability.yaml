@@ -1,5 +1,6 @@
 # Applicability profile for the VG-ROB02-UNTRUSTED gate fixture (verification/gates/rob02_untrusted.sh).
-# One subject, the baseline catalog; each case in cases.json is one bundle for this subject.
+# Two subjects, the baseline catalog; each case in cases.json is one bundle. The fixture subject makes every decision;
+# the other subject only writes memory in the cross-subject cases, whose rulings do not count for the fixture subject.
 profile_version: 1
 observation_window:
   start: "2026-01-01T00:00:00Z"
@@ -9,6 +10,9 @@ content_capture:
 catalogs:
   - "baseline@2026.09"
 subjects:
+  - id: "spiffe://corp/agents/other"
+    name: "ROB-02 gate fixture, other subject"
+    role: "both"
   - id: "spiffe://corp/agents/rob02-fixture"
     name: "ROB-02 gate fixture subject"
     role: "both"

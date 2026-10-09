@@ -5,7 +5,7 @@ fails if a gate in `gates.json` is not named in this file.
 
 ## 0.72.0
 
-- `VG-ROB02-UNTRUSTED` (18.37k) grows to 47 cases and six seeded faults, two in each engine's graph builder. ROB-02
+- `VG-ROB02-UNTRUSTED` (18.37k) grows to 50 cases and six seeded faults, two in each engine's graph builder. ROB-02
   read conformant on a decision the memory guard never ruled on, as long as the bundle held one enforcement-point
   memory read somewhere: a decision whose own reads only the agent reported, an input record no enforcement-point
   read or write covers, or an input the bundle does not hold. Each engine now marks, per decision, whether the
@@ -15,7 +15,11 @@ fails if a gate in `gates.json` is not named in this file.
   guarded and trusted twins and a tainted decision beside an unruled one. The gate also checks that a catalog
   whose declared evidence shape has no target, is declared empty or points outside the catalog folder is refused
   with `catalog.evidence_shape.unresolved` in all three engines, and that Python's `catalog lint` refuses it too.
-  The new faults make each engine mark every decision ruled on. The three engines now run side by side and stop at
+  An enforcement-point memory read now counts as the guard's ruling on its records only when it carries a
+  `trust_min`; a read that did not filter by trust leaves a record the guard never ruled on. Two cases span two
+  subjects: an untrusted write under one subject, used by the other subject's decision as an input or through its
+  own enforcement-point read, reads insufficient_evidence for the deciding subject, and the gate reads that
+  subject's ROB-02 assertion. The new faults make each engine mark every decision ruled on. The three engines now run side by side and stop at
   the first case any of them gets wrong, so a seeded-fault run ends early and the demo lane stays inside its time.
 
 ## 0.71.0
