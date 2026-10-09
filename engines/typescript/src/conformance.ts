@@ -41,7 +41,7 @@ import { parsePythonIntGrammar, toBigIntFromInt } from "./otelGenai";
 import { loadProfile } from "./profile";
 import { pyGet, pyTruthy } from "./readiness";
 import { writeReport } from "./report";
-import { byteCompare, jsonStringifyAscii, sortKeysDeep } from "./util";
+import { byteCompare, decodeUtf8Strict, jsonStringifyAscii, sortKeysDeep } from "./util";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
 /** Stable provenance for ECS assessments, so per-project manifests are identical across machines. */
@@ -168,16 +168,13 @@ export type AdapterRunner = (
   cwd: string,
 ) => { stdout: string; stderr: string };
 
-/** Python's `subprocess.run(text=True)` decoding: strict UTF-8, a BOM kept, so bytes that are not
- * UTF-8 raise (internal.unexpected) instead of becoming U+FFFD. */
-const strictUtf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
-
 const runProcess: AdapterRunner = (command, args, cwd) => {
   const proc = spawnSync(command, args, { cwd, maxBuffer: 1 << 30 });
   if (proc.error !== undefined) {
     throw proc.error; // uv missing from PATH: internal.unexpected, as Python's FileNotFoundError
   }
-  return { stdout: strictUtf8.decode(proc.stdout), stderr: strictUtf8.decode(proc.stderr) };
+  // strict, as Python's subprocess.run(text=True): bytes that are not UTF-8 raise, never U+FFFD
+  return { stdout: decodeUtf8Strict(proc.stdout), stderr: decodeUtf8Strict(proc.stderr) };
 };
 
 /** Python's `str.strip()` (JavaScript's `trim` differs on a few code points). */

@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.ByteBuffer;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -170,9 +169,7 @@ public final class Conformance {
                     .start();
             proc.getOutputStream().close();
             // strict, as Python's subprocess.run(text=True): bytes that are not UTF-8 raise, never U+FFFD
-            String stdout = StandardCharsets.UTF_8.newDecoder()
-                    .decode(ByteBuffer.wrap(proc.getInputStream().readAllBytes()))
-                    .toString();
+            String stdout = Verify.decodeStrict(proc.getInputStream().readAllBytes()).toString();
             proc.waitFor();
             return new String[] {stdout, Files.readString(stderrFile, StandardCharsets.UTF_8)};
         } finally {
