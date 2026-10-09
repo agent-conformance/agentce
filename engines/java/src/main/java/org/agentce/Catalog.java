@@ -169,7 +169,7 @@ public final class Catalog {
     }
 
     private static boolean hasTarget(Psp.Shape shape) {
-        return shape.targetClass != null || !shape.targetNodes.isEmpty() || !shape.targetWhere.isEmpty();
+        return !shape.targetClasses.isEmpty() || !shape.targetNodes.isEmpty() || !shape.targetWhere.isEmpty();
     }
 
     private static List<String> targeted(Map<String, Psp.Shape> shapes) {

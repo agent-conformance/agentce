@@ -106,7 +106,7 @@ class Catalog:
             if iri.endswith(want):
                 return shape
         for shape in self.shapes.values():
-            if shape.target_class or shape.target_nodes or shape.target_where:
+            if shape.target_classes or shape.target_nodes or shape.target_where:
                 return shape
         return None
 
@@ -159,7 +159,7 @@ def _load_evidence_shape(
     targeted = [
         iri
         for iri, shape in loaded.items()
-        if shape.target_class or shape.target_nodes or shape.target_where
+        if shape.target_classes or shape.target_nodes or shape.target_where
     ]
     if len(targeted) != 1:
         entry = MESSAGE_KEYS[_EVIDENCE_SHAPE_UNRESOLVED]
@@ -265,7 +265,7 @@ def _shape_fingerprint(shape: Shape) -> tuple[Any, ...]:
     ``sh:name``/``sh:message`` annotation: two shapes with this same fingerprint test the same thing
     regardless of which control's file declares them."""
     return (
-        shape.target_class,
+        tuple(shape.target_classes),
         tuple(sorted(shape.target_nodes)),
         tuple(sorted(shape.target_where)),
         tuple(sorted(_property_fingerprint(prop) for prop in shape.properties)),

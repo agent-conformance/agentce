@@ -93,7 +93,9 @@ function controlFromDict(data: Record<string, unknown>): ControlSpec {
 }
 
 function hasTarget(shape: Shape): boolean {
-  return Boolean(shape.targetClass) || shape.targetNodes.length > 0 || shape.targetWhere.length > 0;
+  return (
+    shape.targetClasses.length > 0 || shape.targetNodes.length > 0 || shape.targetWhere.length > 0
+  );
 }
 
 /** The file inside `directory` that `path` names, after symlinks, or null when it is missing, not a

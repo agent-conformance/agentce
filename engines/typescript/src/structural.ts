@@ -345,8 +345,8 @@ function hasValue(store: GraphStore, node: string, predicate: string, value: str
 
 function targetNodes(store: GraphStore, shape: Shape): string[] {
   const focus = new Set(shape.targetNodes);
-  if (shape.targetClass !== null) {
-    for (const instance of store.instancesOf(shape.targetClass)) {
+  for (const targetClass of shape.targetClasses) {
+    for (const instance of store.instancesOf(targetClass)) {
       focus.add(instance);
     }
   }

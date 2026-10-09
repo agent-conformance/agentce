@@ -102,7 +102,8 @@ export interface PropertyShape {
 
 export interface Shape {
   iri: string;
-  targetClass: string | null;
+  /** Every `sh:targetClass`, sorted: SHACL reads more than one as a union. */
+  targetClasses: string[];
   targetNodes: string[];
   targetWhere: Array<[string, string]>;
   properties: PropertyShape[];
@@ -240,15 +241,15 @@ export function parseShapes(store: Store): Map<string, Shape> {
   for (const shapeNode of store.getSubjects(RDF_TYPE, sh("NodeShape"), null)) {
     const shape: Shape = {
       iri: shapeNode.value,
-      targetClass: null,
+      targetClasses: [],
       targetNodes: [],
       targetWhere: [],
       properties: [],
     };
-    const targetClass = value(store, shapeNode, sh("targetClass"));
-    if (targetClass !== null) {
-      shape.targetClass = curie(targetClass);
-    }
+    shape.targetClasses = store
+      .getObjects(shapeNode, sh("targetClass"), null)
+      .map(curie)
+      .sort(byteCompare);
     shape.targetNodes = store.getObjects(shapeNode, sh("targetNode"), null).map(curie);
     for (const where of store.getObjects(shapeNode, namedNode(`${AGENTCE}targetWhere`), null)) {
       for (const quad of store.getQuads(where, null, null, null)) {

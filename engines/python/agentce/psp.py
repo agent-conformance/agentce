@@ -106,7 +106,8 @@ class PropertyShape:
 @dataclass
 class Shape:
     iri: str
-    target_class: str | None = None
+    #: Every ``sh:targetClass``, sorted: SHACL reads more than one as a union.
+    target_classes: list[str] = field(default_factory=list)
     target_nodes: list[str] = field(default_factory=list)
     target_where: list[tuple[str, str]] = field(default_factory=list)
     properties: list[PropertyShape] = field(default_factory=list)
@@ -187,9 +188,9 @@ def parse_shapes(graph: Graph) -> dict[str, Shape]:
     shapes: dict[str, Shape] = {}
     for shape_node in graph.subjects(RDF.type, _sh("NodeShape")):
         shape = Shape(iri=str(shape_node))
-        target_class = graph.value(shape_node, _sh("targetClass"))
-        if target_class is not None:
-            shape.target_class = curie(target_class)
+        shape.target_classes = sorted(
+            curie(c) for c in graph.objects(shape_node, _sh("targetClass"))
+        )
         shape.target_nodes = [
             curie(n) for n in graph.objects(shape_node, _sh("targetNode"))
         ]

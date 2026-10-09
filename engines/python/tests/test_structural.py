@@ -170,3 +170,38 @@ def test_resolve_sequence_path() -> None:
     _shapes, shape = _shape()
     values = resolve_path(store, "a", shape.properties[1].path)
     assert [v.repr for v in values] == ["true"]
+
+
+def test_several_target_classes_are_a_union() -> None:
+    """SHACL reads a shape's several sh:targetClass values as a union (18.121): both are kept,
+    sorted, in either order, and the focus nodes are the instances of any of them."""
+    prefix = (
+        "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
+        "@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n"
+    )
+    body = 'sh:property [ sh:path agentce:actsOnUntrusted ; sh:hasValue false ; sh:name "S1" ] .'
+    for targets in (
+        "agentce:ToolCall, agentce:Decision",
+        "agentce:Decision, agentce:ToolCall",
+    ):
+        shapes = parse_shapes_ttl(
+            prefix + f"agentce:S a sh:NodeShape ; sh:targetClass {targets} ; {body}\n"
+        )
+        shape = next(iter(shapes.values()))
+        assert shape.target_classes == ["agentce:Decision", "agentce:ToolCall"]
+        store = GraphStore()
+        store.add_subclass_closure(
+            [
+                (c, c)
+                for c in ("agentce:ToolCall", "agentce:Decision", "agentce:Outcome")
+            ]
+        )
+        for node, cls, untrusted in (
+            ("tc1", "agentce:ToolCall", "false"),
+            ("d1", "agentce:Decision", "true"),
+            ("o1", "agentce:Outcome", "true"),
+        ):
+            store.add_type(node, cls)
+            store.add_literal(node, "agentce:actsOnUntrusted", untrusted, "xsd:boolean")
+        outcome = evaluate_control(store, shape, shapes, control_id="CND-05")
+        assert (outcome.applicable, outcome.failed) == (2, 1)

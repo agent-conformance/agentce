@@ -119,7 +119,9 @@ test("an evidence shape resolves from its own file whatever its name", () => {
   const catalog = loadCatalog(dir);
   const control = catalog.controls.find((c) => c.id === "ROB-02");
   assert.ok(control);
-  assert.equal(evidenceShapeFor(catalog, control)?.targetClass, "agentce:ConsequentialDecision");
+  assert.deepEqual(evidenceShapeFor(catalog, control)?.targetClasses, [
+    "agentce:ConsequentialDecision",
+  ]);
   rmSync(join(dir, ".."), { recursive: true, force: true });
 });
 

@@ -66,7 +66,7 @@ def _control(cid: str, test_cases: list[dict[str, str]] | None = None) -> Contro
 def _shape(iri: str, path: str = "prov:wasAssociatedWith") -> Shape:
     return Shape(
         iri=iri,
-        target_class="agentce:ConsequentialDecision",
+        target_classes=["agentce:ConsequentialDecision"],
         properties=[PropertyShape(path=Predicate(path), name="S1", min_count=1)],
     )
 
@@ -105,7 +105,7 @@ def test_identical_shape_and_fixtures_is_a_problem(tmp_path: Path) -> None:
         # by IRI only, the shape content is byte-for-byte the same object.
         "agentce:DOC-01-Shape": Shape(
             iri="agentce:DOC-01-Shape",
-            target_class=same_shape.target_class,
+            target_classes=same_shape.target_classes,
             properties=same_shape.properties,
         ),
     }
@@ -131,7 +131,7 @@ def test_same_shape_but_different_fixtures_is_not_a_problem(tmp_path: Path) -> N
         "agentce:REC-01-Shape": same_shape,
         "agentce:DOC-01-Shape": Shape(
             iri="agentce:DOC-01-Shape",
-            target_class=same_shape.target_class,
+            target_classes=same_shape.target_classes,
             properties=same_shape.properties,
         ),
     }

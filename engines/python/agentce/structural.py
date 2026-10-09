@@ -279,8 +279,8 @@ def _node_violations(
 
 def _target_nodes(store: GraphStore, shape: Shape) -> list[str]:
     focus: set[str] = set(shape.target_nodes)
-    if shape.target_class is not None:
-        focus.update(store.instances_of(shape.target_class))
+    for target_class in shape.target_classes:
+        focus.update(store.instances_of(target_class))
     if not shape.target_where:
         return sorted(focus)
     kept = []

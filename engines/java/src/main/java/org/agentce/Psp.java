@@ -104,7 +104,8 @@ public final class Psp {
 
     public static final class Shape {
         public String iri;
-        public String targetClass;
+        /** Every {@code sh:targetClass}, sorted: SHACL reads more than one as a union. */
+        public List<String> targetClasses = new ArrayList<>();
         public List<String> targetNodes = new ArrayList<>();
         public List<String[]> targetWhere = new ArrayList<>();
         public List<PropertyShape> properties = new ArrayList<>();
@@ -230,10 +231,10 @@ public final class Psp {
         for (Rdf.Term shapeNode : store.subjects(Rdf.Term.iri(Rdf.RDF_TYPE), sh("NodeShape"))) {
             Shape shape = new Shape();
             shape.iri = shapeNode.value;
-            Rdf.Term targetClass = store.value(shapeNode, sh("targetClass"));
-            if (targetClass != null) {
-                shape.targetClass = curie(targetClass);
+            for (Rdf.Term targetClass : store.objects(shapeNode, sh("targetClass"))) {
+                shape.targetClasses.add(curie(targetClass));
             }
+            shape.targetClasses.sort(Json::byteCompare);
             for (Rdf.Term node : store.objects(shapeNode, sh("targetNode"))) {
                 shape.targetNodes.add(curie(node));
             }

@@ -112,7 +112,7 @@
       "control": "CND-05",
       "outcome": "conformant",
       "population": {
-        "applicable": 1,
+        "applicable": 2,
         "failed": 0
       },
       "violations": []
@@ -121,7 +121,7 @@
       "control": "CND-05",
       "outcome": "non-conformant",
       "population": {
-        "applicable": 1,
+        "applicable": 2,
         "failed": 1
       },
       "violations": [

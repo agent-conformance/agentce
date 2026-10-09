@@ -3,5 +3,5 @@
 @prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
 
 agentce:CND-05-Shape a sh:NodeShape ;
-  sh:targetClass agentce:ToolCall ;
+  sh:targetClass agentce:ToolCall, agentce:Decision ;
   sh:property [ sh:path agentce:actsOnUntrusted ; sh:hasValue false ; sh:name "S1" ] .

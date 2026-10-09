@@ -368,8 +368,8 @@ public final class Structural {
 
     private static List<String> targetNodes(GraphStore store, Psp.Shape shape) {
         Set<String> focus = new LinkedHashSet<>(shape.targetNodes);
-        if (shape.targetClass != null) {
-            focus.addAll(store.instancesOf(shape.targetClass));
+        for (String targetClass : shape.targetClasses) {
+            focus.addAll(store.instancesOf(targetClass));
         }
         List<String> sorted = new ArrayList<>(focus);
         sorted.sort(Json::byteCompare);

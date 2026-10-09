@@ -22,6 +22,8 @@ A shape file is **within the profile** when every shape in it uses only the foll
 
 - `sh:targetClass` — the shape applies to every node of the class (membership per the class-hierarchy
   rule below).
+  A shape may name more than one class; it then applies to every node of any of them (the union, as in
+  SHACL).
 - `sh:targetNode` — the shape applies to a named node.
 - `agentce:targetWhere` — a conjunction of property-value equalities, resolved by the engine to a set
   of focus nodes *before* validation. Its object is a node whose properties are simple value

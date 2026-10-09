@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -288,7 +289,7 @@ class CatalogTest {
     void anEvidenceShapeResolvesFromItsOwnFileWhateverItsName(@TempDir Path tmp) throws IOException {
         Catalog catalog = Catalog.load(withEvidenceShape(tmp, EVIDENCE_PREFIXES + "agentce:Anything" + EVIDENCE_BODY));
         Catalog.ControlSpec control = catalog.controls.stream().filter(c -> c.id.equals("ROB-02")).findFirst().get();
-        assertEquals("agentce:ConsequentialDecision", Catalog.evidenceShapeFor(catalog, control).targetClass);
+        assertEquals(List.of("agentce:ConsequentialDecision"), Catalog.evidenceShapeFor(catalog, control).targetClasses);
     }
 
     @Test

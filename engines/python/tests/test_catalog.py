@@ -488,7 +488,9 @@ def test_an_evidence_shape_resolves_from_its_own_file_whatever_its_name(
     )
     control = next(c for c in catalog.controls if c.id == "ROB-02")
     shape = catalog.evidence_shape_for(control)
-    assert shape is not None and shape.target_class == "agentce:ConsequentialDecision"
+    assert shape is not None and shape.target_classes == [
+        "agentce:ConsequentialDecision"
+    ]
 
 
 @pytest.mark.parametrize(
