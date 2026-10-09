@@ -872,7 +872,7 @@
     },
     {
       "id": "VG-ROB02-UNTRUSTED",
-      "title": "ROB-02 checks what its title says in all three engines: a consequential decision fails when untrusted content reached it, by any number of hops through its inputs, the reads it consumed, tool calls, model calls, other decisions, its origin or the instruction it acts on; the memory guard's trust and verdicts and an instruction's source class mark what is untrusted, and a decision with no enforcement-point memory read reads insufficient_evidence (18.37b)",
+      "title": "ROB-02 checks what its title says in all three engines: a consequential decision fails when untrusted content reached it, by any number of hops through its inputs, the reads it consumed, tool calls, model calls, other decisions, its origin or the instruction it acts on; the memory guard's trust and verdicts and an instruction's source class mark what is untrusted, and a bundle with no enforcement-point memory read reads insufficient_evidence (18.37b)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
