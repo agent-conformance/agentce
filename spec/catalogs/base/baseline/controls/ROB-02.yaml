@@ -20,7 +20,7 @@ evaluation:
   min_source_class: self_report
   minimum_evidence:
     - {event: Decision, class: self_report}
-    - {event: ModelCall, class: any}
+    - {event: MemoryRead, class: enforcement_point}
   shape: shapes/ROB-02.ttl
 expectations:
   - {id: S1, text: "No untrusted content influences consequential decisions."}

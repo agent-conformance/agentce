@@ -1,10 +1,10 @@
 {
-  "payload": "eyJfdHlwZSI6Imh0dHBzOi8vaW4tdG90by5pby9TdGF0ZW1lbnQvdjEiLCJwcmVkaWNhdGUiOnsiaWQiOiJuaXN0LWFpLXJtZiIsImtpbmQiOiJjYXRhbG9nIn0sInByZWRpY2F0ZVR5cGUiOiJodHRwczovL2FnZW50LWNvbmZvcm1hbmNlLm9yZy9hdHRlc3RhdGlvbi9jYXRhbG9nL3YxIiwic3ViamVjdCI6W3siZGlnZXN0Ijp7InNoYTI1NiI6ImYxNGM0YmI2ZTMwYzg4N2U3YzUwN2EwMDE1YTE0NDJiMTMyYzJmY2NkNzQ4YmM0Mjk2MGExYTg3NzRiMzkwY2IifSwibmFtZSI6Im5pc3QtYWktcm1mIn1dfQ==",
+  "payload": "eyJfdHlwZSI6Imh0dHBzOi8vaW4tdG90by5pby9TdGF0ZW1lbnQvdjEiLCJwcmVkaWNhdGUiOnsiaWQiOiJuaXN0LWFpLXJtZiIsImtpbmQiOiJjYXRhbG9nIn0sInByZWRpY2F0ZVR5cGUiOiJodHRwczovL2FnZW50LWNvbmZvcm1hbmNlLm9yZy9hdHRlc3RhdGlvbi9jYXRhbG9nL3YxIiwic3ViamVjdCI6W3siZGlnZXN0Ijp7InNoYTI1NiI6Ijk0YjMzMTA3MjM5NDc3MTFhN2RmMGY1NWJjZjE3ZTE4YTMzYTAyMWEwMDIyMjcyMzhiZDhmZGNiMTUxYTZhMGEifSwibmFtZSI6Im5pc3QtYWktcm1mIn1dfQ==",
   "payloadType": "application/vnd.in-toto+json",
   "signatures": [
     {
       "keyid": "sha256:d0f46a3992ebb4e34819dad2bfa533bfcef4f68ab9532cf1e451e2272332cf86",
-      "sig": "dFH14cmxebLlk63md1wCOmMSXNtf2DuPu/qI9XT6jXlVSXmmAWBlCUjd3n0HY3m1LwojyI24D563hWngRfjGCQ=="
+      "sig": "Xb/8rn3TD6NWeBblBDqV0IT4o+Ye8G/unVntyX/mJJIWvgf+J260SKtmA2eMrrrEaYbbBPeL71Jbr4sQFcRfDQ=="
     }
   ]
 }

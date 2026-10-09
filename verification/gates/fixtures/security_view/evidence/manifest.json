@@ -4,7 +4,17 @@
   "files": [
     {
       "path": "events/subject.jsonl",
-      "sha256": "2d2e8097e5e618ad5a582b049495ba21dba1816fdb1b4e6e3a5cf226c3209fbc"
+      "sha256": "75886a825c46808ef9703377c5836ad808ac1ae8bfdddeb58ecc59a6195c990e"
+    }
+  ],
+  "sources": [
+    {
+      "id": "urn:agentce:source:security-view-fixture:test",
+      "class": "self_report"
+    },
+    {
+      "id": "urn:agentce:source:security-view-fixture:gateway",
+      "class": "enforcement_point"
     }
   ]
 }

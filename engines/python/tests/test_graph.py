@@ -394,3 +394,185 @@ def test_explanation_reconstructable_is_independent_of_notice_order() -> None:
     assert dangling_last.literal_values(
         event_iri("d1"), "agentce:explanationReconstructable"
     ) == ["true"]
+
+
+def _event(event_id: str, ptype: str, data: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": event_id,
+        "source": "urn:agentce:source:guard",
+        "subject": "spiffe://corp/agents/a",
+        "time": "t",
+        "type": f"org.agent-conformance.evidence.{ptype}.v1",
+        "agentcesourceclass": "enforcement_point",
+        "data": {"@type": ptype, **data},
+    }
+
+
+def _robust(events: list[dict[str, Any]], decision_id: str = "d1") -> list[str]:
+    store = build_graph(events, domain=DOMAIN)
+    return store.literal_values(
+        event_iri(decision_id), "agentce:robustToUntrustedContent"
+    )
+
+
+def _with_inputs(event: dict[str, Any], inputs: list[str]) -> dict[str, Any]:
+    event["data"]["inputs"] = inputs
+    return event
+
+
+def test_robust_when_every_input_is_trusted() -> None:
+    write = _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "trusted"})
+    assert _robust([write, _with_inputs(decision("d1", "t"), ["mem:r1"])]) == ["true"]
+
+
+def test_robust_when_the_decision_used_nothing() -> None:
+    assert _robust([decision("d1", "t")]) == ["true"]
+
+
+def test_not_robust_on_an_input_the_guard_marked_untrusted() -> None:
+    for marks in (
+        {"trust": "untrusted"},
+        {"trust": "quarantined"},
+        {"trust": "trusted", "guard_verdict": "quarantine"},
+        {"guard_verdict": "block"},
+    ):
+        write = _event("w1", "MemoryWrite", {"record_ref": "mem:r1", **marks})
+        assert _robust([write, _with_inputs(decision("d1", "t"), ["mem:r1"])]) == [
+            "false"
+        ], marks
+
+
+def test_sanitized_or_reviewed_records_stay_trusted() -> None:
+    write = _event(
+        "w1", "MemoryWrite", {"record_ref": "mem:r1", "guard_verdict": "sanitize"}
+    )
+    assert _robust([write, _with_inputs(decision("d1", "t"), ["mem:r1"])]) == ["true"]
+
+
+def test_not_robust_through_a_consumed_read() -> None:
+    write = _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "untrusted"})
+    read = _event(
+        "m1",
+        "MemoryRead",
+        {"record_refs": ["mem:r1"], "refs": {"consumer": "agentce:event/d1"}},
+    )
+    assert _robust([write, read, decision("d1", "t")]) == ["false"]
+    low = _event(
+        "m2",
+        "MemoryRead",
+        {"trust_min": "untrusted", "refs": {"consumer": "agentce:event/d1"}},
+    )
+    assert _robust([low, decision("d1", "t")]) == ["false"]
+    elsewhere = _event(
+        "m3",
+        "MemoryRead",
+        {"trust_min": "untrusted", "refs": {"consumer": "agentce:event/d2"}},
+    )
+    assert _robust([elsewhere, decision("d1", "t")]) == ["true"]
+
+
+def test_not_robust_when_acting_on_an_untrusted_instruction() -> None:
+    for source_class, expected in (("tool_output", "false"), ("user", "true")):
+        instruction = _event("i1", "Instruction", {"source_class": source_class})
+        dec = decision("d1", "t")
+        dec["data"]["refs"] = {"instruction": "agentce:event/i1"}
+        assert _robust([instruction, dec]) == [expected], source_class
+
+
+def test_robust_to_untrusted_content_is_independent_of_event_order() -> None:
+    write = _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "untrusted"})
+    dec = _with_inputs(decision("d1", "t"), ["mem:r1"])
+    assert _robust([dec, write]) == _robust([write, dec]) == ["false"]
+
+
+def test_malformed_memory_fields_are_ignored() -> None:
+    write = _event(
+        "w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": ["untrusted"]}
+    )
+    read = _event(
+        "m1",
+        "MemoryRead",
+        {
+            "record_refs": "mem:r1",
+            "trust_min": {},
+            "refs": {"consumer": "agentce:event/d1"},
+        },
+    )
+    dec = decision("d1", "t")
+    dec["data"]["inputs"] = "mem:r1"
+    assert _robust([write, read, dec]) == ["true"]
+
+
+def test_not_robust_on_an_input_naming_an_untrusted_event() -> None:
+    read = _event(
+        "m1", "MemoryRead", {"record_refs": ["mem:r9"], "trust_min": "untrusted"}
+    )
+    write = _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "untrusted"})
+    for event in (read, write):
+        dec = _with_inputs(decision("d1", "t"), [event_iri(event["id"])])
+        assert _robust([event, dec]) == ["false"], event["id"]
+
+
+def test_input_model_call_counts_through_the_reads_it_consumed() -> None:
+    call = _event("mc1", "ModelCall", {})
+    for trust_min, expected in (("untrusted", "false"), ("trusted", "true")):
+        read = _event(
+            "m1",
+            "MemoryRead",
+            {
+                "record_refs": ["mem:r9"],
+                "trust_min": trust_min,
+                "refs": {"consumer": "agentce:event/mc1"},
+            },
+        )
+        dec = _with_inputs(decision("d1", "t"), ["agentce:event/mc1"])
+        assert _robust([read, call, dec]) == [expected], trust_min
+
+
+def test_taint_follows_content_through_any_number_of_hops() -> None:
+    write = _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "untrusted"})
+    tool = _event("tc1", "ToolCall", {"used": ["mem:r1"], "result_ref": "content:t1"})
+    call = _event(
+        "mc1", "ModelCall", {"input_ref": "content:t1", "output_ref": "content:o1"}
+    )
+    minor = _with_inputs(decision("d0", "t"), ["content:o1"])
+    dec = _with_inputs(decision("d1", "t"), ["agentce:event/d0"])
+    events = [write, tool, call, minor, dec]
+    assert _robust(events, "d0") == _robust(events, "d1") == ["false"]
+    assert _robust(list(reversed(events)), "d1") == ["false"]
+
+
+def test_taint_reaches_a_decision_through_its_origin() -> None:
+    read = _event(
+        "m1",
+        "MemoryRead",
+        {"trust_min": "untrusted", "refs": {"consumer": "agentce:event/mc1"}},
+    )
+    dec = decision("d1", "t")
+    dec["data"]["refs"] = {"origin": "agentce:event/mc1"}
+    assert _robust([read, _event("mc1", "ModelCall", {}), dec]) == ["false"]
+
+
+def test_a_trusted_write_of_a_record_another_write_tainted_is_untrusted() -> None:
+    bad = _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "untrusted"})
+    good = _event("w2", "MemoryWrite", {"record_ref": "mem:r1", "trust": "trusted"})
+    dec = _with_inputs(decision("d1", "t"), ["agentce:event/w2"])
+    assert _robust([bad, good, dec]) == ["false"]
+
+
+def test_an_instruction_derived_from_an_untrusted_one_is_untrusted() -> None:
+    origin = _event("i1", "Instruction", {"source_class": "tool_output"})
+    derived = _event(
+        "i2",
+        "Instruction",
+        {"source_class": "user", "refs": {"parent": "agentce:event/i1"}},
+    )
+    dec = decision("d1", "t")
+    dec["data"]["refs"] = {"instruction": "agentce:event/i2"}
+    assert _robust([origin, derived, dec]) == ["false"]
+
+
+def test_a_cycle_of_inputs_ends_and_stays_trusted_without_a_source() -> None:
+    first = _with_inputs(decision("d1", "t"), ["agentce:event/d2"])
+    second = _with_inputs(decision("d2", "t"), ["agentce:event/d1"])
+    assert _robust([first, second]) == ["true"]

@@ -115,3 +115,6 @@ agentce:componentDeclared a owl:DatatypeProperty ; rdfs:label "component declare
 agentce:declaredComponentsObserved a owl:DatatypeProperty ; rdfs:label "declared components observed" ;
   rdfs:domain agentce:ComponentRecord ; rdfs:range xsd:boolean ;
   rdfs:comment "On a BundleLoaded: whether every model and MCP server its manifest declares is exercised by a ToolCall or ModelCall of the same subject." .
+agentce:robustToUntrustedContent a owl:DatatypeProperty ; rdfs:label "robust to untrusted content" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
+  rdfs:comment "On a Decision: whether everything it used was trusted -- none of its inputs or the records of a MemoryRead it consumed was written untrusted, quarantined or blocked by the memory guard, no consumed read has trust_min untrusted or quarantined, and the instruction it acts on is not from an untrusted source class." .

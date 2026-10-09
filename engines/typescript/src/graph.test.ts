@@ -107,3 +107,95 @@ test("explanation reconstructable is independent of notice order", () => {
     ["true"],
   );
 });
+
+function memoryEvent(id: string, ptype: string, data: Record<string, unknown>) {
+  return {
+    id,
+    time: "2026-01-01T00:00:00Z",
+    agentcesourceclass: "enforcement_point",
+    data: { "@type": ptype, ...data },
+  };
+}
+
+function robust(events: Record<string, unknown>[], decisionId = "d1"): string[] {
+  const store = buildGraph(events, { domain: MINOR_DOMAIN });
+  return store.literalValues(`agentce:event/${decisionId}`, "agentce:robustToUntrustedContent");
+}
+
+function withInputs(event: ReturnType<typeof decisionEvent>, inputs: string[]) {
+  return { ...event, data: { ...event.data, inputs } };
+}
+
+test("ROB-02: a decision is robust when it used only trusted content, or none", () => {
+  const write = memoryEvent("w1", "MemoryWrite", { record_ref: "mem:r1", trust: "trusted" });
+  assert.deepEqual(robust([write, withInputs(decisionEvent("d1"), ["mem:r1"])]), ["true"]);
+  assert.deepEqual(robust([decisionEvent("d1")]), ["true"]);
+});
+
+test("ROB-02: guard marks and a consumed read's trust_min taint a decision", () => {
+  for (const marks of [
+    { trust: "untrusted" },
+    { trust: "quarantined" },
+    { trust: "trusted", guard_verdict: "quarantine" },
+    { guard_verdict: "block" },
+  ]) {
+    const write = memoryEvent("w1", "MemoryWrite", { record_ref: "mem:r1", ...marks });
+    assert.deepEqual(robust([write, withInputs(decisionEvent("d1"), ["mem:r1"])]), ["false"]);
+  }
+  const sanitized = memoryEvent("w1", "MemoryWrite", {
+    record_ref: "mem:r1",
+    guard_verdict: "sanitize",
+  });
+  assert.deepEqual(robust([sanitized, withInputs(decisionEvent("d1"), ["mem:r1"])]), ["true"]);
+  const read = memoryEvent("m1", "MemoryRead", {
+    trust_min: "untrusted",
+    refs: { consumer: "agentce:event/d1" },
+  });
+  assert.deepEqual(robust([read, decisionEvent("d1")]), ["false"]);
+});
+
+test("ROB-02: taint follows content through any number of hops, in any order", () => {
+  const events = [
+    memoryEvent("w1", "MemoryWrite", { record_ref: "mem:r1", trust: "untrusted" }),
+    memoryEvent("tc1", "ToolCall", { used: ["mem:r1"], result_ref: "content:t1" }),
+    memoryEvent("mc1", "ModelCall", { input_ref: "content:t1", output_ref: "content:o1" }),
+    withInputs(decisionEvent("d0"), ["content:o1"]),
+    withInputs(decisionEvent("d1"), ["agentce:event/d0"]),
+  ];
+  assert.deepEqual(robust(events, "d0"), ["false"]);
+  assert.deepEqual(robust(events), ["false"]);
+  assert.deepEqual(robust([...events].reverse()), ["false"]);
+});
+
+test("ROB-02: origin, a write of a tainted record and a derived instruction taint a decision", () => {
+  const read = memoryEvent("m1", "MemoryRead", {
+    trust_min: "untrusted",
+    refs: { consumer: "agentce:event/mc1" },
+  });
+  const viaOrigin = {
+    ...decisionEvent("d1"),
+    data: { ...decisionEvent("d1").data, refs: { origin: "agentce:event/mc1" } },
+  };
+  assert.deepEqual(robust([read, memoryEvent("mc1", "ModelCall", {}), viaOrigin]), ["false"]);
+  const bad = memoryEvent("w1", "MemoryWrite", { record_ref: "mem:r1", trust: "untrusted" });
+  const good = memoryEvent("w2", "MemoryWrite", { record_ref: "mem:r1", trust: "trusted" });
+  assert.deepEqual(robust([bad, good, withInputs(decisionEvent("d1"), ["agentce:event/w2"])]), [
+    "false",
+  ]);
+  const origin = memoryEvent("i1", "Instruction", { source_class: "tool_output" });
+  const derived = memoryEvent("i2", "Instruction", {
+    source_class: "user",
+    refs: { parent: "agentce:event/i1" },
+  });
+  const acting = {
+    ...decisionEvent("d1"),
+    data: { ...decisionEvent("d1").data, refs: { instruction: "agentce:event/i2" } },
+  };
+  assert.deepEqual(robust([origin, derived, acting]), ["false"]);
+});
+
+test("ROB-02: a cycle of inputs ends and stays trusted without a source", () => {
+  const first = withInputs(decisionEvent("d1"), ["agentce:event/d2"]);
+  const second = withInputs(decisionEvent("d2"), ["agentce:event/d1"]);
+  assert.deepEqual(robust([first, second]), ["true"]);
+});

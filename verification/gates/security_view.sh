@@ -30,8 +30,8 @@
 # a denied `AuthzCheck`; an undeclared `ModelCall` -- plus one `Decision` (so at least one
 # (control, subject) pair reaches a judged outcome rather than tripping `input.nothing_evaluated`)
 # are enough to exercise every fact this view reads from `activity.py`'s own rollup, real citations
-# included. The run's own verdict is genuinely non-conformant (ROB-02 fails its shape's `prov:used`
-# property) -- exit code 1 (`ExitCode.FINDINGS`), not 0, which this script checks for explicitly
+# included. The run's own verdict is genuinely non-conformant (ROB-02: the decision consumed a memory
+# record the guard wrote as untrusted) -- exit code 1 (`ExitCode.FINDINGS`), not 0, which this script checks for explicitly
 # rather than letting a bare `set -e` treat a real, expected finding as a script bug.
 #
 # The two goldens (security_view_golden.json, security_view_golden.md) are always a capture of the

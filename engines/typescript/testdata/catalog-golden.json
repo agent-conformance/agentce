@@ -1101,10 +1101,10 @@
       },
       "violations": [
         {
-          "constraint": "sh:minCount",
+          "constraint": "sh:hasValue",
           "focus": "agentce:event/d1",
           "message_key": "ROB-02.S1",
-          "path": "prov:used"
+          "path": "agentce:robustToUntrustedContent"
         }
       ]
     },

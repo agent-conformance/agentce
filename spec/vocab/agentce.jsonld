@@ -32,45 +32,14 @@
   },
   "@graph": [
     {
-      "@id": "agentce:danglingRef",
-      "@type": "owl:DatatypeProperty",
-      "rdfs:comment": "A refs.* value that resolves to no ingested event.",
+      "@id": "agentce:resultedIn",
+      "@type": "owl:ObjectProperty",
       "rdfs:domain": {
         "@id": "agentce:Activity"
       },
-      "rdfs:label": "dangling reference",
+      "rdfs:label": "resulted in",
       "rdfs:range": {
-        "@id": "xsd:string"
-      }
-    },
-    {
-      "@id": "agentce:refusedBy",
-      "@type": "owl:ObjectProperty",
-      "rdfs:domain": {
-        "@id": "agentce:Instruction"
-      },
-      "rdfs:label": "refused by",
-      "rdfs:range": {
-        "@id": "agentce:Refusal"
-      }
-    },
-    {
-      "@id": "agentce:oversightModality",
-      "@type": "owl:ObjectProperty",
-      "rdfs:domain": {
-        "@id": "agentce:Decision"
-      },
-      "rdfs:label": "oversight modality",
-      "rdfs:range": {
-        "@id": "agentce:OversightModality"
-      }
-    },
-    {
-      "@id": "agentce:ServicePrincipal",
-      "@type": "owl:Class",
-      "rdfs:label": "Service principal",
-      "rdfs:subClassOf": {
-        "@id": "agentce:Principal"
+        "@id": "agentce:Outcome"
       }
     },
     {
@@ -85,142 +54,20 @@
       }
     },
     {
+      "@id": "agentce:notifiedBy",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Decision"
+      },
+      "rdfs:label": "notified by",
+      "rdfs:range": {
+        "@id": "agentce:Notice"
+      }
+    },
+    {
       "@id": "agentce:PolicyDecision",
       "@type": "owl:Class",
       "rdfs:label": "Policy decision",
-      "rdfs:subClassOf": {
-        "@id": "agentce:Activity"
-      }
-    },
-    {
-      "@id": "agentce:Agent",
-      "@type": "owl:Class",
-      "rdfs:label": "Agent",
-      "rdfs:subClassOf": {
-        "@id": "prov:SoftwareAgent"
-      }
-    },
-    {
-      "@id": "agentce:Attestation",
-      "@type": "owl:Class",
-      "rdfs:label": "Attestation"
-    },
-    {
-      "@id": "agentce:OversightEvent",
-      "@type": "owl:Class",
-      "rdfs:label": "Oversight event"
-    },
-    {
-      "@id": "agentce:explanationReconstructable",
-      "@type": "owl:DatatypeProperty",
-      "rdfs:comment": "Whether a decision is notifiedBy a Notice and its own evidence chain resolves (no danglingRef), so the explanation the notice points at can be reconstructed.",
-      "rdfs:domain": {
-        "@id": "agentce:Decision"
-      },
-      "rdfs:label": "explanation reconstructable",
-      "rdfs:range": {
-        "@id": "xsd:boolean"
-      }
-    },
-    {
-      "@id": "agentce:resultedIn",
-      "@type": "owl:ObjectProperty",
-      "rdfs:domain": {
-        "@id": "agentce:Activity"
-      },
-      "rdfs:label": "resulted in",
-      "rdfs:range": {
-        "@id": "agentce:Outcome"
-      }
-    },
-    {
-      "@id": "agentce:ConsequentialDecision",
-      "@type": "owl:Class",
-      "rdfs:comment": "A decision with legal or similarly significant effect on a natural person (IR-05).",
-      "rdfs:label": "Consequential decision",
-      "rdfs:subClassOf": {
-        "@id": "agentce:Decision"
-      }
-    },
-    {
-      "@id": "agentce:adverseOutcomeLinked",
-      "@type": "owl:DatatypeProperty",
-      "rdfs:comment": "Whether an adverse outcome carries an inbound resultedIn edge from the decision it resulted from; vacuously true for a non-adverse outcome.",
-      "rdfs:domain": {
-        "@id": "agentce:Outcome"
-      },
-      "rdfs:label": "adverse outcome linked",
-      "rdfs:range": {
-        "@id": "xsd:boolean"
-      }
-    },
-    {
-      "@id": "agentce:Notice",
-      "@type": "owl:Class",
-      "rdfs:label": "Notice"
-    },
-    {
-      "@id": "agentce:ToolCall",
-      "@type": "owl:Class",
-      "rdfs:label": "Tool call",
-      "rdfs:subClassOf": {
-        "@id": "agentce:Activity"
-      }
-    },
-    {
-      "@id": "agentce:Component",
-      "@type": "owl:Class",
-      "rdfs:label": "Component"
-    },
-    {
-      "@id": "agentce:Instruction",
-      "@type": "owl:Class",
-      "rdfs:label": "Instruction",
-      "rdfs:subClassOf": {
-        "@id": "agentce:Activity"
-      }
-    },
-    {
-      "@id": "agentce:OversightModality",
-      "@type": "owl:Class",
-      "rdfs:label": "Oversight modality"
-    },
-    {
-      "@id": "agentce:Decision",
-      "@type": "owl:Class",
-      "rdfs:label": "Decision",
-      "rdfs:subClassOf": {
-        "@id": "agentce:Activity"
-      }
-    },
-    {
-      "@id": "agentce:Outcome",
-      "@type": "owl:Class",
-      "rdfs:label": "Outcome"
-    },
-    {
-      "@id": "agentce:ResourceAccess",
-      "@type": "owl:Class",
-      "rdfs:label": "Resource access",
-      "rdfs:subClassOf": {
-        "@id": "agentce:Activity"
-      }
-    },
-    {
-      "@id": "agentce:interruptedBy",
-      "@type": "owl:ObjectProperty",
-      "rdfs:domain": {
-        "@id": "agentce:Activity"
-      },
-      "rdfs:label": "interrupted by",
-      "rdfs:range": {
-        "@id": "agentce:OversightEvent"
-      }
-    },
-    {
-      "@id": "agentce:MemoryRead",
-      "@type": "owl:Class",
-      "rdfs:label": "Memory read",
       "rdfs:subClassOf": {
         "@id": "agentce:Activity"
       }
@@ -231,101 +78,6 @@
       "rdfs:label": "Activity",
       "rdfs:subClassOf": {
         "@id": "prov:Activity"
-      }
-    },
-    {
-      "@id": "agentce:SourceClass",
-      "@type": "owl:Class",
-      "rdfs:label": "Source class"
-    },
-    {
-      "@id": "agentce:ModelCall",
-      "@type": "owl:Class",
-      "rdfs:label": "Model call",
-      "rdfs:subClassOf": {
-        "@id": "agentce:Activity"
-      }
-    },
-    {
-      "@id": "agentce:executes",
-      "@type": "owl:ObjectProperty",
-      "rdfs:domain": {
-        "@id": "agentce:ToolCall"
-      },
-      "rdfs:label": "executes",
-      "rdfs:range": {
-        "@id": "agentce:Decision"
-      }
-    },
-    {
-      "@id": "agentce:reviewedBy",
-      "@type": "owl:ObjectProperty",
-      "rdfs:domain": {
-        "@id": "agentce:Activity"
-      },
-      "rdfs:label": "reviewed by",
-      "rdfs:range": {
-        "@id": "agentce:OversightEvent"
-      }
-    },
-    {
-      "@id": "agentce:DelegationIssued",
-      "@type": "owl:Class",
-      "rdfs:label": "Delegation issued",
-      "rdfs:subClassOf": {
-        "@id": "agentce:Activity"
-      }
-    },
-    {
-      "@id": "agentce:Policy",
-      "@type": "owl:Class",
-      "rdfs:label": "Policy"
-    },
-    {
-      "@id": "agentce:actsOn",
-      "@type": "owl:ObjectProperty",
-      "rdfs:domain": {
-        "@id": "agentce:Activity"
-      },
-      "rdfs:label": "acts on",
-      "rdfs:range": {
-        "@id": "agentce:Instruction"
-      }
-    },
-    {
-      "@id": "agentce:overriddenBy",
-      "@type": "owl:ObjectProperty",
-      "rdfs:domain": {
-        "@id": "agentce:Activity"
-      },
-      "rdfs:label": "overridden by",
-      "rdfs:range": {
-        "@id": "agentce:OversightEvent"
-      }
-    },
-    {
-      "@id": "https://agent-conformance.org/vocab/evidence/v1",
-      "@type": "owl:Ontology",
-      "owl:imports": {
-        "@id": "http://www.w3.org/ns/prov"
-      },
-      "rdfs:comment": "A PROV-O profile plus the glue relations AgentCE defines because no existing vocabulary carries them (SPEC 6.3).",
-      "rdfs:label": "AgentCE evidence vocabulary"
-    },
-    {
-      "@id": "agentce:MemoryWrite",
-      "@type": "owl:Class",
-      "rdfs:label": "Memory write",
-      "rdfs:subClassOf": {
-        "@id": "agentce:Activity"
-      }
-    },
-    {
-      "@id": "agentce:HumanPrincipal",
-      "@type": "owl:Class",
-      "rdfs:label": "Human principal",
-      "rdfs:subClassOf": {
-        "@id": "agentce:Principal"
       }
     },
     {
@@ -340,37 +92,115 @@
       }
     },
     {
-      "@id": "agentce:loadedBundle",
-      "@type": "owl:ObjectProperty",
-      "rdfs:domain": {
-        "@id": "agentce:Activity"
-      },
-      "rdfs:label": "loaded bundle",
-      "rdfs:range": {
-        "@id": "agentce:Bundle"
+      "@id": "agentce:Principal",
+      "@type": "owl:Class",
+      "rdfs:label": "Principal",
+      "rdfs:subClassOf": {
+        "@id": "prov:Agent"
       }
     },
     {
-      "@id": "agentce:chainTerminus",
-      "@type": "owl:ObjectProperty",
-      "rdfs:comment": "The root principal of a materialised delegation chain.",
-      "rdfs:domain": {
+      "@id": "agentce:MemoryRead",
+      "@type": "owl:Class",
+      "rdfs:label": "Memory read",
+      "rdfs:subClassOf": {
         "@id": "agentce:Activity"
-      },
-      "rdfs:label": "chain terminus",
-      "rdfs:range": {
-        "@id": "agentce:Principal"
       }
     },
     {
-      "@id": "agentce:authorizedBy",
+      "@id": "agentce:componentDeclared",
+      "@type": "owl:DatatypeProperty",
+      "rdfs:comment": "On a ToolCall or ModelCall: whether the tool or model it names is declared in one of its subject's BundleLoaded manifests and, when both state a version or digest, the call's matches one declared.",
+      "rdfs:domain": {
+        "@id": "agentce:ComponentRecord"
+      },
+      "rdfs:label": "component declared",
+      "rdfs:range": {
+        "@id": "xsd:boolean"
+      }
+    },
+    {
+      "@id": "agentce:ModelCall",
+      "@type": "owl:Class",
+      "rdfs:label": "Model call",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
+      }
+    },
+    {
+      "@id": "agentce:Incident",
+      "@type": "owl:Class",
+      "rdfs:label": "Incident"
+    },
+    {
+      "@id": "agentce:reviewedBy",
       "@type": "owl:ObjectProperty",
       "rdfs:domain": {
         "@id": "agentce:Activity"
       },
-      "rdfs:label": "authorized by",
+      "rdfs:label": "reviewed by",
       "rdfs:range": {
-        "@id": "agentce:PolicyDecision"
+        "@id": "agentce:OversightEvent"
+      }
+    },
+    {
+      "@id": "agentce:explanationReconstructable",
+      "@type": "owl:DatatypeProperty",
+      "rdfs:comment": "Whether a decision is notifiedBy a Notice and its own evidence chain resolves (no danglingRef), so the explanation the notice points at can be reconstructed.",
+      "rdfs:domain": {
+        "@id": "agentce:Decision"
+      },
+      "rdfs:label": "explanation reconstructable",
+      "rdfs:range": {
+        "@id": "xsd:boolean"
+      }
+    },
+    {
+      "@id": "agentce:Attestation",
+      "@type": "owl:Class",
+      "rdfs:label": "Attestation"
+    },
+    {
+      "@id": "agentce:Bundle",
+      "@type": "owl:Class",
+      "rdfs:label": "Bundle"
+    },
+    {
+      "@id": "agentce:overriddenBy",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "overridden by",
+      "rdfs:range": {
+        "@id": "agentce:OversightEvent"
+      }
+    },
+    {
+      "@id": "agentce:Refusal",
+      "@type": "owl:Class",
+      "rdfs:label": "Refusal",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
+      }
+    },
+    {
+      "@id": "agentce:derivedFrom",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Instruction"
+      },
+      "rdfs:label": "derived from",
+      "rdfs:range": {
+        "@id": "prov:Entity"
+      }
+    },
+    {
+      "@id": "agentce:ResourceAccess",
+      "@type": "owl:Class",
+      "rdfs:label": "Resource access",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
       }
     },
     {
@@ -385,20 +215,91 @@
       }
     },
     {
-      "@id": "agentce:Incident",
+      "@id": "agentce:DelegationIssued",
       "@type": "owl:Class",
-      "rdfs:label": "Incident"
+      "rdfs:label": "Delegation issued",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
+      }
     },
     {
-      "@id": "agentce:derivedFrom",
+      "@id": "agentce:actsOn",
       "@type": "owl:ObjectProperty",
       "rdfs:domain": {
-        "@id": "agentce:Instruction"
+        "@id": "agentce:Activity"
       },
-      "rdfs:label": "derived from",
+      "rdfs:label": "acts on",
       "rdfs:range": {
-        "@id": "prov:Entity"
+        "@id": "agentce:Instruction"
       }
+    },
+    {
+      "@id": "agentce:Decision",
+      "@type": "owl:Class",
+      "rdfs:label": "Decision",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
+      }
+    },
+    {
+      "@id": "agentce:HumanPrincipal",
+      "@type": "owl:Class",
+      "rdfs:label": "Human principal",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Principal"
+      }
+    },
+    {
+      "@id": "agentce:declaredComponentsObserved",
+      "@type": "owl:DatatypeProperty",
+      "rdfs:comment": "On a BundleLoaded: whether every model and MCP server its manifest declares is exercised by a ToolCall or ModelCall of the same subject.",
+      "rdfs:domain": {
+        "@id": "agentce:ComponentRecord"
+      },
+      "rdfs:label": "declared components observed",
+      "rdfs:range": {
+        "@id": "xsd:boolean"
+      }
+    },
+    {
+      "@id": "agentce:MemoryWrite",
+      "@type": "owl:Class",
+      "rdfs:label": "Memory write",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
+      }
+    },
+    {
+      "@id": "https://agent-conformance.org/vocab/evidence/v1",
+      "@type": "owl:Ontology",
+      "owl:imports": {
+        "@id": "http://www.w3.org/ns/prov"
+      },
+      "rdfs:comment": "A PROV-O profile plus the glue relations AgentCE defines because no existing vocabulary carries them (SPEC 6.3).",
+      "rdfs:label": "AgentCE evidence vocabulary"
+    },
+    {
+      "@id": "agentce:SourceClass",
+      "@type": "owl:Class",
+      "rdfs:label": "Source class"
+    },
+    {
+      "@id": "agentce:Outcome",
+      "@type": "owl:Class",
+      "rdfs:label": "Outcome"
+    },
+    {
+      "@id": "agentce:Agent",
+      "@type": "owl:Class",
+      "rdfs:label": "Agent",
+      "rdfs:subClassOf": {
+        "@id": "prov:SoftwareAgent"
+      }
+    },
+    {
+      "@id": "agentce:Component",
+      "@type": "owl:Class",
+      "rdfs:label": "Component"
     },
     {
       "@id": "agentce:sourceClass",
@@ -412,14 +313,107 @@
       }
     },
     {
-      "@id": "agentce:attestedBy",
+      "@id": "agentce:Policy",
+      "@type": "owl:Class",
+      "rdfs:label": "Policy"
+    },
+    {
+      "@id": "agentce:oversightModalityMatchesDeclared",
+      "@type": "owl:DatatypeProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Decision"
+      },
+      "rdfs:label": "oversight modality matches declared",
+      "rdfs:range": {
+        "@id": "xsd:boolean"
+      }
+    },
+    {
+      "@id": "agentce:ConsequentialDecision",
+      "@type": "owl:Class",
+      "rdfs:comment": "A decision with legal or similarly significant effect on a natural person (IR-05).",
+      "rdfs:label": "Consequential decision",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Decision"
+      }
+    },
+    {
+      "@id": "agentce:OversightModality",
+      "@type": "owl:Class",
+      "rdfs:label": "Oversight modality"
+    },
+    {
+      "@id": "agentce:authorizedBy",
       "@type": "owl:ObjectProperty",
       "rdfs:domain": {
-        "@id": "agentce:Bundle"
+        "@id": "agentce:Activity"
       },
-      "rdfs:label": "attested by",
+      "rdfs:label": "authorized by",
       "rdfs:range": {
-        "@id": "agentce:Attestation"
+        "@id": "agentce:PolicyDecision"
+      }
+    },
+    {
+      "@id": "agentce:oversightModality",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Decision"
+      },
+      "rdfs:label": "oversight modality",
+      "rdfs:range": {
+        "@id": "agentce:OversightModality"
+      }
+    },
+    {
+      "@id": "agentce:OversightEvent",
+      "@type": "owl:Class",
+      "rdfs:label": "Oversight event"
+    },
+    {
+      "@id": "agentce:loadedBundle",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "loaded bundle",
+      "rdfs:range": {
+        "@id": "agentce:Bundle"
+      }
+    },
+    {
+      "@id": "agentce:ToolCall",
+      "@type": "owl:Class",
+      "rdfs:label": "Tool call",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Activity"
+      }
+    },
+    {
+      "@id": "agentce:delegatedVia",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "delegated via",
+      "rdfs:range": {
+        "@id": "agentce:DelegationIssued"
+      }
+    },
+    {
+      "@id": "agentce:ComponentRecord",
+      "@type": "owl:Class",
+      "rdfs:comment": "An engine-materialised type on every BundleLoaded, ToolCall and ModelCall node, so one shape can judge a subject's declared components against the ones it operates (DOC-01).",
+      "rdfs:label": "Component record"
+    },
+    {
+      "@id": "agentce:interruptedBy",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "interrupted by",
+      "rdfs:range": {
+        "@id": "agentce:OversightEvent"
       }
     },
     {
@@ -431,17 +425,6 @@
       "rdfs:label": "related incident",
       "rdfs:range": {
         "@id": "agentce:Incident"
-      }
-    },
-    {
-      "@id": "agentce:oversightModalityMatchesDeclared",
-      "@type": "owl:DatatypeProperty",
-      "rdfs:domain": {
-        "@id": "agentce:Decision"
-      },
-      "rdfs:label": "oversight modality matches declared",
-      "rdfs:range": {
-        "@id": "xsd:boolean"
       }
     },
     {
@@ -464,74 +447,103 @@
       }
     },
     {
-      "@id": "agentce:Refusal",
+      "@id": "agentce:Instruction",
       "@type": "owl:Class",
-      "rdfs:label": "Refusal",
+      "rdfs:label": "Instruction",
       "rdfs:subClassOf": {
         "@id": "agentce:Activity"
       }
     },
     {
-      "@id": "agentce:Bundle",
-      "@type": "owl:Class",
-      "rdfs:label": "Bundle"
-    },
-    {
-      "@id": "agentce:delegatedVia",
-      "@type": "owl:ObjectProperty",
-      "rdfs:domain": {
-        "@id": "agentce:Activity"
-      },
-      "rdfs:label": "delegated via",
-      "rdfs:range": {
-        "@id": "agentce:DelegationIssued"
-      }
-    },
-    {
-      "@id": "agentce:Principal",
-      "@type": "owl:Class",
-      "rdfs:label": "Principal",
-      "rdfs:subClassOf": {
-        "@id": "prov:Agent"
-      }
-    },
-    {
-      "@id": "agentce:notifiedBy",
-      "@type": "owl:ObjectProperty",
-      "rdfs:domain": {
-        "@id": "agentce:Decision"
-      },
-      "rdfs:label": "notified by",
-      "rdfs:range": {
-        "@id": "agentce:Notice"
-      }
-    },
-    {
-      "@id": "agentce:ComponentRecord",
-      "@type": "owl:Class",
-      "rdfs:comment": "An engine-materialised type on every BundleLoaded, ToolCall and ModelCall node, so one shape can judge a subject's declared components against the ones it operates (DOC-01).",
-      "rdfs:label": "Component record"
-    },
-    {
-      "@id": "agentce:componentDeclared",
+      "@id": "agentce:adverseOutcomeLinked",
       "@type": "owl:DatatypeProperty",
-      "rdfs:comment": "On a ToolCall or ModelCall: whether the tool or model it names is declared in one of its subject's BundleLoaded manifests and, when both state a version or digest, the call's matches one declared.",
+      "rdfs:comment": "Whether an adverse outcome carries an inbound resultedIn edge from the decision it resulted from; vacuously true for a non-adverse outcome.",
       "rdfs:domain": {
-        "@id": "agentce:ComponentRecord"
+        "@id": "agentce:Outcome"
       },
-      "rdfs:label": "component declared",
+      "rdfs:label": "adverse outcome linked",
       "rdfs:range": {
         "@id": "xsd:boolean"
       }
     },
     {
-      "@id": "agentce:declaredComponentsObserved",
-      "@type": "owl:DatatypeProperty",
-      "rdfs:comment": "On a BundleLoaded: whether every model and MCP server its manifest declares is exercised by a ToolCall or ModelCall of the same subject.",
+      "@id": "agentce:executes",
+      "@type": "owl:ObjectProperty",
       "rdfs:domain": {
-        "@id": "agentce:ComponentRecord"
+        "@id": "agentce:ToolCall"
       },
-      "rdfs:label": "declared components observed",
+      "rdfs:label": "executes",
+      "rdfs:range": {
+        "@id": "agentce:Decision"
+      }
+    },
+    {
+      "@id": "agentce:attestedBy",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Bundle"
+      },
+      "rdfs:label": "attested by",
+      "rdfs:range": {
+        "@id": "agentce:Attestation"
+      }
+    },
+    {
+      "@id": "agentce:danglingRef",
+      "@type": "owl:DatatypeProperty",
+      "rdfs:comment": "A refs.* value that resolves to no ingested event.",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "dangling reference",
+      "rdfs:range": {
+        "@id": "xsd:string"
+      }
+    },
+    {
+      "@id": "agentce:ServicePrincipal",
+      "@type": "owl:Class",
+      "rdfs:label": "Service principal",
+      "rdfs:subClassOf": {
+        "@id": "agentce:Principal"
+      }
+    },
+    {
+      "@id": "agentce:chainTerminus",
+      "@type": "owl:ObjectProperty",
+      "rdfs:comment": "The root principal of a materialised delegation chain.",
+      "rdfs:domain": {
+        "@id": "agentce:Activity"
+      },
+      "rdfs:label": "chain terminus",
+      "rdfs:range": {
+        "@id": "agentce:Principal"
+      }
+    },
+    {
+      "@id": "agentce:refusedBy",
+      "@type": "owl:ObjectProperty",
+      "rdfs:domain": {
+        "@id": "agentce:Instruction"
+      },
+      "rdfs:label": "refused by",
+      "rdfs:range": {
+        "@id": "agentce:Refusal"
+      }
+    },
+    {
+      "@id": "agentce:Notice",
+      "@type": "owl:Class",
+      "rdfs:label": "Notice"
+    },
+    {
+      "@id": "agentce:robustToUntrustedContent",
+      "@type": "owl:DatatypeProperty",
+      "rdfs:comment": "On a Decision: whether everything it used was trusted -- none of its inputs or the records of a MemoryRead it consumed was written untrusted, quarantined or blocked by the memory guard, no consumed read has trust_min untrusted or quarantined, and the instruction it acts on is not from an untrusted source class.",
+      "rdfs:domain": {
+        "@id": "agentce:Decision"
+      },
+      "rdfs:label": "robust to untrusted content",
       "rdfs:range": {
         "@id": "xsd:boolean"
       }

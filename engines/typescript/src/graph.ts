@@ -60,6 +60,30 @@ const TRUSTED_INSTRUCTION = new Set([
   "memory_trusted",
 ]);
 
+/** A memory record's trust, or a read's `trust_min`, that ROB-02 treats as untrusted, and the memory guard
+ * verdicts that mark a record untrusted whatever its trust field says (SPEC §7.4). */
+const UNTRUSTED_TRUST = new Set(["untrusted", "quarantined"]);
+const UNTRUSTED_VERDICTS = new Set(["quarantine", "block"]);
+
+/** Payload fields that carry content into their event, and those naming content their event produced
+ * (SPEC §6.2); ROB-02's taint flows along both. Identity, audit and person refs carry none. */
+const CONTENT_IN = [
+  "inputs",
+  "used",
+  "args_ref",
+  "input_ref",
+  "record_refs",
+  "provenance_origin_ref",
+];
+const CONTENT_OUT = ["output_ref", "result_ref", "record_ref", "content_ref"];
+/** `refs` members that carry content into their event: the producing activity, the instruction acted
+ * on and the instruction it was derived from. */
+const REFS_IN = ["origin", "instruction", "parent"];
+
+function isOneOf(value: unknown, values: Set<string>): boolean {
+  return typeof value === "string" && values.has(value);
+}
+
 export type Event = Record<string, unknown>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -450,6 +474,85 @@ class Builder {
     }
   }
 
+  /** Flag whether each Decision kept untrusted content out (SPEC §7.4, ROB-02).
+   *
+   * Untrusted content starts at a MemoryWrite whose trust is untrusted or quarantined or whose guard
+   * verdict is quarantine or block, a MemoryRead whose `trust_min` is untrusted or quarantined, and an
+   * instruction with an untrusted Appendix F source class (CND-05's rule). It flows along every edge that
+   * carries content into an event (CONTENT_IN, CONTENT_OUT, a read to its consumer, a record to and from
+   * its writes) for as many hops as the records show. A closure over all events, so order and cycles
+   * never matter. */
+  private robustToUntrusted(events: Event[]): void {
+    const flows = new Map<string, Set<string>>();
+    const tainted = new Set<string>();
+    const flow = (source: unknown, target: unknown): void => {
+      if (typeof source === "string" && typeof target === "string") {
+        let targets = flows.get(source);
+        if (targets === undefined) {
+          targets = new Set();
+          flows.set(source, targets);
+        }
+        targets.add(target);
+      }
+    };
+    for (const event of events) {
+      const ptype = this.ptype(event);
+      const data = dataOf(event);
+      const refs = refsOf(event);
+      const node = eventIri(String(event.id));
+      for (const key of CONTENT_IN) {
+        const value = data[key];
+        for (const ref of Array.isArray(value) ? value : [value]) {
+          flow(ref, node);
+        }
+      }
+      for (const key of REFS_IN) {
+        flow(refs[key], node);
+      }
+      for (const key of CONTENT_OUT) {
+        flow(node, data[key]);
+      }
+      flow(node, refs.consumer);
+      if (ptype === "MemoryWrite") {
+        // A record and each write of it stand for the same content.
+        flow(data.record_ref, node);
+        if (
+          isOneOf(data.trust, UNTRUSTED_TRUST) ||
+          isOneOf(data.guard_verdict, UNTRUSTED_VERDICTS)
+        ) {
+          tainted.add(node);
+        }
+      } else if (ptype === "MemoryRead" && isOneOf(data.trust_min, UNTRUSTED_TRUST)) {
+        tainted.add(node);
+      }
+    }
+    for (const [iri, untrusted] of this.instructionUntrusted) {
+      if (untrusted) {
+        tainted.add(iri);
+      }
+    }
+    const pending = [...tainted];
+    while (pending.length > 0) {
+      for (const target of flows.get(pending.pop() as string) ?? []) {
+        if (!tainted.has(target)) {
+          tainted.add(target);
+          pending.push(target);
+        }
+      }
+    }
+    for (const event of events) {
+      if (this.ptype(event) === "Decision") {
+        const node = eventIri(String(event.id));
+        this.store.addLiteral(
+          node,
+          "agentce:robustToUntrustedContent",
+          tainted.has(node) ? "false" : "true",
+          BOOL,
+        );
+      }
+    }
+  }
+
   private materialise(events: Event[]): void {
     for (const event of events) {
       const node = eventIri(String(event.id));
@@ -477,6 +580,7 @@ class Builder {
       this.chainTerminus(node, data);
     }
     this.actsOnUntrusted(events);
+    this.robustToUntrusted(events);
     this.conductScopeBudget(events);
     this.precededBy();
   }

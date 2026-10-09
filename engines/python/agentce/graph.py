@@ -61,6 +61,40 @@ _TRUSTED_INSTRUCTION: frozenset[str] = frozenset(
     {"user", "operator", "service", "agent_identified", "memory_trusted"}
 )
 
+#: A memory record's trust, or a read's ``trust_min``, that ROB-02 treats as untrusted, and the memory
+#: guard verdicts that mark a record untrusted whatever its trust field says (SPEC §7.4).
+_UNTRUSTED_TRUST: frozenset[str] = frozenset({"untrusted", "quarantined"})
+_UNTRUSTED_VERDICTS: frozenset[str] = frozenset({"quarantine", "block"})
+
+
+#: Payload fields that carry content into their event, and those naming content their event
+#: produced (SPEC §6.2); ROB-02's taint flows along both. Identity, audit and person refs carry none.
+_CONTENT_IN: tuple[str, ...] = (
+    "inputs",
+    "used",
+    "args_ref",
+    "input_ref",
+    "record_refs",
+    "provenance_origin_ref",
+)
+_CONTENT_OUT: tuple[str, ...] = (
+    "output_ref",
+    "result_ref",
+    "record_ref",
+    "content_ref",
+)
+#: ``refs`` members that carry content into their event: the producing activity, the
+#: instruction acted on and the instruction it was derived from.
+_REFS_IN: tuple[str, ...] = ("origin", "instruction", "parent")
+
+
+def _is_one_of(value: Any, values: frozenset[str]) -> bool:
+    return isinstance(value, str) and value in values
+
+
+def _strings(value: Any) -> list[str]:
+    return [v for v in value if isinstance(v, str)] if isinstance(value, list) else []
+
 
 def _closure(subclass: dict[str, str], classes: set[str]) -> set[tuple[str, str]]:
     nodes = set(classes) | set(subclass) | set(subclass.values())
@@ -407,6 +441,67 @@ class _Builder:
                 BOOL,
             )
 
+    def _robust_to_untrusted(self, events: list[dict[str, Any]]) -> None:
+        """Flag whether each Decision kept untrusted content out (SPEC §7.4, ROB-02).
+
+        Untrusted content starts at a MemoryWrite whose trust is untrusted or quarantined or whose
+        guard verdict is quarantine or block, a MemoryRead whose ``trust_min`` is untrusted or
+        quarantined, and an instruction with an untrusted Appendix F source class (CND-05's rule).
+        It flows along every edge that carries content into an event (``_CONTENT_IN``,
+        ``_CONTENT_OUT``, a read to its consumer, a record to and from its writes) for as many
+        hops as the records show, so a decision is tainted through another decision, a tool call
+        or a model call. A closure over all events, so order and cycles never matter."""
+        flows: dict[str, set[str]] = {}
+        tainted: set[str] = set()
+
+        def flow(source: Any, target: Any) -> None:
+            if isinstance(source, str) and isinstance(target, str):
+                flows.setdefault(source, set()).add(target)
+
+        for event in events:
+            ptype = self._ptype(event)
+            data = _data(event)
+            refs = _refs(event)
+            node = event_iri(str(event["id"]))
+            for key in _CONTENT_IN:
+                value = data.get(key)
+                for ref in _strings(value) if isinstance(value, list) else [value]:
+                    flow(ref, node)
+            for key in _REFS_IN:
+                flow(refs.get(key), node)
+            for key in _CONTENT_OUT:
+                flow(node, data.get(key))
+            flow(node, refs.get("consumer"))
+            if ptype == "MemoryWrite":
+                # A record and each write of it stand for the same content.
+                flow(data.get("record_ref"), node)
+                if _is_one_of(data.get("trust"), _UNTRUSTED_TRUST) or _is_one_of(
+                    data.get("guard_verdict"), _UNTRUSTED_VERDICTS
+                ):
+                    tainted.add(node)
+            elif ptype == "MemoryRead" and _is_one_of(
+                data.get("trust_min"), _UNTRUSTED_TRUST
+            ):
+                tainted.add(node)
+        tainted |= {
+            iri for iri, untrusted in self.instruction_untrusted.items() if untrusted
+        }
+        pending = list(tainted)
+        while pending:
+            for target in flows.get(pending.pop(), ()):
+                if target not in tainted:
+                    tainted.add(target)
+                    pending.append(target)
+        for event in events:
+            if self._ptype(event) == "Decision":
+                node = event_iri(str(event["id"]))
+                self.store.add_literal(
+                    node,
+                    "agentce:robustToUntrustedContent",
+                    "false" if node in tainted else "true",
+                    BOOL,
+                )
+
     # --- materialised (glue) edges (SPEC §7.2) ---
 
     def _materialise(self, events: list[dict[str, Any]]) -> None:
@@ -429,6 +524,7 @@ class _Builder:
                 self._declared_components_observed(node, data)
             self._chain_terminus(node, data)
         self._acts_on_untrusted(events)
+        self._robust_to_untrusted(events)
         self._conduct_scope_budget(events)
         self._preceded_by()
 

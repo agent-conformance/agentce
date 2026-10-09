@@ -323,7 +323,7 @@ def test_security_json_matches_committed_golden(tmp_path: Path) -> None:
     as the committed golden; this test proves the C4 code that gate script exercises produces that
     exact output on a fresh run, byte-for-byte, so a code change that silently drifts the view is
     caught here too, not only by the build gate. The fixture's own real verdict is non-conformant
-    (ROB-02 fails its shape's `prov:used` property), so `assess` exits 1 (ExitCode.FINDINGS), not 0."""
+    (ROB-02: the decision consumed a memory record the guard wrote as untrusted), so `assess` exits 1 (ExitCode.FINDINGS), not 0."""
     out = tmp_path / "o"
     exit_code = cli.main(
         [

@@ -1111,8 +1111,8 @@
       "violations": [
         {
           "focus": "agentce:event/d1",
-          "path": "prov:used",
-          "constraint": "sh:minCount",
+          "path": "agentce:robustToUntrustedContent",
+          "constraint": "sh:hasValue",
           "message_key": "ROB-02.S1"
         }
       ]
