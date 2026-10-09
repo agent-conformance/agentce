@@ -199,3 +199,78 @@ test("ROB-02: a cycle of inputs ends and stays trusted without a source", () => 
   const second = withInputs(decisionEvent("d2"), ["agentce:event/d1"]);
   assert.deepEqual(robust([first, second]), ["true"]);
 });
+
+function ruled(events: Record<string, unknown>[], decisionId = "d1"): string[] {
+  const store = buildGraph(events, { domain: MINOR_DOMAIN });
+  return store.literalValues(`agentce:event/${decisionId}`, "agentce:untrustedContentRuledOn");
+}
+
+function selfReport<T extends Record<string, unknown>>(event: T): T {
+  return { ...event, agentcesourceclass: "self_report" };
+}
+
+test("ROB-02: ruled on when the guard ruled on every input, or there were none", () => {
+  const write = memoryEvent("w1", "MemoryWrite", { record_ref: "mem:r1", trust: "trusted" });
+  assert.deepEqual(ruled([write, withInputs(decisionEvent("d1"), ["mem:r1"])]), ["true"]);
+  assert.deepEqual(ruled([decisionEvent("d1")]), ["true"]);
+});
+
+test("ROB-02: not ruled on through a read only the agent reported", () => {
+  const write = memoryEvent("w1", "MemoryWrite", { record_ref: "mem:r1", trust: "trusted" });
+  const read = selfReport(
+    memoryEvent("m1", "MemoryRead", {
+      record_refs: ["mem:r1"],
+      refs: { consumer: "agentce:event/d1" },
+    }),
+  );
+  assert.deepEqual(ruled([write, read, decisionEvent("d1")]), ["false"]);
+  const guardRead = memoryEvent("m2", "MemoryRead", { record_refs: ["mem:r1"] });
+  assert.deepEqual(ruled([write, guardRead, read, decisionEvent("d1")]), ["false"]);
+});
+
+test("ROB-02: not ruled on a record no enforcement point covers", () => {
+  const unguarded = selfReport(
+    memoryEvent("w1", "MemoryWrite", { record_ref: "mem:r1", trust: "trusted" }),
+  );
+  const used = withInputs(decisionEvent("d1"), ["mem:r1"]);
+  assert.deepEqual(ruled([unguarded, used]), ["false"]);
+  const silent = memoryEvent("w2", "MemoryWrite", { record_ref: "mem:r1" });
+  assert.deepEqual(ruled([silent, used]), ["false"]);
+  const guardRead = memoryEvent("m1", "MemoryRead", { record_refs: ["mem:r1"] });
+  assert.deepEqual(ruled([unguarded, guardRead, used]), ["true"]);
+});
+
+test("ROB-02: not ruled on a ref the bundle does not hold", () => {
+  for (const ref of ["mem:missing", "agentce:event/missing"]) {
+    assert.deepEqual(ruled([withInputs(decisionEvent("d1"), [ref])]), ["false"], ref);
+  }
+  const other = withInputs(decisionEvent("d2"), ["mem:missing"]);
+  assert.deepEqual(ruled([decisionEvent("d1"), other]), ["true"]);
+});
+
+test("ROB-02: ruled on is independent of event order", () => {
+  const write = selfReport(memoryEvent("w1", "MemoryWrite", { record_ref: "mem:r1" }));
+  const events = [write, withInputs(decisionEvent("d1"), ["mem:r1"])];
+  assert.deepEqual(ruled(events), ["false"]);
+  assert.deepEqual(ruled([...events].reverse()), ["false"]);
+});
+
+test("ROB-02: an untrusted origin class with no ruling taints", () => {
+  const used = withInputs(decisionEvent("d1"), ["mem:r1"]);
+  for (const [origin, expected] of [
+    ["tool_output", "false"],
+    ["user", "true"],
+  ]) {
+    const write = memoryEvent("w1", "MemoryWrite", {
+      record_ref: "mem:r1",
+      provenance_origin_class: origin,
+    });
+    assert.deepEqual(robust([write, used]), [expected], origin);
+  }
+  const marked = memoryEvent("w1", "MemoryWrite", {
+    record_ref: "mem:r1",
+    provenance_origin_class: "tool_output",
+    trust: "trusted",
+  });
+  assert.deepEqual(robust([marked, used]), ["true"]);
+});

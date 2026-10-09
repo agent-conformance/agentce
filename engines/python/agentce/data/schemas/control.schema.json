@@ -105,6 +105,11 @@
         "shape": {
           "type": "string",
           "description": "Path to the Portable Shape Profile shape for a rung-2 structural expectation."
+        },
+        "evidence_shape": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to a shape file holding exactly one node shape with a target: every focus it targets must meet it for the control to judge that focus. The outcome is insufficient_evidence when minimum evidence is missing, then non-conformant when the shape at `shape` finds failures beyond tolerance, then insufficient_evidence (never conformant) when any focus violates this shape. A file that is missing or does not hold exactly one targeted node shape is refused when the catalog loads (catalog.evidence_shape.unresolved)."
         }
       }
     },

@@ -34,6 +34,7 @@ function control(
     minSourceClass: "any",
     minimumEvidence,
     shapePath: null,
+    evidenceShapePath: null,
     tolerance: { kind: "count", max: 0 },
     testCases: [],
     raw: {},
@@ -41,7 +42,7 @@ function control(
 }
 
 function catalog(id: string, controls: ControlSpec[], version = "2026.09"): Catalog {
-  return { id, version, directory: "", controls, shapes: new Map() };
+  return { id, version, directory: "", controls, shapes: new Map(), evidenceShapeIris: new Map() };
 }
 
 function profileOneSubject(): Profile {

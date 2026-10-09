@@ -197,3 +197,28 @@ def test_apply_deviations_of_empty_inputs_is_a_no_op() -> None:
     )
     assert applied_empty_deviations == [ovs]
     assert expired_empty_deviations == []
+
+
+_ROB02 = _REPO_ROOT / "verification" / "gates" / "fixtures" / "rob02_untrusted"
+
+
+def _rob02(case: str) -> Any:
+    cases = json.loads((_ROB02 / "cases.json").read_text(encoding="utf-8"))["cases"]
+    profile = Profile.from_dict(
+        {"subjects": [{"id": "spiffe://corp/agents/rob02-fixture", "role": "both"}]}
+    )
+    catalog = load_catalog(_REPO_ROOT / "spec" / "catalogs" / "base" / "baseline")
+    domain = DomainBinding.load(_ROB02 / "domain.linkml.yaml")
+    assertions = assess_subjects(cases[case]["events"], profile, [catalog], domain)
+    return next(a for a in assertions if a.control == "ROB-02")
+
+
+def test_a_decision_the_guard_never_ruled_on_reads_insufficient_evidence() -> None:
+    rob02 = _rob02("input-unguarded-record")
+    assert rob02.outcome == "insufficient_evidence"
+    assert rob02.population == (1, 0)
+    assert _rob02("input-guarded-record").outcome == "conformant"
+
+
+def test_a_tainted_decision_beats_an_unruled_one() -> None:
+    assert _rob02("tainted-and-unguarded").outcome == "non-conformant"

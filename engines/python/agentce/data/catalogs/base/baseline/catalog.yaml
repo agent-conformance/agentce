@@ -17,7 +17,7 @@ title: "Baseline catalog: the checks the standards share"
 provenance:
   source: https://agent-conformance.org/catalogs/base/baseline
   version: "2026.09"
-  digest: sha256:f7edb776ad5f47ff3fb48f3b69a910db32a8d6d3e580fba6045bd23d477ea9c5
+  digest: sha256:4182dc4e7a110329fad7996b3601a1872c357bfbe0f69fd20caf49854d041f8c
 families: [REC, OVS, ROB, TRN, INC, INT, DOC]
 min_crosswalk_frameworks: 2
 precision_policy:

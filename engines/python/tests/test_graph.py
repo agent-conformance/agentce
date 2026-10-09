@@ -576,3 +576,87 @@ def test_a_cycle_of_inputs_ends_and_stays_trusted_without_a_source() -> None:
     first = _with_inputs(decision("d1", "t"), ["agentce:event/d2"])
     second = _with_inputs(decision("d2", "t"), ["agentce:event/d1"])
     assert _robust([first, second]) == ["true"]
+
+
+def _ruled(events: list[dict[str, Any]], decision_id: str = "d1") -> list[str]:
+    store = build_graph(events, domain=DOMAIN)
+    return store.literal_values(
+        event_iri(decision_id), "agentce:untrustedContentRuledOn"
+    )
+
+
+def _self_report(event: dict[str, Any]) -> dict[str, Any]:
+    event["agentcesourceclass"] = "self_report"
+    return event
+
+
+def test_ruled_on_when_the_guard_ruled_on_every_input() -> None:
+    write = _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "trusted"})
+    assert _ruled([write, _with_inputs(decision("d1", "t"), ["mem:r1"])]) == ["true"]
+    assert _ruled([decision("d1", "t")]) == ["true"]
+
+
+def test_not_ruled_on_through_a_read_only_the_agent_reported() -> None:
+    write = _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "trusted"})
+    read = _self_report(
+        _event(
+            "m1",
+            "MemoryRead",
+            {"record_refs": ["mem:r1"], "refs": {"consumer": "agentce:event/d1"}},
+        )
+    )
+    assert _ruled([write, read, decision("d1", "t")]) == ["false"]
+    # The guard's own read of the same record does not cover the agent's read.
+    guard_read = _event("m2", "MemoryRead", {"record_refs": ["mem:r1"]})
+    assert _ruled([write, guard_read, read, decision("d1", "t")]) == ["false"]
+
+
+def test_not_ruled_on_a_record_no_enforcement_point_covers() -> None:
+    unguarded = _self_report(
+        _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "trusted"})
+    )
+    used = _with_inputs(decision("d1", "t"), ["mem:r1"])
+    assert _ruled([unguarded, used]) == ["false"]
+    # An enforcement-point write with no trust or verdict is not a ruling either.
+    silent = _event("w2", "MemoryWrite", {"record_ref": "mem:r1"})
+    assert _ruled([silent, used]) == ["false"]
+    # An enforcement-point read of the record covers it.
+    guard_read = _event("m1", "MemoryRead", {"record_refs": ["mem:r1"]})
+    assert _ruled([unguarded, guard_read, used]) == ["true"]
+
+
+def test_not_ruled_on_a_ref_the_bundle_does_not_hold() -> None:
+    for ref in ("mem:missing", "agentce:event/missing"):
+        used = _with_inputs(decision("d1", "t"), [ref])
+        assert _ruled([used]) == ["false"], ref
+    other = _with_inputs(decision("d2", "t"), ["mem:missing"])
+    assert _ruled([decision("d1", "t"), other]) == ["true"]
+
+
+def test_ruled_on_is_independent_of_event_order() -> None:
+    write = _self_report(_event("w1", "MemoryWrite", {"record_ref": "mem:r1"}))
+    events = [write, _with_inputs(decision("d1", "t"), ["mem:r1"])]
+    assert _ruled(events) == _ruled(list(reversed(events))) == ["false"]
+
+
+def test_an_untrusted_origin_class_with_no_ruling_taints() -> None:
+    for origin, expected in (("tool_output", "false"), ("user", "true")):
+        write = _event(
+            "w1",
+            "MemoryWrite",
+            {"record_ref": "mem:r1", "provenance_origin_class": origin},
+        )
+        used = _with_inputs(decision("d1", "t"), ["mem:r1"])
+        assert _robust([write, used]) == [expected], origin
+    # The guard's own ruling wins over the origin class.
+    ruled = _event(
+        "w1",
+        "MemoryWrite",
+        {
+            "record_ref": "mem:r1",
+            "provenance_origin_class": "tool_output",
+            "trust": "trusted",
+        },
+    )
+    used = _with_inputs(decision("d1", "t"), ["mem:r1"])
+    assert _robust([ruled, used]) == ["true"]

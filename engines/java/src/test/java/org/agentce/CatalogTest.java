@@ -254,4 +254,66 @@ class CatalogTest {
             }
         }
     }
+
+    // --- 18.37k: ROB-02's evidence shape resolves from the file the control declares; a declared
+    // evidence shape that is not exactly one targeted node shape inside the catalog is refused. ---
+
+    private static final String EVIDENCE_PREFIXES = "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
+            + "@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n";
+    private static final String EVIDENCE_BODY = " a sh:NodeShape ; sh:targetClass agentce:ConsequentialDecision ;"
+            + " sh:property [ sh:path agentce:untrustedContentRuledOn ; sh:hasValue true ] .\n";
+
+    private static Path withEvidenceShape(Path tmp, String text) throws IOException {
+        copyTree(Fixtures.BASE, tmp);
+        Path shape = tmp.resolve("shapes/ROB-02-evidence.ttl");
+        if (text == null) {
+            Files.delete(shape);
+        } else {
+            Files.writeString(shape, text);
+        }
+        return tmp;
+    }
+
+    private static Path withEvidenceShapeValue(Path tmp, String value) throws IOException {
+        copyTree(Fixtures.BASE, tmp);
+        Path control = tmp.resolve("controls/ROB-02.yaml");
+        String declared = "evidence_shape: shapes/ROB-02-evidence.ttl";
+        String text = Files.readString(control);
+        assertEquals(true, text.contains(declared));
+        Files.writeString(control, text.replace(declared, "evidence_shape: " + value));
+        return tmp;
+    }
+
+    @Test
+    void anEvidenceShapeResolvesFromItsOwnFileWhateverItsName(@TempDir Path tmp) throws IOException {
+        Catalog catalog = Catalog.load(withEvidenceShape(tmp, EVIDENCE_PREFIXES + "agentce:Anything" + EVIDENCE_BODY));
+        Catalog.ControlSpec control = catalog.controls.stream().filter(c -> c.id.equals("ROB-02")).findFirst().get();
+        assertEquals("agentce:ConsequentialDecision", Catalog.evidenceShapeFor(catalog, control).targetClass);
+    }
+
+    @Test
+    void anUnresolvableEvidenceShapeIsRefused(@TempDir Path tmp) throws IOException {
+        String noTarget = EVIDENCE_PREFIXES + "agentce:E a sh:NodeShape ; sh:property [ sh:path agentce:x ; sh:minCount 1 ] .\n";
+        String twoTargets = EVIDENCE_PREFIXES + "agentce:E1" + EVIDENCE_BODY + "agentce:E2" + EVIDENCE_BODY;
+        java.util.Arrays.asList(null, noTarget, twoTargets).forEach(text -> {
+            Path dir = tmp.resolve(String.valueOf(text == null ? "missing" : text.length()));
+            InputError err = assertThrows(InputError.class, () -> Catalog.load(withEvidenceShape(dir, text)));
+            assertEquals("catalog.evidence_shape.unresolved", err.key);
+        });
+    }
+
+    @Test
+    void aDeclaredEvidenceShapeThatIsNotAFileInTheCatalogIsRefused(@TempDir Path tmp) throws IOException {
+        Path outside = tmp.resolve("outside.ttl");
+        Files.copy(Fixtures.BASE.resolve("shapes/ROB-02-evidence.ttl"), outside);
+        int n = 0;
+        for (String value : java.util.List.of("\"\"", "null", "5", "../outside.ttl", "linked.ttl")) {
+            Path dir = tmp.resolve("cat" + n++).resolve("cat");
+            withEvidenceShapeValue(dir, value);
+            Files.copy(outside, dir.resolveSibling("outside.ttl"));
+            Files.createSymbolicLink(dir.resolve("linked.ttl"), outside);
+            InputError err = assertThrows(InputError.class, () -> Catalog.load(dir), value);
+            assertEquals("catalog.evidence_shape.unresolved", err.key, value);
+        }
+    }
 }

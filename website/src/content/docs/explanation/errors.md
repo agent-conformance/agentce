@@ -9,6 +9,8 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 
 | Key | Cause | Fix |
 |---|---|---|
+| `catalog.evidence_shape.passed_case_unjudged` | control {control}'s test case {case} expects passed, but its evidence shape targets nothing in that fixture or finds a record it cannot judge, so assess would never read it conformant. | check the evidence shape's target (a misspelt class targets nothing) and give the passed fixture the records the evidence shape asks for. |
+| `catalog.evidence_shape.unresolved` | control {control} names '{path}' as its evidence shape, but that is not a file inside the catalog folder holding exactly one node shape with a target, so the control could not tell which records it can judge. | name a file inside the catalog folder that holds exactly one node shape with a target (sh:targetClass, sh:targetNode or agentce:targetWhere), or remove evaluation.evidence_shape from the control. |
 | `catalog.init_exists` | catalog init would overwrite a scaffolded file that already exists. | pass --force to overwrite, or a different <dir>. |
 | `catalog.init_family_collision` | the control family named by --id is already used by a vendored base or overlay catalog. | pass a different --id. |
 | `catalog.init_family_invalid` | the --id given to catalog init is not 2-4 uppercase letters. | pass --id as 2-4 uppercase letters, e.g. --id ACM. |

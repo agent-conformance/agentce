@@ -130,6 +130,8 @@ _KINDS: dict[str, str] = {
     "catalog.shape.script_forbidden": "error",
     "catalog.shape.outside_profile": "error",
     "catalog.shape.parse_error": "error",
+    "catalog.evidence_shape.unresolved": "error",
+    "catalog.evidence_shape.passed_case_unjudged": "error",
     "verify.certificate_algorithm": "error",
     "verify.certificate_validity_malformed": "error",
     "verify.certificate_validity_inverted": "error",

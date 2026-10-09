@@ -14,11 +14,21 @@
  */
 
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { canonicalString } from "./canonical";
-import { loadCatalog, shapeFor } from "./catalog";
+import { evidenceShapeFor, loadCatalog, shapeFor } from "./catalog";
 import { DomainBinding } from "./domain";
 import { buildGraph } from "./graph";
 import { controlOutcomeToJson, evaluateControl } from "./structural";
@@ -69,4 +79,81 @@ test("structural evaluation over the base catalog matches the Python reference",
 test("structural evaluation over the Conduct overlay matches the Python reference", () => {
   const golden = JSON.parse(readFileSync(join(TESTDATA, "conduct-golden.json"), "utf-8"));
   assert.equal(canonicalString(evaluateCatalog(CONDUCT)), canonicalString(golden));
+});
+
+// 18.37k: ROB-02's evidence shape resolves from the file the control declares; a declared evidence
+// shape that is not exactly one targeted node shape inside the catalog is refused.
+const EVIDENCE_PREFIXES =
+  "@prefix sh: <http://www.w3.org/ns/shacl#> .\n" +
+  "@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n";
+const EVIDENCE_BODY =
+  " a sh:NodeShape ; sh:targetClass agentce:ConsequentialDecision ;" +
+  " sh:property [ sh:path agentce:untrustedContentRuledOn ; sh:hasValue true ] .\n";
+
+function withCatalogCopy(edit: (dir: string, tmp: string) => void): string {
+  const tmp = mkdtempSync(join(tmpdir(), "agentce-evidence-shape-"));
+  const dir = join(tmp, "cat");
+  cpSync(BASE, dir, { recursive: true });
+  edit(dir, tmp);
+  return dir;
+}
+
+function refusalKey(dir: string): string {
+  try {
+    loadCatalog(dir);
+    return "loaded";
+  } catch (error) {
+    return (error as { key?: string }).key ?? String(error);
+  } finally {
+    rmSync(join(dir, ".."), { recursive: true, force: true });
+  }
+}
+
+test("an evidence shape resolves from its own file whatever its name", () => {
+  const dir = withCatalogCopy((d) =>
+    writeFileSync(
+      join(d, "shapes", "ROB-02-evidence.ttl"),
+      `${EVIDENCE_PREFIXES}agentce:Anything${EVIDENCE_BODY}`,
+    ),
+  );
+  const catalog = loadCatalog(dir);
+  const control = catalog.controls.find((c) => c.id === "ROB-02");
+  assert.ok(control);
+  assert.equal(evidenceShapeFor(catalog, control)?.targetClass, "agentce:ConsequentialDecision");
+  rmSync(join(dir, ".."), { recursive: true, force: true });
+});
+
+test("an unresolvable evidence shape is refused", () => {
+  const texts: Array<string | null> = [
+    null,
+    `${EVIDENCE_PREFIXES}agentce:E a sh:NodeShape ; sh:property [ sh:path agentce:x ; sh:minCount 1 ] .\n`,
+    `${EVIDENCE_PREFIXES}agentce:E1${EVIDENCE_BODY}agentce:E2${EVIDENCE_BODY}`,
+  ];
+  for (const text of texts) {
+    const dir = withCatalogCopy((d) => {
+      const shape = join(d, "shapes", "ROB-02-evidence.ttl");
+      if (text === null) {
+        rmSync(shape);
+      } else {
+        writeFileSync(shape, text);
+      }
+    });
+    assert.equal(refusalKey(dir), "catalog.evidence_shape.unresolved", String(text));
+  }
+});
+
+test("a declared evidence shape that is not a file in the catalog is refused", () => {
+  const declared = "evidence_shape: shapes/ROB-02-evidence.ttl";
+  for (const value of ['""', "null", "5", "../outside.ttl", "linked.ttl"]) {
+    const dir = withCatalogCopy((d, tmp) => {
+      const control = join(d, "controls", "ROB-02.yaml");
+      const text = readFileSync(control, "utf-8");
+      assert.ok(text.includes(declared));
+      writeFileSync(control, text.replace(declared, `evidence_shape: ${value}`));
+      const outside = join(tmp, "outside.ttl");
+      copyFileSync(join(d, "shapes", "ROB-02-evidence.ttl"), outside);
+      symlinkSync(outside, join(d, "linked.ttl"));
+    });
+    assert.equal(refusalKey(dir), "catalog.evidence_shape.unresolved", value);
+  }
 });

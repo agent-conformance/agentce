@@ -170,4 +170,74 @@ class GraphTest {
         JsonNode second = decisionWith("d2", "\"inputs\": [\"agentce:event/d1\"]");
         assertEquals(List.of("true"), robust(List.of(first, second), "d1"));
     }
+
+    private static List<String> ruled(List<JsonNode> events) {
+        GraphStore store = Graph.buildGraph(events, DomainBinding.fromDict(CREDIT_DOMAIN));
+        return store.literalValues("agentce:event/d1", "agentce:untrustedContentRuledOn");
+    }
+
+    private static JsonNode selfReport(JsonNode event) {
+        ((com.fasterxml.jackson.databind.node.ObjectNode) event).put("agentcesourceclass", "self_report");
+        return event;
+    }
+
+    @Test
+    void rob02RuledOnWhenTheGuardRuledOnEveryInputOrThereWereNone() {
+        JsonNode write = event("w1", "MemoryWrite", "\"record_ref\": \"mem:r1\", \"trust\": \"trusted\"");
+        assertEquals(List.of("true"), ruled(List.of(write, decisionWith("d1", "\"inputs\": [\"mem:r1\"]"))));
+        assertEquals(List.of("true"), ruled(List.of(decisionEvent("d1"))));
+    }
+
+    @Test
+    void rob02NotRuledOnThroughAReadOnlyTheAgentReported() {
+        JsonNode write = event("w1", "MemoryWrite", "\"record_ref\": \"mem:r1\", \"trust\": \"trusted\"");
+        JsonNode read = selfReport(event("m1", "MemoryRead",
+                "\"record_refs\": [\"mem:r1\"], \"refs\": {\"consumer\": \"agentce:event/d1\"}"));
+        assertEquals(List.of("false"), ruled(List.of(write, read, decisionEvent("d1"))));
+        JsonNode guardRead = event("m2", "MemoryRead", "\"record_refs\": [\"mem:r1\"]");
+        assertEquals(List.of("false"), ruled(List.of(write, guardRead, read, decisionEvent("d1"))));
+    }
+
+    @Test
+    void rob02NotRuledOnARecordNoEnforcementPointCovers() {
+        JsonNode unguarded = selfReport(
+                event("w1", "MemoryWrite", "\"record_ref\": \"mem:r1\", \"trust\": \"trusted\""));
+        JsonNode used = decisionWith("d1", "\"inputs\": [\"mem:r1\"]");
+        assertEquals(List.of("false"), ruled(List.of(unguarded, used)));
+        JsonNode silent = event("w2", "MemoryWrite", "\"record_ref\": \"mem:r1\"");
+        assertEquals(List.of("false"), ruled(List.of(silent, used)));
+        JsonNode guardRead = event("m1", "MemoryRead", "\"record_refs\": [\"mem:r1\"]");
+        assertEquals(List.of("true"), ruled(List.of(unguarded, guardRead, used)));
+    }
+
+    @Test
+    void rob02NotRuledOnARefTheBundleDoesNotHold() {
+        for (String ref : List.of("mem:missing", "agentce:event/missing")) {
+            assertEquals(List.of("false"), ruled(List.of(decisionWith("d1", "\"inputs\": [\"" + ref + "\"]"))), ref);
+        }
+        JsonNode other = decisionWith("d2", "\"inputs\": [\"mem:missing\"]");
+        assertEquals(List.of("true"), ruled(List.of(decisionEvent("d1"), other)));
+    }
+
+    @Test
+    void rob02RuledOnIsIndependentOfEventOrder() {
+        JsonNode write = selfReport(event("w1", "MemoryWrite", "\"record_ref\": \"mem:r1\""));
+        List<JsonNode> events = new java.util.ArrayList<>(List.of(write, decisionWith("d1", "\"inputs\": [\"mem:r1\"]")));
+        assertEquals(List.of("false"), ruled(events));
+        java.util.Collections.reverse(events);
+        assertEquals(List.of("false"), ruled(events));
+    }
+
+    @Test
+    void rob02AnUntrustedOriginClassWithNoRulingTaints() {
+        JsonNode used = decisionWith("d1", "\"inputs\": [\"mem:r1\"]");
+        for (List<String> row : List.of(List.of("tool_output", "false"), List.of("user", "true"))) {
+            JsonNode write = event("w1", "MemoryWrite",
+                    "\"record_ref\": \"mem:r1\", \"provenance_origin_class\": \"" + row.get(0) + "\"");
+            assertEquals(List.of(row.get(1)), robust(List.of(write, used), "d1"), row.get(0));
+        }
+        JsonNode marked = event("w1", "MemoryWrite",
+                "\"record_ref\": \"mem:r1\", \"provenance_origin_class\": \"tool_output\", \"trust\": \"trusted\"");
+        assertEquals(List.of("true"), robust(List.of(marked, used), "d1"));
+    }
 }

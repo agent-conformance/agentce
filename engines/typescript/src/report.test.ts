@@ -633,7 +633,14 @@ test("catalogProvenanceDigest changes when the catalog content changes, and igno
 
 test("buildManifest carries the catalog's real content digest, never the all-zero constant", () => {
   const catalogObjects = [
-    { id: "fixture", version: "1", directory: DIGEST_FIXTURE, controls: [], shapes: new Map() },
+    {
+      id: "fixture",
+      version: "1",
+      directory: DIGEST_FIXTURE,
+      controls: [],
+      shapes: new Map(),
+      evidenceShapeIris: new Map(),
+    },
   ];
   const manifest = buildManifest({
     bundleDigest: "sha256:abc",

@@ -14,6 +14,7 @@ evaluation:
     - {event: Decision, class: self_report}
     - {event: MemoryRead, class: enforcement_point}
   shape: shapes/ROB-02.ttl
+  evidence_shape: shapes/ROB-02-evidence.ttl
 expectations:
   - {id: S1, text: "No untrusted content influences consequential decisions."}
 severity: medium

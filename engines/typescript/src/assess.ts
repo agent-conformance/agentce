@@ -12,7 +12,7 @@
 import { effectiveRoles } from "./applicability";
 import { type Assertion, type EvidencePointer, makeAssertion } from "./assertions";
 import { sha256Hex } from "./canonical";
-import { type Catalog, type ControlSpec, shapeFor } from "./catalog";
+import { type Catalog, type ControlSpec, evidenceShapeFor, shapeFor } from "./catalog";
 import type { DomainBinding } from "./domain";
 import { buildGraph } from "./graph";
 import { eventIri } from "./iri";
@@ -184,6 +184,20 @@ function assertControl(
   }
 
   const conformant = withinTolerance(applicable.length, failing.size, control.tolerance);
+  const evidenceShape = evidenceShapeFor(catalog, control);
+  if (conformant && evidenceShape !== null) {
+    const [, unjudged] = evaluateShape(store, evidenceShape, catalog.shapes, control.id);
+    if (unjudged.size > 0) {
+      // A focus the control cannot judge from these records never counts as a pass; a failure
+      // elsewhere still reads non-conformant (above).
+      return makeAssertion({
+        ...base,
+        outcome: "insufficient_evidence",
+        population: [applicable.length, 0],
+        evidence: evidence(eventsByIri, [...unjudged].sort(byteCompare)),
+      });
+    }
+  }
   const focusForEvidence = failing.size > 0 ? [...failing].sort(byteCompare) : applicable;
   return makeAssertion({
     ...base,

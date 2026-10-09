@@ -175,6 +175,20 @@ def _assert_control(
         )
 
     conformant = within_tolerance(len(applicable), len(failing), control.tolerance)
+    evidence_shape = catalog.evidence_shape_for(control)
+    if conformant and evidence_shape is not None:
+        _, unjudged, _ = evaluate_shape(
+            store, evidence_shape, catalog.shapes, control.id
+        )
+        if unjudged:
+            # A focus the control cannot judge from these records never counts as a pass; a
+            # failure elsewhere still reads non-conformant (above).
+            return Assertion(
+                outcome="insufficient_evidence",
+                population=(len(applicable), 0),
+                evidence=_evidence(events_by_iri, sorted(unjudged)),
+                **base,
+            )
     outcome = "conformant" if conformant else "non-conformant"
     focus_for_evidence = sorted(failing) if failing else applicable
     return Assertion(

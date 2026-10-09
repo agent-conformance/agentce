@@ -84,6 +84,11 @@ function isOneOf(value: unknown, values: Set<string>): boolean {
   return typeof value === "string" && values.has(value);
 }
 
+/** A field the record leaves out or sets to null (Python's None). */
+function isAbsent(value: unknown): boolean {
+  return value === undefined || value === null;
+}
+
 export type Event = Record<string, unknown>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -474,17 +479,26 @@ class Builder {
     }
   }
 
-  /** Flag whether each Decision kept untrusted content out (SPEC §7.4, ROB-02).
+  /** Flag whether each Decision kept untrusted content out, and whether the memory guard ruled on all
+   * it used (SPEC §7.4, ROB-02).
    *
-   * Untrusted content starts at a MemoryWrite whose trust is untrusted or quarantined or whose guard
-   * verdict is quarantine or block, a MemoryRead whose `trust_min` is untrusted or quarantined, and an
-   * instruction with an untrusted Appendix F source class (CND-05's rule). It flows along every edge that
-   * carries content into an event (CONTENT_IN, CONTENT_OUT, a read to its consumer, a record to and from
-   * its writes) for as many hops as the records show. A closure over all events, so order and cycles
-   * never matter. */
+   * Untrusted content starts at a MemoryWrite whose trust is untrusted or quarantined, whose guard
+   * verdict is quarantine or block, or which carries no trust and no verdict but an untrusted Appendix F
+   * `provenance_origin_class`; a MemoryRead whose `trust_min` is untrusted or quarantined; and an
+   * instruction with an untrusted Appendix F source class (CND-05's rule). Content the guard never ruled
+   * on starts at a MemoryRead not reported by an enforcement point, a record no enforcement-point read or
+   * ruled write covers, and a ref the bundle does not hold. Both flow along every edge that carries
+   * content into an event (CONTENT_IN, CONTENT_OUT, a read to its consumer, a record to and from its
+   * writes) for as many hops as the records show. Closures over all events, so order and cycles never
+   * matter. */
   private robustToUntrusted(events: Event[]): void {
     const flows = new Map<string, Set<string>>();
     const tainted = new Set<string>();
+    const unruled = new Set<string>();
+    const held = new Set<string>();
+    const named = new Set<string>();
+    const records = new Set<string>();
+    const guarded = new Set<string>();
     const flow = (source: unknown, target: unknown): void => {
       if (typeof source === "string" && typeof target === "string") {
         let targets = flows.get(source);
@@ -493,6 +507,7 @@ class Builder {
           flows.set(source, targets);
         }
         targets.add(target);
+        named.add(source);
       }
     };
     for (const event of events) {
@@ -500,6 +515,8 @@ class Builder {
       const data = dataOf(event);
       const refs = refsOf(event);
       const node = eventIri(String(event.id));
+      held.add(node);
+      const enforced = event.agentcesourceclass === "enforcement_point";
       for (const key of CONTENT_IN) {
         const value = data[key];
         for (const ref of Array.isArray(value) ? value : [value]) {
@@ -511,19 +528,47 @@ class Builder {
       }
       for (const key of CONTENT_OUT) {
         flow(node, data[key]);
+        if (typeof data[key] === "string") {
+          held.add(data[key] as string);
+        }
       }
       flow(node, refs.consumer);
       if (ptype === "MemoryWrite") {
+        const record = data.record_ref;
         // A record and each write of it stand for the same content.
-        flow(data.record_ref, node);
+        flow(record, node);
+        const unmarked = isAbsent(data.trust) && isAbsent(data.guard_verdict);
+        if (typeof record === "string") {
+          records.add(record);
+          if (enforced && !unmarked) {
+            guarded.add(record);
+          }
+        }
         if (
           isOneOf(data.trust, UNTRUSTED_TRUST) ||
-          isOneOf(data.guard_verdict, UNTRUSTED_VERDICTS)
+          isOneOf(data.guard_verdict, UNTRUSTED_VERDICTS) ||
+          (unmarked &&
+            typeof data.provenance_origin_class === "string" &&
+            !TRUSTED_INSTRUCTION.has(data.provenance_origin_class))
         ) {
           tainted.add(node);
         }
-      } else if (ptype === "MemoryRead" && isOneOf(data.trust_min, UNTRUSTED_TRUST)) {
-        tainted.add(node);
+      } else if (ptype === "MemoryRead") {
+        const read = data.record_refs;
+        for (const record of Array.isArray(read) ? read : []) {
+          if (typeof record === "string") {
+            records.add(record);
+            if (enforced) {
+              guarded.add(record);
+            }
+          }
+        }
+        if (!enforced) {
+          unruled.add(node);
+        }
+        if (isOneOf(data.trust_min, UNTRUSTED_TRUST)) {
+          tainted.add(node);
+        }
       }
     }
     for (const [iri, untrusted] of this.instructionUntrusted) {
@@ -531,12 +576,24 @@ class Builder {
         tainted.add(iri);
       }
     }
-    const pending = [...tainted];
-    while (pending.length > 0) {
-      for (const target of flows.get(pending.pop() as string) ?? []) {
-        if (!tainted.has(target)) {
-          tainted.add(target);
-          pending.push(target);
+    for (const record of records) {
+      if (!guarded.has(record)) {
+        unruled.add(record);
+      }
+    }
+    for (const ref of named) {
+      if (!held.has(ref) && !records.has(ref)) {
+        unruled.add(ref);
+      }
+    }
+    for (const seeds of [tainted, unruled]) {
+      const pending = [...seeds];
+      while (pending.length > 0) {
+        for (const target of flows.get(pending.pop() as string) ?? []) {
+          if (!seeds.has(target)) {
+            seeds.add(target);
+            pending.push(target);
+          }
         }
       }
     }
@@ -547,6 +604,12 @@ class Builder {
           node,
           "agentce:robustToUntrustedContent",
           tainted.has(node) ? "false" : "true",
+          BOOL,
+        );
+        this.store.addLiteral(
+          node,
+          "agentce:untrustedContentRuledOn",
+          unruled.has(node) ? "false" : "true",
           BOOL,
         );
       }

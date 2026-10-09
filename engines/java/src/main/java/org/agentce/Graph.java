@@ -117,6 +117,11 @@ public final class Graph {
         return value != null && values.contains(value);
     }
 
+    /** A field the record leaves out or sets to null (Python's None). */
+    private static boolean isAbsent(JsonNode node) {
+        return node == null || node.isNull();
+    }
+
     private static String str(JsonNode node) {
         return node != null && node.isTextual() ? node.textValue() : null;
     }
@@ -531,22 +536,32 @@ public final class Graph {
             }
         }
 
-        /** Flag whether each Decision kept untrusted content out (SPEC §7.4, ROB-02).
+        /** Flag whether each Decision kept untrusted content out, and whether the memory guard
+         * ruled on all it used (SPEC §7.4, ROB-02).
          *
-         * <p>Untrusted content starts at a MemoryWrite whose trust is untrusted or quarantined or
-         * whose guard verdict is quarantine or block, a MemoryRead whose {@code trust_min} is
-         * untrusted or quarantined, and an instruction with an untrusted Appendix F source class
-         * (CND-05's rule). It flows along every edge that carries content into an event (CONTENT_IN,
-         * CONTENT_OUT, a read to its consumer, a record to and from its writes) for as many hops as
-         * the records show. A closure over all events, so order and cycles never matter. */
+         * <p>Untrusted content starts at a MemoryWrite whose trust is untrusted or quarantined, whose
+         * guard verdict is quarantine or block, or which carries no trust and no verdict but an
+         * untrusted Appendix F {@code provenance_origin_class}; a MemoryRead whose {@code trust_min}
+         * is untrusted or quarantined; and an instruction with an untrusted Appendix F source class
+         * (CND-05's rule). Content the guard never ruled on starts at a MemoryRead not reported by an
+         * enforcement point, a record no enforcement-point read or ruled write covers, and a ref the
+         * bundle does not hold. Both flow along every edge that carries content into an event
+         * (CONTENT_IN, CONTENT_OUT, a read to its consumer, a record to and from its writes) for as
+         * many hops as the records show. Closures over all events, so order and cycles never matter. */
         private void robustToUntrusted(List<JsonNode> events) {
             Map<String, Set<String>> flows = new LinkedHashMap<>();
             Set<String> tainted = new LinkedHashSet<>();
+            Set<String> unruled = new LinkedHashSet<>();
+            Set<String> held = new LinkedHashSet<>();
+            Set<String> records = new LinkedHashSet<>();
+            Set<String> guarded = new LinkedHashSet<>();
             for (JsonNode event : events) {
                 String ptype = ptype(event);
                 JsonNode data = dataOf(event);
                 JsonNode refs = refsOf(event);
                 String node = Iri.eventIri(event.get("id").asText());
+                held.add(node);
+                boolean enforced = "enforcement_point".equals(str(event.get("agentcesourceclass")));
                 for (String key : CONTENT_IN) {
                     JsonNode value = data.get(key);
                     if (value != null && value.isArray()) {
@@ -559,19 +574,49 @@ public final class Graph {
                     flow(flows, str(refs.get(key)), node);
                 }
                 for (String key : CONTENT_OUT) {
-                    flow(flows, node, str(data.get(key)));
+                    String produced = str(data.get(key));
+                    flow(flows, node, produced);
+                    if (produced != null) {
+                        held.add(produced);
+                    }
                 }
                 flow(flows, node, str(refs.get("consumer")));
                 if ("MemoryWrite".equals(ptype)) {
+                    String record = str(data.get("record_ref"));
                     // A record and each write of it stand for the same content.
-                    flow(flows, str(data.get("record_ref")), node);
+                    flow(flows, record, node);
+                    boolean unmarked = isAbsent(data.get("trust")) && isAbsent(data.get("guard_verdict"));
+                    if (record != null) {
+                        records.add(record);
+                        if (enforced && !unmarked) {
+                            guarded.add(record);
+                        }
+                    }
+                    String origin = str(data.get("provenance_origin_class"));
                     if (isOneOf(data.get("trust"), UNTRUSTED_TRUST)
-                            || isOneOf(data.get("guard_verdict"), UNTRUSTED_VERDICTS)) {
+                            || isOneOf(data.get("guard_verdict"), UNTRUSTED_VERDICTS)
+                            || (unmarked && origin != null && !TRUSTED_INSTRUCTION.contains(origin))) {
                         tainted.add(node);
                     }
-                } else if ("MemoryRead".equals(ptype)
-                        && isOneOf(data.get("trust_min"), UNTRUSTED_TRUST)) {
-                    tainted.add(node);
+                } else if ("MemoryRead".equals(ptype)) {
+                    JsonNode read = data.get("record_refs");
+                    if (read != null && read.isArray()) {
+                        for (JsonNode ref : read) {
+                            String record = str(ref);
+                            if (record != null) {
+                                records.add(record);
+                                if (enforced) {
+                                    guarded.add(record);
+                                }
+                            }
+                        }
+                    }
+                    if (!enforced) {
+                        unruled.add(node);
+                    }
+                    if (isOneOf(data.get("trust_min"), UNTRUSTED_TRUST)) {
+                        tainted.add(node);
+                    }
                 }
             }
             instructionUntrusted.forEach((iri, untrusted) -> {
@@ -579,11 +624,24 @@ public final class Graph {
                     tainted.add(iri);
                 }
             });
-            List<String> pending = new ArrayList<>(tainted);
-            while (!pending.isEmpty()) {
-                for (String target : flows.getOrDefault(pending.remove(pending.size() - 1), Set.of())) {
-                    if (tainted.add(target)) {
-                        pending.add(target);
+            for (String record : records) {
+                if (!guarded.contains(record)) {
+                    unruled.add(record);
+                }
+            }
+            // Every source of a flow is a ref some event names.
+            for (String ref : flows.keySet()) {
+                if (!held.contains(ref) && !records.contains(ref)) {
+                    unruled.add(ref);
+                }
+            }
+            for (Set<String> seeds : List.of(tainted, unruled)) {
+                List<String> pending = new ArrayList<>(seeds);
+                while (!pending.isEmpty()) {
+                    for (String target : flows.getOrDefault(pending.remove(pending.size() - 1), Set.of())) {
+                        if (seeds.add(target)) {
+                            pending.add(target);
+                        }
                     }
                 }
             }
@@ -592,6 +650,8 @@ public final class Graph {
                     String node = Iri.eventIri(event.get("id").asText());
                     store.addLiteral(
                             node, "agentce:robustToUntrustedContent", tainted.contains(node) ? "false" : "true", BOOL);
+                    store.addLiteral(
+                            node, "agentce:untrustedContentRuledOn", unruled.contains(node) ? "false" : "true", BOOL);
                 }
             }
         }

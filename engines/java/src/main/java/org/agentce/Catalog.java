@@ -26,13 +26,24 @@ public final class Catalog {
     public final Path directory;
     public final List<ControlSpec> controls;
     public final Map<String, Psp.Shape> shapes;
+    /** Each declared {@code evaluation.evidence_shape} path -> the IRI of the one node shape it holds. */
+    public final Map<String, String> evidenceShapeIris;
 
-    private Catalog(String id, String version, Path directory, List<ControlSpec> controls, Map<String, Psp.Shape> shapes) {
+    private static final String EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved";
+
+    private Catalog(
+            String id,
+            String version,
+            Path directory,
+            List<ControlSpec> controls,
+            Map<String, Psp.Shape> shapes,
+            Map<String, String> evidenceShapeIris) {
         this.id = id;
         this.version = version;
         this.directory = directory;
         this.controls = controls;
         this.shapes = shapes;
+        this.evidenceShapeIris = evidenceShapeIris;
     }
 
     public static final class ControlSpec {
@@ -46,6 +57,7 @@ public final class Catalog {
         public String minSourceClass;
         public List<JsonNode> minimumEvidence = new ArrayList<>();
         public String shapePath;
+        public String evidenceShapePath;
         public JsonNode tolerance;
         public List<JsonNode> testCases = new ArrayList<>();
         public JsonNode raw;
@@ -85,6 +97,12 @@ public final class Catalog {
         }
         JsonNode shape = evaluation.get("shape");
         control.shapePath = shape != null && shape.isTextual() ? shape.textValue() : null;
+        // A declared evidence shape is always resolved: a value that is not a path reads as "", which
+        // load refuses, so it can never be skipped into a pass.
+        if (evaluation.has("evidence_shape")) {
+            JsonNode evidenceShape = evaluation.get("evidence_shape");
+            control.evidenceShapePath = evidenceShape.isTextual() ? evidenceShape.textValue() : "";
+        }
         JsonNode tolerance = data.get("tolerance");
         if (tolerance != null && tolerance.isObject()) {
             control.tolerance = tolerance;
@@ -124,6 +142,7 @@ public final class Catalog {
         JsonNode metaRecord = meta != null && meta.isObject() ? meta : Json.nodes().objectNode();
         List<ControlSpec> controls = new ArrayList<>();
         Map<String, Psp.Shape> shapes = new LinkedHashMap<>();
+        Map<String, String> evidenceShapeIris = new LinkedHashMap<>();
         for (String controlFile : yamlFiles(directory.resolve("controls"))) {
             JsonNode data = Yaml.parseFile(directory.resolve("controls").resolve(controlFile));
             if (data == null || !data.isObject()) {
@@ -134,15 +153,71 @@ public final class Catalog {
             if (control.shapePath != null) {
                 shapes.putAll(Psp.loadShapes(directory.resolve(control.shapePath), control.shapePath));
             }
+            if (control.evidenceShapePath != null) {
+                Map<String, Psp.Shape> loaded = loadEvidenceShape(directory, control);
+                evidenceShapeIris.put(control.evidenceShapePath, targeted(loaded).get(0));
+                shapes.putAll(loaded);
+            }
         }
         return new Catalog(
-                text(metaRecord, "id", ""), text(metaRecord, "version", ""), directory, controls, shapes);
+                text(metaRecord, "id", ""),
+                text(metaRecord, "version", ""),
+                directory,
+                controls,
+                shapes,
+                evidenceShapeIris);
+    }
+
+    private static boolean hasTarget(Psp.Shape shape) {
+        return shape.targetClass != null || !shape.targetNodes.isEmpty() || !shape.targetWhere.isEmpty();
+    }
+
+    private static List<String> targeted(Map<String, Psp.Shape> shapes) {
+        return shapes.entrySet().stream().filter(e -> hasTarget(e.getValue())).map(Map.Entry::getKey).toList();
+    }
+
+    /** The shapes in the file a control names as {@code evaluation.evidence_shape}. The file must be inside
+     * the catalog folder after symlinks (where the catalog's signature covers it) and hold exactly one node
+     * shape with a target; anything else is refused, so a declared evidence shape can never be skipped and
+     * read as a pass. */
+    private static Map<String, Psp.Shape> loadEvidenceShape(Path directory, ControlSpec control) {
+        String path = control.evidenceShapePath;
+        Map<String, Psp.Shape> loaded = Map.of();
+        if (!path.isEmpty()) {
+            try {
+                Path root = directory.toRealPath();
+                Path resolved = directory.resolve(path).toRealPath();
+                if (resolved.startsWith(root) && !resolved.equals(root) && Files.isRegularFile(resolved)) {
+                    loaded = Psp.loadShapes(resolved, path);
+                }
+            } catch (IOException | java.nio.file.InvalidPathException e) {
+                loaded = Map.of();
+            }
+        }
+        if (targeted(loaded).size() != 1) {
+            throw new InputError(
+                    EVIDENCE_SHAPE_UNRESOLVED,
+                    ErrorCatalogue.errorCause(EVIDENCE_SHAPE_UNRESOLVED)
+                            .replace("{control}", control.id)
+                            .replace("{path}", path),
+                    ErrorCatalogue.errorFix(EVIDENCE_SHAPE_UNRESOLVED));
+        }
+        return loaded;
+    }
+
+    /** The shape a focus must meet for the control to judge it ({@code evaluation.evidence_shape}); a focus
+     * that violates it lacks the evidence, so the outcome is insufficient_evidence. */
+    public static Psp.Shape evidenceShapeFor(Catalog catalog, ControlSpec control) {
+        if (control.evidenceShapePath == null) {
+            return null;
+        }
+        return catalog.shapes.get(catalog.evidenceShapeIris.get(control.evidenceShapePath));
     }
 
     /** A synthetic catalog carrying only {@code controls}, for tests that need specific
      * {@code minimum_evidence} shapes without a fixture directory on disk. */
     static Catalog forTest(String id, String version, List<ControlSpec> controls) {
-        return new Catalog(id, version, null, controls, Map.of());
+        return new Catalog(id, version, null, controls, Map.of(), Map.of());
     }
 
     /** Files left out of a catalog's provenance digest: the detached signature and {@code catalog.yaml}
@@ -240,7 +315,7 @@ public final class Catalog {
             }
         }
         for (Psp.Shape shape : catalog.shapes.values()) {
-            if (shape.targetClass != null || !shape.targetNodes.isEmpty() || !shape.targetWhere.isEmpty()) {
+            if (hasTarget(shape)) {
                 return shape;
             }
         }

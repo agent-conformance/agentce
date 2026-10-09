@@ -7,11 +7,15 @@
  * the evaluator) is not needed by the conformance pipeline and is not ported here.
  */
 
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { join, sep } from "node:path";
 import { load } from "js-yaml";
+import { errorCause, errorFix } from "./errorCatalogue";
+import { InputError } from "./errors";
 import { type Shape, loadShapes } from "./psp";
-import { byteCompare } from "./util";
+import { byteCompare, formatTemplate } from "./util";
+
+const EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved";
 
 export interface ControlSpec {
   id: string;
@@ -24,6 +28,7 @@ export interface ControlSpec {
   minSourceClass: string;
   minimumEvidence: Array<Record<string, string>>;
   shapePath: string | null;
+  evidenceShapePath: string | null;
   tolerance: Record<string, unknown>;
   testCases: Array<Record<string, string>>;
   raw: Record<string, unknown>;
@@ -35,6 +40,8 @@ export interface Catalog {
   directory: string;
   controls: ControlSpec[];
   shapes: Map<string, Shape>;
+  /** Each declared `evaluation.evidence_shape` path -> the IRI of the one node shape it holds. */
+  evidenceShapeIris: Map<string, string>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -69,6 +76,14 @@ function controlFromDict(data: Record<string, unknown>): ControlSpec {
       ? (evaluation.minimum_evidence as Array<Record<string, string>>)
       : [],
     shapePath: typeof evaluation.shape === "string" ? evaluation.shape : null,
+    // A declared evidence shape is always resolved: a value that is not a path reads as "", which load
+    // refuses, so it can never be skipped into a pass.
+    evidenceShapePath:
+      "evidence_shape" in evaluation
+        ? typeof evaluation.evidence_shape === "string"
+          ? evaluation.evidence_shape
+          : ""
+        : null,
     tolerance: isRecord(data.tolerance) ? data.tolerance : { kind: "count", max: 0 },
     testCases: Array.isArray(data.test_cases)
       ? (data.test_cases as Array<Record<string, string>>)
@@ -77,12 +92,51 @@ function controlFromDict(data: Record<string, unknown>): ControlSpec {
   };
 }
 
+function hasTarget(shape: Shape): boolean {
+  return Boolean(shape.targetClass) || shape.targetNodes.length > 0 || shape.targetWhere.length > 0;
+}
+
+/** The file inside `directory` that `path` names, after symlinks, or null when it is missing, not a
+ * file, or outside the catalog folder (where the catalog's signature would not cover it). */
+function fileInside(directory: string, path: string): string | null {
+  if (path === "") {
+    return null;
+  }
+  try {
+    const root = realpathSync(directory);
+    const resolved = realpathSync(join(directory, path));
+    return resolved.startsWith(root + sep) && statSync(resolved).isFile() ? resolved : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The shapes in the file a control names as `evaluation.evidence_shape`. The file must hold exactly one
+ * node shape with a target, whose IRI is returned with the file's shapes; anything else, including a file
+ * outside the catalog folder, is refused, so a declared evidence shape can never be skipped and read as a
+ * pass. */
+function loadEvidenceShape(directory: string, control: ControlSpec): [string, Map<string, Shape>] {
+  const path = control.evidenceShapePath ?? "";
+  const file = fileInside(directory, path);
+  const loaded = file === null ? new Map<string, Shape>() : loadShapes(file, path);
+  const targeted = [...loaded].filter(([, shape]) => hasTarget(shape)).map(([iri]) => iri);
+  if (targeted.length !== 1) {
+    throw new InputError(
+      EVIDENCE_SHAPE_UNRESOLVED,
+      formatTemplate(errorCause(EVIDENCE_SHAPE_UNRESOLVED), { control: control.id, path }),
+      errorFix(EVIDENCE_SHAPE_UNRESOLVED),
+    );
+  }
+  return [targeted[0] as string, loaded];
+}
+
 /** Load `catalog.yaml` and every control and shape in `directory`. */
 export function loadCatalog(directory: string): Catalog {
   const meta = load(readFileSync(join(directory, "catalog.yaml"), "utf-8"));
   const metaRecord = isRecord(meta) ? meta : {};
   const controls: ControlSpec[] = [];
   const shapes = new Map<string, Shape>();
+  const evidenceShapeIris = new Map<string, string>();
   for (const controlFile of yamlFiles(join(directory, "controls"))) {
     const data = load(readFileSync(join(directory, "controls", controlFile), "utf-8"));
     if (!isRecord(data)) {
@@ -98,6 +152,13 @@ export function loadCatalog(directory: string): Catalog {
         shapes.set(iri, shape);
       }
     }
+    if (control.evidenceShapePath !== null) {
+      const [iri, loaded] = loadEvidenceShape(directory, control);
+      evidenceShapeIris.set(control.evidenceShapePath, iri);
+      for (const [shapeIri, shape] of loaded) {
+        shapes.set(shapeIri, shape);
+      }
+    }
   }
   return {
     id: String(metaRecord.id ?? ""),
@@ -105,6 +166,7 @@ export function loadCatalog(directory: string): Catalog {
     directory,
     controls,
     shapes,
+    evidenceShapeIris,
   };
 }
 
@@ -120,9 +182,18 @@ export function shapeFor(catalog: Catalog, control: ControlSpec): Shape | null {
     }
   }
   for (const shape of catalog.shapes.values()) {
-    if (shape.targetClass || shape.targetNodes.length > 0 || shape.targetWhere.length > 0) {
+    if (hasTarget(shape)) {
       return shape;
     }
   }
   return null;
+}
+
+/** The shape a focus must meet for the control to judge it (`evaluation.evidence_shape`); a focus that
+ * violates it lacks the evidence, so the outcome is insufficient_evidence. */
+export function evidenceShapeFor(catalog: Catalog, control: ControlSpec): Shape | null {
+  if (control.evidenceShapePath === null) {
+    return null;
+  }
+  return catalog.shapes.get(catalog.evidenceShapeIris.get(control.evidenceShapePath) ?? "") ?? null;
 }

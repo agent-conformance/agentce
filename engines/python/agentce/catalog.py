@@ -24,12 +24,16 @@ import yaml
 
 from . import signing
 from .domain import DomainBinding
+from .error_catalogue import MESSAGE_KEYS
 from .errors import InputError
 from .graph import build_graph
+from .i18n_format import format_message
 from .psp import PropertyShape, Shape, load_shapes
-from .structural import evaluate_control
+from .structural import evaluate_control, evaluate_shape
 
 _EXPECTED_TO_CHECK = {"passed", "failed", "inapplicable"}
+_EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved"
+_EVIDENCE_SHAPE_PASSED_CASE = "catalog.evidence_shape.passed_case_unjudged"
 
 #: Files left out of the provenance digest: the detached signature and ``catalog.yaml`` itself (which
 #: carries the provenance block), so the digest covers the catalog's rules and is non-circular.
@@ -81,6 +85,7 @@ class ControlSpec:
     tolerance: dict[str, Any]
     test_cases: list[dict[str, str]]
     raw: dict[str, Any] = field(default_factory=dict)
+    evidence_shape_path: str | None = None
 
 
 @dataclass
@@ -90,6 +95,8 @@ class Catalog:
     directory: Path
     controls: list[ControlSpec]
     shapes: dict[str, Shape]
+    #: Each declared ``evaluation.evidence_shape`` path -> the IRI of the one node shape it holds.
+    evidence_shape_iris: dict[str, str] = field(default_factory=dict)
 
     def shape_for(self, control: ControlSpec) -> Shape | None:
         if control.shape_path is None:
@@ -102,6 +109,13 @@ class Catalog:
             if shape.target_class or shape.target_nodes or shape.target_where:
                 return shape
         return None
+
+    def evidence_shape_for(self, control: ControlSpec) -> Shape | None:
+        """The shape a focus must meet for the control to judge it (``evaluation.evidence_shape``);
+        a focus that violates it lacks the evidence, so the outcome is insufficient_evidence."""
+        if control.evidence_shape_path is None:
+            return None
+        return self.shapes[self.evidence_shape_iris[control.evidence_shape_path]]
 
 
 def _control_from_dict(data: dict[str, Any]) -> ControlSpec:
@@ -122,7 +136,45 @@ def _control_from_dict(data: dict[str, Any]) -> ControlSpec:
         tolerance=data.get("tolerance", {"kind": "count", "max": 0}),
         test_cases=list(data.get("test_cases", [])),
         raw=data,
+        # A declared evidence shape is always resolved: a value that is not a path reads as "",
+        # which load refuses, so it can never be skipped into a pass.
+        evidence_shape_path=(
+            _path_or_empty(evaluation["evidence_shape"])
+            if "evidence_shape" in evaluation
+            else None
+        ),
     )
+
+
+def _path_or_empty(value: Any) -> str:
+    return value if isinstance(value, str) else ""
+
+
+def _load_evidence_shape(
+    directory: Path, control: ControlSpec
+) -> tuple[str, dict[str, Shape]]:
+    """The shapes in the file a control names as ``evaluation.evidence_shape``. The file must hold
+    exactly one node shape with a target, whose IRI is returned with the file's shapes; anything else,
+    including a file outside the catalog directory (which its signature would not cover), is
+    refused, so a declared evidence shape can never be skipped and read as a pass."""
+    path = control.evidence_shape_path
+    assert path is not None
+    resolved = (directory / path).resolve()
+    inside = path != "" and resolved.is_relative_to(directory.resolve())
+    loaded = load_shapes(resolved, path) if inside and resolved.is_file() else {}
+    targeted = [
+        iri
+        for iri, shape in loaded.items()
+        if shape.target_class or shape.target_nodes or shape.target_where
+    ]
+    if len(targeted) != 1:
+        entry = MESSAGE_KEYS[_EVIDENCE_SHAPE_UNRESOLVED]
+        raise InputError(
+            _EVIDENCE_SHAPE_UNRESOLVED,
+            format_message(entry.cause, control=control.id, path=path),
+            entry.fix,
+        )
+    return targeted[0], loaded
 
 
 def load_catalog(directory: Path) -> Catalog:
@@ -132,6 +184,7 @@ def load_catalog(directory: Path) -> Catalog:
     )
     controls: list[ControlSpec] = []
     shapes: dict[str, Shape] = {}
+    evidence_shape_iris: dict[str, str] = {}
     for control_file in sorted((directory / "controls").glob("*.yaml")):
         data = yaml.safe_load(control_file.read_text(encoding="utf-8"))
         control = _control_from_dict(data)
@@ -140,12 +193,17 @@ def load_catalog(directory: Path) -> Catalog:
             shapes.update(
                 load_shapes(directory / control.shape_path, control.shape_path)
             )
+        if control.evidence_shape_path is not None:
+            iri, loaded = _load_evidence_shape(directory, control)
+            evidence_shape_iris[control.evidence_shape_path] = iri
+            shapes.update(loaded)
     return Catalog(
         id=str(meta.get("id", "")),
         version=str(meta.get("version", "")),
         directory=directory,
         controls=controls,
         shapes=shapes,
+        evidence_shape_iris=evidence_shape_iris,
     )
 
 
@@ -452,4 +510,17 @@ def _lint_case(
             f"{control.id}/{case['id']}: expected {case['expected']} but evaluated "
             f"{outcome.outcome} (applicable={outcome.applicable})"
         ]
+    evidence_shape = catalog.evidence_shape_for(control)
+    if evidence_shape is not None and case["expected"] == "passed":
+        # The passed case must also be judged: its foci meet the evidence shape, and the evidence
+        # shape targets at least one of them (a mistyped target would otherwise judge nothing).
+        targeted, unjudged, _ = evaluate_shape(
+            store, evidence_shape, catalog.shapes, control.id
+        )
+        if not targeted or unjudged:
+            entry = MESSAGE_KEYS[_EVIDENCE_SHAPE_PASSED_CASE]
+            return [
+                f"{_EVIDENCE_SHAPE_PASSED_CASE}: "
+                + format_message(entry.cause, control=control.id, case=case["id"])
+            ]
     return []

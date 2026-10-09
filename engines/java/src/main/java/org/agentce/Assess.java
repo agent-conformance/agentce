@@ -191,6 +191,20 @@ public final class Assess {
         }
 
         boolean conformant = Structural.withinTolerance(result.applicable.size(), result.failing.size(), control.tolerance);
+        Psp.Shape evidenceShape = Catalog.evidenceShapeFor(catalog, control);
+        if (conformant && evidenceShape != null) {
+            List<String> unjudged = new ArrayList<>(
+                    Structural.evaluateShape(store, evidenceShape, catalog.shapes, control.id).failing);
+            if (!unjudged.isEmpty()) {
+                // A focus the control cannot judge from these records never counts as a pass; a failure
+                // elsewhere still reads non-conformant (above).
+                unjudged.sort(Json::byteCompare);
+                Assertions.Assertion a = Assertions.make(control.id, control.version, subject.id, "insufficient_evidence", control.rung, control.mode, win, new int[] {result.applicable.size(), 0}, control.severity, familyOf(control.id));
+                a.evidence = evidence(eventsByIri, unjudged);
+                a.crosswalk = crosswalk;
+                return a;
+            }
+        }
         List<String> focusForEvidence;
         if (!result.failing.isEmpty()) {
             focusForEvidence = new ArrayList<>(result.failing);

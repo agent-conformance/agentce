@@ -454,3 +454,111 @@ def test_catalog_init_title_and_version(
         (directory / "controls" / "GEN-01.yaml").read_text(encoding="utf-8")
     )
     assert control_doc["version"] == "2031.03"
+
+
+def _with_evidence_shape(tmp_path: Path, text: str | None) -> Path:
+    """A copy of the base catalog whose ROB-02 evidence shape file holds ``text`` (None: no file)."""
+    catalog_dir = tmp_path / "cat"
+    shutil.copytree(_BASE, catalog_dir)
+    shape = catalog_dir / "shapes" / "ROB-02-evidence.ttl"
+    if text is None:
+        shape.unlink()
+    else:
+        shape.write_text(text, encoding="utf-8")
+    return catalog_dir
+
+
+_EVIDENCE_PREFIXES = (
+    "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
+    "@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n"
+)
+_EVIDENCE_BODY = (
+    " a sh:NodeShape ; sh:targetClass agentce:ConsequentialDecision ;"
+    " sh:property [ sh:path agentce:untrustedContentRuledOn ; sh:hasValue true ] .\n"
+)
+
+
+def test_an_evidence_shape_resolves_from_its_own_file_whatever_its_name(
+    tmp_path: Path,
+) -> None:
+    catalog = load_catalog(
+        _with_evidence_shape(
+            tmp_path, _EVIDENCE_PREFIXES + "agentce:Anything" + _EVIDENCE_BODY
+        )
+    )
+    control = next(c for c in catalog.controls if c.id == "ROB-02")
+    shape = catalog.evidence_shape_for(control)
+    assert shape is not None and shape.target_class == "agentce:ConsequentialDecision"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        None,
+        _EVIDENCE_PREFIXES
+        + "agentce:E a sh:NodeShape ; sh:property [ sh:path agentce:x ; sh:minCount 1 ] .\n",
+        _EVIDENCE_PREFIXES
+        + "agentce:E1"
+        + _EVIDENCE_BODY
+        + "agentce:E2"
+        + _EVIDENCE_BODY,
+    ],
+    ids=["missing", "no-target", "two-targets"],
+)
+def test_an_unresolvable_evidence_shape_is_refused_by_load_and_lint(
+    tmp_path: Path, text: str | None
+) -> None:
+    catalog_dir = _with_evidence_shape(tmp_path, text)
+    with pytest.raises(InputError) as excinfo:
+        load_catalog(catalog_dir)
+    assert excinfo.value.key == "catalog.evidence_shape.unresolved"
+    problems = lint_catalog(catalog_dir)
+    assert [p.split(":")[0] for p in problems] == ["catalog.evidence_shape.unresolved"]
+
+
+def _with_evidence_shape_value(tmp_path: Path, value: str) -> Path:
+    """A copy of the base catalog whose ROB-02 control declares ``evidence_shape: <value>``."""
+    catalog_dir = tmp_path / "cat"
+    shutil.copytree(_BASE, catalog_dir)
+    control = catalog_dir / "controls" / "ROB-02.yaml"
+    text = control.read_text(encoding="utf-8")
+    declared = "evidence_shape: shapes/ROB-02-evidence.ttl"
+    assert declared in text
+    control.write_text(
+        text.replace(declared, f"evidence_shape: {value}"), encoding="utf-8"
+    )
+    return catalog_dir
+
+
+@pytest.mark.parametrize(
+    "value",
+    ['""', "null", "5", "../outside.ttl", "linked.ttl"],
+    ids=["empty", "null", "number", "outside", "symlink-outside"],
+)
+def test_a_declared_evidence_shape_that_is_not_a_file_in_the_catalog_is_refused(
+    tmp_path: Path, value: str
+) -> None:
+    catalog_dir = _with_evidence_shape_value(tmp_path, value)
+    outside = tmp_path / "outside.ttl"
+    shutil.copy(catalog_dir / "shapes" / "ROB-02-evidence.ttl", outside)
+    (catalog_dir / "linked.ttl").symlink_to(outside)
+    with pytest.raises(InputError) as excinfo:
+        load_catalog(catalog_dir)
+    assert excinfo.value.key == "catalog.evidence_shape.unresolved"
+
+
+def test_lint_refuses_an_evidence_shape_that_targets_nothing_in_the_passed_case(
+    tmp_path: Path,
+) -> None:
+    catalog_dir = _with_evidence_shape(
+        tmp_path,
+        _EVIDENCE_PREFIXES
+        + "agentce:E"
+        + _EVIDENCE_BODY.replace("ConsequentialDecision", "ConsequentalDecision"),
+    )
+    load_catalog(
+        catalog_dir
+    )  # loads: the target is well formed, it just matches nothing
+    assert [p.split(":")[0] for p in lint_catalog(catalog_dir)] == [
+        "catalog.evidence_shape.passed_case_unjudged"
+    ]

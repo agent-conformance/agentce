@@ -438,27 +438,40 @@ class _Builder:
             )
 
     def _robust_to_untrusted(self, events: list[dict[str, Any]]) -> None:
-        """Flag whether each Decision kept untrusted content out (SPEC §7.4, ROB-02).
+        """Flag whether each Decision kept untrusted content out, and whether the memory guard
+        ruled on all it used (SPEC §7.4, ROB-02).
 
-        Untrusted content starts at a MemoryWrite whose trust is untrusted or quarantined or whose
-        guard verdict is quarantine or block, a MemoryRead whose ``trust_min`` is untrusted or
-        quarantined, and an instruction with an untrusted Appendix F source class (CND-05's rule).
-        It flows along every edge that carries content into an event (``_CONTENT_IN``,
-        ``_CONTENT_OUT``, a read to its consumer, a record to and from its writes) for as many
-        hops as the records show, so a decision is tainted through another decision, a tool call
-        or a model call. A closure over all events, so order and cycles never matter."""
+        Untrusted content starts at a MemoryWrite whose trust is untrusted or quarantined, whose
+        guard verdict is quarantine or block, or which carries no trust and no verdict but an
+        untrusted Appendix F ``provenance_origin_class``; a MemoryRead whose ``trust_min`` is
+        untrusted or quarantined; and an instruction with an untrusted Appendix F source class
+        (CND-05's rule). Content the guard never ruled on starts at a MemoryRead not reported by
+        an enforcement point, a record no enforcement-point read or ruled write covers, and a
+        ref the bundle does not hold. Both flow along every edge that carries content into an
+        event (``_CONTENT_IN``, ``_CONTENT_OUT``, a read to its consumer, a record to and from
+        its writes) for as many hops as the records show, so a decision is reached through
+        another decision, a tool call or a model call. Closures over all events, so order and
+        cycles never matter."""
         flows: dict[str, set[str]] = {}
         tainted: set[str] = set()
+        unruled: set[str] = set()
+        held: set[str] = set()
+        named: set[str] = set()
+        records: set[str] = set()
+        guarded: set[str] = set()
 
         def flow(source: Any, target: Any) -> None:
             if isinstance(source, str) and isinstance(target, str):
                 flows.setdefault(source, set()).add(target)
+                named.add(source)
 
         for event in events:
             ptype = self._ptype(event)
             data = _data(event)
             refs = _refs(event)
             node = event_iri(str(event["id"]))
+            held.add(node)
+            enforced = event.get("agentcesourceclass") == "enforcement_point"
             for key in _CONTENT_IN:
                 value = data.get(key)
                 for ref in value if isinstance(value, list) else [value]:
@@ -467,27 +480,51 @@ class _Builder:
                 flow(refs.get(key), node)
             for key in _CONTENT_OUT:
                 flow(node, data.get(key))
+                if isinstance(data.get(key), str):
+                    held.add(data[key])
             flow(node, refs.get("consumer"))
             if ptype == "MemoryWrite":
+                record = data.get("record_ref")
                 # A record and each write of it stand for the same content.
-                flow(data.get("record_ref"), node)
-                if _is_one_of(data.get("trust"), _UNTRUSTED_TRUST) or _is_one_of(
-                    data.get("guard_verdict"), _UNTRUSTED_VERDICTS
+                flow(record, node)
+                trust, verdict = data.get("trust"), data.get("guard_verdict")
+                if isinstance(record, str):
+                    records.add(record)
+                    if enforced and (trust is not None or verdict is not None):
+                        guarded.add(record)
+                if (
+                    _is_one_of(trust, _UNTRUSTED_TRUST)
+                    or _is_one_of(verdict, _UNTRUSTED_VERDICTS)
+                    or (
+                        trust is None
+                        and verdict is None
+                        and isinstance(data.get("provenance_origin_class"), str)
+                        and data["provenance_origin_class"] not in _TRUSTED_INSTRUCTION
+                    )
                 ):
                     tainted.add(node)
-            elif ptype == "MemoryRead" and _is_one_of(
-                data.get("trust_min"), _UNTRUSTED_TRUST
-            ):
-                tainted.add(node)
+            elif ptype == "MemoryRead":
+                read = data.get("record_refs")
+                for record in read if isinstance(read, list) else []:
+                    if isinstance(record, str):
+                        records.add(record)
+                        if enforced:
+                            guarded.add(record)
+                if not enforced:
+                    unruled.add(node)
+                if _is_one_of(data.get("trust_min"), _UNTRUSTED_TRUST):
+                    tainted.add(node)
         tainted |= {
             iri for iri, untrusted in self.instruction_untrusted.items() if untrusted
         }
-        pending = list(tainted)
-        while pending:
-            for target in flows.get(pending.pop(), ()):
-                if target not in tainted:
-                    tainted.add(target)
-                    pending.append(target)
+        unruled |= (records - guarded) | (named - held - records)
+        for seeds in (tainted, unruled):
+            pending = list(seeds)
+            while pending:
+                for target in flows.get(pending.pop(), ()):
+                    if target not in seeds:
+                        seeds.add(target)
+                        pending.append(target)
         for event in events:
             if self._ptype(event) == "Decision":
                 node = event_iri(str(event["id"]))
@@ -495,6 +532,12 @@ class _Builder:
                     node,
                     "agentce:robustToUntrustedContent",
                     "false" if node in tainted else "true",
+                    BOOL,
+                )
+                self.store.add_literal(
+                    node,
+                    "agentce:untrustedContentRuledOn",
+                    "false" if node in unruled else "true",
                     BOOL,
                 )
 
