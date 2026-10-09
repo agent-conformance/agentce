@@ -6,13 +6,13 @@ fails if a gate in `gates.json` is not named in this file.
 ## 0.70.0
 
 - `VG-CLI-COLLECT-DOCTOR-INIT` (18.112) is new, with 33 rows and eight seeded faults, and covers the command lines
-  of `collect`, `doctor` and `init`. Python's `init` accepted `--non-interactive` and did nothing with it; `doctor`
-  wrote the message-key catalogue and never read `--project` when both were given, even for a directory that does
-  not exist, and diagnosed instead when `--write-errors` was empty; `collect --dry-run` never read
-  `--adapters-root`, dropped an empty `--out`, and its help said it wrote nothing although `--out` gets the plan
-  and its manifest. An empty `--adapters-root`, `init --out`, `--subject` or `--framework` was read as the
-  default. The rows check that each of those lines is refused with a key at exit 3 and writes nothing, and that a
-  dry run with `--out` writes `collect-plan.json` and `manifest.json`. The three commands are Python only, so
+  of `collect`, `doctor` and `init`. Python's `init` accepted `--non-interactive` and did nothing with it. Given
+  both `--project` and `--write-errors`, `doctor` wrote the message-key catalogue and never read `--project`, even
+  for a directory that does not exist. Given an empty `--write-errors`, it diagnosed instead. `collect --dry-run`
+  never read `--adapters-root` and dropped an empty `--out`. Its help said a dry run wrote nothing, but with
+  `--out` it writes the plan and its manifest. Python read an empty `--adapters-root`, `init --out`, `--subject`
+  or `--framework` as the default. The rows check that each engine refuses those lines with a key at exit 3 and
+  writes nothing, and that a dry run with `--out` writes `collect-plan.json` and `manifest.json`. The three commands are Python only, so
   TypeScript and Java answer every row with `cli.not_implemented`.
 - The gate entries in `gates.json` are in a new order (18.112), so the seeded-fault demo lanes carry a balanced
   load. No gate, row, fault or timeout changed.

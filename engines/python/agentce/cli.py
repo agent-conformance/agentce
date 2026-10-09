@@ -546,8 +546,8 @@ def build_parser() -> argparse.ArgumentParser:
         dest="dry_run",
         action="store_true",
         help=(
-            "plan only: run no adapter and resolve no credential; with --out, write the plan "
-            "(collect-plan.json) and its manifest.json there, nothing else"
+            "plan only. A dry run runs no adapter and resolves no credential. With --out it "
+            "writes the plan (collect-plan.json) and its manifest.json there, nothing else"
         ),
     )
     p.add_argument(
