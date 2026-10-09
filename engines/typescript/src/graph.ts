@@ -656,7 +656,10 @@ class Builder {
         );
       }
     }
-    return new Set([...tainted, ...unruled]);
+    for (const node of unruled) {
+      tainted.add(node);
+    }
+    return tainted;
   }
 
   private materialise(events: Event[]): void {

@@ -3023,8 +3023,8 @@
         {
           "description": "Python: content the memory guard never ruled on does not reach CND-05's chain, so a memory_trusted instruction whose origin is a self-report read reads CND-05 conformant",
           "file": "engines/python/agentce/graph.py",
-          "search": "        return tainted | unruled\n",
-          "replace": "        return tainted\n"
+          "search": "        tainted |= unruled\n",
+          "replace": ""
         },
         {
           "description": "TypeScript: an instruction that declares no source class counts as trusted, so a tool call on it reads CND-05 conformant",
@@ -3035,8 +3035,8 @@
         {
           "description": "TypeScript: content the memory guard never ruled on does not reach CND-05's chain, so a memory_trusted instruction whose origin is a self-report read reads CND-05 conformant",
           "file": "engines/typescript/src/graph.ts",
-          "search": "return new Set([...tainted, ...unruled]);",
-          "replace": "return tainted;"
+          "search": "    for (const node of unruled) {\n      tainted.add(node);\n    }\n",
+          "replace": ""
         },
         {
           "description": "Java: an instruction that declares no source class counts as trusted, so a tool call on it reads CND-05 conformant",

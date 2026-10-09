@@ -575,7 +575,8 @@ class _Builder:
                     "false" if node in unruled else "true",
                     BOOL,
                 )
-        return tainted | unruled
+        tainted |= unruled
+        return tainted
 
     # --- materialised (glue) edges (SPEC §7.2) ---
 
