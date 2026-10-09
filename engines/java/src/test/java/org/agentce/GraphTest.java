@@ -337,4 +337,23 @@ class GraphTest {
             assertEquals(List.of("true"), acts(List.of(derived, call("tc1", "i1")), "tc1"), key);
         }
     }
+
+    @Test
+    void cnd05AnInstructionThatDeclaresNoSourceClassFailsClosed() {
+        JsonNode bare = event("i0", "Instruction", "");
+        assertEquals(List.of("true"), acts(List.of(bare, call("tc1", "i0")), "tc1"));
+        JsonNode derived = instruction("i1", "user", "\"parent\": \"agentce:event/i0\"");
+        assertEquals(List.of("true"), acts(List.of(bare, derived, call("tc1", "i1")), "tc1"));
+    }
+
+    @Test
+    void cnd05AnOriginReadTheGuardNeverRuledOnFailsClosed() {
+        JsonNode derived = instruction("i1", "memory_trusted", "\"origin\": \"agentce:event/m1\"");
+        JsonNode unruled = Json.parse("{\"id\": \"m1\", \"time\": \"2026-01-01T00:00:00Z\", "
+                + "\"agentcesourceclass\": \"self_report\", "
+                + "\"data\": {\"@type\": \"MemoryRead\", \"record_refs\": [\"mem:r9\"]}}");
+        assertEquals(List.of("true"), acts(List.of(unruled, derived, call("tc1", "i1")), "tc1"));
+        JsonNode ruled = event("m1", "MemoryRead", "\"record_refs\": [\"mem:r9\"], \"trust_min\": \"trusted\"");
+        assertEquals(List.of("false"), acts(List.of(ruled, derived, call("tc1", "i1")), "tc1"));
+    }
 }

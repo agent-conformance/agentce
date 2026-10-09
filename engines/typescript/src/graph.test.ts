@@ -384,3 +384,22 @@ test("CND-05: a parent or origin the bundle does not hold fails closed", () => {
     );
   }
 });
+
+test("CND-05: an instruction that declares no source class fails closed", () => {
+  const bare = memoryEvent("i0", "Instruction", {});
+  assert.deepEqual(acts([bare, callEvent("tc1", "i0")]), ["true"]);
+  assert.deepEqual(acts([bare, instructionEvent("i1", "user", { parent: "i0" }), callEvent()]), [
+    "true",
+  ]);
+});
+
+test("CND-05: an origin read the guard never ruled on fails closed", () => {
+  const derived = instructionEvent("i1", "memory_trusted", { origin: "m1" });
+  const unruled = {
+    ...memoryEvent("m1", "MemoryRead", { record_refs: ["mem:r9"] }),
+    agentcesourceclass: "self_report",
+  };
+  assert.deepEqual(acts([unruled, derived, callEvent()]), ["true"]);
+  const ruled = memoryEvent("m1", "MemoryRead", { record_refs: ["mem:r9"], trust_min: "trusted" });
+  assert.deepEqual(acts([ruled, derived, callEvent()]), ["false"]);
+});

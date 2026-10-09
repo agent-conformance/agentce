@@ -757,3 +757,21 @@ def test_acts_on_untrusted_when_the_lineage_names_a_record_the_bundle_does_not_h
     for key in ("parent", "origin"):
         events = [_instruction("i1", "user", **{key: "gone"}), _call()]
         assert _acts(events) == ["true"], key
+
+
+def test_acts_on_untrusted_when_the_instruction_declares_no_source_class() -> None:
+    bare = _event("i0", "Instruction", {})
+    assert _acts([bare, _call(instruction="i0")]) == ["true"]
+    events = [bare, _instruction("i1", "user", parent="i0"), _call()]
+    assert _acts(events) == ["true"]
+
+
+def test_acts_on_untrusted_when_the_guard_never_ruled_on_the_origin_read() -> None:
+    derived = _instruction("i1", "memory_trusted", origin="m1")
+    unruled = _event("m1", "MemoryRead", {"record_refs": ["mem:r9"]})
+    unruled["agentcesourceclass"] = "self_report"
+    assert _acts([unruled, derived, _call()]) == ["true"]
+    ruled = _event(
+        "m1", "MemoryRead", {"record_refs": ["mem:r9"], "trust_min": "trusted"}
+    )
+    assert _acts([ruled, derived, _call()]) == ["false"]

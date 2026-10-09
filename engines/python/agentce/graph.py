@@ -445,9 +445,11 @@ class _Builder:
         records show. It passes through an untrusted source class at an instruction of an untrusted
         Appendix F class, at a tool call or resource access (the content they produce is
         ``tool_output`` or ``retrieved``), at a parent or origin the bundle does not hold, and at
-        anything ROB-02's taint closure reached (``tainted``: an untrusted memory read or write, or
-        content that used one). A closure over
-        all events, so the acting event may precede its instruction and cycles end."""
+        anything ROB-02's closures reached (``tainted``: an untrusted memory read or write, content
+        the memory guard never ruled on, or content that used either). An instruction whose source
+        class is not a declared trusted one (none given, say) cannot show a trusted root either, so
+        it fails closed. A closure over all events, so the acting event may precede its instruction
+        and cycles end."""
         untrusted = set(tainted)
         derived: dict[str, set[str]] = {}
         held: set[str] = set()
@@ -458,6 +460,9 @@ class _Builder:
             if ptype in ("ToolCall", "ResourceAccess"):
                 untrusted.add(node)
             elif ptype == "Instruction":
+                source_class = _data(event).get("source_class")
+                if not _is_one_of(source_class, _TRUSTED_INSTRUCTION):
+                    untrusted.add(node)
                 refs = _refs(event)
                 for key in ("parent", "origin"):
                     _flow(derived, refs.get(key), node)
@@ -491,8 +496,8 @@ class _Builder:
         every edge that carries content into an event (``_CONTENT_IN``, ``_CONTENT_OUT``, a read
         to its consumer, a record to and from its writes) for as many hops as the records show,
         so a decision is reached through another decision, a tool call or a model call. Closures
-        over all events, so order and cycles never matter. Returns the tainted closure, which
-        CND-05's instruction chain also reads (:meth:`_acts_on_untrusted`)."""
+        over all events, so order and cycles never matter. Returns both closures, which CND-05's
+        instruction chain also reads (:meth:`_acts_on_untrusted`)."""
         flows: dict[str, set[str]] = {}
         tainted: set[str] = set()
         unruled: set[str] = set()
@@ -570,7 +575,7 @@ class _Builder:
                     "false" if node in unruled else "true",
                     BOOL,
                 )
-        return tainted
+        return tainted | unruled
 
     # --- materialised (glue) edges (SPEC §7.2) ---
 

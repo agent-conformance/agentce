@@ -529,9 +529,11 @@ public final class Graph {
          * records show. It passes through an untrusted source class at an instruction of an untrusted
          * Appendix F class, at a tool call or resource access (the content they produce is
          * {@code tool_output} or {@code retrieved}), at a parent or origin the bundle does not hold, and at
-         * anything ROB-02's taint closure reached
-         * ({@code tainted}: an untrusted memory read or write, or content that used one). A closure over
-         * all events, so the acting event may precede its instruction and cycles end. */
+         * anything ROB-02's closures reached ({@code tainted}: an untrusted memory read or write, content
+         * the memory guard never ruled on, or content that used either). An instruction whose source
+         * class is not a declared trusted one (none given, say) cannot show a trusted root either, so it
+         * fails closed. A closure over all events, so the acting event may precede its instruction and
+         * cycles end. */
         private void actsOnUntrusted(List<JsonNode> events, Set<String> tainted) {
             Set<String> untrusted = new LinkedHashSet<>(tainted);
             Map<String, Set<String>> derived = new LinkedHashMap<>();
@@ -543,6 +545,9 @@ public final class Graph {
                 if ("ToolCall".equals(ptype) || "ResourceAccess".equals(ptype)) {
                     untrusted.add(node);
                 } else if ("Instruction".equals(ptype)) {
+                    if (!isOneOf(dataOf(event).get("source_class"), TRUSTED_INSTRUCTION)) {
+                        untrusted.add(node);
+                    }
                     JsonNode refs = refsOf(event);
                     for (String key : List.of("parent", "origin")) {
                         flow(derived, str(refs.get(key)), node);
@@ -579,7 +584,7 @@ public final class Graph {
          * with a {@code trust_min} covers, and a ref the bundle does not hold. Both flow along every
          * edge that carries content into an event (CONTENT_IN, CONTENT_OUT, a read to its consumer, a
          * record to and from its writes) for as many hops as the records show. Closures over all
-         * events, so order and cycles never matter. Returns the tainted closure, which CND-05's
+         * events, so order and cycles never matter. Returns both closures, which CND-05's
          * instruction chain also reads ({@link #actsOnUntrusted}). */
         private Set<String> robustToUntrusted(List<JsonNode> events) {
             Map<String, Set<String>> flows = new LinkedHashMap<>();
@@ -681,6 +686,7 @@ public final class Graph {
                             node, "agentce:untrustedContentRuledOn", unruled.contains(node) ? "false" : "true", BOOL);
                 }
             }
+            tainted.addAll(unruled);
             return tainted;
         }
 

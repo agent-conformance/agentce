@@ -493,9 +493,11 @@ class Builder {
    * lineage (`agentce:derivedFrom`, SPEC §6.3) for as many hops as the records show. It passes through
    * an untrusted source class at an instruction of an untrusted Appendix F class, at a tool call or
    * resource access (the content they produce is `tool_output` or `retrieved`), at a parent or origin the
-   * bundle does not hold, and at anything ROB-02's taint closure reached (`tainted`: an untrusted memory
-   * read or write, or content that used one). A closure over all events, so the acting event may
-   * precede its instruction and cycles end. */
+   * bundle does not hold, and at anything ROB-02's closures reached (`tainted`: an untrusted memory
+   * read or write, content the memory guard never ruled on, or content that used either). An instruction
+   * whose source class is not a declared trusted one (none given, say) cannot show a trusted root
+   * either, so it fails closed. A closure over all events, so the acting event may precede its
+   * instruction and cycles end. */
   private actsOnUntrusted(events: Event[], tainted: Set<string>): void {
     const untrusted = new Set(tainted);
     const derived = new Map<string, Set<string>>();
@@ -507,6 +509,9 @@ class Builder {
       if (ptype === "ToolCall" || ptype === "ResourceAccess") {
         untrusted.add(node);
       } else if (ptype === "Instruction") {
+        if (!isOneOf(dataOf(event).source_class, TRUSTED_INSTRUCTION)) {
+          untrusted.add(node);
+        }
         const refs = refsOf(event);
         for (const key of ["parent", "origin"]) {
           flow(derived, refs[key], node);
@@ -547,8 +552,8 @@ class Builder {
    * write and no enforcement-point read with a `trust_min` covers, and a ref the bundle does not hold.
    * Both flow along every edge that carries content into an event (CONTENT_IN, CONTENT_OUT, a read to
    * its consumer, a record to and from its writes) for as many hops as the records show. Closures over
-   * all events, so order and cycles never matter. Returns the tainted closure, which CND-05's
-   * instruction chain also reads (`actsOnUntrusted`). */
+   * all events, so order and cycles never matter. Returns both closures, which CND-05's instruction
+   * chain also reads (`actsOnUntrusted`). */
   private robustToUntrusted(events: Event[]): Set<string> {
     const flows = new Map<string, Set<string>>();
     const tainted = new Set<string>();
@@ -651,7 +656,7 @@ class Builder {
         );
       }
     }
-    return tainted;
+    return new Set([...tainted, ...unruled]);
   }
 
   private materialise(events: Event[]): void {
