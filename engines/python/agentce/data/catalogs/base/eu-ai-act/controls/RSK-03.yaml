@@ -7,23 +7,20 @@ applicability:
   applies_to_roles: [both]
 evaluation:
   mode: semi-automated
-  rung: 2
+  rung: 3
   min_source_class: self_report
   minimum_evidence:
     - {event: Decision, class: self_report}
     - {event: ApprovalDecided, class: any}
-  shape: shapes/RSK-03.ttl
 expectations:
   - {id: S1, text: "Residual-risk indicators are measured within thresholds."}
 severity: medium
 evidence_strength: strong
 tolerance: {kind: count, max: 0}
-tolerance_rationale: "RSK-03 is a structural expectation with no tolerated exceptions."
+tolerance_rationale: "RSK-03 is a rung-3 measurement against declared thresholds; no engine evaluates rung 3 yet, so it reads not_assessed."
 false_positive_modes:
   - "A condition declared as an accepted deviation in the applicability profile."
 techniques:
   - "techniques/rsk-evidence-at-source"
 test_cases:
-  - {id: pass, expected: passed, fixture: test/RSK-03/passed.jsonl}
-  - {id: fail, expected: failed, fixture: test/RSK-03/failed.jsonl}
-  - {id: na, expected: inapplicable, fixture: test/RSK-03/inapplicable.jsonl}
+  - {id: pending, expected: not_assessed, fixture: test/RSK-03/pending.jsonl}

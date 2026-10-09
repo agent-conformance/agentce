@@ -3,5 +3,5 @@
 @prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
 
 agentce:ROB-07-Shape a sh:NodeShape ;
-  sh:targetClass agentce:ConsequentialDecision ;
-  sh:property [ sh:path agentce:reviewedBy ; sh:minCount 1 ; sh:name "S1" ] .
+  sh:targetClass agentce:Incident ;
+  sh:property [ sh:path agentce:incidentResponded ; sh:hasValue true ; sh:name "S1" ] .

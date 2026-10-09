@@ -403,3 +403,128 @@ test("CND-05: an origin read the guard never ruled on fails closed", () => {
   const ruled = memoryEvent("m1", "MemoryRead", { record_refs: ["mem:r9"], trust_min: "trusted" });
   assert.deepEqual(acts([ruled, derived, callEvent()]), ["false"]);
 });
+
+function lit(
+  events: Record<string, unknown>[],
+  id: string,
+  predicate: string,
+  domain = MINOR_DOMAIN,
+) {
+  return buildGraph(events, { domain }).literalValues(`agentce:event/${id}`, predicate);
+}
+
+function refEvent(id: string, ptype: string, data: Record<string, unknown>, decision?: string) {
+  const refs = decision === undefined ? {} : { refs: { decision: `agentce:event/${decision}` } };
+  return memoryEvent(id, ptype, { ...data, ...refs });
+}
+
+const HUMAN_A = { kind: "human", id: "alice" };
+const HUMAN_B = { kind: "human", id: "bob" };
+
+test("INC-03: triggersIncident marks only the decisions an incident names, directly or not", () => {
+  const events = [
+    decisionEvent("d1"),
+    decisionEvent("d2"),
+    decisionEvent("d3"),
+    refEvent("o1", "Override", { replacement: "deny", original: "allow" }, "d2"),
+    refEvent("inc1", "Incident", { related_refs: ["agentce:event/o1"] }, "d1"),
+  ];
+  assert.deepEqual(lit(events, "d1", "agentce:triggersIncident"), ["true"]);
+  assert.deepEqual(lit(events, "d2", "agentce:triggersIncident"), ["true"]);
+  assert.deepEqual(lit(events, "d3", "agentce:triggersIncident"), ["false"]);
+  // No incident at all: no decision triggers one.
+  assert.deepEqual(lit([decisionEvent("d1")], "d1", "agentce:triggersIncident"), ["false"]);
+});
+
+test("INC-03: an untraced incident holds every decision to the rule", () => {
+  const unnamed = [decisionEvent("d1"), decisionEvent("d2"), refEvent("inc1", "Incident", {})];
+  assert.deepEqual(lit(unnamed, "d1", "agentce:triggersIncident"), ["true"]);
+  assert.deepEqual(lit(unnamed, "d2", "agentce:triggersIncident"), ["true"]);
+  const unresolved = [
+    decisionEvent("d1"),
+    decisionEvent("d2"),
+    refEvent("inc1", "Incident", { related_refs: ["agentce:event/missing"] }, "d1"),
+  ];
+  assert.deepEqual(lit(unresolved, "d1", "agentce:triggersIncident"), ["true"]);
+  assert.deepEqual(lit(unresolved, "d2", "agentce:triggersIncident"), ["true"]);
+});
+
+test("OVS-08: coverage counts distinct human reviewers, two under dual control", () => {
+  const approval = (id: string, actor: unknown) => refEvent(id, "ApprovalDecided", { actor }, "d1");
+  const dual = {
+    ...decisionEvent("d1"),
+    data: { ...decisionEvent("d1").data, oversight_modality: "dual_control" },
+  };
+  const cover = (events: Record<string, unknown>[], domain = MINOR_DOMAIN) =>
+    lit(events, "d1", "agentce:oversightCoverageComplete", domain);
+  assert.deepEqual(cover([decisionEvent("d1")]), ["false"]);
+  assert.deepEqual(cover([decisionEvent("d1"), approval("a1", { kind: "service", id: "x" })]), [
+    "false",
+  ]);
+  assert.deepEqual(cover([decisionEvent("d1"), approval("a1", HUMAN_A)]), ["true"]);
+  assert.deepEqual(cover([dual, approval("a1", HUMAN_A), approval("a2", HUMAN_A)]), ["false"]);
+  assert.deepEqual(cover([dual, approval("a1", HUMAN_A), approval("a2", HUMAN_B)]), ["true"]);
+  const declared = DomainBinding.fromDict({
+    decision_types: [
+      {
+        id: "agentce:CreditDecision",
+        subclass_of: "agentce:ConsequentialDecision",
+        consequential: true,
+        required_oversight_modality: "dual_control",
+      },
+    ],
+  });
+  assert.deepEqual(cover([decisionEvent("d1"), approval("a1", HUMAN_A)], declared), ["false"]);
+  assert.deepEqual(
+    cover([decisionEvent("d1"), approval("a1", HUMAN_A), approval("a2", HUMAN_B)], declared),
+    ["true"],
+  );
+});
+
+test("OVS-07: an override is effective when it replaces a held decision's outcome", () => {
+  const effective = (data: Record<string, unknown>, decision = "d1") =>
+    lit(
+      [decisionEvent("d1"), refEvent("o1", "Override", data, decision)],
+      "o1",
+      "agentce:interventionEffective",
+    );
+  assert.deepEqual(effective({ original: "allow", replacement: "deny" }), ["true"]);
+  assert.deepEqual(effective({ original: "allow", replacement: "allow" }), ["false"]);
+  assert.deepEqual(effective({ original: { a: 1, b: [2] }, replacement: { b: [2], a: 1 } }), [
+    "false",
+  ]);
+  assert.deepEqual(effective({ original: "allow" }), ["false"]);
+  assert.deepEqual(effective({ original: "allow", replacement: "deny" }, "missing"), ["false"]);
+});
+
+test("OVS-07: an interrupt is effective when a named mechanism halted or paused the agent", () => {
+  const effective = (data: Record<string, unknown>) =>
+    lit([refEvent("x1", "Interrupt", data)], "x1", "agentce:interventionEffective");
+  assert.deepEqual(effective({ effect: "halted", mechanism: "kill_switch" }), ["true"]);
+  assert.deepEqual(effective({ effect: "paused", mechanism: "manual" }), ["true"]);
+  assert.deepEqual(effective({ effect: "ignored", mechanism: "manual" }), ["false"]);
+  assert.deepEqual(effective({ effect: "halted", mechanism: "other" }), ["false"]);
+});
+
+test("OVS-07: an intervention is by a human only when a human actor is named", () => {
+  const byHuman = (ptype: string, actor: unknown) =>
+    lit([refEvent("x1", ptype, { actor })], "x1", "agentce:interventionByHuman");
+  for (const ptype of ["Override", "Interrupt"]) {
+    assert.deepEqual(byHuman(ptype, HUMAN_A), ["true"], ptype);
+    assert.deepEqual(byHuman(ptype, { kind: "human", id: "" }), ["false"], ptype);
+    assert.deepEqual(byHuman(ptype, { kind: "service", id: "svc" }), ["false"], ptype);
+    assert.deepEqual(byHuman(ptype, undefined), ["false"], ptype);
+  }
+});
+
+test("ROB-07: an incident is responded to when detection and a response are recorded", () => {
+  const responded = (data: Record<string, unknown>) =>
+    lit([refEvent("inc1", "Incident", data)], "inc1", "agentce:incidentResponded");
+  const at = "2026-01-02T00:00:00Z";
+  for (const key of ["causal_assessment_at", "provider_notified_at", "reported_at"]) {
+    assert.deepEqual(responded({ detected_at: at, [key]: at }), ["true"], key);
+    assert.deepEqual(responded({ [key]: at }), ["false"], key);
+  }
+  assert.deepEqual(responded({ detected_at: at }), ["false"]);
+  assert.deepEqual(responded({ detected_at: at, reported_at: "" }), ["false"]);
+});

@@ -62,12 +62,12 @@
       ],
       "family": "DAT",
       "mode": "semi-automated",
-      "outcome": "not_applicable",
+      "outcome": "not_assessed",
       "population": {
         "applicable": 0,
         "failed": 0
       },
-      "rung": 2,
+      "rung": 3,
       "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -1052,12 +1052,12 @@
       ],
       "family": "RSK",
       "mode": "semi-automated",
-      "outcome": "not_applicable",
+      "outcome": "not_assessed",
       "population": {
         "applicable": 0,
         "failed": 0
       },
-      "rung": 2,
+      "rung": 3,
       "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -1304,12 +1304,12 @@
       ],
       "family": "DAT",
       "mode": "semi-automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_assessed",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
-      "rung": 2,
+      "rung": 3,
       "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -1561,9 +1561,9 @@
       ],
       "family": "INC",
       "mode": "automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "rung": 2,
@@ -1963,9 +1963,9 @@
       ],
       "family": "OVS",
       "mode": "semi-automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "rung": 2,
@@ -2424,9 +2424,9 @@
       ],
       "family": "ROB",
       "mode": "semi-automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "rung": 2,
@@ -2499,12 +2499,12 @@
       ],
       "family": "RSK",
       "mode": "semi-automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_assessed",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
-      "rung": 2,
+      "rung": 3,
       "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -2769,12 +2769,12 @@
       ],
       "family": "DAT",
       "mode": "semi-automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_assessed",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
-      "rung": 2,
+      "rung": 3,
       "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -3026,9 +3026,9 @@
       ],
       "family": "INC",
       "mode": "automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "rung": 2,
@@ -3412,9 +3412,9 @@
       ],
       "family": "OVS",
       "mode": "semi-automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "rung": 2,
@@ -3873,9 +3873,9 @@
       ],
       "family": "ROB",
       "mode": "semi-automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "rung": 2,
@@ -3948,12 +3948,12 @@
       ],
       "family": "RSK",
       "mode": "semi-automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_assessed",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
-      "rung": 2,
+      "rung": 3,
       "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -4218,12 +4218,12 @@
       ],
       "family": "DAT",
       "mode": "semi-automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_assessed",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
-      "rung": 2,
+      "rung": 3,
       "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {
@@ -4466,9 +4466,9 @@
       ],
       "family": "INC",
       "mode": "automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "rung": 2,
@@ -4788,9 +4788,9 @@
       ],
       "family": "OVS",
       "mode": "semi-automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "rung": 2,
@@ -5195,9 +5195,9 @@
       ],
       "family": "ROB",
       "mode": "semi-automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "rung": 2,
@@ -5270,12 +5270,12 @@
       ],
       "family": "RSK",
       "mode": "semi-automated",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_assessed",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
-      "rung": 2,
+      "rung": 3,
       "severity": "medium",
       "subject": "spiffe://corp/agents/a",
       "window": {

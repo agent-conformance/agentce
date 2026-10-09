@@ -54,15 +54,15 @@
       "control": "DAT-03",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -311,7 +311,7 @@
       "control": "INC-03",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -319,7 +319,7 @@
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -697,7 +697,7 @@
       "control": "OVS-07",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "rung": 2,
       "mode": "semi-automated",
       "window": {
@@ -705,7 +705,7 @@
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -1158,7 +1158,7 @@
       "control": "ROB-07",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "rung": 2,
       "mode": "semi-automated",
       "window": {
@@ -1166,7 +1166,7 @@
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -1233,15 +1233,15 @@
       "control": "RSK-03",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -1503,15 +1503,15 @@
       "control": "DAT-03",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -1760,7 +1760,7 @@
       "control": "INC-03",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -1768,7 +1768,7 @@
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -2162,7 +2162,7 @@
       "control": "OVS-07",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "rung": 2,
       "mode": "semi-automated",
       "window": {
@@ -2170,7 +2170,7 @@
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -2623,7 +2623,7 @@
       "control": "ROB-07",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "rung": 2,
       "mode": "semi-automated",
       "window": {
@@ -2631,7 +2631,7 @@
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -2698,15 +2698,15 @@
       "control": "RSK-03",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -2968,15 +2968,15 @@
       "control": "DAT-03",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
         "end": "2026-01-01T00:00:00Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -3216,7 +3216,7 @@
       "control": "INC-03",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -3224,7 +3224,7 @@
         "end": "2026-01-01T00:00:00Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -3538,7 +3538,7 @@
       "control": "OVS-07",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "rung": 2,
       "mode": "semi-automated",
       "window": {
@@ -3546,7 +3546,7 @@
         "end": "2026-01-01T00:00:00Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -3945,7 +3945,7 @@
       "control": "ROB-07",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
+      "outcome": "not_applicable",
       "rung": 2,
       "mode": "semi-automated",
       "window": {
@@ -3953,7 +3953,7 @@
         "end": "2026-01-01T00:00:00Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -4020,15 +4020,15 @@
       "control": "RSK-03",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
         "end": "2026-01-01T00:00:00Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -4290,8 +4290,8 @@
       "control": "DAT-03",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "not_applicable",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "1970-01-01T00:00:00Z",
@@ -5280,8 +5280,8 @@
       "control": "RSK-03",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "not_applicable",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "1970-01-01T00:00:00Z",

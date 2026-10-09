@@ -356,4 +356,128 @@ class GraphTest {
         JsonNode ruled = event("m1", "MemoryRead", "\"record_refs\": [\"mem:r9\"], \"trust_min\": \"trusted\"");
         assertEquals(List.of("false"), acts(List.of(ruled, derived, call("tc1", "i1")), "tc1"));
     }
+
+    private static List<String> flag(List<JsonNode> events, JsonNode domain, String node, String predicate) {
+        GraphStore store = Graph.buildGraph(events, DomainBinding.fromDict(domain));
+        return store.literalValues("agentce:event/" + node, "agentce:" + predicate);
+    }
+
+    private static List<String> flag(List<JsonNode> events, String node, String predicate) {
+        return flag(events, CREDIT_DOMAIN, node, predicate);
+    }
+
+    private static JsonNode incident(String id, String dataJson) {
+        return event(id, "Incident", dataJson);
+    }
+
+    private static String decisionRef(String id) {
+        return "\"refs\": {\"decision\": \"agentce:event/" + id + "\"}";
+    }
+
+    @Test
+    void inc03OnlyTheDecisionsAnIncidentNamesTriggerIt() {
+        List<JsonNode> events = List.of(decisionEvent("d1"), decisionEvent("d2"),
+                incident("x1", "\"related_refs\": [\"agentce:event/d1\"]"));
+        assertEquals(List.of("true"), flag(events, "d1", "triggersIncident"));
+        assertEquals(List.of("false"), flag(events, "d2", "triggersIncident"));
+        List<JsonNode> byRef = List.of(decisionEvent("d1"), decisionEvent("d2"), incident("x1", decisionRef("d2")));
+        assertEquals(List.of("false"), flag(byRef, "d1", "triggersIncident"));
+        assertEquals(List.of("true"), flag(byRef, "d2", "triggersIncident"));
+        assertEquals(List.of("false"), flag(List.of(decisionEvent("d1")), "d1", "triggersIncident"));
+    }
+
+    @Test
+    void inc03AnUntracedIncidentHoldsEveryDecisionToTheRule() {
+        List<JsonNode> unnamed = List.of(decisionEvent("d1"), decisionEvent("d2"), incident("x1", ""));
+        assertEquals(List.of("true"), flag(unnamed, "d1", "triggersIncident"));
+        assertEquals(List.of("true"), flag(unnamed, "d2", "triggersIncident"));
+        List<JsonNode> unresolved = List.of(decisionEvent("d1"), decisionEvent("d2"),
+                incident("x1", "\"related_refs\": [\"agentce:event/d1\", \"agentce:event/gone\"]"));
+        assertEquals(List.of("true"), flag(unresolved, "d1", "triggersIncident"));
+        assertEquals(List.of("true"), flag(unresolved, "d2", "triggersIncident"));
+    }
+
+    @Test
+    void inc03ResolvesThroughTheNamedEventsDecision() {
+        List<JsonNode> events = List.of(decisionEvent("d1"), decisionEvent("d2"),
+                event("o1", "Override", decisionRef("d2")),
+                incident("x1", "\"related_refs\": [\"agentce:event/o1\"]"));
+        assertEquals(List.of("false"), flag(events, "d1", "triggersIncident"));
+        assertEquals(List.of("true"), flag(events, "d2", "triggersIncident"));
+    }
+
+    private static JsonNode approval(String id, String decision, String humanId) {
+        return event(id, "ApprovalDecided", decisionRef(decision)
+                + ", \"actor\": {\"kind\": \"human\", \"id\": \"" + humanId + "\"}");
+    }
+
+    @Test
+    void ovs08OneHumanReviewerCoversADecision() {
+        assertEquals(List.of("false"), flag(List.of(decisionEvent("d1")), "d1", "oversightCoverageComplete"));
+        JsonNode service = event("a1", "ApprovalDecided",
+                decisionRef("d1") + ", \"actor\": {\"kind\": \"service\", \"id\": \"svc\"}");
+        assertEquals(List.of("false"), flag(List.of(decisionEvent("d1"), service), "d1", "oversightCoverageComplete"));
+        assertEquals(List.of("true"),
+                flag(List.of(decisionEvent("d1"), approval("a1", "d1", "alice")), "d1", "oversightCoverageComplete"));
+    }
+
+    @Test
+    void ovs08DualControlNeedsTwoDistinctHumans() {
+        JsonNode dual = decisionWith("d1", "\"oversight_modality\": \"dual_control\"");
+        assertEquals(List.of("false"), flag(List.of(dual, approval("a1", "d1", "alice"),
+                approval("a2", "d1", "alice")), "d1", "oversightCoverageComplete"));
+        assertEquals(List.of("true"), flag(List.of(dual, approval("a1", "d1", "alice"),
+                approval("a2", "d1", "bob")), "d1", "oversightCoverageComplete"));
+        JsonNode declared = Json.parse("{\"decision_types\":[{\"id\":\"agentce:CreditDecision\","
+                + "\"subclass_of\":\"agentce:ConsequentialDecision\",\"consequential\":true,"
+                + "\"required_oversight_modality\":\"dual_control\"}]}");
+        List<JsonNode> one = List.of(decisionEvent("d1"), approval("a1", "d1", "alice"));
+        assertEquals(List.of("false"), flag(one, declared, "d1", "oversightCoverageComplete"));
+        List<JsonNode> two = List.of(decisionEvent("d1"), approval("a1", "d1", "alice"), approval("a2", "d1", "bob"));
+        assertEquals(List.of("true"), flag(two, declared, "d1", "oversightCoverageComplete"));
+    }
+
+    @Test
+    void ovs07AnOverrideIsEffectiveWhenItReplacesAHeldDecision() {
+        String human = ", \"actor\": {\"kind\": \"human\", \"id\": \"alice\"}";
+        List<JsonNode> effective = List.of(decisionEvent("d1"), event("o1", "Override",
+                decisionRef("d1") + ", \"original\": \"approve\", \"replacement\": \"deny\"" + human));
+        assertEquals(List.of("true"), flag(effective, "o1", "interventionEffective"));
+        assertEquals(List.of("true"), flag(effective, "o1", "interventionByHuman"));
+        for (String data : List.of(
+                decisionRef("gone") + ", \"original\": \"approve\", \"replacement\": \"deny\"",
+                decisionRef("d1") + ", \"original\": \"approve\"",
+                decisionRef("d1") + ", \"original\": \"approve\", \"replacement\": null",
+                decisionRef("d1") + ", \"original\": {\"x\": 1}, \"replacement\": {\"x\": 1.0}")) {
+            List<JsonNode> events = List.of(decisionEvent("d1"), event("o1", "Override", data));
+            assertEquals(List.of("false"), flag(events, "o1", "interventionEffective"), data);
+            assertEquals(List.of("false"), flag(events, "o1", "interventionByHuman"), data);
+        }
+    }
+
+    @Test
+    void ovs07AnInterruptIsEffectiveWhenANamedMechanismStopsTheAgent() {
+        JsonNode stop = event("i1", "Interrupt", "\"effect\": \"halted\", \"mechanism\": \"kill_switch\", "
+                + "\"actor\": {\"kind\": \"human\", \"id\": \"alice\"}");
+        assertEquals(List.of("true"), flag(List.of(stop), "i1", "interventionEffective"));
+        assertEquals(List.of("true"), flag(List.of(stop), "i1", "interventionByHuman"));
+        for (String data : List.of("\"effect\": \"logged\", \"mechanism\": \"manual\"",
+                "\"effect\": \"paused\", \"mechanism\": \"email\"")) {
+            JsonNode weak = event("i1", "Interrupt", data);
+            assertEquals(List.of("false"), flag(List.of(weak), "i1", "interventionEffective"), data);
+            assertEquals(List.of("false"), flag(List.of(weak), "i1", "interventionByHuman"), data);
+        }
+    }
+
+    @Test
+    void rob07AnIncidentIsRespondedToOnlyAfterDetectionAndAResponse() {
+        assertEquals(List.of("true"), flag(List.of(incident("x1",
+                "\"detected_at\": \"2026-01-01T00:00:00Z\", \"reported_at\": \"2026-01-02T00:00:00Z\"")),
+                "x1", "incidentResponded"));
+        for (String data : List.of("\"detected_at\": \"2026-01-01T00:00:00Z\"",
+                "\"reported_at\": \"2026-01-02T00:00:00Z\"",
+                "\"detected_at\": \"2026-01-01T00:00:00Z\", \"reported_at\": \"\"")) {
+            assertEquals(List.of("false"), flag(List.of(incident("x1", data)), "x1", "incidentResponded"), data);
+        }
+    }
 }

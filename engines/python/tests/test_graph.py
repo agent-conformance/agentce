@@ -775,3 +775,202 @@ def test_acts_on_untrusted_when_the_guard_never_ruled_on_the_origin_read() -> No
         "m1", "MemoryRead", {"record_refs": ["mem:r9"], "trust_min": "trusted"}
     )
     assert _acts([ruled, derived, _call()]) == ["false"]
+
+
+# --- INC-03, OVS-07, OVS-08 and ROB-07 literals ---
+
+ALICE = {"kind": "human", "id": "spiffe://corp/humans/alice"}
+BOB = {"kind": "human", "id": "spiffe://corp/humans/bob"}
+SERVICE = {"kind": "service", "id": "spiffe://corp/services/ops"}
+
+
+def _flag(events: list[dict[str, Any]], node: str, predicate: str) -> list[str]:
+    store = build_graph(events, domain=DOMAIN)
+    return store.literal_values(event_iri(node), f"agentce:{predicate}")
+
+
+def _incident(
+    event_id: str, related: list[str] | None = None, **data: Any
+) -> dict[str, Any]:
+    body: dict[str, Any] = dict(data)
+    if related is not None:
+        body["related_refs"] = related
+    return _event(event_id, "Incident", body)
+
+
+def _approval(event_id: str, actor: dict[str, str]) -> dict[str, Any]:
+    return _event(
+        event_id,
+        "ApprovalDecided",
+        {"refs": {"decision": event_iri("d1")}, "actor": actor},
+    )
+
+
+def _override(
+    event_id: str,
+    *,
+    original: Any = "deny",
+    replacement: Any = "approve",
+    actor: dict[str, str] = ALICE,
+    decision_id: str = "d1",
+) -> dict[str, Any]:
+    return _event(
+        event_id,
+        "Override",
+        {
+            "refs": {"decision": event_iri(decision_id)},
+            "original": original,
+            "replacement": replacement,
+            "actor": actor,
+        },
+    )
+
+
+def _interrupt(
+    event_id: str, effect: str, mechanism: str | None, actor: dict[str, str] = ALICE
+) -> dict[str, Any]:
+    data: dict[str, Any] = {"effect": effect, "actor": actor}
+    if mechanism is not None:
+        data["mechanism"] = mechanism
+    return _event(event_id, "Interrupt", data)
+
+
+def test_triggers_incident_on_a_directly_named_decision_only() -> None:
+    events = [
+        decision("d1", "t"),
+        decision("d2", "t"),
+        _incident("x1", [event_iri("d1")]),
+    ]
+    assert _flag(events, "d1", "triggersIncident") == ["true"]
+    assert _flag(events, "d2", "triggersIncident") == ["false"]
+
+
+def test_triggers_incident_through_the_named_override_s_decision() -> None:
+    events = [
+        decision("d1", "t"),
+        decision("d2", "t"),
+        _override("o1"),
+        _incident("x1", [event_iri("o1")]),
+    ]
+    assert _flag(events, "d1", "triggersIncident") == ["true"]
+    assert _flag(events, "d2", "triggersIncident") == ["false"]
+
+
+def test_triggers_incident_through_refs_decision() -> None:
+    incident = _incident("x1")
+    incident["data"]["refs"] = {"decision": event_iri("d2")}
+    events = [decision("d1", "t"), decision("d2", "t"), incident]
+    assert _flag(events, "d1", "triggersIncident") == ["false"]
+    assert _flag(events, "d2", "triggersIncident") == ["true"]
+
+
+def test_an_incident_with_no_names_holds_every_decision() -> None:
+    events = [decision("d1", "t"), decision("d2", "t"), _incident("x1")]
+    assert _flag(events, "d1", "triggersIncident") == ["true"]
+    assert _flag(events, "d2", "triggersIncident") == ["true"]
+
+
+def test_one_unresolved_name_beside_a_resolved_one_holds_every_decision() -> None:
+    events = [
+        decision("d1", "t"),
+        decision("d2", "t"),
+        _incident("x1", [event_iri("d1"), event_iri("missing")]),
+    ]
+    assert _flag(events, "d2", "triggersIncident") == ["true"]
+
+
+def test_no_incident_triggers_no_decision() -> None:
+    assert _flag([decision("d1", "t")], "d1", "triggersIncident") == ["false"]
+
+
+def test_oversight_coverage_needs_one_human_reviewer() -> None:
+    assert _flag([decision("d1", "t")], "d1", "oversightCoverageComplete") == ["false"]
+    events = [decision("d1", "t"), _approval("a1", ALICE)]
+    assert _flag(events, "d1", "oversightCoverageComplete") == ["true"]
+    events = [decision("d1", "t"), _approval("a1", SERVICE)]
+    assert _flag(events, "d1", "oversightCoverageComplete") == ["false"]
+
+
+def test_dual_control_counts_the_same_human_once() -> None:
+    events = [
+        decision("d1", "t", modality="dual_control"),
+        _approval("a1", ALICE),
+        _approval("a2", ALICE),
+    ]
+    assert _flag(events, "d1", "oversightCoverageComplete") == ["false"]
+
+
+def test_dual_control_is_covered_by_two_humans() -> None:
+    events = [
+        decision("d1", "t", modality="dual_control"),
+        _approval("a1", ALICE),
+        _approval("a2", BOB),
+    ]
+    assert _flag(events, "d1", "oversightCoverageComplete") == ["true"]
+
+
+def test_domain_declared_dual_control_needs_two_humans() -> None:
+    dual = DomainBinding.from_dict(
+        {
+            "decision_types": [
+                {
+                    "id": CREDIT,
+                    "subclass_of": "agentce:ConsequentialDecision",
+                    "consequential": True,
+                    "required_oversight_modality": "dual_control",
+                }
+            ]
+        }
+    )
+    events = [decision("d1", "t"), _approval("a1", ALICE)]
+    store = build_graph(events, domain=dual)
+    assert store.literal_values(
+        event_iri("d1"), "agentce:oversightCoverageComplete"
+    ) == ["false"]
+
+
+def test_override_is_effective_with_a_differing_replacement() -> None:
+    events = [decision("d1", "t"), _override("o1")]
+    assert _flag(events, "o1", "interventionEffective") == ["true"]
+    assert _flag(events, "o1", "interventionByHuman") == ["true"]
+
+
+def test_override_replacement_equal_to_original_is_not_effective() -> None:
+    events = [decision("d1", "t"), _override("o1", replacement="deny")]
+    assert _flag(events, "o1", "interventionEffective") == ["false"]
+
+
+def test_override_of_a_decision_not_held_is_not_effective() -> None:
+    events = [decision("d1", "t"), _override("o1", decision_id="missing")]
+    assert _flag(events, "o1", "interventionEffective") == ["false"]
+
+
+def test_interrupt_is_effective_when_a_mechanism_halts_or_pauses() -> None:
+    for effect in ("halted", "paused"):
+        events = [_interrupt("i1", effect, "kill_switch")]
+        assert _flag(events, "i1", "interventionEffective") == ["true"]
+        assert _flag(events, "i1", "interventionByHuman") == ["true"]
+
+
+def test_interrupt_degraded_or_without_a_mechanism_is_not_effective() -> None:
+    for effect, mechanism in (("degraded", "stop_button"), ("halted", None)):
+        events = [_interrupt("i1", effect, mechanism)]
+        assert _flag(events, "i1", "interventionEffective") == ["false"]
+
+
+def test_intervention_by_a_service_actor_is_not_by_a_human() -> None:
+    events = [decision("d1", "t"), _override("o1", actor=SERVICE)]
+    assert _flag(events, "o1", "interventionByHuman") == ["false"]
+    events = [_interrupt("i1", "halted", "manual", actor=SERVICE)]
+    assert _flag(events, "i1", "interventionByHuman") == ["false"]
+
+
+def test_incident_responded_needs_detection_and_a_response() -> None:
+    responded = _incident(
+        "x1", detected_at="2026-01-01T00:00:00Z", reported_at="2026-01-02T00:00:00Z"
+    )
+    assert _flag([responded], "x1", "incidentResponded") == ["true"]
+    detected_only = _incident("x1", detected_at="2026-01-01T00:00:00Z")
+    assert _flag([detected_only], "x1", "incidentResponded") == ["false"]
+    undetected = _incident("x1", reported_at="2026-01-02T00:00:00Z")
+    assert _flag([undetected], "x1", "incidentResponded") == ["false"]

@@ -17,7 +17,10 @@ import java.util.stream.Stream;
  * engine materialises the glue edges the Portable Shape Profile needs ({@code agentce:chainTerminus},
  * {@code agentce:chainVerified}, {@code agentce:executesConsequential},
  * {@code agentce:oversightModalityMatchesDeclared}, {@code agentce:danglingRef},
- * {@code agentce:precededBy}). The {@code rdfs:subClassOf*} closure is materialised so class membership
+ * {@code agentce:precededBy}, {@code agentce:componentDeclared}, {@code agentce:declaredComponentsObserved},
+ * {@code agentce:triggersIncident}, {@code agentce:oversightCoverageComplete},
+ * {@code agentce:interventionEffective}, {@code agentce:interventionByHuman} and
+ * {@code agentce:incidentResponded}). The {@code rdfs:subClassOf*} closure is materialised so class membership
  * needs no inference. This is a faithful port of the reference; it must build byte-identical graphs.
  */
 public final class Graph {
@@ -86,6 +89,14 @@ public final class Graph {
     /** {@code refs} members that carry content into their event: the producing activity, the
      * instruction acted on and the instruction it was derived from. */
     private static final List<String> REFS_IN = List.of("origin", "instruction", "parent");
+
+    /** Interrupt effects that stop the agent, and the interrupt mechanisms SPEC §6.2 names (OVS-07). */
+    private static final Set<String> INTERRUPT_STOPS = Set.of("halted", "paused");
+    private static final Set<String> INTERRUPT_MECHANISMS =
+            Set.of("stop_button", "kill_switch", "circuit_breaker", "manual");
+    /** The Incident members that record a response after detection (SPEC §6.2; ROB-07). */
+    private static final List<String> INCIDENT_RESPONSES =
+            List.of("causal_assessment_at", "provider_notified_at", "reported_at");
 
     public static GraphStore buildGraph(List<JsonNode> events) {
         return buildGraph(events, DomainBinding.empty(), new GraphStore(), Iri.ZERO_KEY);
@@ -246,6 +257,38 @@ public final class Graph {
         return new String[] {null, null};
     }
 
+    /** The id of the event's {@code actor} when it is a human principal (SPEC §6.2, §7.3 human-actor
+     * rule, first part); null for a missing, unnamed or non-human actor. */
+    private static String humanActor(JsonNode data) {
+        JsonNode actor = data.get("actor");
+        if (actor != null && actor.isObject() && "human".equals(str(actor.get("kind")))) {
+            return text(actor.get("id"));
+        }
+        return null;
+    }
+
+    /** JSON value equality as the reference's {@code ==} reads it: numbers (and booleans, as 1/0)
+     * compare by value, so {@code 1} equals {@code 1.0}; an absent field equals null. */
+    private static boolean jsonEquals(JsonNode a, JsonNode b) {
+        JsonNode left = a == null ? Json.nodes().nullNode() : a;
+        JsonNode right = b == null ? Json.nodes().nullNode() : b;
+        return left.equals((x, y) -> {
+            java.math.BigDecimal nx = numeric(x);
+            java.math.BigDecimal ny = numeric(y);
+            if (nx != null && ny != null) {
+                return nx.compareTo(ny);
+            }
+            return x.equals(y) ? 0 : 1;
+        }, right);
+    }
+
+    private static java.math.BigDecimal numeric(JsonNode node) {
+        if (node.isBoolean()) {
+            return node.booleanValue() ? java.math.BigDecimal.ONE : java.math.BigDecimal.ZERO;
+        }
+        return node.isNumber() ? node.decimalValue() : null;
+    }
+
     private static String principalClass(String kind) {
         if ("human".equals(kind)) {
             return "agentce:HumanPrincipal";
@@ -295,6 +338,10 @@ public final class Graph {
         private final Map<String, Set<String>> operatedNames =
                 Map.of("tool", new LinkedHashSet<>(), "model", new LinkedHashSet<>());
         private boolean hasCalls;
+        // OVS-08: decision IRI -> the distinct human actors whose ApprovalDecided reviewed it.
+        private final Map<String, Set<String>> humanReviewers = new LinkedHashMap<>();
+        // INC-03: event IRI -> the decision its refs.decision names, whatever the event type.
+        private final Map<String, String> refDecision = new LinkedHashMap<>();
 
         Builder(GraphStore store, DomainBinding domain, byte[] key) {
             this.store = store;
@@ -426,6 +473,7 @@ public final class Graph {
             JsonNode refs = refsOf(event);
             String decision = str(refs.get("decision"));
             if (decision != null) {
+                refDecision.put(node, decision);
                 switch (ptype) {
                     case "ToolCall" -> store.addEdge(node, "agentce:executes", decision);
                     case "Outcome" -> {
@@ -435,6 +483,10 @@ public final class Graph {
                     case "ApprovalDecided" -> {
                         store.addEdge(decision, "agentce:reviewedBy", node);
                         decisionReviewed.add(decision);
+                        String human = humanActor(dataOf(event));
+                        if (human != null) {
+                            humanReviewers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);
+                        }
                     }
                     case "Override" -> store.addEdge(decision, "agentce:overriddenBy", node);
                     case "Interrupt" -> store.addEdge(decision, "agentce:interruptedBy", node);
@@ -709,6 +761,7 @@ public final class Graph {
         }
 
         private void materialise(List<JsonNode> events) {
+            Set<String> incidentDecisions = incidentDecisions(events);
             for (JsonNode event : events) {
                 String node = Iri.eventIri(event.get("id").asText());
                 String ptype = ptype(event);
@@ -722,6 +775,17 @@ public final class Graph {
                 if ("Decision".equals(ptype)) {
                     oversightMatches(node, data);
                     explanationReconstructable(node);
+                    oversightCoverage(node, data);
+                    literal(node, "agentce:triggersIncident",
+                            incidentDecisions == null || incidentDecisions.contains(node));
+                }
+                if ("Override".equals(ptype) || "Interrupt".equals(ptype)) {
+                    intervention(node, ptype, event);
+                }
+                if ("Incident".equals(ptype)) {
+                    literal(node, "agentce:incidentResponded",
+                            text(data.get("detected_at")) != null
+                                    && INCIDENT_RESPONSES.stream().anyMatch(k -> text(data.get(k)) != null));
                 }
                 if ("Outcome".equals(ptype)) {
                     adverseOutcomeLinked(node, data);
@@ -737,6 +801,77 @@ public final class Graph {
             actsOnUntrusted(events, robustToUntrusted(events));
             conductScopeBudget(events);
             precededBy();
+        }
+
+        private void literal(String node, String predicate, boolean value) {
+            store.addLiteral(node, predicate, value ? "true" : "false", BOOL);
+        }
+
+        /** INC-03: the held decisions the {@code Incident} events name in {@code related_refs[]} or
+         * {@code refs.decision}, directly or through the {@code refs.decision} of the event named (an
+         * {@code Outcome}, a {@code ToolCall}, an {@code Override}, ...). Null when any name does not
+         * lead to a held decision: the records cannot show which decision triggered that incident, so
+         * every decision is held to the rule (fail closed). */
+        private Set<String> incidentDecisions(List<JsonNode> events) {
+            Set<String> out = new LinkedHashSet<>();
+            for (JsonNode event : events) {
+                if (!"Incident".equals(ptype(event))) {
+                    continue;
+                }
+                List<JsonNode> names = new ArrayList<>();
+                JsonNode related = dataOf(event).get("related_refs");
+                if (related != null && related.isArray()) {
+                    related.forEach(names::add);
+                }
+                JsonNode decision = refsOf(event).get("decision");
+                if (!isAbsent(decision)) {
+                    names.add(decision);
+                }
+                if (names.isEmpty()) {
+                    return null;
+                }
+                for (JsonNode name : names) {
+                    String ref = str(name);
+                    String named = ref == null ? null
+                            : decisionTime.containsKey(ref) ? ref : refDecision.get(ref);
+                    if (named == null || !decisionTime.containsKey(named)) {
+                        return null;
+                    }
+                    out.add(named);
+                }
+            }
+            return out;
+        }
+
+        /** OVS-08 (Art. 14(5)): enough distinct human reviewers -- two when the decision's observed
+         * or domain-declared oversight modality is {@code dual_control}, otherwise one. */
+        private void oversightCoverage(String node, JsonNode data) {
+            String dtype = str(data.get("decision_type"));
+            String declared = dtype != null ? domain.requiredOversight.get(dtype) : null;
+            boolean dual = "dual_control".equals(str(data.get("oversight_modality")))
+                    || "dual_control".equals(declared);
+            int reviewers = humanReviewers.getOrDefault(node, Set.of()).size();
+            literal(node, "agentce:oversightCoverageComplete", reviewers >= (dual ? 2 : 1));
+        }
+
+        /** OVS-07: an {@code Override} is effective when it names a held decision and records a
+         * replacement that differs from the original; an {@code Interrupt} when a named mechanism
+         * halted or paused the agent. Either is recorded when a human actor is named. */
+        private void intervention(String node, String ptype, JsonNode event) {
+            JsonNode data = dataOf(event);
+            boolean effective;
+            if ("Override".equals(ptype)) {
+                String decision = str(refsOf(event).get("decision"));
+                effective = decision != null
+                        && decisionTime.containsKey(decision)
+                        && !isAbsent(data.get("replacement"))
+                        && !jsonEquals(data.get("replacement"), data.get("original"));
+            } else {
+                effective = isOneOf(data.get("effect"), INTERRUPT_STOPS)
+                        && isOneOf(data.get("mechanism"), INTERRUPT_MECHANISMS);
+            }
+            literal(node, "agentce:interventionEffective", effective);
+            literal(node, "agentce:interventionByHuman", humanActor(data) != null);
         }
 
         private void dangling(String node, JsonNode event) {

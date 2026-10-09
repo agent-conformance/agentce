@@ -4,4 +4,5 @@
 
 agentce:INC-03-Shape a sh:NodeShape ;
   sh:targetClass agentce:ConsequentialDecision ;
+  agentce:targetWhere [ agentce:triggersIncident true ] ;
   sh:property [ sh:path agentce:reviewedBy ; sh:minCount 1 ; sh:name "S1" ] .

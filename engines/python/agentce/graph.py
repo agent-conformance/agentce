@@ -5,7 +5,9 @@ becomes a typed node with deterministic IRIs, the §6.3 relations become edges, 
 materialises the glue edges that let the Portable Shape Profile avoid unbounded path traversal --
 ``agentce:chainTerminus``, ``agentce:chainVerified``, ``agentce:executesConsequential``,
 ``agentce:oversightModalityMatchesDeclared``, ``agentce:danglingRef``, ``agentce:precededBy``,
-``agentce:componentDeclared`` and ``agentce:declaredComponentsObserved`` --
+``agentce:componentDeclared``, ``agentce:declaredComponentsObserved``, ``agentce:triggersIncident``,
+``agentce:oversightCoverageComplete``, ``agentce:interventionEffective``, ``agentce:interventionByHuman`` and
+``agentce:incidentResponded`` --
 from the domain binding, the delegation events, and the references between events. The
 ``rdfs:subClassOf*`` closure of the class hierarchy (base vocabulary plus the domain binding) is
 materialised so class membership needs no inference (SPEC §7.2). Everything is deterministic.
@@ -86,6 +88,18 @@ _CONTENT_OUT: tuple[str, ...] = (
 #: ``refs`` members that carry content into their event: the producing activity, the
 #: instruction acted on and the instruction it was derived from.
 _REFS_IN: tuple[str, ...] = ("origin", "instruction", "parent")
+
+#: Interrupt effects that stop the agent, and the interrupt mechanisms SPEC §6.2 names (OVS-07).
+_INTERRUPT_STOPS: frozenset[str] = frozenset({"halted", "paused"})
+_INTERRUPT_MECHANISMS: frozenset[str] = frozenset(
+    {"stop_button", "kill_switch", "circuit_breaker", "manual"}
+)
+#: The Incident members that record a response after detection (SPEC §6.2; ROB-07).
+_INCIDENT_RESPONSES: tuple[str, ...] = (
+    "causal_assessment_at",
+    "provider_notified_at",
+    "reported_at",
+)
 
 
 def _untrusted_source_class(value: Any) -> bool:
@@ -195,6 +209,15 @@ def _principal_ref(entry: Any) -> tuple[str | None, str | None]:
     return None, None
 
 
+def _human_actor(data: dict[str, Any]) -> str | None:
+    """The id of the event's ``actor`` when it is a human principal (SPEC §6.2, §7.3 human-actor
+    rule, first part); ``None`` for a missing, unnamed or non-human actor."""
+    actor = data.get("actor")
+    if isinstance(actor, dict) and actor.get("kind") == "human":
+        return _text(actor.get("id"))
+    return None
+
+
 def _principal_class(kind: str | None) -> str:
     if kind == "human":
         return "agentce:HumanPrincipal"
@@ -240,6 +263,10 @@ class _Builder:
         self.declared: dict[str, dict[str, set[str]]] = {"tool": {}, "model": {}}
         self.operated: dict[str, set[str]] = {"tool": set(), "model": set()}
         self.has_calls = False
+        # OVS-08: decision IRI -> the distinct human actors whose ApprovalDecided reviewed it.
+        self.human_reviewers: dict[str, set[str]] = {}
+        # INC-03: event IRI -> the decision its refs.decision names, whatever the event type.
+        self.ref_decision: dict[str, str] = {}
 
     def build(self, events: list[dict[str, Any]]) -> GraphStore:
         used_classes: set[str] = set(BASE_SUBCLASS) | {
@@ -349,6 +376,7 @@ class _Builder:
         refs = _refs(event)
         decision = refs.get("decision")
         if isinstance(decision, str):
+            self.ref_decision[node] = decision
             if ptype == "ToolCall":
                 self.store.add_edge(node, "agentce:executes", decision)
             elif ptype == "Outcome":
@@ -357,6 +385,9 @@ class _Builder:
             elif ptype == "ApprovalDecided":
                 self.store.add_edge(decision, "agentce:reviewedBy", node)
                 self.decision_reviewed.add(decision)
+                human = _human_actor(_data(event))
+                if human is not None:
+                    self.human_reviewers.setdefault(decision, set()).add(human)
             elif ptype == "Override":
                 self.store.add_edge(decision, "agentce:overriddenBy", node)
             elif ptype == "Interrupt":
@@ -581,6 +612,7 @@ class _Builder:
     # --- materialised (glue) edges (SPEC §7.2) ---
 
     def _materialise(self, events: list[dict[str, Any]]) -> None:
+        incident_decisions = self._incident_decisions(events)
         for event in events:
             node = event_iri(str(event["id"]))
             ptype = self._ptype(event)
@@ -592,6 +624,21 @@ class _Builder:
             if ptype == "Decision":
                 self._oversight_matches(node, data)
                 self._explanation_reconstructable(node)
+                self._oversight_coverage(node, data)
+                self._literal(
+                    node,
+                    "agentce:triggersIncident",
+                    incident_decisions is None or node in incident_decisions,
+                )
+            if ptype in ("Override", "Interrupt"):
+                self._intervention(node, ptype, event)
+            if ptype == "Incident":
+                self._literal(
+                    node,
+                    "agentce:incidentResponded",
+                    _text(data.get("detected_at")) is not None
+                    and any(_text(data.get(k)) for k in _INCIDENT_RESPONSES),
+                )
             if ptype == "Outcome":
                 self._adverse_outcome_linked(node, data)
             if ptype in ("ToolCall", "ModelCall"):
@@ -602,6 +649,73 @@ class _Builder:
         self._acts_on_untrusted(events, self._robust_to_untrusted(events))
         self._conduct_scope_budget(events)
         self._preceded_by()
+
+    def _literal(self, node: str, predicate: str, value: bool) -> None:
+        self.store.add_literal(node, predicate, "true" if value else "false", BOOL)
+
+    def _incident_decisions(self, events: list[dict[str, Any]]) -> set[str] | None:
+        """INC-03: the held decisions the ``Incident`` events name in ``related_refs[]`` or
+        ``refs.decision``, directly or through the ``refs.decision`` of the event named (an
+        ``Outcome``, a ``ToolCall``, an ``Override``, ...). ``None`` when any name does not lead to a
+        held decision: the records cannot show which decision triggered that incident, so every
+        decision is held to the rule (fail closed)."""
+        out: set[str] = set()
+        for event in events:
+            if self._ptype(event) != "Incident":
+                continue
+            related = _data(event).get("related_refs")
+            names = list(related) if isinstance(related, list) else []
+            if (decision := _refs(event).get("decision")) is not None:
+                names.append(decision)
+            if not names:
+                return None
+            for ref in names:
+                if not isinstance(ref, str):
+                    return None
+                named = ref if ref in self.decision_time else self.ref_decision.get(ref)
+                if named not in self.decision_time:
+                    return None
+                out.add(named)
+        return out
+
+    def _oversight_coverage(self, node: str, data: dict[str, Any]) -> None:
+        """OVS-08 (Art. 14(5)): enough distinct human reviewers -- two when the decision's observed
+        or domain-declared oversight modality is ``dual_control``, otherwise one."""
+        dtype = data.get("decision_type")
+        declared = (
+            self.domain.required_oversight.get(dtype)
+            if isinstance(dtype, str)
+            else None
+        )
+        dual = "dual_control" in (data.get("oversight_modality"), declared)
+        reviewers = self.human_reviewers.get(node, set())
+        self._literal(
+            node,
+            "agentce:oversightCoverageComplete",
+            len(reviewers) >= (2 if dual else 1),
+        )
+
+    def _intervention(self, node: str, ptype: str, event: dict[str, Any]) -> None:
+        """OVS-07: an ``Override`` is effective when it names a held decision and records a
+        replacement that differs from the original; an ``Interrupt`` when a named mechanism halted or paused the agent. Either is
+        recorded when a human actor is named."""
+        data = _data(event)
+        if ptype == "Override":
+            decision = _refs(event).get("decision")
+            effective = (
+                isinstance(decision, str)
+                and decision in self.decision_time
+                and data.get("replacement") is not None
+                and data.get("replacement") != data.get("original")
+            )
+        else:
+            effective = _is_one_of(data.get("effect"), _INTERRUPT_STOPS) and _is_one_of(
+                data.get("mechanism"), _INTERRUPT_MECHANISMS
+            )
+        self._literal(node, "agentce:interventionEffective", effective)
+        self._literal(
+            node, "agentce:interventionByHuman", _human_actor(data) is not None
+        )
 
     def _dangling(self, node: str, event: dict[str, Any]) -> None:
         candidates: list[str] = [v for v in _refs(event).values() if isinstance(v, str)]

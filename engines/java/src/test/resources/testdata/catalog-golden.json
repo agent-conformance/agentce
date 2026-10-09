@@ -71,42 +71,6 @@
       "violations": []
     }
   },
-  "DAT-03": {
-    "passed": {
-      "control": "DAT-03",
-      "outcome": "conformant",
-      "population": {
-        "applicable": 1,
-        "failed": 0
-      },
-      "violations": []
-    },
-    "failed": {
-      "control": "DAT-03",
-      "outcome": "non-conformant",
-      "population": {
-        "applicable": 2,
-        "failed": 1
-      },
-      "violations": [
-        {
-          "focus": "agentce:event/d1",
-          "path": "agentce:reviewedBy",
-          "constraint": "sh:minCount",
-          "message_key": "DAT-03.S1"
-        }
-      ]
-    },
-    "inapplicable": {
-      "control": "DAT-03",
-      "outcome": "conformant",
-      "population": {
-        "applicable": 0,
-        "failed": 0
-      },
-      "violations": []
-    }
-  },
   "DOC-01": {
     "passed": {
       "control": "DOC-01",
@@ -349,12 +313,12 @@
       "control": "INC-03",
       "outcome": "non-conformant",
       "population": {
-        "applicable": 2,
+        "applicable": 1,
         "failed": 1
       },
       "violations": [
         {
-          "focus": "agentce:event/d1",
+          "focus": "agentce:event/d2",
           "path": "agentce:reviewedBy",
           "constraint": "sh:minCount",
           "message_key": "INC-03.S1"
@@ -772,7 +736,7 @@
       "control": "OVS-07",
       "outcome": "conformant",
       "population": {
-        "applicable": 1,
+        "applicable": 2,
         "failed": 0
       },
       "violations": []
@@ -786,9 +750,9 @@
       },
       "violations": [
         {
-          "focus": "agentce:event/d1",
-          "path": "agentce:reviewedBy",
-          "constraint": "sh:minCount",
+          "focus": "agentce:event/x1",
+          "path": "agentce:interventionEffective",
+          "constraint": "sh:hasValue",
           "message_key": "OVS-07.S1"
         }
       ]
@@ -808,7 +772,7 @@
       "control": "OVS-08",
       "outcome": "conformant",
       "population": {
-        "applicable": 1,
+        "applicable": 2,
         "failed": 0
       },
       "violations": []
@@ -822,9 +786,9 @@
       },
       "violations": [
         {
-          "focus": "agentce:event/d1",
-          "path": "agentce:reviewedBy",
-          "constraint": "sh:minCount",
+          "focus": "agentce:event/d2",
+          "path": "agentce:oversightCoverageComplete",
+          "constraint": "sh:hasValue",
           "message_key": "OVS-08.S1"
         }
       ]
@@ -1290,9 +1254,9 @@
       },
       "violations": [
         {
-          "focus": "agentce:event/d1",
-          "path": "agentce:reviewedBy",
-          "constraint": "sh:minCount",
+          "focus": "agentce:event/i2",
+          "path": "agentce:incidentResponded",
+          "constraint": "sh:hasValue",
           "message_key": "ROB-07.S1"
         }
       ]
@@ -1348,7 +1312,7 @@
       "control": "RSK-02",
       "outcome": "conformant",
       "population": {
-        "applicable": 1,
+        "applicable": 2,
         "failed": 0
       },
       "violations": []
@@ -1357,13 +1321,13 @@
       "control": "RSK-02",
       "outcome": "non-conformant",
       "population": {
-        "applicable": 2,
+        "applicable": 3,
         "failed": 1
       },
       "violations": [
         {
-          "focus": "agentce:event/d1",
-          "path": "agentce:reviewedBy",
+          "focus": "agentce:event/d2",
+          "path": "(agentce:authorizedBy | agentce:reviewedBy)",
           "constraint": "sh:minCount",
           "message_key": "RSK-02.S1"
         }
@@ -1371,42 +1335,6 @@
     },
     "inapplicable": {
       "control": "RSK-02",
-      "outcome": "conformant",
-      "population": {
-        "applicable": 0,
-        "failed": 0
-      },
-      "violations": []
-    }
-  },
-  "RSK-03": {
-    "passed": {
-      "control": "RSK-03",
-      "outcome": "conformant",
-      "population": {
-        "applicable": 1,
-        "failed": 0
-      },
-      "violations": []
-    },
-    "failed": {
-      "control": "RSK-03",
-      "outcome": "non-conformant",
-      "population": {
-        "applicable": 2,
-        "failed": 1
-      },
-      "violations": [
-        {
-          "focus": "agentce:event/d1",
-          "path": "agentce:reviewedBy",
-          "constraint": "sh:minCount",
-          "message_key": "RSK-03.S1"
-        }
-      ]
-    },
-    "inapplicable": {
-      "control": "RSK-03",
       "outcome": "conformant",
       "population": {
         "applicable": 0,

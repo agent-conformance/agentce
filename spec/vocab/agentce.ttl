@@ -115,6 +115,21 @@ agentce:componentDeclared a owl:DatatypeProperty ; rdfs:label "component declare
 agentce:declaredComponentsObserved a owl:DatatypeProperty ; rdfs:label "declared components observed" ;
   rdfs:domain agentce:ComponentRecord ; rdfs:range xsd:boolean ;
   rdfs:comment "On a BundleLoaded: whether every model and MCP server its manifest declares is exercised by a ToolCall or ModelCall of the same subject." .
+agentce:triggersIncident a owl:DatatypeProperty ; rdfs:label "triggers incident" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether an Incident's related_refs name the decision, an Outcome that resulted from it, or a ToolCall that executed it." .
+agentce:oversightCoverageComplete a owl:DatatypeProperty ; rdfs:label "oversight coverage complete" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether the decision was reviewed by enough distinct human actors: two when its observed or declared oversight modality is dual_control, otherwise one." .
+agentce:interventionEffective a owl:DatatypeProperty ; rdfs:label "intervention effective" ;
+  rdfs:domain agentce:OversightEvent ; rdfs:range xsd:boolean ;
+  rdfs:comment "On an Override: whether it names a recorded decision and records its replacement. On an Interrupt: whether a named mechanism halted or paused the agent." .
+agentce:interventionByHuman a owl:DatatypeProperty ; rdfs:label "intervention by human" ;
+  rdfs:domain agentce:OversightEvent ; rdfs:range xsd:boolean ;
+  rdfs:comment "On an Override or Interrupt: whether its actor is a named human principal." .
+agentce:incidentResponded a owl:DatatypeProperty ; rdfs:label "incident responded" ;
+  rdfs:domain agentce:Incident ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether an Incident records its detection time and at least one response time (causal assessment, provider notification or report)." .
 agentce:robustToUntrustedContent a owl:DatatypeProperty ; rdfs:label "robust to untrusted content" ;
   rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
   rdfs:comment "On a Decision: whether everything it used was trusted, through any number of hops -- no record it used was written untrusted, quarantined or blocked by the memory guard, or written with no trust or verdict from an untrusted provenance_origin_class; no read it used has trust_min untrusted or quarantined; and no instruction it acts on comes from an untrusted source class." .

@@ -4,7 +4,10 @@
  * Each event becomes a typed node with deterministic IRIs, the §6.3 relations become edges, and the
  * engine materialises the glue edges the Portable Shape Profile needs (`agentce:chainTerminus`,
  * `agentce:chainVerified`, `agentce:executesConsequential`, `agentce:oversightModalityMatchesDeclared`,
- * `agentce:danglingRef`, `agentce:precededBy`). The `rdfs:subClassOf*` closure of the class hierarchy
+ * `agentce:danglingRef`, `agentce:precededBy`, `agentce:componentDeclared`,
+ * `agentce:declaredComponentsObserved`, `agentce:triggersIncident`, `agentce:oversightCoverageComplete`,
+ * `agentce:interventionEffective`, `agentce:interventionByHuman` and `agentce:incidentResponded`). The
+ * `rdfs:subClassOf*` closure of the class hierarchy
  * (base vocabulary plus the domain binding) is materialised so class membership needs no inference.
  * This is a faithful port of the Python reference; it must build byte-identical graphs.
  */
@@ -163,6 +166,44 @@ function principalRef(entry: unknown): [string | null, string | null] {
   return [null, null];
 }
 
+/** The id of the event's `actor` when it is a human principal (SPEC §6.2, §7.3 human-actor rule,
+ * first part); `null` for a missing, unnamed or non-human actor. */
+function humanActor(data: Record<string, unknown>): string | null {
+  const actor = data.actor;
+  return isRecord(actor) && actor.kind === "human" ? text(actor.id) : null;
+}
+
+/** Python's `==` over JSON values: a bool equals the number 0 or 1, objects compare by key set and
+ * value whatever their key order, arrays element by element. */
+function pyEquals(a: unknown, b: unknown): boolean {
+  const num = (v: unknown): unknown => (typeof v === "boolean" ? Number(v) : v);
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return (
+      Array.isArray(a) &&
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((v, i) => pyEquals(v, b[i]))
+    );
+  }
+  if (isRecord(a) || isRecord(b)) {
+    if (!isRecord(a) || !isRecord(b)) {
+      return false;
+    }
+    const keys = Object.keys(a);
+    return (
+      keys.length === Object.keys(b).length &&
+      keys.every((k) => Object.prototype.hasOwnProperty.call(b, k) && pyEquals(a[k], b[k]))
+    );
+  }
+  return num(a) === num(b);
+}
+
+/** Interrupt effects that stop the agent, and the interrupt mechanisms SPEC §6.2 names (OVS-07). */
+const INTERRUPT_STOPS = new Set(["halted", "paused"]);
+const INTERRUPT_MECHANISMS = new Set(["stop_button", "kill_switch", "circuit_breaker", "manual"]);
+/** The Incident members that record a response after detection (SPEC §6.2; ROB-07). */
+const INCIDENT_RESPONSES = ["causal_assessment_at", "provider_notified_at", "reported_at"];
+
 function principalClass(kind: string | null): string {
   if (kind === "human") {
     return "agentce:HumanPrincipal";
@@ -252,6 +293,10 @@ class Builder {
   };
   private readonly operated: Record<Family, Set<string>> = { tool: new Set(), model: new Set() };
   private hasCalls = false;
+  // OVS-08: decision IRI -> the distinct human actors whose ApprovalDecided reviewed it.
+  private readonly humanReviewers = new Map<string, Set<string>>();
+  // INC-03: event IRI -> the decision its refs.decision names, whatever the event type.
+  private readonly refDecision = new Map<string, string>();
 
   constructor(
     private readonly store: GraphStore,
@@ -377,6 +422,7 @@ class Builder {
     const refs = refsOf(event);
     const decision = refs.decision;
     if (typeof decision === "string") {
+      this.refDecision.set(node, decision);
       if (ptype === "ToolCall") {
         this.store.addEdge(node, "agentce:executes", decision);
       } else if (ptype === "Outcome") {
@@ -385,6 +431,15 @@ class Builder {
       } else if (ptype === "ApprovalDecided") {
         this.store.addEdge(decision, "agentce:reviewedBy", node);
         this.decisionReviewed.add(decision);
+        const human = humanActor(dataOf(event));
+        if (human !== null) {
+          let reviewers = this.humanReviewers.get(decision);
+          if (!reviewers) {
+            reviewers = new Set();
+            this.humanReviewers.set(decision, reviewers);
+          }
+          reviewers.add(human);
+        }
       } else if (ptype === "Override") {
         this.store.addEdge(decision, "agentce:overriddenBy", node);
       } else if (ptype === "Interrupt") {
@@ -663,6 +718,7 @@ class Builder {
   }
 
   private materialise(events: Event[]): void {
+    const incidentDecisions = this.incidentDecisions(events);
     for (const event of events) {
       const node = eventIri(String(event.id));
       const ptype = this.ptype(event);
@@ -676,6 +732,22 @@ class Builder {
       if (ptype === "Decision") {
         this.oversightMatches(node, data);
         this.explanationReconstructable(node);
+        this.oversightCoverage(node, data);
+        this.literal(
+          node,
+          "agentce:triggersIncident",
+          incidentDecisions === null || incidentDecisions.has(node),
+        );
+      }
+      if (ptype === "Override" || ptype === "Interrupt") {
+        this.intervention(node, ptype, event);
+      }
+      if (ptype === "Incident") {
+        this.literal(
+          node,
+          "agentce:incidentResponded",
+          text(data.detected_at) !== null && INCIDENT_RESPONSES.some((k) => text(data[k]) !== null),
+        );
       }
       if (ptype === "Outcome") {
         this.adverseOutcomeLinked(node, data);
@@ -691,6 +763,80 @@ class Builder {
     this.actsOnUntrusted(events, this.robustToUntrusted(events));
     this.conductScopeBudget(events);
     this.precededBy();
+  }
+
+  private literal(node: string, predicate: string, value: boolean): void {
+    this.store.addLiteral(node, predicate, value ? "true" : "false", BOOL);
+  }
+
+  /**
+   * INC-03: the held decisions the `Incident` events name in `related_refs[]` or `refs.decision`,
+   * directly or through the `refs.decision` of the event named (an `Outcome`, a `ToolCall`, an
+   * `Override`, ...). `null` when any name does not lead to a held decision: the records cannot show
+   * which decision triggered that incident, so every decision is held to the rule (fail closed).
+   */
+  private incidentDecisions(events: Event[]): Set<string> | null {
+    const out = new Set<string>();
+    for (const event of events) {
+      if (this.ptype(event) !== "Incident") {
+        continue;
+      }
+      const related = dataOf(event).related_refs;
+      const names: unknown[] = Array.isArray(related) ? [...related] : [];
+      const decision = refsOf(event).decision;
+      if (!isAbsent(decision)) {
+        names.push(decision);
+      }
+      if (names.length === 0) {
+        return null;
+      }
+      for (const ref of names) {
+        const named =
+          typeof ref === "string"
+            ? this.decisionTime.has(ref)
+              ? ref
+              : this.refDecision.get(ref)
+            : undefined;
+        if (named === undefined || !this.decisionTime.has(named)) {
+          return null;
+        }
+        out.add(named);
+      }
+    }
+    return out;
+  }
+
+  /** OVS-08 (Art. 14(5)): enough distinct human reviewers -- two when the decision's observed or
+   * domain-declared oversight modality is `dual_control`, otherwise one. */
+  private oversightCoverage(node: string, data: Record<string, unknown>): void {
+    const dtype = data.decision_type;
+    const declared =
+      typeof dtype === "string" ? this.domain.requiredOversight.get(dtype) : undefined;
+    const dual = data.oversight_modality === "dual_control" || declared === "dual_control";
+    const reviewers = this.humanReviewers.get(node)?.size ?? 0;
+    this.literal(node, "agentce:oversightCoverageComplete", reviewers >= (dual ? 2 : 1));
+  }
+
+  /** OVS-07: an `Override` is effective when it names a held decision and records a replacement that
+   * differs from the original; an `Interrupt` when a named mechanism halted or paused the agent.
+   * Either is recorded when a human actor is named. */
+  private intervention(node: string, ptype: string, event: Event): void {
+    const data = dataOf(event);
+    let effective: boolean;
+    if (ptype === "Override") {
+      const decision = refsOf(event).decision;
+      const replacement = data.replacement ?? null;
+      effective =
+        typeof decision === "string" &&
+        this.decisionTime.has(decision) &&
+        replacement !== null &&
+        !pyEquals(replacement, data.original ?? null);
+    } else {
+      effective =
+        isOneOf(data.effect, INTERRUPT_STOPS) && isOneOf(data.mechanism, INTERRUPT_MECHANISMS);
+    }
+    this.literal(node, "agentce:interventionEffective", effective);
+    this.literal(node, "agentce:interventionByHuman", humanActor(data) !== null);
   }
 
   private dangling(node: string, event: Event): void {
