@@ -154,9 +154,9 @@ public final class Catalog {
                 shapes.putAll(Psp.loadShapes(directory.resolve(control.shapePath), control.shapePath));
             }
             if (control.evidenceShapePath != null) {
-                Map<String, Psp.Shape> loaded = loadEvidenceShape(directory, control);
-                evidenceShapeIris.put(control.evidenceShapePath, targeted(loaded).get(0));
-                shapes.putAll(loaded);
+                Map.Entry<String, Map<String, Psp.Shape>> loaded = loadEvidenceShape(directory, control);
+                evidenceShapeIris.put(control.evidenceShapePath, loaded.getKey());
+                shapes.putAll(loaded.getValue());
             }
         }
         return new Catalog(
@@ -179,22 +179,23 @@ public final class Catalog {
     /** The shapes in the file a control names as {@code evaluation.evidence_shape}. The file must be inside
      * the catalog folder after symlinks (where the catalog's signature covers it) and hold exactly one node
      * shape with a target; anything else is refused, so a declared evidence shape can never be skipped and
-     * read as a pass. */
-    private static Map<String, Psp.Shape> loadEvidenceShape(Path directory, ControlSpec control) {
+     * read as a pass. Returns the targeted shape's IRI with the file's shapes. */
+    private static Map.Entry<String, Map<String, Psp.Shape>> loadEvidenceShape(Path directory, ControlSpec control) {
         String path = control.evidenceShapePath;
         Map<String, Psp.Shape> loaded = Map.of();
         if (!path.isEmpty()) {
             try {
                 Path root = directory.toRealPath();
                 Path resolved = directory.resolve(path).toRealPath();
-                if (resolved.startsWith(root) && !resolved.equals(root) && Files.isRegularFile(resolved)) {
+                if (resolved.startsWith(root) && Files.isRegularFile(resolved)) {
                     loaded = Psp.loadShapes(resolved, path);
                 }
             } catch (IOException | java.nio.file.InvalidPathException e) {
-                loaded = Map.of();
+                // A path that does not resolve leaves nothing loaded, which is refused below.
             }
         }
-        if (targeted(loaded).size() != 1) {
+        List<String> targeted = targeted(loaded);
+        if (targeted.size() != 1) {
             throw new InputError(
                     EVIDENCE_SHAPE_UNRESOLVED,
                     ErrorCatalogue.errorCause(EVIDENCE_SHAPE_UNRESOLVED)
@@ -202,7 +203,7 @@ public final class Catalog {
                             .replace("{path}", path),
                     ErrorCatalogue.errorFix(EVIDENCE_SHAPE_UNRESOLVED));
         }
-        return loaded;
+        return Map.entry(targeted.get(0), loaded);
     }
 
     /** The shape a focus must meet for the control to judge it ({@code evaluation.evidence_shape}); a focus

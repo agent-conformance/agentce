@@ -80,6 +80,11 @@ const CONTENT_OUT = ["output_ref", "result_ref", "record_ref", "content_ref"];
  * on and the instruction it was derived from. */
 const REFS_IN = ["origin", "instruction", "parent"];
 
+/** An Appendix F source class outside the trusted set (CND-05's rule, also ROB-02's). */
+function untrustedSourceClass(value: unknown): boolean {
+  return typeof value === "string" && !TRUSTED_INSTRUCTION.has(value);
+}
+
 function isOneOf(value: unknown, values: Set<string>): boolean {
   return typeof value === "string" && values.has(value);
 }
@@ -416,7 +421,7 @@ class Builder {
       return;
     }
     const sourceClass = data.source_class;
-    const untrusted = typeof sourceClass === "string" && !TRUSTED_INSTRUCTION.has(sourceClass);
+    const untrusted = untrustedSourceClass(sourceClass);
     this.instructionUntrusted.set(node, untrusted);
     this.store.addLiteral(node, "agentce:instructionUntrusted", untrusted ? "true" : "false", BOOL);
   }
@@ -496,7 +501,6 @@ class Builder {
     const tainted = new Set<string>();
     const unruled = new Set<string>();
     const held = new Set<string>();
-    const named = new Set<string>();
     const records = new Set<string>();
     const guarded = new Set<string>();
     const flow = (source: unknown, target: unknown): void => {
@@ -507,7 +511,6 @@ class Builder {
           flows.set(source, targets);
         }
         targets.add(target);
-        named.add(source);
       }
     };
     for (const event of events) {
@@ -547,9 +550,7 @@ class Builder {
         if (
           isOneOf(data.trust, UNTRUSTED_TRUST) ||
           isOneOf(data.guard_verdict, UNTRUSTED_VERDICTS) ||
-          (unmarked &&
-            typeof data.provenance_origin_class === "string" &&
-            !TRUSTED_INSTRUCTION.has(data.provenance_origin_class))
+          (unmarked && untrustedSourceClass(data.provenance_origin_class))
         ) {
           tainted.add(node);
         }
@@ -581,7 +582,7 @@ class Builder {
         unruled.add(record);
       }
     }
-    for (const ref of named) {
+    for (const ref of flows.keys()) {
       if (!held.has(ref) && !records.has(ref)) {
         unruled.add(ref);
       }

@@ -88,6 +88,11 @@ _CONTENT_OUT: tuple[str, ...] = (
 _REFS_IN: tuple[str, ...] = ("origin", "instruction", "parent")
 
 
+def _untrusted_source_class(value: Any) -> bool:
+    """An Appendix F source class outside the trusted set (CND-05's rule, also ROB-02's)."""
+    return isinstance(value, str) and value not in _TRUSTED_INSTRUCTION
+
+
 def _is_one_of(value: Any, values: frozenset[str]) -> bool:
     return isinstance(value, str) and value in values
 
@@ -355,10 +360,7 @@ class _Builder:
         from the enforcement point's records in a second pass (:meth:`_conduct_scope_budget`)."""
         if ptype == "Instruction":
             source_class = data.get("source_class")
-            untrusted = (
-                isinstance(source_class, str)
-                and source_class not in _TRUSTED_INSTRUCTION
-            )
+            untrusted = _untrusted_source_class(source_class)
             self.instruction_untrusted[node] = untrusted
             self.store.add_literal(
                 node,
@@ -456,14 +458,12 @@ class _Builder:
         tainted: set[str] = set()
         unruled: set[str] = set()
         held: set[str] = set()
-        named: set[str] = set()
         records: set[str] = set()
         guarded: set[str] = set()
 
         def flow(source: Any, target: Any) -> None:
             if isinstance(source, str) and isinstance(target, str):
                 flows.setdefault(source, set()).add(target)
-                named.add(source)
 
         for event in events:
             ptype = self._ptype(event)
@@ -488,18 +488,17 @@ class _Builder:
                 # A record and each write of it stand for the same content.
                 flow(record, node)
                 trust, verdict = data.get("trust"), data.get("guard_verdict")
+                unmarked = trust is None and verdict is None
                 if isinstance(record, str):
                     records.add(record)
-                    if enforced and (trust is not None or verdict is not None):
+                    if enforced and not unmarked:
                         guarded.add(record)
                 if (
                     _is_one_of(trust, _UNTRUSTED_TRUST)
                     or _is_one_of(verdict, _UNTRUSTED_VERDICTS)
                     or (
-                        trust is None
-                        and verdict is None
-                        and isinstance(data.get("provenance_origin_class"), str)
-                        and data["provenance_origin_class"] not in _TRUSTED_INSTRUCTION
+                        unmarked
+                        and _untrusted_source_class(data.get("provenance_origin_class"))
                     )
                 ):
                     tainted.add(node)
@@ -517,7 +516,7 @@ class _Builder:
         tainted |= {
             iri for iri, untrusted in self.instruction_untrusted.items() if untrusted
         }
-        unruled |= (records - guarded) | (named - held - records)
+        unruled |= (records - guarded) | (set(flows) - held - records)
         for seeds in (tainted, unruled):
             pending = list(seeds)
             while pending:

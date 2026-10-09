@@ -112,6 +112,11 @@ public final class Graph {
         return refs != null && refs.isObject() ? refs : Json.nodes().objectNode();
     }
 
+    /** An Appendix F source class outside the trusted set (CND-05's rule, also ROB-02's). */
+    private static boolean untrustedSourceClass(String sourceClass) {
+        return sourceClass != null && !TRUSTED_INSTRUCTION.contains(sourceClass);
+    }
+
     private static boolean isOneOf(JsonNode node, Set<String> values) {
         String value = str(node);
         return value != null && values.contains(value);
@@ -479,7 +484,7 @@ public final class Graph {
                 return;
             }
             String sourceClass = str(data.get("source_class"));
-            boolean untrusted = sourceClass != null && !TRUSTED_INSTRUCTION.contains(sourceClass);
+            boolean untrusted = untrustedSourceClass(sourceClass);
             instructionUntrusted.put(node, untrusted);
             store.addLiteral(node, "agentce:instructionUntrusted", untrusted ? "true" : "false", BOOL);
         }
@@ -595,7 +600,7 @@ public final class Graph {
                     String origin = str(data.get("provenance_origin_class"));
                     if (isOneOf(data.get("trust"), UNTRUSTED_TRUST)
                             || isOneOf(data.get("guard_verdict"), UNTRUSTED_VERDICTS)
-                            || (unmarked && origin != null && !TRUSTED_INSTRUCTION.contains(origin))) {
+                            || (unmarked && untrustedSourceClass(origin))) {
                         tainted.add(node);
                     }
                 } else if ("MemoryRead".equals(ptype)) {

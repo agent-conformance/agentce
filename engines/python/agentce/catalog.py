@@ -139,26 +139,20 @@ def _control_from_dict(data: dict[str, Any]) -> ControlSpec:
         # A declared evidence shape is always resolved: a value that is not a path reads as "",
         # which load refuses, so it can never be skipped into a pass.
         evidence_shape_path=(
-            _path_or_empty(evaluation["evidence_shape"])
+            (value if isinstance(value := evaluation["evidence_shape"], str) else "")
             if "evidence_shape" in evaluation
             else None
         ),
     )
 
 
-def _path_or_empty(value: Any) -> str:
-    return value if isinstance(value, str) else ""
-
-
 def _load_evidence_shape(
-    directory: Path, control: ControlSpec
+    directory: Path, control_id: str, path: str
 ) -> tuple[str, dict[str, Shape]]:
     """The shapes in the file a control names as ``evaluation.evidence_shape``. The file must hold
     exactly one node shape with a target, whose IRI is returned with the file's shapes; anything else,
     including a file outside the catalog directory (which its signature would not cover), is
     refused, so a declared evidence shape can never be skipped and read as a pass."""
-    path = control.evidence_shape_path
-    assert path is not None
     resolved = (directory / path).resolve()
     inside = path != "" and resolved.is_relative_to(directory.resolve())
     loaded = load_shapes(resolved, path) if inside and resolved.is_file() else {}
@@ -171,7 +165,7 @@ def _load_evidence_shape(
         entry = MESSAGE_KEYS[_EVIDENCE_SHAPE_UNRESOLVED]
         raise InputError(
             _EVIDENCE_SHAPE_UNRESOLVED,
-            format_message(entry.cause, control=control.id, path=path),
+            format_message(entry.cause, control=control_id, path=path),
             entry.fix,
         )
     return targeted[0], loaded
@@ -194,7 +188,9 @@ def load_catalog(directory: Path) -> Catalog:
                 load_shapes(directory / control.shape_path, control.shape_path)
             )
         if control.evidence_shape_path is not None:
-            iri, loaded = _load_evidence_shape(directory, control)
+            iri, loaded = _load_evidence_shape(
+                directory, control.id, control.evidence_shape_path
+            )
             evidence_shape_iris[control.evidence_shape_path] = iri
             shapes.update(loaded)
     return Catalog(
