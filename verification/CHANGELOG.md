@@ -3,6 +3,16 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.74.0
+
+- `VG-CND05-CHAIN` (18.121) adds eight decision cases (31 in all) and three seeded faults, one in each engine's shape
+  parser. CND-05 says no tool call or decision acts on an untrusted instruction (SPEC §7.7.4), but its shape targeted
+  tool calls only, and each engine read a single `sh:targetClass` per shape, so a decision acting on a `tool_output`
+  instruction read conformant. Each engine now reads every `sh:targetClass` of a shape as a union, as SHACL does, and
+  CND-05 targets `agentce:ToolCall` and `agentce:Decision`. A decision on an untrusted instruction, typed or not,
+  direct or derived, reads non-conformant and names the decision; records with no tool call read
+  insufficient_evidence, never conformant; trusted twins stay conformant.
+
 ## 0.73.0
 
 - `VG-CND05-CHAIN` (18.37l) is new, with 23 cases and three seeded faults, one in each engine's graph builder. CND-05

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build gate helper for VG-CND05-CHAIN (18.37l): CND-05 fails a tool call that acts on an instruction whose chain passes
-# through an untrusted source class (SPEC §7.7.4): the instruction itself, or any instruction or activity on its
+# Build gate helper for VG-CND05-CHAIN (18.37l, 18.121): CND-05 fails a tool call or a decision that acts on an
+# instruction whose chain passes through an untrusted source class (SPEC §7.7.4): the instruction itself, or any instruction or activity on its
 # refs.parent / refs.origin lineage, by any number of hops (SPEC §6.2, Appendix F). Each case in
 # fixtures/cnd05_chain/cases.json becomes one bundle; the real Python, TypeScript and Java CLIs assess it against the
 # baseline catalog and the Conduct overlay, and CND-05's outcome and failing events must match the case's expectation in

@@ -1,4 +1,4 @@
-# Domain ontology binding for the VG-CND05-CHAIN gate fixture. The cases hold no decisions; assess needs a binding.
+# Domain ontology binding for the VG-CND05-CHAIN gate fixture: the decision cases' dom:CreditDecision is consequential.
 decision_types:
   - id: "dom:CreditDecision"
     subclass_of: "agentce:ConsequentialDecision"

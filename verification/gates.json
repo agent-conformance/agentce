@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.73.0",
+  "suite_version": "0.74.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2957,7 +2957,7 @@
     },
     {
       "id": "VG-CND05-CHAIN",
-      "title": "CND-05 follows an instruction's chain in all three engines: a tool call acting on an instruction whose refs.parent or refs.origin lineage passes through an untrusted source class, by any number of hops, is non-conformant, where the chain passes through an untrusted source class at an instruction of an untrusted Appendix F class, at a tool call or resource access that produced the content, at a memory read the guard marked untrusted, or at a parent or origin the bundle does not hold; trusted chains, cycles and untrusted instructions off the chain do not fail it (18.37l)",
+      "title": "CND-05 follows an instruction's chain in all three engines: a tool call or a decision acting on an instruction whose refs.parent or refs.origin lineage passes through an untrusted source class, by any number of hops, is non-conformant, where the chain passes through an untrusted source class at an instruction of an untrusted Appendix F class, at a tool call or resource access that produced the content, at a memory read the guard marked untrusted, or at a parent or origin the bundle does not hold; trusted chains, cycles and untrusted instructions off the chain do not fail it; a decision acting on such an instruction fails the same way, since each engine reads every sh:targetClass of CND-05's shape, ToolCall and Decision (18.37l, 18.121)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -2974,7 +2974,7 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/cnd05_chain/cases.json (a direct tool_output instruction and a direct user one; a user instruction whose refs.parent is a tool_output instruction; two refs.parent hops to a retrieved instruction; three hops to a memory_untrusted one; refs.origin a guard read at trust_min untrusted, or a read of a record the guard wrote untrusted; refs.origin a tool call or a resource access; a parent then an origin hop; the instruction after the call in the file; a parent cycle with and without a tool_output instruction on it; two calls, one on an untrusted chain; a parent or origin the bundle does not hold, or named by a bare event id beside a held tool_output instruction of that id; each with trusted twins: an operator parent, a two-hop service chain, a trusted read origin, an untrusted child of the acted-on instruction, an untrusted instruction off the chain) gives the expected CND-05 outcome, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined",
+        "pass": "every case in verification/gates/fixtures/cnd05_chain/cases.json (a direct tool_output instruction and a direct user one; a user instruction whose refs.parent is a tool_output instruction; two refs.parent hops to a retrieved instruction; three hops to a memory_untrusted one; refs.origin a guard read at trust_min untrusted, or a read of a record the guard wrote untrusted; refs.origin a tool call or a resource access; a parent then an origin hop; the instruction after the call in the file; a parent cycle with and without a tool_output instruction on it; two calls, one on an untrusted chain; a parent or origin the bundle does not hold, or named by a bare event id beside a held tool_output instruction of that id; each with trusted twins: an operator parent, a two-hop service chain, a trusted read origin, an untrusted child of the acted-on instruction, an untrusted instruction off the chain; and decisions, typed and untyped, on a direct tool_output instruction, on one derived by refs.parent or by a refs.origin tool call, a decision and a call on one tool_output instruction, a decision with no tool call in the records (insufficient_evidence, never conformant), with trusted twins for a typed and an untyped decision) gives the expected CND-05 outcome, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined",
         "fail": "any case gives another CND-05 outcome, another set of failing events or another exit code in any engine, or quarantines a record"
       },
       "faults": [
@@ -2995,9 +2995,27 @@
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "boolean acts = instruction != null && untrusted.contains(instruction);",
           "replace": "boolean acts = instruction != null && instructionUntrusted.getOrDefault(instruction, false);"
+        },
+        {
+          "description": "Python's PSP parser reads one sh:targetClass per shape, so CND-05 judges either its ToolCalls or its Decisions, not both",
+          "file": "engines/python/agentce/psp.py",
+          "search": "        shape.target_classes = sorted(\n            curie(c) for c in graph.objects(shape_node, _sh(\"targetClass\"))\n        )\n",
+          "replace": "        one = graph.value(shape_node, _sh(\"targetClass\"))\n        shape.target_classes = [] if one is None else [curie(one)]\n"
+        },
+        {
+          "description": "TypeScript's PSP parser reads one sh:targetClass per shape, so CND-05 judges either its ToolCalls or its Decisions, not both",
+          "file": "engines/typescript/src/psp.ts",
+          "search": "      .map(curie)\n      .sort(byteCompare);\n",
+          "replace": "      .map(curie)\n      .sort(byteCompare)\n      .slice(0, 1);\n"
+        },
+        {
+          "description": "Java's PSP parser reads one sh:targetClass per shape, so CND-05 judges either its ToolCalls or its Decisions, not both",
+          "file": "engines/java/src/main/java/org/agentce/Psp.java",
+          "search": "            shape.targetClasses.sort(Json::byteCompare);\n",
+          "replace": "            shape.targetClasses.sort(Json::byteCompare);\n            shape.targetClasses = new ArrayList<>(shape.targetClasses.subList(0, Math.min(1, shape.targetClasses.size())));\n"
         }
       ],
-      "fix_hint": "Run verification/gates/cnd05_chain.sh; it names the engine, the case, the CND-05 outcome and failing events it gave and the ones expected. The rule is actsOnUntrusted in each engine's graph builder: the refs.parent / refs.origin closure over instructions, seeded with tool calls, resource accesses and ROB-02's tainted set."
+      "fix_hint": "Run verification/gates/cnd05_chain.sh; it names the engine, the case, the CND-05 outcome and failing events it gave and the ones expected. The rule is actsOnUntrusted in each engine's graph builder: the refs.parent / refs.origin closure over instructions, seeded with tool calls, resource accesses and ROB-02's tainted set. A decision case that reads conformant points at the PSP parser (psp.py, psp.ts, Psp.java): every sh:targetClass of a shape is read, as a union."
     }
   ]
 }
