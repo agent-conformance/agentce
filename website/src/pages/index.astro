@@ -147,7 +147,7 @@ Top gaps:
 Next step: Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again. See report.md in ./out for every control.
 quickstart complete: 49 assertions; report in ./out
 
-<span class="c-prompt">$</span> <span class="c-cmd">head -n 41 out/report.md</span>
+<span class="c-prompt">$</span> <span class="c-cmd">head -n 42 out/report.md</span>
 # AgentCE conformance report
 
 ## What your agents did
@@ -166,9 +166,10 @@ quickstart complete: 49 assertions; report in ./out
 ## Where your records can't show it yet
 
 - `ApprovalDecided (self_report)`: unlocks 8 check(s), needed by 0 more; rung 2 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: oversight.
-- `ModelCall (self_report)`: unlocks 4 check(s), needed by 0 more; rung 1 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: otel-genai.
+- `ModelCall (self_report)`: unlocks 3 check(s), needed by 0 more; rung 1 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: otel-genai.
 - `Notice (self_report)`: unlocks 3 check(s), needed by 0 more; rung 2 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: oversight.
 - `PolicyDecision (self_report)`: unlocks 3 check(s), needed by 0 more; rung 3 -- a request to platform or security. Adapters that can supply this: mcp-gateway, policy-engines.
+- `MemoryRead (enforcement_point)`: unlocks 1 check(s), needed by 0 more; rung 3 -- a request to platform or security. Adapters that can supply this: no adapter today.
 
 ## Verdict
 
