@@ -20,8 +20,8 @@ options:
   --config CONFIG       the collection config file
   --out OUT             the output bundle path
   --dry-run             plan only. A dry run runs no adapter and resolves no
-                        credential. With --out it writes the plan (collect-
-                        plan.json) and its manifest.json there, nothing else
+                        credential. With --out it writes collect-plan.json and
+                        manifest.json there, nothing else
   --adapters-root ADAPTERS_ROOT
                         the adapters checkout a source's `export` is resolved
                         through (default: ./adapters)
