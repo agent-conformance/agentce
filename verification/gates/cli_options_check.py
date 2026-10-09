@@ -40,7 +40,8 @@ CONFORMANCE = FIXTURES / "conformance"
 #: three sample adapters directories whose conformance.py reports one adapter: {S} identical with its
 #: round trip (claim full), {Sp} identical without it (claim partial), {Sn} no JSON at all (18.111);
 #: and four that print counts as Python's int() reads them: {Sb} past 2**64 and one apart (partial),
-#: {Ss} the string "1.0" and {Sz} null (both refused), {Sf} round_trip 0.0 (partial).
+#: {Ss} the string "1.0" and {Sz} null (both refused), {Sf} round_trip 0.0 (partial); and {Sx} and
+#: {Se}, a byte that is not UTF-8 on stdout or stderr (refused, as Python's strict decode).
 PLACES = {
     "{root}": str(ROOT),
     "{A}": str(ROOT / "verification/gates/fixtures/diff/before/assertions.json"),
@@ -54,6 +55,8 @@ PLACES = {
     "{Ss}": str(CONFORMANCE / "adapters-strcount"),
     "{Sz}": str(CONFORMANCE / "adapters-nullcount"),
     "{Sf}": str(CONFORMANCE / "adapters-floatrt"),
+    "{Sx}": str(CONFORMANCE / "adapters-badbytes-stdout"),
+    "{Se}": str(CONFORMANCE / "adapters-badbytes-stderr"),
 }
 #: The fields of each --debug record, as Python's logsetup.JsonFormatter writes them.
 DEBUG_RECORDS = [

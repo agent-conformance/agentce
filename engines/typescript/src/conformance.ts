@@ -168,12 +168,16 @@ export type AdapterRunner = (
   cwd: string,
 ) => { stdout: string; stderr: string };
 
+/** Python's `subprocess.run(text=True)` decoding: strict UTF-8, a BOM kept, so bytes that are not
+ * UTF-8 raise (internal.unexpected) instead of becoming U+FFFD. */
+const strictUtf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+
 const runProcess: AdapterRunner = (command, args, cwd) => {
-  const proc = spawnSync(command, args, { cwd, encoding: "utf-8", maxBuffer: 1 << 30 });
+  const proc = spawnSync(command, args, { cwd, maxBuffer: 1 << 30 });
   if (proc.error !== undefined) {
     throw proc.error; // uv missing from PATH: internal.unexpected, as Python's FileNotFoundError
   }
-  return { stdout: proc.stdout, stderr: proc.stderr };
+  return { stdout: strictUtf8.decode(proc.stdout), stderr: strictUtf8.decode(proc.stderr) };
 };
 
 /** Python's `str.strip()` (JavaScript's `trim` differs on a few code points). */

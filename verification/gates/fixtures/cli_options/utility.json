@@ -120,6 +120,8 @@
     {"id": "run-adapters-bigcount", "argv": ["conformance", "run", "--engine", "{engine}", "--corpus", "{C}", "--adapters", "{Sb}"], "exit": 1, "key": null, "json": "none", "says": ["round_trip True; claim partial"], "writes": null},
     {"id": "run-adapters-strcount", "argv": ["conformance", "run", "--engine", "{engine}", "--corpus", "{C}", "--adapters", "{Ss}"], "exit": 3, "key": "internal.unexpected", "writes": null},
     {"id": "run-adapters-nullcount", "argv": ["conformance", "run", "--engine", "{engine}", "--corpus", "{C}", "--adapters", "{Sz}"], "exit": 3, "key": "internal.unexpected", "writes": null},
-    {"id": "run-adapters-floatrt", "argv": ["conformance", "run", "--engine", "{engine}", "--corpus", "{C}", "--adapters", "{Sf}"], "exit": 1, "key": null, "json": "none", "says": ["claim partial"], "writes": null}
+    {"id": "run-adapters-floatrt", "argv": ["conformance", "run", "--engine", "{engine}", "--corpus", "{C}", "--adapters", "{Sf}"], "exit": 1, "key": null, "json": "none", "says": ["claim partial"], "writes": null},
+    {"id": "run-adapters-badbytes-stdout", "argv": ["conformance", "run", "--engine", "{engine}", "--corpus", "{C}", "--adapters", "{Sx}"], "exit": 3, "key": "internal.unexpected", "writes": null},
+    {"id": "run-adapters-badbytes-stderr", "argv": ["conformance", "run", "--engine", "{engine}", "--corpus", "{C}", "--adapters", "{Se}"], "exit": 3, "key": "internal.unexpected", "writes": null}
   ]
 }

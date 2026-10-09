@@ -2805,6 +2805,18 @@
           "file": "engines/typescript/src/conformance.ts",
           "search": "    parsed = parseJson(proc.stdout, { pythonConstants: true });\n",
           "replace": "    parsed = JSON.parse(proc.stdout);\n"
+        },
+        {
+          "description": "TypeScript decodes the orchestrator's output leniently again, so a byte that is not UTF-8 becomes U+FFFD and the claim stands where Python refuses",
+          "file": "engines/typescript/src/conformance.ts",
+          "search": "const strictUtf8 = new TextDecoder(\"utf-8\", { fatal: true, ignoreBOM: true });\n",
+          "replace": "const strictUtf8 = new TextDecoder(\"utf-8\", { ignoreBOM: true });\n"
+        },
+        {
+          "description": "Java decodes the orchestrator's stdout leniently again, so a byte that is not UTF-8 becomes U+FFFD and the claim stands where Python refuses",
+          "file": "engines/java/src/main/java/org/agentce/Conformance.java",
+          "search": "            String stdout = StandardCharsets.UTF_8.newDecoder()\n",
+          "replace": "            String stdout = StandardCharsets.UTF_8.newDecoder()\n                    .onMalformedInput(java.nio.charset.CodingErrorAction.REPLACE)\n"
         }
       ]
     }

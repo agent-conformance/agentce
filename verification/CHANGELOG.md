@@ -5,7 +5,7 @@ fails if a gate in `gates.json` is not named in this file.
 
 ## 0.69.0
 
-- `VG-CLI-UTILITY` (18.111) is new, with 119 rows and ten seeded faults, and covers the command lines of `validate`, `diff`,
+- `VG-CLI-UTILITY` (18.111) is new, with 121 rows and twelve seeded faults, and covers the command lines of `validate`, `diff`,
   `version`, `conformance` and `conformance run`. TypeScript and Java said the bundle was missing for
   `validate -h`, read `diff -h` as a file, printed the version for `version --help` and for any argument, and
   refused `conformance -h` as an unknown action. They ran past unknown flags and extra arguments, ignored the
@@ -16,9 +16,11 @@ fails if a gate in `gates.json` is not named in this file.
   check that each engine refuses those lines with a key at exit 3, prints the same usage for `-h`, reads diff's
   files on either side of `--format`, and runs the adapters' own orchestrator for `--adapters`. The
   orchestrator's claim goes into the report and sets the exit code. They read a committed empty corpus, a one-project corpus written
-  by the corpus generator, and seven sample adapters directories: claim full, partial and none, and four whose
+  by the corpus generator, and nine sample adapters directories: claim full, partial and none, and four whose
   counts each engine must read as Python's `int()` does (two past 2**64 that differ by one, the string `"1.0"`
-  and `null`, both refused with `internal.unexpected`, and a `round_trip` of `0.0`, which is false). A case's
+  and `null`, both refused with `internal.unexpected`, and a `round_trip` of `0.0`, which is false), and two that
+  write a byte that is not UTF-8 on stdout or stderr, refused with `internal.unexpected` as Python's strict decode
+  refuses it. A case's
   `has` can now list several paths, and its `file_says` names a token a written file must hold.
 - `VG-CLI-OPTIONS` (18.111): its `validate`, `diff`, `conformance` and `version` rows no longer need a
   TypeScript or Java override, and its Java unknown-flag fault seeds the same fault in the rewritten scanner.
