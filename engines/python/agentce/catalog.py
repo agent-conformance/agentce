@@ -106,7 +106,7 @@ class Catalog:
             if iri.endswith(want):
                 return shape
         for shape in self.shapes.values():
-            if shape.target_classes or shape.target_nodes or shape.target_where:
+            if shape.has_target:
                 return shape
         return None
 
@@ -156,11 +156,7 @@ def _load_evidence_shape(
     resolved = (directory / path).resolve()
     inside = path != "" and resolved.is_relative_to(directory.resolve())
     loaded = load_shapes(resolved, path) if inside and resolved.is_file() else {}
-    targeted = [
-        iri
-        for iri, shape in loaded.items()
-        if shape.target_classes or shape.target_nodes or shape.target_where
-    ]
+    targeted = [iri for iri, shape in loaded.items() if shape.has_target]
     if len(targeted) != 1:
         entry = MESSAGE_KEYS[_EVIDENCE_SHAPE_UNRESOLVED]
         raise InputError(

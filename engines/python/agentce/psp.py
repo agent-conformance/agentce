@@ -112,6 +112,10 @@ class Shape:
     target_where: list[tuple[str, str]] = field(default_factory=list)
     properties: list[PropertyShape] = field(default_factory=list)
 
+    @property
+    def has_target(self) -> bool:
+        return bool(self.target_classes or self.target_nodes or self.target_where)
+
 
 def _sh(name: str) -> URIRef:
     return URIRef(SH + name)

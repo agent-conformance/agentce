@@ -241,15 +241,14 @@ export function parseShapes(store: Store): Map<string, Shape> {
   for (const shapeNode of store.getSubjects(RDF_TYPE, sh("NodeShape"), null)) {
     const shape: Shape = {
       iri: shapeNode.value,
-      targetClasses: [],
+      targetClasses: store
+        .getObjects(shapeNode, sh("targetClass"), null)
+        .map(curie)
+        .sort(byteCompare),
       targetNodes: [],
       targetWhere: [],
       properties: [],
     };
-    shape.targetClasses = store
-      .getObjects(shapeNode, sh("targetClass"), null)
-      .map(curie)
-      .sort(byteCompare);
     shape.targetNodes = store.getObjects(shapeNode, sh("targetNode"), null).map(curie);
     for (const where of store.getObjects(shapeNode, namedNode(`${AGENTCE}targetWhere`), null)) {
       for (const quad of store.getQuads(where, null, null, null)) {

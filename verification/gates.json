@@ -3005,8 +3005,8 @@
         {
           "description": "TypeScript's PSP parser reads one sh:targetClass per shape, so CND-05 judges either its ToolCalls or its Decisions, not both",
           "file": "engines/typescript/src/psp.ts",
-          "search": "      .map(curie)\n      .sort(byteCompare);\n",
-          "replace": "      .map(curie)\n      .sort(byteCompare)\n      .slice(0, 1);\n"
+          "search": "        .map(curie)\n        .sort(byteCompare),\n",
+          "replace": "        .map(curie)\n        .sort(byteCompare)\n        .slice(0, 1),\n"
         },
         {
           "description": "Java's PSP parser reads one sh:targetClass per shape, so CND-05 judges either its ToolCalls or its Decisions, not both",
