@@ -64,12 +64,17 @@ rob02() {
     | "\(.outcome) \([.violations[]?.focus | sub("^agentce:event/"; "")] | unique | join(","))"' "$1"
 }
 
-status=0
-for dir in "$work"/*/; do
-  name="$(basename "$dir")"
-  want="$(cat "$dir/expected")"
-  want_exit="$(cat "$dir/exit")"
-  for engine in python typescript java; do
+# One engine over every case; returns non-zero on any mismatch. The three engines run side by side (each writes only
+# its own out-<engine> and err-<engine>), so the gate's wall time is the slowest engine's, not the sum. The first
+# mismatch in any engine stops all three (the $work/.stop marker), and the refusal sub-check is skipped: the gate has
+# already failed, and a seeded-fault run turns red without assessing every case.
+check_cases() {
+  local engine="$1" status=0 dir name want want_exit out code got
+  for dir in "$work"/*/; do
+    [ -e "$work/.stop" ] && return 1
+    name="$(basename "$dir")"
+    want="$(cat "$dir/expected")"
+    want_exit="$(cat "$dir/exit")"
     out="$dir/out-$engine"
     code=0
     run "$engine" assess --bundle "$dir/bundle" --profile "$fixtures/applicability.yaml" \
@@ -78,8 +83,8 @@ for dir in "$work"/*/; do
     if [ ! -f "$out/assertions.json" ]; then
       echo "rob02-untrusted: $engine wrote no assertions.json for $name (exit $code)" >&2
       tail -3 "$dir/err-$engine" >&2
-      status=1
-      continue
+      touch "$work/.stop"
+      return 1
     fi
     if [ "$code" != "$want_exit" ]; then
       echo "rob02-untrusted: $engine $name exited $code, expected $want_exit" >&2
@@ -94,8 +99,24 @@ for dir in "$work"/*/; do
       echo "rob02-untrusted: $engine $name gave '$got', expected '$want'" >&2
       status=1
     fi
+    [ "$status" -eq 0 ] || touch "$work/.stop"
   done
+  return "$status"
+}
+
+status=0
+pids=()
+for engine in python typescript java; do
+  check_cases "$engine" &
+  pids+=("$!")
 done
+for pid in "${pids[@]}"; do
+  wait "$pid" || status=1
+done
+if [ "$status" -ne 0 ]; then
+  echo "rob02-untrusted: stopped at the first case an engine got wrong (above)" >&2
+  exit 1
+fi
 # A declared evidence shape is resolved or refused, never skipped into a pass. Copies of the baseline whose ROB-02
 # evidence shape has lost its target, is declared empty, or points outside the catalog folder make assess refuse with
 # one key in every engine; a renamed evidence shape stays bound to the file the control names and still judges. Catalog

@@ -15,7 +15,8 @@ fails if a gate in `gates.json` is not named in this file.
   guarded and trusted twins and a tainted decision beside an unruled one. The gate also checks that a catalog
   whose declared evidence shape has no target, is declared empty or points outside the catalog folder is refused
   with `catalog.evidence_shape.unresolved` in all three engines, and that Python's `catalog lint` refuses it too.
-  The new faults make each engine mark every decision ruled on.
+  The new faults make each engine mark every decision ruled on. The three engines now run side by side and stop at
+  the first case any of them gets wrong, so a seeded-fault run ends early and the demo lane stays inside its time.
 
 ## 0.71.0
 
