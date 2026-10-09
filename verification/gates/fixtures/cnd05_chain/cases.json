@@ -1633,6 +1633,144 @@
           }
         }
       ]
+    },
+    "instruction-parent-bare-id": {
+      "why": "a user instruction whose refs.parent is a bare event id (\"i0\"), not an agentce:event IRI, beside a held tool_output instruction i0: the ref does not resolve to i0, so it is a record the bundle does not hold",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "id": "i0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:59Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "tool_output"
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:01:11Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "refs": {
+              "parent": "i0"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:01:12Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/cnd05-fixture"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ]
+    },
+    "instruction-origin-bare-id": {
+      "why": "a user instruction whose refs.origin is a bare event id (\"i0\"), not an agentce:event IRI, beside a held tool_output instruction i0: the ref does not resolve to i0, so it is a record the bundle does not hold",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "id": "i0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:59Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "tool_output"
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:01:09Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "refs": {
+              "origin": "i0"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/cnd05-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:01:10Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/cnd05-fixture"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ]
     }
   }
 }

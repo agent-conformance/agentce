@@ -5,13 +5,13 @@ fails if a gate in `gates.json` is not named in this file.
 
 ## 0.73.0
 
-- `VG-CND05-CHAIN` (18.37l) is new, with 21 cases and three seeded faults, one in each engine's graph builder. CND-05
+- `VG-CND05-CHAIN` (18.37l) is new, with 23 cases and three seeded faults, one in each engine's graph builder. CND-05
   fails an action on an instruction whose chain passes through an untrusted source class (SPEC §7.7.4), but every
   engine read only the acted-on instruction's own class, so a user instruction derived from a tool_output
   instruction passed. Each engine now follows the instruction's `refs.parent` and `refs.origin` lineage for as many
   hops as the records show: the chain is untrusted at an instruction of an untrusted Appendix F class, at a tool call
   or resource access that produced the content, at a memory read the guard marked untrusted, and at a parent or
-  origin the bundle does not hold. Trusted twins,
+  origin the bundle does not hold, including one named by a bare event id. Trusted twins,
   parent cycles, an untrusted child of the acted-on instruction and an untrusted instruction off the chain keep it
   passing.
 
