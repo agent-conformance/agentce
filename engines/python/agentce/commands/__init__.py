@@ -3501,20 +3501,16 @@ def cmd_doctor(ns: argparse.Namespace) -> CommandResult:
                 "catalogue instead of diagnosing.",
                 "drop --project to write the catalogue, or drop --write-errors to diagnose the project.",
             )
+        # An empty value is Path("."), a directory, so write_text refuses it with the rest.
         path = Path(write_errors)
-        fix = "pass --write-errors <file> with a writable path, e.g. docs/errors.md."
-        if write_errors == "" or path.is_dir():
-            raise InputError(
-                "input.write_errors_unwritable",
-                f"--write-errors {write_errors!r} names no file.",
-                fix,
-            )
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(render_errors_md(), encoding="utf-8")
         except OSError as exc:
             raise InputError(
-                "input.write_errors_unwritable", exc.strerror or str(exc), fix
+                "input.write_errors_unwritable",
+                f"--write-errors {write_errors!r}: {exc.strerror or exc}.",
+                "pass --write-errors <file> with a writable path, e.g. docs/errors.md.",
             ) from exc
         result.data.update({"errors_md": str(path)})
         result.note(f"wrote {path}")
