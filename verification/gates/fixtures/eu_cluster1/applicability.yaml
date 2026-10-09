@@ -1,0 +1,14 @@
+# Applicability profile for the VG-EUAIACT-CLUSTER1 gate fixture (verification/gates/eu_cluster1.sh).
+# One subject, the eu-ai-act catalog; each case in cases.json is one bundle for this subject.
+profile_version: 1
+observation_window:
+  start: "2026-01-01T00:00:00Z"
+  end: "2026-02-01T00:00:00Z"
+content_capture:
+  mode: hashes_only
+catalogs:
+  - "eu-ai-act@2026.09"
+subjects:
+  - id: "spiffe://corp/agents/eu-cluster1"
+    name: "EU AI Act cluster-1 gate fixture subject"
+    role: "both"

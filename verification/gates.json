@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.75.0",
+  "suite_version": "0.76.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3052,6 +3052,68 @@
         }
       ],
       "fix_hint": "Run verification/gates/cnd05_chain.sh; it names the engine, the case, the CND-05 outcome and failing events it gave and the ones expected. The rule is actsOnUntrusted in each engine's graph builder: the refs.parent / refs.origin closure over instructions, seeded with tool calls, resource accesses, instructions that declare no trusted source class and ROB-02's two closures (tainted, and never ruled on by the guard). A decision case that reads conformant points at the PSP parser (psp.py, psp.ts, Psp.java): every sh:targetClass of a shape is read, as a union."
+    },
+    {
+      "id": "VG-EUAIACT-CLUSTER1",
+      "title": "Eight eu-ai-act controls that shared one rule (a consequential decision is reviewed) each test what their title says in all three engines (18.37c): INC-03 the decisions an incident names, holding every decision to the rule when any name leads to no held decision; OVS-01 every consequential decision reviewed; OVS-07 overrides and interrupts effective and by a human; OVS-08 enough distinct human reviewers, two under dual_control; ROB-07 incidents detected and responded to; RSK-02 a policy decision or a review; DAT-03 and RSK-03 (rung 3) not_assessed",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/eu_cluster1.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/eu_cluster1/cases.json (41: INC-03 triggering decision reviewed and not, trigger via Outcome, ToolCall, refs.decision, no incident, incident naming another decision, untraced incident, unresolved id, a reviewed decision named beside an Override of an unreviewed one or beside an unresolved id, with reviewed twins; OVS-01 all reviewed and one not; OVS-07 effective override, halted and paused interrupts, override with no replacement, an unchanged replacement, a decision not held, a service actor, interrupt degraded, without mechanism, without actor, none; OVS-08 one human, no actor, service reviewer, dual_control two humans and one human twice, domain-declared dual_control with one human; ROB-07 responded, reported, detected only, no detection, no incident; RSK-02 authorized and neither; DAT-03 and RSK-03 not_assessed) gives the expected outcome of its control, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined",
+        "fail": "any case gives another outcome, another set of failing events or another exit code in any engine, or quarantines a record"
+      },
+      "faults": [
+        {
+          "description": "Python skips an Incident name that leads to no held decision instead of holding every decision to the rule, so a reviewed decision named beside an unresolved id hides the unreviewed one (INC-03)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                if named not in self.decision_time:\n                    return None\n",
+          "replace": "                if named not in self.decision_time:\n                    continue\n"
+        },
+        {
+          "description": "Python counts OVS-08 reviewers per approval, not per distinct human, so one human approving twice satisfies dual_control",
+          "file": "engines/python/agentce/graph.py",
+          "search": "self.human_reviewers.setdefault(decision, set()).add(human)",
+          "replace": "self.human_reviewers.setdefault(decision, set()).add(node)"
+        },
+        {
+          "description": "TypeScript skips an Incident name that leads to no held decision instead of holding every decision to the rule (INC-03)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "        if (named === undefined || !this.decisionTime.has(named)) {\n          return null;\n",
+          "replace": "        if (named === undefined || !this.decisionTime.has(named)) {\n          continue;\n"
+        },
+        {
+          "description": "TypeScript counts OVS-08 reviewers per approval, not per distinct human",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "          reviewers.add(human);\n",
+          "replace": "          reviewers.add(node);\n"
+        },
+        {
+          "description": "Java skips an Incident name that leads to no held decision instead of holding every decision to the rule (INC-03)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "                    if (named == null || !decisionTime.containsKey(named)) {\n                        return null;\n",
+          "replace": "                    if (named == null || !decisionTime.containsKey(named)) {\n                        continue;\n"
+        },
+        {
+          "description": "Java counts OVS-08 reviewers per approval, not per distinct human",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "humanReviewers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);",
+          "replace": "humanReviewers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(node);"
+        }
+      ],
+      "fix_hint": "Each engine's graph builder materialises triggersIncident, oversightCoverageComplete, interventionEffective, interventionByHuman and incidentResponded (graph.py _incident_decisions, _oversight_coverage, _intervention; graph.ts and Graph.java the same); an Incident name that resolves to no held decision, directly or through the named event's refs.decision, must hold every decision to INC-03, and OVS-08 counts distinct human actor ids. Run `ENGINES=python bash verification/gates/eu_cluster1.sh` (or typescript, java) to see one engine's cases."
     }
   ]
 }

@@ -1,0 +1,11 @@
+# Domain ontology binding for the VG-EUAIACT-CLUSTER1 gate fixture (18.37c). Two consequential decision
+# types: dom:CreditDecision declares no oversight modality, dom:LargeLoanDecision declares dual_control, so
+# OVS-08 needs two distinct human reviewers on it whatever the decision itself records.
+decision_types:
+  - id: "dom:CreditDecision"
+    subclass_of: "agentce:ConsequentialDecision"
+    consequential: true
+  - id: "dom:LargeLoanDecision"
+    subclass_of: "agentce:ConsequentialDecision"
+    consequential: true
+    required_oversight_modality: "dual_control"
