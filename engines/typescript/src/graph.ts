@@ -491,11 +491,11 @@ class Builder {
    * verdict is quarantine or block, or which carries no trust and no verdict but an untrusted Appendix F
    * `provenance_origin_class`; a MemoryRead whose `trust_min` is untrusted or quarantined; and an
    * instruction with an untrusted Appendix F source class (CND-05's rule). Content the guard never ruled
-   * on starts at a MemoryRead not reported by an enforcement point, a record no enforcement-point read or
-   * ruled write covers, and a ref the bundle does not hold. Both flow along every edge that carries
-   * content into an event (CONTENT_IN, CONTENT_OUT, a read to its consumer, a record to and from its
-   * writes) for as many hops as the records show. Closures over all events, so order and cycles never
-   * matter. */
+   * on starts at a MemoryRead not reported by an enforcement point, a record no ruled enforcement-point
+   * write and no enforcement-point read with a `trust_min` covers, and a ref the bundle does not hold.
+   * Both flow along every edge that carries content into an event (CONTENT_IN, CONTENT_OUT, a read to
+   * its consumer, a record to and from its writes) for as many hops as the records show. Closures over
+   * all events, so order and cycles never matter. */
   private robustToUntrusted(events: Event[]): void {
     const flows = new Map<string, Set<string>>();
     const tainted = new Set<string>();
@@ -559,7 +559,8 @@ class Builder {
         for (const record of Array.isArray(read) ? read : []) {
           if (typeof record === "string") {
             records.add(record);
-            if (enforced) {
+            // A guard's read rules on its records only when it filtered them by trust.
+            if (enforced && !isAbsent(data.trust_min)) {
               guarded.add(record);
             }
           }

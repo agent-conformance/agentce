@@ -549,10 +549,11 @@ public final class Graph {
          * untrusted Appendix F {@code provenance_origin_class}; a MemoryRead whose {@code trust_min}
          * is untrusted or quarantined; and an instruction with an untrusted Appendix F source class
          * (CND-05's rule). Content the guard never ruled on starts at a MemoryRead not reported by an
-         * enforcement point, a record no enforcement-point read or ruled write covers, and a ref the
-         * bundle does not hold. Both flow along every edge that carries content into an event
-         * (CONTENT_IN, CONTENT_OUT, a read to its consumer, a record to and from its writes) for as
-         * many hops as the records show. Closures over all events, so order and cycles never matter. */
+         * enforcement point, a record no ruled enforcement-point write and no enforcement-point read
+         * with a {@code trust_min} covers, and a ref the bundle does not hold. Both flow along every
+         * edge that carries content into an event (CONTENT_IN, CONTENT_OUT, a read to its consumer, a
+         * record to and from its writes) for as many hops as the records show. Closures over all
+         * events, so order and cycles never matter. */
         private void robustToUntrusted(List<JsonNode> events) {
             Map<String, Set<String>> flows = new LinkedHashMap<>();
             Set<String> tainted = new LinkedHashSet<>();
@@ -610,7 +611,8 @@ public final class Graph {
                             String record = str(ref);
                             if (record != null) {
                                 records.add(record);
-                                if (enforced) {
+                                // A guard's read rules on its records only when it filtered them by trust.
+                                if (enforced && !isAbsent(data.get("trust_min"))) {
                                     guarded.add(record);
                                 }
                             }

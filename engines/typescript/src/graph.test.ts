@@ -236,8 +236,14 @@ test("ROB-02: not ruled on a record no enforcement point covers", () => {
   assert.deepEqual(ruled([unguarded, used]), ["false"]);
   const silent = memoryEvent("w2", "MemoryWrite", { record_ref: "mem:r1" });
   assert.deepEqual(ruled([silent, used]), ["false"]);
+  // An enforcement-point read covers the record only when it filtered by trust.
   const guardRead = memoryEvent("m1", "MemoryRead", { record_refs: ["mem:r1"] });
-  assert.deepEqual(ruled([unguarded, guardRead, used]), ["true"]);
+  assert.deepEqual(ruled([unguarded, guardRead, used]), ["false"]);
+  const filtered = memoryEvent("m1", "MemoryRead", {
+    record_refs: ["mem:r1"],
+    trust_min: "trusted",
+  });
+  assert.deepEqual(ruled([unguarded, filtered, used]), ["true"]);
 });
 
 test("ROB-02: not ruled on a ref the bundle does not hold", () => {

@@ -551,7 +551,7 @@
     {
       "@id": "agentce:untrustedContentRuledOn",
       "@type": "owl:DatatypeProperty",
-      "rdfs:comment": "On a Decision: whether the memory guard ruled on everything it used, through any number of hops -- every read it used was reported by an enforcement point, every record it used is covered by an enforcement-point read or an enforcement-point write carrying a trust or guard verdict, and every ref it used is held in the bundle.",
+      "rdfs:comment": "On a Decision: whether the memory guard ruled on everything it used, through any number of hops -- every read it used was reported by an enforcement point, every record it used is covered by an enforcement-point read carrying a trust_min or an enforcement-point write carrying a trust or guard verdict, and every ref it used is held in the bundle.",
       "rdfs:domain": {
         "@id": "agentce:Decision"
       },

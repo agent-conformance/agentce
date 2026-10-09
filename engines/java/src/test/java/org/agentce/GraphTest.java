@@ -206,8 +206,12 @@ class GraphTest {
         assertEquals(List.of("false"), ruled(List.of(unguarded, used)));
         JsonNode silent = event("w2", "MemoryWrite", "\"record_ref\": \"mem:r1\"");
         assertEquals(List.of("false"), ruled(List.of(silent, used)));
+        // An enforcement-point read covers the record only when it filtered by trust.
         JsonNode guardRead = event("m1", "MemoryRead", "\"record_refs\": [\"mem:r1\"]");
-        assertEquals(List.of("true"), ruled(List.of(unguarded, guardRead, used)));
+        assertEquals(List.of("false"), ruled(List.of(unguarded, guardRead, used)));
+        JsonNode filtered =
+                event("m1", "MemoryRead", "\"record_refs\": [\"mem:r1\"], \"trust_min\": \"trusted\"");
+        assertEquals(List.of("true"), ruled(List.of(unguarded, filtered, used)));
     }
 
     @Test

@@ -448,12 +448,12 @@ class _Builder:
         untrusted Appendix F ``provenance_origin_class``; a MemoryRead whose ``trust_min`` is
         untrusted or quarantined; and an instruction with an untrusted Appendix F source class
         (CND-05's rule). Content the guard never ruled on starts at a MemoryRead not reported by
-        an enforcement point, a record no enforcement-point read or ruled write covers, and a
-        ref the bundle does not hold. Both flow along every edge that carries content into an
-        event (``_CONTENT_IN``, ``_CONTENT_OUT``, a read to its consumer, a record to and from
-        its writes) for as many hops as the records show, so a decision is reached through
-        another decision, a tool call or a model call. Closures over all events, so order and
-        cycles never matter."""
+        an enforcement point, a record no ruled enforcement-point write and no enforcement-point
+        read with a ``trust_min`` covers, and a ref the bundle does not hold. Both flow along
+        every edge that carries content into an event (``_CONTENT_IN``, ``_CONTENT_OUT``, a read
+        to its consumer, a record to and from its writes) for as many hops as the records show,
+        so a decision is reached through another decision, a tool call or a model call. Closures
+        over all events, so order and cycles never matter."""
         flows: dict[str, set[str]] = {}
         tainted: set[str] = set()
         unruled: set[str] = set()
@@ -507,7 +507,8 @@ class _Builder:
                 for record in read if isinstance(read, list) else []:
                     if isinstance(record, str):
                         records.add(record)
-                        if enforced:
+                        # A guard's read rules on its records only when it filtered them by trust.
+                        if enforced and data.get("trust_min") is not None:
                             guarded.add(record)
                 if not enforced:
                     unruled.add(node)

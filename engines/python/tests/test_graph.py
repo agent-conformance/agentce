@@ -620,9 +620,13 @@ def test_not_ruled_on_a_record_no_enforcement_point_covers() -> None:
     # An enforcement-point write with no trust or verdict is not a ruling either.
     silent = _event("w2", "MemoryWrite", {"record_ref": "mem:r1"})
     assert _ruled([silent, used]) == ["false"]
-    # An enforcement-point read of the record covers it.
+    # An enforcement-point read of the record covers it only when it filtered by trust.
     guard_read = _event("m1", "MemoryRead", {"record_refs": ["mem:r1"]})
-    assert _ruled([unguarded, guard_read, used]) == ["true"]
+    assert _ruled([unguarded, guard_read, used]) == ["false"]
+    filtered = _event(
+        "m1", "MemoryRead", {"record_refs": ["mem:r1"], "trust_min": "trusted"}
+    )
+    assert _ruled([unguarded, filtered, used]) == ["true"]
 
 
 def test_not_ruled_on_a_ref_the_bundle_does_not_hold() -> None:
