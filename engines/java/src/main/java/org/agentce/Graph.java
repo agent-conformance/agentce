@@ -112,6 +112,11 @@ public final class Graph {
         return refs != null && refs.isObject() ? refs : Json.nodes().objectNode();
     }
 
+    private static boolean isOneOf(JsonNode node, Set<String> values) {
+        String value = str(node);
+        return value != null && values.contains(value);
+    }
+
     private static String str(JsonNode node) {
         return node != null && node.isTextual() ? node.textValue() : null;
     }
@@ -560,13 +565,12 @@ public final class Graph {
                 if ("MemoryWrite".equals(ptype)) {
                     // A record and each write of it stand for the same content.
                     flow(flows, str(data.get("record_ref")), node);
-                    if (UNTRUSTED_TRUST.contains(Objects.requireNonNullElse(str(data.get("trust")), ""))
-                            || UNTRUSTED_VERDICTS.contains(
-                                    Objects.requireNonNullElse(str(data.get("guard_verdict")), ""))) {
+                    if (isOneOf(data.get("trust"), UNTRUSTED_TRUST)
+                            || isOneOf(data.get("guard_verdict"), UNTRUSTED_VERDICTS)) {
                         tainted.add(node);
                     }
                 } else if ("MemoryRead".equals(ptype)
-                        && UNTRUSTED_TRUST.contains(Objects.requireNonNullElse(str(data.get("trust_min")), ""))) {
+                        && isOneOf(data.get("trust_min"), UNTRUSTED_TRUST)) {
                     tainted.add(node);
                 }
             }

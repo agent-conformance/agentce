@@ -92,10 +92,6 @@ def _is_one_of(value: Any, values: frozenset[str]) -> bool:
     return isinstance(value, str) and value in values
 
 
-def _strings(value: Any) -> list[str]:
-    return [v for v in value if isinstance(v, str)] if isinstance(value, list) else []
-
-
 def _closure(subclass: dict[str, str], classes: set[str]) -> set[tuple[str, str]]:
     nodes = set(classes) | set(subclass) | set(subclass.values())
     pairs: set[tuple[str, str]] = {(node, node) for node in nodes}  # reflexive
@@ -465,7 +461,7 @@ class _Builder:
             node = event_iri(str(event["id"]))
             for key in _CONTENT_IN:
                 value = data.get(key)
-                for ref in _strings(value) if isinstance(value, list) else [value]:
+                for ref in value if isinstance(value, list) else [value]:
                     flow(ref, node)
             for key in _REFS_IN:
                 flow(refs.get(key), node)
