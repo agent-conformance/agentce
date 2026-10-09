@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.71.0",
+  "suite_version": "0.72.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2822,7 +2822,7 @@
     },
     {
       "id": "VG-ROB02-UNTRUSTED",
-      "title": "ROB-02 checks what its title says in all three engines: a consequential decision fails when untrusted content reached it, by any number of hops through its inputs, the reads it consumed, tool calls, model calls, other decisions, its origin or the instruction it acts on; the memory guard's trust and verdicts and an instruction's source class mark what is untrusted, and a bundle with no enforcement-point memory read reads insufficient_evidence (18.37b)",
+      "title": "ROB-02 checks what its title says in all three engines: a consequential decision fails when untrusted content reached it, by any number of hops through its inputs, the reads it consumed, tool calls, model calls, other decisions, its origin or the instruction it acts on; the memory guard's trust and verdicts, a write's untrusted provenance_origin_class and an instruction's source class mark what is untrusted; a decision whose used content the guard never ruled on (its own reads only self-reported, a record no enforcement-point read or write covers, a ref the bundle does not hold) reads insufficient_evidence, never a pass; and a declared evidence shape that cannot be resolved is refused (18.37b, 18.37k)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -2839,8 +2839,8 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/rob02_untrusted/cases.json (at least 40: clean memory; an input the guard wrote untrusted or quarantined; guard verdicts quarantine and block; sanitize is not untrusted; a consumed read with trust_min untrusted or quarantined, or of an untrusted record; acting on a tool_output or a user instruction; untrusted content the decision did not use; a minor decision tainted; two decisions, one tainted; a decision with no inputs; the untrusted write after the decision; a record written twice; memory reads only from self_report; no memory records; no decisions; inputs naming an untrusted read or write event or a model call that consumed an untrusted read; chains through another decision, a tool call's used[], two model calls, a model call's input_ref or output_ref and the decision's refs.origin, each with a trusted twin; a trusted write of a tainted record; an instruction derived from a tool_output instruction) gives the expected ROB-02 outcome, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined",
-        "fail": "any case gives another ROB-02 outcome, another set of failing events or another exit code in any engine, quarantines a record, or the case file has fewer than 40 cases"
+        "pass": "every case in verification/gates/fixtures/rob02_untrusted/cases.json (at least 47: clean memory; an input the guard wrote untrusted or quarantined; guard verdicts quarantine and block; sanitize is not untrusted; a consumed read with trust_min untrusted or quarantined, or of an untrusted record; acting on a tool_output or a user instruction; untrusted content the decision did not use; a minor decision tainted; two decisions, one tainted; a decision with no inputs; the untrusted write after the decision; a record written twice; memory reads only from self_report; no memory records; no decisions; inputs naming an untrusted read or write event or a model call that consumed an untrusted read; chains through another decision, a tool call's used[], two model calls, a model call's input_ref or output_ref and the decision's refs.origin, each with a trusted twin; a trusted write of a tainted record; an instruction derived from a tool_output instruction; a decision whose own reads are only self-reported, an input record no enforcement-point read or write covers, and an input event the bundle does not hold, each beside an enforcement-point memory read elsewhere in the bundle; a guarded twin; a write whose only trust signal is an untrusted provenance_origin_class and its trusted twin; a tainted decision beside an unruled one) gives the expected ROB-02 outcome, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined; and assess in all three engines refuses, with catalog.evidence_shape.unresolved, a baseline copy whose ROB-02 evidence shape has no target, is declared empty or points outside the catalog folder, while a copy whose evidence shape is renamed still judges; Python's catalog lint refuses the targetless copy and a mistyped target class",
+        "fail": "any case gives another ROB-02 outcome, another set of failing events or another exit code in any engine, quarantines a record, or the case file has fewer than 47 cases, or an unresolvable evidence shape is not refused with its key"
       },
       "faults": [
         {
@@ -2860,9 +2860,27 @@
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "tainted.contains(node) ? \"false\" : \"true\"",
           "replace": "\"true\""
+        },
+        {
+          "description": "Python marks every decision's used content ruled on, so a decision whose own memory reads are only self-reported reads ROB-02 conformant",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                    \"false\" if node in unruled else \"true\",",
+          "replace": "                    \"true\","
+        },
+        {
+          "description": "TypeScript marks every decision's used content ruled on, so a decision whose own memory reads are only self-reported reads ROB-02 conformant",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "          unruled.has(node) ? \"false\" : \"true\",",
+          "replace": "          \"true\","
+        },
+        {
+          "description": "Java marks every decision's used content ruled on, so a decision whose own memory reads are only self-reported reads ROB-02 conformant",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "unruled.contains(node) ? \"false\" : \"true\"",
+          "replace": "\"true\""
         }
       ],
-      "fix_hint": "Run verification/gates/rob02_untrusted.sh; it names the engine, the case, the ROB-02 outcome and failing events it gave and the ones expected. The rule is each engine's robustToUntrusted closure in its graph builder (the CONTENT_IN, CONTENT_OUT and REFS_IN tables)."
+      "fix_hint": "Run verification/gates/rob02_untrusted.sh; it names the engine, the case, the ROB-02 outcome and failing events it gave and the ones expected. The rules are each engine's two closures (tainted, and not ruled on) in robustToUntrusted in its graph builder (the CONTENT_IN, CONTENT_OUT and REFS_IN tables)."
     },
     {
       "id": "VG-CLI-COLLECT-DOCTOR-INIT",

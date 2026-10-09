@@ -96,9 +96,57 @@ for dir in "$work"/*/; do
     fi
   done
 done
+# A declared evidence shape is resolved or refused, never skipped into a pass. Copies of the baseline whose ROB-02
+# evidence shape has lost its target, is declared empty, or points outside the catalog folder make assess refuse with
+# one key in every engine; a renamed evidence shape stays bound to the file the control names and still judges. Catalog
+# lint (Python only; TypeScript and Java do not implement it) refuses the targetless copy and a mistyped target class.
+cats="$work/.catalogs"
+evidence=shapes/ROB-02-evidence.ttl
+base_cat="$root/spec/catalogs/base/baseline"
+mkdir -p "$cats"
+for copy in no-target empty outside renamed typo; do cp -R "$base_cat" "$cats/$copy"; done
+grep -v 'sh:targetClass' "$base_cat/$evidence" >"$cats/no-target/$evidence"
+sed -i.bak "s#evidence_shape: $evidence#evidence_shape: ''#" "$cats/empty/controls/ROB-02.yaml"
+cp "$base_cat/$evidence" "$cats/outside.ttl"
+sed -i.bak "s#evidence_shape: $evidence#evidence_shape: ../outside.ttl#" "$cats/outside/controls/ROB-02.yaml"
+sed 's/ROB-02-EvidenceShape/AnyName/' "$base_cat/$evidence" >"$cats/renamed/$evidence"
+sed 's/agentce:ConsequentialDecision/agentce:ConsequentalDecision/' "$base_cat/$evidence" >"$cats/typo/$evidence"
+rm -f "$cats"/*/controls/*.bak
+key=catalog.evidence_shape.unresolved
+for copy in no-target typo; do
+  code=0
+  lint="$(run python catalog lint "$cats/$copy" 2>&1)" || code=$?
+  want_key="$key"
+  [ "$copy" = typo ] && want_key=catalog.evidence_shape.passed_case_unjudged
+  if [ "$code" = 0 ] || ! grep -q "$want_key" <<<"$lint"; then
+    echo "rob02-untrusted: catalog lint did not refuse the $copy evidence shape with $want_key (exit $code)" >&2
+    status=1
+  fi
+done
+unguarded="$work/input-unguarded-record"
+for engine in python typescript java; do
+  for copy in no-target empty outside renamed; do
+    out="$unguarded/out-$engine-$copy"
+    code=0
+    run "$engine" assess --bundle "$unguarded/bundle" --profile "$fixtures/applicability.yaml" \
+      --domain "$fixtures/domain.linkml.yaml" --catalog-dir "$cats/$copy" --allow-unverified-catalog --out "$out" \
+      >"$out.err" 2>&1 || code=$?
+    # Python writes the refusal to stderr, TypeScript and Java to stdout; either carries the key.
+    if [ "$copy" != renamed ]; then
+      if [ "$code" != 3 ] || ! grep -q "$key" "$out.err"; then
+        echo "rob02-untrusted: $engine assess with the $copy evidence shape exited $code without $key" >&2
+        status=1
+      fi
+    elif [ "$code" != "$(cat "$unguarded/exit")" ] || [ "$(rob02 "$out/assertions.json" 2>/dev/null)" != "$(cat "$unguarded/expected")" ]; then
+      echo "rob02-untrusted: $engine with a renamed evidence shape did not read $(cat "$unguarded/expected") (exit $code)" >&2
+      status=1
+    fi
+  done
+done
+
 count="$(ls -d "$work"/*/ | wc -l | tr -d ' ')"
-if [ "$count" -lt 40 ]; then
-  echo "rob02-untrusted: only $count cases in cases.json, expected at least 40" >&2
+if [ "$count" -lt 47 ]; then
+  echo "rob02-untrusted: only $count cases in cases.json, expected at least 47" >&2
   status=1
 fi
 [ "$status" -eq 0 ] && echo "rob02-untrusted: $count cases, three engines agree with the expected ROB-02 outcome"

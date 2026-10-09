@@ -713,6 +713,24 @@
       },
       "events": [
         {
+          "id": "w0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:00Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
           "id": "g0",
           "source": "urn:src:enforcement_point",
           "subject": "spiffe://corp/agents/rob02-fixture",
@@ -865,6 +883,24 @@
       },
       "events": [
         {
+          "id": "w0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:00Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
           "id": "m1",
           "source": "urn:src:enforcement_point",
           "subject": "spiffe://corp/agents/rob02-fixture",
@@ -903,7 +939,7 @@
               "id": "spiffe://corp/agents/rob02-fixture"
             },
             "inputs": [
-              "ctx:input-1"
+              "mem:r1"
             ]
           }
         },
@@ -2968,6 +3004,613 @@
           }
         }
       ]
+    },
+    "decision-own-reads-self-report-only": {
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "m0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "trust_min": "trusted",
+            "refs": {
+              "consumer": "agentce:event/d0"
+            }
+          }
+        },
+        {
+          "id": "d0",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": [
+              "mem:r1"
+            ]
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "trust_min": "trusted",
+            "refs": {
+              "consumer": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": []
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 0
+      }
+    },
+    "input-dangling-event": {
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "trust_min": "trusted",
+            "refs": {
+              "consumer": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": [
+              "mem:r1",
+              "agentce:event/x9"
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 0
+      }
+    },
+    "input-unguarded-record": {
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "trust_min": "trusted",
+            "refs": {
+              "consumer": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "id": "w2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r2",
+            "trust": "trusted"
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": [
+              "mem:r1",
+              "mem:r2"
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 0
+      }
+    },
+    "input-guarded-record": {
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "trust_min": "trusted",
+            "refs": {
+              "consumer": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "id": "w2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r2",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": [
+              "mem:r1",
+              "mem:r2"
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 0
+      }
+    },
+    "write-origin-class-untrusted": {
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "provenance_origin_class": "tool_output"
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "refs": {
+              "consumer": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": [
+              "mem:r1"
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1"
+        ],
+        "exit": 1
+      }
+    },
+    "write-origin-class-trusted": {
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "provenance_origin_class": "user"
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "refs": {
+              "consumer": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": [
+              "mem:r1"
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 0
+      }
+    },
+    "tainted-and-unguarded": {
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "untrusted"
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "refs": {
+              "consumer": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": [
+              "mem:r1"
+            ]
+          }
+        },
+        {
+          "id": "m2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r3"
+            ],
+            "refs": {
+              "consumer": "agentce:event/d2"
+            }
+          }
+        },
+        {
+          "id": "d2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": []
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1"
+        ],
+        "exit": 1
+      }
     }
   }
 }

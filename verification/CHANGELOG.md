@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.72.0
+
+- `VG-ROB02-UNTRUSTED` (18.37k) grows to 47 cases and six seeded faults, two in each engine's graph builder. ROB-02
+  read conformant on a decision the memory guard never ruled on, as long as the bundle held one enforcement-point
+  memory read somewhere: a decision whose own reads only the agent reported, an input record no enforcement-point
+  read or write covers, or an input the bundle does not hold. Each engine now marks, per decision, whether the
+  guard ruled on all the content it used, and ROB-02 reads insufficient_evidence for a decision it did not. A write
+  with no trust and no verdict whose `provenance_origin_class` is an untrusted Appendix F class now counts as
+  untrusted. The case file adds those decisions, each beside an enforcement-point read elsewhere in the bundle, with
+  guarded and trusted twins and a tainted decision beside an unruled one. The gate also checks that a catalog
+  whose declared evidence shape has no target, is declared empty or points outside the catalog folder is refused
+  with `catalog.evidence_shape.unresolved` in all three engines, and that Python's `catalog lint` refuses it too.
+  The new faults make each engine mark every decision ruled on.
+
 ## 0.71.0
 
 - `VG-ROB02-UNTRUSTED` (18.37b) is new, with 40 cases and three seeded faults, one in each engine's graph builder.
