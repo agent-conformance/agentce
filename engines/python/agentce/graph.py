@@ -504,11 +504,12 @@ class _Builder:
                     tainted.add(node)
             elif ptype == "MemoryRead":
                 read = data.get("record_refs")
+                # A guard's read rules on its records only when it filtered them by trust.
+                ruling = enforced and data.get("trust_min") is not None
                 for record in read if isinstance(read, list) else []:
                     if isinstance(record, str):
                         records.add(record)
-                        # A guard's read rules on its records only when it filtered them by trust.
-                        if enforced and data.get("trust_min") is not None:
+                        if ruling:
                             guarded.add(record)
                 if not enforced:
                     unruled.add(node)

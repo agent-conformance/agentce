@@ -606,13 +606,14 @@ public final class Graph {
                     }
                 } else if ("MemoryRead".equals(ptype)) {
                     JsonNode read = data.get("record_refs");
+                    // A guard's read rules on its records only when it filtered them by trust.
+                    boolean ruling = enforced && !isAbsent(data.get("trust_min"));
                     if (read != null && read.isArray()) {
                         for (JsonNode ref : read) {
                             String record = str(ref);
                             if (record != null) {
                                 records.add(record);
-                                // A guard's read rules on its records only when it filtered them by trust.
-                                if (enforced && !isAbsent(data.get("trust_min"))) {
+                                if (ruling) {
                                     guarded.add(record);
                                 }
                             }

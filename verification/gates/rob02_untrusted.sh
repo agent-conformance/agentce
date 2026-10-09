@@ -60,8 +60,9 @@ run() {
 
 # ROB-02's outcome for the fixture subject (the one that decides; the profile's other subject only holds memory
 # writes in the cross-subject cases), then the event ids of its failing focus nodes ("<outcome> <id,id>").
+subject="spiffe://corp/agents/rob02-fixture"
 rob02() {
-  jq -r '[.[]? // .assertions[] | select(.control == "ROB-02" and .subject == "spiffe://corp/agents/rob02-fixture")][0]
+  jq -r --arg subject "$subject" '[.[]? // .assertions[] | select(.control == "ROB-02" and .subject == $subject)][0]
     | "\(.outcome) \([.violations[]?.focus | sub("^agentce:event/"; "")] | unique | join(","))"' "$1"
 }
 

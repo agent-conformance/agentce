@@ -556,11 +556,12 @@ class Builder {
         }
       } else if (ptype === "MemoryRead") {
         const read = data.record_refs;
+        // A guard's read rules on its records only when it filtered them by trust.
+        const ruling = enforced && !isAbsent(data.trust_min);
         for (const record of Array.isArray(read) ? read : []) {
           if (typeof record === "string") {
             records.add(record);
-            // A guard's read rules on its records only when it filtered them by trust.
-            if (enforced && !isAbsent(data.trust_min)) {
+            if (ruling) {
               guarded.add(record);
             }
           }
