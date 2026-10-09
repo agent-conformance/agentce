@@ -52,7 +52,7 @@ def test_init_still_accepts_the_flags_it_used_to_require(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     code, env = _run(
-        ["init", "--non-interactive", "--role", "provider", "--out", str(tmp_path)],
+        ["init", "--role", "provider", "--out", str(tmp_path)],
         capsys,
     )
     assert code == 0 and env["role"] == "provider"

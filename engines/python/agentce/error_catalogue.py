@@ -206,6 +206,11 @@ _KINDS: dict[str, str] = {
     "input.verify_target": "error",
     "input.out_missing": "error",
     "input.out_dir_unwritable": "error",
+    "input.adapters_root_not_a_directory": "error",
+    "input.collect_flag_unused": "error",
+    "input.doctor_flag_unused": "error",
+    "input.init_value_empty": "error",
+    "input.write_errors_unwritable": "error",
     # Warnings.
     "environment.cryptography_source_build": "warning",
     "warning.pilot_window": "warning",

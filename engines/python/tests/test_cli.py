@@ -1388,7 +1388,6 @@ def test_init_writes_a_valid_profile(
     code, env = run(
         [
             "init",
-            "--non-interactive",
             "--framework",
             "custom-loop",
             "--subject",

@@ -39,7 +39,7 @@ def _run(argv: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, str,
 
 
 def _bare_init(out: Path, capsys: pytest.CaptureFixture[str]) -> dict[str, Any]:
-    code, _, _ = _run(["init", "--non-interactive", "--out", str(out)], capsys)
+    code, _, _ = _run(["init", "--out", str(out)], capsys)
     assert code == 0
     profile = yaml.safe_load(
         (out / "agentce" / "applicability.yaml").read_text(encoding="utf-8")
@@ -85,7 +85,6 @@ def test_init_with_own_subject_says_how_to_emit_under_it(
     code, out, _ = _run(
         [
             "init",
-            "--non-interactive",
             "--subject",
             "spiffe://corp/agents/a",
             "--out",
@@ -104,7 +103,6 @@ def test_init_for_an_otel_framework_keeps_a_source_to_fill_in(
     code, _, _ = _run(
         [
             "init",
-            "--non-interactive",
             "--framework",
             "langgraph",
             "--out",

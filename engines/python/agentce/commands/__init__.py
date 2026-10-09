@@ -2355,14 +2355,28 @@ def cmd_collect(ns: argparse.Namespace) -> CommandResult:
     )
     out = _opt_str(ns, "out")
     dry_run = _flag(ns, "dry_run")
+    _refuse_empty_out(out)
     if not dry_run and not out:
         raise InputError(
             "input.out_missing",
             "a real collection needs an output bundle path.",
             "pass --out <bundle>, or --dry-run to plan only.",
         )
+    raw_adapters_root = _opt_str(ns, "adapters_root")
+    if dry_run and raw_adapters_root is not None:
+        raise InputError(
+            "input.collect_flag_unused",
+            "--adapters-root is never read in a dry run: a dry run adapts no source.",
+            "drop --adapters-root, or drop --dry-run to run the collection.",
+        )
+    if raw_adapters_root == "":
+        raise InputError(
+            "input.adapters_root_not_a_directory",
+            "--adapters-root '' names no directory.",
+            "pass --adapters-root <dir> (an adapters checkout), or drop it to use ./adapters.",
+        )
     config = load_config(config_path)
-    adapters_root = Path(_opt_str(ns, "adapters_root") or "adapters")
+    adapters_root = Path(raw_adapters_root or "adapters")
     outcome = run_collect(
         config,
         out_dir=Path(out) if out else None,
@@ -3479,10 +3493,29 @@ def cmd_doctor(ns: argparse.Namespace) -> CommandResult:
     the exact fix for each problem (SPEC §13.4 AX-5). With ``--write-errors`` it regenerates the message-key catalogue instead."""
     result = CommandResult(command="doctor")
     write_errors = _opt_str(ns, "write_errors")
-    if write_errors:
+    if write_errors is not None:
+        if _opt_str(ns, "project") is not None:
+            raise InputError(
+                "input.doctor_flag_unused",
+                "--project is never read with --write-errors: doctor writes the message-key "
+                "catalogue instead of diagnosing.",
+                "drop --project to write the catalogue, or drop --write-errors to diagnose the project.",
+            )
         path = Path(write_errors)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(render_errors_md(), encoding="utf-8")
+        fix = "pass --write-errors <file> with a writable path, e.g. docs/errors.md."
+        if write_errors == "" or path.is_dir():
+            raise InputError(
+                "input.write_errors_unwritable",
+                f"--write-errors {write_errors!r} names no file.",
+                fix,
+            )
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(render_errors_md(), encoding="utf-8")
+        except OSError as exc:
+            raise InputError(
+                "input.write_errors_unwritable", exc.strerror or str(exc), fix
+            ) from exc
         result.data.update({"errors_md": str(path)})
         result.note(f"wrote {path}")
         return result
@@ -3640,6 +3673,14 @@ def cmd_quickstart(ns: argparse.Namespace) -> CommandResult:
 def cmd_init(ns: argparse.Namespace) -> CommandResult:
     """Write a starter applicability profile for an adopter (SPEC §13.4 AX-2)."""
     result = CommandResult(command="init")
+    _refuse_empty_out(_opt_str(ns, "out"))
+    for flag in ("subject", "framework"):
+        if _opt_str(ns, flag) == "":
+            raise InputError(
+                "input.init_value_empty",
+                f"--{flag} '' names nothing.",
+                f"pass a value with --{flag}, or drop it to use the default.",
+            )
     out = _opt_str(ns, "out") or DEFAULT_PROJECT_DIR
     subject = _opt_str(ns, "subject") or DEFAULT_SUBJECT
     role = _opt_str(ns, "role") or "deployer"

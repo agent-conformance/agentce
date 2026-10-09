@@ -19,7 +19,9 @@ options:
   -h, --help            show this help message and exit
   --config CONFIG       the collection config file
   --out OUT             the output bundle path
-  --dry-run             plan only; write nothing
+  --dry-run             plan only: run no adapter and resolve no credential;
+                        with --out, write the plan (collect-plan.json) and its
+                        manifest.json there, nothing else
   --adapters-root ADAPTERS_ROOT
                         the adapters checkout a source's `export` is resolved
                         through (default: ./adapters)

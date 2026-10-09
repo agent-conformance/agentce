@@ -31,6 +31,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `environment.python_unsupported` | the running Python is older than the interpreter the engine supports. | run the engine under Python 3.12 or newer (`uv python install 3.12`). |
 | `input.adapter_missing` | ingest needs an adapter. | pass --adapter, e.g. --adapter otel-genai. |
 | `input.adapter_not_found` | no adapter directory exists at the given adapters-root and adapter name. | pass --adapters-root pointing at the adapters checkout, or check the adapter name. |
+| `input.adapters_root_not_a_directory` | collect was given an empty --adapters-root, which names no adapters checkout. | pass --adapters-root <dir> (an adapters checkout), or drop it to use ./adapters. |
 | `input.allow_unverified_requires_catalog_dir` | --allow-unverified-catalog was given without --catalog-dir, so there is no catalog for it to apply to. | add --catalog-dir <dir>, or drop --allow-unverified-catalog. |
 | `input.assess_flag_needs_value` | argument --deviations: expected one argument | pass --deviations <file>. |
 | `input.assess_unrecognized_flag` | assess was given a flag it does not recognize, or more than one records folder. | run `agentce assess --help` for the flags assess takes, or drop the flag. |
@@ -51,6 +52,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.catalog_unresolved` | a requested catalog id@version does not resolve to any catalog directory. | use an available <id>@<version>, or pass --catalog-dir <dir> for a catalog on disk. |
 | `input.catalog_unverified` | a --catalog-dir catalog is unsigned, or its signature does not verify against the effective trust root. | point --catalog-dir at a catalog whose catalog.sig.json verifies, or pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) for the root that signed it; --allow-unverified-catalog assesses it anyway and records the override as a limitation. |
 | `input.collect_config` | the collect config could not be read, or does not have the expected shape. | fix the config file the error names, then re-run collect. |
+| `input.collect_flag_unused` | collect was given --adapters-root with --dry-run; a dry run adapts no source, so the flag is never read. | drop --adapters-root, or drop --dry-run to run the collection. |
 | `input.collect_unrecognized_flag` | collect was given a flag it does not recognize, or an argument it does not take. | run `agentce collect --help` for the flags collect takes, or drop the flag. |
 | `input.config_action` | the only config action is `show`. | run `agentce config show`. |
 | `input.config_unrecognized_flag` | config was given a flag it does not recognize, or an argument it does not take. | run `agentce config show --help` for the flags it takes, or drop the flag. |
@@ -65,6 +67,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.diff_format` | --format must be one of text, json, or md. | pass --format text|json|md. |
 | `input.diff_unrecognized_flag` | diff was given a flag it does not recognize. | pass --format text|json|md, or drop the flag. |
 | `input.digest_unreadable` | assess could not read the deviation register, profile or domain file again to record its digest. | make the file readable, then re-run. |
+| `input.doctor_flag_unused` | doctor was given --project with --write-errors; --write-errors writes the message-key catalogue instead of diagnosing, so --project is never read. | drop --project to write the catalogue, or drop --write-errors to diagnose the project. |
 | `input.doctor_unrecognized_flag` | doctor was given a flag it does not recognize, or an argument it does not take. | run `agentce doctor --help` for the flags doctor takes, or drop the flag. |
 | `input.domain_binding_invalid` | the domain binding is not safe YAML: a disallowed construct, or a structure nested too deeply to parse safely. | remove custom YAML tags and flatten deep nesting in the domain binding file. |
 | `input.emit_format` | --emit named a format the engine does not write. | pass --emit with formats from the list the error names. |
@@ -79,8 +82,9 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.init_exists` | init would overwrite a profile or domain binding that already exists. | pass --force to overwrite, or --out <dir> to write somewhere else. |
 | `input.init_role` | --role must be one of deployer, provider, or both. | pass --role deployer|provider|both. |
 | `input.init_unrecognized_flag` | init was given a flag it does not recognize, or an argument it does not take. | run `agentce init --help` for the flags init takes, or drop the flag. |
+| `input.init_value_empty` | init was given an empty --subject or --framework. | pass a value with the flag, or drop it to use the default. |
 | `input.nothing_evaluated` | no control reached conformant, non-conformant, or insufficient_evidence, so the run judged nothing. | emit under the subject and source the profile declares (agentce-emit reads AGENTCE_EMIT_SUBJECT and AGENTCE_EMIT_SOURCE), and record the evidence the catalog's controls apply to. |
-| `input.out_dir_unwritable` | the --out directory of assess, quickstart, validate, conformance or init could not be created or written to, or --out was empty. | choose a writable --out directory. |
+| `input.out_dir_unwritable` | the --out directory of assess, quickstart, validate, conformance, collect or init could not be created or written to, or --out was empty. | choose a writable --out directory. |
 | `input.out_missing` | the command needs an output bundle path. | pass --out <bundle>. |
 | `input.package_path_overlap` | --out overlaps --bundle, --profile, --domain, or a --catalog-dir: packaging would read from or write into the tree it is producing. | point --out somewhere outside every input path, then re-run. |
 | `input.package_requires_bundle` | --package-for-sharing works only with --bundle/--profile; a records-folder run cannot be reproduced from a --bundle re-run. | pass --bundle and --profile instead of a records folder, or drop --package-for-sharing. |
@@ -116,6 +120,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.verify_target` | verify's target flags were given more than once, none at all, or in a combination that isn't valid. | pass exactly one target, e.g. `agentce verify --bundle <dir>`. |
 | `input.verify_unrecognized_flag` | verify was given a flag it does not recognize. | pass --bundle, --catalog, --release, or --report (with --signer-trust-root or --expect-keyid for --report), or drop the flag. |
 | `input.version_unrecognized_flag` | version was given a flag it does not recognize, or an argument it does not take. | run `agentce version --help` for the flags version takes, or drop the flag. |
+| `input.write_errors_unwritable` | doctor --write-errors was empty, named a directory, or could not be written to. | pass --write-errors <file> with a writable path, e.g. docs/errors.md. |
 | `internal.unexpected` | an unexpected internal error occurred. | re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate. |
 | `report.missing_evidence_pointer` | an assertion reached a conformant, non-conformant, or partial outcome with no evidence pointer. | every conformant, non-conformant, or partial outcome must cite evidence (DC-5). |
 | `sign.claim_malformed` | claim.json is not a JSON object whose signatures field, if present, is a list. | re-run the `agentce assess` command that wrote this report, then sign the new report. |

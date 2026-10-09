@@ -545,7 +545,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run",
         dest="dry_run",
         action="store_true",
-        help="plan only; write nothing",
+        help=(
+            "plan only: run no adapter and resolve no credential; with --out, write the plan "
+            "(collect-plan.json) and its manifest.json there, nothing else"
+        ),
     )
     p.add_argument(
         "--adapters-root",
@@ -788,12 +791,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser(
         "init", parents=[common], help="write a starter applicability profile"
-    )
-    p.add_argument(
-        "--non-interactive",
-        dest="non_interactive",
-        action="store_true",
-        help="accepted for compatibility; init never prompts",
     )
     p.add_argument(
         "--framework", help="the agent framework, e.g. custom-loop, langgraph"

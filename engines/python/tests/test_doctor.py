@@ -68,7 +68,6 @@ def test_doctor_agrees_with_init_layout(tmp_path: Path, capsys) -> None:
         cli.main(
             [
                 "init",
-                "--non-interactive",
                 "--framework",
                 "custom-loop",
                 "--subject",
