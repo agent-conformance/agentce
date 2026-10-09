@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.69.0",
+  "suite_version": "0.70.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2819,6 +2819,79 @@
         }
       ],
       "fix_hint": "run verification/gates/fail_on_parity.sh and read the FAIL lines; the reference is engines/python/agentce/fail_on.py (parse_fail_on) and cmd_assess's --fail-on handling in engines/python/agentce/commands/__init__.py, ported in engines/typescript/src/failOn.ts and cli.ts (runAssess, assessValueFlags) and engines/java/src/main/java/org/agentce/FailOn.java and Cli.java (runAssess, assessValueFlags)."
+    },
+    {
+      "id": "VG-CLI-COLLECT-DOCTOR-INIT",
+      "title": "collect, doctor and init read every option they are given or refuse it with a key: init refuses --non-interactive as unknown, doctor refuses --project beside --write-errors, an empty value is refused and never read as the default, and a dry run with --out writes the plan and its manifest, as its help says",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/cli_options.sh",
+        "collect_doctor_init.json"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 600,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/cli_options/collect_doctor_init.json gives its expected exit code and --json key in the real Python CLI, and TypeScript and Java give exit 3 cli.not_implemented (the commands are Python only); a refused run writes nothing: init --non-interactive, alone, with --out and in = form, gets input.init_unrecognized_flag and init --out writes the profile; doctor --project beside --write-errors, in either order and whatever --project names (a missing directory, '' or =), gets input.doctor_flag_unused, also before an empty --write-errors; --write-errors alone writes the catalogue (the last repeat wins) and an empty, = , directory or unwritable --write-errors gets input.write_errors_unwritable; collect --dry-run --out (also = form) writes collect-plan.json and manifest.json, a dry run with no --out writes nothing, an empty --out gets input.out_dir_unwritable with or without --dry-run (checked before --adapters-root), --adapters-root beside --dry-run gets input.collect_flag_unused and an empty --adapters-root in a real run input.adapters_root_not_a_directory; init --out '' gets input.out_dir_unwritable and an empty --subject or --framework input.init_value_empty",
+        "fail": "any engine gives another exit code or key for a case, a refused run writes a file, init accepts --non-interactive, doctor drops --project or an empty --write-errors, collect drops an empty --out or --adapters-root, or a dry run with --out does not write its plan and manifest"
+      },
+      "faults": [
+        {
+          "description": "Python init takes --non-interactive again and does nothing with it",
+          "file": "engines/python/agentce/cli.py",
+          "search": "    p.add_argument(\n        \"--framework\", help=\"the agent framework, e.g. custom-loop, langgraph\"\n    )\n",
+          "replace": "    p.add_argument(\"--non-interactive\", dest=\"non_interactive\", action=\"store_true\")\n    p.add_argument(\n        \"--framework\", help=\"the agent framework, e.g. custom-loop, langgraph\"\n    )\n"
+        },
+        {
+          "description": "Python doctor drops --project beside --write-errors again and writes the catalogue",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "        if _opt_str(ns, \"project\") is not None:\n            raise InputError(\n                \"input.doctor_flag_unused\",",
+          "replace": "        if False:\n            raise InputError(\n                \"input.doctor_flag_unused\","
+        },
+        {
+          "description": "Python doctor reads an empty --write-errors as not given again and diagnoses instead",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    write_errors = _opt_str(ns, \"write_errors\")\n    if write_errors is not None:\n",
+          "replace": "    write_errors = _opt_str(ns, \"write_errors\") or None\n    if write_errors is not None:\n"
+        },
+        {
+          "description": "Python collect drops an empty --out in a dry run again",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    dry_run = _flag(ns, \"dry_run\")\n    _refuse_empty_out(out)\n",
+          "replace": "    dry_run = _flag(ns, \"dry_run\")\n    if not dry_run:\n        _refuse_empty_out(out)\n"
+        },
+        {
+          "description": "Python collect's dry run stops writing the plan and its manifest to --out",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "        out_dir=Path(out) if out else None,\n        dry_run=dry_run,",
+          "replace": "        out_dir=Path(out) if out and not dry_run else None,\n        dry_run=dry_run,"
+        },
+        {
+          "description": "Python collect takes --adapters-root beside --dry-run again without reading it",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    if dry_run and raw_adapters_root is not None:\n",
+          "replace": "    if False:\n"
+        },
+        {
+          "description": "Python init falls back to the default subject for an empty --subject again",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    for flag in (\"subject\", \"framework\"):\n",
+          "replace": "    for flag in (\"framework\",):\n"
+        },
+        {
+          "description": "Python collect reads an empty --adapters-root as ./adapters again",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    if raw_adapters_root == \"\":\n",
+          "replace": "    if False:\n"
+        }
+      ]
     }
   ]
 }
