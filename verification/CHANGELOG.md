@@ -3,6 +3,19 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.71.0
+
+- `VG-ROB02-UNTRUSTED` (18.37b) is new, with 40 cases and three seeded faults, one in each engine's graph builder.
+  ROB-02 says no untrusted content influences consequential decisions, but it only checked that a decision named
+  an input, and a decision in a valid bundle never names one that way, so the rule never looked at trust. Now each
+  engine follows content from the memory guard's records and an instruction's source class to every decision it
+  reached, through inputs, the reads a decision or a call consumed, tool calls, model calls, other decisions and a
+  decision's origin, for as many hops as the records show. A decision that untrusted, quarantined or blocked
+  content reached fails. Each case checks ROB-02's outcome, the failing decisions and the exit code in all three
+  engines, with nothing quarantined.
+- `VG-CATALOG-RULE-UNIQUE`'s baseline drops the eu-ai-act pair DAT-01/ROB-02 (18.37b): the two controls no longer
+  share a rule, and the pair ceiling falls from 25 to 24.
+
 ## 0.70.0
 
 - `VG-CLI-COLLECT-DOCTOR-INIT` (18.112) is new, with 33 rows and eight seeded faults, and covers the command lines

@@ -1,0 +1,9 @@
+# Domain ontology binding for the VG-ROB02-UNTRUSTED gate fixture: one consequential decision type
+# (ROB-02's population) and one that is not, so a case can show a non-consequential decision is out of scope.
+decision_types:
+  - id: "dom:CreditDecision"
+    subclass_of: "agentce:ConsequentialDecision"
+    consequential: true
+  - id: "dom:Minor"
+    subclass_of: "agentce:Decision"
+    consequential: false
