@@ -2939,13 +2939,13 @@
           "description": "Python drops the session check, so an override or approval with no session_ref, or one naming no held record, counts as a human's",
           "file": "engines/python/agentce/graph.py",
           "search": "        if actor is None or not isinstance(login, str) or login not in self.event_info:\n            return None\n",
-          "replace": "        if actor is None:\n            return None\n        if not isinstance(login, str) or login not in self.event_info:\n            return principal_iri(actor, self.key), \"\"\n"
+          "replace": "        if actor is None:\n            return None\n        if not isinstance(login, str) or login not in self.event_info:\n            return principal_iri(actor, self.key)\n"
         },
         {
           "description": "TypeScript drops the session check, so an override or approval with no session_ref, or one naming no held record, counts as a human's",
           "file": "engines/typescript/src/graph.ts",
           "search": "    if (actor === null || typeof login !== \"string\" || loginInfo === undefined) {\n      return null;\n    }\n",
-          "replace": "    if (actor === null) {\n      return null;\n    }\n    if (typeof login !== \"string\" || loginInfo === undefined) {\n      return [principalIri(actor, this.key), \"\"];\n    }\n"
+          "replace": "    if (actor === null) {\n      return null;\n    }\n    if (typeof login !== \"string\" || loginInfo === undefined) {\n      return principalIri(actor, this.key);\n    }\n"
         },
         {
           "description": "Java drops the session check, so an override or approval with no session_ref, or one naming no held record, counts as a human's",
@@ -2992,14 +2992,14 @@
         {
           "description": "Python drops the delegation-chain check, so the owner the agent acts for counts as the independent human",
           "file": "engines/python/agentce/graph.py",
-          "search": "return None if actor_iri in chain else (actor_iri, login)",
-          "replace": "return actor_iri, login"
+          "search": "return None if actor_iri in chain else actor_iri",
+          "replace": "return actor_iri"
         },
         {
           "description": "TypeScript drops the delegation-chain check, so the owner the agent acts for counts as the independent human",
           "file": "engines/typescript/src/graph.ts",
-          "search": "return chain.has(actorIri) ? null : [actorIri, login];",
-          "replace": "return [actorIri, login];"
+          "search": "return chain.has(actorIri) ? null : actorIri;",
+          "replace": "return actorIri;"
         },
         {
           "description": "Java drops the delegation-chain check, so the owner the agent acts for counts as the independent human",
@@ -3008,16 +3008,16 @@
           "replace": "return new HumanKey(actorIri, login);"
         },
         {
-          "description": "Python keys OVS-08's distinct humans by actor id alone, so one login under two spellings of an id counts as two humans",
+          "description": "Python compares principal ids untrimmed, so a padded spelling of the owner's id escapes the delegation-chain check",
           "file": "engines/python/agentce/graph.py",
-          "search": "if actor in g[0] or login in g[1]",
-          "replace": "if actor in g[0]"
+          "search": "    return value.strip(_ID_PAD) or None",
+          "replace": "    return value or None"
         },
         {
-          "description": "TypeScript keys OVS-08's distinct humans by actor id alone, so one login under two spellings of an id counts as two humans",
+          "description": "TypeScript compares principal ids untrimmed, so a padded spelling of the owner's id escapes the delegation-chain check",
           "file": "engines/typescript/src/graph.ts",
-          "search": "if (group[0].has(actor) || group[1].has(login)) {",
-          "replace": "if (group[0].has(actor)) {"
+          "search": "  return end > start ? value.slice(start, end) : null;",
+          "replace": "  return value === \"\" ? null : value;"
         },
         {
           "description": "Java keys OVS-08's distinct humans by actor id alone, so one login under two spellings of an id counts as two humans",
@@ -3042,6 +3042,30 @@
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "Stream.of(agentId, str(event.get(\"subject\")))",
           "replace": "Stream.of(agentId)"
+        },
+        {
+          "file": "engines/python/agentce/graph.py",
+          "search": "        if login_principal != actor_iri:\n            return None\n",
+          "replace": "",
+          "description": "Python drops the login-principal check, so a login that names another principal counts as the actor's"
+        },
+        {
+          "file": "engines/typescript/src/graph.ts",
+          "search": "    if (loginPrincipal !== actorIri) {\n      return null;\n    }\n",
+          "replace": "",
+          "description": "TypeScript drops the login-principal check, so a login that names another principal counts as the actor's"
+        },
+        {
+          "file": "engines/python/agentce/graph.py",
+          "search": "    return value.strip(_ID_PAD) or None",
+          "replace": "    return value.strip() or None",
+          "description": "Python trims ids with its own strip, which keeps U+FEFF, so a padded spelling of the owner's id escapes the delegation-chain check"
+        },
+        {
+          "file": "engines/typescript/src/graph.ts",
+          "search": "  return end > start ? value.slice(start, end) : null;",
+          "replace": "  return value.trim() || null;",
+          "description": "TypeScript trims ids with its own trim, which keeps U+0085, so a padded spelling of the owner's id escapes the delegation-chain check"
         }
       ],
       "fix_hint": "Run verification/gates/human_actor.sh; it names the engine, the case and what it gave against what was expected. The rule is _human_key / humanKey in each engine's graph builder (read in the second pass), the reviews it gates are mapReviews, and OVS-08's count is distinctHumans."
@@ -3249,8 +3273,8 @@
         {
           "description": "Python counts OVS-08 reviewers per approval, not per distinct human, so one human approving twice satisfies dual_control",
           "file": "engines/python/agentce/graph.py",
-          "search": "self.human_reviewers.setdefault(decision, []).append(key)",
-          "replace": "self.human_reviewers.setdefault(decision, []).append((node, node))"
+          "search": "self.human_reviewers.setdefault(decision, set()).add(key)",
+          "replace": "self.human_reviewers.setdefault(decision, set()).add(node)"
         },
         {
           "description": "TypeScript skips an Incident name that leads to no held decision instead of holding every decision to the rule (INC-03)",
@@ -3261,8 +3285,8 @@
         {
           "description": "TypeScript counts OVS-08 reviewers per approval, not per distinct human",
           "file": "engines/typescript/src/graph.ts",
-          "search": "      reviewers.push(key);\n",
-          "replace": "      reviewers.push([node, node]);\n"
+          "search": "      reviewers.add(key);\n",
+          "replace": "      reviewers.add(node);\n"
         },
         {
           "description": "Java skips an Incident name that leads to no held decision instead of holding every decision to the rule (INC-03)",

@@ -167,11 +167,33 @@ function principalRef(entry: unknown): [string | null, string | null] {
   return [null, null];
 }
 
-/** The id of the event's `actor` when it is a human principal (SPEC §6.2, §7.3 human-actor rule,
- * first part); `null` for a missing, unnamed or non-human actor. */
-function humanActor(data: Record<string, unknown>): string | null {
-  const actor = data.actor;
-  return isRecord(actor) && actor.kind === "human" ? text(actor.id) : null;
+/** The characters the human-actor rule trims from each end of a principal id: Unicode White_Space plus U+FEFF,
+ * written out because Python's strip, JavaScript's trim and Java's strip each trim a different set (SPEC §10.4). */
+const ID_PAD =
+  "\t\n\u000b\u000c\r \u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a" +
+  "\u2028\u2029\u202f\u205f\u3000\ufeff";
+
+/** A principal id as the human-actor rule compares it: trimmed of `ID_PAD` at both ends, `null` when nothing is
+ * left, so a padded spelling of an id is the same principal everywhere in the rule. */
+function ruleId(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  let start = 0;
+  let end = value.length;
+  while (start < end && ID_PAD.includes(value[start] as string)) {
+    start++;
+  }
+  while (end > start && ID_PAD.includes(value[end - 1] as string)) {
+    end--;
+  }
+  return end > start ? value.slice(start, end) : null;
+}
+
+/** The trimmed id of a human principal (SPEC §6.2 `actor`, SessionStart `principal`; §10.4 human-actor rule);
+ * `null` for a missing, unnamed or non-human principal. */
+function humanId(principal: unknown): string | null {
+  return isRecord(principal) && principal.kind === "human" ? ruleId(principal.id) : null;
 }
 
 /** Python's `==` over JSON values: a bool equals the number 0 or 1, objects compare by key set and
@@ -208,34 +230,6 @@ const LOGIN_CLASSES = new Set(["independent_system", "enforcement_point"]);
 const OVERSIGHT_TYPES = new Set(["ApprovalDecided", "Override", "Interrupt"]);
 /** The Incident members that record a response after detection (SPEC §6.2; ROB-07). */
 const INCIDENT_RESPONSES = ["causal_assessment_at", "provider_notified_at", "reported_at"];
-
-/** A verified human: the actor's principal IRI and the IRI of the login record its session_ref names. */
-type HumanKey = [string, string];
-
-/** OVS-08: the number of distinct humans among verified keys. Two keys are one human when they share the actor or
- * the login, so one login under two spellings of an id, or one id over two logins, counts once; the count does not
- * depend on the order of the keys. */
-function distinctHumans(keys: HumanKey[]): number {
-  let groups: [Set<string>, Set<string>][] = [];
-  for (const [actor, login] of keys) {
-    const merged: [Set<string>, Set<string>] = [new Set([actor]), new Set([login])];
-    const rest: [Set<string>, Set<string>][] = [];
-    for (const group of groups) {
-      if (group[0].has(actor) || group[1].has(login)) {
-        for (const a of group[0]) {
-          merged[0].add(a);
-        }
-        for (const l of group[1]) {
-          merged[1].add(l);
-        }
-      } else {
-        rest.push(group);
-      }
-    }
-    groups = [...rest, merged];
-  }
-  return groups.length;
-}
 
 function principalClass(kind: string | null): string {
   if (kind === "human") {
@@ -332,14 +326,18 @@ class Builder {
   // SPEC §10.4 human-actor rule, read in the second pass so file order never matters: event IRI -> [type, source
   // class, agent id] of every event; agent id -> every principal IRI in its delegation chain (its acted_for and its
   // DelegationIssued chains); event IRI -> the principal IRIs of its own acted_for.
-  private readonly eventInfo = new Map<string, [string, string | null, string | null]>();
+  // A SessionStart also records the IRI of the human principal its login names (18.140), else null.
+  private readonly eventInfo = new Map<
+    string,
+    [string, string | null, string | null, string | null]
+  >();
   private readonly agentChain = new Map<string, Set<string>>();
   // event IRI -> the agents it concerns: its own agent and its CloudEvents subject (the assessed agent), so an event
   // that leaves out the optional agent still concerns the subject.
   private readonly eventAgents = new Map<string, Set<string>>();
   private readonly actedFor = new Map<string, Set<string>>();
-  // OVS-08: decision IRI -> the key of every verified ApprovalDecided that reviewed it.
-  private readonly humanReviewers = new Map<string, HumanKey[]>();
+  // OVS-08: decision IRI -> the actor IRI of every verified ApprovalDecided that reviewed it.
+  private readonly humanReviewers = new Map<string, Set<string>>();
   // INC-03: event IRI -> the decision its refs.decision names, whatever the event type.
   private readonly refDecision = new Map<string, string>();
 
@@ -397,7 +395,13 @@ class Builder {
     const agentId = isRecord(agent) && typeof agent.id === "string" ? agent.id : null;
     const sourceClass =
       typeof event.agentcesourceclass === "string" ? event.agentcesourceclass : null;
-    this.eventInfo.set(node, [ptype, sourceClass, agentId]);
+    const loginPrincipal = ptype === "SessionStart" ? humanId(data.principal) : null;
+    this.eventInfo.set(node, [
+      ptype,
+      sourceClass,
+      agentId,
+      loginPrincipal === null ? null : principalIri(loginPrincipal, this.key),
+    ]);
     const actedFor = this.principalIris(data.acted_for);
     this.actedFor.set(node, actedFor);
     const owners = new Set(
@@ -474,12 +478,13 @@ class Builder {
     });
   }
 
-  /** The pseudonymised IRIs of an `acted_for` or `chain` list (SPEC §6.3: the delegation chain). */
+  /** The pseudonymised IRIs of an `acted_for` or `chain` list (SPEC §6.3: the delegation chain), ids trimmed as the
+   * human-actor rule compares them. */
   private principalIris(principals: unknown): Set<string> {
     const out = new Set<string>();
     if (Array.isArray(principals)) {
       for (const entry of principals) {
-        const [pid] = principalRef(entry);
+        const pid = ruleId(principalRef(entry)[0]);
         if (pid !== null) {
           out.add(principalIri(pid, this.key));
         }
@@ -488,18 +493,18 @@ class Builder {
     return out;
   }
 
-  /** SPEC §10.4 human-actor rule: the key of an ApprovalDecided, Override or Interrupt whose actor is a human
-   * principal whose `session_ref` names a held identity-provider login record, and who is nowhere in the delegation
-   * chain of the activity; `null` when any part fails (fail closed).
+  /** SPEC §10.4 human-actor rule: the actor IRI of an ApprovalDecided, Override or Interrupt whose actor is a human
+   * principal whose `session_ref` names a held identity-provider login record of that same human, and who is nowhere
+   * in the delegation chain of the activity; `null` when any part fails (fail closed).
    *
    * The login record is a held `SessionStart` (the only session record the event model has) from an
-   * independent_system or enforcement_point stream whose agent is none of the agents the oversight record concerns:
-   * the own agent and CloudEvents subject of the record and of the named decision, whose own run session is no
-   * human's login. The delegation chain is
-   * the named decision's and the record's own `acted_for` and every chain of those agents. */
-  private humanKey(node: string, event: Event): HumanKey | null {
+   * independent_system or enforcement_point stream whose `principal` is the actor (ids trimmed of `ID_PAD`) and whose
+   * agent is none of the agents the oversight record concerns: the own agent and CloudEvents subject of the record
+   * and of the named decision, whose own run session is no human's login. The delegation chain is the named
+   * decision's and the record's own `acted_for` and every chain of those agents. */
+  private humanKey(node: string, event: Event): string | null {
     const data = dataOf(event);
-    const actor = humanActor(data);
+    const actor = humanId(data.actor);
     const login = data.session_ref;
     const loginInfo = typeof login === "string" ? this.eventInfo.get(login) : undefined;
     if (actor === null || typeof login !== "string" || loginInfo === undefined) {
@@ -510,11 +515,15 @@ class Builder {
       ...(this.eventAgents.get(node) ?? []),
       ...((typeof decision === "string" ? this.eventAgents.get(decision) : undefined) ?? []),
     ]);
-    const [loginType, loginClass, loginAgent] = loginInfo;
+    const [loginType, loginClass, loginAgent, loginPrincipal] = loginInfo;
     if (loginType !== "SessionStart" || loginClass === null || !LOGIN_CLASSES.has(loginClass)) {
       return null;
     }
     if (loginAgent === null || concerned.has(loginAgent)) {
+      return null;
+    }
+    const actorIri = principalIri(actor, this.key);
+    if (loginPrincipal !== actorIri) {
       return null;
     }
     const chain = new Set(this.actedFor.get(node));
@@ -528,8 +537,7 @@ class Builder {
         chain.add(p);
       }
     }
-    const actorIri = principalIri(actor, this.key);
-    return chain.has(actorIri) ? null : [actorIri, login];
+    return chain.has(actorIri) ? null : actorIri;
   }
 
   private mapChain(agentId: string, actedFor: unknown): void {
@@ -965,10 +973,10 @@ class Builder {
       this.decisionReviewed.add(decision);
       let reviewers = this.humanReviewers.get(decision);
       if (!reviewers) {
-        reviewers = [];
+        reviewers = new Set();
         this.humanReviewers.set(decision, reviewers);
       }
-      reviewers.push(key);
+      reviewers.add(key);
     }
     return byHuman;
   }
@@ -980,7 +988,7 @@ class Builder {
     const declared =
       typeof dtype === "string" ? this.domain.requiredOversight.get(dtype) : undefined;
     const dual = data.oversight_modality === "dual_control" || declared === "dual_control";
-    const reviewers = distinctHumans(this.humanReviewers.get(node) ?? []);
+    const reviewers = this.humanReviewers.get(node)?.size ?? 0;
     this.literal(node, "agentce:oversightCoverageComplete", reviewers >= (dual ? 2 : 1));
   }
 
