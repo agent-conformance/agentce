@@ -97,7 +97,9 @@ def integrity_golden(testdata: Path) -> list[dict[str, Any]]:
 
 
 def state_golden(testdata: Path) -> dict[str, Any]:
-    """Record a report, then plan a re-assessment against a changed bundle with a late event."""
+    """Record a report, then plan a re-assessment against a changed bundle with a late event; and the
+    ``state.json`` Python writes once ``last_outcomes`` holds prior outcomes (a port must load and save it
+    unchanged, SPEC §9.6)."""
     inputs = _load(testdata, "state-fixture.json")
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -109,12 +111,19 @@ def state_golden(testdata: Path) -> dict[str, Any]:
         supersedes, late = StateDir.load(root / "state").plan(
             inputs["bundle_b"], inputs["events_b"], inputs["window_b"]
         )
+        with_outcomes = StateDir.load(root / "state")
+        with_outcomes.last_outcomes = inputs["last_outcomes"]
+        with_outcomes.save()
+        state_json_with_outcomes = (root / "state" / "state.json").read_text(
+            encoding="utf-8"
+        )
     return {
         **{key: inputs[key] for key in STATE_INPUTS},
         "manifest_digest": digest,
         "state_json_after_record": state_json,
         "supersedes": supersedes,
         "late_events": late,
+        "state_json_with_outcomes": state_json_with_outcomes,
     }
 
 

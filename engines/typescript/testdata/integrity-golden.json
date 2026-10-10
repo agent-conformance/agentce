@@ -1,46 +1,46 @@
 [
   {
-    "stream": "s-anchored",
-    "strength": "export_anchored",
-    "status": "verified",
     "anchors": [
       {
         "at": "2026-02-01T00:00:00.000Z"
       }
-    ]
+    ],
+    "status": "verified",
+    "stream": "s-anchored",
+    "strength": "export_anchored"
   },
   {
+    "status": "verified_weak",
     "stream": "s-chained",
-    "strength": "export_chained",
-    "status": "verified_weak"
+    "strength": "export_chained"
   },
   {
-    "stream": "s-failed",
-    "strength": "export_chained",
-    "status": "failed",
-    "first_bad_index": 1
-  },
-  {
-    "stream": "s-gap",
-    "strength": "export_chained",
-    "status": "gap",
-    "first_bad_index": 1
-  },
-  {
-    "stream": "s-reordered",
-    "strength": "export_chained",
-    "status": "reordered",
-    "first_bad_index": 1
-  },
-  {
-    "stream": "s-suspect",
-    "strength": "export_anchored",
-    "status": "time_suspect",
     "first_bad_index": 1,
+    "status": "failed",
+    "stream": "s-failed",
+    "strength": "export_chained"
+  },
+  {
+    "first_bad_index": 1,
+    "status": "gap",
+    "stream": "s-gap",
+    "strength": "export_chained"
+  },
+  {
+    "first_bad_index": 1,
+    "status": "reordered",
+    "stream": "s-reordered",
+    "strength": "export_chained"
+  },
+  {
     "anchors": [
       {
         "at": "2026-03-01T00:00:00.000Z"
       }
-    ]
+    ],
+    "first_bad_index": 1,
+    "status": "time_suspect",
+    "stream": "s-suspect",
+    "strength": "export_anchored"
   }
 ]

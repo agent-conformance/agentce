@@ -1,43 +1,41 @@
 [
   {
-    "subject": "agent-A",
-    "roles": [
-      "deployer",
-      "provider"
-    ],
     "catalogs": [
       "base/eu-ai-act"
     ],
+    "class_justifications": [
+      {
+        "class": "instrumented",
+        "justification": "declared for src-1 in the applicability profile of agent-A",
+        "source": "src-1"
+      }
+    ],
     "controls": [
       {
-        "id": "CTRL-1",
         "applicable": true,
+        "id": "CTRL-1",
         "reason_code": "role_match",
         "reason_refs": [
           "deployer"
         ]
       },
       {
-        "id": "CTRL-2",
         "applicable": true,
+        "id": "CTRL-2",
         "reason_code": "role_match",
         "reason_refs": [
           "provider"
         ]
       },
       {
-        "id": "CTRL-3",
         "applicable": true,
+        "id": "CTRL-3",
         "reason_code": "role_match",
         "reason_refs": [
           "deployer",
           "provider"
         ]
       }
-    ],
-    "observed_decision_types": [
-      "credit_decision",
-      "refund_decision"
     ],
     "declared_decision_types": [
       "credit_decision"
@@ -60,55 +58,57 @@
         "ref": "agent-C"
       }
     ],
-    "class_justifications": [
-      {
-        "source": "src-1",
-        "class": "instrumented",
-        "justification": "declared for src-1 in the applicability profile of agent-A"
-      }
-    ]
+    "observed_decision_types": [
+      "credit_decision",
+      "refund_decision"
+    ],
+    "roles": [
+      "deployer",
+      "provider"
+    ],
+    "subject": "agent-A"
   },
   {
-    "subject": "agent-B",
-    "roles": [
-      "deployer"
-    ],
     "catalogs": [
       "base/eu-ai-act"
     ],
+    "class_justifications": [
+      {
+        "class": "self_report",
+        "justification": "declared for src-2 in the applicability profile of agent-B",
+        "source": "src-2"
+      }
+    ],
     "controls": [
       {
-        "id": "CTRL-1",
         "applicable": true,
+        "id": "CTRL-1",
         "reason_code": "role_match",
         "reason_refs": [
           "deployer"
         ]
       },
       {
-        "id": "CTRL-2",
         "applicable": false,
+        "id": "CTRL-2",
         "reason_code": "role_mismatch",
         "reason_refs": []
       },
       {
-        "id": "CTRL-3",
         "applicable": true,
+        "id": "CTRL-3",
         "reason_code": "role_match",
         "reason_refs": [
           "deployer"
         ]
       }
     ],
-    "observed_decision_types": [],
     "declared_decision_types": [],
     "drift": [],
-    "class_justifications": [
-      {
-        "source": "src-2",
-        "class": "self_report",
-        "justification": "declared for src-2 in the applicability profile of agent-B"
-      }
-    ]
+    "observed_decision_types": [],
+    "roles": [
+      "deployer"
+    ],
+    "subject": "agent-B"
   }
 ]

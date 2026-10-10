@@ -25,6 +25,17 @@
       "time": "2026-03-01T00:00:00.000Z"
     }
   ],
+  "last_outcomes": {
+    "spiffe://corp/agents/a|DOC-01": {
+      "outcome": "conformant"
+    },
+    "spiffe://corp/agents/a|OVS-03": {
+      "outcome": "non-conformant"
+    },
+    "spiffe://corp/agents/\u00e9l\u00e8ve|REC-04": {
+      "outcome": "insufficient_evidence"
+    }
+  },
   "manifest_bytes": "{\"agentce_manifest_version\": 1, \"name\": \"one\"}\n",
   "window_a": "2026-02-01T00:00:00.000Z",
   "window_b": "2026-03-31T00:00:00.000Z"

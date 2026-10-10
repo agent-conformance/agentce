@@ -37,6 +37,17 @@ test("state directory matches the Python reference golden", () => {
   assert.equal(canonicalString(late), canonicalString(golden.late_events));
 });
 
+test("a Python-written state.json with prior outcomes loads and saves unchanged", () => {
+  const golden = JSON.parse(readFileSync(join(TESTDATA, "state-golden.json"), "utf-8"));
+  const stateDir = mkdtempSync(join(tmpdir(), "agentce-state-"));
+  writeFileSync(join(stateDir, "state.json"), golden.state_json_with_outcomes);
+  StateDir.load(stateDir).save();
+  assert.equal(
+    readFileSync(join(stateDir, "state.json"), "utf-8"),
+    golden.state_json_with_outcomes,
+  );
+});
+
 test("STATE_VERSION matches the reference and windowEnd prefers the declared end", () => {
   assert.equal(STATE_VERSION, 1);
   assert.equal(windowEnd({ end: "2026-03-31T00:00:00Z" }, []), "2026-03-31T00:00:00Z");

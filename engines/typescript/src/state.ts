@@ -14,7 +14,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { InputError } from "./errors";
-import { byteCompare, sortKeysDeep } from "./util";
+import { byteCompare, jsonStringifyAscii, sortKeysDeep } from "./util";
 
 export const STATE_VERSION = 1;
 const STATE_FILE = "state.json";
@@ -62,6 +62,8 @@ export class StateDir {
   bundleDigests: string[] = [];
   lastReportDigest: string | null = null;
   lastWindowEnd: string | null = null;
+  /** The last outcome per `subject|control` pair, carried as Python writes it (drift reads it). */
+  lastOutcomes: Record<string, unknown> = {};
 
   private constructor(path: string) {
     this.path = path;
@@ -90,6 +92,8 @@ export class StateDir {
     state.lastReportDigest =
       typeof data.last_report_digest === "string" ? data.last_report_digest : null;
     state.lastWindowEnd = typeof data.last_window_end === "string" ? data.last_window_end : null;
+    // Additive since state_version 1: absent (an older directory) or not an object reads as `{}`.
+    state.lastOutcomes = isRecord(data.last_outcomes) ? { ...data.last_outcomes } : {};
     return state;
   }
 
@@ -101,10 +105,11 @@ export class StateDir {
         bundle_digests: [...new Set(this.bundleDigests)].sort(byteCompare),
         last_report_digest: this.lastReportDigest,
         last_window_end: this.lastWindowEnd,
+        last_outcomes: this.lastOutcomes,
       };
       writeFileSync(
         join(this.path, STATE_FILE),
-        `${JSON.stringify(sortKeysDeep(payload), null, 2)}\n`,
+        `${jsonStringifyAscii(sortKeysDeep(payload), 2)}\n`,
       );
     } catch (err) {
       const e = err as NodeJS.ErrnoException;

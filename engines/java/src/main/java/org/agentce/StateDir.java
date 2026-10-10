@@ -32,6 +32,8 @@ public final class StateDir {
     public List<String> bundleDigests = new ArrayList<>();
     public String lastReportDigest;
     public String lastWindowEnd;
+    /** The last outcome per {@code subject|control} pair, carried as Python writes it (drift reads it). */
+    public ObjectNode lastOutcomes = Json.nodes().objectNode();
 
     private StateDir(Path path) {
         this.path = path;
@@ -84,6 +86,11 @@ public final class StateDir {
         state.lastReportDigest = lastReport != null && lastReport.isTextual() ? lastReport.textValue() : null;
         JsonNode lastEnd = data.get("last_window_end");
         state.lastWindowEnd = lastEnd != null && lastEnd.isTextual() ? lastEnd.textValue() : null;
+        // Additive since state_version 1: absent (an older directory) or not an object reads as {}.
+        JsonNode outcomes = data.get("last_outcomes");
+        if (outcomes != null && outcomes.isObject()) {
+            state.lastOutcomes = ((ObjectNode) outcomes).deepCopy();
+        }
         return state;
     }
 
@@ -104,6 +111,7 @@ public final class StateDir {
             } else {
                 payload.putNull("last_window_end");
             }
+            payload.set("last_outcomes", lastOutcomes);
             Files.write(path.resolve(STATE_FILE), (Json.pretty(payload) + "\n").getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new InputError(

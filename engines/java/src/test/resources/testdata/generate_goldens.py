@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Regenerate the Java engine's byte-identical goldens from the Python reference engine.
 
-Run with:
+Run from the repository root with:
 
-    cd /Users/willsct/agentce && env -u VIRTUAL_ENV uv run --project engines/python --frozen \\
+    env -u VIRTUAL_ENV uv run --project engines/python --frozen \\
         python engines/java/src/test/resources/testdata/generate_goldens.py
+
+Add ``--check`` to compare every golden with the live Python engine and write nothing (exit 1 names
+each stale, missing or unproduced golden); VG-ENGINE-GOLDENS-FRESH runs it.
 
 Why this script exists: ``engines/java/src/test/java/org/agentce/{Assess,Catalog,Report}Test.java``
 each assert that the Java engine's output is byte-identical (after RFC 8785 canonicalisation, or
@@ -33,6 +36,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[6]
 sys.path.insert(0, str(REPO / "engines" / "python"))
+sys.path.insert(0, str(REPO / "engines" / "python" / "tests"))
 
 from agentce.assertions import Assertion, aggregate  # noqa: E402
 from agentce.assess import assess_subjects  # noqa: E402
@@ -48,6 +52,7 @@ from agentce.report import (  # noqa: E402
     render_sarif,
 )
 from agentce.structural import evaluate_control  # noqa: E402
+from parity_goldens import shared_goldens, write_or_check  # noqa: E402
 
 BASE = REPO / "spec" / "catalogs" / "base" / "eu-ai-act"
 CONDUCT = REPO / "spec" / "catalogs" / "overlays" / "conduct"
@@ -56,7 +61,9 @@ SUBJECT = "spiffe://corp/agents/a"
 CASES = ("passed", "failed", "inapplicable")
 
 
-def events_of(control_id: str, case: str, directory: Path = BASE) -> list[dict[str, object]]:
+def events_of(
+    control_id: str, case: str, directory: Path = BASE
+) -> list[dict[str, object]]:
     path = directory / "test" / control_id / f"{case}.jsonl"
     return [
         json.loads(line)
@@ -65,14 +72,12 @@ def events_of(control_id: str, case: str, directory: Path = BASE) -> list[dict[s
     ]
 
 
-def write_golden(name: str, data: object) -> None:
-    """Write ``data`` in the same style as the existing goldens: 2-space indent, insertion order
+def dump(data: object) -> str:
+    """Serialise ``data`` in the same style as the existing goldens: 2-space indent, insertion order
     preserved (not sorted -- ``Canonical.canonicalString`` on the Java side sorts for comparison; the
     file's own order just mirrors this script's, as the existing goldens already do), a trailing
-    newline, and no other file touched."""
-    path = TESTDATA / name
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    print(f"wrote {path}")
+    newline."""
+    return json.dumps(data, indent=2) + "\n"
 
 
 def without_provenance_md(md: str) -> str:
@@ -214,25 +219,26 @@ def build_report_golden(catalog: Catalog, domain: DomainBinding) -> dict[str, ob
     }
 
 
-def main() -> None:
+def goldens() -> dict[str, str]:
+    """Every golden this engine's parity tests read, file name -> the exact text to commit."""
     catalog = load_catalog(BASE)
     domain = DomainBinding.load(BASE / "test" / "domain.yaml")
-
-    write_golden("assess-golden.json", build_assess_golden(catalog, domain))
-    write_golden("catalog-golden.json", build_catalog_golden(catalog, domain))
-    write_golden("report-golden.json", build_report_golden(catalog, domain))
-
     # The Conduct overlay (SPEC §7.7) is a separate catalog with its own fixtures; a real,
     # user-reachable guard that CND-01/CND-05 (withinScope/actsOnUntrusted) are materialised the
     # same way Python does -- found missing from TS/Java entirely in 18.37, ported, and guarded here
     # so a future regression in either engine's graph builder turns this golden red.
     conduct_catalog = load_catalog(CONDUCT)
     conduct_domain = DomainBinding.load(CONDUCT / "test" / "domain.yaml")
-    write_golden(
-        "conduct-golden.json",
-        build_catalog_golden(conduct_catalog, conduct_domain, CONDUCT),
-    )
+    return {
+        "assess-golden.json": dump(build_assess_golden(catalog, domain)),
+        "catalog-golden.json": dump(build_catalog_golden(catalog, domain)),
+        "report-golden.json": dump(build_report_golden(catalog, domain)),
+        "conduct-golden.json": dump(
+            build_catalog_golden(conduct_catalog, conduct_domain, CONDUCT)
+        ),
+        **shared_goldens(TESTDATA, dump),
+    }
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(write_or_check(TESTDATA, goldens(), sys.argv[1:]))
