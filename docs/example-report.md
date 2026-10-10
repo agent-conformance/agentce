@@ -23,7 +23,7 @@ This is the report the vendored quickstart project renders end to end with defau
 
 ## Where your records can't show it yet
 
-- `ApprovalDecided (self_report)`: unlocks 8 check(s), needed by 0 more; rung 2 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: oversight.
+- `ApprovalDecided (self_report)`: unlocks 4 check(s), needed by 0 more; rung 2 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: oversight.
 - `ModelCall (self_report)`: unlocks 3 check(s), needed by 0 more; rung 1 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: otel-genai.
 - `Notice (self_report)`: unlocks 3 check(s), needed by 0 more; rung 2 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: oversight.
 - `PolicyDecision (self_report)`: unlocks 3 check(s), needed by 0 more; rung 3 -- a request to platform or security. Adapters that can supply this: mcp-gateway, policy-engines.
@@ -35,19 +35,19 @@ This is the report the vendored quickstart project renders end to end with defau
 
 Top gaps:
 
-- insufficient evidence: DAT-01, DAT-02, DAT-03, INC-03, OVS-01 (+13 more gaps)
-- not assessed: DAT-04, DOC-05, OVS-09, RSK-04, RSK-05
+- insufficient evidence: DAT-01, DAT-02, INC-03, OVS-01, OVS-05 (+9 more gaps)
+- not assessed: DAT-03, DAT-04, DOC-05, OVS-09, RSK-03 (+2 more gaps)
 
 Next step: Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.
 
 ## Outcome summary
 
-- `conformant`: 25
+- `conformant`: 26
 - `non-conformant`: 0
 - `partial`: 0
-- `not applicable`: 1
-- `not assessed`: 5
-- `insufficient evidence`: 18
+- `not applicable`: 2
+- `not assessed`: 7
+- `insufficient evidence`: 14
 
 ## Assertions
 
@@ -126,7 +126,7 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
 - **Input data quality and representativeness are measured** (`DAT-02` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
   - `eu-ai-act Art. 10 (clause reference unverified)`
   - Remediation: dat-evidence-at-source
-- **Outcome parity across declared groups is within thresholds** (`DAT-03` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
+- **Outcome parity across declared groups is within thresholds** (`DAT-03` @ `spiffe://corp/agents/credit-langgraph`) -> **not assessed** (rung 3, semi-automated; 0/0 failed)
   - `eu-ai-act Art. 10 (clause reference unverified)`
   - Remediation: dat-evidence-at-source
 - **Data-governance measures are documented and reviewed** (`DAT-04` @ `spiffe://corp/agents/credit-langgraph`) -> **not assessed** (rung 3, manual; 0/0 failed)
@@ -159,7 +159,7 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
 - **Consequential decisions record the authorisation that gated them** (`OVS-05` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
   - `eu-ai-act Art. 26(2) (clause reference unverified)`
   - Remediation: ovs-evidence-at-source
-- **Overrides and interrupts are effective and recorded** (`OVS-07` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
+- **Overrides and interrupts are effective and recorded** (`OVS-07` @ `spiffe://corp/agents/credit-langgraph`) -> **not applicable** (rung 2, semi-automated; 0/0 failed)
   - `eu-ai-act Art. 14(4)(b) (clause reference unverified)`
   - Remediation: ovs-evidence-at-source
 - **Oversight coverage of consequential decisions is complete** (`OVS-08` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
@@ -197,8 +197,9 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
   - `eu-ai-act Art. 15 (clause reference unverified)`
   - Evidence: `agentce:event/langgraph-known-pass-tc1`
   - Remediation: rob-evidence-at-source
-- **Cyber-incident detection and response are exercised** (`ROB-07` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
+- **Cyber-incident detection and response are exercised** (`ROB-07` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, semi-automated; 0/1 failed)
   - `eu-ai-act Art. 15 (clause reference unverified)`
+  - Evidence: `agentce:event/langgraph-known-pass-inc1`
   - Remediation: rob-evidence-at-source
 - **Consequential decisions record the authorisation gate they cleared** (`RSK-01` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
   - `eu-ai-act Art. 9 (clause reference unverified)`
@@ -206,7 +207,7 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
 - **Consequential decisions are subject to a risk-review activity** (`RSK-02` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
   - `eu-ai-act Art. 9 (clause reference unverified)`
   - Remediation: rsk-evidence-at-source
-- **Residual-risk indicators are measured within thresholds** (`RSK-03` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
+- **Residual-risk indicators are measured within thresholds** (`RSK-03` @ `spiffe://corp/agents/credit-langgraph`) -> **not assessed** (rung 3, semi-automated; 0/0 failed)
   - `eu-ai-act Art. 9 (clause reference unverified)`
   - Remediation: rsk-evidence-at-source
 - **A fundamental-rights impact assessment is recorded** (`RSK-04` @ `spiffe://corp/agents/credit-langgraph`) -> **not assessed** (rung 3, manual; 0/0 failed)

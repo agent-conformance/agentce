@@ -42,7 +42,7 @@ Every control across the EU AI Act base catalog and its overlays, and the NIST A
 |---|---|---|---|---|
 | [`DAT-01`](dat-01.md) | Consequential decisions record the data they consumed | medium | automated | 2 |
 | [`DAT-02`](dat-02.md) | Input data quality and representativeness are measured | medium | semi-automated | 2 |
-| [`DAT-03`](dat-03.md) | Outcome parity across declared groups is within thresholds | medium | semi-automated | 2 |
+| [`DAT-03`](dat-03.md) | Outcome parity across declared groups is within thresholds | medium | semi-automated | 3 |
 | [`DAT-04`](dat-04.md) | Data-governance measures are documented and reviewed | medium | manual | 3 |
 | [`DOC-01`](doc-01.md) | Operating components match the declared documentation | high | automated | 2 |
 | [`DOC-02`](doc-02.md) | Consequential decisions are documented with a time of record | medium | automated | 2 |
@@ -81,7 +81,7 @@ Every control across the EU AI Act base catalog and its overlays, and the NIST A
 | [`ROB-07`](rob-07.md) | Cyber-incident detection and response are exercised | medium | semi-automated | 2 |
 | [`RSK-01`](rsk-01.md) | Consequential decisions record the authorisation gate they cleared | medium | automated | 2 |
 | [`RSK-02`](rsk-02.md) | Consequential decisions are subject to a risk-review activity | medium | automated | 2 |
-| [`RSK-03`](rsk-03.md) | Residual-risk indicators are measured within thresholds | medium | semi-automated | 2 |
+| [`RSK-03`](rsk-03.md) | Residual-risk indicators are measured within thresholds | medium | semi-automated | 3 |
 | [`RSK-04`](rsk-04.md) | A fundamental-rights impact assessment is recorded | medium | manual | 3 |
 | [`RSK-05`](rsk-05.md) | Registration and applicability declarations are current | medium | manual | 3 |
 | [`TRN-01`](trn-01.md) | Affected persons are notified for every consequential decision | medium | automated | 2 |

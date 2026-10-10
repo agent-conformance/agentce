@@ -6,7 +6,7 @@ Residual-risk indicators are measured within thresholds.
 |---|---|
 | Severity | medium |
 | Mode | semi-automated |
-| Rung | 2 |
+| Rung | 3 |
 | Catalog | EU AI Act base catalog (base) |
 
 Crosswalked to clause(s) Art. 9. Clause numbers only are cited; standard text is never reproduced.

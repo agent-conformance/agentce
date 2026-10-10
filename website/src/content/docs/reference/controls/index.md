@@ -45,7 +45,7 @@ Every control across the EU AI Act base catalog and its overlays, and the NIST A
 |---|---|---|---|---|
 | [`DAT-01`](/reference/controls/dat-01/) | Consequential decisions record the data they consumed | medium | automated | 2 |
 | [`DAT-02`](/reference/controls/dat-02/) | Input data quality and representativeness are measured | medium | semi-automated | 2 |
-| [`DAT-03`](/reference/controls/dat-03/) | Outcome parity across declared groups is within thresholds | medium | semi-automated | 2 |
+| [`DAT-03`](/reference/controls/dat-03/) | Outcome parity across declared groups is within thresholds | medium | semi-automated | 3 |
 | [`DAT-04`](/reference/controls/dat-04/) | Data-governance measures are documented and reviewed | medium | manual | 3 |
 | [`DOC-01`](/reference/controls/doc-01/) | Operating components match the declared documentation | high | automated | 2 |
 | [`DOC-02`](/reference/controls/doc-02/) | Consequential decisions are documented with a time of record | medium | automated | 2 |
@@ -84,7 +84,7 @@ Every control across the EU AI Act base catalog and its overlays, and the NIST A
 | [`ROB-07`](/reference/controls/rob-07/) | Cyber-incident detection and response are exercised | medium | semi-automated | 2 |
 | [`RSK-01`](/reference/controls/rsk-01/) | Consequential decisions record the authorisation gate they cleared | medium | automated | 2 |
 | [`RSK-02`](/reference/controls/rsk-02/) | Consequential decisions are subject to a risk-review activity | medium | automated | 2 |
-| [`RSK-03`](/reference/controls/rsk-03/) | Residual-risk indicators are measured within thresholds | medium | semi-automated | 2 |
+| [`RSK-03`](/reference/controls/rsk-03/) | Residual-risk indicators are measured within thresholds | medium | semi-automated | 3 |
 | [`RSK-04`](/reference/controls/rsk-04/) | A fundamental-rights impact assessment is recorded | medium | manual | 3 |
 | [`RSK-05`](/reference/controls/rsk-05/) | Registration and applicability declarations are current | medium | manual | 3 |
 | [`TRN-01`](/reference/controls/trn-01/) | Affected persons are notified for every consequential decision | medium | automated | 2 |
