@@ -36,6 +36,13 @@ public final class Ingest {
     private Ingest() {}
 
     public static final int DEFAULT_MAX_EVENT_BYTES = 1_048_576;
+
+    /** The evidence ladder (SPEC §6.4 classes, lowest first): of two records with one id, the lower class is quarantined. */
+    private static final Map<String, Integer> CLASS_RANK =
+            Map.of("self_report", 0, "enforcement_point", 1, "independent_system", 2);
+
+    /** A record that passed every per-record check, waiting for the id and time-order checks. */
+    private record Candidate(JsonNode event, JsonNode rawEvent, String source, String typeValue, int rank) {}
     private static final Pattern TYPE_RE =
             Pattern.compile("^org\\.agent-conformance\\.evidence\\.(?<name>[A-Za-z0-9]+)\\.v1$");
 
@@ -81,8 +88,11 @@ public final class Ingest {
     public static Result ingest(Bundle bundle, int maxEventBytes) {
         Result result = new Result();
         Set<String> validTypes = Schema.eventTypes();
-        Set<String> seenIds = new HashSet<>();
-        Map<String, String> lastTime = new HashMap<>();
+        // Pass 1 checks each record on its own; `records` keeps, in file order, each quarantine record and each
+        // candidate. `ownerRank` is the highest trusted class among the candidates that carry each id: a record of a
+        // lower class never displaces it (18.143).
+        List<Object> records = new ArrayList<>();
+        Map<String, Integer> ownerRank = new HashMap<>();
 
         for (Path path : bundle.eventFiles) {
             byte[] content;
@@ -96,7 +106,7 @@ public final class Ingest {
                 try {
                     raw = Verify.decodeStrict(rawLine).toString();
                 } catch (CharacterCodingException e) {
-                    result.quarantined.add(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
+                    records.add(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
                             .detail("invalid UTF-8"));
                     continue;
                 }
@@ -105,7 +115,7 @@ public final class Ingest {
                     continue;
                 }
                 if (line.getBytes(StandardCharsets.UTF_8).length > maxEventBytes) {
-                    result.quarantined.add(new Quarantine.Record(Quarantine.Reason.OVERSIZE)
+                    records.add(new Quarantine.Record(Quarantine.Reason.OVERSIZE)
                             .detail("event exceeds " + maxEventBytes + " bytes"));
                     continue;
                 }
@@ -122,19 +132,19 @@ public final class Ingest {
                 try {
                     event = Json.parse(line);
                 } catch (RuntimeException exc) {
-                    result.quarantined.add(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
+                    records.add(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
                             .detail("invalid JSON"));
                     continue;
                 }
                 if (event == null || !event.isObject()) {
-                    result.quarantined.add(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
+                    records.add(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
                             .detail("event is not a JSON object"));
                     continue;
                 }
 
                 List<String> errors = Schema.validateEvent(event);
                 if (!errors.isEmpty()) {
-                    result.quarantined.add(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
+                    records.add(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
                             .eventId(opt(event, "id"))
                             .source(opt(event, "source"))
                             .type(opt(event, "type"))
@@ -145,7 +155,7 @@ public final class Ingest {
                 String typeValue = event.get("type").asText();
                 String name = typeNameOf(typeValue);
                 if (name == null || !validTypes.contains(name)) {
-                    result.quarantined.add(new Quarantine.Record(Quarantine.Reason.UNKNOWN_TYPE)
+                    records.add(new Quarantine.Record(Quarantine.Reason.UNKNOWN_TYPE)
                             .eventId(event.get("id").asText())
                             .source(event.get("source").asText())
                             .type(typeValue)
@@ -155,7 +165,7 @@ public final class Ingest {
 
                 String source = event.get("source").asText();
                 if (bundle.sources != null && !bundle.sources.contains(source)) {
-                    result.quarantined.add(new Quarantine.Record(Quarantine.Reason.UNKNOWN_SOURCE)
+                    records.add(new Quarantine.Record(Quarantine.Reason.UNKNOWN_SOURCE)
                             .eventId(event.get("id").asText())
                             .source(source)
                             .type(typeValue)
@@ -168,7 +178,7 @@ public final class Ingest {
                 if (declaredClass != null) {
                     String eventClass = event.get("agentcesourceclass").asText();
                     if (!eventClass.equals(declaredClass)) {
-                        result.quarantined.add(new Quarantine.Record(Quarantine.Reason.CLASS_MISMATCH)
+                        records.add(new Quarantine.Record(Quarantine.Reason.CLASS_MISMATCH)
                                 .eventId(event.get("id").asText())
                                 .source(source)
                                 .type(typeValue)
@@ -185,33 +195,49 @@ public final class Ingest {
                 }
 
                 String eventId = event.get("id").asText();
-                if (seenIds.contains(eventId)) {
-                    result.quarantined.add(new Quarantine.Record(Quarantine.Reason.DUPLICATE_ID)
-                            .eventId(eventId)
-                            .source(source)
-                            .type(typeValue)
-                            .detail("event id already seen in this bundle"));
-                    continue;
-                }
-
-                String stream = streamOf(event);
-                String timeValue = event.get("time").asText();
-                String previous = lastTime.get(stream);
-                if (previous != null && Json.byteCompare(timeValue, previous) < 0) {
-                    result.quarantined.add(new Quarantine.Record(Quarantine.Reason.TIME_ORDER)
-                            .eventId(eventId)
-                            .source(source)
-                            .stream(stream)
-                            .type(typeValue)
-                            .detail("time " + timeValue + " precedes " + previous + " in the stream"));
-                    continue;
-                }
-
-                seenIds.add(eventId);
-                lastTime.put(stream, timeValue);
-                result.accepted.add(event);
-                result.rawAccepted.add(rawEvent);
+                int rank = CLASS_RANK.get(event.get("agentcesourceclass").asText());
+                ownerRank.merge(eventId, rank, Math::max);
+                records.add(new Candidate(event, rawEvent, source, typeValue, rank));
             }
+        }
+
+        Set<String> seenIds = new HashSet<>();
+        Map<String, String> lastTime = new HashMap<>();
+        for (Object record : records) {
+            if (!(record instanceof Candidate candidate)) {
+                result.quarantined.add((Quarantine.Record) record);
+                continue;
+            }
+            JsonNode event = candidate.event();
+            String eventId = event.get("id").asText();
+            if (seenIds.contains(eventId) || candidate.rank() < ownerRank.get(eventId)) {
+                result.quarantined.add(new Quarantine.Record(Quarantine.Reason.DUPLICATE_ID)
+                        .eventId(eventId)
+                        .source(candidate.source())
+                        .type(candidate.typeValue())
+                        .detail(seenIds.contains(eventId)
+                                ? "event id already seen in this bundle"
+                                : "a record of a higher source class has this event id"));
+                continue;
+            }
+
+            String stream = streamOf(event);
+            String timeValue = event.get("time").asText();
+            String previous = lastTime.get(stream);
+            if (previous != null && Json.byteCompare(timeValue, previous) < 0) {
+                result.quarantined.add(new Quarantine.Record(Quarantine.Reason.TIME_ORDER)
+                        .eventId(eventId)
+                        .source(candidate.source())
+                        .stream(stream)
+                        .type(candidate.typeValue())
+                        .detail("time " + timeValue + " precedes " + previous + " in the stream"));
+                continue;
+            }
+
+            seenIds.add(eventId);
+            lastTime.put(stream, timeValue);
+            result.accepted.add(event);
+            result.rawAccepted.add(candidate.rawEvent());
         }
         return result;
     }

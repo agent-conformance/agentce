@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -142,6 +143,40 @@ class IngestTest {
         assertEquals(List.of(), result.quarantined);
         for (JsonNode event : result.accepted) {
             assertEquals("self_report", event.get("agentcesourceclass").asText());
+        }
+    }
+
+    @Test
+    void aLowerClassRecordNeverDisplacesAHigherClassRecord(@TempDir Path tempDir) throws IOException {
+        // 18.143: the agent's own record reusing the enforcement point's id, before or after it, is the one
+        // quarantined; the class ingest trusts ranks, so an undeclared source asserting independent_system loses too.
+        String agent = "urn:example:agent";
+        JsonNode genuine = Fixtures.buildIngestEvent(SOURCE, "enforcement_point", "e1", "gw");
+        JsonNode shadow = Fixtures.buildIngestEvent(agent, "self_report", "e1", "agent");
+        JsonNode undeclared = Fixtures.buildIngestEvent(agent, "independent_system", "e1", "agent");
+        Object[][] runs = {
+            {List.of(shadow, genuine), "self_report", "a record of a higher source class has this event id"},
+            {List.of(genuine, shadow), "self_report", "event id already seen in this bundle"},
+            {List.of(undeclared, genuine), null, "a record of a higher source class has this event id"},
+        };
+        int n = 0;
+        for (Object[] run : runs) {
+            ArrayNode sources = Json.nodes().arrayNode();
+            sources.addObject().put("id", SOURCE).put("class", "enforcement_point");
+            ObjectNode agentSource = sources.addObject().put("id", agent);
+            if (run[1] != null) {
+                agentSource.put("class", (String) run[1]);
+            }
+            @SuppressWarnings("unchecked")
+            List<JsonNode> events = (List<JsonNode>) run[0];
+            Ingest.Result result =
+                    Ingest.ingest(Fixtures.writeIngestBundle(tempDir.resolve("b" + n++), events, sources));
+            assertEquals(List.of(genuine), result.accepted);
+            assertEquals(1, result.quarantined.size());
+            ObjectNode q = result.quarantined.get(0).toJson();
+            assertEquals("duplicate_id", q.get("reason").asText());
+            assertEquals(agent, q.get("source").asText());
+            assertEquals(run[2], q.get("detail").asText());
         }
     }
 }

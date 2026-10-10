@@ -36,7 +36,11 @@ function enforcementPointEvent(): Record<string, unknown> {
   };
 }
 
-function writeBundle(events: Array<Record<string, unknown>>, sources: string[] | null): string {
+/** `sources` entries are a source id (declared with no class) or `[id, class]`. */
+function writeBundle(
+  events: Array<Record<string, unknown>>,
+  sources: Array<string | [string, string]> | null,
+): string {
   const dir = mkdtempSync(join(tmpdir(), "agentce-ingest-"));
   mkdirSync(join(dir, "events"));
   const lines = `${events.map((e) => JSON.stringify(e)).join("\n")}\n`;
@@ -47,7 +51,9 @@ function writeBundle(events: Array<Record<string, unknown>>, sources: string[] |
     files: [{ path: "events/stream.jsonl", sha256: `sha256:${hash}` }],
   };
   if (sources !== null) {
-    manifest.sources = sources.map((id) => ({ id }));
+    manifest.sources = sources.map((s) =>
+      typeof s === "string" ? { id: s } : { id: s[0], class: s[1] },
+    );
   }
   writeFileSync(join(dir, "manifest.json"), JSON.stringify(manifest));
   return dir;
@@ -224,4 +230,37 @@ test('a manifest class of "", null, or a non-string value is treated as undeclar
   for (const event of result.accepted) {
     assert.equal(event.agentcesourceclass, "self_report");
   }
+});
+
+test("a lower-class record never displaces a higher-class record with the same id (18.143)", () => {
+  const genuine = enforcementPointEvent();
+  const shadow = { ...genuine, source: "urn:example:agent", agentcesourceclass: "self_report" };
+  const classes: Array<[string, string]> = [
+    [String(genuine.source), "enforcement_point"],
+    ["urn:example:agent", "self_report"],
+  ];
+  for (const [events, detail] of [
+    [[shadow, genuine], "a record of a higher source class has this event id"],
+    [[genuine, shadow], "event id already seen in this bundle"],
+  ] as const) {
+    const result = ingest(loadBundle(writeBundle([...events], classes)));
+    assert.deepEqual(result.accepted, [genuine]);
+    assert.deepEqual(
+      result.quarantined.map((q) => [q.reason, q.source, q.detail]),
+      [["duplicate_id", "urn:example:agent", detail]],
+    );
+  }
+  // The class ingest trusts ranks, not the record's own: an undeclared source asserting
+  // independent_system counts as self_report and still loses the id.
+  const undeclared = { ...shadow, agentcesourceclass: "independent_system" };
+  const result = ingest(
+    loadBundle(
+      writeBundle(
+        [undeclared, genuine],
+        ["urn:example:agent", [String(genuine.source), "enforcement_point"]],
+      ),
+    ),
+  );
+  assert.deepEqual(result.accepted, [genuine]);
+  assert.equal(result.quarantined[0].source, "urn:example:agent");
 });

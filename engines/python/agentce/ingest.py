@@ -35,6 +35,9 @@ DEFAULT_MAX_EVENT_BYTES = 1_048_576
 #: The whitespace JSON itself allows around a value (RFC 8259 §2); nothing else is trimmed from a line.
 _JSON_WHITESPACE = " \t\r\n"
 
+#: The evidence ladder (SPEC §6.4 classes, lowest first): of two records with one id, the lower class is quarantined.
+_CLASS_RANK = {"self_report": 0, "enforcement_point": 1, "independent_system": 2}
+
 _TYPE_RE = re.compile(r"^org\.agent-conformance\.evidence\.(?P<name>[A-Za-z0-9]+)\.v1$")
 
 
@@ -75,8 +78,13 @@ def ingest(
     """Ingest ``bundle``'s events, returning the accepted events and the quarantine records."""
     result = IngestResult()
     valid_types = event_types()
-    seen_ids: set[str] = set()
-    last_time: dict[str, str] = {}
+    # Pass 1 checks each record on its own; `records` keeps, in file order, each quarantine record and each candidate
+    # (the event as readers see it, as received, its source, type and class rank). `owner_rank` is the highest trusted
+    # class among the candidates that carry each id: a record of a lower class never displaces it (18.143).
+    records: list[
+        QuarantineRecord | tuple[dict[str, Any], dict[str, Any], str, str, int]
+    ] = []
+    owner_rank: dict[str, int] = {}
 
     for path in bundle.event_files:
         # One line rule the three engines share (18.65): lines end at \n, \r\n or a lone \r
@@ -87,7 +95,7 @@ def ingest(
             try:
                 raw = raw_line.decode("utf-8")
             except UnicodeDecodeError:
-                result.quarantined.append(
+                records.append(
                     QuarantineRecord(
                         QuarantineReason.SCHEMA_INVALID, detail="invalid UTF-8"
                     )
@@ -97,7 +105,7 @@ def ingest(
             if not line:
                 continue
             if len(line.encode("utf-8")) > max_event_bytes:
-                result.quarantined.append(
+                records.append(
                     QuarantineRecord(
                         QuarantineReason.OVERSIZE,
                         detail=f"event exceeds {max_event_bytes} bytes",
@@ -113,7 +121,7 @@ def ingest(
             try:
                 event = load_json(line)
             except JSONError as exc:
-                result.quarantined.append(
+                records.append(
                     QuarantineRecord(
                         QuarantineReason.SCHEMA_INVALID,
                         detail=f"invalid JSON: {exc.msg}",
@@ -123,7 +131,7 @@ def ingest(
             except RecursionError as exc:
                 raise _too_deep() from exc
             if not isinstance(event, dict):
-                result.quarantined.append(
+                records.append(
                     QuarantineRecord(
                         QuarantineReason.SCHEMA_INVALID,
                         detail="event is not a JSON object",
@@ -133,7 +141,7 @@ def ingest(
 
             errors = validate_event(event)
             if errors:
-                result.quarantined.append(
+                records.append(
                     QuarantineRecord(
                         QuarantineReason.SCHEMA_INVALID,
                         event_id=_opt(event, "id"),
@@ -147,7 +155,7 @@ def ingest(
             type_value = str(event["type"])
             name = _event_type_name(type_value)
             if name is None or name not in valid_types:
-                result.quarantined.append(
+                records.append(
                     QuarantineRecord(
                         QuarantineReason.UNKNOWN_TYPE,
                         event_id=str(event["id"]),
@@ -160,7 +168,7 @@ def ingest(
 
             source = str(event["source"])
             if bundle.sources is not None and source not in bundle.sources:
-                result.quarantined.append(
+                records.append(
                     QuarantineRecord(
                         QuarantineReason.UNKNOWN_SOURCE,
                         event_id=str(event["id"]),
@@ -180,7 +188,7 @@ def ingest(
             if declared_class is not None:
                 event_class = str(event["agentcesourceclass"])
                 if event_class != declared_class:
-                    result.quarantined.append(
+                    records.append(
                         QuarantineRecord(
                             QuarantineReason.CLASS_MISMATCH,
                             event_id=str(event["id"]),
@@ -201,38 +209,54 @@ def ingest(
                 event = {**event, "agentcesourceclass": "self_report"}
 
             event_id = str(event["id"])
-            if event_id in seen_ids:
-                result.quarantined.append(
-                    QuarantineRecord(
-                        QuarantineReason.DUPLICATE_ID,
-                        event_id=event_id,
-                        source=source,
-                        type=type_value,
-                        detail="event id already seen in this bundle",
-                    )
-                )
-                continue
+            rank = _CLASS_RANK[str(event["agentcesourceclass"])]
+            owner_rank[event_id] = max(rank, owner_rank.get(event_id, rank))
+            records.append((event, raw_event, source, type_value, rank))
 
-            stream = _stream_of(event)
-            time_value = str(event["time"])
-            previous = last_time.get(stream)
-            if previous is not None and time_value < previous:
-                result.quarantined.append(
-                    QuarantineRecord(
-                        QuarantineReason.TIME_ORDER,
-                        event_id=event_id,
-                        source=source,
-                        stream=stream,
-                        type=type_value,
-                        detail=f"time {time_value} precedes {previous} in the stream",
-                    )
+    seen_ids: set[str] = set()
+    last_time: dict[str, str] = {}
+    for record in records:
+        if isinstance(record, QuarantineRecord):
+            result.quarantined.append(record)
+            continue
+        event, raw_event, source, type_value, rank = record
+        event_id = str(event["id"])
+        if event_id in seen_ids or rank < owner_rank[event_id]:
+            result.quarantined.append(
+                QuarantineRecord(
+                    QuarantineReason.DUPLICATE_ID,
+                    event_id=event_id,
+                    source=source,
+                    type=type_value,
+                    detail=(
+                        "event id already seen in this bundle"
+                        if event_id in seen_ids
+                        else "a record of a higher source class has this event id"
+                    ),
                 )
-                continue
+            )
+            continue
 
-            seen_ids.add(event_id)
-            last_time[stream] = time_value
-            result.accepted.append(event)
-            result.raw_accepted.append(raw_event)
+        stream = _stream_of(event)
+        time_value = str(event["time"])
+        previous = last_time.get(stream)
+        if previous is not None and time_value < previous:
+            result.quarantined.append(
+                QuarantineRecord(
+                    QuarantineReason.TIME_ORDER,
+                    event_id=event_id,
+                    source=source,
+                    stream=stream,
+                    type=type_value,
+                    detail=f"time {time_value} precedes {previous} in the stream",
+                )
+            )
+            continue
+
+        seen_ids.add(event_id)
+        last_time[stream] = time_value
+        result.accepted.append(event)
+        result.raw_accepted.append(raw_event)
 
     return result
 

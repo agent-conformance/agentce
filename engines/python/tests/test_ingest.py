@@ -62,6 +62,43 @@ def test_duplicate_id(
     assert result.quarantined[0].reason == QuarantineReason.DUPLICATE_ID
 
 
+def test_a_lower_class_record_never_displaces_a_higher_class_record(
+    make_bundle: Callable[..., Any],
+    clone: Callable[[dict[str, Any]], dict[str, Any]],
+    example_event: dict[str, Any],
+) -> None:
+    # 18.143: the agent's own record reusing the enforcement point's id, before or after it, is the one quarantined.
+    genuine = str(example_event["source"])
+    shadow = clone(example_event)
+    shadow["source"] = "urn:example:agent"
+    shadow["agentcesourceclass"] = "self_report"
+    classes = {genuine: "enforcement_point", "urn:example:agent": "self_report"}
+    for items, detail in (
+        (
+            [shadow, example_event],
+            "a record of a higher source class has this event id",
+        ),
+        ([example_event, shadow], "event id already seen in this bundle"),
+    ):
+        result = _ingest(make_bundle, items, source_classes=classes)
+        assert result.accepted == [example_event]
+        assert [(q.reason, q.source, q.detail) for q in result.quarantined] == [
+            (QuarantineReason.DUPLICATE_ID, "urn:example:agent", detail)
+        ]
+
+    # The class ingest trusts ranks, not the record's own: an undeclared source asserting
+    # independent_system counts as self_report and still loses the id.
+    shadow["agentcesourceclass"] = "independent_system"
+    result = _ingest(
+        make_bundle,
+        [shadow, example_event],
+        sources=["urn:example:agent"],
+        source_classes={genuine: "enforcement_point"},
+    )
+    assert result.accepted == [example_event]
+    assert result.quarantined[0].source == "urn:example:agent"
+
+
 def test_time_order(
     make_bundle: Callable[..., Any],
     clone: Callable[[dict[str, Any]], dict[str, Any]],
