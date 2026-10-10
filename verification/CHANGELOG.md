@@ -14,9 +14,9 @@ fails if a gate in `gates.json` is not named in this file.
   ids compare after trimming Unicode White_Space and U+FEFF from both ends in every engine, so a trailing space or a
   U+00A0, U+0085 or U+FEFF pad neither splits one human in two nor escapes the delegation-chain check. The gate now
   runs 85 cases. Six new seeded faults, two per engine: the login-principal check dropped, and ids trimmed with the
-  language's own whitespace set. The OVS-08 fault (distinct humans keyed by actor id alone) now matches the fixed
-  rule, since a counted actor's login names that actor, so it became ids compared untrimmed, where a padded owner id
-  escapes the delegation-chain check.
+  language's own whitespace set. The old OVS-08 fault keyed distinct humans by actor id alone. Since a counted
+  actor's login now names that actor, that fault no longer changes any outcome, so it now compares ids untrimmed and
+  lets a padded owner id escape the delegation-chain check.
 
 ## 0.79.0
 
