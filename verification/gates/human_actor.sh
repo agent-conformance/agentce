@@ -68,12 +68,15 @@ outcome() {
     | "\(.outcome) \([.violations[]?.focus | sub("^agentce:event/"; "")] | unique | join(","))"' "$1"
 }
 
-# One engine over every case; returns non-zero on any mismatch. The three engines run side by side, so the gate's
-# wall time is the slowest engine's; the first mismatch in any engine stops all three (the $work/.stop marker).
+# One engine over its share of the cases (every case whose position modulo $3 is $2); returns non-zero on any
+# mismatch. All workers run side by side, Python on three since its CLI starts slowest, so the gate's wall time is
+# the slowest worker's; the first mismatch in any worker stops them all (the $work/.stop marker).
 check_cases() {
-  local engine="$1" dir name want out code got quarantined
+  local engine="$1" worker="$2" workers="$3" position=-1 dir name want out code got quarantined
   for dir in "$work"/*/; do
     [ -e "$work/.stop" ] && return 1
+    position=$((position + 1))
+    [ $((position % workers)) -eq "$worker" ] || continue
     name="$(basename "$dir")"
     want="$(cat "$dir/expected")"
     out="$dir/out-$engine"
@@ -100,8 +103,9 @@ check_cases() {
 
 status=0
 pids=()
-for engine in python typescript java; do
-  check_cases "$engine" &
+for share in "python 0 3" "python 1 3" "python 2 3" "typescript 0 1" "java 0 1"; do
+  # shellcheck disable=SC2086 # the share is three words on purpose
+  check_cases $share &
   pids+=("$!")
 done
 for pid in "${pids[@]}"; do

@@ -18,7 +18,9 @@ fails if a gate in `gates.json` is not named in this file.
   88 cases. Six new seeded faults, two per engine: the login-principal check dropped, and ids trimmed with the
   language's own whitespace set. The old OVS-08 fault keyed distinct humans by actor id alone. Since a counted
   actor's login now names that actor, that fault no longer changes any outcome, so it now compares ids untrimmed and
-  lets a padded owner id escape the delegation-chain check.
+  lets a padded owner id escape the delegation-chain check. The gate now splits the Python cases over three workers
+  beside one each for TypeScript and Java, since Python's CLI starts slowest; that keeps the seeded-fault demo, 24
+  faults over 88 cases, inside its CI lane's 20 minutes.
 
 ## 0.79.0
 
