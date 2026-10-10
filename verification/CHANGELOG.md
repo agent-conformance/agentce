@@ -3,6 +3,21 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.80.0
+
+- `VG-HUMAN-ACTOR` (18.140, changed) also checks that the identity-provider login an override, interrupt or approval
+  cites names that record's own actor. After 18.126 any held login from an independent or enforcement-point stream
+  counted, so a self-reported override by one human could cite another human's genuine login, or a sub-agent's own
+  session under the same subject, and OVS-01, OVS-07 and CND-02 read it as the first human's review. A
+  `SessionStart` now carries an optional `principal`, the human the identity provider authenticated, and the rule
+  fails closed when the cited login names nobody, a service, a blank id or someone other than the actor. Principal
+  ids compare after trimming Unicode White_Space and U+FEFF from both ends in every engine, so a trailing space or a
+  U+00A0, U+0085 or U+FEFF pad neither splits one human in two nor escapes the delegation-chain check. The gate now
+  runs 85 cases. Six new seeded faults, two per engine: the login-principal check dropped, and ids trimmed with the
+  language's own whitespace set. The OVS-08 fault (distinct humans keyed by actor id alone) now matches the fixed
+  rule, since a counted actor's login names that actor, so it became ids compared untrimmed, where a padded owner id
+  escapes the delegation-chain check.
+
 ## 0.79.0
 
 - `VG-HUMAN-ACTOR` (18.126, new, tier quick) checks the SPEC §10.4 human-actor rule in all three engines. An

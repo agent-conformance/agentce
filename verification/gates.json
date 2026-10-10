@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.79.0",
+  "suite_version": "0.80.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2914,7 +2914,7 @@
     },
     {
       "id": "VG-HUMAN-ACTOR",
-      "title": "An approval, override or interrupt counts as a human's only under the full SPEC §10.4 human-actor rule, in all three engines: its actor is a human principal whose session_ref names a held identity-provider login record (a SessionStart of someone other than the agents it concerns, from an independent_system or enforcement_point stream) and who is nowhere in the delegation chain of the activity; under dual control two approvals on one login, or by one id, are one human (18.126)",
+      "title": "An approval, override or interrupt counts as a human's only under the full SPEC §10.4 human-actor rule, in all three engines: its actor is a human principal whose session_ref names a held identity-provider login record (a SessionStart of someone other than the agents it concerns, from an independent_system or enforcement_point stream, whose principal is that same human) and who is nowhere in the delegation chain of the activity, with ids compared after trimming Unicode White_Space and U+FEFF; under dual control two approvals on one login, or by one id, are one human (18.126, 18.140)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -2931,7 +2931,7 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/human_actor/cases.json (53: Override, Interrupt and ApprovalDecided, with and without their optional agent, each with a verified login from an independent_system and an enforcement_point stream, the login arriving before or after; no session_ref, a session_ref naming no held record, a bare id, the record itself, another approval, a tool call, an outcome, a policy decision, a self_report login, a login quarantined for a class mismatch, the assessed agent's own enforcement-point session; a service actor, a blank actor id, no actor; an actor in the decision's acted_for, in the agent's acted_for on another event, in a DelegationIssued chain of the agent, in the record's own acted_for, the agent's owner interrupting; dual control with two verified humans, two ids on one login, one id on two logins, one verified and one not, one in the chain; OVS-01, OVS-07, OVS-08, CND-02, RSK-02 and INC-03 each with a verified twin and a failing case) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "pass": "every case in verification/gates/fixtures/human_actor/cases.json (85: Override, Interrupt and ApprovalDecided, with and without their optional agent, each with a verified login from an independent_system and an enforcement_point stream, the login arriving before or after; no session_ref, a session_ref naming no held record, a bare id, the record itself, another approval, a tool call, an outcome, a policy decision, a self_report login, a login quarantined for a class mismatch, the assessed agent's own enforcement-point session; a service actor, a blank actor id, no actor; an actor in the decision's acted_for, in the agent's acted_for on another event, in a DelegationIssued chain of the agent, in the record's own acted_for, the agent's owner interrupting; a login that names another principal, names no principal, names a service or a blank id, and its twin that names the actor; a sub-agent's own session under the same subject, with and without naming the actor; the actor's, the owner's and a chain id padded with a trailing space, U+00A0, U+0085 or U+FEFF; dual control with two verified humans, two ids on one login, one id on two logins, one verified and one not, one in the chain; OVS-01, OVS-07, OVS-08, CND-02, RSK-02 and INC-03 each with a verified twin and a failing case) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
         "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
       },
       "faults": [
