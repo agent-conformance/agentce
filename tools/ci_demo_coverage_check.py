@@ -264,13 +264,10 @@ def _coverage_problems(
     return problems
 
 
-def partition_problems(
-    gates: list[str], total: int, root: Path = REPO_ROOT
-) -> list[str]:
+def partition_problems(gates: list[str], total: int, shard: ModuleType) -> list[str]:
     """Actually call the real, on-disk ``shard.py``'s ``partition()`` for every index of ``total``
     and confirm the union, against the real gate list, assigns every gate to exactly one shard --
     catching a truncated or off-by-one edit to ``partition()`` that a wiring check alone cannot see."""
-    shard = _load_shard_module(root)
     assignments: dict[str, list[int]] = {}
     for index in range(total):
         for gate in shard.partition(gates, index, total):
@@ -308,19 +305,22 @@ def check_workflow(
     gates = [line for line in result.stdout.splitlines() if line]
     if not gates:
         return problems + ["`verification/run --list` printed no gates"]
+    shard = _load_shard_module(root)
     for total in PARTITION_TOTALS:
-        problems += partition_problems(gates, total, root)
+        problems += partition_problems(gates, total, shard)
     registry = json.loads(
         (root / "verification" / "gates.json").read_text(encoding="utf-8")
     )
     quick = [gate["id"] for gate in registry["gates"] if gate["tier"] == "quick"]
-    from_shard = _load_shard_module(root).quick_ids(registry)
+    from_shard = shard.quick_ids(registry)
     if from_shard != quick:
         problems.append(
             f"shard.py's quick_ids() is not the registry's quick tier in order: {from_shard} != {quick}"
         )
     for total in PARTITION_TOTALS:
-        problems += [f"quick tier: {p}" for p in partition_problems(quick, total, root)]
+        problems += [
+            f"quick tier: {p}" for p in partition_problems(quick, total, shard)
+        ]
     return problems
 
 

@@ -55,8 +55,13 @@ def run_slice(
     return 0
 
 
-def _run_script(*args: str) -> int:
-    return subprocess.run(["python3", str(HERE / "run"), *args]).returncode
+def _run_script(*args: str, capture: bool = False) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["python3", str(HERE / "run"), *args],
+        capture_output=capture,
+        text=True,
+        check=capture,
+    )
 
 
 def main(argv: list[str]) -> int:
@@ -82,12 +87,7 @@ def main(argv: list[str]) -> int:
     if quick:
         gates = quick_ids(json.loads((HERE / "gates.json").read_text(encoding="utf-8")))
     else:
-        gates = subprocess.run(
-            ["python3", str(HERE / "run"), "--list"],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.splitlines()
+        gates = _run_script("--list", capture=True).stdout.splitlines()
     if not gates:
         print("no gates to shard", file=sys.stderr)
         return 1
@@ -99,7 +99,7 @@ def main(argv: list[str]) -> int:
     mode = "--gate" if quick else "--demo-fault"
     return run_slice(
         mine,
-        lambda gate: _run_script(mode, gate),
+        lambda gate: _run_script(mode, gate).returncode,
         f"shard {shard}/{total}",
         "passed or skipped" if quick else "demoed clean",
     )
