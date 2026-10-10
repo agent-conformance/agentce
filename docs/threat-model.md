@@ -15,7 +15,8 @@ to inputs, parsing, or integrity handling.
   every outcome is derived.
 - **The conformance claim and report** — the signed statement of what was assessed.
 - **The engine, catalogs, overlays, and corpus** — the code and data that decide outcomes.
-- **The pseudonymisation key** (SPEC §6.7) — supplied by reference, never in the bundle.
+- **The pseudonymisation key** (SPEC §6.7) — SPEC §6.7 has it supplied by reference and never in the
+  bundle; the engines take no key yet (row 12).
 
 ## Trust boundaries
 
@@ -42,13 +43,18 @@ service.
   false records, omits actions, or crafts records that satisfy a shape without meaning what the shape
   assumes. This class holds evidence spoofing, self-approval through agent-held credentials,
   enforcement-point bypass (direct provider calls), shape-satisfying-but-meaningless records, and
-  instruction-provenance laundering. Countered by trust classes, minimum-evidence and source-class
-  requirements, cross-source corroboration (SPEC §10.4), and coverage denominators independent of both
-  the agent and the enforcement point.
+  instruction-provenance laundering. Today the engines counter it only in part: a control's minimum
+  evidence asks for events of named types and source classes. Three defenses the SPEC names are not
+  built yet. They are holding each control to the minimum source class it declares (planned as 18.127), the
+  two-source check of SPEC §10.4 (planned as 20.11), and coverage denominators that decide INT and REC
+  verdicts (SPEC §6.5, planned as 18.134). Until they land, the engines take each record's declared
+  source class as given; rows 1, 5, 8 and 11 say what this leaves open.
 - **A2 — Tampering with the record after the fact.** Replay, reordering, timestamp manipulation, chain
-  recomputation after export, or re-identification of pseudonymised subjects. Countered by the integrity
-  envelope (SPEC §6.6): hash chains, out-of-band anchoring, timestamp cross-checks, and keyed
-  pseudonyms.
+  recomputation after export, or re-identification of pseudonymised subjects. The SPEC counters it with
+  the integrity envelope (SPEC §6.6) and keyed pseudonyms (SPEC §6.7). The engines check hash chains,
+  anchors and timestamps and report the results in `integrity.jsonl`, but those results do not yet
+  change a verdict (rows 2, 3 and 6, planned as 18.132), and the engines take no pseudonym key yet
+  (row 12).
 - **A3 — Subversion of the toolchain and trust base.** A modified engine or catalog, catalog or corpus
   substitution, or collusion between the source and the assessor. Countered by signed, offline-verified
   catalogs and releases, the engine and input digests in the manifest, and independent verifier reruns.
@@ -57,18 +63,18 @@ service.
 
 | # | Threat (SPEC §8.7) | Class | Mitigation | Test / control reference |
 |---|---|---|---|---|
-| 1 | Evidence spoofing | A1 | Trust classes: a `self_report` stream never satisfies a control that declares `min_source_class: enforcement_point`; model-stated rationale is never accepted as evidence of "why" | SPEC §6.4, IR-03; a control's `min_source_class` and `minimum_evidence` (SPEC §7.1); ECS spoofing fixtures |
-| 2 | Replay / duplicate events | A2 | Hash chain (`integrity.prev`) and per-stream ordering; a repeated id is quarantined `duplicate_id` | SPEC §6.6; quarantine reason `duplicate_id` (App F); `quarantine.schema.json` |
-| 3 | Timestamp manipulation | A2 | Source timestamps cross-checked against the anchors that cover them; an out-of-range event is `time_suspect` and excluded from timing controls; `time_order` quarantine beyond skew | SPEC §6.6; `IntegrityResult.status = time_suspect`; INC/REC timing controls |
-| 4 | Self-approval through agent-held credentials | A1 | `independent_system` requires that no principal in the agent's delegation chain can create or transition the record; the human-actor rule requires a distinct human approver | SPEC §6.4, §10.4; OVS-03 expectation E2, CND-02 |
-| 5 | Enforcement-point bypass (direct provider calls) | A1 | Coverage denominators independent of both the agent and the enforcement point (egress proxy, firewall, admission attestation); unreconciled coverage is `unknown` and yields `insufficient_evidence` on INT/REC controls | SPEC §6.5; `coverage.json`; INT and REC families |
-| 6 | Export-host chain recomputation | A2 | `export_anchored` anchors each stream head out-of-band to a write-once location; an `export_chained` enforcement-point stream is capped at `verified_weak` and its rung-2 outcomes at `partial` | SPEC §6.6; `IntegrityResult.strength`; integrity strength rules |
-| 7 | Modified engines | A3 | The manifest records the engine package digest; a report from an engine whose digest is not a published release is marked `engine_unverified`; verifiers rerun with the signed release and check its signatures with `agentce verify --release` | SPEC §8.7, §8.4; `manifest.json`, claim `engine_unverified`; [verification](verification.md) |
-| 8 | Shape-satisfying-but-meaningless records | A1 | Minimum evidence and source class plus corroboration: a well-formed self-report alone cannot satisfy a high-severity control; the shape reads engine-materialised edges from enforcement-point facts | SPEC §7.1 `minimum_evidence`, IR-02/IR-03; §10.4 |
-| 9 | Collusion between source and assessor | A3 | Independent verifier reruns from the reproducibility manifest; `assessor_independent` recorded in the claim; coverage denominators independent of the source | SPEC §8.4; claim `assessor_independent`; ECS reproducibility |
+| 1 | Evidence spoofing | A1 | Trust classes. Every event carries the class its source declared, and a control's `minimum_evidence` asks for at least one event of a named type and class in the subject's records. The engines read a control's `min_source_class` but do not apply it yet (`source_class_satisfied` is always true), so a `self_report`-only stream can satisfy a control that declares a higher minimum when its `minimum_evidence` does not name that class (INT-01 and INC-02, for example), and the class check never looks at the records a verdict rests on. The fix is planned as 18.127. Model-stated rationale is never accepted as evidence of "why" | SPEC §6.4, IR-03; a control's `min_source_class` and `minimum_evidence` (SPEC §7.1); ECS spoofing fixtures |
+| 2 | Replay / duplicate events | A2 | Hash chain (`integrity.prev`) and per-stream ordering; a repeated id is quarantined `duplicate_id`. A broken or reordered chain appears in `integrity.jsonl` but does not yet change a verdict (planned as 18.132) | SPEC §6.6; quarantine reason `duplicate_id` (App F); `quarantine.schema.json` |
+| 3 | Timestamp manipulation | A2 | Source timestamps cross-checked against the anchors that cover them; the engine marks an out-of-range stream `time_suspect` in `integrity.jsonl` and quarantines `time_order` an event whose time precedes the one before it in its stream. A `time_suspect` event still counts in timing controls today, because integrity results do not yet change a verdict | SPEC §6.6; `IntegrityResult.status = time_suspect`; INC/REC timing controls |
+| 4 | Self-approval through agent-held credentials | A1 | The human-actor rule requires a distinct human approver. SPEC §6.4 defines `independent_system` as a system in which no principal in the agent's delegation chain can create or transition the record; the engines take a source's declared class as given and do not yet hold a control to its declared minimum class (planned as 18.127) | SPEC §6.4, §10.4; OVS-03 expectation E2, CND-02 |
+| 5 | Enforcement-point bypass (direct provider calls) | A1 | Coverage denominators independent of both the agent and the enforcement point (egress proxy, firewall, admission attestation); `coverage.json` and `agentce readiness` report unreconciled coverage as `unknown`. That `unknown` does not yet change a verdict, so INT and REC controls can read conformant without an independent denominator (SPEC §6.5 says `insufficient_evidence`; planned as 18.134) | SPEC §6.5; `coverage.json`; INT and REC families |
+| 6 | Export-host chain recomputation | A2 | `export_anchored` anchors each stream head out-of-band to a write-once location; an `export_chained` stream's integrity result is `verified_weak`. The SPEC §6.6 cap of its rung-2 outcomes at `partial` is not built yet, because integrity results go to `integrity.jsonl` and do not yet change a verdict (planned as 18.132) | SPEC §6.6; `IntegrityResult.strength`; integrity strength rules |
+| 7 | Modified engines | A3 | The manifest records the engine package digest; verifiers rerun with the signed release and check its signatures with `agentce verify --release`. The engines do not yet mark a report from an engine whose digest is not a published release `engine_unverified` in the claim (SPEC §8.7) | SPEC §8.7, §8.4; `manifest.json`, claim `engine_unverified`; [verification](verification.md) |
+| 8 | Shape-satisfying-but-meaningless records | A1 | Minimum evidence. A control needs the events its `minimum_evidence` names, but that check asks only that one such event exists somewhere in the subject's records, not that the records a verdict rests on have that class, and the two-source check of SPEC §10.4 is not applied, so a well-formed self-report beside one unrelated enforcement-point event can satisfy a high-severity control today (CND-05 does). Planned as 18.127 (source class) and 20.11 (§10.4) | SPEC §7.1 `minimum_evidence`, IR-02/IR-03; §10.4 |
+| 9 | Collusion between source and assessor | A3 | Independent verifier reruns from the reproducibility manifest. The claim does not yet record `assessor_independent` (SPEC §9.1), and coverage denominators do not yet decide a verdict (row 5) | SPEC §8.4; claim `assessor_independent`; ECS reproducibility |
 | 10 | Catalog substitution | A3 | `agentce assess` verifies every `--catalog-dir` catalog against the effective trust root (`--trust-root`, else `AGENTCE_TRUST_ROOT`, else the vendored development root) before it evaluates a control, and refuses an unsigned, untrusted, or altered one with `input.catalog_unverified` (exit 3); unverified use requires the explicit `--allow-unverified-catalog`, which the manifest and the claim record as a limitation; a catalog whose own `id@version` is not the one requested is refused with `input.catalog_mismatch` and has no override; the manifest records each catalog's content digest. This covers the base catalog today; the sector overlays are not yet signed (tracked as follow-up work). The probe corpus is protected by a separate, non-Sigstore mechanism instead — a frozen content hash plus a recorded human sign-off, checked at load time (SPEC §7.2) — and rule fixtures under `spec/rules/` carry no signature or integrity check today. SPEC §8.7's text naming catalogs, overlays, probe corpora, and rule fixtures together as Sigstore-signed is broader than what is built; closing that gap for overlays, probe corpora, and rule fixtures is tracked as follow-up work, not yet built | SPEC §8.7; `agentce verify --catalog`; [verification](verification.md); `manifest.json` input digests and `limitations`; `engines/python/tests/test_catalog_signature.py`; `engines/python/agentce/probe.py` (probe corpus hash + sign-off check) |
-| 11 | Instruction-provenance laundering | A1 | Ingress instruction attestation records the channel `source_class` at entry; an agent-side `source_class` that disagrees is a finding `CND.instruction_relabelled`; high-severity instruction controls require corroboration | SPEC §7.7.5; CND-04, CND-05 |
-| 12 | Pseudonym re-identification by dictionary | A2 | `person_ref` values are keyed pseudonyms (HMAC-SHA-256 with a per-subject key held outside the bundle and supplied by reference); the manifest names, but never contains, the key | SPEC §6.7, IR-12; `manifest.json` `pseudonym_key_id` |
+| 11 | Instruction-provenance laundering | A1 | Each Instruction event carries the `source_class` its producer declared, and CND-05 judges an action's instruction chain from those classes, so an action on an instruction that declares no trusted class reads non-conformant. Nothing yet compares an agent-side `source_class` with an ingress record of the same instruction, and no adapter produces ingress Instruction events, so an instruction the agent relabels as `user` is not caught. Taking the declared class as given is planned to end with 18.127; reconciling against ingress records waits for the first gateway reader of Instruction events | SPEC §7.7.5; CND-04, CND-05 |
+| 12 | Pseudonym re-identification by dictionary | A2 | Principal IRIs are HMAC-SHA-256 pseudonyms of the principal id. The engines take no key yet, so every run uses the documented all-zero key and its principal IRIs can be reversed by dictionary; a per-subject key supplied by reference, the manifest's `pseudonym_key_id`, and the `pseudonymisation: none` limitation in the claim (SPEC §6.7) are not built yet | SPEC §6.7, IR-12; `manifest.json` `pseudonym_key_id` |
 | 13 | Cross-engine parser divergence on number tokens | A2 | A number token the canonical form refuses (a fraction or exponent, even on a whole number; an integer above `2^53 − 1`) is refused by every engine, and the accepted form is identical, so a value one engine hashes cannot be one another folds to a different number or refuses; literal ordering in shape constraints is exact and covers only integer and date-time forms | `spec/model/canonical-form.md` (number grammar), `spec/rules/psp.md` (literal ordering); the `numeric-temporal-edge-vectors` job in `three-engine.yml` |
 | 14 | Code injection through `assess --fail-on` | A3 | The expression is parsed by a hand-written tokenizer and a parser with no call, attribute-access, or grouping syntax in the grammar at all, into a flat list of OR-groups of AND-ed comparisons, so evaluating even a long chain never recurses; a dunder-import call, a backtick-embedded shell command, a bare `os.system(...)`, or a well-formed clause with an evaluable tail appended after `or` is refused as an unexpected token at parse time, before any assertion is evaluated, never by `eval`/`exec` | SPEC §7, §8.5; `agentce/fail_on.py`, `engines/typescript/src/failOn.ts`, `engines/java/src/main/java/org/agentce/FailOn.java`; `input.fail_on_invalid_expression` (exit 3); `engines/python/tests/test_policy_gating.py` |
 
@@ -204,8 +210,8 @@ relabelled attestation as `verified` and let it pass a supply-chain control.
 - **`BundleLoaded` carries no signature of its own -- a named residual risk, not yet closed.** Unlike
   `Attestation`, a `BundleLoaded` record (a bundle-load log line or CycloneDX AIBOM) has no `dsse`
   envelope and no `verification` field; its trust rests on the adapter run's declared source class
-  (`enforcement_point` by default -- `event_producers.json` -- not the lower `self_report` class the
-  general trust-class mitigations above (rows 1, 8) gate on) and the evidence stream's hash-chain and
+  (`enforcement_point` by default -- `event_producers.json` -- above the `self_report` class that rows
+  1 and 8 discuss, though those rows' class gates are not built yet) and the evidence stream's hash-chain and
   anchoring (rows 2, 6), never on cryptographic signature verification. A record can name
   `attestation_refs`, but no engine resolves or cross-checks those ids against a verified `Attestation`
   event today -- `attestation_refs` appears only in schema/type-generation code and the adapter's own
@@ -228,10 +234,13 @@ relabelled attestation as `verified` and let it pass a supply-chain control.
 ## Assumptions and residual risk
 
 - The integrity guarantees rest on at least one **independent system** and one **independent coverage
-  denominator** per subject; a deployment that declares neither is limited to design-level (`partial`)
-  outcomes, and the report says so.
-- Offline signature verification depends on a **vendored trust root**; a stale root is a warning recorded
-  in the manifest, never a silent network call (SPEC §8.7). The [verification procedure](verification.md)
+  denominator** per subject. SPEC §6.5 and §6.6 limit the outcomes of a deployment that has neither,
+  but the engines do not apply that limit yet: coverage is written to `coverage.json` and integrity
+  results to `integrity.jsonl`, and neither changes a verdict (planned as 18.134 and 18.132), so such a
+  deployment can still read conformant.
+- Offline signature verification depends on a **vendored trust root** and never makes a network call
+  (SPEC §8.7). The engines do not yet check whether that root is stale, so the manifest carries no
+  stale-root warning (SPEC §8.7 asks for one; planned as 18.135). The [verification procedure](verification.md)
   gives the trust roots and the per-profile checks.
 - `BundleLoaded` events are not DSSE-verified; see "Supply-chain attestation input" above for the
   residual risk this leaves open.
