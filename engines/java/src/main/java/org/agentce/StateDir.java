@@ -89,7 +89,7 @@ public final class StateDir {
         // Additive since state_version 1: absent (an older directory) or not an object reads as {}.
         JsonNode outcomes = data.get("last_outcomes");
         if (outcomes != null && outcomes.isObject()) {
-            state.lastOutcomes = ((ObjectNode) outcomes).deepCopy();
+            state.lastOutcomes = (ObjectNode) outcomes;
         }
         return state;
     }

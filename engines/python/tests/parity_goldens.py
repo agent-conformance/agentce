@@ -140,12 +140,13 @@ def shared_goldens(testdata: Path, dump: Dump) -> dict[str, str]:
 def stale(testdata: Path, goldens: dict[str, str]) -> list[str]:
     """Each golden whose committed bytes differ from ``goldens`` (or is missing), and each committed
     ``*-golden.*`` file no producer writes."""
-    problems = [
-        f"{name}: {'missing' if not (testdata / name).is_file() else 'differs from the live Python engine'}"
-        for name, text in sorted(goldens.items())
-        if not (testdata / name).is_file()
-        or (testdata / name).read_text(encoding="utf-8") != text
-    ]
+    problems: list[str] = []
+    for name, text in sorted(goldens.items()):
+        path = testdata / name
+        if not path.is_file():
+            problems.append(f"{name}: missing")
+        elif path.read_text(encoding="utf-8") != text:
+            problems.append(f"{name}: differs from the live Python engine")
     problems += [
         f"{path.name}: committed but no generator produces it"
         for path in sorted(testdata.glob("*-golden.*"))

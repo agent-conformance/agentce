@@ -3185,8 +3185,8 @@
         {
           "description": "--check stops comparing a committed golden's bytes, so it only notices missing or unproduced files and passes every stale golden",
           "file": "engines/python/tests/parity_goldens.py",
-          "search": "or (testdata / name).read_text(encoding=\"utf-8\") != text",
-          "replace": "or False"
+          "search": "elif path.read_text(encoding=\"utf-8\") != text:",
+          "replace": "elif False:"
         }
       ]
     }

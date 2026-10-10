@@ -93,7 +93,7 @@ export class StateDir {
       typeof data.last_report_digest === "string" ? data.last_report_digest : null;
     state.lastWindowEnd = typeof data.last_window_end === "string" ? data.last_window_end : null;
     // Additive since state_version 1: absent (an older directory) or not an object reads as `{}`.
-    state.lastOutcomes = isRecord(data.last_outcomes) ? { ...data.last_outcomes } : {};
+    state.lastOutcomes = isRecord(data.last_outcomes) ? data.last_outcomes : {};
     return state;
   }
 
