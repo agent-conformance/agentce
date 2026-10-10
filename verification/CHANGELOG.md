@@ -3,6 +3,22 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.82.0
+
+- `VG-APPROVAL-ORDER` (18.141, new, tier quick) checks that an approval gates an action only when it was recorded at
+  or before the action, in all three engines. Every engine used to count a verified `approve` whenever it was
+  recorded, so an approval logged hours after the enforcement point had already run the action read conformant on
+  CND-02 ("High-effect actions are gated by a recorded approval") and on OVS-08. Now an `approve` adds
+  `agentce:approvedBy`, and counts toward OVS-08's distinct approvers, only when its time is at or before the time
+  of every `ToolCall` that executes the decision. Times compare as instants through the same literal comparison the
+  shapes use (an offset or a fraction of a second is honoured, text order never decides), and a time that cannot be
+  compared with the action's gates nothing. A decision no `ToolCall` executes is unaffected, and OVS-01 and RSK-02
+  still count a late approval as a review. The gate runs 21 cases through the real Python, TypeScript and Java CLIs
+  with the same runner as `VG-APPROVAL-OUTCOME`. Six seeded faults, two per engine: the order ignored, and the times
+  compared as text.
+- `VG-APPROVAL-OUTCOME`'s runner takes a fixture name (default `approval_outcome`), and its four TypeScript and Java
+  faults and two Python faults follow the order test now sitting beside the outcome test; each fault is unchanged.
+
 ## 0.81.0
 
 - `VG-APPROVAL-OUTCOME` (18.136, new, tier quick) checks that an approval gates a decision only when its outcome is

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.81.0",
+  "suite_version": "0.82.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3387,8 +3387,8 @@
         {
           "description": "Python writes agentce:approvedBy for a verified approval whatever its outcome, so a reject gates a high-effect action for CND-02 and satisfies nist-ai-rmf OVS-08",
           "file": "engines/python/agentce/graph.py",
-          "search": "                if _data(event).get(\"outcome\") == \"approve\":\n                    self.store.add_edge(decision, \"agentce:approvedBy\", node)\n",
-          "replace": "                self.store.add_edge(decision, \"agentce:approvedBy\", node)\n                if _data(event).get(\"outcome\") == \"approve\":\n"
+          "search": "                if _data(event).get(\"outcome\") == \"approve\" and _before_every(\n                    str(event.get(\"time\", \"\")), action_times.get(decision, ())\n                ):\n                    self.store.add_edge(decision, \"agentce:approvedBy\", node)\n",
+          "replace": "                self.store.add_edge(decision, \"agentce:approvedBy\", node)\n                if _data(event).get(\"outcome\") == \"approve\" and _before_every(\n                    str(event.get(\"time\", \"\")), action_times.get(decision, ())\n                ):\n"
         },
         {
           "description": "Python counts a verified approval toward OVS-08's distinct approvers whatever its outcome, so a reject or an edit covers the decision",
@@ -3399,26 +3399,89 @@
         {
           "description": "TypeScript writes agentce:approvedBy for a verified approval whatever its outcome (CND-02, nist-ai-rmf OVS-08)",
           "file": "engines/typescript/src/graph.ts",
-          "search": "      if (dataOf(event).outcome !== \"approve\") {\n        continue;\n      }\n      this.store.addEdge(decision, \"agentce:approvedBy\", node);\n",
-          "replace": "      this.store.addEdge(decision, \"agentce:approvedBy\", node);\n      if (dataOf(event).outcome !== \"approve\") {\n        continue;\n      }\n"
+          "search": "      if (\n        dataOf(event).outcome !== \"approve\" ||\n        !beforeEvery(String(event.time ?? \"\"), actionTimes.get(decision) ?? [])\n      ) {\n        continue;\n      }\n      this.store.addEdge(decision, \"agentce:approvedBy\", node);\n",
+          "replace": "      this.store.addEdge(decision, \"agentce:approvedBy\", node);\n      if (\n        dataOf(event).outcome !== \"approve\" ||\n        !beforeEvery(String(event.time ?? \"\"), actionTimes.get(decision) ?? [])\n      ) {\n        continue;\n      }\n"
         },
         {
           "description": "TypeScript counts a verified approval toward OVS-08's distinct approvers whatever its outcome",
           "file": "engines/typescript/src/graph.ts",
-          "search": "      if (dataOf(event).outcome !== \"approve\") {\n        continue;\n      }\n      this.store.addEdge(decision, \"agentce:approvedBy\", node);\n      let approvers",
-          "replace": "      if (dataOf(event).outcome === \"approve\") {\n        this.store.addEdge(decision, \"agentce:approvedBy\", node);\n      }\n      let approvers"
+          "search": "      if (\n        dataOf(event).outcome !== \"approve\" ||\n        !beforeEvery(String(event.time ?? \"\"), actionTimes.get(decision) ?? [])\n      ) {\n        continue;\n      }\n      this.store.addEdge(decision, \"agentce:approvedBy\", node);\n      let approvers",
+          "replace": "      if (\n        dataOf(event).outcome === \"approve\" &&\n        beforeEvery(String(event.time ?? \"\"), actionTimes.get(decision) ?? [])\n      ) {\n        this.store.addEdge(decision, \"agentce:approvedBy\", node);\n      }\n      let approvers"
         },
         {
           "description": "Java writes agentce:approvedBy for a verified approval whatever its outcome (CND-02, nist-ai-rmf OVS-08)",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
-          "search": "                if (\"approve\".equals(str(dataOf(event).get(\"outcome\")))) {\n                    store.addEdge(decision, \"agentce:approvedBy\", node);\n",
-          "replace": "                store.addEdge(decision, \"agentce:approvedBy\", node);\n                if (\"approve\".equals(str(dataOf(event).get(\"outcome\")))) {\n"
+          "search": "                if (\"approve\".equals(str(dataOf(event).get(\"outcome\")))\n                        && beforeEvery(timeOf(event), actionTimes.getOrDefault(decision, List.of()))) {\n                    store.addEdge(decision, \"agentce:approvedBy\", node);\n",
+          "replace": "                    store.addEdge(decision, \"agentce:approvedBy\", node);\n                if (\"approve\".equals(str(dataOf(event).get(\"outcome\")))\n                        && beforeEvery(timeOf(event), actionTimes.getOrDefault(decision, List.of()))) {\n"
         },
         {
           "description": "Java counts a verified approval toward OVS-08's distinct approvers whatever its outcome",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "                    store.addEdge(decision, \"agentce:approvedBy\", node);\n                    humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);\n                }\n",
           "replace": "                    store.addEdge(decision, \"agentce:approvedBy\", node);\n                }\n                humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);\n"
+        }
+      ]
+    },
+    {
+      "id": "VG-APPROVAL-ORDER",
+      "title": "An approval gates an action only when it is recorded at or before it, in all three engines: CND-02 and OVS-08 count a verified approve only when its time is at or before every ToolCall that executes the decision, compared as instants, while OVS-01 and RSK-02 still count a late approval as a review (18.141)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/approval_outcome.sh",
+        "approval_order"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/approval_order/cases.json (21: CND-02 with the approve after the action ran, before it, at the same instant, one second and one millisecond after, the same instant written with trailing zeros or another offset, after or before in another offset whose text sorts the other way, between two actions, after a self-reported record of the action, one approval before and one after, another decision's earlier action, and an approval time with no offset; eu-ai-act and nist-ai-rmf OVS-08 with the approve after the action ran, under dual control one approver before and one after and both before, and an approve with no action; OVS-01 and RSK-02 counting a late approval as a review) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
+      },
+      "fix_hint": "Run bash verification/gates/approval_outcome.sh approval_order; it names the engine, the case and what it gave against what was expected. The order test sits in each engine's graph builder beside the outcome test: _before_every / beforeEvery, which compares the approval's time with each executing ToolCall's time through the structural literal comparison (instants, never text).",
+      "faults": [
+        {
+          "description": "Python writes agentce:approvedBy for an approve whenever it was recorded, so an approval that came after the action ran gates it for CND-02 and counts toward OVS-08",
+          "file": "engines/python/agentce/graph.py",
+          "search": "    return all(compare_literals(time, action) in (-1, 0) for action in actions)\n",
+          "replace": "    return True\n"
+        },
+        {
+          "description": "Python compares the approval and action times as text, so an approval written in another offset that sorts earlier as text gates an action it came after",
+          "file": "engines/python/agentce/graph.py",
+          "search": "    return all(compare_literals(time, action) in (-1, 0) for action in actions)\n",
+          "replace": "    return all(time <= action for action in actions)\n"
+        },
+        {
+          "description": "TypeScript counts an approve whenever it was recorded (CND-02, OVS-08)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "    const order = compareLiterals(time, action);\n    return order === -1 || order === 0;\n",
+          "replace": "    const order = compareLiterals(time, action);\n    return order === -1 || order === 0 || order === 1 || order === null;\n"
+        },
+        {
+          "description": "TypeScript compares the approval and action times as text",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "    const order = compareLiterals(time, action);\n    return order === -1 || order === 0;\n",
+          "replace": "    const order = compareLiterals(time, action);\n    return order !== null && time <= action;\n"
+        },
+        {
+          "description": "Java counts an approve whenever it was recorded (CND-02, OVS-08)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "            return order != null && order <= 0;\n",
+          "replace": "            return true;\n"
+        },
+        {
+          "description": "Java compares the approval and action times as text",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "            return order != null && order <= 0;\n",
+          "replace": "            return order != null && time.compareTo(action) <= 0;\n"
         }
       ]
     }

@@ -7,105 +7,25 @@ human-actor rule unless the case says otherwise. Each case names one control, th
 and Conduct; nist: nist-ai-rmf), its events and the expected outcome, failing events, quarantined record count and
 assess exit code."""
 
-import json
+import sys
 from pathlib import Path
 
-SUBJECT = "spiffe://corp/agents/approval-outcome"
-CTX = "https://agent-conformance.org/contexts/evidence/v1"
-CLASS = {"Decision": "self_report", "ToolCall": "enforcement_point"}
-CHAIN = ["urn:example:service:orchestrator", "urn:example:person:owner-1"]
-IDP = "urn:example:service:identity-provider"
-NC = "non-conformant"
-MISSING = object()
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from approval_events import (  # noqa: E402
+    MISSING,
+    NC,
+    SUBJECT,
+    TWO,
+    appr,
+    case,
+    dec,
+    dual,
+    idp,
+    incident,
+    ran,
+    write,
+)
 
-
-def ev(i, t, **data):
-    cls = data.pop("cls", CLASS.get(t, "independent_system"))
-    return {
-        "specversion": "1.0",
-        "id": i,
-        "source": f"urn:src:{cls}",
-        "subject": SUBJECT,
-        "type": f"org.agent-conformance.evidence.{t}.v1",
-        "datacontenttype": "application/ld+json",
-        "agentcesourceclass": cls,
-        "time": "2026-01-10T00:00:00Z",
-        "data": {"@context": CTX, "@type": t, "agent": {"id": SUBJECT}, **data},
-    }
-
-
-def ref(i):
-    return f"agentce:event/{i}"
-
-
-def dec(i="d1", **k):
-    return ev(i, "Decision", decision_type="dom:CreditDecision", acted_for=CHAIN, **k)
-
-
-def dual(i="d1"):
-    return dec(i, oversight_modality="dual_control")
-
-
-def ran(d="d1", i="t0"):
-    """The enforcement point executed the decision's action."""
-    return ev(i, "ToolCall", tool={"name": "x"}, refs={"decision": ref(d)})
-
-
-def idp(i="s1", who="u2"):
-    """The identity-provider login of human `who` (SPEC §10.4)."""
-    e = ev(
-        i,
-        "SessionStart",
-        environment="idp-login",
-        principal={"id": who, "kind": "human"},
-    )
-    e["data"]["agent"] = {"id": IDP}
-    return e
-
-
-def appr(outcome, i="a1", d="d1", who="u2", s="s1", kind="human"):
-    """An ApprovalDecided on decision d by `who` through login s; outcome=MISSING leaves the outcome out."""
-    data = {
-        "refs": {"decision": ref(d)},
-        "actor": {"id": who, "kind": kind, "authority_ref": "ref:authority/reviewers"},
-        "session_ref": ref(s),
-    }
-    if outcome is not MISSING:
-        data["outcome"] = outcome
-    return ev(i, "ApprovalDecided", **data)
-
-
-def incident():
-    return ev(
-        "i1",
-        "Incident",
-        incident_id="i1",
-        incident_class="fundamental_rights",
-        related_refs=[ref("d1")],
-        detected_at="2026-01-10T00:00:00Z",
-    )
-
-
-C = {}
-
-
-def case(
-    name, control, events, outcome, failing=(), quarantined=0, profile="eu", exit=2
-):
-    C[name] = {
-        "control": control,
-        "profile": profile,
-        "events": events,
-        "expected": {
-            "outcome": outcome,
-            "failing": list(failing),
-            "quarantined": quarantined,
-            "exit": exit,
-        },
-    }
-
-
-TWO = [idp("s1"), idp("s2", who="u3")]
 # CND-02: the action ran; only an approve outcome gated it.
 case("cnd02-approve", "CND-02", [dec(), ran(), idp(), appr("approve")], "conformant")
 case(
@@ -295,7 +215,4 @@ case(
     ["d1"],
 )
 
-Path("cases.json").write_text(
-    json.dumps({"cases": C}, indent=2) + "\n", encoding="utf-8"
-)
-print(len(C), "cases")
+write()

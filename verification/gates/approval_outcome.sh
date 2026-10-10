@@ -1,18 +1,23 @@
 #!/usr/bin/env bash
-# Build gate helper for VG-APPROVAL-OUTCOME (18.136): an approval gates a decision only when its outcome is approve
-# (SPEC §6.2 ApprovalDecided.outcome approve|edit|reject). CND-02 and OVS-08 count only an approve (the
-# agentce:approvedBy edge and OVS-08's distinct approvers); OVS-01, INC-03 and RSK-02 ask for a review, which a reject
-# or an edit also is. Each case in fixtures/approval_outcome/cases.json becomes one bundle assessed under its profile
+# Build gate helper for VG-APPROVAL-OUTCOME (18.136) and, given the fixture name approval_order, VG-APPROVAL-ORDER
+# (18.141). An approval gates a decision only when its outcome is approve (SPEC §6.2 ApprovalDecided.outcome
+# approve|edit|reject) and it is recorded at or before every action that executes the decision. CND-02 and OVS-08 count
+# only such an approve (the agentce:approvedBy edge and OVS-08's distinct approvers); OVS-01, INC-03 and RSK-02 ask for
+# a review, which a reject, an edit or a late approval also is. Each case in fixtures/<name>/cases.json (the profiles
+# and the domain are fixtures/approval_outcome's for both) becomes one bundle assessed under its profile
 # (eu: eu-ai-act and Conduct; nist: nist-ai-rmf); the real Python, TypeScript and Java CLIs assess it, and the case's
 # control must give the expected outcome and failing events in every engine, with the expected quarantined record count
 # and exit code.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
+name="${1:-approval_outcome}"
+label="${name//_/-}"
 fixtures="$root/verification/gates/fixtures/approval_outcome"
+cases="$root/verification/gates/fixtures/$name/cases.json"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen python - "$fixtures/cases.json" "$work") <<'PY'
+(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen python - "$cases" "$work") <<'PY'
 import hashlib
 import json
 import sys
@@ -87,7 +92,7 @@ check_cases() {
       --domain "$fixtures/domain.linkml.yaml" --out "$out" \
       >/dev/null 2>"$dir/err-$engine" || code=$?
     if [ ! -f "$out/assertions.json" ]; then
-      echo "approval-outcome: $engine wrote no assertions.json for $name (exit $code)" >&2
+      echo "$label: $engine wrote no assertions.json for $name (exit $code)" >&2
       tail -3 "$dir/err-$engine" >&2
       touch "$work/.stop"
       return 1
@@ -96,7 +101,7 @@ check_cases() {
     [ -f "$out/quarantine.jsonl" ] && quarantined="$(wc -l <"$out/quarantine.jsonl" | tr -d ' ')"
     got="$(outcome "$out/assertions.json" "$(cat "$dir/control")") $quarantined $code"
     if [ "$got" != "$want" ]; then
-      echo "approval-outcome: $engine $name gave '$got', expected '$want' (outcome failing quarantined exit)" >&2
+      echo "$label: $engine $name gave '$got', expected '$want' (outcome failing quarantined exit)" >&2
       touch "$work/.stop"
       return 1
     fi
@@ -114,7 +119,7 @@ for pid in "${pids[@]}"; do
   wait "$pid" || status=1
 done
 if [ "$status" -ne 0 ]; then
-  echo "approval-outcome: stopped at the first case an engine got wrong (above)" >&2
+  echo "$label: stopped at the first case an engine got wrong (above)" >&2
   exit 1
 fi
-echo "approval-outcome: $(ls -d "$work"/*/ | wc -l | tr -d ' ') cases agree in Python, TypeScript and Java: only an approve outcome approves"
+echo "$label: $(ls -d "$work"/*/ | wc -l | tr -d ' ') cases agree in Python, TypeScript and Java"
