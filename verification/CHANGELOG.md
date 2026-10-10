@@ -3,6 +3,18 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.77.0
+
+- `VG-DEMO-SHARD-COVERAGE` (18.131) now covers the quick tier too. One `build` job used to run all 61 quick-tier
+  gates in a row under a 30-minute limit, and on 893cf53 it took 1623 s. The quick tier now runs in a 12-lane
+  `quick-tier` matrix: each lane runs `verification/shard.py --quick <index> <total>`, which takes the registry's
+  quick-tier gates in order, keeps its own slice, and runs `./verification/run --gate` on each, so a lane judges a
+  gate exactly as `./verification/run --quick` does. `build` no longer runs a whole tier, and `quick` fails unless
+  `build`, every quick-tier lane and every demo-fault lane succeeded. The gate checks the new job's steps and
+  wiring and that the quick-tier partition gives every quick-tier gate to exactly one lane at two totals. Its
+  self-test runs `quick_ids()` and `run_slice()` on a made-up registry. Five seeded faults added, nine in all.
+  `./verification/run --quick` is unchanged and still runs the whole tier locally.
+
 ## 0.76.0
 
 - `VG-EUAIACT-CLUSTER1` (18.37c, new, tier quick) runs 44 cases through the real Python, TypeScript and Java CLIs.
