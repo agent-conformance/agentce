@@ -337,8 +337,8 @@ class Builder {
   // that leaves out the optional agent still concerns the subject.
   private readonly eventAgents = new Map<string, Set<string>>();
   private readonly actedFor = new Map<string, Set<string>>();
-  // OVS-08: decision IRI -> the actor IRI of every verified ApprovalDecided that reviewed it.
-  private readonly humanReviewers = new Map<string, Set<string>>();
+  // OVS-08: decision IRI -> the actor IRI of every verified ApprovalDecided whose outcome is approve.
+  private readonly humanApprovers = new Map<string, Set<string>>();
   // INC-03: event IRI -> the decision its refs.decision names, whatever the event type.
   private readonly refDecision = new Map<string, string>();
 
@@ -954,7 +954,8 @@ class Builder {
   }
 
   /** Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An ApprovalDecided
-   * reviews the decision it names (`agentce:reviewedBy`; OVS-01, OVS-08, CND-02, INC-03, RSK-02) only when it does;
+   * reviews the decision it names (`agentce:reviewedBy`; OVS-01, INC-03, RSK-02) only when it does, whatever its
+   * outcome; it also approves it (`agentce:approvedBy`; CND-02, OVS-08) only when its outcome is approve;
    * one that fails it is no human's review. */
   private mapOversight(events: Event[]): Map<string, boolean> {
     const byHuman = new Map<string, boolean>();
@@ -972,25 +973,29 @@ class Builder {
       }
       this.store.addEdge(decision, "agentce:reviewedBy", node);
       this.decisionReviewed.add(decision);
-      let reviewers = this.humanReviewers.get(decision);
-      if (!reviewers) {
-        reviewers = new Set();
-        this.humanReviewers.set(decision, reviewers);
+      if (dataOf(event).outcome !== "approve") {
+        continue;
       }
-      reviewers.add(key);
+      this.store.addEdge(decision, "agentce:approvedBy", node);
+      let approvers = this.humanApprovers.get(decision);
+      if (!approvers) {
+        approvers = new Set();
+        this.humanApprovers.set(decision, approvers);
+      }
+      approvers.add(key);
     }
     return byHuman;
   }
 
-  /** OVS-08 (Art. 14(5)): enough distinct human reviewers -- two when the decision's observed or
+  /** OVS-08 (Art. 14(5)): enough distinct human approvers -- two when the decision's observed or
    * domain-declared oversight modality is `dual_control`, otherwise one. */
   private oversightCoverage(node: string, data: Record<string, unknown>): void {
     const dtype = data.decision_type;
     const declared =
       typeof dtype === "string" ? this.domain.requiredOversight.get(dtype) : undefined;
     const dual = data.oversight_modality === "dual_control" || declared === "dual_control";
-    const reviewers = this.humanReviewers.get(node)?.size ?? 0;
-    this.literal(node, "agentce:oversightCoverageComplete", reviewers >= (dual ? 2 : 1));
+    const approvers = this.humanApprovers.get(node)?.size ?? 0;
+    this.literal(node, "agentce:oversightCoverageComplete", approvers >= (dual ? 2 : 1));
   }
 
   /** OVS-07: an `Override` is effective when it names a held decision and records a replacement that

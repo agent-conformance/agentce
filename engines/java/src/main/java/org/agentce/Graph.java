@@ -378,8 +378,8 @@ public final class Graph {
         // event that leaves out the optional agent still concerns the subject.
         private final Map<String, Set<String>> eventAgents = new LinkedHashMap<>();
         private final Map<String, Set<String>> actedFor = new LinkedHashMap<>();
-        // OVS-08: decision IRI -> the key of every verified ApprovalDecided that reviewed it.
-        private final Map<String, Set<String>> humanReviewers = new LinkedHashMap<>();
+        // OVS-08: decision IRI -> the actor IRI of every verified ApprovalDecided whose outcome is approve.
+        private final Map<String, Set<String>> humanApprovers = new LinkedHashMap<>();
         // INC-03: event IRI -> the decision its refs.decision names, whatever the event type.
         private final Map<String, String> refDecision = new LinkedHashMap<>();
 
@@ -971,8 +971,9 @@ public final class Graph {
         }
 
         /** Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An
-         * ApprovalDecided reviews the decision it names ({@code agentce:reviewedBy}; OVS-01, OVS-08, CND-02, INC-03,
-         * RSK-02) only when it does; one that fails it is no human's review. */
+         * ApprovalDecided reviews the decision it names ({@code agentce:reviewedBy}; OVS-01, INC-03, RSK-02) only when
+         * it does, whatever its outcome; it also approves it ({@code agentce:approvedBy}; CND-02, OVS-08) only when its
+         * outcome is approve. One that fails the rule is no human's review. */
         private Map<String, Boolean> mapOversight(List<JsonNode> events) {
             Map<String, Boolean> byHuman = new LinkedHashMap<>();
             for (JsonNode event : events) {
@@ -989,20 +990,23 @@ public final class Graph {
                 }
                 store.addEdge(decision, "agentce:reviewedBy", node);
                 decisionReviewed.add(decision);
-                humanReviewers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);
+                if ("approve".equals(str(dataOf(event).get("outcome")))) {
+                    store.addEdge(decision, "agentce:approvedBy", node);
+                    humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);
+                }
             }
             return byHuman;
         }
 
-        /** OVS-08 (Art. 14(5)): enough distinct human reviewers -- two when the decision's observed
+        /** OVS-08 (Art. 14(5)): enough distinct human approvers -- two when the decision's observed
          * or domain-declared oversight modality is {@code dual_control}, otherwise one. */
         private void oversightCoverage(String node, JsonNode data) {
             String dtype = str(data.get("decision_type"));
             String declared = dtype != null ? domain.requiredOversight.get(dtype) : null;
             boolean dual = "dual_control".equals(str(data.get("oversight_modality")))
                     || "dual_control".equals(declared);
-            int reviewers = humanReviewers.getOrDefault(node, Set.of()).size();
-            literal(node, "agentce:oversightCoverageComplete", reviewers >= (dual ? 2 : 1));
+            int approvers = humanApprovers.getOrDefault(node, Set.of()).size();
+            literal(node, "agentce:oversightCoverageComplete", approvers >= (dual ? 2 : 1));
         }
 
         /** OVS-07: an {@code Override} is effective when it names a held decision and records a
