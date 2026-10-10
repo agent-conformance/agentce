@@ -832,16 +832,17 @@ def _incident(
     return _event(event_id, "Incident", body)
 
 
-def _approval(event_id: str, actor: dict[str, str]) -> dict[str, Any]:
-    return _event(
-        event_id,
-        "ApprovalDecided",
-        {
-            "refs": {"decision": event_iri("d1")},
-            "actor": actor,
-            "session_ref": _session(actor),
-        },
-    )
+def _approval(
+    event_id: str, actor: dict[str, str], outcome: str | None = "approve"
+) -> dict[str, Any]:
+    data: dict[str, Any] = {
+        "refs": {"decision": event_iri("d1")},
+        "actor": actor,
+        "session_ref": _session(actor),
+    }
+    if outcome is not None:
+        data["outcome"] = outcome
+    return _event(event_id, "ApprovalDecided", data)
 
 
 def _override(
@@ -932,6 +933,27 @@ def test_oversight_coverage_needs_one_human_reviewer() -> None:
     assert _flag(events, "d1", "oversightCoverageComplete") == ["true"]
     events = [decision("d1", "t"), _approval("a1", SERVICE)]
     assert _flag(events, "d1", "oversightCoverageComplete") == ["false"]
+
+
+def test_only_an_approve_outcome_approves() -> None:
+    """A reject, an edit or no outcome is a review (agentce:reviewedBy; OVS-01, INC-03, RSK-02) but never an approval
+    (agentce:approvedBy; CND-02, OVS-08)."""
+    d1 = event_iri("d1")
+    for outcome, approved in (
+        ("approve", True),
+        ("reject", False),
+        ("edit", False),
+        (None, False),
+    ):
+        events = [decision("d1", "t"), _approval("a1", ALICE, outcome), *LOGINS]
+        store = build_graph(events, domain=DOMAIN)
+        assert store.objects(d1, "agentce:reviewedBy") == [event_iri("a1")]
+        assert store.objects(d1, "agentce:approvedBy") == (
+            [event_iri("a1")] if approved else []
+        )
+        assert _flag(events, "d1", "oversightCoverageComplete") == [
+            str(approved).lower()
+        ]
 
 
 def test_dual_control_counts_the_same_human_once() -> None:

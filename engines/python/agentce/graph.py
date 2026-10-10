@@ -294,8 +294,8 @@ class _Builder:
         self.event_agents: dict[str, frozenset[str]] = {}
         self.agent_chain: dict[str, set[str]] = {}
         self.acted_for: dict[str, set[str]] = {}
-        # OVS-08: decision IRI -> the actor IRI of every verified ApprovalDecided that reviewed it.
-        self.human_reviewers: dict[str, set[str]] = {}
+        # OVS-08: decision IRI -> the actor IRI of every verified ApprovalDecided whose outcome is approve.
+        self.human_approvers: dict[str, set[str]] = {}
         # INC-03: event IRI -> the decision its refs.decision names, whatever the event type.
         self.ref_decision: dict[str, str] = {}
 
@@ -752,8 +752,9 @@ class _Builder:
 
     def _map_oversight(self, events: list[dict[str, Any]]) -> dict[str, bool]:
         """Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An
-        ApprovalDecided reviews the decision it names (``agentce:reviewedBy``; OVS-01, OVS-08, CND-02, INC-03, RSK-02)
-        only when it does; one that fails it is no human's review."""
+        ApprovalDecided reviews the decision it names (``agentce:reviewedBy``; OVS-01, INC-03, RSK-02) only when it
+        does, whatever its outcome; it also approves it (``agentce:approvedBy``; CND-02, OVS-08) only when its outcome
+        is approve. One that fails the rule is no human's review."""
         by_human: dict[str, bool] = {}
         for event in events:
             ptype = self._ptype(event)
@@ -770,7 +771,9 @@ class _Builder:
             ):
                 self.store.add_edge(decision, "agentce:reviewedBy", node)
                 self.decision_reviewed.add(decision)
-                self.human_reviewers.setdefault(decision, set()).add(key)
+                if _data(event).get("outcome") == "approve":
+                    self.store.add_edge(decision, "agentce:approvedBy", node)
+                    self.human_approvers.setdefault(decision, set()).add(key)
         return by_human
 
     def _literal(self, node: str, predicate: str, value: bool) -> None:
@@ -818,7 +821,7 @@ class _Builder:
         )
 
     def _oversight_coverage(self, node: str, data: dict[str, Any]) -> None:
-        """OVS-08 (Art. 14(5)): enough distinct human reviewers -- two when the decision's observed
+        """OVS-08 (Art. 14(5)): enough distinct human approvers -- two when the decision's observed
         or domain-declared oversight modality is ``dual_control``, otherwise one."""
         dtype = data.get("decision_type")
         declared = (
@@ -827,11 +830,11 @@ class _Builder:
             else None
         )
         dual = "dual_control" in (data.get("oversight_modality"), declared)
-        reviewers = len(self.human_reviewers.get(node, ()))
+        approvers = len(self.human_approvers.get(node, ()))
         self._literal(
             node,
             "agentce:oversightCoverageComplete",
-            reviewers >= (2 if dual else 1),
+            approvers >= (2 if dual else 1),
         )
 
     def _intervention(
