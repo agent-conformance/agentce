@@ -3387,8 +3387,8 @@
         {
           "description": "Python records every verified approval as an approve whatever its outcome, so a reject gates a high-effect action for CND-02 and satisfies nist-ai-rmf OVS-08",
           "file": "engines/python/agentce/graph.py",
-          "search": "                        _data(event).get(\"outcome\") == \"approve\",\n",
-          "replace": "                        True,\n"
+          "search": "            approve = data.get(\"outcome\") == \"approve\"\n",
+          "replace": "            approve = True\n"
         },
         {
           "description": "Python counts a verified approval toward OVS-08's distinct approvers whatever its outcome, so a reject or an edit covers the decision",
@@ -3549,8 +3549,8 @@
         {
           "description": "Python drops a human's own reject that fails the SPEC §10.4 rule (no login, or another human's login), so the approve that human withdrew still gates the action for CND-02",
           "file": "engines/python/agentce/graph.py",
-          "search": "                and key is None\n",
-          "replace": "                and False\n"
+          "search": "            if who is None and actor is not None and not approve:\n",
+          "replace": "            if False:\n"
         },
         {
           "description": "TypeScript drops a human's own reject that fails the SPEC §10.4 rule (CND-02, OVS-08)",

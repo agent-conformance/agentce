@@ -789,32 +789,23 @@ class _Builder:
             key = self._verified_actor(node, event)
             by_human[node] = key is not None
             decision = _refs(event).get("decision")
-            actor = _human_id(_data(event).get("actor"))
-            if (
-                ptype == "ApprovalDecided"
-                and key is None
-                and isinstance(decision, str)
-                and actor is not None
-                and _data(event).get("outcome") != "approve"
-            ):
+            if ptype != "ApprovalDecided" or not isinstance(decision, str):
+                continue
+            data = _data(event)
+            approve = data.get("outcome") == "approve"
+            actor = _human_id(data.get("actor"))
+            who = key
+            if who is None and actor is not None and not approve:
                 # A human's own no withdraws that human's approve even when it fails §10.4 (fail closed, 18.142).
-                decided.setdefault(
-                    (decision, principal_iri(actor, self.key)), []
-                ).append((node, str(event.get("time", "")), False))
-            if (
-                ptype == "ApprovalDecided"
-                and key is not None
-                and isinstance(decision, str)
-            ):
+                who = principal_iri(actor, self.key)
+            if who is None:
+                continue
+            if key is not None:
                 self.store.add_edge(decision, "agentce:reviewedBy", node)
                 self.decision_reviewed.add(decision)
-                decided.setdefault((decision, key), []).append(
-                    (
-                        node,
-                        str(event.get("time", "")),
-                        _data(event).get("outcome") == "approve",
-                    )
-                )
+            decided.setdefault((decision, who), []).append(
+                (node, str(event.get("time", "")), approve)
+            )
         for (decision, key), records in decided.items():
             actions = action_times.get(decision, ())
             withdrawals = [

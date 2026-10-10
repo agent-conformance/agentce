@@ -1017,7 +1017,7 @@ class Builder {
         decided.set(decision, byActor);
       }
       const records = byActor.get(human) ?? [];
-      records.push([node, String(event.time ?? ""), key !== null && approve]);
+      records.push([node, String(event.time ?? ""), approve]);
       byActor.set(human, records);
     }
     for (const [decision, byActor] of decided) {

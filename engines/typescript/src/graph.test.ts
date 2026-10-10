@@ -544,6 +544,19 @@ test("only an approve outcome approves: a reject, an edit or no outcome is a rev
   }
 });
 
+/** A verified ApprovalDecided on d1 by `who` with outcome `out`, recorded at `time`. */
+function decided(id: string, who: typeof HUMAN_A | typeof HUMAN_B, out: string, time: string) {
+  return {
+    ...refEvent(
+      id,
+      "ApprovalDecided",
+      { outcome: out, actor: who, session_ref: sessionOf(who) },
+      "d1",
+    ),
+    time,
+  };
+}
+
 test("a later reject by the same human withdraws the approval: the most recent decision before the action governs", () => {
   for (const [actor, outcome, decidedAt, approved] of [
     [HUMAN_A, "reject", "2026-01-10T02:00:00Z", false],
@@ -556,20 +569,6 @@ test("a later reject by the same human withdraws the approval: the most recent d
     [HUMAN_A, "reject", "2026-01-10T00:30:00Z", true],
     [HUMAN_B, "reject", "2026-01-10T02:00:00Z", true],
   ] as const) {
-    const decided = (
-      id: string,
-      who: typeof HUMAN_A | typeof HUMAN_B,
-      out: string,
-      time: string,
-    ) => ({
-      ...refEvent(
-        id,
-        "ApprovalDecided",
-        { outcome: out, actor: who, session_ref: sessionOf(who) },
-        "d1",
-      ),
-      time,
-    });
     const events = [
       decisionEvent("d1"),
       { ...refEvent("t0", "ToolCall", {}, "d1"), time: "2026-01-10T03:00:00Z" },

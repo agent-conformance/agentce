@@ -1037,7 +1037,7 @@ public final class Graph {
                 }
                 decided.computeIfAbsent(decision, k -> new LinkedHashMap<>())
                         .computeIfAbsent(who, k -> new ArrayList<>())
-                        .add(new Decided(node, timeOf(event), human != null && approve));
+                        .add(new Decided(node, timeOf(event), approve));
             }
             for (Map.Entry<String, Map<String, List<Decided>>> byDecision : decided.entrySet()) {
                 String decision = byDecision.getKey();
