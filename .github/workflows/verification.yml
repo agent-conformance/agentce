@@ -1,12 +1,13 @@
 # The verification suite on every pull request, run the way anyone would run it from a fresh clone:
 # the registry check, the quick tier, and each gate's seeded-fault demo. Every action is pinned by commit SHA.
 #
-# The quick tier and lint/type-check run in `build`. Every gate's seeded-fault demo runs in parallel
-# across the `demo-fault` matrix, each shard computing its own slice of `./verification/run --list`
-# at run time (verification/shard.py) rather than naming gates in this file, so no edit here can drop
-# or sample a gate's demo (VG-DEMO-SHARD-COVERAGE guards the partition itself). `quick` stays the
-# required check's name: it does no work of its own, only fails unless `build` and every demo-fault
-# shard succeeded, so a failed, cancelled or skipped shard still turns the required check red.
+# Lint/type-check and the registry checks run in `build`. The quick tier runs in parallel across the
+# `quick-tier` matrix and every gate's seeded-fault demo across the `demo-fault` matrix, each shard
+# computing its own slice at run time (verification/shard.py) rather than naming gates in this file, so
+# no edit here can drop or sample a gate (VG-DEMO-SHARD-COVERAGE guards both partitions). `quick` stays
+# the required check's name: it does no work of its own, only fails unless `build`, every quick-tier
+# shard and every demo-fault shard succeeded, so a failed, cancelled or skipped shard still turns the
+# required check red.
 name: verification
 
 on:
@@ -33,8 +34,20 @@ jobs:
         run: ./verification/run --lint-registry --demo-reject
       - name: The runner reports fail, skipped and pass honestly on registries the probe writes
         run: python3 verification/probe.py
-      - name: Quick tier
-        run: ./verification/run --quick
+
+  quick-tier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      # `lane` only fans out 12 parallel jobs; the partition uses strategy.job-index/job-total.
+      matrix:
+        lane: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/setup-verification-env
+      - name: This shard's quick-tier gates
+        run: python3 verification/shard.py --quick "${{ strategy.job-index }}" "${{ strategy.job-total }}"
 
   demo-fault:
     runs-on: ubuntu-latest
@@ -52,16 +65,16 @@ jobs:
         run: python3 verification/shard.py "${{ strategy.job-index }}" "${{ strategy.job-total }}"
 
   quick:
-    needs: [build, demo-fault]
+    needs: [build, quick-tier, demo-fault]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require build and every demo-fault shard to have succeeded
+      - name: Require build and every quick-tier and demo-fault shard to have succeeded
         run: |
-          if [ "${{ needs.build.result }}" != "success" ] || [ "${{ needs.demo-fault.result }}" != "success" ]; then
-            echo "build: ${{ needs.build.result }}, demo-fault: ${{ needs.demo-fault.result }}"
+          if [ "${{ needs.build.result }}" != "success" ] || [ "${{ needs.quick-tier.result }}" != "success" ] || [ "${{ needs.demo-fault.result }}" != "success" ]; then
+            echo "build: ${{ needs.build.result }}, quick-tier: ${{ needs.quick-tier.result }}, demo-fault: ${{ needs.demo-fault.result }}"
             echo "a required job failed, was cancelled, or was skipped"
             exit 1
           fi
-          echo "build and every demo-fault shard succeeded"
+          echo "build and every quick-tier and demo-fault shard succeeded"

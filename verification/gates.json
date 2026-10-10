@@ -4,7 +4,7 @@
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
-      "title": "The CI demo-fault job (18.74) is wired to strategy.job-index/strategy.job-total, not a value written into the matrix, so no edit can silently stop demoing some gates",
+      "title": "The CI demo-fault and quick-tier jobs (18.74, 18.131) are wired to strategy.job-index/strategy.job-total, not a value written into the matrix, so no edit can silently stop demoing or running some gates",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -17,8 +17,8 @@
       "timeout_s": 60,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "tools/ci_demo_coverage_check.py's --self-test confirms its comparator discriminates correct job-index/job-total wiring from a matrix-value-keyed, swallowed, conditional or under-checked invocation on either the demo-fault step or the quick job, that shard.py's own partition() assigns every gate to exactly one shard at two different totals, then the real run confirms .github/workflows/verification.yml's demo-fault job's step invokes verification/shard.py with exactly strategy.job-index and strategy.job-total, that quick's step is an exact match for its canonical dependency-check run text with needs/if/continue-on-error wired correctly on both jobs, and that the workflow root carries only name, on, permissions and jobs (no root env: such as BASH_ENV, no defaults)",
-        "fail": "the self-test's comparator fails to discriminate any of the bad cases, shard.py's partition() drops or duplicates a gate, or the real run finds the demo-fault job's step not wired to strategy.job-index/strategy.job-total, quick's step not an exact match for its canonical run text, continue-on-error/a stray if: on either job or step, or a workflow-root key outside name, on, permissions and jobs"
+        "pass": "tools/ci_demo_coverage_check.py's --self-test confirms its comparator discriminates correct job-index/job-total wiring from a matrix-value-keyed, swallowed, conditional or under-checked invocation on either the demo-fault step or the quick job, that shard.py's own partition() assigns every gate to exactly one shard at two different totals, then the real run confirms .github/workflows/verification.yml's demo-fault job's step invokes verification/shard.py with exactly strategy.job-index and strategy.job-total, that quick's step is an exact match for its canonical dependency-check run text with needs/if/continue-on-error wired correctly on both jobs, and that the workflow root carries only name, on, permissions and jobs (no root env: such as BASH_ENV, no defaults); and for the quick tier: the self-test shows shard.py's quick_ids() keeps only quick-tier gates in registry order and its run_slice() exits 1 when any gate's run exits non-zero (1 or 2) and 0 only when all exit 0, the real run confirms the quick-tier job is exactly checkout, the setup action and shard.py --quick with strategy.job-index and strategy.job-total, quick needs and checks quick-tier, no build step runs a whole tier, and the quick tier partition assigns every quick-tier gate to exactly one shard at two totals",
+        "fail": "the self-test's comparator fails to discriminate any of the bad cases, shard.py's partition() drops or duplicates a gate, or the real run finds the demo-fault job's step not wired to strategy.job-index/strategy.job-total, quick's step not an exact match for its canonical run text, continue-on-error/a stray if: on either job or step, or a workflow-root key outside name, on, permissions and jobs, or for the quick tier: quick_ids() or run_slice() misjudges a self-test case, the quick-tier job's steps or wiring differ, quick does not need and check quick-tier, a build step runs a whole tier, or the quick tier partition drops or duplicates a gate"
       },
       "faults": [
         {
@@ -34,16 +34,46 @@
           "replace": "return [gate for position, gate in enumerate(gates) if position % total == index and position < total]"
         },
         {
-          "description": "the required quick check stops depending on demo-fault's result, so a failed, cancelled or skipped shard would no longer fail the one check branch protection requires",
+          "description": "the required quick check stops depending on the quick-tier shards' result, so a failed, cancelled or skipped quick-tier shard would no longer fail the one check branch protection requires",
           "file": ".github/workflows/verification.yml",
-          "search": "needs: [build, demo-fault]",
-          "replace": "needs: [build]"
+          "search": "needs: [build, quick-tier, demo-fault]",
+          "replace": "needs: [build, demo-fault]"
         },
         {
           "description": "a workflow-root env: sets BASH_ENV to a file that exits 0; bash sources it before every run: step under GitHub's default bash -e {0}, so quick and every demo shard report success whatever happened, without any job or step text changing (18.76)",
           "file": ".github/workflows/verification.yml",
           "search": "\npermissions:\n  contents: read\n",
           "replace": "\npermissions:\n  contents: read\n\nenv:\n  BASH_ENV: '$(f=$(mktemp); echo \"exit 0\" > $f; echo $f)'\n"
+        },
+        {
+          "description": "the quick-tier step is rewired to key off the matrix's own lane value instead of strategy.job-index, so lane 12's value 12 is out of range and lane 1's slice is never run",
+          "file": ".github/workflows/verification.yml",
+          "search": "python3 verification/shard.py --quick \"${{ strategy.job-index }}\" \"${{ strategy.job-total }}\"",
+          "replace": "python3 verification/shard.py --quick \"${{ matrix.lane }}\" \"${{ strategy.job-total }}\""
+        },
+        {
+          "description": "build runs the whole quick tier again, as it did before 18.131, so one job can time out the required check",
+          "file": ".github/workflows/verification.yml",
+          "search": "        run: python3 verification/probe.py\n",
+          "replace": "        run: python3 verification/probe.py\n      - name: Quick tier\n        run: ./verification/run --quick\n"
+        },
+        {
+          "description": "shard.py's slice runner counts only exit code 1 as a failure, so a gate that exits 2 (a usage or unknown-gate error) passes its shard",
+          "file": "verification/shard.py",
+          "search": "failed = [gate for gate in gates if run(gate) != 0]",
+          "replace": "failed = [gate for gate in gates if run(gate) == 1]"
+        },
+        {
+          "description": "shard.py's slice runner reports failures but exits 0, so a failing quick gate leaves its shard and the required check green",
+          "file": "verification/shard.py",
+          "search": "        print(f\"{label}: FAILED: {failed}\", file=sys.stderr)\n        return 1\n",
+          "replace": "        print(f\"{label}: FAILED: {failed}\", file=sys.stderr)\n        return 0\n"
+        },
+        {
+          "description": "shard.py's quick list drops its tier filter, so the quick-tier shards would also run any full-tier gate the registry gains",
+          "file": "verification/shard.py",
+          "search": "return [gate[\"id\"] for gate in registry[\"gates\"] if gate[\"tier\"] == \"quick\"]",
+          "replace": "return [gate[\"id\"] for gate in registry[\"gates\"]]"
         }
       ],
       "fix_hint": "run verification/gates/ci_demo_coverage.sh and read which wiring problem it found; the step is .github/workflows/verification.yml's jobs.demo-fault's 'This shard's seeded-fault demos' step, checked by tools/ci_demo_coverage_check.py."

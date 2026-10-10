@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import subprocess
 import sys
 from collections.abc import Collection
@@ -62,8 +63,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "verification.yml"
 DEMO_JOB = "demo-fault"
 QUICK_JOB = "quick"
+QUICK_TIER_JOB = "quick-tier"
+SETUP_ACTION = "./.github/actions/setup-verification-env"
 SHARD_SCRIPT = "verification/shard.py"
 CANONICAL_RUN = 'python3 verification/shard.py "${{ strategy.job-index }}" "${{ strategy.job-total }}"'
+CANONICAL_QUICK_TIER_RUN = 'python3 verification/shard.py --quick "${{ strategy.job-index }}" "${{ strategy.job-total }}"'
 # Three reviews in a row (contract-critic r1, r2, verifier r1) each found an edit to
 # verification.yml that an earlier, blocklist-style version of this check did not reject
 # (continue-on-error, a rewired run line, needs, exit 0, || true, a step if:). Listing bad edits one
@@ -141,17 +145,44 @@ def _step_wiring_problems(
     return problems
 
 
-def wiring_problems(job: Any) -> list[str]:
-    """The demo-fault job may carry only an allowed key (so `continue-on-error`, `if:`, or
-    `defaults.run.shell` are rejected by construction, not by naming them one at a time), and its
-    step must be exactly the canonical invocation."""
+def wiring_problems(
+    job: Any, name: str = DEMO_JOB, canonical_run: str = CANONICAL_RUN
+) -> list[str]:
+    """A shard job (demo-fault or quick-tier) may carry only an allowed key (so
+    `continue-on-error`, `if:`, or `defaults.run.shell` are rejected by construction, not by naming
+    them one at a time), its steps must be exactly checkout, the setup action (without which most
+    gates would skip, and a skip exits 0) and the shard step, and that step must be exactly the
+    canonical invocation."""
     if not isinstance(job, dict):
-        return [f"jobs.{DEMO_JOB} is missing or not a mapping"]
-    problems = _unknown_keys(job, DEMO_JOB_ALLOWED_KEYS, f"jobs.{DEMO_JOB}")
+        return [f"jobs.{name} is missing or not a mapping"]
+    problems = _unknown_keys(job, DEMO_JOB_ALLOWED_KEYS, f"jobs.{name}")
+    steps = job.get("steps")
+    uses = [
+        str(step.get("uses", "")).split("@")[0] if isinstance(step, dict) else ""
+        for step in (steps if isinstance(steps, list) else [])
+    ]
+    if uses != ["actions/checkout", SETUP_ACTION, ""]:
+        problems.append(
+            f"jobs.{name}'s steps are not exactly checkout, {SETUP_ACTION} and the shard step: {uses}"
+        )
     step = _demo_step(job)
     if step is None:
-        return problems + [f"no step in jobs.{DEMO_JOB} invokes {SHARD_SCRIPT}"]
-    return problems + _step_wiring_problems(step, SHARD_SCRIPT, CANONICAL_RUN)
+        return problems + [f"no step in jobs.{name} invokes {SHARD_SCRIPT}"]
+    return problems + _step_wiring_problems(
+        step, f"{name} {SHARD_SCRIPT}", canonical_run
+    )
+
+
+def build_problems(job: Any) -> list[str]:
+    """No build step may run a whole tier: the quick tier runs only in the quick-tier shards."""
+    steps = job.get("steps") if isinstance(job, dict) else None
+    return [
+        f"a build step runs a whole tier, which only the {QUICK_TIER_JOB} shards may do: {run!r}"
+        for run in (
+            str(step.get("run", "")) for step in (steps or []) if isinstance(step, dict)
+        )
+        if "verification/run" in run and ("--quick" in run or "--full" in run)
+    ]
 
 
 # `${{always()}}` without the inner spaces is also valid GitHub syntax; it is refused on purpose
@@ -159,12 +190,14 @@ def wiring_problems(job: Any) -> list[str]:
 CANONICAL_QUICK_IF_VALUES = {"always()", "${{ always() }}"}
 CANONICAL_QUICK_RUN = (
     'if [ "${{ needs.build.result }}" != "success" ] || '
+    '[ "${{ needs.quick-tier.result }}" != "success" ] || '
     '[ "${{ needs.demo-fault.result }}" != "success" ]; then\n'
-    '  echo "build: ${{ needs.build.result }}, demo-fault: ${{ needs.demo-fault.result }}"\n'
+    '  echo "build: ${{ needs.build.result }}, quick-tier: ${{ needs.quick-tier.result }}, '
+    'demo-fault: ${{ needs.demo-fault.result }}"\n'
     '  echo "a required job failed, was cancelled, or was skipped"\n'
     "  exit 1\n"
     "fi\n"
-    'echo "build and every demo-fault shard succeeded"'
+    'echo "build and every quick-tier and demo-fault shard succeeded"'
 )
 
 
@@ -193,7 +226,7 @@ def quick_wiring_problems(job: Any) -> list[str]:
     problems = _unknown_keys(job, QUICK_JOB_ALLOWED_KEYS, f"jobs.{QUICK_JOB}")
     needs = job.get("needs")
     needed = set(needs) if isinstance(needs, list) else set()
-    for required in ("build", DEMO_JOB):
+    for required in ("build", QUICK_TIER_JOB, DEMO_JOB):
         if required not in needed:
             problems.append(
                 f"jobs.{QUICK_JOB}.needs does not include {required!r}: {needs!r}"
@@ -259,7 +292,11 @@ def check_workflow(
     problems = (
         workflow_level_problems(doc)
         + wiring_problems(jobs.get(DEMO_JOB))
+        + wiring_problems(
+            jobs.get(QUICK_TIER_JOB), QUICK_TIER_JOB, CANONICAL_QUICK_TIER_RUN
+        )
         + quick_wiring_problems(jobs.get(QUICK_JOB))
+        + build_problems(jobs.get("build"))
     )
     result = subprocess.run(
         ["python3", str(root / "verification" / "run"), "--list"],
@@ -273,6 +310,17 @@ def check_workflow(
         return problems + ["`verification/run --list` printed no gates"]
     for total in PARTITION_TOTALS:
         problems += partition_problems(gates, total, root)
+    registry = json.loads(
+        (root / "verification" / "gates.json").read_text(encoding="utf-8")
+    )
+    quick = [gate["id"] for gate in registry["gates"] if gate["tier"] == "quick"]
+    from_shard = _load_shard_module(root).quick_ids(registry)
+    if from_shard != quick:
+        problems.append(
+            f"shard.py's quick_ids() is not the registry's quick tier in order: {from_shard} != {quick}"
+        )
+    for total in PARTITION_TOTALS:
+        problems += [f"quick tier: {p}" for p in partition_problems(quick, total, root)]
     return problems
 
 
@@ -326,9 +374,45 @@ def _shape_violation_cases(
     ]
 
 
+def _shard_quick_self_test(shard: ModuleType) -> list[str]:
+    """shard.py's quick mode on a synthetic registry and injected runners: quick_ids() keeps only
+    quick-tier ids in registry order, and run_slice() exits 1 unless every run exits 0."""
+    failures = []
+    registry = {
+        "gates": [
+            {"id": "B", "tier": "quick"},
+            {"id": "F", "tier": "full"},
+            {"id": "A", "tier": "quick"},
+        ]
+    }
+    got = shard.quick_ids(registry)
+    print(f"shard quick: quick_ids drops the full-tier gate and keeps order: {got}")
+    if got != ["B", "A"]:
+        failures.append(f"quick_ids -> {got}")
+    codes = {
+        "all gates exit 0": ({}, 0),
+        "a gate exits 1": ({"A": 1}, 1),
+        "a gate exits 2": ({"B": 2}, 1),
+    }
+    for name, (exits, want) in codes.items():
+        got_code = shard.run_slice(
+            ["B", "A"], lambda gate: exits.get(gate, 0), "self-test", "ok"
+        )
+        print(f"shard quick: run_slice when {name}: exit {got_code} (want {want})")
+        if got_code != want:
+            failures.append(f"run_slice when {name} -> {got_code}")
+    return failures
+
+
 def self_test() -> int:
     good_step = {"run": CANONICAL_RUN}
-    good_job = {"steps": [good_step]}
+    good_job = {
+        "steps": [
+            {"uses": "actions/checkout"},
+            {"uses": SETUP_ACTION},
+            good_step,
+        ]
+    }
     cases: list[tuple[str, Any, bool]] = [
         ("correctly wired demo-fault job", good_job, True),
         (
@@ -378,7 +462,7 @@ def self_test() -> int:
     failures = _misjudged(cases, wiring_problems)
     quick_good_step: dict[str, Any] = {"run": CANONICAL_QUICK_RUN}
     quick_good: dict[str, Any] = {
-        "needs": ["build", "demo-fault"],
+        "needs": ["build", "quick-tier", "demo-fault"],
         "if": "always()",
         "steps": [quick_good_step],
     }
@@ -503,6 +587,25 @@ def self_test() -> int:
         partition_cases,
         lambda assignments: _coverage_problems(gates, assignments, len(gates)),
     )
+    failures += _shard_quick_self_test(_load_shard_module(REPO_ROOT))
+    build_cases: list[tuple[str, Any, bool]] = [
+        (
+            "build with lint steps only",
+            {"steps": [{"run": "python3 verification/probe.py"}]},
+            True,
+        ),
+        (
+            "a renamed build step running --quick --json",
+            {"steps": [{"name": "x", "run": "./verification/run --quick --json"}]},
+            False,
+        ),
+        (
+            "a build step running --full",
+            {"steps": [{"run": "python3 verification/run --full"}]},
+            False,
+        ),
+    ]
+    failures += _misjudged(build_cases, build_problems)
     if failures:
         print(f"self-test FAIL: misjudged case(s): {failures}")
         return 1
