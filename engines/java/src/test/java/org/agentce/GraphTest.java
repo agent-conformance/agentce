@@ -357,10 +357,17 @@ class GraphTest {
         assertEquals(List.of("false"), acts(List.of(ruled, derived, call("tc1", "i1")), "tc1"));
     }
 
-    /** An identity-provider SessionStart a session_ref can name (SPEC §10.4). */
+    /** An identity-provider SessionStart a session_ref can name, naming the actor its id names (SPEC §10.4). */
     private static JsonNode login(String id, String sourceClass, String agent) {
+        return login(id, sourceClass, agent, ", \"principal\": {\"kind\": \"human\", \"id\": \""
+                + id.substring("login-".length()) + "\"}");
+    }
+
+    /** An identity-provider SessionStart whose data ends with {@code principal} (empty: it names nobody). */
+    private static JsonNode login(String id, String sourceClass, String agent, String principal) {
         return Json.parse("{\"id\": \"" + id + "\", \"time\": \"2026-01-01T00:00:00Z\", \"agentcesourceclass\": \""
-                + sourceClass + "\", \"data\": {\"@type\": \"SessionStart\", \"agent\": {\"id\": \"" + agent + "\"}}}");
+                + sourceClass + "\", \"data\": {\"@type\": \"SessionStart\", \"agent\": {\"id\": \"" + agent + "\"}"
+                + principal + "}}");
     }
 
     private static final String IDP = "urn:example:service:identity-provider";
@@ -543,6 +550,15 @@ class GraphTest {
                 event("login-alice", "ToolCall", "\"tool\": {\"name\": \"x\"}")), "d1", cover));
         assertEquals(List.of("false"), flag(List.of(decision, approval("a1", "d1", "owner"),
                 login("login-owner", "independent_system", IDP)), "d1", cover));
+        // The login names someone else, or nobody: it is not the actor's own.
+        assertEquals(List.of("false"), flag(List.of(decision, approval("a1", "d1", "alice"), login("login-alice",
+                "independent_system", IDP, ", \"principal\": {\"kind\": \"human\", \"id\": \"bob\"}")), "d1", cover));
+        assertEquals(List.of("false"), flag(List.of(decision, approval("a1", "d1", "alice"),
+                login("login-alice", "independent_system", IDP, "")), "d1", cover));
+        // Ids compare after trimming one fixed whitespace set from both ends.
+        assertEquals(List.of("true"), flag(List.of(decision, approval("a1", "d1", "alice"), login("login-alice",
+                "independent_system", IDP, ", \"principal\": {\"kind\": \"human\", \"id\": \"\\u00a0alice\\ufeff\"}")),
+                "d1", cover));
         JsonNode noSession = event("a1", "ApprovalDecided",
                 decisionRef("d1") + ", \"actor\": {\"kind\": \"human\", \"id\": \"alice\"}");
         assertEquals(List.of("false"), flag(withLogins(List.of(decision, noSession)), "d1", cover));
