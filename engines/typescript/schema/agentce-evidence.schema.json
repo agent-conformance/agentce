@@ -1534,6 +1534,12 @@
                         "string",
                         "null"
                     ]
+                },
+                "session_ref": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
                 }
             },
             "title": "InterruptPayload",
@@ -2129,6 +2135,12 @@
                     ]
                 },
                 "session_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "session_ref": {
                     "type": [
                         "string",
                         "null"

@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.79.0
+
+- `VG-HUMAN-ACTOR` (18.126, new, tier quick) checks the SPEC §10.4 human-actor rule in all three engines. An
+  approval, override or interrupt used to count as a human's whenever its actor said `kind: human` with an id, so an
+  agent could write its own approval and pass OVS-01, OVS-07, OVS-08, CND-02, INC-03 and RSK-02, the human the agent
+  acts for could count as its independent reviewer, and two spellings of one id on one login counted as two humans
+  under dual control. Now the actor's `session_ref` must name a held `SessionStart` of someone other than the agents
+  the record concerns, from an `independent_system` or `enforcement_point` stream, and the actor must be outside the
+  activity's delegation chain; dual control counts approvals that share a login or an id as one human. Override and
+  Interrupt gain the optional `session_ref` the rule needs (the schema used to quarantine it). The gate runs 45 cases
+  through the real Python, TypeScript and Java CLIs. Fifteen seeded faults, five per engine: the session check
+  dropped, any held record taken as the login, the agent's own session accepted, the delegation-chain check dropped,
+  and dual control keyed by actor id alone.
+
 ## 0.78.0
 
 - `VG-ENGINE-GOLDENS-FRESH` (18.37d, new, tier quick) checks that every TypeScript and Java parity golden is what

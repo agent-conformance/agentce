@@ -625,6 +625,7 @@ export interface ApprovalDecidedPayload extends Payload {
 
 export interface OverridePayload extends Payload {
     actor?: Principal,
+    session_ref?: string,
     original?: string,
     replacement?: string,
     reason_code?: string,
@@ -634,6 +635,7 @@ export interface OverridePayload extends Payload {
 
 export interface InterruptPayload extends Payload {
     actor?: Principal,
+    session_ref?: string,
     mechanism?: string,
     effect?: string,
 }

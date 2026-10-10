@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.78.0",
+  "suite_version": "0.79.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2913,6 +2913,122 @@
       "fix_hint": "Run verification/gates/rob02_untrusted.sh; it names the engine, the case, the ROB-02 outcome and failing events it gave and the ones expected. The rules are each engine's two closures (tainted, and not ruled on) in robustToUntrusted in its graph builder (the CONTENT_IN, CONTENT_OUT and REFS_IN tables)."
     },
     {
+      "id": "VG-HUMAN-ACTOR",
+      "title": "An approval, override or interrupt counts as a human's only under the full SPEC §10.4 human-actor rule, in all three engines: its actor is a human principal whose session_ref names a held identity-provider login record (a SessionStart of someone other than the agents it concerns, from an independent_system or enforcement_point stream) and who is nowhere in the delegation chain of the activity; under dual control two approvals on one login, or by one id, are one human (18.126)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/human_actor.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/human_actor/cases.json (45: Override, Interrupt and ApprovalDecided each with a verified login from an independent_system and an enforcement_point stream, the login arriving before or after; no session_ref, a session_ref naming no held record, a bare id, the record itself, another approval, a tool call, an outcome, a policy decision, a self_report login, a login quarantined for a class mismatch, the assessed agent's own enforcement-point session; a service actor, a blank actor id, no actor; an actor in the decision's acted_for, in the agent's acted_for on another event, in a DelegationIssued chain of the agent, in the record's own acted_for, the agent's owner interrupting; dual control with two verified humans, two ids on one login, one id on two logins, one verified and one not, one in the chain; OVS-01, OVS-07, OVS-08, CND-02, RSK-02 and INC-03 each with a verified twin and a failing case) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
+      },
+      "faults": [
+        {
+          "description": "Python drops the session check, so an override or approval with no session_ref, or one naming no held record, counts as a human's",
+          "file": "engines/python/agentce/graph.py",
+          "search": "        if actor is None or not isinstance(login, str) or login not in self.event_info:\n            return None\n",
+          "replace": "        if actor is None:\n            return None\n        if not isinstance(login, str) or login not in self.event_info:\n            return principal_iri(actor, self.key), \"\"\n"
+        },
+        {
+          "description": "TypeScript drops the session check, so an override or approval with no session_ref, or one naming no held record, counts as a human's",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "    if (actor === null || typeof login !== \"string\" || loginInfo === undefined) {\n      return null;\n    }\n",
+          "replace": "    if (actor === null) {\n      return null;\n    }\n    if (typeof login !== \"string\" || loginInfo === undefined) {\n      return [principalIri(actor, this.key), \"\"];\n    }\n"
+        },
+        {
+          "description": "Java drops the session check, so an override or approval with no session_ref, or one naming no held record, counts as a human's",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "            if (actor == null || loginInfo == null) {\n                return null;\n            }\n",
+          "replace": "            if (actor == null) {\n                return null;\n            }\n            if (loginInfo == null) {\n                return new HumanKey(Iri.principalIri(actor, key), \"\");\n            }\n"
+        },
+        {
+          "description": "Python accepts any held record from an independent or enforcement-point stream as the login, so a session_ref naming the agent's gateway tool call counts",
+          "file": "engines/python/agentce/graph.py",
+          "search": "if login_type != \"SessionStart\" or login_class not in _LOGIN_CLASSES:",
+          "replace": "if login_class not in _LOGIN_CLASSES:"
+        },
+        {
+          "description": "TypeScript accepts any held record from an independent or enforcement-point stream as the login, so a session_ref naming the agent's gateway tool call counts",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "if (loginType !== \"SessionStart\" || loginClass === null",
+          "replace": "if (loginClass === null"
+        },
+        {
+          "description": "Java accepts any held record from an independent or enforcement-point stream as the login, so a session_ref naming the agent's gateway tool call counts",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "if (!\"SessionStart\".equals(loginInfo.type())\n                    || loginInfo.sourceClass() == null",
+          "replace": "if (loginInfo.sourceClass() == null"
+        },
+        {
+          "description": "Python accepts the assessed agent's own run session as a human's login",
+          "file": "engines/python/agentce/graph.py",
+          "search": "if login_agent is None or login_agent in concerned:",
+          "replace": "if login_agent is None:"
+        },
+        {
+          "description": "TypeScript accepts the assessed agent's own run session as a human's login",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "if (loginAgent === null || concerned.has(loginAgent)) {",
+          "replace": "if (loginAgent === null) {"
+        },
+        {
+          "description": "Java accepts the assessed agent's own run session as a human's login",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "if (loginInfo.agent() == null || concerned.contains(loginInfo.agent())) {",
+          "replace": "if (loginInfo.agent() == null) {"
+        },
+        {
+          "description": "Python drops the delegation-chain check, so the owner the agent acts for counts as the independent human",
+          "file": "engines/python/agentce/graph.py",
+          "search": "return None if actor_iri in chain else (actor_iri, login)",
+          "replace": "return actor_iri, login"
+        },
+        {
+          "description": "TypeScript drops the delegation-chain check, so the owner the agent acts for counts as the independent human",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "return chain.has(actorIri) ? null : [actorIri, login];",
+          "replace": "return [actorIri, login];"
+        },
+        {
+          "description": "Java drops the delegation-chain check, so the owner the agent acts for counts as the independent human",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "return chain.contains(actorIri) ? null : new HumanKey(actorIri, login);",
+          "replace": "return new HumanKey(actorIri, login);"
+        },
+        {
+          "description": "Python keys OVS-08's distinct humans by actor id alone, so one login under two spellings of an id counts as two humans",
+          "file": "engines/python/agentce/graph.py",
+          "search": "if actor in g[0] or login in g[1]",
+          "replace": "if actor in g[0]"
+        },
+        {
+          "description": "TypeScript keys OVS-08's distinct humans by actor id alone, so one login under two spellings of an id counts as two humans",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "if (group[0].has(actor) || group[1].has(login)) {",
+          "replace": "if (group[0].has(actor)) {"
+        },
+        {
+          "description": "Java keys OVS-08's distinct humans by actor id alone, so one login under two spellings of an id counts as two humans",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "if (group.get(0).contains(key.actor()) || group.get(1).contains(key.login())) {",
+          "replace": "if (group.get(0).contains(key.actor())) {"
+        }
+      ],
+      "fix_hint": "Run verification/gates/human_actor.sh; it names the engine, the case and what it gave against what was expected. The rule is _human_key / humanKey in each engine's graph builder (read in the second pass), the reviews it gates are mapReviews, and OVS-08's count is distinctHumans."
+    },
+    {
       "id": "VG-CLI-COLLECT-DOCTOR-INIT",
       "title": "collect, doctor and init read every option they are given or refuse it with a key: init refuses --non-interactive as unknown, doctor refuses --project beside --write-errors, an empty value is refused and never read as the default, and a dry run with --out writes the plan and its manifest, as its help says",
       "tier": "quick",
@@ -3115,8 +3231,8 @@
         {
           "description": "Python counts OVS-08 reviewers per approval, not per distinct human, so one human approving twice satisfies dual_control",
           "file": "engines/python/agentce/graph.py",
-          "search": "self.human_reviewers.setdefault(decision, set()).add(human)",
-          "replace": "self.human_reviewers.setdefault(decision, set()).add(node)"
+          "search": "self.human_reviewers.setdefault(decision, []).append(key)",
+          "replace": "self.human_reviewers.setdefault(decision, []).append((node, node))"
         },
         {
           "description": "TypeScript skips an Incident name that leads to no held decision instead of holding every decision to the rule (INC-03)",
@@ -3127,8 +3243,8 @@
         {
           "description": "TypeScript counts OVS-08 reviewers per approval, not per distinct human",
           "file": "engines/typescript/src/graph.ts",
-          "search": "          reviewers.add(human);\n",
-          "replace": "          reviewers.add(node);\n"
+          "search": "      reviewers.push(key);\n",
+          "replace": "      reviewers.push([node, node]);\n"
         },
         {
           "description": "Java skips an Incident name that leads to no held decision instead of holding every decision to the rule (INC-03)",
@@ -3139,8 +3255,8 @@
         {
           "description": "Java counts OVS-08 reviewers per approval, not per distinct human",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
-          "search": "humanReviewers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);",
-          "replace": "humanReviewers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(node);"
+          "search": "humanReviewers.computeIfAbsent(decision, k -> new ArrayList<>()).add(human);",
+          "replace": "humanReviewers.computeIfAbsent(decision, k -> new ArrayList<>()).add(new HumanKey(node, node));"
         },
         {
           "description": "Python counts an RSK-02 authorization that names any string, not only a policy decision the bundle holds, so a dangling authorization reads conformant",

@@ -593,6 +593,7 @@ type OverridePayload struct {
 	// Embedded types for inheritance
 	Payload `json:",inline"`
 	Actor *Principal `json:"actor,omitempty"`
+	SessionRef *string `json:"session_ref,omitempty"`
 	Original *string `json:"original,omitempty"`
 	Replacement *string `json:"replacement,omitempty"`
 	ReasonCode *string `json:"reason_code,omitempty"`
@@ -602,6 +603,7 @@ type InterruptPayload struct {
 	// Embedded types for inheritance
 	Payload `json:",inline"`
 	Actor *Principal `json:"actor,omitempty"`
+	SessionRef *string `json:"session_ref,omitempty"`
 	Mechanism InterruptMechanism `json:"mechanism,omitempty"`
 	Effect InterruptEffect `json:"effect,omitempty"`
 }

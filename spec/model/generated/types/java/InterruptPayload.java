@@ -14,6 +14,7 @@ import lombok.*;
 public class InterruptPayload extends Payload {
 
   private Principal actor;
+  private String sessionRef;
   private String mechanism;
   private String effect;
 

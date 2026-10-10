@@ -47,6 +47,7 @@ C	agentce:ResourceAccess	prov:Activity
 C	agentce:ServicePrincipal	agentce:Principal
 C	agentce:ServicePrincipal	agentce:ServicePrincipal
 C	agentce:ServicePrincipal	prov:Agent
+C	agentce:SessionStart	agentce:SessionStart
 C	agentce:ToolCall	agentce:Activity
 C	agentce:ToolCall	agentce:ToolCall
 C	agentce:ToolCall	prov:Activity
@@ -87,6 +88,9 @@ E	agentce:event/dec-2	rdf:type	credit:LoanApproval
 E	agentce:event/del-1	agentce:sourceClass	agentce:enforcement_point
 E	agentce:event/del-1	prov:wasAssociatedWith	spiffe://corp/agent-a
 E	agentce:event/del-1	rdf:type	agentce:DelegationIssued
+E	agentce:event/login-1	agentce:sourceClass	agentce:independent_system
+E	agentce:event/login-1	prov:wasAssociatedWith	urn:example:service:identity-provider
+E	agentce:event/login-1	rdf:type	agentce:SessionStart
 E	agentce:event/out-1	rdf:type	agentce:Outcome
 E	agentce:event/tc-1	agentce:executes	agentce:event/dec-1
 E	agentce:event/tc-1	prov:wasAssociatedWith	spiffe://corp/agent-a
@@ -100,11 +104,12 @@ E	ci:score	rdf:type	agentce:ContextItem
 E	human:reviewer	rdf:type	agentce:Agent
 E	spiffe://corp/agent-a	prov:actedOnBehalfOf	agentce:principal/4f9618842a3b141eae7bfb7cd81ee43b2ba78b2eef1a7c1d0c13c7ea559ab534
 E	spiffe://corp/agent-a	rdf:type	agentce:Agent
+E	urn:example:service:identity-provider	rdf:type	agentce:Agent
 L	agentce:event/appr-1	prov:atTime	2026-06-01T09:30:00.000Z	xsd:dateTime
 L	agentce:event/dec-1	agentce:actsOnUntrusted	false	xsd:boolean
 L	agentce:event/dec-1	agentce:danglingRef	agentce:event/missing-x	xsd:string
 L	agentce:event/dec-1	agentce:explanationReconstructable	false	xsd:boolean
-L	agentce:event/dec-1	agentce:oversightCoverageComplete	false	xsd:boolean
+L	agentce:event/dec-1	agentce:oversightCoverageComplete	true	xsd:boolean
 L	agentce:event/dec-1	agentce:oversightModalityMatchesDeclared	true	xsd:boolean
 L	agentce:event/dec-1	agentce:riskReviewed	true	xsd:boolean
 L	agentce:event/dec-1	agentce:robustToUntrustedContent	true	xsd:boolean
@@ -122,6 +127,7 @@ L	agentce:event/dec-2	agentce:untrustedContentRuledOn	true	xsd:boolean
 L	agentce:event/dec-2	prov:atTime	2026-06-01T10:00:00.000Z	xsd:dateTime
 L	agentce:event/del-1	agentce:chainVerified	true	xsd:boolean
 L	agentce:event/del-1	prov:atTime	2026-06-01T08:00:00.000Z	xsd:dateTime
+L	agentce:event/login-1	prov:atTime	2026-06-01T09:29:00.000Z	xsd:dateTime
 L	agentce:event/out-1	agentce:adverseOutcomeLinked	true	xsd:boolean
 L	agentce:event/out-1	prov:atTime	2026-06-01T09:10:00.000Z	xsd:dateTime
 L	agentce:event/tc-1	agentce:actsOnUntrusted	false	xsd:boolean

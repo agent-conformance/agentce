@@ -357,6 +357,30 @@ class GraphTest {
         assertEquals(List.of("false"), acts(List.of(ruled, derived, call("tc1", "i1")), "tc1"));
     }
 
+    /** An identity-provider SessionStart a session_ref can name (SPEC §10.4). */
+    private static JsonNode login(String id, String sourceClass, String agent) {
+        return Json.parse("{\"id\": \"" + id + "\", \"time\": \"2026-01-01T00:00:00Z\", \"agentcesourceclass\": \""
+                + sourceClass + "\", \"data\": {\"@type\": \"SessionStart\", \"agent\": {\"id\": \"" + agent + "\"}}}");
+    }
+
+    private static final String IDP = "urn:example:service:identity-provider";
+
+    /** The identity-provider logins of the test reviewers alice and bob (login-alice, login-bob). */
+    private static final List<JsonNode> LOGINS =
+            List.of(login("login-alice", "independent_system", IDP), login("login-bob", "independent_system", IDP));
+
+    /** A human actor with the session_ref of its login, login-&lt;id&gt;. */
+    private static String human(String id) {
+        return "\"actor\": {\"kind\": \"human\", \"id\": \"" + id + "\"}, \"session_ref\": \"agentce:event/login-" + id.strip()
+                + "\"";
+    }
+
+    private static List<JsonNode> withLogins(List<JsonNode> events) {
+        List<JsonNode> all = new ArrayList<>(events);
+        all.addAll(LOGINS);
+        return all;
+    }
+
     private static List<String> flag(List<JsonNode> events, JsonNode domain, String node, String predicate) {
         GraphStore store = Graph.buildGraph(events, DomainBinding.fromDict(domain));
         return store.literalValues("agentce:event/" + node, "agentce:" + predicate);
@@ -407,8 +431,7 @@ class GraphTest {
     }
 
     private static JsonNode approval(String id, String decision, String humanId) {
-        return event(id, "ApprovalDecided", decisionRef(decision)
-                + ", \"actor\": {\"kind\": \"human\", \"id\": \"" + humanId + "\"}");
+        return event(id, "ApprovalDecided", decisionRef(decision) + ", " + human(humanId));
     }
 
     @Test
@@ -418,7 +441,8 @@ class GraphTest {
                 decisionRef("d1") + ", \"actor\": {\"kind\": \"service\", \"id\": \"svc\"}");
         assertEquals(List.of("false"), flag(List.of(decisionEvent("d1"), service), "d1", "oversightCoverageComplete"));
         assertEquals(List.of("true"),
-                flag(List.of(decisionEvent("d1"), approval("a1", "d1", "alice")), "d1", "oversightCoverageComplete"));
+                flag(withLogins(List.of(decisionEvent("d1"), approval("a1", "d1", "alice"))), "d1",
+                        "oversightCoverageComplete"));
     }
 
     @Test
@@ -426,22 +450,22 @@ class GraphTest {
         JsonNode dual = decisionWith("d1", "\"oversight_modality\": \"dual_control\"");
         assertEquals(List.of("false"), flag(List.of(dual, approval("a1", "d1", "alice"),
                 approval("a2", "d1", "alice")), "d1", "oversightCoverageComplete"));
-        assertEquals(List.of("true"), flag(List.of(dual, approval("a1", "d1", "alice"),
-                approval("a2", "d1", "bob")), "d1", "oversightCoverageComplete"));
+        assertEquals(List.of("true"), flag(withLogins(List.of(dual, approval("a1", "d1", "alice"),
+                approval("a2", "d1", "bob"))), "d1", "oversightCoverageComplete"));
         JsonNode declared = Json.parse("{\"decision_types\":[{\"id\":\"agentce:CreditDecision\","
                 + "\"subclass_of\":\"agentce:ConsequentialDecision\",\"consequential\":true,"
                 + "\"required_oversight_modality\":\"dual_control\"}]}");
         List<JsonNode> one = List.of(decisionEvent("d1"), approval("a1", "d1", "alice"));
         assertEquals(List.of("false"), flag(one, declared, "d1", "oversightCoverageComplete"));
-        List<JsonNode> two = List.of(decisionEvent("d1"), approval("a1", "d1", "alice"), approval("a2", "d1", "bob"));
+        List<JsonNode> two =
+                withLogins(List.of(decisionEvent("d1"), approval("a1", "d1", "alice"), approval("a2", "d1", "bob")));
         assertEquals(List.of("true"), flag(two, declared, "d1", "oversightCoverageComplete"));
     }
 
     @Test
     void ovs07AnOverrideIsEffectiveWhenItReplacesAHeldDecision() {
-        String human = ", \"actor\": {\"kind\": \"human\", \"id\": \"alice\"}";
-        List<JsonNode> effective = List.of(decisionEvent("d1"), event("o1", "Override",
-                decisionRef("d1") + ", \"original\": \"approve\", \"replacement\": \"deny\"" + human));
+        List<JsonNode> effective = withLogins(List.of(decisionEvent("d1"), event("o1", "Override",
+                decisionRef("d1") + ", \"original\": \"approve\", \"replacement\": \"deny\", " + human("alice"))));
         assertEquals(List.of("true"), flag(effective, "o1", "interventionEffective"));
         assertEquals(List.of("true"), flag(effective, "o1", "interventionByHuman"));
         for (String data : List.of(
@@ -458,9 +482,9 @@ class GraphTest {
     @Test
     void ovs07AnInterruptIsEffectiveWhenANamedMechanismStopsTheAgent() {
         JsonNode stop = event("i1", "Interrupt", "\"effect\": \"halted\", \"mechanism\": \"kill_switch\", "
-                + "\"actor\": {\"kind\": \"human\", \"id\": \"alice\"}");
+                + human("alice"));
         assertEquals(List.of("true"), flag(List.of(stop), "i1", "interventionEffective"));
-        assertEquals(List.of("true"), flag(List.of(stop), "i1", "interventionByHuman"));
+        assertEquals(List.of("true"), flag(withLogins(List.of(stop)), "i1", "interventionByHuman"));
         for (String data : List.of("\"effect\": \"logged\", \"mechanism\": \"manual\"",
                 "\"effect\": \"paused\", \"mechanism\": \"email\"")) {
             JsonNode weak = event("i1", "Interrupt", data);
@@ -485,7 +509,7 @@ class GraphTest {
     void rsk02ADecisionIsRiskReviewedByAReviewOrAHeldPolicyDecisionItsAuthorizationNames() {
         JsonNode policy = event("p1", "PolicyDecision", "\"decision\": \"allow\"");
         JsonNode outcome = event("o1", "Outcome", "\"refs\": {\"decision\": \"agentce:event/d1\"}");
-        assertEquals(List.of("true"), flag(List.of(decisionEvent("d1"), approval("a1", "d1", "alice")),
+        assertEquals(List.of("true"), flag(withLogins(List.of(decisionEvent("d1"), approval("a1", "d1", "alice"))),
                 "d1", "riskReviewed"));
         assertEquals(List.of("true"), flag(List.of(policy,
                 decisionWith("d1", "\"refs\": {\"authorization\": \"agentce:event/p1\"}")), "d1", "riskReviewed"));
@@ -497,5 +521,46 @@ class GraphTest {
             assertEquals(List.of("false"), flag(List.of(policy, outcome,
                     decisionWith("d1", "\"refs\": {\"authorization\": " + ref + "}")), "d1", "riskReviewed"), ref);
         }
+    }
+
+    /** SPEC §10.4: an approval or override counts as a human's only when its actor's session_ref names a held
+     * identity-provider login of someone other than the agent, from an independent or enforcement-point stream, and
+     * the actor is outside the delegation chain; under dual control one login or one id is one human. */
+    @Test
+    void humanActorRule() {
+        String agent = "spiffe://corp/agents/a";
+        String chained = "\"decision_type\": \"agentce:CreditDecision\", \"agent\": {\"id\": \"" + agent
+                + "\"}, \"acted_for\": [\"owner\"]";
+        JsonNode decision = event("d1", "Decision", chained);
+        String cover = "oversightCoverageComplete";
+        assertEquals(List.of("true"), flag(withLogins(List.of(decision, approval("a1", "d1", "alice"))), "d1", cover));
+        assertEquals(List.of("false"), flag(List.of(decision, approval("a1", "d1", "alice")), "d1", cover));
+        assertEquals(List.of("false"), flag(List.of(decision, approval("a1", "d1", "alice"),
+                login("login-alice", "self_report", IDP)), "d1", cover));
+        assertEquals(List.of("false"), flag(List.of(decision, approval("a1", "d1", "alice"),
+                login("login-alice", "enforcement_point", agent)), "d1", cover));
+        assertEquals(List.of("false"), flag(List.of(decision, approval("a1", "d1", "alice"),
+                event("login-alice", "ToolCall", "\"tool\": {\"name\": \"x\"}")), "d1", cover));
+        assertEquals(List.of("false"), flag(List.of(decision, approval("a1", "d1", "owner"),
+                login("login-owner", "independent_system", IDP)), "d1", cover));
+        JsonNode noSession = event("a1", "ApprovalDecided",
+                decisionRef("d1") + ", \"actor\": {\"kind\": \"human\", \"id\": \"alice\"}");
+        assertEquals(List.of("false"), flag(withLogins(List.of(decision, noSession)), "d1", cover));
+        JsonNode override = event("o1", "Override", decisionRef("d1") + ", " + human("owner"));
+        assertEquals(List.of("false"), flag(List.of(decision, override,
+                login("login-owner", "independent_system", IDP)), "o1", "interventionByHuman"));
+        // Dual control: two ids on one login, or one id on two logins, are one human.
+        JsonNode dual = event("d1", "Decision", chained + ", \"oversight_modality\": \"dual_control\"");
+        assertEquals(List.of("false"), flag(withLogins(List.of(dual, approval("a1", "d1", "alice"),
+                approval("a2", "d1", "alice "))), "d1", cover));
+        JsonNode aliceOnBobsLogin = event("a2", "ApprovalDecided", decisionRef("d1")
+                + ", \"actor\": {\"kind\": \"human\", \"id\": \"alice\"}, \"session_ref\": \"agentce:event/login-bob\"");
+        assertEquals(List.of("false"), flag(withLogins(List.of(dual, approval("a1", "d1", "alice"), aliceOnBobsLogin)),
+                "d1", cover));
+        // File order never matters: the login before the decision and after the approval still counts.
+        List<JsonNode> reordered = new ArrayList<>(LOGINS);
+        reordered.add(approval("a1", "d1", "alice"));
+        reordered.add(decision);
+        assertEquals(List.of("true"), flag(reordered, "d1", cover));
     }
 }

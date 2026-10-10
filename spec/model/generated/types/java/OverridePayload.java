@@ -14,6 +14,7 @@ import lombok.*;
 public class OverridePayload extends Payload {
 
   private Principal actor;
+  private String sessionRef;
   private String original;
   private String replacement;
   private String reasonCode;

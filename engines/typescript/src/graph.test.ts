@@ -420,6 +420,26 @@ function refEvent(id: string, ptype: string, data: Record<string, unknown>, deci
 
 const HUMAN_A = { kind: "human", id: "alice" };
 const HUMAN_B = { kind: "human", id: "bob" };
+const IDP = "urn:example:service:identity-provider";
+
+/** An identity-provider SessionStart a session_ref can name (SPEC §10.4). */
+function login(id: string, sourceClass = "independent_system", agent = IDP) {
+  return {
+    id,
+    time: "2026-01-01T00:00:00Z",
+    agentcesourceclass: sourceClass,
+    data: { "@type": "SessionStart", agent: { id: agent } },
+  };
+}
+
+/** The login a test actor's records name: login-<actor id>. */
+function sessionOf(actor: unknown): string {
+  const id =
+    typeof actor === "object" && actor !== null ? (actor as { id?: unknown }).id : undefined;
+  return `agentce:event/login-${String(id)}`;
+}
+
+const LOGINS = [login("login-alice"), login("login-bob")];
 
 test("INC-03: triggersIncident marks only the decisions an incident names, directly or not", () => {
   const events = [
@@ -450,13 +470,14 @@ test("INC-03: an untraced incident holds every decision to the rule", () => {
 });
 
 test("OVS-08: coverage counts distinct human reviewers, two under dual control", () => {
-  const approval = (id: string, actor: unknown) => refEvent(id, "ApprovalDecided", { actor }, "d1");
+  const approval = (id: string, actor: unknown) =>
+    refEvent(id, "ApprovalDecided", { actor, session_ref: sessionOf(actor) }, "d1");
   const dual = {
     ...decisionEvent("d1"),
     data: { ...decisionEvent("d1").data, oversight_modality: "dual_control" },
   };
   const cover = (events: Record<string, unknown>[], domain = MINOR_DOMAIN) =>
-    lit(events, "d1", "agentce:oversightCoverageComplete", domain);
+    lit([...events, ...LOGINS], "d1", "agentce:oversightCoverageComplete", domain);
   assert.deepEqual(cover([decisionEvent("d1")]), ["false"]);
   assert.deepEqual(cover([decisionEvent("d1"), approval("a1", { kind: "service", id: "x" })]), [
     "false",
@@ -508,7 +529,11 @@ test("OVS-07: an interrupt is effective when a named mechanism halted or paused 
 
 test("OVS-07: an intervention is by a human only when a human actor is named", () => {
   const byHuman = (ptype: string, actor: unknown) =>
-    lit([refEvent("x1", ptype, { actor })], "x1", "agentce:interventionByHuman");
+    lit(
+      [refEvent("x1", ptype, { actor, session_ref: sessionOf(actor) }), ...LOGINS],
+      "x1",
+      "agentce:interventionByHuman",
+    );
   for (const ptype of ["Override", "Interrupt"]) {
     assert.deepEqual(byHuman(ptype, HUMAN_A), ["true"], ptype);
     assert.deepEqual(byHuman(ptype, { kind: "human", id: "" }), ["false"], ptype);
@@ -535,8 +560,14 @@ test("RSK-02: a decision is risk-reviewed by a review or a held policy decision 
     const d = decisionEvent("d1");
     return { ...d, data: { ...d.data, refs: { [key]: ref } } };
   };
-  const risk = (events: Record<string, unknown>[]) => lit(events, "d1", "agentce:riskReviewed");
-  const review = refEvent("a1", "ApprovalDecided", { actor: HUMAN_A }, "d1");
+  const risk = (events: Record<string, unknown>[]) =>
+    lit([...events, ...LOGINS], "d1", "agentce:riskReviewed");
+  const review = refEvent(
+    "a1",
+    "ApprovalDecided",
+    { actor: HUMAN_A, session_ref: sessionOf(HUMAN_A) },
+    "d1",
+  );
   assert.deepEqual(risk([decisionEvent("d1"), review]), ["true"]);
   assert.deepEqual(risk([policy, authorized("agentce:event/p1")]), ["true"]);
   assert.deepEqual(risk([policy, authorized("agentce:event/p1", "request")]), ["true"]);
@@ -546,4 +577,64 @@ test("RSK-02: a decision is risk-reviewed by a review or a held policy decision 
   assert.deepEqual(risk([outcome, authorized("agentce:event/o1")]), ["false"]);
   assert.deepEqual(risk([policy, authorized("p1")]), ["false"]);
   assert.deepEqual(risk([policy, authorized(["agentce:event/p1"])]), ["false"]);
+});
+
+test("human-actor rule: an approval or override counts only with a held login outside the agent and its chain", () => {
+  const agent = { id: "spiffe://corp/agents/a" };
+  const owner = { kind: "human", id: "owner" };
+  const decision = (modality?: string) => {
+    const d = decisionEvent("d1");
+    return { ...d, data: { ...d.data, agent, acted_for: ["owner"], oversight_modality: modality } };
+  };
+  const approval = (id: string, actor: unknown, session = sessionOf(actor)) =>
+    refEvent(id, "ApprovalDecided", { actor, session_ref: session }, "d1");
+  const reviewed = (...events: Record<string, unknown>[]) =>
+    lit([decision(), ...events], "d1", "agentce:oversightCoverageComplete");
+  assert.deepEqual(reviewed(approval("a1", HUMAN_A), ...LOGINS), ["true"]);
+  assert.deepEqual(reviewed(approval("a1", HUMAN_A)), ["false"]); // the login is not held
+  assert.deepEqual(reviewed(approval("a1", HUMAN_A), login("login-alice", "self_report")), [
+    "false",
+  ]);
+  assert.deepEqual(reviewed(approval("a1", HUMAN_A), login("login-alice", undefined, agent.id)), [
+    "false",
+  ]);
+  const toolCall = refEvent("login-alice", "ToolCall", { tool: { name: "x" } });
+  assert.deepEqual(reviewed(approval("a1", HUMAN_A), toolCall), ["false"]);
+  assert.deepEqual(reviewed(approval("a1", owner), login("login-owner")), ["false"]);
+  const noSession = refEvent("a1", "ApprovalDecided", { actor: HUMAN_A }, "d1");
+  assert.deepEqual(reviewed(noSession, ...LOGINS), ["false"]);
+  const override = refEvent(
+    "o1",
+    "Override",
+    { actor: owner, session_ref: sessionOf(owner) },
+    "d1",
+  );
+  assert.deepEqual(
+    lit([decision(), override, login("login-owner")], "o1", "agentce:interventionByHuman"),
+    ["false"],
+  );
+  // Dual control: two ids on one login, or one id on two logins, are one human.
+  const dual = (...events: Record<string, unknown>[]) =>
+    lit(
+      [decision("dual_control"), ...events, ...LOGINS],
+      "d1",
+      "agentce:oversightCoverageComplete",
+    );
+  const alias = { kind: "human", id: "alice " };
+  assert.deepEqual(dual(approval("a1", HUMAN_A), approval("a2", HUMAN_B)), ["true"]);
+  assert.deepEqual(dual(approval("a1", HUMAN_A), approval("a2", alias, sessionOf(HUMAN_A))), [
+    "false",
+  ]);
+  assert.deepEqual(dual(approval("a1", HUMAN_A), approval("a2", HUMAN_A, sessionOf(HUMAN_B))), [
+    "false",
+  ]);
+  // File order never matters: the login after the approval still counts.
+  assert.deepEqual(
+    lit(
+      [...LOGINS, approval("a1", HUMAN_A), decision()],
+      "d1",
+      "agentce:oversightCoverageComplete",
+    ),
+    ["true"],
+  );
 });

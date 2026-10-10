@@ -452,6 +452,7 @@ classes:
     is_a: Payload
     attributes:
       actor: {range: Principal, inlined: true}
+      session_ref: {}
       original: {}
       replacement: {}
       reason_code: {}
@@ -459,6 +460,7 @@ classes:
     is_a: Payload
     attributes:
       actor: {range: Principal, inlined: true}
+      session_ref: {}
       mechanism: {range: InterruptMechanism}
       effect: {range: InterruptEffect}
 

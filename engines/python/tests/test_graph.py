@@ -254,10 +254,15 @@ def test_preceded_by_reviewed_decision() -> None:
         "time": "2026-01-01T00:00:30Z",
         "type": "org.agent-conformance.evidence.ApprovalDecided.v1",
         "agentcesourceclass": "independent_system",
-        "data": {"@type": "ApprovalDecided", "refs": {"decision": "agentce:event/d1"}},
+        "data": {
+            "@type": "ApprovalDecided",
+            "refs": {"decision": "agentce:event/d1"},
+            "actor": ALICE,
+            "session_ref": _session(ALICE),
+        },
     }
     later = decision("d2", "2026-01-01T01:00:00Z")
-    store = build_graph([earlier, approval, later], domain=DOMAIN)
+    store = build_graph([earlier, approval, later, *LOGINS], domain=DOMAIN)
     assert store.objects(event_iri("d2"), "agentce:precededBy") == [event_iri("d1")]
 
 
@@ -779,8 +784,26 @@ def test_acts_on_untrusted_when_the_guard_never_ruled_on_the_origin_read() -> No
 
 # --- INC-03, OVS-07, OVS-08 and ROB-07 literals ---
 
-ALICE = {"kind": "human", "id": "spiffe://corp/humans/alice"}
-BOB = {"kind": "human", "id": "spiffe://corp/humans/bob"}
+# Reviewers outside the decisions' delegation chain (acted_for alice), each with an identity-provider login.
+ALICE = {"kind": "human", "id": "spiffe://corp/reviewers/alice"}
+BOB = {"kind": "human", "id": "spiffe://corp/reviewers/bob"}
+IDP = "urn:example:service:identity-provider"
+
+
+def _login(
+    event_id: str, source_class: str = "independent_system", agent: str = IDP
+) -> dict[str, Any]:
+    """An identity-provider SessionStart a session_ref can name (SPEC §10.4)."""
+    event = _event(event_id, "SessionStart", {"agent": {"id": agent}})
+    event["agentcesourceclass"] = source_class
+    return event
+
+
+def _session(actor: dict[str, str]) -> str:
+    return event_iri("login-" + actor["id"].rsplit("/", 1)[-1])
+
+
+LOGINS = [_login("login-alice"), _login("login-bob")]
 SERVICE = {"kind": "service", "id": "spiffe://corp/services/ops"}
 
 
@@ -802,7 +825,11 @@ def _approval(event_id: str, actor: dict[str, str]) -> dict[str, Any]:
     return _event(
         event_id,
         "ApprovalDecided",
-        {"refs": {"decision": event_iri("d1")}, "actor": actor},
+        {
+            "refs": {"decision": event_iri("d1")},
+            "actor": actor,
+            "session_ref": _session(actor),
+        },
     )
 
 
@@ -822,6 +849,7 @@ def _override(
             "original": original,
             "replacement": replacement,
             "actor": actor,
+            "session_ref": _session(actor),
         },
     )
 
@@ -829,7 +857,11 @@ def _override(
 def _interrupt(
     event_id: str, effect: str, mechanism: str | None, actor: dict[str, str] = ALICE
 ) -> dict[str, Any]:
-    data: dict[str, Any] = {"effect": effect, "actor": actor}
+    data: dict[str, Any] = {
+        "effect": effect,
+        "actor": actor,
+        "session_ref": _session(actor),
+    }
     if mechanism is not None:
         data["mechanism"] = mechanism
     return _event(event_id, "Interrupt", data)
@@ -885,7 +917,7 @@ def test_no_incident_triggers_no_decision() -> None:
 
 def test_oversight_coverage_needs_one_human_reviewer() -> None:
     assert _flag([decision("d1", "t")], "d1", "oversightCoverageComplete") == ["false"]
-    events = [decision("d1", "t"), _approval("a1", ALICE)]
+    events = [decision("d1", "t"), _approval("a1", ALICE), *LOGINS]
     assert _flag(events, "d1", "oversightCoverageComplete") == ["true"]
     events = [decision("d1", "t"), _approval("a1", SERVICE)]
     assert _flag(events, "d1", "oversightCoverageComplete") == ["false"]
@@ -896,6 +928,7 @@ def test_dual_control_counts_the_same_human_once() -> None:
         decision("d1", "t", modality="dual_control"),
         _approval("a1", ALICE),
         _approval("a2", ALICE),
+        *LOGINS,
     ]
     assert _flag(events, "d1", "oversightCoverageComplete") == ["false"]
 
@@ -905,6 +938,7 @@ def test_dual_control_is_covered_by_two_humans() -> None:
         decision("d1", "t", modality="dual_control"),
         _approval("a1", ALICE),
         _approval("a2", BOB),
+        *LOGINS,
     ]
     assert _flag(events, "d1", "oversightCoverageComplete") == ["true"]
 
@@ -930,7 +964,7 @@ def test_domain_declared_dual_control_needs_two_humans() -> None:
 
 
 def test_override_is_effective_with_a_differing_replacement() -> None:
-    events = [decision("d1", "t"), _override("o1")]
+    events = [decision("d1", "t"), _override("o1"), *LOGINS]
     assert _flag(events, "o1", "interventionEffective") == ["true"]
     assert _flag(events, "o1", "interventionByHuman") == ["true"]
 
@@ -947,7 +981,7 @@ def test_override_of_a_decision_not_held_is_not_effective() -> None:
 
 def test_interrupt_is_effective_when_a_mechanism_halts_or_pauses() -> None:
     for effect in ("halted", "paused"):
-        events = [_interrupt("i1", effect, "kill_switch")]
+        events = [_interrupt("i1", effect, "kill_switch"), *LOGINS]
         assert _flag(events, "i1", "interventionEffective") == ["true"]
         assert _flag(events, "i1", "interventionByHuman") == ["true"]
 
@@ -985,7 +1019,7 @@ def _authorized(ref: Any, key: str = "authorization") -> dict[str, Any]:
 def test_risk_reviewed_by_a_review_or_a_held_policy_decision() -> None:
     policy = _event("p1", "PolicyDecision", {"decision": "allow"})
     assert _flag(
-        [decision("d1", "t"), _approval("a1", ALICE)], "d1", "riskReviewed"
+        [decision("d1", "t"), _approval("a1", ALICE), *LOGINS], "d1", "riskReviewed"
     ) == ["true"]
     assert _flag([policy, _authorized(event_iri("p1"))], "d1", "riskReviewed") == [
         "true"
@@ -1006,3 +1040,48 @@ def test_risk_reviewed_needs_the_authorization_to_name_a_held_policy_decision() 
         [policy, _authorized([event_iri("p1")])],
     ):
         assert _flag(events, "d1", "riskReviewed") == ["false"]
+
+
+def test_human_actor_rule() -> None:
+    """SPEC §10.4: an approval or override counts as a human's only when its actor's session_ref names a held
+    identity-provider login of someone other than the agent, from an independent or enforcement-point stream, and the
+    actor is outside the delegation chain; under dual control one login or one id is one human."""
+
+    def reviewed(*events: dict[str, Any]) -> list[str]:
+        return _flag([decision("d1", "t"), *events], "d1", "oversightCoverageComplete")
+
+    assert reviewed(_approval("a1", ALICE), *LOGINS) == ["true"]
+    assert reviewed(_approval("a1", ALICE)) == ["false"]  # the login is not held
+    assert reviewed(_approval("a1", ALICE), _login("login-alice", "self_report")) == [
+        "false"
+    ]
+    assert reviewed(
+        _approval("a1", ALICE), _login("login-alice", agent="spiffe://corp/agents/a")
+    ) == ["false"]
+    tool_call = _event("login-alice", "ToolCall", {"tool": {"name": "x"}})
+    assert reviewed(_approval("a1", ALICE), tool_call) == ["false"]
+    owner = {
+        "kind": "human",
+        "id": "spiffe://corp/humans/alice",
+    }  # the decision acts for alice
+    assert reviewed(_approval("a1", owner), _login("login-alice")) == ["false"]
+    no_session = _approval("a1", ALICE)
+    del no_session["data"]["session_ref"]
+    assert reviewed(no_session, *LOGINS) == ["false"]
+    events = [decision("d1", "t"), _override("o1", actor=owner), _login("login-alice")]
+    assert _flag(events, "o1", "interventionByHuman") == ["false"]
+    # Dual control: two ids on one login, or one id on two logins, are one human.
+    dual = decision("d1", "t", modality="dual_control")
+    alias = {"kind": "human", "id": ALICE["id"] + " "}
+    one_login = [dual, _approval("a1", ALICE), _approval("a2", alias), *LOGINS]
+    one_login[2]["data"]["session_ref"] = _session(ALICE)
+    assert _flag(one_login, "d1", "oversightCoverageComplete") == ["false"]
+    two_logins = [dual, _approval("a1", ALICE), _approval("a2", ALICE), *LOGINS]
+    two_logins[2]["data"]["session_ref"] = _session(BOB)
+    assert _flag(two_logins, "d1", "oversightCoverageComplete") == ["false"]
+    # File order never matters: the login after the approval still counts.
+    assert _flag(
+        [*LOGINS, _approval("a1", ALICE), decision("d1", "t")],
+        "d1",
+        "oversightCoverageComplete",
+    ) == ["true"]

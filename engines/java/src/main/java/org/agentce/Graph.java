@@ -94,6 +94,10 @@ public final class Graph {
     private static final Set<String> INTERRUPT_STOPS = Set.of("halted", "paused");
     private static final Set<String> INTERRUPT_MECHANISMS =
             Set.of("stop_button", "kill_switch", "circuit_breaker", "manual");
+    /** The stream classes an identity-provider login record must come from (SPEC §6.2 ApprovalDecided.session_ref, §10.4). */
+    private static final Set<String> LOGIN_CLASSES = Set.of("independent_system", "enforcement_point");
+    /** The records the SPEC §10.4 human-actor rule applies to. */
+    private static final Set<String> OVERSIGHT_TYPES = Set.of("ApprovalDecided", "Override", "Interrupt");
     /** The Incident members that record a response after detection (SPEC §6.2; ROB-07). */
     private static final List<String> INCIDENT_RESPONSES =
             List.of("causal_assessment_at", "provider_notified_at", "reported_at");
@@ -267,6 +271,35 @@ public final class Graph {
         return null;
     }
 
+    /** A verified human: the actor's principal IRI and the IRI of the login record its session_ref names. */
+    private record HumanKey(String actor, String login) {}
+
+    /** What the human-actor rule reads of every event: its type, source class and agent id. */
+    private record EventInfo(String type, String sourceClass, String agent) {}
+
+    /** OVS-08: the number of distinct humans among verified keys. Two keys are one human when they share the actor
+     * or the login, so one login under two spellings of an id, or one id over two logins, counts once; the count does
+     * not depend on the order of the keys. */
+    private static int distinctHumans(List<HumanKey> keys) {
+        List<List<Set<String>>> groups = new ArrayList<>();
+        for (HumanKey key : keys) {
+            List<Set<String>> merged =
+                    List.of(new LinkedHashSet<>(Set.of(key.actor())), new LinkedHashSet<>(Set.of(key.login())));
+            List<List<Set<String>>> rest = new ArrayList<>();
+            for (List<Set<String>> group : groups) {
+                if (group.get(0).contains(key.actor()) || group.get(1).contains(key.login())) {
+                    merged.get(0).addAll(group.get(0));
+                    merged.get(1).addAll(group.get(1));
+                } else {
+                    rest.add(group);
+                }
+            }
+            rest.add(merged);
+            groups = rest;
+        }
+        return groups.size();
+    }
+
     /** JSON value equality as the reference's {@code ==} reads it: numbers (and booleans, as 1/0)
      * compare by value, so {@code 1} equals {@code 1.0}; an absent field equals null. */
     private static boolean jsonEquals(JsonNode a, JsonNode b) {
@@ -338,8 +371,14 @@ public final class Graph {
         private final Map<String, Set<String>> operatedNames =
                 Map.of("tool", new LinkedHashSet<>(), "model", new LinkedHashSet<>());
         private boolean hasCalls;
-        // OVS-08: decision IRI -> the distinct human actors whose ApprovalDecided reviewed it.
-        private final Map<String, Set<String>> humanReviewers = new LinkedHashMap<>();
+        // SPEC §10.4 human-actor rule, read in the second pass so file order never matters: event IRI -> type, source
+        // class and agent id of every event; agent id -> every principal IRI in its delegation chain (its acted_for
+        // and its DelegationIssued chains); event IRI -> the principal IRIs of its own acted_for.
+        private final Map<String, EventInfo> eventInfo = new LinkedHashMap<>();
+        private final Map<String, Set<String>> agentChain = new LinkedHashMap<>();
+        private final Map<String, Set<String>> actedFor = new LinkedHashMap<>();
+        // OVS-08: decision IRI -> the key of every verified ApprovalDecided that reviewed it.
+        private final Map<String, List<HumanKey>> humanReviewers = new LinkedHashMap<>();
         // INC-03: event IRI -> the decision its refs.decision names, whatever the event type.
         private final Map<String, String> refDecision = new LinkedHashMap<>();
 
@@ -392,11 +431,21 @@ public final class Graph {
             }
 
             JsonNode agent = data.get("agent");
-            if (agent != null && agent.isObject() && agent.get("id") != null && agent.get("id").isTextual()) {
-                String agentId = agent.get("id").textValue();
+            String agentId = agent != null && agent.isObject() && agent.get("id") != null && agent.get("id").isTextual()
+                    ? agent.get("id").textValue()
+                    : null;
+            eventInfo.put(node, new EventInfo(ptype, sourceClass, agentId));
+            Set<String> ownActedFor = principalIris(data.get("acted_for"));
+            actedFor.put(node, ownActedFor);
+            if (agentId != null) {
                 store.addType(agentId, "agentce:Agent");
                 store.addEdge(node, "prov:wasAssociatedWith", agentId);
                 mapChain(agentId, data.get("acted_for"));
+                Set<String> chain = agentChain.computeIfAbsent(agentId, k -> new LinkedHashSet<>());
+                chain.addAll(ownActedFor);
+                if ("DelegationIssued".equals(ptype)) {
+                    chain.addAll(principalIris(data.get("chain")));
+                }
             }
 
             JsonNode used = data.get("used");
@@ -453,6 +502,62 @@ public final class Graph {
             }
         }
 
+        /** The pseudonymised IRIs of an {@code acted_for} or {@code chain} list (SPEC §6.3: the delegation chain). */
+        private Set<String> principalIris(JsonNode principals) {
+            Set<String> out = new LinkedHashSet<>();
+            if (principals != null && principals.isArray()) {
+                for (JsonNode entry : principals) {
+                    String pid = principalRef(entry)[0];
+                    if (pid != null) {
+                        out.add(Iri.principalIri(pid, key));
+                    }
+                }
+            }
+            return out;
+        }
+
+        /** SPEC §10.4 human-actor rule: the key of an ApprovalDecided, Override or Interrupt whose actor is a human
+         * principal whose {@code session_ref} names a held identity-provider login record, and who is nowhere in the
+         * delegation chain of the activity; null when any part fails (fail closed).
+         *
+         * <p>The login record is a held {@code SessionStart} (the only session record the event model has) from an
+         * independent_system or enforcement_point stream whose agent is none of the agents the oversight record
+         * concerns: its own agent and the named decision's agent, whose own run session is no human's login. The
+         * delegation chain is the named decision's and the record's own {@code acted_for} and every chain of those
+         * agents. */
+        private HumanKey humanKey(String node, JsonNode event) {
+            JsonNode data = dataOf(event);
+            String actor = humanActor(data);
+            String login = str(data.get("session_ref"));
+            EventInfo loginInfo = login != null ? eventInfo.get(login) : null;
+            if (actor == null || loginInfo == null) {
+                return null;
+            }
+            String decision = str(refsOf(event).get("decision"));
+            EventInfo decisionInfo = decision != null ? eventInfo.get(decision) : null;
+            Set<String> concerned = new LinkedHashSet<>();
+            Stream.of(eventInfo.get(node).agent(), decisionInfo != null ? decisionInfo.agent() : null)
+                    .filter(Objects::nonNull)
+                    .forEach(concerned::add);
+            if (!"SessionStart".equals(loginInfo.type())
+                    || loginInfo.sourceClass() == null
+                    || !LOGIN_CLASSES.contains(loginInfo.sourceClass())) {
+                return null;
+            }
+            if (loginInfo.agent() == null || concerned.contains(loginInfo.agent())) {
+                return null;
+            }
+            Set<String> chain = new LinkedHashSet<>(actedFor.get(node));
+            if (decision != null) {
+                chain.addAll(actedFor.getOrDefault(decision, Set.of()));
+            }
+            for (String agentId : concerned) {
+                chain.addAll(agentChain.getOrDefault(agentId, Set.of()));
+            }
+            String actorIri = Iri.principalIri(actor, key);
+            return chain.contains(actorIri) ? null : new HumanKey(actorIri, login);
+        }
+
         private void mapChain(String agentId, JsonNode actedFor) {
             if (actedFor == null || !actedFor.isArray()) {
                 return;
@@ -479,14 +584,6 @@ public final class Graph {
                     case "Outcome" -> {
                         store.addEdge(decision, "agentce:resultedIn", node);
                         outcomeDecision.put(node, decision);
-                    }
-                    case "ApprovalDecided" -> {
-                        store.addEdge(decision, "agentce:reviewedBy", node);
-                        decisionReviewed.add(decision);
-                        String human = humanActor(dataOf(event));
-                        if (human != null) {
-                            humanReviewers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);
-                        }
                     }
                     case "Override" -> store.addEdge(decision, "agentce:overriddenBy", node);
                     case "Interrupt" -> store.addEdge(decision, "agentce:interruptedBy", node);
@@ -761,6 +858,14 @@ public final class Graph {
         }
 
         private void materialise(List<JsonNode> events) {
+            Map<String, HumanKey> humans = new LinkedHashMap<>();
+            for (JsonNode event : events) {
+                if (OVERSIGHT_TYPES.contains(ptype(event))) {
+                    String node = Iri.eventIri(event.get("id").asText());
+                    humans.put(node, humanKey(node, event));
+                }
+            }
+            mapReviews(events, humans);
             Set<String> incidentDecisions = incidentDecisions(events);
             Set<String> policyDecisions = new LinkedHashSet<>();
             for (JsonNode event : events) {
@@ -787,7 +892,7 @@ public final class Graph {
                     riskReviewed(node, refsOf(event), policyDecisions);
                 }
                 if ("Override".equals(ptype) || "Interrupt".equals(ptype)) {
-                    intervention(node, ptype, event);
+                    intervention(node, ptype, event, humans.get(node) != null);
                 }
                 if ("Incident".equals(ptype)) {
                     literal(node, "agentce:incidentResponded",
@@ -861,6 +966,23 @@ public final class Graph {
             literal(node, "agentce:riskReviewed", gated);
         }
 
+        /** An ApprovalDecided reviews the decision it names ({@code agentce:reviewedBy}; OVS-01, OVS-08, CND-02,
+         * INC-03, RSK-02) only when its actor meets the SPEC §10.4 human-actor rule; one that fails it is no human's
+         * review. */
+        private void mapReviews(List<JsonNode> events, Map<String, HumanKey> humans) {
+            for (JsonNode event : events) {
+                String node = Iri.eventIri(event.get("id").asText());
+                String decision = str(refsOf(event).get("decision"));
+                HumanKey human = humans.get(node);
+                if (!"ApprovalDecided".equals(ptype(event)) || human == null || decision == null) {
+                    continue;
+                }
+                store.addEdge(decision, "agentce:reviewedBy", node);
+                decisionReviewed.add(decision);
+                humanReviewers.computeIfAbsent(decision, k -> new ArrayList<>()).add(human);
+            }
+        }
+
         /** OVS-08 (Art. 14(5)): enough distinct human reviewers -- two when the decision's observed
          * or domain-declared oversight modality is {@code dual_control}, otherwise one. */
         private void oversightCoverage(String node, JsonNode data) {
@@ -868,14 +990,14 @@ public final class Graph {
             String declared = dtype != null ? domain.requiredOversight.get(dtype) : null;
             boolean dual = "dual_control".equals(str(data.get("oversight_modality")))
                     || "dual_control".equals(declared);
-            int reviewers = humanReviewers.getOrDefault(node, Set.of()).size();
+            int reviewers = distinctHumans(humanReviewers.getOrDefault(node, List.of()));
             literal(node, "agentce:oversightCoverageComplete", reviewers >= (dual ? 2 : 1));
         }
 
         /** OVS-07: an {@code Override} is effective when it names a held decision and records a
          * replacement that differs from the original; an {@code Interrupt} when a named mechanism
-         * halted or paused the agent. Either is recorded when a human actor is named. */
-        private void intervention(String node, String ptype, JsonNode event) {
+         * halted or paused the agent. Either is by a human when its actor meets the SPEC §10.4 human-actor rule. */
+        private void intervention(String node, String ptype, JsonNode event, boolean byHuman) {
             JsonNode data = dataOf(event);
             boolean effective;
             if ("Override".equals(ptype)) {
@@ -889,7 +1011,7 @@ public final class Graph {
                         && isOneOf(data.get("mechanism"), INTERRUPT_MECHANISMS);
             }
             literal(node, "agentce:interventionEffective", effective);
-            literal(node, "agentce:interventionByHuman", humanActor(data) != null);
+            literal(node, "agentce:interventionByHuman", byHuman);
         }
 
         private void dangling(String node, JsonNode event) {

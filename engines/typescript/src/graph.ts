@@ -202,8 +202,40 @@ function pyEquals(a: unknown, b: unknown): boolean {
 /** Interrupt effects that stop the agent, and the interrupt mechanisms SPEC §6.2 names (OVS-07). */
 const INTERRUPT_STOPS = new Set(["halted", "paused"]);
 const INTERRUPT_MECHANISMS = new Set(["stop_button", "kill_switch", "circuit_breaker", "manual"]);
+/** The stream classes an identity-provider login record must come from (SPEC §6.2 ApprovalDecided.session_ref, §10.4). */
+const LOGIN_CLASSES = new Set(["independent_system", "enforcement_point"]);
+/** The records the SPEC §10.4 human-actor rule applies to. */
+const OVERSIGHT_TYPES = new Set(["ApprovalDecided", "Override", "Interrupt"]);
 /** The Incident members that record a response after detection (SPEC §6.2; ROB-07). */
 const INCIDENT_RESPONSES = ["causal_assessment_at", "provider_notified_at", "reported_at"];
+
+/** A verified human: the actor's principal IRI and the IRI of the login record its session_ref names. */
+type HumanKey = [string, string];
+
+/** OVS-08: the number of distinct humans among verified keys. Two keys are one human when they share the actor or
+ * the login, so one login under two spellings of an id, or one id over two logins, counts once; the count does not
+ * depend on the order of the keys. */
+function distinctHumans(keys: HumanKey[]): number {
+  let groups: [Set<string>, Set<string>][] = [];
+  for (const [actor, login] of keys) {
+    const merged: [Set<string>, Set<string>] = [new Set([actor]), new Set([login])];
+    const rest: [Set<string>, Set<string>][] = [];
+    for (const group of groups) {
+      if (group[0].has(actor) || group[1].has(login)) {
+        for (const a of group[0]) {
+          merged[0].add(a);
+        }
+        for (const l of group[1]) {
+          merged[1].add(l);
+        }
+      } else {
+        rest.push(group);
+      }
+    }
+    groups = [...rest, merged];
+  }
+  return groups.length;
+}
 
 function principalClass(kind: string | null): string {
   if (kind === "human") {
@@ -292,10 +324,19 @@ class Builder {
     tool: new Map(),
     model: new Map(),
   };
-  private readonly operated: Record<Family, Set<string>> = { tool: new Set(), model: new Set() };
+  private readonly operated: Record<Family, Set<string>> = {
+    tool: new Set(),
+    model: new Set(),
+  };
   private hasCalls = false;
-  // OVS-08: decision IRI -> the distinct human actors whose ApprovalDecided reviewed it.
-  private readonly humanReviewers = new Map<string, Set<string>>();
+  // SPEC §10.4 human-actor rule, read in the second pass so file order never matters: event IRI -> [type, source
+  // class, agent id] of every event; agent id -> every principal IRI in its delegation chain (its acted_for and its
+  // DelegationIssued chains); event IRI -> the principal IRIs of its own acted_for.
+  private readonly eventInfo = new Map<string, [string, string | null, string | null]>();
+  private readonly agentChain = new Map<string, Set<string>>();
+  private readonly actedFor = new Map<string, Set<string>>();
+  // OVS-08: decision IRI -> the key of every verified ApprovalDecided that reviewed it.
+  private readonly humanReviewers = new Map<string, HumanKey[]>();
   // INC-03: event IRI -> the decision its refs.decision names, whatever the event type.
   private readonly refDecision = new Map<string, string>();
 
@@ -323,7 +364,10 @@ class Builder {
     for (const type of this.decisionType.values()) {
       usedClasses.add(type);
     }
-    const merged = { ...BASE_SUBCLASS, ...Object.fromEntries(this.domain.subclasses) };
+    const merged = {
+      ...BASE_SUBCLASS,
+      ...Object.fromEntries(this.domain.subclasses),
+    };
     this.store.addSubclassClosure(closure(merged, usedClasses));
     this.materialise(events);
     return this.store;
@@ -347,11 +391,29 @@ class Builder {
     }
 
     const agent = data.agent;
-    if (isRecord(agent) && typeof agent.id === "string") {
-      const agentId = agent.id;
+    const agentId = isRecord(agent) && typeof agent.id === "string" ? agent.id : null;
+    const sourceClass =
+      typeof event.agentcesourceclass === "string" ? event.agentcesourceclass : null;
+    this.eventInfo.set(node, [ptype, sourceClass, agentId]);
+    const actedFor = this.principalIris(data.acted_for);
+    this.actedFor.set(node, actedFor);
+    if (agentId !== null) {
       this.store.addType(agentId, "agentce:Agent");
       this.store.addEdge(node, "prov:wasAssociatedWith", agentId);
       this.mapChain(agentId, data.acted_for);
+      let chain = this.agentChain.get(agentId);
+      if (!chain) {
+        chain = new Set();
+        this.agentChain.set(agentId, chain);
+      }
+      for (const p of actedFor) {
+        chain.add(p);
+      }
+      if (ptype === "DelegationIssued") {
+        for (const p of this.principalIris(data.chain)) {
+          chain.add(p);
+        }
+      }
     }
 
     const used = Array.isArray(data.used) ? data.used : [];
@@ -403,6 +465,66 @@ class Builder {
     });
   }
 
+  /** The pseudonymised IRIs of an `acted_for` or `chain` list (SPEC §6.3: the delegation chain). */
+  private principalIris(principals: unknown): Set<string> {
+    const out = new Set<string>();
+    if (Array.isArray(principals)) {
+      for (const entry of principals) {
+        const [pid] = principalRef(entry);
+        if (pid !== null) {
+          out.add(principalIri(pid, this.key));
+        }
+      }
+    }
+    return out;
+  }
+
+  /** SPEC §10.4 human-actor rule: the key of an ApprovalDecided, Override or Interrupt whose actor is a human
+   * principal whose `session_ref` names a held identity-provider login record, and who is nowhere in the delegation
+   * chain of the activity; `null` when any part fails (fail closed).
+   *
+   * The login record is a held `SessionStart` (the only session record the event model has) from an
+   * independent_system or enforcement_point stream whose agent is none of the agents the oversight record concerns:
+   * its own agent and the named decision's agent, whose own run session is no human's login. The delegation chain is
+   * the named decision's and the record's own `acted_for` and every chain of those agents. */
+  private humanKey(node: string, event: Event): HumanKey | null {
+    const data = dataOf(event);
+    const actor = humanActor(data);
+    const login = data.session_ref;
+    const loginInfo = typeof login === "string" ? this.eventInfo.get(login) : undefined;
+    if (actor === null || typeof login !== "string" || loginInfo === undefined) {
+      return null;
+    }
+    const decision = refsOf(event).decision;
+    const decisionInfo = typeof decision === "string" ? this.eventInfo.get(decision) : undefined;
+    const concerned = new Set<string>();
+    for (const agentId of [this.eventInfo.get(node)?.[2], decisionInfo?.[2]]) {
+      if (typeof agentId === "string") {
+        concerned.add(agentId);
+      }
+    }
+    const [loginType, loginClass, loginAgent] = loginInfo;
+    if (loginType !== "SessionStart" || loginClass === null || !LOGIN_CLASSES.has(loginClass)) {
+      return null;
+    }
+    if (loginAgent === null || concerned.has(loginAgent)) {
+      return null;
+    }
+    const chain = new Set(this.actedFor.get(node));
+    if (typeof decision === "string") {
+      for (const p of this.actedFor.get(decision) ?? []) {
+        chain.add(p);
+      }
+    }
+    for (const agentId of concerned) {
+      for (const p of this.agentChain.get(agentId) ?? []) {
+        chain.add(p);
+      }
+    }
+    const actorIri = principalIri(actor, this.key);
+    return chain.has(actorIri) ? null : [actorIri, login];
+  }
+
   private mapChain(agentId: string, actedFor: unknown): void {
     if (!Array.isArray(actedFor)) {
       return;
@@ -429,18 +551,6 @@ class Builder {
       } else if (ptype === "Outcome") {
         this.store.addEdge(decision, "agentce:resultedIn", node);
         this.outcomeDecision.set(node, decision);
-      } else if (ptype === "ApprovalDecided") {
-        this.store.addEdge(decision, "agentce:reviewedBy", node);
-        this.decisionReviewed.add(decision);
-        const human = humanActor(dataOf(event));
-        if (human !== null) {
-          let reviewers = this.humanReviewers.get(decision);
-          if (!reviewers) {
-            reviewers = new Set();
-            this.humanReviewers.set(decision, reviewers);
-          }
-          reviewers.add(human);
-        }
       } else if (ptype === "Override") {
         this.store.addEdge(decision, "agentce:overriddenBy", node);
       } else if (ptype === "Interrupt") {
@@ -719,6 +829,14 @@ class Builder {
   }
 
   private materialise(events: Event[]): void {
+    const humans = new Map<string, HumanKey | null>();
+    for (const event of events) {
+      if (OVERSIGHT_TYPES.has(this.ptype(event))) {
+        const node = eventIri(String(event.id));
+        humans.set(node, this.humanKey(node, event));
+      }
+    }
+    this.mapReviews(events, humans);
     const incidentDecisions = this.incidentDecisions(events);
     const policyDecisions = new Set(
       events.filter((e) => this.ptype(e) === "PolicyDecision").map((e) => eventIri(String(e.id))),
@@ -745,7 +863,7 @@ class Builder {
         this.riskReviewed(node, refsOf(event), policyDecisions);
       }
       if (ptype === "Override" || ptype === "Interrupt") {
-        this.intervention(node, ptype, event);
+        this.intervention(node, ptype, event, (humans.get(node) ?? null) !== null);
       }
       if (ptype === "Incident") {
         this.literal(
@@ -826,6 +944,27 @@ class Builder {
     );
   }
 
+  /** An ApprovalDecided reviews the decision it names (`agentce:reviewedBy`; OVS-01, OVS-08, CND-02, INC-03,
+   * RSK-02) only when its actor meets the SPEC §10.4 human-actor rule; one that fails it is no human's review. */
+  private mapReviews(events: Event[], humans: Map<string, HumanKey | null>): void {
+    for (const event of events) {
+      const node = eventIri(String(event.id));
+      const decision = refsOf(event).decision;
+      const key = humans.get(node) ?? null;
+      if (this.ptype(event) !== "ApprovalDecided" || key === null || typeof decision !== "string") {
+        continue;
+      }
+      this.store.addEdge(decision, "agentce:reviewedBy", node);
+      this.decisionReviewed.add(decision);
+      let reviewers = this.humanReviewers.get(decision);
+      if (!reviewers) {
+        reviewers = [];
+        this.humanReviewers.set(decision, reviewers);
+      }
+      reviewers.push(key);
+    }
+  }
+
   /** OVS-08 (Art. 14(5)): enough distinct human reviewers -- two when the decision's observed or
    * domain-declared oversight modality is `dual_control`, otherwise one. */
   private oversightCoverage(node: string, data: Record<string, unknown>): void {
@@ -833,14 +972,14 @@ class Builder {
     const declared =
       typeof dtype === "string" ? this.domain.requiredOversight.get(dtype) : undefined;
     const dual = data.oversight_modality === "dual_control" || declared === "dual_control";
-    const reviewers = this.humanReviewers.get(node)?.size ?? 0;
+    const reviewers = distinctHumans(this.humanReviewers.get(node) ?? []);
     this.literal(node, "agentce:oversightCoverageComplete", reviewers >= (dual ? 2 : 1));
   }
 
   /** OVS-07: an `Override` is effective when it names a held decision and records a replacement that
    * differs from the original; an `Interrupt` when a named mechanism halted or paused the agent.
-   * Either is recorded when a human actor is named. */
-  private intervention(node: string, ptype: string, event: Event): void {
+   * Either is by a human when its actor meets the SPEC §10.4 human-actor rule. */
+  private intervention(node: string, ptype: string, event: Event, byHuman: boolean): void {
     const data = dataOf(event);
     let effective: boolean;
     if (ptype === "Override") {
@@ -856,7 +995,7 @@ class Builder {
         isOneOf(data.effect, INTERRUPT_STOPS) && isOneOf(data.mechanism, INTERRUPT_MECHANISMS);
     }
     this.literal(node, "agentce:interventionEffective", effective);
-    this.literal(node, "agentce:interventionByHuman", humanActor(data) !== null);
+    this.literal(node, "agentce:interventionByHuman", byHuman);
   }
 
   private dangling(node: string, event: Event): void {
@@ -1037,7 +1176,11 @@ class Builder {
 
 export function buildGraph(
   events: Event[],
-  options: { domain?: DomainBinding; store?: GraphStore; pseudonymKey?: Buffer } = {},
+  options: {
+    domain?: DomainBinding;
+    store?: GraphStore;
+    pseudonymKey?: Buffer;
+  } = {},
 ): GraphStore {
   const builder = new Builder(
     options.store ?? new GraphStore(),

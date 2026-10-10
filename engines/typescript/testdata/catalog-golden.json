@@ -521,12 +521,18 @@
       "outcome": "non-conformant",
       "population": {
         "applicable": 2,
-        "failed": 1
+        "failed": 2
       },
       "violations": [
         {
           "constraint": "sh:minCount",
           "focus": "agentce:event/d1",
+          "message_key": "OVS-01.S1",
+          "path": "agentce:reviewedBy"
+        },
+        {
+          "constraint": "sh:minCount",
+          "focus": "agentce:event/d2",
           "message_key": "OVS-01.S1",
           "path": "agentce:reviewedBy"
         }
@@ -737,14 +743,26 @@
       "outcome": "non-conformant",
       "population": {
         "applicable": 2,
-        "failed": 1
+        "failed": 2
       },
       "violations": [
+        {
+          "constraint": "sh:hasValue",
+          "focus": "agentce:event/v1",
+          "message_key": "OVS-07.S2",
+          "path": "agentce:interventionByHuman"
+        },
         {
           "constraint": "sh:hasValue",
           "focus": "agentce:event/x1",
           "message_key": "OVS-07.S1",
           "path": "agentce:interventionEffective"
+        },
+        {
+          "constraint": "sh:hasValue",
+          "focus": "agentce:event/x1",
+          "message_key": "OVS-07.S2",
+          "path": "agentce:interventionByHuman"
         }
       ]
     },
@@ -773,9 +791,15 @@
       "outcome": "non-conformant",
       "population": {
         "applicable": 2,
-        "failed": 1
+        "failed": 2
       },
       "violations": [
+        {
+          "constraint": "sh:hasValue",
+          "focus": "agentce:event/d1",
+          "message_key": "OVS-08.S1",
+          "path": "agentce:oversightCoverageComplete"
+        },
         {
           "constraint": "sh:hasValue",
           "focus": "agentce:event/d2",
@@ -1313,12 +1337,18 @@
       "outcome": "non-conformant",
       "population": {
         "applicable": 5,
-        "failed": 3
+        "failed": 4
       },
       "violations": [
         {
           "constraint": "sh:hasValue",
           "focus": "agentce:event/d2",
+          "message_key": "RSK-02.S1",
+          "path": "agentce:riskReviewed"
+        },
+        {
+          "constraint": "sh:hasValue",
+          "focus": "agentce:event/d3",
           "message_key": "RSK-02.S1",
           "path": "agentce:riskReviewed"
         },

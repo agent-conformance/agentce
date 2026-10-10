@@ -1206,6 +1206,7 @@ class OverridePayload(Payload):
     class_model_uri: ClassVar[URIRef] = AGENTCE.OverridePayload
 
     actor: Optional[Union[dict, Principal]] = None
+    session_ref: Optional[str] = None
     original: Optional[str] = None
     replacement: Optional[str] = None
     reason_code: Optional[str] = None
@@ -1213,6 +1214,9 @@ class OverridePayload(Payload):
     def __post_init__(self, *_: str, **kwargs: Any):
         if self.actor is not None and not isinstance(self.actor, Principal):
             self.actor = Principal(**as_dict(self.actor))
+
+        if self.session_ref is not None and not isinstance(self.session_ref, str):
+            self.session_ref = str(self.session_ref)
 
         if self.original is not None and not isinstance(self.original, str):
             self.original = str(self.original)
@@ -1236,12 +1240,16 @@ class InterruptPayload(Payload):
     class_model_uri: ClassVar[URIRef] = AGENTCE.InterruptPayload
 
     actor: Optional[Union[dict, Principal]] = None
+    session_ref: Optional[str] = None
     mechanism: Optional[Union[str, "InterruptMechanism"]] = None
     effect: Optional[Union[str, "InterruptEffect"]] = None
 
     def __post_init__(self, *_: str, **kwargs: Any):
         if self.actor is not None and not isinstance(self.actor, Principal):
             self.actor = Principal(**as_dict(self.actor))
+
+        if self.session_ref is not None and not isinstance(self.session_ref, str):
+            self.session_ref = str(self.session_ref)
 
         if self.mechanism is not None and not isinstance(self.mechanism, InterruptMechanism):
             self.mechanism = InterruptMechanism(self.mechanism)
@@ -2299,6 +2307,9 @@ slots.approvalDecidedPayload__explanation_viewed = Slot(uri=AGENTCE.explanation_
 slots.overridePayload__actor = Slot(uri=AGENTCE.actor, name="overridePayload__actor", curie=AGENTCE.curie('actor'),
                    model_uri=AGENTCE.overridePayload__actor, domain=None, range=Optional[Union[dict, Principal]])
 
+slots.overridePayload__session_ref = Slot(uri=AGENTCE.session_ref, name="overridePayload__session_ref", curie=AGENTCE.curie('session_ref'),
+                   model_uri=AGENTCE.overridePayload__session_ref, domain=None, range=Optional[str])
+
 slots.overridePayload__original = Slot(uri=AGENTCE.original, name="overridePayload__original", curie=AGENTCE.curie('original'),
                    model_uri=AGENTCE.overridePayload__original, domain=None, range=Optional[str])
 
@@ -2310,6 +2321,9 @@ slots.overridePayload__reason_code = Slot(uri=AGENTCE.reason_code, name="overrid
 
 slots.interruptPayload__actor = Slot(uri=AGENTCE.actor, name="interruptPayload__actor", curie=AGENTCE.curie('actor'),
                    model_uri=AGENTCE.interruptPayload__actor, domain=None, range=Optional[Union[dict, Principal]])
+
+slots.interruptPayload__session_ref = Slot(uri=AGENTCE.session_ref, name="interruptPayload__session_ref", curie=AGENTCE.curie('session_ref'),
+                   model_uri=AGENTCE.interruptPayload__session_ref, domain=None, range=Optional[str])
 
 slots.interruptPayload__mechanism = Slot(uri=AGENTCE.mechanism, name="interruptPayload__mechanism", curie=AGENTCE.curie('mechanism'),
                    model_uri=AGENTCE.interruptPayload__mechanism, domain=None, range=Optional[Union[str, "InterruptMechanism"]])
