@@ -84,6 +84,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -196,6 +200,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -331,6 +339,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -468,6 +480,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -583,6 +599,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -695,6 +715,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -809,6 +833,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -903,6 +931,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -1044,6 +1076,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -1213,6 +1249,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -1326,6 +1366,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -1467,6 +1511,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -1538,6 +1586,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -1650,6 +1702,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -1721,6 +1777,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -1810,6 +1870,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -1909,6 +1973,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -1978,6 +2046,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -2050,6 +2122,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -2125,6 +2201,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -2200,6 +2280,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -2328,6 +2412,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -2398,6 +2486,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -2548,6 +2640,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -2752,6 +2848,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         },
@@ -2769,6 +2869,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u2",
+              "kind": "human"
             }
           }
         }
@@ -2867,6 +2971,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -2940,6 +3048,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -3233,6 +3345,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -3322,6 +3438,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -3416,6 +3536,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -3529,6 +3653,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }
@@ -3623,6 +3751,10 @@
             "@type": "SessionStart",
             "agent": {
               "id": "urn:example:service:identity-provider"
+            },
+            "principal": {
+              "id": "u1",
+              "kind": "human"
             }
           }
         }

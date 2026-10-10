@@ -39,10 +39,12 @@ def login(actor):
 
 
 def logins(events):
-    """The identity-provider SessionStart each session_ref in the case names, from an independent stream."""
+    """The identity-provider SessionStart each session_ref in the case names, from an independent stream, naming the
+    actor that cites it as the human it authenticated (18.140)."""
     held = {ref(e["id"]) for e in events}
-    named = sorted({e["data"]["session_ref"] for e in events if "session_ref" in e["data"]} - held)
-    return [ev(r.rsplit("/", 1)[1], "SessionStart", agent={"id": IDP}) for r in named]
+    named = {e["data"]["session_ref"]: e["data"]["actor"] for e in events if "session_ref" in e["data"]}
+    return [ev(r.rsplit("/", 1)[1], "SessionStart", agent={"id": IDP}, principal={"id": named[r]["id"], "kind": "human"})
+            for r in sorted(set(named) - held)]
 
 
 def appr(i, d, actor=None):
