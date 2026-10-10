@@ -15,7 +15,7 @@ title: "NIST AI Risk Management Framework (AI RMF 1.0) base catalog"
 provenance:
   source: https://agent-conformance.org/catalogs/base/nist-ai-rmf
   version: "2026.09"
-  digest: sha256:e703b36e6b15fc52a2d8b5bba723402eec01011b7d250bac94297fc69aa9016d
+  digest: sha256:abd2b5411f065de1dcc7447ea996504c890070a56a40c5f7b83e144664c836ed
 families: [REC, OVS, ROB, TRN, INC]
 precision_policy:
   demote_below: "0.98"   # a rung-2 rule below this precision on the corpus is demoted (SPEC 11.6)
