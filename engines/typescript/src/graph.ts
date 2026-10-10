@@ -324,9 +324,9 @@ class Builder {
   };
   private hasCalls = false;
   // SPEC §10.4 human-actor rule, read in the second pass so file order never matters: event IRI -> [type, source
-  // class, agent id] of every event; agent id -> every principal IRI in its delegation chain (its acted_for and its
-  // DelegationIssued chains); event IRI -> the principal IRIs of its own acted_for.
-  // A SessionStart also records the IRI of the human principal its login names (18.140), else null.
+  // class, agent id, login principal IRI] of every event, the last set only on a SessionStart that names a human
+  // (18.140); agent id -> every principal IRI in its delegation chain (its acted_for and its DelegationIssued
+  // chains); event IRI -> the principal IRIs of its own acted_for.
   private readonly eventInfo = new Map<
     string,
     [string, string | null, string | null, string | null]
@@ -502,7 +502,7 @@ class Builder {
    * agent is none of the agents the oversight record concerns: the own agent and CloudEvents subject of the record
    * and of the named decision, whose own run session is no human's login. The delegation chain is the named
    * decision's and the record's own `acted_for` and every chain of those agents. */
-  private humanKey(node: string, event: Event): string | null {
+  private verifiedActor(node: string, event: Event): string | null {
     const data = dataOf(event);
     const actor = humanId(data.actor);
     const login = data.session_ref;
@@ -963,7 +963,7 @@ class Builder {
         continue;
       }
       const node = eventIri(String(event.id));
-      const key = this.humanKey(node, event);
+      const key = this.verifiedActor(node, event);
       byHuman.set(node, key !== null);
       const decision = refsOf(event).decision;
       if (ptype !== "ApprovalDecided" || key === null || typeof decision !== "string") {

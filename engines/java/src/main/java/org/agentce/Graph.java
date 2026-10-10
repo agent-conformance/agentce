@@ -533,7 +533,7 @@ public final class Graph {
          * CloudEvents subject of the record and of the named decision, whose own run session is no human's login. The
          * delegation chain is the named decision's and the record's own {@code acted_for} and every chain of those
          * agents. */
-        private String humanKey(String node, JsonNode event) {
+        private String verifiedActor(String node, JsonNode event) {
             JsonNode data = dataOf(event);
             String actor = humanId(data.get("actor"));
             String login = str(data.get("session_ref"));
@@ -980,7 +980,7 @@ public final class Graph {
                     continue;
                 }
                 String node = Iri.eventIri(event.get("id").asText());
-                String human = humanKey(node, event);
+                String human = verifiedActor(node, event);
                 byHuman.put(node, human != null);
                 String decision = str(refsOf(event).get("decision"));
                 if (!"ApprovalDecided".equals(ptype) || human == null || decision == null) {

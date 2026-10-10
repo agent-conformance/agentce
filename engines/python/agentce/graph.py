@@ -284,9 +284,9 @@ class _Builder:
         self.operated: dict[str, set[str]] = {"tool": set(), "model": set()}
         self.has_calls = False
         # SPEC §10.4 human-actor rule, read in the second pass so file order never matters: event IRI -> (type,
-        # source class, agent id) of every event; agent id -> every principal IRI in its delegation chain (its
-        # acted_for and its DelegationIssued chains); event IRI -> the principal IRIs of its own acted_for.
-        # A SessionStart also records the IRI of the human principal its login names (18.140), else None.
+        # source class, agent id, login principal IRI) of every event, the last set only on a SessionStart that names
+        # a human (18.140); agent id -> every principal IRI in its delegation chain (its acted_for and its
+        # DelegationIssued chains); event IRI -> the principal IRIs of its own acted_for.
         self.event_info: dict[str, tuple[str, str | None, str | None, str | None]] = {}
         # event IRI -> the agents it concerns: its own agent and its CloudEvents subject (the assessed agent), so an
         # event that leaves out the optional agent still concerns the subject.
@@ -424,7 +424,7 @@ class _Builder:
         ids = (_rule_id(_principal_ref(entry)[0]) for entry in principals)
         return {principal_iri(pid, self.key) for pid in ids if pid is not None}
 
-    def _human_key(self, node: str, event: dict[str, Any]) -> str | None:
+    def _verified_actor(self, node: str, event: dict[str, Any]) -> str | None:
         """SPEC §10.4 human-actor rule: the actor IRI of an ApprovalDecided, Override or Interrupt whose actor is a
         human principal whose ``session_ref`` names a held identity-provider login record of that same human, and who
         is nowhere in the delegation chain of the activity; ``None`` when any part fails (fail closed).
@@ -761,7 +761,7 @@ class _Builder:
             if ptype not in _OVERSIGHT_TYPES:
                 continue
             node = event_iri(str(event["id"]))
-            key = self._human_key(node, event)
+            key = self._verified_actor(node, event)
             by_human[node] = key is not None
             decision = _refs(event).get("decision")
             if (

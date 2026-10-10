@@ -43,7 +43,7 @@ def logins(events):
     actor that cites it as the human it authenticated (18.140)."""
     held = {ref(e["id"]) for e in events}
     named = {e["data"]["session_ref"]: e["data"]["actor"] for e in events if "session_ref" in e["data"]}
-    return [ev(r.rsplit("/", 1)[1], "SessionStart", agent={"id": IDP}, principal={"id": named[r]["id"], "kind": "human"})
+    return [ev(r.rsplit("/", 1)[1], "SessionStart", agent={"id": IDP}, principal=named[r])
             for r in sorted(set(named) - held)]
 
 
