@@ -856,8 +856,7 @@ public final class Graph {
         private void riskReviewed(String node, JsonNode refs, Set<String> policyDecisions) {
             boolean gated = decisionReviewed.contains(node);
             for (String key : List.of("authorization", "request")) {
-                String ref = str(refs.get(key));
-                gated |= ref != null && policyDecisions.contains(ref);
+                gated |= isOneOf(refs.get(key), policyDecisions);
             }
             literal(node, "agentce:riskReviewed", gated);
         }

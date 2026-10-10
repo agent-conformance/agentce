@@ -613,11 +613,11 @@ class _Builder:
 
     def _materialise(self, events: list[dict[str, Any]]) -> None:
         incident_decisions = self._incident_decisions(events)
-        policy_decisions = {
+        policy_decisions = frozenset(
             event_iri(str(event["id"]))
             for event in events
             if self._ptype(event) == "PolicyDecision"
-        }
+        )
         for event in events:
             node = event_iri(str(event["id"]))
             ptype = self._ptype(event)
@@ -685,7 +685,7 @@ class _Builder:
         return out
 
     def _risk_reviewed(
-        self, node: str, refs: dict[str, Any], policy_decisions: set[str]
+        self, node: str, refs: dict[str, Any], policy_decisions: frozenset[str]
     ) -> None:
         """RSK-02 (Art. 9): a review of the decision, or a ``refs.authorization`` (or
         ``refs.request``) naming a ``PolicyDecision`` the bundle holds. A name that leads to no
@@ -695,7 +695,7 @@ class _Builder:
             "agentce:riskReviewed",
             node in self.decision_reviewed
             or any(
-                isinstance(ref := refs.get(k), str) and ref in policy_decisions
+                _is_one_of(refs.get(k), policy_decisions)
                 for k in ("authorization", "request")
             ),
         )

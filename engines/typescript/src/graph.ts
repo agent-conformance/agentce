@@ -822,10 +822,7 @@ class Builder {
       node,
       "agentce:riskReviewed",
       this.decisionReviewed.has(node) ||
-        ["authorization", "request"].some((k) => {
-          const ref = refs[k];
-          return typeof ref === "string" && policyDecisions.has(ref);
-        }),
+        ["authorization", "request"].some((k) => isOneOf(refs[k], policyDecisions)),
     );
   }
 

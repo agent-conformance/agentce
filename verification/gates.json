@@ -3115,20 +3115,20 @@
         {
           "description": "Python counts an RSK-02 authorization that names any string, not only a policy decision the bundle holds, so a dangling authorization reads conformant",
           "file": "engines/python/agentce/graph.py",
-          "search": "isinstance(ref := refs.get(k), str) and ref in policy_decisions",
-          "replace": "isinstance(ref := refs.get(k), str)"
+          "search": "_is_one_of(refs.get(k), policy_decisions)",
+          "replace": "isinstance(refs.get(k), str)"
         },
         {
           "description": "TypeScript counts an RSK-02 authorization that names any string, not only a held policy decision",
           "file": "engines/typescript/src/graph.ts",
-          "search": "return typeof ref === \"string\" && policyDecisions.has(ref);",
-          "replace": "return typeof ref === \"string\";"
+          "search": "isOneOf(refs[k], policyDecisions))",
+          "replace": "typeof refs[k] === \"string\")"
         },
         {
           "description": "Java counts an RSK-02 authorization that names any string, not only a held policy decision",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
-          "search": "gated |= ref != null && policyDecisions.contains(ref);",
-          "replace": "gated |= ref != null;"
+          "search": "gated |= isOneOf(refs.get(key), policyDecisions);",
+          "replace": "gated |= str(refs.get(key)) != null;"
         }
       ],
       "fix_hint": "Each engine's graph builder materialises triggersIncident, oversightCoverageComplete, interventionEffective, interventionByHuman, incidentResponded and riskReviewed (graph.py _incident_decisions, _oversight_coverage, _intervention, _risk_reviewed; graph.ts and Graph.java the same); an Incident name that resolves to no held decision, directly or through the named event's refs.decision, must hold every decision to INC-03; OVS-08 counts distinct human actor ids; RSK-02 counts only an authorization or request that names a PolicyDecision the bundle holds. Run `ENGINES=python bash verification/gates/eu_cluster1.sh` (or typescript, java) to run one engine; it stops at the first case that engine gets wrong."
