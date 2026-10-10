@@ -5,12 +5,12 @@ fails if a gate in `gates.json` is not named in this file.
 
 ## 0.76.0
 
-- `VG-EUAIACT-CLUSTER1` (18.37c, new, tier quick) runs 41 cases through the real Python, TypeScript and Java CLIs.
+- `VG-EUAIACT-CLUSTER1` (18.37c, new, tier quick) runs 44 cases through the real Python, TypeScript and Java CLIs.
   Eight eu-ai-act controls (DAT-03, INC-03, OVS-01, OVS-07, OVS-08, ROB-07, RSK-02, RSK-03) shared one rule, a
   consequential decision is reviewed, so most of them passed on records that said nothing about their own
   requirement. Each now tests what its title says: INC-03 the decisions an incident names (every decision when any
   name leads to no held decision), OVS-07 effective overrides and interrupts by a human, OVS-08 distinct human
-  reviewers (two under dual_control), ROB-07 a response after detection, RSK-02 a policy decision or a review,
+  reviewers (two under dual_control), ROB-07 a response after detection, RSK-02 a review or an authorization that names a policy decision the bundle holds,
   OVS-01 a review. DAT-03 and RSK-03 are rung 3 and read not_assessed. Six seeded faults, two in each engine's graph
   builder: an unresolved incident name skipped, and reviewers counted per approval. The three engines run side by
   side and the first wrong case stops them, so a seeded-fault run turns red without assessing every case.

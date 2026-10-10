@@ -101,6 +101,9 @@ case("rob07-no-incident", "ROB-07", [dec("d1")], "not_applicable")
 # RSK-02: a policy decision or a review gates each consequential decision.
 case("rsk02-authorized", "RSK-02", [ev("p1", "PolicyDecision", decision="allow", policy_id="p"), dec("d1", refs={"authorization": ref("p1")}), dec("d2"), appr("a2", "d2")], "conformant")
 case("rsk02-neither", "RSK-02", [dec("d1"), dec("d2"), appr("a2", "d2")], "non-conformant", ["d1"])
+case("rsk02-authorization-dangling", "RSK-02", [dec("d1", refs={"authorization": ref("p1")}), dec("d2"), appr("a2", "d2")], "non-conformant", ["d1"])
+case("rsk02-policy-not-exported", "RSK-02", [ev("p1", "PolicyDecision", decision="allow", policy_id="p"), dec("d1", refs={"authorization": ref("p9")}), dec("d2"), appr("a2", "d2")], "non-conformant", ["d1"])
+case("rsk02-authorization-not-policy", "RSK-02", [dec("d1", refs={"authorization": ref("a2")}), dec("d2"), appr("a2", "d2")], "non-conformant", ["d1"])
 # DAT-03 and RSK-03 are rung 3: not assessed.
 case("dat03-rung3", "DAT-03", [dec("d1"), appr("a1", "d1")], "not_assessed")
 case("rsk03-rung3", "RSK-03", [dec("d1"), appr("a1", "d1")], "not_assessed")
