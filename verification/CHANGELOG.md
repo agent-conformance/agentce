@@ -6,15 +6,18 @@ fails if a gate in `gates.json` is not named in this file.
 ## 0.76.0
 
 - `VG-EUAIACT-CLUSTER1` (18.37c, new, tier quick) runs 44 cases through the real Python, TypeScript and Java CLIs.
-  Eight eu-ai-act controls (DAT-03, INC-03, OVS-01, OVS-07, OVS-08, ROB-07, RSK-02, RSK-03) shared one rule, a
+  Eight eu-ai-act controls (DAT-03, INC-03, OVS-01, OVS-07, OVS-08, ROB-07, RSK-02, RSK-03) shared one rule, that a
   consequential decision is reviewed, so most of them passed on records that said nothing about their own
-  requirement. Each now tests what its title says: INC-03 the decisions an incident names (every decision when any
-  name leads to no held decision), OVS-07 effective overrides and interrupts by a human, OVS-08 distinct human
-  reviewers (two under dual_control), ROB-07 a response after detection, RSK-02 a review or an authorization that names a policy decision the bundle holds,
-  OVS-01 a review. DAT-03 and RSK-03 are rung 3 and read not_assessed. Seven seeded faults: two in each engine's graph
-  builder (an unresolved incident name skipped, reviewers counted per approval) and one in Python's (an RSK-02
-  authorization counted whatever it names; the cases run all three engines, and each engine's unit tests cover it). The three engines run side by
-  side and the first wrong case stops them, so a seeded-fault run turns red without assessing every case.
+  requirement. Each now tests what its title says. INC-03 checks the decisions an incident names, and every decision
+  when any name leads to no held decision. OVS-07 checks that overrides and interrupts take effect and come from a
+  human. OVS-08 counts distinct human reviewers, two under dual_control. ROB-07 looks for a response after detection.
+  RSK-02 needs a review, or an authorization that names a policy decision the bundle holds. OVS-01 needs a review.
+  DAT-03 and RSK-03 are rung 3 and read not_assessed.
+  The gate has seven seeded faults. Each engine's graph builder gets two, one that skips an unresolved incident name
+  and one that counts reviewers per approval. Python's also gets one that accepts an RSK-02 authorization whatever it
+  names. The cases run all three engines and each engine's unit tests cover that check, so one copy is enough. The
+  three engines run side by side and the first wrong case stops them, so a seeded-fault run turns red without
+  assessing every case.
 
 ## 0.75.0
 

@@ -3119,7 +3119,7 @@
           "replace": "isinstance(refs.get(k), str)"
         }
       ],
-      "fix_hint": "Each engine's graph builder materialises triggersIncident, oversightCoverageComplete, interventionEffective, interventionByHuman, incidentResponded and riskReviewed (graph.py _incident_decisions, _oversight_coverage, _intervention, _risk_reviewed; graph.ts and Graph.java the same); an Incident name that resolves to no held decision, directly or through the named event's refs.decision, must hold every decision to INC-03; OVS-08 counts distinct human actor ids; RSK-02 counts only an authorization or request that names a PolicyDecision the bundle holds. Run `ENGINES=python bash verification/gates/eu_cluster1.sh` (or typescript, java) to run one engine; it stops at the first case that engine gets wrong."
+      "fix_hint": "Each engine's graph builder sets triggersIncident, oversightCoverageComplete, interventionEffective, interventionByHuman, incidentResponded and riskReviewed (graph.py _incident_decisions, _oversight_coverage, _intervention and _risk_reviewed, with the same names in graph.ts and Graph.java). An Incident name that leads to no held decision, directly or through the named event's refs.decision, holds every decision to INC-03. OVS-08 counts distinct human actor ids. RSK-02 counts an authorization or request only when it names a PolicyDecision the bundle holds. Run `ENGINES=python bash verification/gates/eu_cluster1.sh` (or typescript, java) for one engine; it stops at the first case that engine gets wrong."
     }
   ]
 }
