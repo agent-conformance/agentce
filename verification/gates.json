@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.82.0",
+  "suite_version": "0.83.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3309,8 +3309,8 @@
         {
           "description": "Java counts OVS-08 approvers per approval, not per distinct human",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
-          "search": "humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);",
-          "replace": "humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(node);"
+          "search": "humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(byActor.getKey());",
+          "replace": "humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(d.node());"
         },
         {
           "description": "Python counts an RSK-02 authorization that names any string, not only a policy decision the bundle holds, so a dangling authorization reads conformant",
@@ -3385,10 +3385,10 @@
       "fix_hint": "Run verification/gates/approval_outcome.sh; it names the engine, the case and what it gave against what was expected. The outcome test sits in each engine's graph builder beside the human-actor rule: the agentce:approvedBy edge and human_approvers / humanApprovers, which OVS-08's oversightCoverageComplete counts.",
       "faults": [
         {
-          "description": "Python writes agentce:approvedBy for a verified approval whatever its outcome, so a reject gates a high-effect action for CND-02 and satisfies nist-ai-rmf OVS-08",
+          "description": "Python records every verified approval as an approve whatever its outcome, so a reject gates a high-effect action for CND-02 and satisfies nist-ai-rmf OVS-08",
           "file": "engines/python/agentce/graph.py",
-          "search": "                if _data(event).get(\"outcome\") == \"approve\" and _before_every(\n                    str(event.get(\"time\", \"\")), action_times.get(decision, ())\n                ):\n                    self.store.add_edge(decision, \"agentce:approvedBy\", node)\n",
-          "replace": "                self.store.add_edge(decision, \"agentce:approvedBy\", node)\n                if _data(event).get(\"outcome\") == \"approve\" and _before_every(\n                    str(event.get(\"time\", \"\")), action_times.get(decision, ())\n                ):\n"
+          "search": "                        _data(event).get(\"outcome\") == \"approve\",\n",
+          "replace": "                        True,\n"
         },
         {
           "description": "Python counts a verified approval toward OVS-08's distinct approvers whatever its outcome, so a reject or an edit covers the decision",
@@ -3397,28 +3397,28 @@
           "replace": "                    self.store.add_edge(decision, \"agentce:approvedBy\", node)\n                self.human_approvers.setdefault(decision, set()).add(key)\n"
         },
         {
-          "description": "TypeScript writes agentce:approvedBy for a verified approval whatever its outcome (CND-02, nist-ai-rmf OVS-08)",
+          "description": "TypeScript records every verified approval as an approve whatever its outcome (CND-02, nist-ai-rmf OVS-08)",
           "file": "engines/typescript/src/graph.ts",
-          "search": "      if (\n        dataOf(event).outcome !== \"approve\" ||\n        !beforeEvery(String(event.time ?? \"\"), actionTimes.get(decision) ?? [])\n      ) {\n        continue;\n      }\n      this.store.addEdge(decision, \"agentce:approvedBy\", node);\n",
-          "replace": "      this.store.addEdge(decision, \"agentce:approvedBy\", node);\n      if (\n        dataOf(event).outcome !== \"approve\" ||\n        !beforeEvery(String(event.time ?? \"\"), actionTimes.get(decision) ?? [])\n      ) {\n        continue;\n      }\n"
+          "search": "      const approve = dataOf(event).outcome === \"approve\";\n",
+          "replace": "      const approve = true;\n"
         },
         {
           "description": "TypeScript counts a verified approval toward OVS-08's distinct approvers whatever its outcome",
           "file": "engines/typescript/src/graph.ts",
-          "search": "      if (\n        dataOf(event).outcome !== \"approve\" ||\n        !beforeEvery(String(event.time ?? \"\"), actionTimes.get(decision) ?? [])\n      ) {\n        continue;\n      }\n      this.store.addEdge(decision, \"agentce:approvedBy\", node);\n      let approvers",
-          "replace": "      if (\n        dataOf(event).outcome === \"approve\" &&\n        beforeEvery(String(event.time ?? \"\"), actionTimes.get(decision) ?? [])\n      ) {\n        this.store.addEdge(decision, \"agentce:approvedBy\", node);\n      }\n      let approvers"
+          "search": "          if (\n            !approve ||\n            !beforeEvery(time, actions) ||\n            !withdrawals.every((w) => compareLiterals(time, w) === 1)\n          ) {\n            continue;\n          }\n          this.store.addEdge(decision, \"agentce:approvedBy\", node);\n          let approvers",
+          "replace": "          if (\n            approve &&\n            beforeEvery(time, actions) &&\n            withdrawals.every((w) => compareLiterals(time, w) === 1)\n          ) {\n            this.store.addEdge(decision, \"agentce:approvedBy\", node);\n          }\n          let approvers"
         },
         {
-          "description": "Java writes agentce:approvedBy for a verified approval whatever its outcome (CND-02, nist-ai-rmf OVS-08)",
+          "description": "Java records every verified approval as an approve whatever its outcome (CND-02, nist-ai-rmf OVS-08)",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
-          "search": "                if (\"approve\".equals(str(dataOf(event).get(\"outcome\")))\n                        && beforeEvery(timeOf(event), actionTimes.getOrDefault(decision, List.of()))) {\n                    store.addEdge(decision, \"agentce:approvedBy\", node);\n",
-          "replace": "                    store.addEdge(decision, \"agentce:approvedBy\", node);\n                if (\"approve\".equals(str(dataOf(event).get(\"outcome\")))\n                        && beforeEvery(timeOf(event), actionTimes.getOrDefault(decision, List.of()))) {\n"
+          "search": "                boolean approve = \"approve\".equals(str(dataOf(event).get(\"outcome\")));\n",
+          "replace": "                boolean approve = true;\n"
         },
         {
           "description": "Java counts a verified approval toward OVS-08's distinct approvers whatever its outcome",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
-          "search": "                    store.addEdge(decision, \"agentce:approvedBy\", node);\n                    humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);\n                }\n",
-          "replace": "                    store.addEdge(decision, \"agentce:approvedBy\", node);\n                }\n                humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);\n"
+          "search": "                            store.addEdge(decision, \"agentce:approvedBy\", d.node());\n                            humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(byActor.getKey());\n                        }\n",
+          "replace": "                            store.addEdge(decision, \"agentce:approvedBy\", d.node());\n                        }\n                        humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(byActor.getKey());\n"
         }
       ]
     },
@@ -3482,6 +3482,87 @@
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "            return order != null && order <= 0;\n",
           "replace": "            return order != null && time.compareTo(action) <= 0;\n"
+        }
+      ]
+    },
+    {
+      "id": "VG-APPROVAL-WITHDRAWAL",
+      "title": "Each human's most recent decision governs whether that human approved, in all three engines: CND-02 and OVS-08 count a verified approve only when the same human recorded no reject or edit on the decision at or after it (or at a time that cannot be placed against it) before the action ran, compared as instants, while two distinct humans who each decide once are unaffected (18.142)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/approval_outcome.sh",
+        "approval_withdrawal"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/approval_withdrawal/cases.json (28: CND-02 with one human's approve then reject, reject then approve, approve then edit, approve reject approve, approve then the action then reject, a reject at the action's own instant, a reject between two actions, approve and reject at the same instant, a reject time with no offset, a later reject or approve written in another offset whose text sorts the other way, one human's reject on another decision, the same human's reject with no login, citing another human's login, self-reported or with a padded id, an approve followed by a decision with no outcome, a verified reject followed by an approve with no login, and two distinct humans' approve and reject in either order; eu-ai-act and nist-ai-rmf OVS-08 with one human's approve then reject, dual control with one human's approve and another's reject, one of two approvers withdrawing and withdrawing then restoring, and the same human's approve and reject with no action in either order; OVS-01 counting a withdrawn approval as a review) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
+      },
+      "fix_hint": "Run bash verification/gates/approval_outcome.sh approval_withdrawal; it names the engine, the case and what it gave against what was expected. The withdrawal test sits in each engine's graph builder after the human-actor pass (_map_oversight / mapOversight): per decision and human (a verified actor, or for a non-approve any human actor with the same trimmed id: fail closed), a non-approve recorded at or before some executing ToolCall (_after_every / afterEvery false) withdraws every approve of that human not strictly later than it, compared through the structural literal comparison (instants, never text).",
+      "faults": [
+        {
+          "description": "Python ignores a human's later reject or edit, so an approve that the same human withdrew before the action ran still gates it for CND-02 and counts toward OVS-08",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                    and all(compare_literals(time, w) == 1 for w in withdrawals)\n",
+          "replace": "                    and True\n"
+        },
+        {
+          "description": "Python orders one human's decisions as text, so a reject written in another offset that sorts earlier as text does not withdraw the approve it came after",
+          "file": "engines/python/agentce/graph.py",
+          "search": "all(compare_literals(time, w) == 1 for w in withdrawals)",
+          "replace": "all(time > w for w in withdrawals)"
+        },
+        {
+          "description": "TypeScript ignores a human's later reject or edit (CND-02, OVS-08)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "            !withdrawals.every((w) => compareLiterals(time, w) === 1)\n",
+          "replace": "            false\n"
+        },
+        {
+          "description": "TypeScript orders one human's decisions as text",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "withdrawals.every((w) => compareLiterals(time, w) === 1)",
+          "replace": "withdrawals.every((w) => time > w)"
+        },
+        {
+          "description": "Java ignores a human's later reject or edit (CND-02, OVS-08)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "                            return order != null && order > 0;\n                        })) {\n",
+          "replace": "                            return true;\n                        })) {\n"
+        },
+        {
+          "description": "Java orders one human's decisions as text",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "Integer order = Structural.compareLiterals(d.time(), w);",
+          "replace": "Integer order = d.time().compareTo(w);"
+        },
+        {
+          "description": "Python drops a human's own reject that fails the SPEC §10.4 rule (no login, or another human's login), so the approve that human withdrew still gates the action for CND-02",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                and key is None\n",
+          "replace": "                and False\n"
+        },
+        {
+          "description": "TypeScript drops a human's own reject that fails the SPEC §10.4 rule (CND-02, OVS-08)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "const human = key ?? (actor !== null && !approve ? principalIri(actor, this.key) : null);",
+          "replace": "const human = key;"
+        },
+        {
+          "description": "Java drops a human's own reject that fails the SPEC §10.4 rule (CND-02, OVS-08)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "String who = human != null ? human : actor != null && !approve ? Iri.principalIri(actor, key) : null;",
+          "replace": "String who = human;"
         }
       ]
     }

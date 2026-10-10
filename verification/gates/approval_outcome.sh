@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Build gate helper for VG-APPROVAL-OUTCOME (18.136) and, given the fixture name approval_order, VG-APPROVAL-ORDER
-# (18.141). An approval gates a decision only when its outcome is approve (SPEC §6.2 ApprovalDecided.outcome
-# approve|edit|reject) and it is recorded at or before every action that executes the decision. CND-02 and OVS-08 count
+# Build gate helper for VG-APPROVAL-OUTCOME (18.136) and, given a fixture name, VG-APPROVAL-ORDER (approval_order,
+# 18.141) and VG-APPROVAL-WITHDRAWAL (approval_withdrawal, 18.142). An approval gates a decision only when its outcome
+# is approve (SPEC §6.2 ApprovalDecided.outcome approve|edit|reject), it is recorded at or before every action that
+# executes the decision, and the same human did not withdraw it before the action ran. CND-02 and OVS-08 count
 # only such an approve (the agentce:approvedBy edge and OVS-08's distinct approvers); OVS-01, INC-03 and RSK-02 ask for
 # a review, which a reject, an edit or a late approval also is. Each case in fixtures/<name>/cases.json (the profiles
 # and the domain are fixtures/approval_outcome's for both) becomes one bundle assessed under its profile

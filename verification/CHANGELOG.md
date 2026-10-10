@@ -3,6 +3,25 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.83.0
+
+- `VG-APPROVAL-WITHDRAWAL` (18.142, new, tier quick) checks that each human's own most recent decision on a decision
+  governs whether that human approved it, in all three engines. Every engine used to count any verified `approve` a
+  human ever recorded, so one human who approved and then rejected the same decision before the action ran still read
+  conformant on CND-02 ("High-effect actions are gated by a recorded approval") and on OVS-08. Now a `reject` or an
+  `edit` withdraws every earlier `approve` by the same human, as does one at the same instant or at a time that
+  cannot be placed against the `approve`; a later `approve` after that human's `reject` still gates. A decision
+  recorded after every `ToolCall` that executes the decision withdraws nothing, since the action already ran under
+  the approval; one between two actions withdraws it, since the second ran without it. Times compare as instants,
+  never as text. Two distinct humans who each decide once are unaffected: one `approve` and another human's `reject`
+  stay conformant on CND-02 outside dual control, and OVS-08 under dual control still needs two approvals. The gate
+  runs 28 cases through the real Python, TypeScript and Java CLIs with the `VG-APPROVAL-OUTCOME` runner. A human's
+  own `reject` withdraws that human's `approve` even when the `reject` itself fails the SPEC §10.4 human-actor rule
+  (no login, another human's login, a padded id), so the check fails closed. Nine seeded faults, three per engine:
+  the withdrawal ignored, one human's decisions ordered as text, and a `reject` that fails §10.4 dropped.
+- `VG-APPROVAL-OUTCOME`'s six faults and `VG-EUAIACT-CLUSTER1`'s Java distinct-approver fault are re-pointed at the restructured approval code (same faults:
+  every outcome recorded as an approve, every outcome counted toward OVS-08's approvers, approvers counted per approval).
+
 ## 0.82.0
 
 - `VG-APPROVAL-ORDER` (18.141, new, tier quick) checks that an approval gates an action only when it was recorded at
