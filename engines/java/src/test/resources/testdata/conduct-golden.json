@@ -55,7 +55,7 @@
       "violations": [
         {
           "focus": "agentce:event/d1",
-          "path": "agentce:reviewedBy",
+          "path": "agentce:approvedBy",
           "constraint": "sh:minCount",
           "message_key": "CND-02.S1"
         }

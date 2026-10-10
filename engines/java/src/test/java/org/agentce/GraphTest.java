@@ -438,7 +438,23 @@ class GraphTest {
     }
 
     private static JsonNode approval(String id, String decision, String humanId) {
-        return event(id, "ApprovalDecided", decisionRef(decision) + ", " + human(humanId));
+        return event(id, "ApprovalDecided", decisionRef(decision) + ", \"outcome\": \"approve\", " + human(humanId));
+    }
+
+    /** A reject, an edit or no outcome is a review (agentce:reviewedBy; OVS-01, INC-03, RSK-02) but never an
+     * approval (agentce:approvedBy; CND-02, OVS-08). */
+    @Test
+    void onlyAnApproveOutcomeApproves() {
+        for (String outcome : new String[] {"\"approve\"", "\"reject\"", "\"edit\"", null}) {
+            String data = decisionRef("d1") + (outcome == null ? "" : ", \"outcome\": " + outcome) + ", " + human("alice");
+            List<JsonNode> events = withLogins(List.of(decisionEvent("d1"), event("a1", "ApprovalDecided", data)));
+            GraphStore store = Graph.buildGraph(events, DomainBinding.fromDict(CREDIT_DOMAIN));
+            boolean approved = "\"approve\"".equals(outcome);
+            assertEquals(List.of("agentce:event/a1"), store.objects("agentce:event/d1", "agentce:reviewedBy"), data);
+            assertEquals(approved ? List.of("agentce:event/a1") : List.of(),
+                    store.objects("agentce:event/d1", "agentce:approvedBy"), data);
+            assertEquals(List.of(String.valueOf(approved)), flag(events, "d1", "oversightCoverageComplete"), data);
+        }
     }
 
     @Test
@@ -560,7 +576,7 @@ class GraphTest {
                 "independent_system", IDP, ", \"principal\": {\"kind\": \"human\", \"id\": \"\\u00a0alice\\ufeff\"}")),
                 "d1", cover));
         JsonNode noSession = event("a1", "ApprovalDecided",
-                decisionRef("d1") + ", \"actor\": {\"kind\": \"human\", \"id\": \"alice\"}");
+                decisionRef("d1") + ", \"outcome\": \"approve\", \"actor\": {\"kind\": \"human\", \"id\": \"alice\"}");
         assertEquals(List.of("false"), flag(withLogins(List.of(decision, noSession)), "d1", cover));
         JsonNode override = event("o1", "Override", decisionRef("d1") + ", " + human("owner"));
         assertEquals(List.of("false"), flag(List.of(decision, override,
@@ -569,7 +585,7 @@ class GraphTest {
         JsonNode dual = event("d1", "Decision", chained + ", \"oversight_modality\": \"dual_control\"");
         assertEquals(List.of("false"), flag(withLogins(List.of(dual, approval("a1", "d1", "alice"),
                 approval("a2", "d1", "alice "))), "d1", cover));
-        JsonNode aliceOnBobsLogin = event("a2", "ApprovalDecided", decisionRef("d1")
+        JsonNode aliceOnBobsLogin = event("a2", "ApprovalDecided", decisionRef("d1") + ", \"outcome\": \"approve\""
                 + ", \"actor\": {\"kind\": \"human\", \"id\": \"alice\"}, \"session_ref\": \"agentce:event/login-bob\"");
         assertEquals(List.of("false"), flag(withLogins(List.of(dual, approval("a1", "d1", "alice"), aliceOnBobsLogin)),
                 "d1", cover));

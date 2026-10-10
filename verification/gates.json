@@ -3283,10 +3283,10 @@
           "replace": "                if named not in self.decision_time:\n                    continue\n"
         },
         {
-          "description": "Python counts OVS-08 reviewers per approval, not per distinct human, so one human approving twice satisfies dual_control",
+          "description": "Python counts OVS-08 approvers per approval, not per distinct human, so one human approving twice satisfies dual_control",
           "file": "engines/python/agentce/graph.py",
-          "search": "self.human_reviewers.setdefault(decision, set()).add(key)",
-          "replace": "self.human_reviewers.setdefault(decision, set()).add(node)"
+          "search": "self.human_approvers.setdefault(decision, set()).add(key)",
+          "replace": "self.human_approvers.setdefault(decision, set()).add(node)"
         },
         {
           "description": "TypeScript skips an Incident name that leads to no held decision instead of holding every decision to the rule (INC-03)",
@@ -3295,10 +3295,10 @@
           "replace": "        if (named === undefined || !this.decisionTime.has(named)) {\n          continue;\n"
         },
         {
-          "description": "TypeScript counts OVS-08 reviewers per approval, not per distinct human",
+          "description": "TypeScript counts OVS-08 approvers per approval, not per distinct human",
           "file": "engines/typescript/src/graph.ts",
-          "search": "      reviewers.add(key);\n",
-          "replace": "      reviewers.add(node);\n"
+          "search": "      approvers.add(key);\n",
+          "replace": "      approvers.add(node);\n"
         },
         {
           "description": "Java skips an Incident name that leads to no held decision instead of holding every decision to the rule (INC-03)",
@@ -3307,10 +3307,10 @@
           "replace": "                    if (named == null || !decisionTime.containsKey(named)) {\n                        continue;\n"
         },
         {
-          "description": "Java counts OVS-08 reviewers per approval, not per distinct human",
+          "description": "Java counts OVS-08 approvers per approval, not per distinct human",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
-          "search": "humanReviewers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);",
-          "replace": "humanReviewers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(node);"
+          "search": "humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);",
+          "replace": "humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(node);"
         },
         {
           "description": "Python counts an RSK-02 authorization that names any string, not only a policy decision the bundle holds, so a dangling authorization reads conformant",

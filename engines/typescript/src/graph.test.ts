@@ -480,7 +480,12 @@ test("INC-03: an untraced incident holds every decision to the rule", () => {
 
 test("OVS-08: coverage counts distinct human reviewers, two under dual control", () => {
   const approval = (id: string, actor: unknown) =>
-    refEvent(id, "ApprovalDecided", { actor, session_ref: sessionOf(actor) }, "d1");
+    refEvent(
+      id,
+      "ApprovalDecided",
+      { outcome: "approve", actor, session_ref: sessionOf(actor) },
+      "d1",
+    );
   const dual = {
     ...decisionEvent("d1"),
     data: { ...decisionEvent("d1").data, oversight_modality: "dual_control" },
@@ -509,6 +514,34 @@ test("OVS-08: coverage counts distinct human reviewers, two under dual control",
     cover([decisionEvent("d1"), approval("a1", HUMAN_A), approval("a2", HUMAN_B)], declared),
     ["true"],
   );
+});
+
+test("only an approve outcome approves: a reject, an edit or no outcome is a review, never an approval", () => {
+  for (const [outcome, approved] of [
+    ["approve", true],
+    ["reject", false],
+    ["edit", false],
+    [undefined, false],
+  ] as const) {
+    const events = [
+      decisionEvent("d1"),
+      refEvent(
+        "a1",
+        "ApprovalDecided",
+        { outcome, actor: HUMAN_A, session_ref: sessionOf(HUMAN_A) },
+        "d1",
+      ),
+      ...LOGINS,
+    ];
+    const store = buildGraph(events, { domain: MINOR_DOMAIN });
+    assert.deepEqual(store.objects("agentce:event/d1", "agentce:reviewedBy"), ["agentce:event/a1"]);
+    assert.deepEqual(
+      store.objects("agentce:event/d1", "agentce:approvedBy"),
+      approved ? ["agentce:event/a1"] : [],
+      String(outcome),
+    );
+    assert.deepEqual(lit(events, "d1", "agentce:oversightCoverageComplete"), [String(approved)]);
+  }
 });
 
 test("OVS-07: an override is effective when it replaces a held decision's outcome", () => {
@@ -596,7 +629,7 @@ test("human-actor rule: an approval or override counts only with a held login ou
     return { ...d, data: { ...d.data, agent, acted_for: ["owner"], oversight_modality: modality } };
   };
   const approval = (id: string, actor: unknown, session = sessionOf(actor)) =>
-    refEvent(id, "ApprovalDecided", { actor, session_ref: session }, "d1");
+    refEvent(id, "ApprovalDecided", { outcome: "approve", actor, session_ref: session }, "d1");
   const reviewed = (...events: Record<string, unknown>[]) =>
     lit([decision(), ...events], "d1", "agentce:oversightCoverageComplete");
   assert.deepEqual(reviewed(approval("a1", HUMAN_A), ...LOGINS), ["true"]);
@@ -617,7 +650,7 @@ test("human-actor rule: an approval or override counts only with a held login ou
   assert.deepEqual(named(null), ["false"]);
   // Ids compare after trimming one fixed whitespace set from both ends.
   assert.deepEqual(named({ kind: "human", id: "\u00a0alice\ufeff" }), ["true"]);
-  const noSession = refEvent("a1", "ApprovalDecided", { actor: HUMAN_A }, "d1");
+  const noSession = refEvent("a1", "ApprovalDecided", { outcome: "approve", actor: HUMAN_A }, "d1");
   assert.deepEqual(reviewed(noSession, ...LOGINS), ["false"]);
   const override = refEvent(
     "o1",

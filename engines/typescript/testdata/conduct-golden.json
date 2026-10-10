@@ -48,7 +48,7 @@
           "constraint": "sh:minCount",
           "focus": "agentce:event/d1",
           "message_key": "CND-02.S1",
-          "path": "agentce:reviewedBy"
+          "path": "agentce:approvedBy"
         }
       ]
     },

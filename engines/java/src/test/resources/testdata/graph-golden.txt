@@ -69,6 +69,7 @@ C	prov:SoftwareAgent	prov:Agent
 C	prov:SoftwareAgent	prov:SoftwareAgent
 E	agentce:event/appr-1	prov:wasAssociatedWith	human:reviewer
 E	agentce:event/appr-1	rdf:type	agentce:ApprovalDecided
+E	agentce:event/dec-1	agentce:approvedBy	agentce:event/appr-1
 E	agentce:event/dec-1	agentce:authorizedBy	agentce:event/del-1
 E	agentce:event/dec-1	agentce:chainTerminus	agentce:principal/4f9618842a3b141eae7bfb7cd81ee43b2ba78b2eef1a7c1d0c13c7ea559ab534
 E	agentce:event/dec-1	agentce:derivedFrom	agentce:event/missing-x
