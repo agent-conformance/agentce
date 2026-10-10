@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.80.0",
+  "suite_version": "0.81.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3357,6 +3357,68 @@
           "file": "engines/python/tests/parity_goldens.py",
           "search": "elif path.read_text(encoding=\"utf-8\") != text:",
           "replace": "elif False:"
+        }
+      ]
+    },
+    {
+      "id": "VG-APPROVAL-OUTCOME",
+      "title": "An approval gates a decision only when its outcome is approve, in all three engines: CND-02 and OVS-08 count only a verified ApprovalDecided whose outcome is approve (agentce:approvedBy and OVS-08's distinct approvers), while OVS-01, INC-03 and RSK-02 still count a reject or an edit as a review (18.136)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/approval_outcome.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/approval_outcome/cases.json (25: CND-02 with an approve, a reject, an edit, no outcome and the out-of-enum spelling 'approved' (quarantined), a reject by the agent itself, a reject and an approve by two verified humans in both orders, an approve that names another decision, a reject with no enforcement-point call; eu-ai-act OVS-08 with an approve, a reject, an edit and no outcome, and under dual control two approves, an approve and a reject in both orders and two rejects; nist-ai-rmf OVS-08 with an approve, a reject and no outcome; OVS-01, RSK-02 and INC-03 each counting a reject as a review, and OVS-01 refusing a reject by the agent) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
+      },
+      "fix_hint": "Run verification/gates/approval_outcome.sh; it names the engine, the case and what it gave against what was expected. The outcome test sits in each engine's graph builder beside the human-actor rule: the agentce:approvedBy edge and human_approvers / humanApprovers, which OVS-08's oversightCoverageComplete counts.",
+      "faults": [
+        {
+          "description": "Python writes agentce:approvedBy for a verified approval whatever its outcome, so a reject gates a high-effect action for CND-02 and satisfies nist-ai-rmf OVS-08",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                if _data(event).get(\"outcome\") == \"approve\":\n                    self.store.add_edge(decision, \"agentce:approvedBy\", node)\n",
+          "replace": "                self.store.add_edge(decision, \"agentce:approvedBy\", node)\n                if _data(event).get(\"outcome\") == \"approve\":\n"
+        },
+        {
+          "description": "Python counts a verified approval toward OVS-08's distinct approvers whatever its outcome, so a reject or an edit covers the decision",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                    self.store.add_edge(decision, \"agentce:approvedBy\", node)\n                    self.human_approvers.setdefault(decision, set()).add(key)\n",
+          "replace": "                    self.store.add_edge(decision, \"agentce:approvedBy\", node)\n                self.human_approvers.setdefault(decision, set()).add(key)\n"
+        },
+        {
+          "description": "TypeScript writes agentce:approvedBy for a verified approval whatever its outcome (CND-02, nist-ai-rmf OVS-08)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "      if (dataOf(event).outcome !== \"approve\") {\n        continue;\n      }\n      this.store.addEdge(decision, \"agentce:approvedBy\", node);\n",
+          "replace": "      this.store.addEdge(decision, \"agentce:approvedBy\", node);\n      if (dataOf(event).outcome !== \"approve\") {\n        continue;\n      }\n"
+        },
+        {
+          "description": "TypeScript counts a verified approval toward OVS-08's distinct approvers whatever its outcome",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "      if (dataOf(event).outcome !== \"approve\") {\n        continue;\n      }\n      this.store.addEdge(decision, \"agentce:approvedBy\", node);\n      let approvers",
+          "replace": "      if (dataOf(event).outcome === \"approve\") {\n        this.store.addEdge(decision, \"agentce:approvedBy\", node);\n      }\n      let approvers"
+        },
+        {
+          "description": "Java writes agentce:approvedBy for a verified approval whatever its outcome (CND-02, nist-ai-rmf OVS-08)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "                if (\"approve\".equals(str(dataOf(event).get(\"outcome\")))) {\n                    store.addEdge(decision, \"agentce:approvedBy\", node);\n",
+          "replace": "                store.addEdge(decision, \"agentce:approvedBy\", node);\n                if (\"approve\".equals(str(dataOf(event).get(\"outcome\")))) {\n"
+        },
+        {
+          "description": "Java counts a verified approval toward OVS-08's distinct approvers whatever its outcome",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "                    store.addEdge(decision, \"agentce:approvedBy\", node);\n                    humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);\n                }\n",
+          "replace": "                    store.addEdge(decision, \"agentce:approvedBy\", node);\n                }\n                humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);\n"
         }
       ]
     }

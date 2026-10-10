@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.81.0
+
+- `VG-APPROVAL-OUTCOME` (18.136, new, tier quick) checks that an approval gates a decision only when its outcome is
+  `approve`, in all three engines. Every engine used to count any verified `ApprovalDecided` as an approval, so a
+  reviewer's reject, an edit or a record with no outcome read conformant on CND-02 ("High-effect actions are gated by
+  a recorded approval") and on OVS-08, even when the action ran anyway. Now only an `approve` adds the new
+  `agentce:approvedBy` edge, which CND-02 and nist-ai-rmf OVS-08 ask for, and only an `approve` counts toward the
+  distinct approvers that eu-ai-act and baseline OVS-08 count; `agentce:reviewedBy` still takes any outcome, so
+  OVS-01, INC-03 and RSK-02 keep counting a reject as a review. The gate runs 25 cases through the real Python,
+  TypeScript and Java CLIs. Six seeded faults, two per engine: `approvedBy` written for any outcome, and any outcome
+  counted toward OVS-08's approvers.
+- `VG-EUAIACT-CLUSTER1`'s three dual-control faults follow the rename of the per-decision set they edit (reviewers to
+  approvers); each fault is unchanged.
+
 ## 0.80.0
 
 - `VG-HUMAN-ACTOR` (18.140, changed) also checks that the identity-provider login an override, interrupt or approval

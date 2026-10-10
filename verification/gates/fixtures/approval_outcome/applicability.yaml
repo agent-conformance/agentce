@@ -1,0 +1,15 @@
+# Applicability profile for the VG-APPROVAL-OUTCOME gate fixture (verification/gates/approval_outcome.sh): one subject,
+# the eu-ai-act catalog (OVS-01, OVS-08, INC-03, RSK-02) and the Conduct overlay (CND-02).
+profile_version: 1
+observation_window:
+  start: "2026-01-01T00:00:00Z"
+  end: "2026-02-01T00:00:00Z"
+content_capture:
+  mode: hashes_only
+catalogs:
+  - "eu-ai-act@2026.09"
+  - "conduct@2026.09"
+subjects:
+  - id: "spiffe://corp/agents/approval-outcome"
+    name: "Approval-outcome gate fixture subject"
+    role: "both"
