@@ -24,7 +24,8 @@
       "chosen": "escalate", "agent": {"id": "spiffe://corp/agents/claims-triage"},
       "used": ["ci:application-form"]}},
     {"id": "login-supervisor", "time": "2026-06-01T11:04:00.000Z", "agentcesourceclass": "independent_system",
-      "data": {"@type": "SessionStart", "agent": {"id": "urn:example:service:identity-provider"}}},
+      "data": {"@type": "SessionStart", "agent": {"id": "urn:example:service:identity-provider"},
+        "principal": {"kind": "human", "id": "human:supervisor"}}},
     {"id": "appr-review", "time": "2026-06-01T11:05:00.000Z", "data": {
       "@type": "ApprovalDecided", "agent": {"id": "human:supervisor"},
       "actor": {"kind": "human", "id": "human:supervisor"},
