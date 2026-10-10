@@ -102,6 +102,22 @@ IDP_CALL["type"] = "org.agent-conformance.evidence.ToolCall.v1"
 IDP_CALL["data"].update({"@type": "ToolCall", "tool": {"name": "lookup"}})
 del IDP_CALL["data"]["environment"], IDP_CALL["data"]["principal"]
 case("override-session-is-an-idp-toolcall", "OVS-07", [dec(), IDP_CALL, override(s="t9")], NC, ["v1"])
+# A gateway's held record that names the actor as its principal but is no session: only the type check stops it.
+GATEWAY = "urn:example:service:gateway"
+
+
+def names_actor(i, t, **k):
+    e = ev(i, t, cls="enforcement_point", principal={"id": "u2", "kind": "human"}, **k)
+    e["data"]["agent"] = {"id": GATEWAY}
+    return e
+
+
+case("override-session-is-a-policy-decision-naming-the-actor", "OVS-07",
+     [dec(), names_actor("p9", "PolicyDecision", decision="allow", policy_id="p"), override(s="p9")], NC, ["v1"])
+case("approval-session-is-a-policy-decision-naming-the-actor", "OVS-01",
+     [dec(), names_actor("p9", "PolicyDecision", decision="allow", policy_id="p"), appr(s="p9")], NC, ["d1"])
+case("interrupt-session-is-an-instruction-naming-the-actor", "OVS-07",
+     [dec(), names_actor("i9", "Instruction", instruction_id="i9"), interrupt(s="i9")], NC, ["x1"])
 case("override-session-is-the-agents-own-session", "OVS-07", [dec(), idp(cls="enforcement_point", agent=SUBJECT), override()], NC, ["v1"])
 case("override-session-is-an-approval", "OVS-07", [dec(), appr(s=None), override(s="a1")], NC, ["v1"])
 case("override-session-class-mismatch", "OVS-07", [dec(), idp(source="urn:src:self_report"), override()], NC, ["v1"], 1)

@@ -293,8 +293,9 @@ public final class Graph {
         return null;
     }
 
-    /** What the human-actor rule reads of every event: its type, source class and agent id, and for a SessionStart
-     * the IRI of the human principal its login names (18.140), else null. */
+    /** What the human-actor rule reads of every event: its type, source class and agent id, and the IRI of the human
+     * principal it names, else null, read from any type (SessionStart, PolicyDecision and Instruction carry one) so
+     * only the type check keeps a login a session (18.140). */
     private record EventInfo(String type, String sourceClass, String agent, String loginPrincipal) {}
 
     /** JSON value equality as the reference's {@code ==} reads it: numbers (and booleans, as 1/0)
@@ -434,7 +435,7 @@ public final class Graph {
             String agentId = agent != null && agent.isObject() && agent.get("id") != null && agent.get("id").isTextual()
                     ? agent.get("id").textValue()
                     : null;
-            String loginPrincipal = "SessionStart".equals(ptype) ? humanId(data.get("principal")) : null;
+            String loginPrincipal = humanId(data.get("principal"));
             eventInfo.put(node, new EventInfo(
                     ptype, sourceClass, agentId, loginPrincipal == null ? null : Iri.principalIri(loginPrincipal, key)));
             Set<String> ownActedFor = principalIris(data.get("acted_for"));

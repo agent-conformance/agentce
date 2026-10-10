@@ -2931,7 +2931,7 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/human_actor/cases.json (85: Override, Interrupt and ApprovalDecided, with and without their optional agent, each with a verified login from an independent_system and an enforcement_point stream, the login arriving before or after; no session_ref, a session_ref naming no held record, a bare id, the record itself, another approval, a tool call, an outcome, a policy decision, a self_report login, a login quarantined for a class mismatch, the assessed agent's own enforcement-point session; a service actor, a blank actor id, no actor; an actor in the decision's acted_for, in the agent's acted_for on another event, in a DelegationIssued chain of the agent, in the record's own acted_for, the agent's owner interrupting; a login that names another principal, names no principal, names a service or a blank id, and its twin that names the actor; a sub-agent's own session under the same subject, with and without naming the actor; the actor's, the owner's and a chain id padded with a trailing space, U+00A0, U+0085 or U+FEFF; dual control with two verified humans, two ids on one login, one id on two logins, one verified and one not, one in the chain; OVS-01, OVS-07, OVS-08, CND-02, RSK-02 and INC-03 each with a verified twin and a failing case) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "pass": "every case in verification/gates/fixtures/human_actor/cases.json (88: Override, Interrupt and ApprovalDecided, with and without their optional agent, each with a verified login from an independent_system and an enforcement_point stream, the login arriving before or after; no session_ref, a session_ref naming no held record, a bare id, the record itself, another approval, a tool call, an outcome, a policy decision, a self_report login, a login quarantined for a class mismatch, the assessed agent's own enforcement-point session; a service actor, a blank actor id, no actor; an actor in the decision's acted_for, in the agent's acted_for on another event, in a DelegationIssued chain of the agent, in the record's own acted_for, the agent's owner interrupting; a gateway's policy decision or instruction that names the actor; a login that names another principal, names no principal, names a service or a blank id, and its twin that names the actor; a sub-agent's own session under the same subject, with and without naming the actor; the actor's, the owner's and a chain id padded with a trailing space, U+00A0, U+0085 or U+FEFF; dual control with two verified humans, two ids on one login, one id on two logins, one verified and one not, one in the chain; OVS-01, OVS-07, OVS-08, CND-02, RSK-02 and INC-03 each with a verified twin and a failing case) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
         "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
       },
       "faults": [
@@ -2954,19 +2954,19 @@
           "replace": "            if (actor == null) {\n                return null;\n            }\n            if (loginInfo == null) {\n                return Iri.principalIri(actor, key);\n            }\n"
         },
         {
-          "description": "Python accepts any held record from an independent or enforcement-point stream as the login, so a session_ref naming the agent's gateway tool call counts",
+          "description": "Python accepts any held record from an independent or enforcement-point stream as the login, so a gateway's policy decision or instruction that names the actor counts as the actor's login",
           "file": "engines/python/agentce/graph.py",
           "search": "if login_type != \"SessionStart\" or login_class not in _LOGIN_CLASSES:",
           "replace": "if login_class not in _LOGIN_CLASSES:"
         },
         {
-          "description": "TypeScript accepts any held record from an independent or enforcement-point stream as the login, so a session_ref naming the agent's gateway tool call counts",
+          "description": "TypeScript accepts any held record from an independent or enforcement-point stream as the login, so a gateway's policy decision or instruction that names the actor counts as the actor's login",
           "file": "engines/typescript/src/graph.ts",
           "search": "if (loginType !== \"SessionStart\" || loginClass === null",
           "replace": "if (loginClass === null"
         },
         {
-          "description": "Java accepts any held record from an independent or enforcement-point stream as the login, so a session_ref naming the agent's gateway tool call counts",
+          "description": "Java accepts any held record from an independent or enforcement-point stream as the login, so a gateway's policy decision or instruction that names the actor counts as the actor's login",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "if (!\"SessionStart\".equals(loginInfo.type())\n                    || loginInfo.sourceClass() == null",
           "replace": "if (loginInfo.sourceClass() == null"

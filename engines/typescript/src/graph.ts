@@ -323,10 +323,11 @@ class Builder {
     model: new Set(),
   };
   private hasCalls = false;
-  // SPEC §10.4 human-actor rule, read in the second pass so file order never matters: event IRI -> [type, source
-  // class, agent id, login principal IRI] of every event, the last set only on a SessionStart that names a human
-  // (18.140); agent id -> every principal IRI in its delegation chain (its acted_for and its DelegationIssued
-  // chains); event IRI -> the principal IRIs of its own acted_for.
+  // SPEC §10.4 human-actor rule, read in the second pass so file order never matters: event IRI -> [type, source class,
+  // agent id, the IRI of the human principal it names] of every event, the last read from any type (SessionStart,
+  // PolicyDecision and Instruction carry one) so only the type check keeps a login a session (18.140); agent id ->
+  // every principal IRI in its delegation chain (its acted_for and its DelegationIssued chains); event IRI -> the
+  // principal IRIs of its own acted_for.
   private readonly eventInfo = new Map<
     string,
     [string, string | null, string | null, string | null]
@@ -395,7 +396,7 @@ class Builder {
     const agentId = isRecord(agent) && typeof agent.id === "string" ? agent.id : null;
     const sourceClass =
       typeof event.agentcesourceclass === "string" ? event.agentcesourceclass : null;
-    const loginPrincipal = ptype === "SessionStart" ? humanId(data.principal) : null;
+    const loginPrincipal = humanId(data.principal);
     this.eventInfo.set(node, [
       ptype,
       sourceClass,

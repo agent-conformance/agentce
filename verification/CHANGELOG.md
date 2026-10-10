@@ -12,8 +12,10 @@ fails if a gate in `gates.json` is not named in this file.
   `SessionStart` now carries an optional `principal`, the human the identity provider authenticated, and the rule
   fails closed when the cited login names nobody, a service, a blank id or someone other than the actor. Principal
   ids compare after trimming Unicode White_Space and U+FEFF from both ends in every engine, so a trailing space or a
-  U+00A0, U+0085 or U+FEFF pad neither splits one human in two nor escapes the delegation-chain check. The gate now
-  runs 85 cases. Six new seeded faults, two per engine: the login-principal check dropped, and ids trimmed with the
+  U+00A0, U+0085 or U+FEFF pad neither splits one human in two nor escapes the delegation-chain check. The rule
+  reads the principal any record names, so the login's type check is what stops a gateway's policy decision or
+  instruction that names the actor; the three faults that drop that check now fail on those cases. The gate now runs
+  88 cases. Six new seeded faults, two per engine: the login-principal check dropped, and ids trimmed with the
   language's own whitespace set. The old OVS-08 fault keyed distinct humans by actor id alone. Since a counted
   actor's login now names that actor, that fault no longer changes any outcome, so it now compares ids untrimmed and
   lets a padded owner id escape the delegation-chain check.

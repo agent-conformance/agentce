@@ -283,10 +283,11 @@ class _Builder:
         self.declared: dict[str, dict[str, set[str]]] = {"tool": {}, "model": {}}
         self.operated: dict[str, set[str]] = {"tool": set(), "model": set()}
         self.has_calls = False
-        # SPEC §10.4 human-actor rule, read in the second pass so file order never matters: event IRI -> (type,
-        # source class, agent id, login principal IRI) of every event, the last set only on a SessionStart that names
-        # a human (18.140); agent id -> every principal IRI in its delegation chain (its acted_for and its
-        # DelegationIssued chains); event IRI -> the principal IRIs of its own acted_for.
+        # SPEC §10.4 human-actor rule, read in the second pass so file order never matters: event IRI -> (type, source
+        # class, agent id, the IRI of the human principal it names) of every event, the last read from any type
+        # (SessionStart, PolicyDecision and Instruction carry one) so only the type check keeps a login a session
+        # (18.140); agent id -> every principal IRI in its delegation chain (its acted_for and its DelegationIssued
+        # chains); event IRI -> the principal IRIs of its own acted_for.
         self.event_info: dict[str, tuple[str, str | None, str | None, str | None]] = {}
         # event IRI -> the agents it concerns: its own agent and its CloudEvents subject (the assessed agent), so an
         # event that leaves out the optional agent still concerns the subject.
@@ -344,9 +345,7 @@ class _Builder:
             else None
         )
         source_class = event.get("agentcesourceclass")
-        login_principal = (
-            _human_id(data.get("principal")) if ptype == "SessionStart" else None
-        )
+        login_principal = _human_id(data.get("principal"))
         self.event_info[node] = (
             ptype,
             source_class if isinstance(source_class, str) else None,
