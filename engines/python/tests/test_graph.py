@@ -791,10 +791,21 @@ IDP = "urn:example:service:identity-provider"
 
 
 def _login(
-    event_id: str, source_class: str = "independent_system", agent: str = IDP
+    event_id: str,
+    source_class: str = "independent_system",
+    agent: str = IDP,
+    principal: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """An identity-provider SessionStart a session_ref can name (SPEC §10.4)."""
-    event = _event(event_id, "SessionStart", {"agent": {"id": agent}})
+    """An identity-provider SessionStart a session_ref can name, naming the human it authenticated (SPEC §10.4);
+    by default the reviewer its id names."""
+    if principal is None:
+        principal = {
+            "kind": "human",
+            "id": "spiffe://corp/reviewers/" + event_id.removeprefix("login-"),
+        }
+    event = _event(
+        event_id, "SessionStart", {"agent": {"id": agent}, "principal": principal}
+    )
     event["agentcesourceclass"] = source_class
     return event
 
@@ -1064,11 +1075,29 @@ def test_human_actor_rule() -> None:
         "kind": "human",
         "id": "spiffe://corp/humans/alice",
     }  # the decision acts for alice
-    assert reviewed(_approval("a1", owner), _login("login-alice")) == ["false"]
+    assert reviewed(_approval("a1", owner), _login("login-alice", principal=owner)) == [
+        "false"
+    ]
+    # The login names someone else, or nobody: it is not the actor's own.
+    assert reviewed(_approval("a1", ALICE), _login("login-alice", principal=BOB)) == [
+        "false"
+    ]
+    unnamed = _login("login-alice")
+    del unnamed["data"]["principal"]
+    assert reviewed(_approval("a1", ALICE), unnamed) == ["false"]
+    # Ids compare after trimming one fixed whitespace set from both ends.
+    padded = {"kind": "human", "id": "\u00a0" + ALICE["id"] + "\ufeff"}
+    assert reviewed(
+        _approval("a1", ALICE), _login("login-alice", principal=padded)
+    ) == ["true"]
     no_session = _approval("a1", ALICE)
     del no_session["data"]["session_ref"]
     assert reviewed(no_session, *LOGINS) == ["false"]
-    events = [decision("d1", "t"), _override("o1", actor=owner), _login("login-alice")]
+    events = [
+        decision("d1", "t"),
+        _override("o1", actor=owner),
+        _login("login-alice", principal=owner),
+    ]
     assert _flag(events, "o1", "interventionByHuman") == ["false"]
     # Dual control: two ids on one login, or one id on two logins, are one human.
     dual = decision("d1", "t", modality="dual_control")
