@@ -14,6 +14,12 @@ fixtures="$root/verification/gates/fixtures/eu_cluster1"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
+# The TypeScript and Java builds run beside the fixture writer; the case loop waits for them.
+engines="${ENGINES:-python typescript java}"
+builds=()
+case " $engines " in *" typescript "*) (cd "$root/engines/typescript" && pnpm --silent build >/dev/null) & builds+=("$!") ;; esac
+case " $engines " in *" java "*) (cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist) & builds+=("$!") ;; esac
+
 (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen python - "$fixtures/cases.json" "$work") <<'PY'
 import hashlib
 import json
@@ -43,10 +49,14 @@ for name, case in cases.items():
     (bundle.parent / "expected").write_text(f"{expected['outcome']} {failing}\n", encoding="utf-8")
     (bundle.parent / "exit").write_text(f"{expected['exit']}\n", encoding="utf-8")
 PY
-
-engines="${ENGINES:-python typescript java}"
-case " $engines " in *" typescript "*) (cd "$root/engines/typescript" && pnpm --silent build >/dev/null) ;; esac
-case " $engines " in *" java "*) (cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist) ;; esac
+for pid in ${builds[@]+"${builds[@]}"}; do
+  wait "$pid"
+done
+cases=("$work"/*/)
+if [ "${#cases[@]}" -lt 30 ]; then
+  echo "eu-cluster1: only ${#cases[@]} cases in cases.json, expected at least 30" >&2
+  exit 1
+fi
 
 run() {
   local engine="$1"
@@ -71,7 +81,7 @@ outcome() {
 # without assessing every case.
 check_cases() {
   local engine="$1" status=0 dir name want want_exit control out code got
-  for dir in "$work"/*/; do
+  for dir in "${cases[@]}"; do
     [ -e "$work/.stop" ] && return 1
     name="$(basename "$dir")"
     want="$(cat "$dir/expected")"
@@ -119,9 +129,4 @@ if [ "$status" -ne 0 ]; then
   echo "eu-cluster1: stopped at the first case an engine got wrong (above)" >&2
   exit 1
 fi
-count="$(ls -d "$work"/*/ | wc -l | tr -d ' ')"
-if [ "$count" -lt 30 ]; then
-  echo "eu-cluster1: only $count cases in cases.json, expected at least 30" >&2
-  exit 1
-fi
-echo "eu-cluster1: $count cases, every engine in [$engines] agrees with each expected outcome"
+echo "eu-cluster1: ${#cases[@]} cases, every engine in [$engines] agrees with each expected outcome"

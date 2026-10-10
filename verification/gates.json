@@ -3113,7 +3113,7 @@
           "replace": "humanReviewers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(node);"
         }
       ],
-      "fix_hint": "Each engine's graph builder materialises triggersIncident, oversightCoverageComplete, interventionEffective, interventionByHuman and incidentResponded (graph.py _incident_decisions, _oversight_coverage, _intervention; graph.ts and Graph.java the same); an Incident name that resolves to no held decision, directly or through the named event's refs.decision, must hold every decision to INC-03, and OVS-08 counts distinct human actor ids. Run `ENGINES=python bash verification/gates/eu_cluster1.sh` (or typescript, java) to see one engine's cases."
+      "fix_hint": "Each engine's graph builder materialises triggersIncident, oversightCoverageComplete, interventionEffective, interventionByHuman and incidentResponded (graph.py _incident_decisions, _oversight_coverage, _intervention; graph.ts and Graph.java the same); an Incident name that resolves to no held decision, directly or through the named event's refs.decision, must hold every decision to INC-03, and OVS-08 counts distinct human actor ids. Run `ENGINES=python bash verification/gates/eu_cluster1.sh` (or typescript, java) to run one engine; it stops at the first case that engine gets wrong."
     }
   ]
 }
