@@ -12,7 +12,8 @@ fails if a gate in `gates.json` is not named in this file.
   name leads to no held decision), OVS-07 effective overrides and interrupts by a human, OVS-08 distinct human
   reviewers (two under dual_control), ROB-07 a response after detection, RSK-02 a policy decision or a review,
   OVS-01 a review. DAT-03 and RSK-03 are rung 3 and read not_assessed. Six seeded faults, two in each engine's graph
-  builder: an unresolved incident name skipped, and reviewers counted per approval.
+  builder: an unresolved incident name skipped, and reviewers counted per approval. The three engines run side by
+  side and the first wrong case stops them, so a seeded-fault run turns red without assessing every case.
 
 ## 0.75.0
 

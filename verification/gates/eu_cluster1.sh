@@ -65,13 +65,18 @@ outcome() {
     | "\(.outcome) \([.violations[]?.focus | sub("^agentce:event/"; "")] | unique | join(","))"' "$1"
 }
 
-status=0
-for dir in "$work"/*/; do
-  name="$(basename "$dir")"
-  want="$(cat "$dir/expected")"
-  want_exit="$(cat "$dir/exit")"
-  control="$(cat "$dir/control")"
-  for engine in $engines; do
+# One engine over every case; returns non-zero on any mismatch. The engines run side by side (each writes only its own
+# out-<engine> and err-<engine>), so the gate's wall time is the slowest engine's, not the sum. The first mismatch in
+# any engine stops them all (the $work/.stop marker): the gate has already failed, and a seeded-fault run turns red
+# without assessing every case.
+check_cases() {
+  local engine="$1" status=0 dir name want want_exit control out code got
+  for dir in "$work"/*/; do
+    [ -e "$work/.stop" ] && return 1
+    name="$(basename "$dir")"
+    want="$(cat "$dir/expected")"
+    want_exit="$(cat "$dir/exit")"
+    control="$(cat "$dir/control")"
     out="$dir/out-$engine"
     code=0
     run "$engine" assess --bundle "$dir/bundle" --profile "$fixtures/applicability.yaml" \
@@ -80,8 +85,8 @@ for dir in "$work"/*/; do
     if [ ! -f "$out/assertions.json" ]; then
       echo "eu-cluster1: $engine wrote no assertions.json for $name (exit $code)" >&2
       tail -3 "$dir/err-$engine" >&2
-      status=1
-      continue
+      touch "$work/.stop"
+      return 1
     fi
     if [ "$code" != "$want_exit" ]; then
       echo "eu-cluster1: $engine $name exited $code, expected $want_exit" >&2
@@ -96,12 +101,27 @@ for dir in "$work"/*/; do
       echo "eu-cluster1: $engine $name gave $control '$got', expected '$want'" >&2
       status=1
     fi
+    [ "$status" -eq 0 ] || touch "$work/.stop"
   done
+  return "$status"
+}
+
+status=0
+pids=()
+for engine in $engines; do
+  check_cases "$engine" &
+  pids+=("$!")
 done
+for pid in "${pids[@]}"; do
+  wait "$pid" || status=1
+done
+if [ "$status" -ne 0 ]; then
+  echo "eu-cluster1: stopped at the first case an engine got wrong (above)" >&2
+  exit 1
+fi
 count="$(ls -d "$work"/*/ | wc -l | tr -d ' ')"
 if [ "$count" -lt 30 ]; then
   echo "eu-cluster1: only $count cases in cases.json, expected at least 30" >&2
-  status=1
+  exit 1
 fi
-[ "$status" -eq 0 ] && echo "eu-cluster1: $count cases, every engine in [$engines] agrees with each expected outcome"
-exit "$status"
+echo "eu-cluster1: $count cases, every engine in [$engines] agrees with each expected outcome"
