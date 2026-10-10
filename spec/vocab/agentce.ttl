@@ -61,6 +61,9 @@ agentce:oversightModality a owl:ObjectProperty ; rdfs:label "oversight modality"
   rdfs:domain agentce:Decision ; rdfs:range agentce:OversightModality .
 agentce:reviewedBy a owl:ObjectProperty ; rdfs:label "reviewed by" ;
   rdfs:domain agentce:Activity ; rdfs:range agentce:OversightEvent .
+agentce:approvedBy a owl:ObjectProperty ; rdfs:label "approved by" ;
+  rdfs:subPropertyOf agentce:reviewedBy ;
+  rdfs:domain agentce:Activity ; rdfs:range agentce:OversightEvent .
 agentce:overriddenBy a owl:ObjectProperty ; rdfs:label "overridden by" ;
   rdfs:domain agentce:Activity ; rdfs:range agentce:OversightEvent .
 agentce:interruptedBy a owl:ObjectProperty ; rdfs:label "interrupted by" ;

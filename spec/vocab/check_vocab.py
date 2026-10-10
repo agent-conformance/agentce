@@ -24,7 +24,7 @@ NS = "https://agent-conformance.org/vocab/evidence/v1#"
 # Glue relations of SPEC 6.3 that this vocabulary defines (the reused prov:* relations are not ours).
 GLUE_RELATIONS = [
     "authorizedBy", "delegatedVia", "chainVerified", "executes", "oversightModality",
-    "reviewedBy", "overriddenBy", "interruptedBy", "loadedBundle", "attestedBy", "resultedIn",
+    "reviewedBy", "approvedBy", "overriddenBy", "interruptedBy", "loadedBundle", "attestedBy", "resultedIn",
     "notifiedBy", "relatedIncident", "sourceClass", "precededBy", "actsOn", "derivedFrom",
     "withinScope", "refusedBy",
 ]
