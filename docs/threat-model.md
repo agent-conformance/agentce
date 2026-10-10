@@ -6,7 +6,7 @@ Spec refs: SPEC §8.7 (security of the engine itself), §6.6 (integrity envelope
 
 This threat model covers the evidence pipeline and the engine that assesses it. It enumerates every
 threat named in SPEC §8.7, groups them into three attack classes, and gives each a mitigation and the
-test or control that proves the mitigation holds. It is updated in the same change as any modification
+test or control that checks it. It is updated in the same change as any modification
 to inputs, parsing, or integrity handling.
 
 ## Assets
@@ -59,14 +59,14 @@ service.
   substitution, or collusion between the source and the assessor. Countered by signed, offline-verified
   catalogs and releases, the engine and input digests in the manifest, and independent verifier reruns.
 
-## Threats, mitigations, and the check that proves each
+## Threats, mitigations, and the check for each
 
 | # | Threat (SPEC §8.7) | Class | Mitigation | Test / control reference |
 |---|---|---|---|---|
 | 1 | Evidence spoofing | A1 | Trust classes. Every event carries the class its source declared, and a control's `minimum_evidence` asks for at least one event of a named type and class in the subject's records. The engines read a control's `min_source_class` but do not apply it yet (`source_class_satisfied` is always true), so a `self_report`-only stream can satisfy a control that declares a higher minimum when its `minimum_evidence` does not name that class (INC-02, for example), and the class check never looks at the records a verdict rests on. The fix is planned as 18.127. Model-stated rationale is never accepted as evidence of "why" | SPEC §6.4, IR-03; a control's `min_source_class` and `minimum_evidence` (SPEC §7.1); ECS spoofing fixtures |
 | 2 | Replay / duplicate events | A2 | Hash chain (`integrity.prev`) and per-stream ordering; a repeated id is quarantined `duplicate_id`. A broken or reordered chain appears in `integrity.jsonl` but does not yet change a verdict (planned as 18.132) | SPEC §6.6; quarantine reason `duplicate_id` (App F); `quarantine.schema.json` |
 | 3 | Timestamp manipulation | A2 | Source timestamps cross-checked against the anchors that cover them; the engine marks an out-of-range stream `time_suspect` in `integrity.jsonl` and quarantines `time_order` an event whose time precedes the one before it in its stream. A `time_suspect` event still counts in timing controls today, because integrity results do not yet change a verdict | SPEC §6.6; `IntegrityResult.status = time_suspect`; INC/REC timing controls |
-| 4 | Self-approval through agent-held credentials | A1 | The human-actor rule requires a distinct human approver. SPEC §6.4 defines `independent_system` as a system in which no principal in the agent's delegation chain can create or transition the record; the engines take a source's declared class as given and do not yet hold a control to its declared minimum class (planned as 18.127) | SPEC §6.4, §10.4; OVS-03 expectation E2, CND-02 |
+| 4 | Self-approval through agent-held credentials | A1 | Approval controls. CND-02 asks only that a consequential decision has a recorded approval, from any actor or none. OVS-08 also asks that the approver's recorded `actor.kind` is `human`, and OVS-07 asks the same of whoever overrides or interrupts. Nothing yet checks that the approver is a distinct human, so an agent that records itself as a human approver, or a human in the decision's own delegation chain, satisfies CND-02 and OVS-08 today. The SPEC §10.4 human-actor rule (a human principal whose session resolves in an independent stream and whose id is outside the delegation chain) is planned as 18.126. SPEC §6.4 defines `independent_system` as a system in which no principal in the agent's delegation chain can create or transition the record; the engines take a source's declared class as given and do not yet hold a control to its declared minimum class (planned as 18.127) | SPEC §6.4, §10.4; OVS-03 expectations E2a and E2b, CND-02, OVS-07, OVS-08 |
 | 5 | Enforcement-point bypass (direct provider calls) | A1 | Coverage denominators independent of both the agent and the enforcement point (egress proxy, firewall, admission attestation); `coverage.json` reports unreconciled coverage as `unknown`. That `unknown` does not yet change a verdict, so INT and REC controls can read conformant without an independent denominator (SPEC §6.5 says `insufficient_evidence`; planned as 18.134) | SPEC §6.5; `coverage.json`; INT and REC families |
 | 6 | Export-host chain recomputation | A2 | `export_anchored` anchors each stream head out-of-band to a write-once location; an `export_chained` stream's integrity result is `verified_weak`. The SPEC §6.6 cap of its rung-2 outcomes at `partial` is not built yet, because integrity results go to `integrity.jsonl` and do not yet change a verdict (planned as 18.132) | SPEC §6.6; `IntegrityResult.strength`; integrity strength rules |
 | 7 | Modified engines | A3 | The manifest records the engine package digest; verifiers rerun with the signed release and check its signatures with `agentce verify --release`. The engines do not yet mark a report from an engine whose digest is not a published release `engine_unverified` in the claim (SPEC §8.7) | SPEC §8.7, §8.4; `manifest.json`, claim `engine_unverified`; [verification](verification.md) |
@@ -83,7 +83,7 @@ service.
 An evidence bundle's contents -- the manifest, the YAML files that ride with it (the applicability
 profile, the domain binding), and every event line -- are adversarial input to the file-system and
 parsing layer, independent of whatever the evidence itself claims about the assessed agent (SPEC
-§8.1, §8.7). This section names the mitigations that hold that boundary and the check that proves
+§8.1, §8.7). This section names the mitigations that hold that boundary and the check for
 each.
 
 - **Path confinement and symlink handling.** `bundle.py`'s manifest loader refuses a listed path that
@@ -91,7 +91,7 @@ each.
   symlinks) and refuses one that resolves outside the bundle root -- so a manifest entry with an
   innocuous relative string that is actually a symlink to a file outside the bundle cannot be read
   through. Both cases are refused with `input.bundle_manifest_path` at exit `3`, never silently
-  followed. Proved by `engines/python/tests/test_bundle.py` and the bundle-manifest checks in
+  followed. Checked by `engines/python/tests/test_bundle.py` and the bundle-manifest checks in
   `engines/python/tests/test_input_hardening.py`.
 - **Structural depth limits.** `Profile.load`/`DomainBinding.load` (`safe_yaml.py`) and per-event JSON
   parsing (`ingest.py`) each catch the `RecursionError` a pathologically deep -- but small-byte --
@@ -113,7 +113,7 @@ each.
   reach. This is a stated design choice, not an oversight: if archive convenience-loading is ever
   proposed, its hazards must be closed here first, before any extraction step is added.
 - **Fuzz fixtures and the CI guard.** The hostile fixtures above (a symlink escaping the bundle root, a
-  disallowed YAML tag, pathologically deep YAML and JSON, an oversized manifest-listed file) are proved
+  disallowed YAML tag, pathologically deep YAML and JSON, an oversized manifest-listed file) are checked
   by the `evidence-input-hardening` job in `.github/workflows/ci.yml`, which runs on every push and
   pull request and fails if any of these refusals regresses.
 
@@ -132,7 +132,7 @@ sharing the same hardening building blocks, not the same mitigation:
   adapter, invoked by both `ingest` and the real `collect` path) catches a `RecursionError` from a
   pathologically deep export and reports it in its `{"error": ...}` contract, so the caller
   (`commands/__init__.py`'s `_adapt_export`) surfaces a clean `input.ingest_failed` message rather
-  than a raw traceback fragment. Proved by `engines/python/tests/test_collect.py` and the
+  than a raw traceback fragment. Checked by `engines/python/tests/test_collect.py` and the
   `check_hardened_input` fact in `tools/collect_ingest_check.py`.
 - **Path confinement does not apply here, by design.** `bundle.confine_to_root`'s threat model is a
   bundle-relative reference inside a shared root someone else produced (a manifest entry that could
@@ -164,10 +164,10 @@ reading assistant treat it as part of the trusted prompt rather than as inert da
 - **Sanitising, not trust separation by format.** Both renderers build their template context by
   routing every evidence- or profile-derived field -- the subject id, each evidence ref, each
   validation path, each tool-call name -- through the same `sanitize_for_markdown` function
-  (`engines/python/agentce/report.py:1354`, via the `_sanitize_field` convenience at line 1391;
-  `_remediation_md_context` at line 1599 for the remediation package, `_skill_finding_context` at line
-  1660 for the skill folder) before it reaches the template (SPEC §7 injection hardening).
-  `sanitize_for_markdown` calls the shared `_neutralize` core (line 1298) first -- which collapses
+  (`engines/python/agentce/report.py`, via the `_sanitize_field` convenience;
+  `_remediation_md_context` for the remediation package, `_skill_finding_context` for the skill
+  folder) before it reaches the template (SPEC §7 injection hardening).
+  `sanitize_for_markdown` calls the shared `_neutralize` core first -- which collapses
   embedded newlines, other control characters, and Unicode whitespace to single spaces (so a derived
   string can never start a new line and become a live heading or a bare instruction line of its own)
   and drops bidi-override, zero-width, and other `Default_Ignorable_Code_Point` characters entirely --
@@ -177,11 +177,11 @@ reading assistant treat it as part of the trusted prompt rather than as inert da
   the rendered document come only from the template or the signed catalog; everything evidence-derived
   is sanitised and length-capped this way, never trusted verbatim. This is sanitising, not erasure --
   the string still appears, as inert data.
-- **Same mitigation, two output formats.** `render_remediation_md` (line 1622) and
-  `render_skill_finding_md`/`render_skill_md` (lines 1679/1688) are two templates over the same
+- **Same mitigation, two output formats.** `render_remediation_md` and
+  `render_skill_finding_md`/`render_skill_md` are two templates over the same
   canonical `remediation-package.json`, and both derive their context through `sanitize_for_markdown`,
   so one row covers both F17's and F31's rendered output.
-- **Proved by hostile fixtures.** `engines/python/tests/test_remediation.py::test_sanitize_for_markdown_escapes_a_hostile_subject_id`
+- **Checked by hostile fixtures.** `engines/python/tests/test_remediation.py::test_sanitize_for_markdown_escapes_a_hostile_subject_id`
   renders a package whose subject id contains a Markdown heading and a backtick fence and asserts the
   rendered document neutralises both; `engines/python/tests/test_skill_emit.py::test_finding_note_escapes_a_hostile_tool_name`
   does the equivalent for a hostile tool-call name in a generated skill finding note;
@@ -219,7 +219,7 @@ relabelled attestation as `verified` and let it pass a supply-chain control.
   applicability check (`applicability.py`) reads its unsigned `components` field directly. A forged or
   relabelled `BundleLoaded` record is today's residual risk, tracked as follow-up work, not covered by
   the DSSE mitigation above.
-- **Proved by hostile and interoperability fixtures, enforced by a seeded-fault gate.** The public
+- **Checked by hostile and interoperability fixtures, enforced by a seeded-fault gate.** The public
   verification suite's `VG-ATTESTATION-SIGNATURES` gate (`verification/gates.json`) runs
   `adapters/supply-chain/tests/test_signatures.py` and seeds two faults directly against `_verify` --
   an always-succeeding signature check, and a dropped `observed_digests` comparison -- each
