@@ -422,13 +422,22 @@ const HUMAN_A = { kind: "human", id: "alice" };
 const HUMAN_B = { kind: "human", id: "bob" };
 const IDP = "urn:example:service:identity-provider";
 
-/** An identity-provider SessionStart a session_ref can name (SPEC §10.4). */
-function login(id: string, sourceClass = "independent_system", agent = IDP) {
+/**
+ * An identity-provider SessionStart a session_ref can name, naming the human it authenticated (SPEC §10.4); by
+ * default the actor its id names.
+ */
+function login(
+  id: string,
+  sourceClass = "independent_system",
+  agent = IDP,
+  principal: unknown = { kind: "human", id: id.replace(/^login-/, "") },
+) {
+  const named = principal === null ? {} : { principal };
   return {
     id,
     time: "2026-01-01T00:00:00Z",
     agentcesourceclass: sourceClass,
-    data: { "@type": "SessionStart", agent: { id: agent } },
+    data: { "@type": "SessionStart", agent: { id: agent }, ...named },
   };
 }
 
@@ -601,6 +610,13 @@ test("human-actor rule: an approval or override counts only with a held login ou
   const toolCall = refEvent("login-alice", "ToolCall", { tool: { name: "x" } });
   assert.deepEqual(reviewed(approval("a1", HUMAN_A), toolCall), ["false"]);
   assert.deepEqual(reviewed(approval("a1", owner), login("login-owner")), ["false"]);
+  // The login names someone else, or nobody: it is not the actor's own.
+  const named = (principal: unknown) =>
+    reviewed(approval("a1", HUMAN_A), login("login-alice", undefined, IDP, principal));
+  assert.deepEqual(named(HUMAN_B), ["false"]);
+  assert.deepEqual(named(null), ["false"]);
+  // Ids compare after trimming one fixed whitespace set from both ends.
+  assert.deepEqual(named({ kind: "human", id: "\u00a0alice\ufeff" }), ["true"]);
   const noSession = refEvent("a1", "ApprovalDecided", { actor: HUMAN_A }, "d1");
   assert.deepEqual(reviewed(noSession, ...LOGINS), ["false"]);
   const override = refEvent(
