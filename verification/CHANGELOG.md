@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.78.0
+
+- `VG-ENGINE-GOLDENS-FRESH` (18.37d, new, tier quick) checks that every TypeScript and Java parity golden is what
+  the Python engine writes today. The ports' byte-identical tests compare against goldens captured from Python, and
+  nothing used to capture them again, so a change made only in Python left those tests green on an old snapshot.
+  18.37 found two graph-builder gaps that way. Each engine's `generate_goldens.py` now builds every golden its tests
+  read from one map, five of them through shared producers in `engines/python/tests/parity_goldens.py`, and
+  `--check` compares the map with the committed files byte for byte, writes nothing, and names each stale, missing
+  or unproduced golden. Any other argument exits 2. The gate's self-test runs `--check` on a copy with one golden
+  edited, one deleted and one stray, then the real run checks both engines. The state golden was stale: Python's
+  `state.json` has carried `last_outcomes` since 2026-09-24, and TypeScript and Java now load and save it. Three
+  seeded faults: a graph-builder change and a `state.json` change made only in Python, and a `--check` that stops
+  comparing bytes.
+
 ## 0.77.0
 
 - `VG-DEMO-SHARD-COVERAGE` (18.131) now covers the quick tier too. One `build` job used to run all 61 quick-tier

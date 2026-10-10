@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.77.0",
+  "suite_version": "0.78.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3150,6 +3150,45 @@
         }
       ],
       "fix_hint": "Each engine's graph builder sets triggersIncident, oversightCoverageComplete, interventionEffective, interventionByHuman, incidentResponded and riskReviewed (graph.py _incident_decisions, _oversight_coverage, _intervention and _risk_reviewed, with the same names in graph.ts and Graph.java). An Incident name that leads to no held decision, directly or through the named event's refs.decision, holds every decision to INC-03. OVS-08 counts distinct human actor ids. RSK-02 counts an authorization or request only when it names a PolicyDecision the bundle holds. Run `ENGINES=python bash verification/gates/eu_cluster1.sh` (or typescript, java) for one engine; it stops at the first case that engine gets wrong."
+    },
+    {
+      "id": "VG-ENGINE-GOLDENS-FRESH",
+      "title": "Every TypeScript and Java parity golden is what the live Python engine writes today (18.37d), so a Python-only change cannot leave the ports' byte-identical tests passing on a stale snapshot",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/engine_goldens_fresh.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 120,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "tools/engine_goldens_fresh_check.py's --self-test shows generate_goldens.py --check, run on a copy of the TypeScript testdata directory, passes the unedited copy and exits 1 naming an edited golden, a deleted golden and a stray *-golden.* file no generator produces, leaving the copy byte for byte unchanged; then the real run shows both engines' generate_goldens.py --check exit 0, so every committed golden in engines/typescript/testdata and engines/java/src/test/resources/testdata equals the live Python engine's output and no golden lacks a generator",
+        "fail": "the self-test finds --check passing an edited, deleted or unproduced golden, failing an unedited copy, or writing to the directory; or either engine's --check exits non-zero because a committed golden differs from the live Python engine, is missing, or has no generator"
+      },
+      "faults": [
+        {
+          "description": "a Python-only graph-builder change: every ToolCall and ResourceAccess reads withinScope true even when an authorization denied it, which the conduct-overlay golden (CND-01) captured before; the TypeScript and Java tests would stay green on the old snapshot",
+          "file": "engines/python/agentce/graph.py",
+          "search": "node, \"agentce:withinScope\", \"false\" if node in denied else \"true\", BOOL",
+          "replace": "node, \"agentce:withinScope\", \"true\", BOOL"
+        },
+        {
+          "description": "a Python-only state-directory change: state.json stops carrying last_outcomes, so the state golden the ports' state tests read no longer matches what Python writes",
+          "file": "engines/python/agentce/state.py",
+          "search": "                \"last_outcomes\": dict(sorted(self.last_outcomes.items())),\n",
+          "replace": ""
+        },
+        {
+          "description": "--check stops comparing a committed golden's bytes, so it only notices missing or unproduced files and passes every stale golden",
+          "file": "engines/python/tests/parity_goldens.py",
+          "search": "or (testdata / name).read_text(encoding=\"utf-8\") != text",
+          "replace": "or False"
+        }
+      ]
     }
   ]
 }
