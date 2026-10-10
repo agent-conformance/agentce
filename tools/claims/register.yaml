@@ -115,7 +115,7 @@ claims:
       - website/src/content/docs/docs/running-assessments.md
     check:
       workflow: .github/workflows/verification.yml
-      job: build
+      job: quick-tier
       description: >-
         VG-VERIFY runs `verify --catalog`, `--release` and `--bundle` in the Python, TypeScript and
         Java engines. Each engine refuses a tampered or unsigned catalog or release, verifies a
@@ -652,10 +652,10 @@ claims:
       - README.md
     check:
       workflow: .github/workflows/verification.yml
-      job: build
+      job: quick-tier
       description: >-
-        The "Quick tier" step runs VG-INGEST-SUPPORT-MATRIX, which recomputes the matrix's real
+        A quick-tier shard runs VG-INGEST-SUPPORT-MATRIX, which recomputes the matrix's real
         per-tier counts from spec/ingest/support-matrix.yaml and fails if README.md's tier lines or
         the trace-store-connectors.md table name a source outside the matrix or under the wrong
-        tier; docs/build.py --check-links and --check-publish (run in the same build) fail if the
+        tier; docs/build.py --check-links and --check-publish (run by website.yml) fail if the
         generated Supported-sources page is stale against the matrix.
