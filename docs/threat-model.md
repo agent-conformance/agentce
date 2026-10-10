@@ -15,8 +15,8 @@ to inputs, parsing, or integrity handling.
   every outcome is derived.
 - **The conformance claim and report** — the signed statement of what was assessed.
 - **The engine, catalogs, overlays, and corpus** — the code and data that decide outcomes.
-- **The pseudonymisation key** (SPEC §6.7) — SPEC §6.7 has it supplied by reference and never in the
-  bundle; the engines take no key yet (row 12).
+- **The pseudonymisation key** (SPEC §6.7) — SPEC §6.7 says it is supplied by reference and never kept in
+  the bundle; the engines take no key yet (row 12).
 
 ## Trust boundaries
 
