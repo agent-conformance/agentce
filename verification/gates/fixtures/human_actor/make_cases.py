@@ -117,6 +117,23 @@ case("interrupt-human-no-session-ref", "OVS-07", [dec(), idp(), interrupt(s=None
 case("interrupt-human-in-agent-chain", "OVS-07", [dec(), idp(), interrupt(actor=human(OWNER))], NC, ["x1"])
 case("interrupt-session-not-held", "OVS-07", [dec(), interrupt(s="s9")], NC, ["x1"])
 case("interrupt-session-self-report", "OVS-07", [dec(), idp(cls="self_report"), interrupt()], NC, ["x1"])
+
+
+def no_agent(e):
+    """The event without its optional agent: the CloudEvents subject still names the assessed agent."""
+    del e["data"]["agent"]
+    return e
+
+
+# An oversight record (and its decision) that leaves out the optional agent still concerns the subject.
+OWN = dict(cls="enforcement_point", agent=SUBJECT)
+case("interrupt-no-agent-verified-session", "OVS-07", [dec(), idp(), no_agent(interrupt())], "conformant")
+case("interrupt-no-agent-agents-own-session", "OVS-07", [dec(), idp(**OWN), no_agent(interrupt())], NC, ["x1"])
+case("interrupt-no-agent-by-owner", "OVS-07", [dec(), idp(), no_agent(interrupt(actor=human(OWNER)))], NC, ["x1"])
+case("interrupt-other-agent-agents-own-session", "OVS-07",
+     [dec(), idp(**OWN), interrupt(agent={"id": "spiffe://corp/agents/other"})], NC, ["x1"])
+case("override-no-agent-agents-own-session", "OVS-07", [no_agent(dec()), idp(**OWN), no_agent(override())], NC, ["v1"])
+case("approval-no-agent-agents-own-session", "OVS-01", [no_agent(dec()), idp(**OWN), no_agent(appr())], NC, ["d1"])
 # OVS-01: an approval is a review only under the rule.
 case("approval-human-verified-session", "OVS-01", [dec(), idp(), appr()], "conformant")
 case("approval-before-decision", "OVS-01", [idp(), appr(), dec()], "conformant")

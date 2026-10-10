@@ -2931,7 +2931,7 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/human_actor/cases.json (45: Override, Interrupt and ApprovalDecided each with a verified login from an independent_system and an enforcement_point stream, the login arriving before or after; no session_ref, a session_ref naming no held record, a bare id, the record itself, another approval, a tool call, an outcome, a policy decision, a self_report login, a login quarantined for a class mismatch, the assessed agent's own enforcement-point session; a service actor, a blank actor id, no actor; an actor in the decision's acted_for, in the agent's acted_for on another event, in a DelegationIssued chain of the agent, in the record's own acted_for, the agent's owner interrupting; dual control with two verified humans, two ids on one login, one id on two logins, one verified and one not, one in the chain; OVS-01, OVS-07, OVS-08, CND-02, RSK-02 and INC-03 each with a verified twin and a failing case) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "pass": "every case in verification/gates/fixtures/human_actor/cases.json (53: Override, Interrupt and ApprovalDecided, with and without their optional agent, each with a verified login from an independent_system and an enforcement_point stream, the login arriving before or after; no session_ref, a session_ref naming no held record, a bare id, the record itself, another approval, a tool call, an outcome, a policy decision, a self_report login, a login quarantined for a class mismatch, the assessed agent's own enforcement-point session; a service actor, a blank actor id, no actor; an actor in the decision's acted_for, in the agent's acted_for on another event, in a DelegationIssued chain of the agent, in the record's own acted_for, the agent's owner interrupting; dual control with two verified humans, two ids on one login, one id on two logins, one verified and one not, one in the chain; OVS-01, OVS-07, OVS-08, CND-02, RSK-02 and INC-03 each with a verified twin and a failing case) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
         "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
       },
       "faults": [
@@ -3024,6 +3024,24 @@
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "if (group.get(0).contains(key.actor()) || group.get(1).contains(key.login())) {",
           "replace": "if (group.get(0).contains(key.actor())) {"
+        },
+        {
+          "description": "Python reads the concerned agents from the optional agent field alone, so an oversight record that leaves it out escapes the own-session and delegation-chain checks",
+          "file": "engines/python/agentce/graph.py",
+          "search": "for a in (agent_id, subject) if isinstance(a, str)",
+          "replace": "for a in (agent_id,) if isinstance(a, str)"
+        },
+        {
+          "description": "TypeScript reads the concerned agents from the optional agent field alone, so an oversight record that leaves it out escapes the own-session and delegation-chain checks",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "[agentId, event.subject].filter(",
+          "replace": "[agentId].filter("
+        },
+        {
+          "description": "Java reads the concerned agents from the optional agent field alone, so an oversight record that leaves it out escapes the own-session and delegation-chain checks",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "Stream.of(agentId, str(event.get(\"subject\")))",
+          "replace": "Stream.of(agentId)"
         }
       ],
       "fix_hint": "Run verification/gates/human_actor.sh; it names the engine, the case and what it gave against what was expected. The rule is _human_key / humanKey in each engine's graph builder (read in the second pass), the reviews it gates are mapReviews, and OVS-08's count is distinctHumans."

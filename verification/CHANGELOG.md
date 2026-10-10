@@ -12,10 +12,11 @@ fails if a gate in `gates.json` is not named in this file.
   under dual control. Now the actor's `session_ref` must name a held `SessionStart` of someone other than the agents
   the record concerns, from an `independent_system` or `enforcement_point` stream, and the actor must be outside the
   activity's delegation chain; dual control counts approvals that share a login or an id as one human. Override and
-  Interrupt gain the optional `session_ref` the rule needs (the schema used to quarantine it). The gate runs 47 cases
-  through the real Python, TypeScript and Java CLIs. Fifteen seeded faults, five per engine: the session check
+  Interrupt gain the optional `session_ref` the rule needs (the schema used to quarantine it). The gate runs 53 cases
+  through the real Python, TypeScript and Java CLIs. Eighteen seeded faults, six per engine: the session check
   dropped, any held record taken as the login, the agent's own session accepted, the delegation-chain check dropped,
-  and dual control keyed by actor id alone.
+  dual control keyed by actor id alone, and the concerned agents read from the optional `agent` field without the
+  event's `subject`.
 
 ## 0.78.0
 

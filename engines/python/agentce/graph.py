@@ -290,6 +290,9 @@ class _Builder:
         # source class, agent id) of every event; agent id -> every principal IRI in its delegation chain (its
         # acted_for and its DelegationIssued chains); event IRI -> the principal IRIs of its own acted_for.
         self.event_info: dict[str, tuple[str, str | None, str | None]] = {}
+        # event IRI -> the agents it concerns: its own agent and its CloudEvents subject (the assessed agent), so an
+        # event that leaves out the optional agent still concerns the subject.
+        self.event_agents: dict[str, frozenset[str]] = {}
         self.agent_chain: dict[str, set[str]] = {}
         self.acted_for: dict[str, set[str]] = {}
         # OVS-08: decision IRI -> the (actor IRI, login IRI) key of every verified ApprovalDecided that reviewed it.
@@ -349,14 +352,19 @@ class _Builder:
             agent_id,
         )
         self.acted_for[node] = self._principal_iris(data.get("acted_for"))
+        subject = event.get("subject")
+        self.event_agents[node] = frozenset(
+            a for a in (agent_id, subject) if isinstance(a, str)
+        )
+        for owner in self.event_agents[node]:
+            chain = self.agent_chain.setdefault(owner, set())
+            chain |= self.acted_for[node]
+            if ptype == "DelegationIssued":
+                chain |= self._principal_iris(data.get("chain"))
         if agent_id is not None:
             self.store.add_type(agent_id, "agentce:Agent")
             self.store.add_edge(node, "prov:wasAssociatedWith", agent_id)
             self._map_chain(agent_id, data.get("acted_for"))
-            chain = self.agent_chain.setdefault(agent_id, set())
-            chain |= self.acted_for[node]
-            if ptype == "DelegationIssued":
-                chain |= self._principal_iris(data.get("chain"))
 
         for item in data.get("used", []) or []:
             if isinstance(item, str):
@@ -418,7 +426,8 @@ class _Builder:
 
         The login record is a held ``SessionStart`` (the only session record the event model has) from an
         independent_system or enforcement_point stream whose agent is none of the agents the oversight record
-        concerns: its own agent and the named decision's agent, whose own run session is no human's login. The
+        concerns: the own agent and CloudEvents subject of the record and of the named decision, whose own run session
+        is no human's login. The
         delegation chain is the named decision's and the record's own ``acted_for`` and every chain of those
         agents."""
         data = _data(event)
@@ -427,11 +436,11 @@ class _Builder:
         if actor is None or not isinstance(login, str) or login not in self.event_info:
             return None
         decision = _refs(event).get("decision")
-        decision_info = (
-            self.event_info.get(decision) if isinstance(decision, str) else None
+        concerned = self.event_agents[node] | (
+            self.event_agents.get(decision, frozenset())
+            if isinstance(decision, str)
+            else frozenset()
         )
-        owners = (self.event_info[node][2], decision_info[2] if decision_info else None)
-        concerned = {agent_id for agent_id in owners if agent_id is not None}
         login_type, login_class, login_agent = self.event_info[login]
         if login_type != "SessionStart" or login_class not in _LOGIN_CLASSES:
             return None

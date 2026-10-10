@@ -376,6 +376,9 @@ public final class Graph {
         // and its DelegationIssued chains); event IRI -> the principal IRIs of its own acted_for.
         private final Map<String, EventInfo> eventInfo = new LinkedHashMap<>();
         private final Map<String, Set<String>> agentChain = new LinkedHashMap<>();
+        // event IRI -> the agents it concerns: its own agent and its CloudEvents subject (the assessed agent), so an
+        // event that leaves out the optional agent still concerns the subject.
+        private final Map<String, Set<String>> eventAgents = new LinkedHashMap<>();
         private final Map<String, Set<String>> actedFor = new LinkedHashMap<>();
         // OVS-08: decision IRI -> the key of every verified ApprovalDecided that reviewed it.
         private final Map<String, List<HumanKey>> humanReviewers = new LinkedHashMap<>();
@@ -437,15 +440,20 @@ public final class Graph {
             eventInfo.put(node, new EventInfo(ptype, sourceClass, agentId));
             Set<String> ownActedFor = principalIris(data.get("acted_for"));
             actedFor.put(node, ownActedFor);
-            if (agentId != null) {
-                store.addType(agentId, "agentce:Agent");
-                store.addEdge(node, "prov:wasAssociatedWith", agentId);
-                mapChain(agentId, data.get("acted_for"));
-                Set<String> chain = agentChain.computeIfAbsent(agentId, k -> new LinkedHashSet<>());
+            Set<String> owners = new LinkedHashSet<>();
+            Stream.of(agentId, str(event.get("subject"))).filter(Objects::nonNull).forEach(owners::add);
+            eventAgents.put(node, owners);
+            for (String owner : owners) {
+                Set<String> chain = agentChain.computeIfAbsent(owner, k -> new LinkedHashSet<>());
                 chain.addAll(ownActedFor);
                 if ("DelegationIssued".equals(ptype)) {
                     chain.addAll(principalIris(data.get("chain")));
                 }
+            }
+            if (agentId != null) {
+                store.addType(agentId, "agentce:Agent");
+                store.addEdge(node, "prov:wasAssociatedWith", agentId);
+                mapChain(agentId, data.get("acted_for"));
             }
 
             JsonNode used = data.get("used");
@@ -522,7 +530,8 @@ public final class Graph {
          *
          * <p>The login record is a held {@code SessionStart} (the only session record the event model has) from an
          * independent_system or enforcement_point stream whose agent is none of the agents the oversight record
-         * concerns: its own agent and the named decision's agent, whose own run session is no human's login. The
+         * concerns: the own agent and CloudEvents subject of the record and of the named decision, whose own run
+         * session is no human's login. The
          * delegation chain is the named decision's and the record's own {@code acted_for} and every chain of those
          * agents. */
         private HumanKey humanKey(String node, JsonNode event) {
@@ -534,11 +543,10 @@ public final class Graph {
                 return null;
             }
             String decision = str(refsOf(event).get("decision"));
-            EventInfo decisionInfo = decision != null ? eventInfo.get(decision) : null;
-            Set<String> concerned = new LinkedHashSet<>();
-            Stream.of(eventInfo.get(node).agent(), decisionInfo != null ? decisionInfo.agent() : null)
-                    .filter(Objects::nonNull)
-                    .forEach(concerned::add);
+            Set<String> concerned = new LinkedHashSet<>(eventAgents.get(node));
+            if (decision != null) {
+                concerned.addAll(eventAgents.getOrDefault(decision, Set.of()));
+            }
             if (!"SessionStart".equals(loginInfo.type())
                     || loginInfo.sourceClass() == null
                     || !LOGIN_CLASSES.contains(loginInfo.sourceClass())) {

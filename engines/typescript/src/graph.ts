@@ -334,6 +334,9 @@ class Builder {
   // DelegationIssued chains); event IRI -> the principal IRIs of its own acted_for.
   private readonly eventInfo = new Map<string, [string, string | null, string | null]>();
   private readonly agentChain = new Map<string, Set<string>>();
+  // event IRI -> the agents it concerns: its own agent and its CloudEvents subject (the assessed agent), so an event
+  // that leaves out the optional agent still concerns the subject.
+  private readonly eventAgents = new Map<string, Set<string>>();
   private readonly actedFor = new Map<string, Set<string>>();
   // OVS-08: decision IRI -> the key of every verified ApprovalDecided that reviewed it.
   private readonly humanReviewers = new Map<string, HumanKey[]>();
@@ -397,14 +400,15 @@ class Builder {
     this.eventInfo.set(node, [ptype, sourceClass, agentId]);
     const actedFor = this.principalIris(data.acted_for);
     this.actedFor.set(node, actedFor);
-    if (agentId !== null) {
-      this.store.addType(agentId, "agentce:Agent");
-      this.store.addEdge(node, "prov:wasAssociatedWith", agentId);
-      this.mapChain(agentId, data.acted_for);
-      let chain = this.agentChain.get(agentId);
+    const owners = new Set(
+      [agentId, event.subject].filter((a): a is string => typeof a === "string"),
+    );
+    this.eventAgents.set(node, owners);
+    for (const owner of owners) {
+      let chain = this.agentChain.get(owner);
       if (!chain) {
         chain = new Set();
-        this.agentChain.set(agentId, chain);
+        this.agentChain.set(owner, chain);
       }
       for (const p of actedFor) {
         chain.add(p);
@@ -414,6 +418,11 @@ class Builder {
           chain.add(p);
         }
       }
+    }
+    if (agentId !== null) {
+      this.store.addType(agentId, "agentce:Agent");
+      this.store.addEdge(node, "prov:wasAssociatedWith", agentId);
+      this.mapChain(agentId, data.acted_for);
     }
 
     const used = Array.isArray(data.used) ? data.used : [];
@@ -485,7 +494,8 @@ class Builder {
    *
    * The login record is a held `SessionStart` (the only session record the event model has) from an
    * independent_system or enforcement_point stream whose agent is none of the agents the oversight record concerns:
-   * its own agent and the named decision's agent, whose own run session is no human's login. The delegation chain is
+   * the own agent and CloudEvents subject of the record and of the named decision, whose own run session is no
+   * human's login. The delegation chain is
    * the named decision's and the record's own `acted_for` and every chain of those agents. */
   private humanKey(node: string, event: Event): HumanKey | null {
     const data = dataOf(event);
@@ -496,13 +506,10 @@ class Builder {
       return null;
     }
     const decision = refsOf(event).decision;
-    const decisionInfo = typeof decision === "string" ? this.eventInfo.get(decision) : undefined;
-    const concerned = new Set<string>();
-    for (const agentId of [this.eventInfo.get(node)?.[2], decisionInfo?.[2]]) {
-      if (typeof agentId === "string") {
-        concerned.add(agentId);
-      }
-    }
+    const concerned = new Set([
+      ...(this.eventAgents.get(node) ?? []),
+      ...((typeof decision === "string" ? this.eventAgents.get(decision) : undefined) ?? []),
+    ]);
     const [loginType, loginClass, loginAgent] = loginInfo;
     if (loginType !== "SessionStart" || loginClass === null || !LOGIN_CLASSES.has(loginClass)) {
       return null;
