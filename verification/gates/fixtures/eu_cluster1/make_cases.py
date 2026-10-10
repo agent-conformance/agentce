@@ -30,8 +30,23 @@ def human(pid):
     return {"id": pid, "kind": "human"}
 
 
+IDP = "urn:example:service:identity-provider"
+
+
+def login(actor):
+    """SPEC §10.4: a human actor counts only with a session_ref to a held identity-provider login (18.126)."""
+    return {"session_ref": ref("login-" + actor["id"])} if actor and actor.get("kind") == "human" else {}
+
+
+def logins(events):
+    """The identity-provider SessionStart each session_ref in the case names, from an independent stream."""
+    held = {ref(e["id"]) for e in events}
+    named = sorted({e["data"]["session_ref"] for e in events if "session_ref" in e["data"]} - held)
+    return [ev(r.rsplit("/", 1)[1], "SessionStart", agent={"id": IDP}) for r in named]
+
+
 def appr(i, d, actor=None):
-    return ev(i, "ApprovalDecided", refs={"decision": ref(d)}, outcome="approve", **({"actor": actor} if actor else {}))
+    return ev(i, "ApprovalDecided", refs={"decision": ref(d)}, outcome="approve", **({"actor": actor} if actor else {}), **login(actor))
 
 
 def inc(i, related=(), **k):
@@ -39,11 +54,11 @@ def inc(i, related=(), **k):
 
 
 def override(i, d, actor=human("u1"), **k):
-    return ev(i, "Override", refs={"decision": ref(d)}, actor=actor, original="approve", reason_code="harm", **k)
+    return ev(i, "Override", refs={"decision": ref(d)}, actor=actor, original="approve", reason_code="harm", **login(actor), **k)
 
 
 def interrupt(i, mechanism="kill_switch", effect="halted", actor=human("u1")):
-    return ev(i, "Interrupt", effect=effect, **({"mechanism": mechanism} if mechanism else {}), **({"actor": actor} if actor else {}))
+    return ev(i, "Interrupt", effect=effect, **({"mechanism": mechanism} if mechanism else {}), **({"actor": actor} if actor else {}), **login(actor))
 
 
 DET = {"detected_at": "2026-01-10T00:00:00Z"}
@@ -51,7 +66,7 @@ C = {}
 
 
 def case(name, control, events, outcome, failing=()):
-    C[name] = {"control": control, "events": events, "expected": {"outcome": outcome, "failing": list(failing), "exit": None}}
+    C[name] = {"control": control, "events": events + logins(events), "expected": {"outcome": outcome, "failing": list(failing), "exit": None}}
 
 
 # INC-03: incident-triggering decisions carry an oversight review.
@@ -72,8 +87,8 @@ case("inc03-mixed-unresolved-reviewed", "INC-03", [dec("d1"), dec("d2"), appr("a
 case("inc03-no-incident", "INC-03", [dec("d1"), appr("a1", "d1", human("u1"))], "not_applicable")
 case("inc03-incident-elsewhere", "INC-03", [dec("d1"), dec("d2"), appr("a1", "d1", human("u1")), inc("i1", [ref("d1")], **DET)], "conformant")
 # OVS-01: every consequential decision reviewed (unchanged rule; now the only one in the group).
-case("ovs01-all-reviewed", "OVS-01", [dec("d1"), appr("a1", "d1")], "conformant")
-case("ovs01-one-unreviewed", "OVS-01", [dec("d1"), dec("d2"), appr("a1", "d1")], "non-conformant", ["d2"])
+case("ovs01-all-reviewed", "OVS-01", [dec("d1"), appr("a1", "d1", human("u1"))], "conformant")
+case("ovs01-one-unreviewed", "OVS-01", [dec("d1"), dec("d2"), appr("a1", "d1", human("u1"))], "non-conformant", ["d2"])
 # OVS-07: overrides and interrupts are effective and recorded by a human.
 case("ovs07-effective", "OVS-07", [dec("d1"), override("v1", "d1", replacement="reject"), interrupt("x1")], "conformant")
 case("ovs07-paused", "OVS-07", [dec("d1"), interrupt("x1", effect="paused")], "conformant")
@@ -99,11 +114,11 @@ case("rob07-detected-only", "ROB-07", [inc("i1", causal_assessment_at="2026-01-1
 case("rob07-no-detection", "ROB-07", [inc("i1", reported_at="2026-01-11T00:00:00Z")], "non-conformant", ["i1"])
 case("rob07-no-incident", "ROB-07", [dec("d1")], "not_applicable")
 # RSK-02: a policy decision or a review gates each consequential decision.
-case("rsk02-authorized", "RSK-02", [ev("p1", "PolicyDecision", decision="allow", policy_id="p"), dec("d1", refs={"authorization": ref("p1")}), dec("d2"), appr("a2", "d2")], "conformant")
-case("rsk02-neither", "RSK-02", [dec("d1"), dec("d2"), appr("a2", "d2")], "non-conformant", ["d1"])
-case("rsk02-authorization-dangling", "RSK-02", [dec("d1", refs={"authorization": ref("p1")}), dec("d2"), appr("a2", "d2")], "non-conformant", ["d1"])
-case("rsk02-policy-not-exported", "RSK-02", [ev("p1", "PolicyDecision", decision="allow", policy_id="p"), dec("d1", refs={"authorization": ref("p9")}), dec("d2"), appr("a2", "d2")], "non-conformant", ["d1"])
-case("rsk02-authorization-not-policy", "RSK-02", [dec("d1", refs={"authorization": ref("a2")}), dec("d2"), appr("a2", "d2")], "non-conformant", ["d1"])
+case("rsk02-authorized", "RSK-02", [ev("p1", "PolicyDecision", decision="allow", policy_id="p"), dec("d1", refs={"authorization": ref("p1")}), dec("d2"), appr("a2", "d2", human("u1"))], "conformant")
+case("rsk02-neither", "RSK-02", [dec("d1"), dec("d2"), appr("a2", "d2", human("u1"))], "non-conformant", ["d1"])
+case("rsk02-authorization-dangling", "RSK-02", [dec("d1", refs={"authorization": ref("p1")}), dec("d2"), appr("a2", "d2", human("u1"))], "non-conformant", ["d1"])
+case("rsk02-policy-not-exported", "RSK-02", [ev("p1", "PolicyDecision", decision="allow", policy_id="p"), dec("d1", refs={"authorization": ref("p9")}), dec("d2"), appr("a2", "d2", human("u1"))], "non-conformant", ["d1"])
+case("rsk02-authorization-not-policy", "RSK-02", [dec("d1", refs={"authorization": ref("a2")}), dec("d2"), appr("a2", "d2", human("u1"))], "non-conformant", ["d1"])
 # DAT-03 and RSK-03 are rung 3: not assessed.
 case("dat03-rung3", "DAT-03", [dec("d1"), appr("a1", "d1")], "not_assessed")
 case("rsk03-rung3", "RSK-03", [dec("d1"), appr("a1", "d1")], "not_assessed")

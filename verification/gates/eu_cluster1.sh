@@ -41,6 +41,11 @@ for name, case in cases.items():
                 "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
             }
         ],
+        # Declared classes, so a login record keeps its stream's class (SPEC §6.4, §10.4).
+        "sources": [
+            {"id": f"urn:src:{cls}", "class": cls}
+            for cls in ("enforcement_point", "independent_system", "self_report")
+        ],
     }
     (bundle / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     expected = case["expected"]

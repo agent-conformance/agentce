@@ -43,7 +43,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -67,6 +68,23 @@
               "agentce:event/d1"
             ],
             "detected_at": "2026-01-10T00:00:00Z"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -137,7 +155,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -161,6 +180,23 @@
               "agentce:event/d1"
             ],
             "detected_at": "2026-01-10T00:00:00Z"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -233,7 +269,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -278,6 +315,23 @@
               "agentce:event/o1"
             ],
             "detected_at": "2026-01-10T00:00:00Z"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -350,7 +404,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -397,6 +452,23 @@
               "agentce:event/t1"
             ],
             "detected_at": "2026-01-10T00:00:00Z"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -469,7 +541,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -494,6 +567,23 @@
               "decision": "agentce:event/d1"
             },
             "detected_at": "2026-01-10T00:00:00Z"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -566,7 +656,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -588,6 +679,23 @@
             "incident_class": "fundamental_rights",
             "related_refs": [],
             "detected_at": "2026-01-10T00:00:00Z"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -660,7 +768,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -684,6 +793,23 @@
               "agentce:event/zz"
             ],
             "detected_at": "2026-01-10T00:00:00Z"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -738,7 +864,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -760,6 +887,23 @@
             "incident_class": "fundamental_rights",
             "related_refs": [],
             "detected_at": "2026-01-10T00:00:00Z"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -830,7 +974,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -857,6 +1002,7 @@
             },
             "original": "approve",
             "reason_code": "harm",
+            "session_ref": "agentce:event/login-u1",
             "replacement": "reject"
           }
         },
@@ -882,6 +1028,23 @@
               "agentce:event/v2"
             ],
             "detected_at": "2026-01-10T00:00:00Z"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -954,7 +1117,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -979,7 +1143,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -1006,6 +1171,7 @@
             },
             "original": "approve",
             "reason_code": "harm",
+            "session_ref": "agentce:event/login-u1",
             "replacement": "reject"
           }
         },
@@ -1031,6 +1197,23 @@
               "agentce:event/v2"
             ],
             "detected_at": "2026-01-10T00:00:00Z"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -1101,7 +1284,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -1126,6 +1310,23 @@
               "agentce:event/zz"
             ],
             "detected_at": "2026-01-10T00:00:00Z"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -1198,7 +1399,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -1223,7 +1425,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -1248,6 +1451,23 @@
               "agentce:event/zz"
             ],
             "detected_at": "2026-01-10T00:00:00Z"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -1300,6 +1520,24 @@
             "actor": {
               "id": "u1",
               "kind": "human"
+            },
+            "session_ref": "agentce:event/login-u1"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
             }
           }
         }
@@ -1371,7 +1609,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -1395,6 +1634,23 @@
               "agentce:event/d1"
             ],
             "detected_at": "2026-01-10T00:00:00Z"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -1443,14 +1699,36 @@
             "refs": {
               "decision": "agentce:event/d1"
             },
-            "outcome": "approve"
+            "outcome": "approve",
+            "actor": {
+              "id": "u1",
+              "kind": "human"
+            },
+            "session_ref": "agentce:event/login-u1"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": 1
+        "exit": 0
       }
     },
     "ovs01-one-unreviewed": {
@@ -1510,7 +1788,29 @@
             "refs": {
               "decision": "agentce:event/d1"
             },
-            "outcome": "approve"
+            "outcome": "approve",
+            "actor": {
+              "id": "u1",
+              "kind": "human"
+            },
+            "session_ref": "agentce:event/login-u1"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -1567,6 +1867,7 @@
             },
             "original": "approve",
             "reason_code": "harm",
+            "session_ref": "agentce:event/login-u1",
             "replacement": "reject"
           }
         },
@@ -1590,6 +1891,24 @@
             "actor": {
               "id": "u1",
               "kind": "human"
+            },
+            "session_ref": "agentce:event/login-u1"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
             }
           }
         }
@@ -1641,6 +1960,24 @@
             "actor": {
               "id": "u1",
               "kind": "human"
+            },
+            "session_ref": "agentce:event/login-u1"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
             }
           }
         }
@@ -1695,7 +2032,25 @@
               "kind": "human"
             },
             "original": "approve",
-            "reason_code": "harm"
+            "reason_code": "harm",
+            "session_ref": "agentce:event/login-u1"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -1752,7 +2107,25 @@
             },
             "original": "approve",
             "reason_code": "harm",
+            "session_ref": "agentce:event/login-u1",
             "replacement": "approve"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -1809,7 +2182,25 @@
             },
             "original": "approve",
             "reason_code": "harm",
+            "session_ref": "agentce:event/login-u1",
             "replacement": "reject"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -1919,6 +2310,24 @@
             "actor": {
               "id": "u1",
               "kind": "human"
+            },
+            "session_ref": "agentce:event/login-u1"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
             }
           }
         }
@@ -1971,6 +2380,24 @@
             "actor": {
               "id": "u1",
               "kind": "human"
+            },
+            "session_ref": "agentce:event/login-u1"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
             }
           }
         }
@@ -2103,6 +2530,24 @@
             "actor": {
               "id": "u1",
               "kind": "human"
+            },
+            "session_ref": "agentce:event/login-u1"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
             }
           }
         }
@@ -2263,7 +2708,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -2288,6 +2734,41 @@
             "actor": {
               "id": "u2",
               "kind": "human"
+            },
+            "session_ref": "agentce:event/login-u2"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u2",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
             }
           }
         }
@@ -2342,7 +2823,8 @@
             "actor": {
               "id": "u1",
               "kind": "human"
-            }
+            },
+            "session_ref": "agentce:event/login-u1"
           }
         },
         {
@@ -2367,6 +2849,24 @@
             "actor": {
               "id": "u1",
               "kind": "human"
+            },
+            "session_ref": "agentce:event/login-u1"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
             }
           }
         }
@@ -2422,6 +2922,24 @@
             "actor": {
               "id": "u1",
               "kind": "human"
+            },
+            "session_ref": "agentce:event/login-u1"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
             }
           }
         }
@@ -2693,7 +3211,29 @@
             "refs": {
               "decision": "agentce:event/d2"
             },
-            "outcome": "approve"
+            "outcome": "approve",
+            "actor": {
+              "id": "u1",
+              "kind": "human"
+            },
+            "session_ref": "agentce:event/login-u1"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -2760,7 +3300,29 @@
             "refs": {
               "decision": "agentce:event/d2"
             },
-            "outcome": "approve"
+            "outcome": "approve",
+            "actor": {
+              "id": "u1",
+              "kind": "human"
+            },
+            "session_ref": "agentce:event/login-u1"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -2832,7 +3394,29 @@
             "refs": {
               "decision": "agentce:event/d2"
             },
-            "outcome": "approve"
+            "outcome": "approve",
+            "actor": {
+              "id": "u1",
+              "kind": "human"
+            },
+            "session_ref": "agentce:event/login-u1"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -2923,7 +3507,29 @@
             "refs": {
               "decision": "agentce:event/d2"
             },
-            "outcome": "approve"
+            "outcome": "approve",
+            "actor": {
+              "id": "u1",
+              "kind": "human"
+            },
+            "session_ref": "agentce:event/login-u1"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
@@ -2995,7 +3601,29 @@
             "refs": {
               "decision": "agentce:event/d2"
             },
-            "outcome": "approve"
+            "outcome": "approve",
+            "actor": {
+              "id": "u1",
+              "kind": "human"
+            },
+            "session_ref": "agentce:event/login-u1"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "login-u1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster1",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            }
           }
         }
       ],
