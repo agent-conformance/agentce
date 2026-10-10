@@ -956,6 +956,32 @@ def test_only_an_approve_outcome_approves() -> None:
         ]
 
 
+def test_an_approve_after_the_action_ran_is_a_review_not_an_approval() -> None:
+    """An approve gates the decision (agentce:approvedBy; CND-02, OVS-08) only when it is recorded at or before every
+    ToolCall that executes it, compared as instants; a later one is still a review (agentce:reviewedBy)."""
+    d1 = event_iri("d1")
+    for approved_at, approved in (
+        ("2026-01-10T00:00:00Z", True),
+        ("2026-01-10T01:00:00Z", True),
+        ("2026-01-10T01:00:00.001Z", False),
+        ("2026-01-10T00:30:00-05:00", False),
+        ("2026-01-10T05:00:00+04:00", True),
+        ("2026-01-10T00:30:00", False),
+    ):
+        action = _event("t0", "ToolCall", {"refs": {"decision": d1}})
+        action["time"] = "2026-01-10T01:00:00Z"
+        approval = {**_approval("a1", ALICE), "time": approved_at}
+        events = [decision("d1", "2026-01-10T00:00:00Z"), action, approval, *LOGINS]
+        store = build_graph(events, domain=DOMAIN)
+        assert store.objects(d1, "agentce:reviewedBy") == [event_iri("a1")]
+        assert store.objects(d1, "agentce:approvedBy") == (
+            [event_iri("a1")] if approved else []
+        ), approved_at
+        assert _flag(events, "d1", "oversightCoverageComplete") == [
+            str(approved).lower()
+        ]
+
+
 def test_dual_control_counts_the_same_human_once() -> None:
     events = [
         decision("d1", "t", modality="dual_control"),

@@ -15,11 +15,13 @@ materialised so class membership needs no inference (SPEC §7.2). Everything is 
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any
 
 from .domain import DomainBinding
 from .iri import ZERO_KEY, event_iri, is_event_ref, principal_iri
 from .store import GraphStore
+from .structural import compare_literals
 
 BOOL = "xsd:boolean"
 DATETIME = "xsd:dateTime"
@@ -254,6 +256,12 @@ def _data(event: dict[str, Any]) -> dict[str, Any]:
 def _refs(event: dict[str, Any]) -> dict[str, Any]:
     refs = _data(event).get("refs")
     return refs if isinstance(refs, dict) else {}
+
+
+def _before_every(time: str, actions: Iterable[str]) -> bool:
+    """Whether ``time`` is at or before every action time, compared as instants (SPEC §6.7); a time that cannot be
+    compared with an action's gates nothing."""
+    return all(compare_literals(time, action) in (-1, 0) for action in actions)
 
 
 class _Builder:
@@ -754,8 +762,14 @@ class _Builder:
         """Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An
         ApprovalDecided reviews the decision it names (``agentce:reviewedBy``; OVS-01, INC-03, RSK-02) only when it
         does, whatever its outcome; it also approves it (``agentce:approvedBy``; CND-02, OVS-08) only when its outcome
-        is approve. One that fails the rule is no human's review."""
+        is approve and it is recorded at or before every ToolCall that executes the decision (18.141). One that fails
+        the rule is no human's review."""
         by_human: dict[str, bool] = {}
+        action_times: dict[str, list[str]] = {}
+        for event in events:
+            decision = _refs(event).get("decision")
+            if self._ptype(event) == "ToolCall" and isinstance(decision, str):
+                action_times.setdefault(decision, []).append(str(event.get("time", "")))
         for event in events:
             ptype = self._ptype(event)
             if ptype not in _OVERSIGHT_TYPES:
@@ -771,7 +785,9 @@ class _Builder:
             ):
                 self.store.add_edge(decision, "agentce:reviewedBy", node)
                 self.decision_reviewed.add(decision)
-                if _data(event).get("outcome") == "approve":
+                if _data(event).get("outcome") == "approve" and _before_every(
+                    str(event.get("time", "")), action_times.get(decision, ())
+                ):
                     self.store.add_edge(decision, "agentce:approvedBy", node)
                     self.human_approvers.setdefault(decision, set()).add(key)
         return by_human

@@ -544,6 +544,40 @@ test("only an approve outcome approves: a reject, an edit or no outcome is a rev
   }
 });
 
+test("an approve after the action ran is a review, not an approval: order compares instants", () => {
+  for (const [approvedAt, approved] of [
+    ["2026-01-10T00:00:00Z", true],
+    ["2026-01-10T01:00:00Z", true],
+    ["2026-01-10T01:00:00.001Z", false],
+    ["2026-01-10T00:30:00-05:00", false],
+    ["2026-01-10T05:00:00+04:00", true],
+    ["2026-01-10T00:30:00", false],
+  ] as const) {
+    const events = [
+      decisionEvent("d1"),
+      { ...refEvent("t0", "ToolCall", {}, "d1"), time: "2026-01-10T01:00:00Z" },
+      {
+        ...refEvent(
+          "a1",
+          "ApprovalDecided",
+          { outcome: "approve", actor: HUMAN_A, session_ref: sessionOf(HUMAN_A) },
+          "d1",
+        ),
+        time: approvedAt,
+      },
+      ...LOGINS,
+    ];
+    const store = buildGraph(events, { domain: MINOR_DOMAIN });
+    assert.deepEqual(store.objects("agentce:event/d1", "agentce:reviewedBy"), ["agentce:event/a1"]);
+    assert.deepEqual(
+      store.objects("agentce:event/d1", "agentce:approvedBy"),
+      approved ? ["agentce:event/a1"] : [],
+      approvedAt,
+    );
+    assert.deepEqual(lit(events, "d1", "agentce:oversightCoverageComplete"), [String(approved)]);
+  }
+});
+
 test("OVS-07: an override is effective when it replaces a held decision's outcome", () => {
   const effective = (data: Record<string, unknown>, decision = "d1") =>
     lit(

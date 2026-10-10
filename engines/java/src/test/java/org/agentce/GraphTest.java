@@ -4,12 +4,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -455,6 +458,31 @@ class GraphTest {
                     store.objects("agentce:event/d1", "agentce:approvedBy"), data);
             assertEquals(List.of(String.valueOf(approved)), flag(events, "d1", "oversightCoverageComplete"), data);
         }
+    }
+
+    /** An approve gates the decision (agentce:approvedBy; CND-02, OVS-08) only when it is recorded at or before
+     * every ToolCall that executes it, compared as instants; a later one is still a review (agentce:reviewedBy). */
+    @Test
+    void anApproveAfterTheActionRanIsAReviewNotAnApproval() {
+        Map<String, Boolean> cases = new LinkedHashMap<>();
+        cases.put("2026-01-10T00:00:00Z", true);
+        cases.put("2026-01-10T01:00:00Z", true);
+        cases.put("2026-01-10T01:00:00.001Z", false);
+        cases.put("2026-01-10T00:30:00-05:00", false);
+        cases.put("2026-01-10T05:00:00+04:00", true);
+        cases.put("2026-01-10T00:30:00", false);
+        cases.forEach((approvedAt, approved) -> {
+            ObjectNode action = (ObjectNode) event("t0", "ToolCall", decisionRef("d1"));
+            action.put("time", "2026-01-10T01:00:00Z");
+            ObjectNode approval = (ObjectNode) approval("a1", "d1", "alice");
+            approval.put("time", approvedAt);
+            List<JsonNode> events = withLogins(List.of(decisionEvent("d1"), action, approval));
+            GraphStore store = Graph.buildGraph(events, DomainBinding.fromDict(CREDIT_DOMAIN));
+            assertEquals(List.of("agentce:event/a1"), store.objects("agentce:event/d1", "agentce:reviewedBy"), approvedAt);
+            assertEquals(approved ? List.of("agentce:event/a1") : List.of(),
+                    store.objects("agentce:event/d1", "agentce:approvedBy"), approvedAt);
+            assertEquals(List.of(String.valueOf(approved)), flag(events, "d1", "oversightCoverageComplete"), approvedAt);
+        });
     }
 
     @Test

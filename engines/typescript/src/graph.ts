@@ -16,6 +16,7 @@
 import { DomainBinding } from "./domain";
 import { ZERO_KEY, eventIri, isEventRef, principalIri } from "./iri";
 import { GraphStore } from "./store";
+import { compareLiterals } from "./structural";
 import { byteCompare } from "./util";
 
 const BOOL = "xsd:boolean";
@@ -130,6 +131,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function dataOf(event: Event): Record<string, unknown> {
   return isRecord(event.data) ? event.data : {};
+}
+
+/** Whether `time` is at or before every action time, compared as instants (SPEC §6.7); a time that cannot be
+ * compared with an action's gates nothing. */
+function beforeEvery(time: string, actions: string[]): boolean {
+  return actions.every((action) => {
+    const order = compareLiterals(time, action);
+    return order === -1 || order === 0;
+  });
 }
 
 function refsOf(event: Event): Record<string, unknown> {
@@ -955,10 +965,19 @@ class Builder {
 
   /** Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An ApprovalDecided
    * reviews the decision it names (`agentce:reviewedBy`; OVS-01, INC-03, RSK-02) only when it does, whatever its
-   * outcome; it also approves it (`agentce:approvedBy`; CND-02, OVS-08) only when its outcome is approve;
-   * one that fails it is no human's review. */
+   * outcome; it also approves it (`agentce:approvedBy`; CND-02, OVS-08) only when its outcome is approve and it is
+   * recorded at or before every ToolCall that executes the decision (18.141); one that fails it is no human's review. */
   private mapOversight(events: Event[]): Map<string, boolean> {
     const byHuman = new Map<string, boolean>();
+    const actionTimes = new Map<string, string[]>();
+    for (const event of events) {
+      const decision = refsOf(event).decision;
+      if (this.ptype(event) === "ToolCall" && typeof decision === "string") {
+        const times = actionTimes.get(decision) ?? [];
+        times.push(String(event.time ?? ""));
+        actionTimes.set(decision, times);
+      }
+    }
     for (const event of events) {
       const ptype = this.ptype(event);
       if (!OVERSIGHT_TYPES.has(ptype)) {
@@ -973,7 +992,10 @@ class Builder {
       }
       this.store.addEdge(decision, "agentce:reviewedBy", node);
       this.decisionReviewed.add(decision);
-      if (dataOf(event).outcome !== "approve") {
+      if (
+        dataOf(event).outcome !== "approve" ||
+        !beforeEvery(String(event.time ?? ""), actionTimes.get(decision) ?? [])
+      ) {
         continue;
       }
       this.store.addEdge(decision, "agentce:approvedBy", node);

@@ -106,7 +106,7 @@ E	human:reviewer	rdf:type	agentce:Agent
 E	spiffe://corp/agent-a	prov:actedOnBehalfOf	agentce:principal/4f9618842a3b141eae7bfb7cd81ee43b2ba78b2eef1a7c1d0c13c7ea559ab534
 E	spiffe://corp/agent-a	rdf:type	agentce:Agent
 E	urn:example:service:identity-provider	rdf:type	agentce:Agent
-L	agentce:event/appr-1	prov:atTime	2026-06-01T09:30:00.000Z	xsd:dateTime
+L	agentce:event/appr-1	prov:atTime	2026-06-01T09:04:00.000Z	xsd:dateTime
 L	agentce:event/dec-1	agentce:actsOnUntrusted	false	xsd:boolean
 L	agentce:event/dec-1	agentce:danglingRef	agentce:event/missing-x	xsd:string
 L	agentce:event/dec-1	agentce:explanationReconstructable	false	xsd:boolean
@@ -128,7 +128,7 @@ L	agentce:event/dec-2	agentce:untrustedContentRuledOn	true	xsd:boolean
 L	agentce:event/dec-2	prov:atTime	2026-06-01T10:00:00.000Z	xsd:dateTime
 L	agentce:event/del-1	agentce:chainVerified	true	xsd:boolean
 L	agentce:event/del-1	prov:atTime	2026-06-01T08:00:00.000Z	xsd:dateTime
-L	agentce:event/login-1	prov:atTime	2026-06-01T09:29:00.000Z	xsd:dateTime
+L	agentce:event/login-1	prov:atTime	2026-06-01T09:03:00.000Z	xsd:dateTime
 L	agentce:event/out-1	agentce:adverseOutcomeLinked	true	xsd:boolean
 L	agentce:event/out-1	prov:atTime	2026-06-01T09:10:00.000Z	xsd:dateTime
 L	agentce:event/tc-1	agentce:actsOnUntrusted	false	xsd:boolean

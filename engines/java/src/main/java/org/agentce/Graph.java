@@ -146,6 +146,19 @@ public final class Graph {
         return node != null && node.isTextual() ? node.textValue() : null;
     }
 
+    private static String timeOf(JsonNode event) {
+        return Objects.toString(str(event.get("time")), "");
+    }
+
+    /** Whether {@code time} is at or before every action time, compared as instants (SPEC §6.7); a time that cannot be
+     * compared with an action's gates nothing. */
+    private static boolean beforeEvery(String time, List<String> actions) {
+        return actions.stream().allMatch(action -> {
+            Integer order = Structural.compareLiterals(time, action);
+            return order != null && order <= 0;
+        });
+    }
+
     // DOC-01 (SPEC §7.4, Art. 11 / Annex IV): the events that declare an operating component (a
     // BundleLoaded manifest) or exercise one (a ToolCall or ModelCall) are typed with this
     // engine-materialised class, so one shape can compare the declaration with what operated.
@@ -973,9 +986,17 @@ public final class Graph {
         /** Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An
          * ApprovalDecided reviews the decision it names ({@code agentce:reviewedBy}; OVS-01, INC-03, RSK-02) only when
          * it does, whatever its outcome; it also approves it ({@code agentce:approvedBy}; CND-02, OVS-08) only when its
-         * outcome is approve. One that fails the rule is no human's review. */
+         * outcome is approve and it is recorded at or before every ToolCall that executes the decision (18.141). One
+         * that fails the rule is no human's review. */
         private Map<String, Boolean> mapOversight(List<JsonNode> events) {
             Map<String, Boolean> byHuman = new LinkedHashMap<>();
+            Map<String, List<String>> actionTimes = new LinkedHashMap<>();
+            for (JsonNode event : events) {
+                String decision = str(refsOf(event).get("decision"));
+                if ("ToolCall".equals(ptype(event)) && decision != null) {
+                    actionTimes.computeIfAbsent(decision, k -> new ArrayList<>()).add(timeOf(event));
+                }
+            }
             for (JsonNode event : events) {
                 String ptype = ptype(event);
                 if (!OVERSIGHT_TYPES.contains(ptype)) {
@@ -990,7 +1011,8 @@ public final class Graph {
                 }
                 store.addEdge(decision, "agentce:reviewedBy", node);
                 decisionReviewed.add(decision);
-                if ("approve".equals(str(dataOf(event).get("outcome")))) {
+                if ("approve".equals(str(dataOf(event).get("outcome")))
+                        && beforeEvery(timeOf(event), actionTimes.getOrDefault(decision, List.of()))) {
                     store.addEdge(decision, "agentce:approvedBy", node);
                     humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);
                 }
