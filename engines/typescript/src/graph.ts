@@ -829,14 +829,7 @@ class Builder {
   }
 
   private materialise(events: Event[]): void {
-    const humans = new Map<string, HumanKey | null>();
-    for (const event of events) {
-      if (OVERSIGHT_TYPES.has(this.ptype(event))) {
-        const node = eventIri(String(event.id));
-        humans.set(node, this.humanKey(node, event));
-      }
-    }
-    this.mapReviews(events, humans);
+    const byHuman = this.mapOversight(events);
     const incidentDecisions = this.incidentDecisions(events);
     const policyDecisions = new Set(
       events.filter((e) => this.ptype(e) === "PolicyDecision").map((e) => eventIri(String(e.id))),
@@ -863,7 +856,7 @@ class Builder {
         this.riskReviewed(node, refsOf(event), policyDecisions);
       }
       if (ptype === "Override" || ptype === "Interrupt") {
-        this.intervention(node, ptype, event, (humans.get(node) ?? null) !== null);
+        this.intervention(node, ptype, event, byHuman.get(node) === true);
       }
       if (ptype === "Incident") {
         this.literal(
@@ -944,14 +937,21 @@ class Builder {
     );
   }
 
-  /** An ApprovalDecided reviews the decision it names (`agentce:reviewedBy`; OVS-01, OVS-08, CND-02, INC-03,
-   * RSK-02) only when its actor meets the SPEC §10.4 human-actor rule; one that fails it is no human's review. */
-  private mapReviews(events: Event[], humans: Map<string, HumanKey | null>): void {
+  /** Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An ApprovalDecided
+   * reviews the decision it names (`agentce:reviewedBy`; OVS-01, OVS-08, CND-02, INC-03, RSK-02) only when it does;
+   * one that fails it is no human's review. */
+  private mapOversight(events: Event[]): Map<string, boolean> {
+    const byHuman = new Map<string, boolean>();
     for (const event of events) {
+      const ptype = this.ptype(event);
+      if (!OVERSIGHT_TYPES.has(ptype)) {
+        continue;
+      }
       const node = eventIri(String(event.id));
+      const key = this.humanKey(node, event);
+      byHuman.set(node, key !== null);
       const decision = refsOf(event).decision;
-      const key = humans.get(node) ?? null;
-      if (this.ptype(event) !== "ApprovalDecided" || key === null || typeof decision !== "string") {
+      if (ptype !== "ApprovalDecided" || key === null || typeof decision !== "string") {
         continue;
       }
       this.store.addEdge(decision, "agentce:reviewedBy", node);
@@ -963,6 +963,7 @@ class Builder {
       }
       reviewers.push(key);
     }
+    return byHuman;
   }
 
   /** OVS-08 (Art. 14(5)): enough distinct human reviewers -- two when the decision's observed or

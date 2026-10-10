@@ -71,7 +71,7 @@ outcome() {
 # One engine over every case; returns non-zero on any mismatch. The three engines run side by side, so the gate's
 # wall time is the slowest engine's; the first mismatch in any engine stops all three (the $work/.stop marker).
 check_cases() {
-  local engine="$1" status=0 dir name want out code got quarantined
+  local engine="$1" dir name want out code got quarantined
   for dir in "$work"/*/; do
     [ -e "$work/.stop" ] && return 1
     name="$(basename "$dir")"
@@ -92,11 +92,10 @@ check_cases() {
     got="$(outcome "$out/assertions.json" "$(cat "$dir/control")") $quarantined $code"
     if [ "$got" != "$want" ]; then
       echo "human-actor: $engine $name gave '$got', expected '$want' (outcome failing quarantined exit)" >&2
-      status=1
       touch "$work/.stop"
+      return 1
     fi
   done
-  return "$status"
 }
 
 status=0

@@ -691,13 +691,7 @@ class _Builder:
     # --- materialised (glue) edges (SPEC §7.2) ---
 
     def _materialise(self, events: list[dict[str, Any]]) -> None:
-        humans = {
-            node: self._human_key(node, event)
-            for event in events
-            if self._ptype(event) in _OVERSIGHT_TYPES
-            for node in (event_iri(str(event["id"])),)
-        }
-        self._map_reviews(events, humans)
+        by_human = self._map_oversight(events)
         incident_decisions = self._incident_decisions(events)
         policy_decisions = frozenset(
             event_iri(str(event["id"]))
@@ -723,7 +717,7 @@ class _Builder:
                 )
                 self._risk_reviewed(node, _refs(event), policy_decisions)
             if ptype in ("Override", "Interrupt"):
-                self._intervention(node, ptype, event, humans[node] is not None)
+                self._intervention(node, ptype, event, by_human[node])
             if ptype == "Incident":
                 self._literal(
                     node,
@@ -742,24 +736,28 @@ class _Builder:
         self._conduct_scope_budget(events)
         self._preceded_by()
 
-    def _map_reviews(
-        self, events: list[dict[str, Any]], humans: dict[str, tuple[str, str] | None]
-    ) -> None:
-        """An ApprovalDecided reviews the decision it names (``agentce:reviewedBy``; OVS-01, OVS-08, CND-02, INC-03,
-        RSK-02) only when its actor meets the SPEC §10.4 human-actor rule; one that fails it is no human's review."""
+    def _map_oversight(self, events: list[dict[str, Any]]) -> dict[str, bool]:
+        """Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An
+        ApprovalDecided reviews the decision it names (``agentce:reviewedBy``; OVS-01, OVS-08, CND-02, INC-03, RSK-02)
+        only when it does; one that fails it is no human's review."""
+        by_human: dict[str, bool] = {}
         for event in events:
-            node = event_iri(str(event["id"]))
-            decision = _refs(event).get("decision")
-            key = humans.get(node)
-            if (
-                self._ptype(event) != "ApprovalDecided"
-                or key is None
-                or not isinstance(decision, str)
-            ):
+            ptype = self._ptype(event)
+            if ptype not in _OVERSIGHT_TYPES:
                 continue
-            self.store.add_edge(decision, "agentce:reviewedBy", node)
-            self.decision_reviewed.add(decision)
-            self.human_reviewers.setdefault(decision, []).append(key)
+            node = event_iri(str(event["id"]))
+            key = self._human_key(node, event)
+            by_human[node] = key is not None
+            decision = _refs(event).get("decision")
+            if (
+                ptype == "ApprovalDecided"
+                and key is not None
+                and isinstance(decision, str)
+            ):
+                self.store.add_edge(decision, "agentce:reviewedBy", node)
+                self.decision_reviewed.add(decision)
+                self.human_reviewers.setdefault(decision, []).append(key)
+        return by_human
 
     def _literal(self, node: str, predicate: str, value: bool) -> None:
         self.store.add_literal(node, predicate, "true" if value else "false", BOOL)

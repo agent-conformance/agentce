@@ -858,14 +858,7 @@ public final class Graph {
         }
 
         private void materialise(List<JsonNode> events) {
-            Map<String, HumanKey> humans = new LinkedHashMap<>();
-            for (JsonNode event : events) {
-                if (OVERSIGHT_TYPES.contains(ptype(event))) {
-                    String node = Iri.eventIri(event.get("id").asText());
-                    humans.put(node, humanKey(node, event));
-                }
-            }
-            mapReviews(events, humans);
+            Map<String, Boolean> byHuman = mapOversight(events);
             Set<String> incidentDecisions = incidentDecisions(events);
             Set<String> policyDecisions = new LinkedHashSet<>();
             for (JsonNode event : events) {
@@ -892,7 +885,7 @@ public final class Graph {
                     riskReviewed(node, refsOf(event), policyDecisions);
                 }
                 if ("Override".equals(ptype) || "Interrupt".equals(ptype)) {
-                    intervention(node, ptype, event, humans.get(node) != null);
+                    intervention(node, ptype, event, byHuman.get(node));
                 }
                 if ("Incident".equals(ptype)) {
                     literal(node, "agentce:incidentResponded",
@@ -966,21 +959,28 @@ public final class Graph {
             literal(node, "agentce:riskReviewed", gated);
         }
 
-        /** An ApprovalDecided reviews the decision it names ({@code agentce:reviewedBy}; OVS-01, OVS-08, CND-02,
-         * INC-03, RSK-02) only when its actor meets the SPEC §10.4 human-actor rule; one that fails it is no human's
-         * review. */
-        private void mapReviews(List<JsonNode> events, Map<String, HumanKey> humans) {
+        /** Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An
+         * ApprovalDecided reviews the decision it names ({@code agentce:reviewedBy}; OVS-01, OVS-08, CND-02, INC-03,
+         * RSK-02) only when it does; one that fails it is no human's review. */
+        private Map<String, Boolean> mapOversight(List<JsonNode> events) {
+            Map<String, Boolean> byHuman = new LinkedHashMap<>();
             for (JsonNode event : events) {
+                String ptype = ptype(event);
+                if (!OVERSIGHT_TYPES.contains(ptype)) {
+                    continue;
+                }
                 String node = Iri.eventIri(event.get("id").asText());
+                HumanKey human = humanKey(node, event);
+                byHuman.put(node, human != null);
                 String decision = str(refsOf(event).get("decision"));
-                HumanKey human = humans.get(node);
-                if (!"ApprovalDecided".equals(ptype(event)) || human == null || decision == null) {
+                if (!"ApprovalDecided".equals(ptype) || human == null || decision == null) {
                     continue;
                 }
                 store.addEdge(decision, "agentce:reviewedBy", node);
                 decisionReviewed.add(decision);
                 humanReviewers.computeIfAbsent(decision, k -> new ArrayList<>()).add(human);
             }
+            return byHuman;
         }
 
         /** OVS-08 (Art. 14(5)): enough distinct human reviewers -- two when the decision's observed
