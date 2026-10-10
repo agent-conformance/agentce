@@ -544,6 +544,78 @@ test("only an approve outcome approves: a reject, an edit or no outcome is a rev
   }
 });
 
+test("a later reject by the same human withdraws the approval: the most recent decision before the action governs", () => {
+  for (const [actor, outcome, decidedAt, approved] of [
+    [HUMAN_A, "reject", "2026-01-10T02:00:00Z", false],
+    [HUMAN_A, "edit", "2026-01-10T02:00:00Z", false],
+    [HUMAN_A, "reject", "2026-01-10T01:00:00Z", false],
+    [HUMAN_A, "reject", "2026-01-10T03:00:00Z", false],
+    [HUMAN_A, "reject", "2026-01-10T04:00:00Z", true],
+    [HUMAN_A, "reject", "2026-01-10T02:00:00", false],
+    [HUMAN_A, "reject", "2026-01-10T03:30:00+02:00", false],
+    [HUMAN_A, "reject", "2026-01-10T00:30:00Z", true],
+    [HUMAN_B, "reject", "2026-01-10T02:00:00Z", true],
+  ] as const) {
+    const decided = (
+      id: string,
+      who: typeof HUMAN_A | typeof HUMAN_B,
+      out: string,
+      time: string,
+    ) => ({
+      ...refEvent(
+        id,
+        "ApprovalDecided",
+        { outcome: out, actor: who, session_ref: sessionOf(who) },
+        "d1",
+      ),
+      time,
+    });
+    const events = [
+      decisionEvent("d1"),
+      { ...refEvent("t0", "ToolCall", {}, "d1"), time: "2026-01-10T03:00:00Z" },
+      decided("a1", HUMAN_A, "approve", "2026-01-10T01:00:00Z"),
+      decided("a2", actor, outcome, decidedAt),
+      ...LOGINS,
+    ];
+    const store = buildGraph(events, { domain: MINOR_DOMAIN });
+    assert.deepEqual(store.objects("agentce:event/d1", "agentce:reviewedBy"), [
+      "agentce:event/a1",
+      "agentce:event/a2",
+    ]);
+    assert.deepEqual(
+      store.objects("agentce:event/d1", "agentce:approvedBy"),
+      approved ? ["agentce:event/a1"] : [],
+      `${outcome} ${decidedAt}`,
+    );
+  }
+});
+
+test("the same human's reject withdraws the approval even when it fails the human-actor rule", () => {
+  for (const login of [undefined, sessionOf(HUMAN_B)]) {
+    const data: Record<string, unknown> = { outcome: "reject", actor: HUMAN_A };
+    if (login !== undefined) {
+      data.session_ref = login;
+    }
+    const events = [
+      decisionEvent("d1"),
+      {
+        ...refEvent(
+          "a1",
+          "ApprovalDecided",
+          { outcome: "approve", actor: HUMAN_A, session_ref: sessionOf(HUMAN_A) },
+          "d1",
+        ),
+        time: "2026-01-10T01:00:00Z",
+      },
+      { ...refEvent("a2", "ApprovalDecided", data, "d1"), time: "2026-01-10T02:00:00Z" },
+      ...LOGINS,
+    ];
+    const store = buildGraph(events, { domain: MINOR_DOMAIN });
+    assert.deepEqual(store.objects("agentce:event/d1", "agentce:reviewedBy"), ["agentce:event/a1"]);
+    assert.deepEqual(store.objects("agentce:event/d1", "agentce:approvedBy"), [], String(login));
+  }
+});
+
 test("an approve after the action ran is a review, not an approval: order compares instants", () => {
   for (const [approvedAt, approved] of [
     ["2026-01-10T00:00:00Z", true],

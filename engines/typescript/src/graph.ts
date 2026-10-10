@@ -142,6 +142,12 @@ function beforeEvery(time: string, actions: string[]): boolean {
   });
 }
 
+/** Whether `time` is after every action time, compared as instants (SPEC §6.7): a decision recorded after the action
+ * already ran cannot withdraw the approval it ran under (18.142). Never true when no action ran. */
+function afterEvery(time: string, actions: string[]): boolean {
+  return actions.length > 0 && actions.every((action) => compareLiterals(time, action) === 1);
+}
+
 function refsOf(event: Event): Record<string, unknown> {
   const refs = dataOf(event).refs;
   return isRecord(refs) ? refs : {};
@@ -965,11 +971,15 @@ class Builder {
 
   /** Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An ApprovalDecided
    * reviews the decision it names (`agentce:reviewedBy`; OVS-01, INC-03, RSK-02) only when it does, whatever its
-   * outcome; it also approves it (`agentce:approvedBy`; CND-02, OVS-08) only when its outcome is approve and it is
-   * recorded at or before every ToolCall that executes the decision (18.141); one that fails it is no human's review. */
+   * outcome; it also approves it (`agentce:approvedBy`; CND-02, OVS-08) only when its outcome is approve, it is
+   * recorded at or before every ToolCall that executes the decision (18.141), and the same human recorded no other
+   * decision on it at or after it, or at a time that cannot be placed against it, unless that decision came after
+   * every such ToolCall (18.142: each human's most recent decision governs); one that fails it is no human's review. */
   private mapOversight(events: Event[]): Map<string, boolean> {
     const byHuman = new Map<string, boolean>();
     const actionTimes = new Map<string, string[]>();
+    // decision -> human -> that human's decisions on it: [node, time, approve]
+    const decided = new Map<string, Map<string, Array<[string, string, boolean]>>>();
     for (const event of events) {
       const decision = refsOf(event).decision;
       if (this.ptype(event) === "ToolCall" && typeof decision === "string") {
@@ -987,24 +997,52 @@ class Builder {
       const key = this.verifiedActor(node, event);
       byHuman.set(node, key !== null);
       const decision = refsOf(event).decision;
-      if (ptype !== "ApprovalDecided" || key === null || typeof decision !== "string") {
+      if (ptype !== "ApprovalDecided" || typeof decision !== "string") {
         continue;
       }
-      this.store.addEdge(decision, "agentce:reviewedBy", node);
-      this.decisionReviewed.add(decision);
-      if (
-        dataOf(event).outcome !== "approve" ||
-        !beforeEvery(String(event.time ?? ""), actionTimes.get(decision) ?? [])
-      ) {
+      const approve = dataOf(event).outcome === "approve";
+      const actor = humanId(dataOf(event).actor);
+      // A human's own no withdraws that human's approve even when it fails §10.4 (fail closed, 18.142).
+      const human = key ?? (actor !== null && !approve ? principalIri(actor, this.key) : null);
+      if (human === null) {
         continue;
       }
-      this.store.addEdge(decision, "agentce:approvedBy", node);
-      let approvers = this.humanApprovers.get(decision);
-      if (!approvers) {
-        approvers = new Set();
-        this.humanApprovers.set(decision, approvers);
+      if (key !== null) {
+        this.store.addEdge(decision, "agentce:reviewedBy", node);
+        this.decisionReviewed.add(decision);
       }
-      approvers.add(key);
+      let byActor = decided.get(decision);
+      if (!byActor) {
+        byActor = new Map();
+        decided.set(decision, byActor);
+      }
+      const records = byActor.get(human) ?? [];
+      records.push([node, String(event.time ?? ""), key !== null && approve]);
+      byActor.set(human, records);
+    }
+    for (const [decision, byActor] of decided) {
+      const actions = actionTimes.get(decision) ?? [];
+      for (const [key, records] of byActor) {
+        const withdrawals = records
+          .filter(([, time, approve]) => !approve && !afterEvery(time, actions))
+          .map(([, time]) => time);
+        for (const [node, time, approve] of records) {
+          if (
+            !approve ||
+            !beforeEvery(time, actions) ||
+            !withdrawals.every((w) => compareLiterals(time, w) === 1)
+          ) {
+            continue;
+          }
+          this.store.addEdge(decision, "agentce:approvedBy", node);
+          let approvers = this.humanApprovers.get(decision);
+          if (!approvers) {
+            approvers = new Set();
+            this.humanApprovers.set(decision, approvers);
+          }
+          approvers.add(key);
+        }
+      }
     }
     return byHuman;
   }

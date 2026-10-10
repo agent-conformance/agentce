@@ -460,6 +460,57 @@ class GraphTest {
         }
     }
 
+    /** Each human's most recent decision before the action governs (18.142): the same human's reject or edit at or
+     * after an approve, or at a time that cannot be placed against it, withdraws it unless it came after every
+     * ToolCall; another human's reject does not. */
+    @Test
+    void aLaterRejectByTheSameHumanWithdrawsTheApproval() {
+        String[][] cases = {
+            {"alice", "reject", "2026-01-10T02:00:00Z", "false"},
+            {"alice", "edit", "2026-01-10T02:00:00Z", "false"},
+            {"alice", "reject", "2026-01-10T01:00:00Z", "false"},
+            {"alice", "reject", "2026-01-10T03:00:00Z", "false"},
+            {"alice", "reject", "2026-01-10T04:00:00Z", "true"},
+            {"alice", "reject", "2026-01-10T02:00:00", "false"},
+            {"alice", "reject", "2026-01-10T03:30:00+02:00", "false"},
+            {"alice", "reject", "2026-01-10T00:30:00Z", "true"},
+            {"bob", "reject", "2026-01-10T02:00:00Z", "true"},
+        };
+        for (String[] c : cases) {
+            ObjectNode action = (ObjectNode) event("t0", "ToolCall", decisionRef("d1"));
+            action.put("time", "2026-01-10T03:00:00Z");
+            ObjectNode approval = (ObjectNode) approval("a1", "d1", "alice");
+            approval.put("time", "2026-01-10T01:00:00Z");
+            ObjectNode later = (ObjectNode) event(
+                    "a2", "ApprovalDecided", decisionRef("d1") + ", \"outcome\": \"" + c[1] + "\", " + human(c[0]));
+            later.put("time", c[2]);
+            List<JsonNode> events = withLogins(List.of(decisionEvent("d1"), action, approval, later));
+            GraphStore store = Graph.buildGraph(events, DomainBinding.fromDict(CREDIT_DOMAIN));
+            String label = c[1] + " " + c[2];
+            assertEquals(List.of("agentce:event/a1", "agentce:event/a2"),
+                    store.objects("agentce:event/d1", "agentce:reviewedBy"), label);
+            assertEquals(Boolean.parseBoolean(c[3]) ? List.of("agentce:event/a1") : List.of(),
+                    store.objects("agentce:event/d1", "agentce:approvedBy"), label);
+        }
+    }
+
+    /** A human's own reject withdraws that human's approve even when it names no login or another human's login
+     * (18.142, fail closed); it is still no review. */
+    @Test
+    void theSameHumansRejectWithdrawsEvenWhenItFailsTheHumanActorRule() {
+        for (String login : new String[] {"", ", \"session_ref\": \"agentce:event/login-bob\""}) {
+            ObjectNode approval = (ObjectNode) approval("a1", "d1", "alice");
+            approval.put("time", "2026-01-10T01:00:00Z");
+            ObjectNode later = (ObjectNode) event("a2", "ApprovalDecided", decisionRef("d1")
+                    + ", \"outcome\": \"reject\", \"actor\": {\"kind\": \"human\", \"id\": \"alice\"}" + login);
+            later.put("time", "2026-01-10T02:00:00Z");
+            GraphStore store = Graph.buildGraph(
+                    withLogins(List.of(decisionEvent("d1"), approval, later)), DomainBinding.fromDict(CREDIT_DOMAIN));
+            assertEquals(List.of("agentce:event/a1"), store.objects("agentce:event/d1", "agentce:reviewedBy"), login);
+            assertEquals(List.of(), store.objects("agentce:event/d1", "agentce:approvedBy"), login);
+        }
+    }
+
     /** An approve gates the decision (agentce:approvedBy; CND-02, OVS-08) only when it is recorded at or before
      * every ToolCall that executes it, compared as instants; a later one is still a review (agentce:reviewedBy). */
     @Test

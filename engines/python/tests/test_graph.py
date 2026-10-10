@@ -982,6 +982,67 @@ def test_an_approve_after_the_action_ran_is_a_review_not_an_approval() -> None:
         ]
 
 
+def test_a_later_reject_by_the_same_human_withdraws_the_approval() -> None:
+    """Each human's most recent decision before the action governs (18.142): the same human's reject or edit at or
+    after an approve, or at a time that cannot be placed against it, withdraws it unless it came after every ToolCall;
+    another human's reject does not."""
+    d1 = event_iri("d1")
+    for actor, outcome, decided_at, approved in (
+        (ALICE, "reject", "2026-01-10T02:00:00Z", False),
+        (ALICE, "edit", "2026-01-10T02:00:00Z", False),
+        (ALICE, "reject", "2026-01-10T01:00:00Z", False),
+        (ALICE, "reject", "2026-01-10T03:00:00Z", False),
+        (ALICE, "reject", "2026-01-10T04:00:00Z", True),
+        (ALICE, "reject", "2026-01-10T02:00:00", False),
+        (ALICE, "reject", "2026-01-10T03:30:00+02:00", False),
+        (ALICE, "reject", "2026-01-10T00:30:00Z", True),
+        (BOB, "reject", "2026-01-10T02:00:00Z", True),
+    ):
+        action = _event("t0", "ToolCall", {"refs": {"decision": d1}})
+        action["time"] = "2026-01-10T03:00:00Z"
+        approval = {**_approval("a1", ALICE), "time": "2026-01-10T01:00:00Z"}
+        later = {**_approval("a2", actor, outcome), "time": decided_at}
+        events = [
+            decision("d1", "2026-01-10T00:00:00Z"),
+            action,
+            approval,
+            later,
+            *LOGINS,
+        ]
+        store = build_graph(events, domain=DOMAIN)
+        assert store.objects(d1, "agentce:reviewedBy") == [
+            event_iri("a1"),
+            event_iri("a2"),
+        ]
+        assert store.objects(d1, "agentce:approvedBy") == (
+            [event_iri("a1")] if approved else []
+        ), (outcome, decided_at)
+
+
+def test_the_same_humans_reject_withdraws_even_when_it_fails_the_human_actor_rule() -> (
+    None
+):
+    """A human's own reject withdraws that human's approve even when it names no login or another human's login
+    (18.142, fail closed); it is still no review."""
+    d1 = event_iri("d1")
+    for login in (None, _session(BOB)):
+        later = _approval("a2", ALICE, "reject")
+        later["time"] = "2026-01-10T02:00:00Z"
+        if login is None:
+            del later["data"]["session_ref"]
+        else:
+            later["data"]["session_ref"] = login
+        events = [
+            decision("d1", "2026-01-10T00:00:00Z"),
+            {**_approval("a1", ALICE), "time": "2026-01-10T01:00:00Z"},
+            later,
+            *LOGINS,
+        ]
+        store = build_graph(events, domain=DOMAIN)
+        assert store.objects(d1, "agentce:reviewedBy") == [event_iri("a1")], login
+        assert store.objects(d1, "agentce:approvedBy") == [], login
+
+
 def test_dual_control_counts_the_same_human_once() -> None:
     events = [
         decision("d1", "t", modality="dual_control"),

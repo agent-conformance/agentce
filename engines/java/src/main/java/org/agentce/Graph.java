@@ -159,6 +159,18 @@ public final class Graph {
         });
     }
 
+    /** Whether {@code time} is after every action time, compared as instants (SPEC §6.7): a decision recorded after
+     * the action already ran cannot withdraw the approval it ran under (18.142). Never true when no action ran. */
+    private static boolean afterEvery(String time, List<String> actions) {
+        return !actions.isEmpty() && actions.stream().allMatch(action -> {
+            Integer order = Structural.compareLiterals(time, action);
+            return order != null && order > 0;
+        });
+    }
+
+    /** One human's decision on a decision: the ApprovalDecided node, its time and whether its outcome is approve. */
+    private record Decided(String node, String time, boolean approve) {}
+
     // DOC-01 (SPEC §7.4, Art. 11 / Annex IV): the events that declare an operating component (a
     // BundleLoaded manifest) or exercise one (a ToolCall or ModelCall) are typed with this
     // engine-materialised class, so one shape can compare the declaration with what operated.
@@ -986,11 +998,14 @@ public final class Graph {
         /** Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An
          * ApprovalDecided reviews the decision it names ({@code agentce:reviewedBy}; OVS-01, INC-03, RSK-02) only when
          * it does, whatever its outcome; it also approves it ({@code agentce:approvedBy}; CND-02, OVS-08) only when its
-         * outcome is approve and it is recorded at or before every ToolCall that executes the decision (18.141). One
-         * that fails the rule is no human's review. */
+         * outcome is approve, it is recorded at or before every ToolCall that executes the decision (18.141), and the
+         * same human recorded no other decision on it at or after it, or at a time that cannot be placed against it,
+         * unless that decision came after every such ToolCall (18.142: each human's most recent decision governs).
+         * One that fails the rule is no human's review. */
         private Map<String, Boolean> mapOversight(List<JsonNode> events) {
             Map<String, Boolean> byHuman = new LinkedHashMap<>();
             Map<String, List<String>> actionTimes = new LinkedHashMap<>();
+            Map<String, Map<String, List<Decided>>> decided = new LinkedHashMap<>();
             for (JsonNode event : events) {
                 String decision = str(refsOf(event).get("decision"));
                 if ("ToolCall".equals(ptype(event)) && decision != null) {
@@ -1006,15 +1021,41 @@ public final class Graph {
                 String human = verifiedActor(node, event);
                 byHuman.put(node, human != null);
                 String decision = str(refsOf(event).get("decision"));
-                if (!"ApprovalDecided".equals(ptype) || human == null || decision == null) {
+                if (!"ApprovalDecided".equals(ptype) || decision == null) {
                     continue;
                 }
-                store.addEdge(decision, "agentce:reviewedBy", node);
-                decisionReviewed.add(decision);
-                if ("approve".equals(str(dataOf(event).get("outcome")))
-                        && beforeEvery(timeOf(event), actionTimes.getOrDefault(decision, List.of()))) {
-                    store.addEdge(decision, "agentce:approvedBy", node);
-                    humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);
+                boolean approve = "approve".equals(str(dataOf(event).get("outcome")));
+                String actor = humanId(dataOf(event).get("actor"));
+                // A human's own no withdraws that human's approve even when it fails §10.4 (fail closed, 18.142).
+                String who = human != null ? human : actor != null && !approve ? Iri.principalIri(actor, key) : null;
+                if (who == null) {
+                    continue;
+                }
+                if (human != null) {
+                    store.addEdge(decision, "agentce:reviewedBy", node);
+                    decisionReviewed.add(decision);
+                }
+                decided.computeIfAbsent(decision, k -> new LinkedHashMap<>())
+                        .computeIfAbsent(who, k -> new ArrayList<>())
+                        .add(new Decided(node, timeOf(event), human != null && approve));
+            }
+            for (Map.Entry<String, Map<String, List<Decided>>> byDecision : decided.entrySet()) {
+                String decision = byDecision.getKey();
+                List<String> actions = actionTimes.getOrDefault(decision, List.of());
+                for (Map.Entry<String, List<Decided>> byActor : byDecision.getValue().entrySet()) {
+                    List<String> withdrawals = byActor.getValue().stream()
+                            .filter(d -> !d.approve() && !afterEvery(d.time(), actions))
+                            .map(Decided::time)
+                            .toList();
+                    for (Decided d : byActor.getValue()) {
+                        if (d.approve() && beforeEvery(d.time(), actions) && withdrawals.stream().allMatch(w -> {
+                            Integer order = Structural.compareLiterals(d.time(), w);
+                            return order != null && order > 0;
+                        })) {
+                            store.addEdge(decision, "agentce:approvedBy", d.node());
+                            humanApprovers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(byActor.getKey());
+                        }
+                    }
                 }
             }
             return byHuman;

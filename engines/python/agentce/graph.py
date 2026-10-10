@@ -15,7 +15,7 @@ materialised so class membership needs no inference (SPEC §7.2). Everything is 
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from typing import Any
 
 from .domain import DomainBinding
@@ -262,6 +262,14 @@ def _before_every(time: str, actions: Iterable[str]) -> bool:
     """Whether ``time`` is at or before every action time, compared as instants (SPEC §6.7); a time that cannot be
     compared with an action's gates nothing."""
     return all(compare_literals(time, action) in (-1, 0) for action in actions)
+
+
+def _after_every(time: str, actions: Collection[str]) -> bool:
+    """Whether ``time`` is after every action time, compared as instants (SPEC §6.7): a decision recorded after the
+    action already ran cannot withdraw the approval it ran under (18.142). Never true when no action ran."""
+    return bool(actions) and all(
+        compare_literals(time, action) == 1 for action in actions
+    )
 
 
 class _Builder:
@@ -762,10 +770,13 @@ class _Builder:
         """Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An
         ApprovalDecided reviews the decision it names (``agentce:reviewedBy``; OVS-01, INC-03, RSK-02) only when it
         does, whatever its outcome; it also approves it (``agentce:approvedBy``; CND-02, OVS-08) only when its outcome
-        is approve and it is recorded at or before every ToolCall that executes the decision (18.141). One that fails
+        is approve, it is recorded at or before every ToolCall that executes the decision (18.141), and the same human
+        recorded no other decision on it at or after it, or at a time that cannot be placed against it, unless that
+        decision came after every such ToolCall (18.142: each human's most recent decision governs). One that fails
         the rule is no human's review."""
         by_human: dict[str, bool] = {}
         action_times: dict[str, list[str]] = {}
+        decided: dict[tuple[str, str], list[tuple[str, str, bool]]] = {}
         for event in events:
             decision = _refs(event).get("decision")
             if self._ptype(event) == "ToolCall" and isinstance(decision, str):
@@ -778,6 +789,18 @@ class _Builder:
             key = self._verified_actor(node, event)
             by_human[node] = key is not None
             decision = _refs(event).get("decision")
+            actor = _human_id(_data(event).get("actor"))
+            if (
+                ptype == "ApprovalDecided"
+                and key is None
+                and isinstance(decision, str)
+                and actor is not None
+                and _data(event).get("outcome") != "approve"
+            ):
+                # A human's own no withdraws that human's approve even when it fails §10.4 (fail closed, 18.142).
+                decided.setdefault(
+                    (decision, principal_iri(actor, self.key)), []
+                ).append((node, str(event.get("time", "")), False))
             if (
                 ptype == "ApprovalDecided"
                 and key is not None
@@ -785,8 +808,25 @@ class _Builder:
             ):
                 self.store.add_edge(decision, "agentce:reviewedBy", node)
                 self.decision_reviewed.add(decision)
-                if _data(event).get("outcome") == "approve" and _before_every(
-                    str(event.get("time", "")), action_times.get(decision, ())
+                decided.setdefault((decision, key), []).append(
+                    (
+                        node,
+                        str(event.get("time", "")),
+                        _data(event).get("outcome") == "approve",
+                    )
+                )
+        for (decision, key), records in decided.items():
+            actions = action_times.get(decision, ())
+            withdrawals = [
+                time
+                for _, time, approve in records
+                if not approve and not _after_every(time, actions)
+            ]
+            for node, time, approve in records:
+                if (
+                    approve
+                    and _before_every(time, actions)
+                    and all(compare_literals(time, w) == 1 for w in withdrawals)
                 ):
                     self.store.add_edge(decision, "agentce:approvedBy", node)
                     self.human_approvers.setdefault(decision, set()).add(key)
