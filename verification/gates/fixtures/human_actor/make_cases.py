@@ -93,6 +93,12 @@ case("override-session-bare-id", "OVS-07", [dec(), idp(), override(s="bare")], N
 case("override-session-self-report", "OVS-07", [dec(), idp(cls="self_report"), override()], NC, ["v1"])
 case("override-session-is-itself", "OVS-07", [dec(), override(s="v1")], NC, ["v1"])
 case("override-session-is-a-toolcall", "OVS-07", [dec(), ev("t1", "ToolCall", tool={"name": "x"}), override(s="t1")], NC, ["v1"])
+# A record of the identity provider itself that is not a SessionStart: only the type check stops it.
+IDP_CALL = idp("t9")
+IDP_CALL["type"] = "org.agent-conformance.evidence.ToolCall.v1"
+IDP_CALL["data"].update({"@type": "ToolCall", "tool": {"name": "lookup"}})
+del IDP_CALL["data"]["environment"]
+case("override-session-is-an-idp-toolcall", "OVS-07", [dec(), IDP_CALL, override(s="t9")], NC, ["v1"])
 case("override-session-is-the-agents-own-session", "OVS-07", [dec(), idp(cls="enforcement_point", agent=SUBJECT), override()], NC, ["v1"])
 case("override-session-is-an-approval", "OVS-07", [dec(), appr(s=None), override(s="a1")], NC, ["v1"])
 case("override-session-class-mismatch", "OVS-07", [dec(), idp(source="urn:src:self_report"), override()], NC, ["v1"], 1)
@@ -119,6 +125,7 @@ case("approval-session-not-held", "OVS-01", [dec(), appr(s="s9")], NC, ["d1"])
 case("approval-session-self-report", "OVS-01", [dec(), idp(cls="self_report"), appr()], NC, ["d1"])
 case("approval-session-is-the-outcome", "OVS-01", [dec(), ev("o1", "Outcome", refs={"decision": ref("d1")}, outcome_type="approved"), appr(s="o1")], NC, ["d1"])
 case("approval-session-is-a-policy-decision", "OVS-01", [dec(), ev("p1", "PolicyDecision", cls="enforcement_point", decision="allow", policy_id="p"), appr(s="p1")], NC, ["d1"])
+case("approval-session-is-an-idp-toolcall", "OVS-01", [dec(), IDP_CALL, appr(s="t9")], NC, ["d1"])
 case("approval-session-is-the-agents-own-session", "OVS-01", [dec(), idp(cls="enforcement_point", agent=SUBJECT), appr()], NC, ["d1"])
 case("approval-human-in-delegation-chain", "OVS-01", [dec(), idp(), appr(actor=human(OWNER))], NC, ["d1"])
 case("approval-no-actor-with-session", "OVS-01", [dec(), idp(), appr(actor=None)], NC, ["d1"])
