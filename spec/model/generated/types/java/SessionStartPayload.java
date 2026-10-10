@@ -19,6 +19,7 @@ public class SessionStartPayload extends Payload {
   private List<String> modelVersions;
   private String intendedPurposeRef;
   private String registrationRef;
+  private Principal principal;
 
 
 }

@@ -1405,16 +1405,12 @@
             sh:description "Source-specific extras; never evaluated by rules." ;
             sh:maxCount 1 ;
             sh:nodeKind sh:Literal ;
-            sh:order 11 ;
+            sh:order 12 ;
             sh:path <https://agent-conformance.org/vocab/evidence/v1#ext> ],
         [ sh:datatype xsd:string ;
             sh:nodeKind sh:Literal ;
             sh:order 3 ;
             sh:path <https://agent-conformance.org/vocab/evidence/v1#model_versions> ],
-        [ sh:datatype xsd:string ;
-            sh:nodeKind sh:Literal ;
-            sh:order 7 ;
-            sh:path prov:actedOnBehalfOf ],
         [ sh:datatype xsd:string ;
             sh:maxCount 1 ;
             sh:nodeKind sh:Literal ;
@@ -1440,26 +1436,36 @@
             sh:nodeKind sh:Literal ;
             sh:order 4 ;
             sh:path <https://agent-conformance.org/vocab/evidence/v1#intended_purpose_ref> ],
+        [ sh:datatype xsd:string ;
+            sh:nodeKind sh:Literal ;
+            sh:order 8 ;
+            sh:path prov:actedOnBehalfOf ],
         [ sh:class <https://agent-conformance.org/vocab/evidence/v1#IntegrityBlock> ;
             sh:maxCount 1 ;
             sh:nodeKind sh:BlankNodeOrIRI ;
-            sh:order 10 ;
+            sh:order 11 ;
             sh:path <https://agent-conformance.org/vocab/evidence/v1#integrity> ],
-        [ sh:datatype xsd:string ;
-            sh:maxCount 1 ;
-            sh:nodeKind sh:Literal ;
-            sh:order 8 ;
-            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
         [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Refs> ;
             sh:maxCount 1 ;
             sh:nodeKind sh:BlankNodeOrIRI ;
-            sh:order 9 ;
+            sh:order 10 ;
             sh:path <https://agent-conformance.org/vocab/evidence/v1#refs> ],
+        [ sh:datatype xsd:string ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 9 ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#session_id> ],
         [ sh:class <https://agent-conformance.org/vocab/evidence/v1#AgentRef> ;
             sh:maxCount 1 ;
             sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 7 ;
+            sh:path prov:wasAssociatedWith ],
+        [ sh:class <https://agent-conformance.org/vocab/evidence/v1#Principal> ;
+            sh:description "The human an identity provider authenticated in this session. An approval, override or interrupt counts as a human's only when the login its session_ref names gives that same human here (SPEC 10.4)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
             sh:order 6 ;
-            sh:path prov:wasAssociatedWith ] ;
+            sh:path <https://agent-conformance.org/vocab/evidence/v1#principal> ] ;
     sh:targetClass <https://agent-conformance.org/vocab/evidence/v1#SessionStartPayload> .
 
 <https://agent-conformance.org/vocab/evidence/v1#ToolCallPayload> a sh:NodeShape ;

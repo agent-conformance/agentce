@@ -424,6 +424,8 @@ type SessionStartPayload struct {
 	ModelVersions []string `json:"model_versions,omitempty"`
 	IntendedPurposeRef *string `json:"intended_purpose_ref,omitempty"`
 	RegistrationRef *string `json:"registration_ref,omitempty"`
+	// The human an identity provider authenticated in this session. An approval, override or interrupt counts as a human's only when the login its session_ref names gives that same human here (SPEC 10.4).
+	Principal *Principal `json:"principal,omitempty"`
 }
 
 type SessionEndPayload struct {

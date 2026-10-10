@@ -608,6 +608,7 @@ class SessionStartPayload(Payload):
     model_versions: Optional[Union[str, list[str]]] = empty_list()
     intended_purpose_ref: Optional[str] = None
     registration_ref: Optional[str] = None
+    principal: Optional[Union[dict, Principal]] = None
 
     def __post_init__(self, *_: str, **kwargs: Any):
         if self.deployer is not None and not isinstance(self.deployer, Principal):
@@ -628,6 +629,9 @@ class SessionStartPayload(Payload):
 
         if self.registration_ref is not None and not isinstance(self.registration_ref, str):
             self.registration_ref = str(self.registration_ref)
+
+        if self.principal is not None and not isinstance(self.principal, Principal):
+            self.principal = Principal(**as_dict(self.principal))
 
         super().__post_init__(**kwargs)
 
@@ -2054,6 +2058,9 @@ slots.sessionStartPayload__intended_purpose_ref = Slot(uri=AGENTCE.intended_purp
 
 slots.sessionStartPayload__registration_ref = Slot(uri=AGENTCE.registration_ref, name="sessionStartPayload__registration_ref", curie=AGENTCE.curie('registration_ref'),
                    model_uri=AGENTCE.sessionStartPayload__registration_ref, domain=None, range=Optional[str])
+
+slots.sessionStartPayload__principal = Slot(uri=AGENTCE.principal, name="sessionStartPayload__principal", curie=AGENTCE.curie('principal'),
+                   model_uri=AGENTCE.sessionStartPayload__principal, domain=None, range=Optional[Union[dict, Principal]])
 
 slots.sessionEndPayload__end_reason = Slot(uri=AGENTCE.end_reason, name="sessionEndPayload__end_reason", curie=AGENTCE.curie('end_reason'),
                    model_uri=AGENTCE.sessionEndPayload__end_reason, domain=None, range=Optional[Union[str, "EndReason"]])
