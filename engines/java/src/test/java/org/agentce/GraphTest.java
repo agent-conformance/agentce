@@ -480,4 +480,22 @@ class GraphTest {
             assertEquals(List.of("false"), flag(List.of(incident("x1", data)), "x1", "incidentResponded"), data);
         }
     }
+
+    @Test
+    void rsk02ADecisionIsRiskReviewedByAReviewOrAHeldPolicyDecisionItsAuthorizationNames() {
+        JsonNode policy = event("p1", "PolicyDecision", "\"decision\": \"allow\"");
+        JsonNode outcome = event("o1", "Outcome", "\"refs\": {\"decision\": \"agentce:event/d1\"}");
+        assertEquals(List.of("true"), flag(List.of(decisionEvent("d1"), approval("a1", "d1", "alice")),
+                "d1", "riskReviewed"));
+        assertEquals(List.of("true"), flag(List.of(policy,
+                decisionWith("d1", "\"refs\": {\"authorization\": \"agentce:event/p1\"}")), "d1", "riskReviewed"));
+        assertEquals(List.of("true"), flag(List.of(policy,
+                decisionWith("d1", "\"refs\": {\"request\": \"agentce:event/p1\"}")), "d1", "riskReviewed"));
+        assertEquals(List.of("false"), flag(List.of(decisionEvent("d1")), "d1", "riskReviewed"));
+        for (String ref : List.of("\"agentce:event/missing\"", "\"agentce:event/o1\"", "\"p1\"",
+                "[\"agentce:event/p1\"]")) {
+            assertEquals(List.of("false"), flag(List.of(policy, outcome,
+                    decisionWith("d1", "\"refs\": {\"authorization\": " + ref + "}")), "d1", "riskReviewed"), ref);
+        }
+    }
 }

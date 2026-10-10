@@ -6,8 +6,8 @@ materialises the glue edges that let the Portable Shape Profile avoid unbounded 
 ``agentce:chainTerminus``, ``agentce:chainVerified``, ``agentce:executesConsequential``,
 ``agentce:oversightModalityMatchesDeclared``, ``agentce:danglingRef``, ``agentce:precededBy``,
 ``agentce:componentDeclared``, ``agentce:declaredComponentsObserved``, ``agentce:triggersIncident``,
-``agentce:oversightCoverageComplete``, ``agentce:interventionEffective``, ``agentce:interventionByHuman`` and
-``agentce:incidentResponded`` --
+``agentce:oversightCoverageComplete``, ``agentce:interventionEffective``, ``agentce:interventionByHuman``,
+``agentce:incidentResponded`` and ``agentce:riskReviewed`` --
 from the domain binding, the delegation events, and the references between events. The
 ``rdfs:subClassOf*`` closure of the class hierarchy (base vocabulary plus the domain binding) is
 materialised so class membership needs no inference (SPEC §7.2). Everything is deterministic.
@@ -613,6 +613,11 @@ class _Builder:
 
     def _materialise(self, events: list[dict[str, Any]]) -> None:
         incident_decisions = self._incident_decisions(events)
+        policy_decisions = {
+            event_iri(str(event["id"]))
+            for event in events
+            if self._ptype(event) == "PolicyDecision"
+        }
         for event in events:
             node = event_iri(str(event["id"]))
             ptype = self._ptype(event)
@@ -630,6 +635,7 @@ class _Builder:
                     "agentce:triggersIncident",
                     incident_decisions is None or node in incident_decisions,
                 )
+                self._risk_reviewed(node, _refs(event), policy_decisions)
             if ptype in ("Override", "Interrupt"):
                 self._intervention(node, ptype, event)
             if ptype == "Incident":
@@ -677,6 +683,22 @@ class _Builder:
                     return None
                 out.add(named)
         return out
+
+    def _risk_reviewed(
+        self, node: str, refs: dict[str, Any], policy_decisions: set[str]
+    ) -> None:
+        """RSK-02 (Art. 9): a review of the decision, or a ``refs.authorization`` (or
+        ``refs.request``) naming a ``PolicyDecision`` the bundle holds. A name that leads to no
+        held policy decision gates nothing."""
+        self._literal(
+            node,
+            "agentce:riskReviewed",
+            node in self.decision_reviewed
+            or any(
+                isinstance(ref := refs.get(k), str) and ref in policy_decisions
+                for k in ("authorization", "request")
+            ),
+        )
 
     def _oversight_coverage(self, node: str, data: dict[str, Any]) -> None:
         """OVS-08 (Art. 14(5)): enough distinct human reviewers -- two when the decision's observed

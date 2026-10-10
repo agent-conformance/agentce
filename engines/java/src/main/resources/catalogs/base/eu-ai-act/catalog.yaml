@@ -11,7 +11,7 @@ title: EU AI Act base catalog
 provenance:
   source: https://agent-conformance.org/catalogs/base/eu-ai-act
   version: "2026.09"
-  digest: sha256:86a0f92f10fbc39d0e22434cfb62aca7944b9c2edd3f1e64dc7a340a103860a0
+  digest: sha256:c28c384c5623900b491110461bf35b83ee4184bd61414f07176bd8c53dc67bbf
 families: [REC, OVS, ROB, DAT, DOC, RSK, TRN, INC, INT]
 precision_policy:
   demote_below: "0.98"   # a rung-2 rule below this precision on the corpus is demoted (SPEC 11.6)

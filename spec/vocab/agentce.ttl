@@ -130,6 +130,9 @@ agentce:interventionByHuman a owl:DatatypeProperty ; rdfs:label "intervention by
 agentce:incidentResponded a owl:DatatypeProperty ; rdfs:label "incident responded" ;
   rdfs:domain agentce:Incident ; rdfs:range xsd:boolean ;
   rdfs:comment "Whether an Incident records its detection time and at least one response time (causal assessment, provider notification or report)." .
+agentce:riskReviewed a owl:DatatypeProperty ; rdfs:label "risk reviewed" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether the decision was reviewed, or its authorization names a PolicyDecision the bundle holds." .
 agentce:robustToUntrustedContent a owl:DatatypeProperty ; rdfs:label "robust to untrusted content" ;
   rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
   rdfs:comment "On a Decision: whether everything it used was trusted, through any number of hops -- no record it used was written untrusted, quarantined or blocked by the memory guard, or written with no trust or verdict from an untrusted provenance_origin_class; no read it used has trust_min untrusted or quarantined; and no instruction it acts on comes from an untrusted source class." .

@@ -1321,14 +1321,26 @@
       "control": "RSK-02",
       "outcome": "non-conformant",
       "population": {
-        "applicable": 3,
-        "failed": 1
+        "applicable": 5,
+        "failed": 3
       },
       "violations": [
         {
           "focus": "agentce:event/d2",
-          "path": "(agentce:authorizedBy | agentce:reviewedBy)",
-          "constraint": "sh:minCount",
+          "path": "agentce:riskReviewed",
+          "constraint": "sh:hasValue",
+          "message_key": "RSK-02.S1"
+        },
+        {
+          "focus": "agentce:event/d4",
+          "path": "agentce:riskReviewed",
+          "constraint": "sh:hasValue",
+          "message_key": "RSK-02.S1"
+        },
+        {
+          "focus": "agentce:event/d5",
+          "path": "agentce:riskReviewed",
+          "constraint": "sh:hasValue",
           "message_key": "RSK-02.S1"
         }
       ]

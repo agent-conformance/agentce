@@ -974,3 +974,35 @@ def test_incident_responded_needs_detection_and_a_response() -> None:
     assert _flag([detected_only], "x1", "incidentResponded") == ["false"]
     undetected = _incident("x1", reported_at="2026-01-02T00:00:00Z")
     assert _flag([undetected], "x1", "incidentResponded") == ["false"]
+
+
+def _authorized(ref: Any, key: str = "authorization") -> dict[str, Any]:
+    event = decision("d1", "t")
+    event["data"]["refs"] = {key: ref}
+    return event
+
+
+def test_risk_reviewed_by_a_review_or_a_held_policy_decision() -> None:
+    policy = _event("p1", "PolicyDecision", {"decision": "allow"})
+    assert _flag(
+        [decision("d1", "t"), _approval("a1", ALICE)], "d1", "riskReviewed"
+    ) == ["true"]
+    assert _flag([policy, _authorized(event_iri("p1"))], "d1", "riskReviewed") == [
+        "true"
+    ]
+    assert _flag(
+        [policy, _authorized(event_iri("p1"), "request")], "d1", "riskReviewed"
+    ) == ["true"]
+    assert _flag([decision("d1", "t")], "d1", "riskReviewed") == ["false"]
+
+
+def test_risk_reviewed_needs_the_authorization_to_name_a_held_policy_decision() -> None:
+    policy = _event("p1", "PolicyDecision", {"decision": "allow"})
+    outcome = _event("o1", "Outcome", {"refs": {"decision": event_iri("d1")}})
+    for events in (
+        [policy, _authorized(event_iri("missing"))],
+        [outcome, _authorized(event_iri("o1"))],
+        [policy, _authorized("p1")],
+        [policy, _authorized([event_iri("p1")])],
+    ):
+        assert _flag(events, "d1", "riskReviewed") == ["false"]

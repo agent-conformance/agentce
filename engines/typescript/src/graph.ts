@@ -6,7 +6,8 @@
  * `agentce:chainVerified`, `agentce:executesConsequential`, `agentce:oversightModalityMatchesDeclared`,
  * `agentce:danglingRef`, `agentce:precededBy`, `agentce:componentDeclared`,
  * `agentce:declaredComponentsObserved`, `agentce:triggersIncident`, `agentce:oversightCoverageComplete`,
- * `agentce:interventionEffective`, `agentce:interventionByHuman` and `agentce:incidentResponded`). The
+ * `agentce:interventionEffective`, `agentce:interventionByHuman`, `agentce:incidentResponded` and
+ * `agentce:riskReviewed`). The
  * `rdfs:subClassOf*` closure of the class hierarchy
  * (base vocabulary plus the domain binding) is materialised so class membership needs no inference.
  * This is a faithful port of the Python reference; it must build byte-identical graphs.
@@ -719,6 +720,9 @@ class Builder {
 
   private materialise(events: Event[]): void {
     const incidentDecisions = this.incidentDecisions(events);
+    const policyDecisions = new Set(
+      events.filter((e) => this.ptype(e) === "PolicyDecision").map((e) => eventIri(String(e.id))),
+    );
     for (const event of events) {
       const node = eventIri(String(event.id));
       const ptype = this.ptype(event);
@@ -738,6 +742,7 @@ class Builder {
           "agentce:triggersIncident",
           incidentDecisions === null || incidentDecisions.has(node),
         );
+        this.riskReviewed(node, refsOf(event), policyDecisions);
       }
       if (ptype === "Override" || ptype === "Interrupt") {
         this.intervention(node, ptype, event);
@@ -804,6 +809,24 @@ class Builder {
       }
     }
     return out;
+  }
+
+  /** RSK-02 (Art. 9): a review of the decision, or a `refs.authorization` (or `refs.request`) naming a
+   * `PolicyDecision` the bundle holds. A name that leads to no held policy decision gates nothing. */
+  private riskReviewed(
+    node: string,
+    refs: Record<string, unknown>,
+    policyDecisions: Set<string>,
+  ): void {
+    this.literal(
+      node,
+      "agentce:riskReviewed",
+      this.decisionReviewed.has(node) ||
+        ["authorization", "request"].some((k) => {
+          const ref = refs[k];
+          return typeof ref === "string" && policyDecisions.has(ref);
+        }),
+    );
   }
 
   /** OVS-08 (Art. 14(5)): enough distinct human reviewers -- two when the decision's observed or

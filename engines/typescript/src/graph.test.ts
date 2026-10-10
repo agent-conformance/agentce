@@ -528,3 +528,22 @@ test("ROB-07: an incident is responded to when detection and a response are reco
   assert.deepEqual(responded({ detected_at: at }), ["false"]);
   assert.deepEqual(responded({ detected_at: at, reported_at: "" }), ["false"]);
 });
+
+test("RSK-02: a decision is risk-reviewed by a review or a held policy decision its authorization names", () => {
+  const policy = refEvent("p1", "PolicyDecision", { decision: "allow" });
+  const authorized = (ref: unknown, key = "authorization") => {
+    const d = decisionEvent("d1");
+    return { ...d, data: { ...d.data, refs: { [key]: ref } } };
+  };
+  const risk = (events: Record<string, unknown>[]) => lit(events, "d1", "agentce:riskReviewed");
+  const review = refEvent("a1", "ApprovalDecided", { actor: HUMAN_A }, "d1");
+  assert.deepEqual(risk([decisionEvent("d1"), review]), ["true"]);
+  assert.deepEqual(risk([policy, authorized("agentce:event/p1")]), ["true"]);
+  assert.deepEqual(risk([policy, authorized("agentce:event/p1", "request")]), ["true"]);
+  assert.deepEqual(risk([decisionEvent("d1")]), ["false"]);
+  const outcome = refEvent("o1", "Outcome", {}, "d1");
+  assert.deepEqual(risk([policy, authorized("agentce:event/missing")]), ["false"]);
+  assert.deepEqual(risk([outcome, authorized("agentce:event/o1")]), ["false"]);
+  assert.deepEqual(risk([policy, authorized("p1")]), ["false"]);
+  assert.deepEqual(risk([policy, authorized(["agentce:event/p1"])]), ["false"]);
+});

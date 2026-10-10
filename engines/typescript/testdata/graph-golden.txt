@@ -106,6 +106,7 @@ L	agentce:event/dec-1	agentce:danglingRef	agentce:event/missing-x	xsd:string
 L	agentce:event/dec-1	agentce:explanationReconstructable	false	xsd:boolean
 L	agentce:event/dec-1	agentce:oversightCoverageComplete	false	xsd:boolean
 L	agentce:event/dec-1	agentce:oversightModalityMatchesDeclared	true	xsd:boolean
+L	agentce:event/dec-1	agentce:riskReviewed	true	xsd:boolean
 L	agentce:event/dec-1	agentce:robustToUntrustedContent	true	xsd:boolean
 L	agentce:event/dec-1	agentce:triggersIncident	false	xsd:boolean
 L	agentce:event/dec-1	agentce:untrustedContentRuledOn	false	xsd:boolean
@@ -114,6 +115,7 @@ L	agentce:event/dec-2	agentce:actsOnUntrusted	false	xsd:boolean
 L	agentce:event/dec-2	agentce:explanationReconstructable	false	xsd:boolean
 L	agentce:event/dec-2	agentce:oversightCoverageComplete	false	xsd:boolean
 L	agentce:event/dec-2	agentce:oversightModalityMatchesDeclared	false	xsd:boolean
+L	agentce:event/dec-2	agentce:riskReviewed	false	xsd:boolean
 L	agentce:event/dec-2	agentce:robustToUntrustedContent	true	xsd:boolean
 L	agentce:event/dec-2	agentce:triggersIncident	false	xsd:boolean
 L	agentce:event/dec-2	agentce:untrustedContentRuledOn	true	xsd:boolean

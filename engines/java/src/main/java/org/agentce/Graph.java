@@ -19,8 +19,8 @@ import java.util.stream.Stream;
  * {@code agentce:oversightModalityMatchesDeclared}, {@code agentce:danglingRef},
  * {@code agentce:precededBy}, {@code agentce:componentDeclared}, {@code agentce:declaredComponentsObserved},
  * {@code agentce:triggersIncident}, {@code agentce:oversightCoverageComplete},
- * {@code agentce:interventionEffective}, {@code agentce:interventionByHuman} and
- * {@code agentce:incidentResponded}). The {@code rdfs:subClassOf*} closure is materialised so class membership
+ * {@code agentce:interventionEffective}, {@code agentce:interventionByHuman},
+ * {@code agentce:incidentResponded} and {@code agentce:riskReviewed}). The {@code rdfs:subClassOf*} closure is materialised so class membership
  * needs no inference. This is a faithful port of the reference; it must build byte-identical graphs.
  */
 public final class Graph {
@@ -762,6 +762,12 @@ public final class Graph {
 
         private void materialise(List<JsonNode> events) {
             Set<String> incidentDecisions = incidentDecisions(events);
+            Set<String> policyDecisions = new LinkedHashSet<>();
+            for (JsonNode event : events) {
+                if ("PolicyDecision".equals(ptype(event))) {
+                    policyDecisions.add(Iri.eventIri(event.get("id").asText()));
+                }
+            }
             for (JsonNode event : events) {
                 String node = Iri.eventIri(event.get("id").asText());
                 String ptype = ptype(event);
@@ -778,6 +784,7 @@ public final class Graph {
                     oversightCoverage(node, data);
                     literal(node, "agentce:triggersIncident",
                             incidentDecisions == null || incidentDecisions.contains(node));
+                    riskReviewed(node, refsOf(event), policyDecisions);
                 }
                 if ("Override".equals(ptype) || "Interrupt".equals(ptype)) {
                     intervention(node, ptype, event);
@@ -841,6 +848,18 @@ public final class Graph {
                 }
             }
             return out;
+        }
+
+        /** RSK-02 (Art. 9): a review of the decision, or a {@code refs.authorization} (or
+         * {@code refs.request}) naming a {@code PolicyDecision} the bundle holds. A name that leads to
+         * no held policy decision gates nothing. */
+        private void riskReviewed(String node, JsonNode refs, Set<String> policyDecisions) {
+            boolean gated = decisionReviewed.contains(node);
+            for (String key : List.of("authorization", "request")) {
+                String ref = str(refs.get(key));
+                gated |= ref != null && policyDecisions.contains(ref);
+            }
+            literal(node, "agentce:riskReviewed", gated);
         }
 
         /** OVS-08 (Art. 14(5)): enough distinct human reviewers -- two when the decision's observed
