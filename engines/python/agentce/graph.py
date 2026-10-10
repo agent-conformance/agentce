@@ -96,6 +96,12 @@ _INTERRUPT_MECHANISMS: frozenset[str] = frozenset(
 )
 #: The stream classes an identity-provider login record must come from (SPEC §6.2 ApprovalDecided.session_ref, §10.4).
 _LOGIN_CLASSES: frozenset[str] = frozenset({"independent_system", "enforcement_point"})
+#: The characters the human-actor rule trims from each end of a principal id: Unicode White_Space plus U+FEFF, written
+#: out because Python's strip, JavaScript's trim and Java's strip each trim a different set (SPEC §10.4).
+_ID_PAD = (
+    "\t\n\x0b\x0c\r \x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
+    "\u2028\u2029\u202f\u205f\u3000\ufeff"
+)
 #: The records the SPEC §10.4 human-actor rule applies to.
 _OVERSIGHT_TYPES: frozenset[str] = frozenset(
     {"ApprovalDecided", "Override", "Interrupt"}
@@ -216,29 +222,20 @@ def _principal_ref(entry: Any) -> tuple[str | None, str | None]:
     return None, None
 
 
-def _human_actor(data: dict[str, Any]) -> str | None:
-    """The id of the event's ``actor`` when it is a human principal (SPEC §6.2, §7.3 human-actor
-    rule, first part); ``None`` for a missing, unnamed or non-human actor."""
-    actor = data.get("actor")
-    if isinstance(actor, dict) and actor.get("kind") == "human":
-        return _text(actor.get("id"))
+def _rule_id(value: Any) -> str | None:
+    """A principal id as the human-actor rule compares it: trimmed of ``_ID_PAD`` at both ends, ``None`` when nothing
+    is left, so a padded spelling of an id is the same principal everywhere in the rule."""
+    if not isinstance(value, str):
+        return None
+    return value.strip(_ID_PAD) or None
+
+
+def _human_id(principal: Any) -> str | None:
+    """The trimmed id of a human principal (SPEC §6.2 ``actor``, SessionStart ``principal``; §10.4 human-actor rule);
+    ``None`` for a missing, unnamed or non-human principal."""
+    if isinstance(principal, dict) and principal.get("kind") == "human":
+        return _rule_id(principal.get("id"))
     return None
-
-
-def _distinct_humans(keys: list[tuple[str, str]]) -> int:
-    """OVS-08: the number of distinct humans among verified ``(actor IRI, login IRI)`` keys. Two keys are one human
-    when they share the actor or the login, so one login under two spellings of an id, or one id over two logins,
-    counts once; the count does not depend on the order of the keys."""
-    groups: list[tuple[set[str], set[str]]] = []
-    for actor, login in keys:
-        joined = [g for g in groups if actor in g[0] or login in g[1]]
-        merged: tuple[set[str], set[str]] = ({actor}, {login})
-        for group in joined:
-            merged[0].update(group[0])
-            merged[1].update(group[1])
-            groups.remove(group)
-        groups.append(merged)
-    return len(groups)
 
 
 def _principal_class(kind: str | None) -> str:
@@ -289,14 +286,15 @@ class _Builder:
         # SPEC §10.4 human-actor rule, read in the second pass so file order never matters: event IRI -> (type,
         # source class, agent id) of every event; agent id -> every principal IRI in its delegation chain (its
         # acted_for and its DelegationIssued chains); event IRI -> the principal IRIs of its own acted_for.
-        self.event_info: dict[str, tuple[str, str | None, str | None]] = {}
+        # A SessionStart also records the IRI of the human principal its login names (18.140), else None.
+        self.event_info: dict[str, tuple[str, str | None, str | None, str | None]] = {}
         # event IRI -> the agents it concerns: its own agent and its CloudEvents subject (the assessed agent), so an
         # event that leaves out the optional agent still concerns the subject.
         self.event_agents: dict[str, frozenset[str]] = {}
         self.agent_chain: dict[str, set[str]] = {}
         self.acted_for: dict[str, set[str]] = {}
-        # OVS-08: decision IRI -> the (actor IRI, login IRI) key of every verified ApprovalDecided that reviewed it.
-        self.human_reviewers: dict[str, list[tuple[str, str]]] = {}
+        # OVS-08: decision IRI -> the actor IRI of every verified ApprovalDecided that reviewed it.
+        self.human_reviewers: dict[str, set[str]] = {}
         # INC-03: event IRI -> the decision its refs.decision names, whatever the event type.
         self.ref_decision: dict[str, str] = {}
 
@@ -346,10 +344,16 @@ class _Builder:
             else None
         )
         source_class = event.get("agentcesourceclass")
+        login_principal = (
+            _human_id(data.get("principal")) if ptype == "SessionStart" else None
+        )
         self.event_info[node] = (
             ptype,
             source_class if isinstance(source_class, str) else None,
             agent_id,
+            None
+            if login_principal is None
+            else principal_iri(login_principal, self.key),
         )
         self.acted_for[node] = self._principal_iris(data.get("acted_for"))
         subject = event.get("subject")
@@ -413,25 +417,25 @@ class _Builder:
             self.store.add_literal(p_iri, "agentce:chainIndex", str(index), INTEGER)
 
     def _principal_iris(self, principals: object) -> set[str]:
-        """The pseudonymised IRIs of an ``acted_for`` or ``chain`` list (SPEC §6.3: the delegation chain)."""
+        """The pseudonymised IRIs of an ``acted_for`` or ``chain`` list (SPEC §6.3: the delegation chain), ids trimmed
+        as the human-actor rule compares them."""
         if not isinstance(principals, list):
             return set()
-        ids = (_principal_ref(entry)[0] for entry in principals)
+        ids = (_rule_id(_principal_ref(entry)[0]) for entry in principals)
         return {principal_iri(pid, self.key) for pid in ids if pid is not None}
 
-    def _human_key(self, node: str, event: dict[str, Any]) -> tuple[str, str] | None:
-        """SPEC §10.4 human-actor rule: the ``(actor IRI, login IRI)`` of an ApprovalDecided, Override or Interrupt
-        whose actor is a human principal whose ``session_ref`` names a held identity-provider login record, and who is
-        nowhere in the delegation chain of the activity; ``None`` when any part fails (fail closed).
+    def _human_key(self, node: str, event: dict[str, Any]) -> str | None:
+        """SPEC §10.4 human-actor rule: the actor IRI of an ApprovalDecided, Override or Interrupt whose actor is a
+        human principal whose ``session_ref`` names a held identity-provider login record of that same human, and who
+        is nowhere in the delegation chain of the activity; ``None`` when any part fails (fail closed).
 
         The login record is a held ``SessionStart`` (the only session record the event model has) from an
-        independent_system or enforcement_point stream whose agent is none of the agents the oversight record
-        concerns: the own agent and CloudEvents subject of the record and of the named decision, whose own run session
-        is no human's login. The
-        delegation chain is the named decision's and the record's own ``acted_for`` and every chain of those
-        agents."""
+        independent_system or enforcement_point stream whose ``principal`` is the actor (ids trimmed of ``_ID_PAD``)
+        and whose agent is none of the agents the oversight record concerns: the own agent and CloudEvents subject of
+        the record and of the named decision, whose own run session is no human's login. The delegation chain is the
+        named decision's and the record's own ``acted_for`` and every chain of those agents."""
         data = _data(event)
-        actor = _human_actor(data)
+        actor = _human_id(data.get("actor"))
         login = data.get("session_ref")
         if actor is None or not isinstance(login, str) or login not in self.event_info:
             return None
@@ -441,18 +445,20 @@ class _Builder:
             if isinstance(decision, str)
             else frozenset()
         )
-        login_type, login_class, login_agent = self.event_info[login]
+        login_type, login_class, login_agent, login_principal = self.event_info[login]
         if login_type != "SessionStart" or login_class not in _LOGIN_CLASSES:
             return None
         if login_agent is None or login_agent in concerned:
+            return None
+        actor_iri = principal_iri(actor, self.key)
+        if login_principal != actor_iri:
             return None
         chain = set(self.acted_for[node])
         if isinstance(decision, str):
             chain |= self.acted_for.get(decision, set())
         for agent_id in concerned:
             chain |= self.agent_chain.get(agent_id, set())
-        actor_iri = principal_iri(actor, self.key)
-        return None if actor_iri in chain else (actor_iri, login)
+        return None if actor_iri in chain else actor_iri
 
     def _map_chain(self, agent_id: str, acted_for: object) -> None:
         if not isinstance(acted_for, list):
@@ -765,7 +771,7 @@ class _Builder:
             ):
                 self.store.add_edge(decision, "agentce:reviewedBy", node)
                 self.decision_reviewed.add(decision)
-                self.human_reviewers.setdefault(decision, []).append(key)
+                self.human_reviewers.setdefault(decision, set()).add(key)
         return by_human
 
     def _literal(self, node: str, predicate: str, value: bool) -> None:
@@ -822,7 +828,7 @@ class _Builder:
             else None
         )
         dual = "dual_control" in (data.get("oversight_modality"), declared)
-        reviewers = _distinct_humans(self.human_reviewers.get(node, []))
+        reviewers = len(self.human_reviewers.get(node, ()))
         self._literal(
             node,
             "agentce:oversightCoverageComplete",

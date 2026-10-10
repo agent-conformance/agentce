@@ -1,4 +1,4 @@
-"""Write cases.json for VG-HUMAN-ACTOR (18.126). Run from this folder: python make_cases.py.
+"""Write cases.json for VG-HUMAN-ACTOR (18.126, 18.140). Run from this folder: python make_cases.py.
 
 SPEC §10.4 human-actor rule: an ApprovalDecided, Override or Interrupt counts only when its actor is a human principal
 whose session_ref names an identity-provider record the bundle holds from an independent_system or enforcement_point
@@ -36,9 +36,12 @@ def dec(i="d1", dtype="dom:CreditDecision", **k):
 IDP = "urn:example:service:identity-provider"
 
 
-def idp(i="s1", cls="independent_system", agent=IDP, **k):
+def idp(i="s1", cls="independent_system", agent=IDP, who="u2", **k):
     """The identity-provider login record a session_ref names: a SessionStart of the identity provider, never of the
-    assessed agent (the agent's own run session is no human's login)."""
+    assessed agent (the agent's own run session is no human's login), naming the human it authenticated as its
+    principal (18.140): who=None leaves the principal out, a dict writes it as given."""
+    if who is not None:
+        k["principal"] = who if isinstance(who, dict) else {"id": who, "kind": "human"}
     e = ev(i, "SessionStart", cls=cls, environment="idp-login", **k)
     e["data"]["agent"] = {"id": agent}
     return e
@@ -97,12 +100,12 @@ case("override-session-is-a-toolcall", "OVS-07", [dec(), ev("t1", "ToolCall", to
 IDP_CALL = idp("t9")
 IDP_CALL["type"] = "org.agent-conformance.evidence.ToolCall.v1"
 IDP_CALL["data"].update({"@type": "ToolCall", "tool": {"name": "lookup"}})
-del IDP_CALL["data"]["environment"]
+del IDP_CALL["data"]["environment"], IDP_CALL["data"]["principal"]
 case("override-session-is-an-idp-toolcall", "OVS-07", [dec(), IDP_CALL, override(s="t9")], NC, ["v1"])
 case("override-session-is-the-agents-own-session", "OVS-07", [dec(), idp(cls="enforcement_point", agent=SUBJECT), override()], NC, ["v1"])
 case("override-session-is-an-approval", "OVS-07", [dec(), appr(s=None), override(s="a1")], NC, ["v1"])
 case("override-session-class-mismatch", "OVS-07", [dec(), idp(source="urn:src:self_report"), override()], NC, ["v1"], 1)
-case("override-human-in-delegation-chain", "OVS-07", [dec(), idp(), override(actor=human(OWNER))], NC, ["v1"])
+case("override-human-in-delegation-chain", "OVS-07", [dec(), idp(who=OWNER), override(actor=human(OWNER))], NC, ["v1"])
 case("override-actor-in-agent-chain-elsewhere", "OVS-07",
      [dec(), idp(), ev("t1", "ToolCall", tool={"name": "x"}, acted_for=[SVC, "u2"]), override()], NC, ["v1"])
 case("override-actor-in-delegation-issued-chain", "OVS-07",
@@ -114,7 +117,7 @@ case("override-human-blank-id", "OVS-07", [dec(), idp(), override(actor={"id": "
 # OVS-07, Interrupt: the halted agent's own chain.
 case("interrupt-human-verified-session", "OVS-07", [dec(), idp(), interrupt()], "conformant")
 case("interrupt-human-no-session-ref", "OVS-07", [dec(), idp(), interrupt(s=None)], NC, ["x1"])
-case("interrupt-human-in-agent-chain", "OVS-07", [dec(), idp(), interrupt(actor=human(OWNER))], NC, ["x1"])
+case("interrupt-human-in-agent-chain", "OVS-07", [dec(), idp(who=OWNER), interrupt(actor=human(OWNER))], NC, ["x1"])
 case("interrupt-session-not-held", "OVS-07", [dec(), interrupt(s="s9")], NC, ["x1"])
 case("interrupt-session-self-report", "OVS-07", [dec(), idp(cls="self_report"), interrupt()], NC, ["x1"])
 
@@ -129,7 +132,7 @@ def no_agent(e):
 OWN = dict(cls="enforcement_point", agent=SUBJECT)
 case("interrupt-no-agent-verified-session", "OVS-07", [dec(), idp(), no_agent(interrupt())], "conformant")
 case("interrupt-no-agent-agents-own-session", "OVS-07", [dec(), idp(**OWN), no_agent(interrupt())], NC, ["x1"])
-case("interrupt-no-agent-by-owner", "OVS-07", [dec(), idp(), no_agent(interrupt(actor=human(OWNER)))], NC, ["x1"])
+case("interrupt-no-agent-by-owner", "OVS-07", [dec(), idp(who=OWNER), no_agent(interrupt(actor=human(OWNER)))], NC, ["x1"])
 case("interrupt-other-agent-agents-own-session", "OVS-07",
      [dec(), idp(**OWN), interrupt(agent={"id": "spiffe://corp/agents/other"})], NC, ["x1"])
 case("override-no-agent-agents-own-session", "OVS-07", [no_agent(dec()), idp(**OWN), no_agent(override())], NC, ["v1"])
@@ -144,12 +147,12 @@ case("approval-session-is-the-outcome", "OVS-01", [dec(), ev("o1", "Outcome", re
 case("approval-session-is-a-policy-decision", "OVS-01", [dec(), ev("p1", "PolicyDecision", cls="enforcement_point", decision="allow", policy_id="p"), appr(s="p1")], NC, ["d1"])
 case("approval-session-is-an-idp-toolcall", "OVS-01", [dec(), IDP_CALL, appr(s="t9")], NC, ["d1"])
 case("approval-session-is-the-agents-own-session", "OVS-01", [dec(), idp(cls="enforcement_point", agent=SUBJECT), appr()], NC, ["d1"])
-case("approval-human-in-delegation-chain", "OVS-01", [dec(), idp(), appr(actor=human(OWNER))], NC, ["d1"])
+case("approval-human-in-delegation-chain", "OVS-01", [dec(), idp(who=OWNER), appr(actor=human(OWNER))], NC, ["d1"])
 case("approval-no-actor-with-session", "OVS-01", [dec(), idp(), appr(actor=None)], NC, ["d1"])
 # OVS-08: distinct verified humans; two approvals that resolve to one identity-provider record are one human.
 case("ovs08-verified-human", "OVS-08", [dec(), idp(), appr()], "conformant")
 case("dual-control-two-verified-humans", "OVS-08",
-     [dec(oversight_modality="dual_control"), idp("s1"), idp("s2"), appr("a1", actor=human("u2"), s="s1"),
+     [dec(oversight_modality="dual_control"), idp("s1"), idp("s2", who="u3"), appr("a1", actor=human("u2"), s="s1"),
       appr("a2", actor=human("u3"), s="s2")], "conformant")
 case("dual-control-one-human-two-ids", "OVS-08",
      [dec(oversight_modality="dual_control"), idp("s1"), appr("a1", actor=human("u2"), s="s1"),
@@ -161,16 +164,66 @@ case("dual-control-one-verified-one-not", "OVS-08",
      [dec(oversight_modality="dual_control"), idp("s1"), appr("a1", actor=human("u2"), s="s1"),
       appr("a2", actor=human("u3"), s=None)], NC, ["d1"])
 case("dual-control-one-in-chain", "OVS-08",
-     [dec(oversight_modality="dual_control"), idp("s1"), idp("s2"), appr("a1", actor=human("u2"), s="s1"),
+     [dec(oversight_modality="dual_control"), idp("s1"), idp("s2", who=OWNER), appr("a1", actor=human("u2"), s="s1"),
       appr("a2", actor=human(OWNER), s="s2")], NC, ["d1"])
 GW = ev("t0", "ToolCall", tool={"name": "x"}, refs={"decision": ref("d1")})  # CND-02 needs an enforcement-point call
 # The other controls that count a review: CND-02 (Conduct), RSK-02 and INC-03.
 case("cnd02-approval-verified", "CND-02", [dec(), GW, idp(), appr()], "conformant")
 case("cnd02-approval-no-session-ref", "CND-02", [dec(), GW, idp(), appr(s=None)], NC, ["d1"])
 case("rsk02-review-verified", "RSK-02", [dec(), idp(), appr()], "conformant")
-case("rsk02-review-in-delegation-chain", "RSK-02", [dec(), idp(), appr(actor=human(OWNER))], NC, ["d1"])
+case("rsk02-review-in-delegation-chain", "RSK-02", [dec(), idp(who=OWNER), appr(actor=human(OWNER))], NC, ["d1"])
 case("inc03-review-verified", "INC-03", [dec(), idp(), appr(), incident([ref("d1")])], "conformant")
 case("inc03-review-no-session-ref", "INC-03", [dec(), idp(), appr(s=None), incident([ref("d1")])], NC, ["d1"])
+
+# 18.140: the login must name the record's own actor as its principal (SPEC §10.4 "its session_ref": the actor's own
+# login). A login that names another human, no one, or a non-human principal never counts; ids compare after trimming
+# surrounding whitespace, so a padded spelling of an id is the same principal on both sides of every comparison.
+case("override-login-names-the-actor", "OVS-07", [dec(), idp(who="u2"), override(actor=human("u2"))], "conformant")
+case("interrupt-login-names-the-actor", "OVS-07", [dec(), idp(who="u2"), interrupt(actor=human("u2"))], "conformant")
+case("approval-login-names-the-actor", "OVS-01", [dec(), idp(who="u2"), appr(actor=human("u2"))], "conformant")
+case("override-login-names-another-principal", "OVS-07", [dec(), idp(who="u3"), override()], NC, ["v1"])
+case("interrupt-login-names-another-principal", "OVS-07", [dec(), idp(who="u3"), interrupt()], NC, ["x1"])
+case("approval-login-names-another-principal", "OVS-01", [dec(), idp(who="u3"), appr()], NC, ["d1"])
+case("override-login-names-no-principal", "OVS-07", [dec(), idp(who=None), override()], NC, ["v1"])
+case("interrupt-login-names-no-principal", "OVS-07", [dec(), idp(who=None), interrupt()], NC, ["x1"])
+case("approval-login-names-no-principal", "OVS-01", [dec(), idp(who=None), appr()], NC, ["d1"])
+case("override-login-principal-is-a-service", "OVS-07", [dec(), idp(who={"id": "u2", "kind": "service"}), override()], NC, ["v1"])
+case("override-login-principal-blank-id", "OVS-07", [dec(), idp(who={"id": " ", "kind": "human"}), override(actor=human(" "))], NC, ["v1"])
+case("dual-control-second-login-names-the-first-human", "OVS-08",
+     [dec(oversight_modality="dual_control"), idp("s1"), idp("s2"), appr("a1", actor=human("u2"), s="s1"),
+      appr("a2", actor=human("u3"), s="s2")], NC, ["d1"])
+case("cnd02-login-names-another-principal", "CND-02", [dec(), GW, idp(who="u3"), appr()], NC, ["d1"])
+# Row 232: a padded spelling of the owner's id, on the actor and its login, or in the chain, is still the owner.
+case("override-trailing-space-owner-id-variant", "OVS-07",
+     [dec(), idp(who=OWNER + " "), override(actor=human(OWNER + " "))], NC, ["v1"])
+case("approval-trailing-space-owner-id-variant", "OVS-01",
+     [dec(), idp(who=OWNER + " "), appr(actor=human(OWNER + " "))], NC, ["d1"])
+case("override-chain-trailing-space-id-variant", "OVS-07",
+     [ev("d1", "Decision", decision_type="dom:CreditDecision", acted_for=[SVC, OWNER + " "]), idp(who=OWNER),
+      override(actor=human(OWNER))], NC, ["v1"])
+case("override-actor-trailing-space-id-variant-same-human", "OVS-07",
+     [dec(), idp(who="u2"), override(actor=human("u2 "))], "conformant")
+# The engines trim one fixed set (Unicode White_Space plus U+FEFF), not their language's own trim: Python's strip keeps
+# U+FEFF, JavaScript's trim keeps U+0085 and Java's strip keeps U+00A0, so each pad below catches one of them.
+for pad, name in (("\u00a0", "nbsp"), ("\ufeff", "bom"), ("\u0085", "nel")):
+    case(f"override-{name}-owner-id-variant", "OVS-07",
+         [dec(), idp(who=OWNER + pad), override(actor=human(OWNER + pad))], NC, ["v1"])
+    case(f"approval-{name}-owner-id-variant", "OVS-01",
+         [dec(), idp(who=OWNER + pad), appr(actor=human(OWNER + pad))], NC, ["d1"])
+    case(f"interrupt-chain-{name}-id-variant", "OVS-07",
+         [ev("d1", "Decision", decision_type="dom:CreditDecision", acted_for=[SVC, pad + OWNER]), idp(who=OWNER),
+          interrupt(actor=human(OWNER))], NC, ["x1"])
+    case(f"override-actor-{name}-id-variant-same-human", "OVS-07",
+         [dec(), idp(who=pad + "u2"), override(actor=human("u2" + pad))], "conformant")
+# Row 234: a sub-agent's own SessionStart under the same subject names no human principal: no login.
+WORKER = "spiffe://corp/agents/worker"
+case("override-login-is-a-sub-agent-session", "OVS-07", [dec(), idp(cls="enforcement_point", agent=WORKER, who=None), override()], NC, ["v1"])
+case("approval-login-is-a-sub-agent-session", "OVS-01", [dec(), idp(cls="enforcement_point", agent=WORKER, who=None), appr()], NC, ["d1"])
+
+# A principal on a SessionStart is an identity provider's statement that it authenticated that human, whoever's
+# session it is: a sub-agent session from an enforcement-point stream that names the actor is that actor's login.
+case("override-sub-agent-session-names-the-actor", "OVS-07",
+     [dec(), idp(cls="enforcement_point", agent=WORKER, who="u2"), override()], "conformant")
 
 Path("cases.json").write_text(json.dumps({"cases": C}, indent=2) + "\n", encoding="utf-8")
 print(len(C), "cases")
