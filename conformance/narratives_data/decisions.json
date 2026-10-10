@@ -27,7 +27,7 @@
       "data": {"@type": "SessionStart", "agent": {"id": "urn:example:service:identity-provider"},
         "principal": {"kind": "human", "id": "human:supervisor"}}},
     {"id": "appr-review", "time": "2026-06-01T11:05:00.000Z", "data": {
-      "@type": "ApprovalDecided", "agent": {"id": "human:supervisor"},
+      "@type": "ApprovalDecided", "agent": {"id": "human:supervisor"}, "outcome": "approve",
       "actor": {"kind": "human", "id": "human:supervisor"},
       "session_ref": "agentce:event/login-supervisor",
       "refs": {"decision": "agentce:event/dec-review"}}},

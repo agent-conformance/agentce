@@ -4,4 +4,4 @@
 
 agentce:CND-02-Shape a sh:NodeShape ;
   sh:targetClass agentce:ConsequentialDecision ;
-  sh:property [ sh:path agentce:reviewedBy ; sh:minCount 1 ; sh:name "S1" ] .
+  sh:property [ sh:path agentce:approvedBy ; sh:minCount 1 ; sh:name "S1" ] .

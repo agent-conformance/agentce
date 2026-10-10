@@ -18,7 +18,7 @@
        "agent": {"id": "spiffe://corp/agent-a"}, "acted_for": [{"id": "human:officer", "kind": "human"}],
        "oversight_modality": "human_on_the_loop"}},
     {"id": "appr-1", "time": "2026-06-01T09:30:00.000Z",
-     "data": {"@type": "ApprovalDecided", "agent": {"id": "human:reviewer"},
+     "data": {"@type": "ApprovalDecided", "agent": {"id": "human:reviewer"}, "outcome": "approve",
        "actor": {"id": "human:reviewer", "kind": "human"}, "session_ref": "agentce:event/login-1",
        "refs": {"decision": "agentce:event/dec-1"}}},
     {"id": "login-1", "time": "2026-06-01T09:29:00.000Z", "agentcesourceclass": "independent_system",
