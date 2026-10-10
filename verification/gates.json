@@ -2951,7 +2951,7 @@
           "description": "Java drops the session check, so an override or approval with no session_ref, or one naming no held record, counts as a human's",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "            if (actor == null || loginInfo == null) {\n                return null;\n            }\n",
-          "replace": "            if (actor == null) {\n                return null;\n            }\n            if (loginInfo == null) {\n                return new HumanKey(Iri.principalIri(actor, key), \"\");\n            }\n"
+          "replace": "            if (actor == null) {\n                return null;\n            }\n            if (loginInfo == null) {\n                return Iri.principalIri(actor, key);\n            }\n"
         },
         {
           "description": "Python accepts any held record from an independent or enforcement-point stream as the login, so a session_ref naming the agent's gateway tool call counts",
@@ -3004,8 +3004,8 @@
         {
           "description": "Java drops the delegation-chain check, so the owner the agent acts for counts as the independent human",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
-          "search": "return chain.contains(actorIri) ? null : new HumanKey(actorIri, login);",
-          "replace": "return new HumanKey(actorIri, login);"
+          "search": "return chain.contains(actorIri) ? null : actorIri;",
+          "replace": "return actorIri;"
         },
         {
           "description": "Python compares principal ids untrimmed, so a padded spelling of the owner's id escapes the delegation-chain check",
@@ -3020,10 +3020,10 @@
           "replace": "  return value === \"\" ? null : value;"
         },
         {
-          "description": "Java keys OVS-08's distinct humans by actor id alone, so one login under two spellings of an id counts as two humans",
+          "description": "Java compares principal ids untrimmed, so a padded spelling of the owner's id escapes the delegation-chain check",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
-          "search": "if (group.get(0).contains(key.actor()) || group.get(1).contains(key.login())) {",
-          "replace": "if (group.get(0).contains(key.actor())) {"
+          "search": "        return end > start ? value.substring(start, end) : null;",
+          "replace": "        return value.isEmpty() ? null : value;"
         },
         {
           "description": "Python reads the concerned agents from the optional agent field alone, so an oversight record that leaves it out escapes the own-session and delegation-chain checks",
@@ -3066,6 +3066,18 @@
           "search": "  return end > start ? value.slice(start, end) : null;",
           "replace": "  return value.trim() || null;",
           "description": "TypeScript trims ids with its own trim, which keeps U+0085, so a padded spelling of the owner's id escapes the delegation-chain check"
+        },
+        {
+          "description": "Java drops the login-principal check, so a login that names another principal counts as the actor's",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "            if (!actorIri.equals(loginInfo.loginPrincipal())) {\n                return null;\n            }\n",
+          "replace": ""
+        },
+        {
+          "description": "Java trims ids with its own strip, which keeps U+00A0, so a padded spelling of the owner's id escapes the delegation-chain check",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "        return end > start ? value.substring(start, end) : null;",
+          "replace": "        return value.strip().isEmpty() ? null : value.strip();"
         }
       ],
       "fix_hint": "Run verification/gates/human_actor.sh; it names the engine, the case and what it gave against what was expected. The rule is _human_key / humanKey in each engine's graph builder (read in the second pass), the reviews it gates are mapReviews, and OVS-08's count is distinctHumans."
@@ -3297,8 +3309,8 @@
         {
           "description": "Java counts OVS-08 reviewers per approval, not per distinct human",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
-          "search": "humanReviewers.computeIfAbsent(decision, k -> new ArrayList<>()).add(human);",
-          "replace": "humanReviewers.computeIfAbsent(decision, k -> new ArrayList<>()).add(new HumanKey(node, node));"
+          "search": "humanReviewers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(human);",
+          "replace": "humanReviewers.computeIfAbsent(decision, k -> new LinkedHashSet<>()).add(node);"
         },
         {
           "description": "Python counts an RSK-02 authorization that names any string, not only a policy decision the bundle holds, so a dangling authorization reads conformant",
