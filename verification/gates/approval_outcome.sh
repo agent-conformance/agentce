@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Build gate helper for VG-APPROVAL-OUTCOME (18.136) and, given a fixture name, VG-APPROVAL-ORDER (approval_order,
 # 18.141), VG-APPROVAL-WITHDRAWAL (approval_withdrawal, 18.142), VG-DUPLICATE-ID-CLASS (duplicate_id_class, 18.143:
-# a record of a lower source class never displaces a higher-class record with the same event id) and VG-STREAM-SOURCE-BOUND
-# (stream_source_bound, 18.147: a record's claimed stream never joins another source's time-order group). An approval gates a decision only when its outcome
+# a record of a lower source class never displaces a higher-class record with the same event id), VG-STREAM-SOURCE-BOUND
+# (stream_source_bound, 18.147: a record's claimed stream never joins another source's time-order group) and
+# VG-TIME-ORDER-INSTANT (time_order_instant, 18.145: ingest compares stream times as instants). An approval gates a decision only when its outcome
 # is approve (SPEC §6.2 ApprovalDecided.outcome approve|edit|reject), it is recorded at or before every action that
 # executes the decision, and the same human did not withdraw it before the action ran. CND-02 and OVS-08 count
 # only such an approve (the agentce:approvedBy edge and OVS-08's distinct approvers); OVS-01, INC-03 and RSK-02 ask for

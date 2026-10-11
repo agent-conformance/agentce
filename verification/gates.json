@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.88.0",
+  "suite_version": "0.89.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3850,6 +3850,51 @@
           "file": "engines/java/src/main/java/org/agentce/Ingest.java",
           "search": "List<String> orderKey = List.of(candidate.source(), stream);",
           "replace": "List<String> orderKey = List.of(\"\", stream);"
+        }
+      ]
+    },
+    {
+      "id": "VG-TIME-ORDER-INSTANT",
+      "title": "Ingest's time-order check compares event times as instants, in all three engines: a UTC offset or a fraction of a second never puts a later record before an earlier one, so a human's later reject written with an offset is never quarantined time_order and still withdraws the approve (18.145)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/approval_outcome.sh",
+        "time_order_instant"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/time_order_instant/cases.json (11: CND-02 with one reviewer's approve at 01:00Z, the same human's reject and then the action, where the reject is written with a UTC offset (00:30-02:00, 02:30Z), as the same instant as the approve with another offset (03:00+02:00 against 01:00Z), or with a fraction of a second (01:00:00.500Z); the enforcement point's action written with an offset after its own earlier record; each against its twin written in UTC; a reject truly earlier than the approve written with an offset and in UTC; and a naive reject time that keeps byte order) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs, so each offset case reads exactly like its UTC twin (non-conformant, failing d1, nothing quarantined) and a truly earlier record is quarantined however its time is written",
+        "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
+      },
+      "fix_hint": "Run bash verification/gates/approval_outcome.sh time_order_instant; it names the engine, the case and what it gave against what was expected. Ingest (ingest.py _precedes / ingest.ts precedes / Ingest.java precedes) compares a record's time with the previous one in its stream through compare_instants (structural.py / structural.ts / Structural.java), and keeps byte order only when the two are not comparable instants.",
+      "faults": [
+        {
+          "description": "Python compares stream times as bytes, so a reject at 00:30-02:00 (02:30Z) after an approve at 01:00Z is quarantined time_order and CND-02 no longer fails d1",
+          "file": "engines/python/agentce/ingest.py",
+          "search": "return time < previous if order is None else order < 0",
+          "replace": "return time < previous"
+        },
+        {
+          "description": "TypeScript compares stream times as bytes",
+          "file": "engines/typescript/src/ingest.ts",
+          "search": "return order === null ? byteCompare(time, previous) < 0 : order < 0;",
+          "replace": "return byteCompare(time, previous) < 0;"
+        },
+        {
+          "description": "Java compares stream times as bytes",
+          "file": "engines/java/src/main/java/org/agentce/Ingest.java",
+          "search": "return order == null ? Json.byteCompare(time, previous) < 0 : order < 0;",
+          "replace": "return Json.byteCompare(time, previous) < 0;"
         }
       ]
     }

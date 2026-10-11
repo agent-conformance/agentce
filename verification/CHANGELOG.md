@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.89.0
+
+- `VG-TIME-ORDER-INSTANT` (18.145, new, tier quick) checks that ingest compares event times as instants when it checks
+  time order, in all three engines. Ingest compared a record's time with the previous one in its stream as text, so a
+  time written with a UTC offset or a fraction of a second could sort before an earlier one. A human's reject at
+  00:30 two hours behind UTC (02:30Z) after their approve at 01:00Z was quarantined for `time_order`, and CND-02 read
+  `insufficient_evidence` instead of catching the withdrawn approval. The other way round, a record truly earlier
+  than the one before it but written with an offset was accepted. Ingest now applies the offset and compares fractions
+  exactly, and keeps text order only for two times that cannot be compared as instants (one with no offset). The gate
+  runs 11 cases through the real Python, TypeScript and Java CLIs: a reject written with an offset, as the same
+  instant with another offset, and with a fraction of a second, and the enforcement point's action written with an
+  offset, each against its twin written in UTC; a truly earlier reject written with an offset and in UTC; and a reject
+  with no offset. The gate has one seeded fault per engine that compares the times as text.
+
 ## 0.88.0
 
 - `VG-STREAM-SOURCE-BOUND` (18.147, new, tier quick) checks that a record's claimed integrity stream never joins it to
