@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.88.0
+
+- `VG-STREAM-SOURCE-BOUND` (18.147, new, tier quick) checks that a record's claimed integrity stream never joins it to
+  another source's time-order group, in all three engines. Ingest checked time order per stream and took the stream
+  from the record's own `data.integrity.stream`. An agent's own record could name the enforcement point's stream with a
+  later time, and ingest then quarantined the enforcement point's genuine ToolCall for `time_order`, so CND-02 read
+  `insufficient_evidence` instead of catching the violation. Ingest now checks time order per source and claimed
+  stream. The gate runs 12 cases through the real Python, TypeScript and Java CLIs. Eight have an agent record claim
+  another source's stream: from a self_report source, an undeclared source and an independent_system source, naming
+  the gateway's own stream id, arriving after the ToolCall, naming another subject, and claiming the identity
+  provider's stream before an approve and before a reject. Each reads exactly like its twin, and a twelfth case shows
+  one source still keeps time order within its own stream. The gate has one seeded fault per engine that keys time
+  order on the claimed stream alone.
+
 ## 0.87.0
 
 - `VG-QUARANTINE-NO-PASS` (18.149, changed) checks the exit code a late record gives. When a guard's untrusted write

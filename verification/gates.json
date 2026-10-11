@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.87.0",
+  "suite_version": "0.88.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3805,6 +3805,51 @@
           "file": "engines/java/src/main/java/org/agentce/Assess.java",
           "search": "                    boolean isShort = !readable.isEmpty() && \"insufficient_evidence\".equals(assertion.outcome);\n",
           "replace": "                    boolean isShort = false;\n"
+        }
+      ]
+    },
+    {
+      "id": "VG-STREAM-SOURCE-BOUND",
+      "title": "A record's claimed integrity stream never joins it to another source's time-order group at ingest, in all three engines: time order is checked per (source, claimed stream), so an agent's own record that names the enforcement point's stream cannot get the enforcement point's genuine ToolCall quarantined time_order (18.147)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/approval_outcome.sh",
+        "stream_source_bound"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/stream_source_bound/cases.json (12: CND-02 with the agent's own routine Decision x9, recorded later than the enforcement point's ToolCall, claiming the enforcement point's stream from a self_report source, an undeclared source and an independent_system source, claiming the gateway's own claimed stream id, arriving after the ToolCall with an earlier time, and naming another subject, against the twin where x9 claims nothing; x9 claiming the identity provider's stream before an approve through the login and before a reject, against their twins; and one source's own later record quarantining its earlier ToolCall in the stream both claim) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs, so each hijack case reads exactly like its twin (non-conformant, failing d1, nothing quarantined) and one source still keeps time order within its own stream",
+        "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
+      },
+      "fix_hint": "Run bash verification/gates/approval_outcome.sh stream_source_bound; it names the engine, the case and what it gave against what was expected. Ingest (ingest.py / ingest.ts / Ingest.java) keeps the last time per ordering key, order_key / orderKey = (the record's source, the stream it claims or its source); the quarantine record's stream field keeps the claimed stream.",
+      "faults": [
+        {
+          "description": "Python keys time order on the claimed stream alone, so the agent's record naming the enforcement point's stream quarantines the genuine ToolCall time_order",
+          "file": "engines/python/agentce/ingest.py",
+          "search": "order_key = (source, stream)",
+          "replace": "order_key = (\"\", stream)"
+        },
+        {
+          "description": "TypeScript keys time order on the claimed stream alone",
+          "file": "engines/typescript/src/ingest.ts",
+          "search": "const orderKey = JSON.stringify([source, stream]);",
+          "replace": "const orderKey = JSON.stringify([\"\", stream]);"
+        },
+        {
+          "description": "Java keys time order on the claimed stream alone",
+          "file": "engines/java/src/main/java/org/agentce/Ingest.java",
+          "search": "List<String> orderKey = List.of(candidate.source(), stream);",
+          "replace": "List<String> orderKey = List.of(\"\", stream);"
         }
       ]
     }
