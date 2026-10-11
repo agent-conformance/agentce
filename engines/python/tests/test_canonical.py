@@ -63,3 +63,20 @@ def test_the_extreme_accepted_integers_are_exact() -> None:
         == "-9007199254740991"
     )
     assert canonical.canonical_string(json.loads("-0")) == "0"
+
+
+def test_a_value_nested_to_the_input_depth_limit_has_a_canonical_form() -> None:
+    # Ingest reads records nested up to MAX_JSON_DEPTH, and a quarantined one is hashed (18.119).
+    from agentce.signing import MAX_JSON_DEPTH
+
+    value: object = []
+    for _ in range(MAX_JSON_DEPTH - 1):
+        value = [value]
+    text = canonical.canonical_string({"a": value})
+    assert text == '{"a":' + "[" * MAX_JSON_DEPTH + "]" * MAX_JSON_DEPTH + "}"
+
+
+def test_the_first_problem_in_document_order_is_refused() -> None:
+    with pytest.raises(canonical.CanonicalizationError) as excinfo:
+        canonical.canonical_string({"b": 1.5, "a": [2**60]})
+    assert excinfo.value.reason == "integer_out_of_range"

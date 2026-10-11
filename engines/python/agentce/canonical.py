@@ -75,7 +75,11 @@ def _utf16_key(nfc_key: str) -> bytes:
     return nfc_key.encode("utf-16-be")
 
 
-def _serialise(value: object) -> str:
+class _Text(str):
+    """Output text already in canonical form, told apart from a JSON string still to serialise."""
+
+
+def _scalar(value: object) -> str:
     if value is None:
         return "null"
     if isinstance(
@@ -90,14 +94,10 @@ def _serialise(value: object) -> str:
         raise CanonicalizationError("non_integer_number", repr(value))
     if isinstance(value, str):
         return _string(value)
-    if isinstance(value, (list, tuple)):
-        return "[" + ",".join(_serialise(item) for item in value) + "]"
-    if isinstance(value, dict):
-        return _serialise_object(value)
     raise CanonicalizationError("unsupported_type", type(value).__name__)
 
 
-def _serialise_object(obj: dict[object, object]) -> str:
+def _sorted_members(obj: dict[object, object]) -> list[tuple[str, object]]:
     members: list[tuple[str, object]] = []
     seen: set[str] = set()
     for raw_key, raw_value in obj.items():
@@ -111,11 +111,37 @@ def _serialise_object(obj: dict[object, object]) -> str:
         seen.add(nfc_key)
         members.append((nfc_key, raw_value))
     members.sort(key=lambda kv: _utf16_key(kv[0]))
-    return (
-        "{"
-        + ",".join(_string(key) + ":" + _serialise(val) for key, val in members)
-        + "}"
-    )
+    return members
+
+
+def _serialise(value: object) -> str:
+    """Serialise with an explicit stack, in document order, so any depth the JSON reader accepts (SPEC R12) fits:
+    a recursive walk would exhaust Python's call stack well before that limit."""
+    out: list[str] = []
+    stack: list[object] = [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, _Text):
+            out.append(item)
+            continue
+        if isinstance(item, (list, tuple)):
+            parts: list[object] = [_Text("[")]
+            for position, element in enumerate(item):
+                if position:
+                    parts.append(_Text(","))
+                parts.append(element)
+            parts.append(_Text("]"))
+        elif isinstance(item, dict):
+            parts = [_Text("{")]
+            for position, (key, member) in enumerate(_sorted_members(item)):
+                parts.append(_Text(("," if position else "") + _string(key) + ":"))
+                parts.append(member)
+            parts.append(_Text("}"))
+        else:
+            out.append(_scalar(item))
+            continue
+        stack.extend(reversed(parts))
+    return "".join(out)
 
 
 def canonical_string(value: object) -> str:
