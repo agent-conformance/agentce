@@ -357,14 +357,17 @@ public final class Assess {
                             && ("conformant".equals(assertion.outcome)
                                     || ("not_applicable".equals(assertion.outcome)
                                             && roleApplies(roles, control.appliesToRoles)));
-                    if (!flattered) {
+                    // Held records that read insufficient_evidence may lack only what a late record supplies, so a
+                    // readable withheld record is judged with them too: it can still read non-conformant (18.149).
+                    boolean isShort = !readable.isEmpty() && "insufficient_evidence".equals(assertion.outcome);
+                    if (!(flattered || isShort)) {
                         assertions.add(assertion);
                         continue;
                     }
                     String withWithheld = readable.isEmpty()
                             ? assertion.outcome
                             : assertControl(cfStore, catalog, control, subject, roles, cfEvents, cfByIri, win).outcome;
-                    if (unreadable || !assertion.outcome.equals(withWithheld)) {
+                    if ((unreadable && flattered) || !assertion.outcome.equals(withWithheld)) {
                         assertion = notEnoughWithWithheld(assertion, own, "non-conformant".equals(withWithheld));
                     }
                     assertions.add(assertion);

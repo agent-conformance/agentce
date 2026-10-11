@@ -303,7 +303,8 @@ def assess_subjects(
     ``withheld`` is required, so every caller decides what ingest withheld; it is ingest's quarantined records that may hold evidence (18.119): quarantine never gives a
     better outcome. A control that reads conformant, or not_applicable for want of a population, reads
     insufficient_evidence naming them when a record ingest could not read may belong to the subject, or when
-    judging the subject's readable withheld records with its held ones changes that outcome."""
+    judging the subject's readable withheld records with its held ones changes that outcome. A control whose held
+    records read insufficient_evidence names the readable withheld records when judging them too changes it (18.149)."""
     assertions: list[Assertion] = []
     events_by_subject = index_by_subject(accepted)
     for subject in profile.subjects:
@@ -341,7 +342,10 @@ def assess_subjects(
                         and _role_applies(roles, control.applies_to_roles)
                     )
                 )
-                if not flattered:
+                # Held records that read insufficient_evidence may lack only what a late record supplies, so a
+                # readable withheld record is judged with them too: it can still read non-conformant (18.149).
+                short = bool(readable) and assertion.outcome == "insufficient_evidence"
+                if not (flattered or short):
                     assertions.append(assertion)
                     continue
                 with_withheld = (
@@ -359,7 +363,7 @@ def assess_subjects(
                         applicability_declared=applicability_declared,
                     ).outcome
                 )
-                if unreadable or with_withheld != assertion.outcome:
+                if (unreadable and flattered) or with_withheld != assertion.outcome:
                     assertion = _not_enough_with_withheld(
                         assertion,
                         own,

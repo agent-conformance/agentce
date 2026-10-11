@@ -347,7 +347,10 @@ export function assessSubjects(
           own.length > 0 &&
           (assertion.outcome === "conformant" ||
             (assertion.outcome === "not_applicable" && roleApplies(roles, control.appliesToRoles)));
-        if (!flattered) {
+        // Held records that read insufficient_evidence may lack only what a late record supplies, so a
+        // readable withheld record is judged with them too: it can still read non-conformant (18.149).
+        const short = readable.length > 0 && assertion.outcome === "insufficient_evidence";
+        if (!(flattered || short)) {
           assertions.push(assertion);
           continue;
         }
@@ -365,7 +368,7 @@ export function assessSubjects(
                 win,
                 applicabilityDeclared,
               ).outcome;
-        if (unreadable || withWithheld !== assertion.outcome) {
+        if ((unreadable && flattered) || withWithheld !== assertion.outcome) {
           assertion = notEnoughWithWithheld(assertion, own, withWithheld === "non-conformant");
         }
         assertions.push(assertion);
