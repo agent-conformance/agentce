@@ -998,7 +998,7 @@ class Builder {
    * decision on it at or after it, or at a time that cannot be placed against it, unless that decision came after
    * every such ToolCall (18.142: each human's most recent decision governs); one that fails it is no human's review.
    * Every refs.decision is read through `heldDecision` (18.148), and a ToolCall or Outcome naming no held decision
-   * bounds every decision's approvals. */
+   * (a null refs.decision included, 18.157) bounds every decision's approvals. */
   private mapOversight(events: Event[]): Map<string, boolean> {
     const byHuman = new Map<string, boolean>();
     const actionTimes = new Map<string, string[]>();
@@ -1010,10 +1010,12 @@ class Builder {
     const decided = new Map<string, Map<string, Array<[string, string, boolean]>>>();
     for (const event of events) {
       const ptype = this.ptype(event);
-      const ref = refsOf(event).decision;
-      if ((ptype !== "ToolCall" && ptype !== "Outcome") || ref === undefined || ref === null) {
+      const refs = refsOf(event);
+      // No refs.decision key is no claim; a present null names no held decision (18.157).
+      if ((ptype !== "ToolCall" && ptype !== "Outcome") || !Object.hasOwn(refs, "decision")) {
         continue;
       }
+      const ref = refs.decision;
       const time = String(event.time ?? "");
       const decision = this.heldDecision(ref);
       if (decision === null) {

@@ -721,6 +721,36 @@ test("a bare id names the decision in the approval bound, and an unresolved effe
   }
 });
 
+test("a null decision ref bounds every approval, and an absent one bounds none (18.157)", () => {
+  const d1 = "agentce:event/d1";
+  for (const [data, approved] of [
+    [{ refs: { decision: null } }, false],
+    [{ refs: {} }, true],
+    [{}, true],
+  ] as const) {
+    const events: Record<string, unknown>[] = [
+      decisionEvent("d1"),
+      {
+        ...memoryEvent("a1", "ApprovalDecided", {
+          outcome: "approve",
+          actor: HUMAN_A,
+          session_ref: sessionOf(HUMAN_A),
+          refs: { decision: d1 },
+        }),
+        time: "2026-01-10T05:00:00Z",
+      },
+      { ...memoryEvent("o1", "Outcome", { ...data }), time: "2026-01-10T01:00:00Z" },
+      ...LOGINS,
+    ];
+    const store = buildGraph(events, { domain: MINOR_DOMAIN });
+    assert.deepEqual(
+      store.objects(d1, "agentce:approvedBy"),
+      approved ? ["agentce:event/a1"] : [],
+      JSON.stringify(data),
+    );
+  }
+});
+
 test("OVS-07: an override is effective when it replaces a held decision's outcome", () => {
   const effective = (data: Record<string, unknown>, decision = "d1") =>
     lit(

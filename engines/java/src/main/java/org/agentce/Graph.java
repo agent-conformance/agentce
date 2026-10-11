@@ -1028,7 +1028,8 @@ public final class Graph {
          * Outcome that names it (18.144: the decision had already taken effect), and the same human recorded no other decision on it at or after it, or at a time that cannot be placed against it,
          * unless that decision came after every such ToolCall (18.142: each human's most recent decision governs).
          * One that fails the rule is no human's review. Every refs.decision is read through {@link #heldDecision}
-         * (18.148), and a ToolCall or Outcome naming no held decision bounds every decision's approvals. */
+         * (18.148), and a ToolCall or Outcome naming no held decision (a null refs.decision included, 18.157) bounds
+         * every decision's approvals. */
         private Map<String, Boolean> mapOversight(List<JsonNode> events) {
             Map<String, Boolean> byHuman = new LinkedHashMap<>();
             Map<String, List<String>> actionTimes = new LinkedHashMap<>();
@@ -1040,7 +1041,8 @@ public final class Graph {
             for (JsonNode event : events) {
                 String type = ptype(event);
                 JsonNode ref = refsOf(event).get("decision");
-                if (!("ToolCall".equals(type) || "Outcome".equals(type)) || ref == null || ref.isNull()) {
+                // No refs.decision key is no claim; a present null names no held decision (18.157).
+                if (!("ToolCall".equals(type) || "Outcome".equals(type)) || ref == null) {
                     continue;
                 }
                 String decision = heldDecision(ref);

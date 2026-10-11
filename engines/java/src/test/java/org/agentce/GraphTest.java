@@ -595,6 +595,28 @@ class GraphTest {
     }
 
     @Test
+    void aNullDecisionRefBoundsEveryApproval() {
+        // A present null refs.decision names no held decision, so it bounds the approve; an Outcome with no
+        // refs.decision key, or no refs, is no decision's effect (18.157).
+        String d1 = "agentce:event/d1";
+        String[][] cases = {
+            {"\"refs\": {\"decision\": null}", "false"},
+            {"\"refs\": {}", "true"},
+            {"", "true"},
+        };
+        for (String[] c : cases) {
+            ObjectNode approval = (ObjectNode) approval("a1", "d1", "alice");
+            approval.put("time", "2026-01-10T05:00:00Z");
+            ObjectNode outcome = (ObjectNode) event("o1", "Outcome", c[0]);
+            outcome.put("time", "2026-01-10T01:00:00Z");
+            List<JsonNode> events = withLogins(List.of(decisionEvent("d1"), approval, outcome));
+            GraphStore store = Graph.buildGraph(events, DomainBinding.fromDict(CREDIT_DOMAIN));
+            assertEquals(Boolean.parseBoolean(c[1]) ? List.of("agentce:event/a1") : List.of(),
+                    store.objects(d1, "agentce:approvedBy"), c[0]);
+        }
+    }
+
+    @Test
     void ovs08OneHumanReviewerCoversADecision() {
         assertEquals(List.of("false"), flag(List.of(decisionEvent("d1")), "d1", "oversightCoverageComplete"));
         JsonNode service = event("a1", "ApprovalDecided",

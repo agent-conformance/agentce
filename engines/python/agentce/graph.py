@@ -793,7 +793,7 @@ class _Builder:
         recorded no other decision on it at or after it, or at a time that cannot be placed against it, unless that
         decision came after every such ToolCall (18.142: each human's most recent decision governs). One that fails
         the rule is no human's review. Every refs.decision is read through ``_held_decision`` (18.148), and a ToolCall
-        or Outcome naming no held decision bounds every decision's approvals."""
+        or Outcome naming no held decision (a null refs.decision included, 18.157) bounds every decision's approvals."""
         by_human: dict[str, bool] = {}
         action_times: dict[str, list[str]] = {}
         outcome_times: dict[str, list[str]] = {}
@@ -803,9 +803,11 @@ class _Builder:
         decided: dict[tuple[str, str], list[tuple[str, str, bool]]] = {}
         for event in events:
             ptype = self._ptype(event)
-            ref = _refs(event).get("decision")
-            if ptype not in ("ToolCall", "Outcome") or ref is None:
+            refs = _refs(event)
+            # No refs.decision key is no claim; a present null names no held decision (18.157).
+            if ptype not in ("ToolCall", "Outcome") or "decision" not in refs:
                 continue
+            ref = refs["decision"]
             time = str(event.get("time", ""))
             decision = self._held_decision(ref)
             if decision is None:

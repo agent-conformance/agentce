@@ -1033,6 +1033,22 @@ def test_a_bare_id_names_the_decision() -> None:
         ), (outcome_ref, approval_ref)
 
 
+def test_a_null_decision_ref_bounds_every_approval() -> None:
+    """A present null refs.decision names no held decision, so an Outcome carrying it before the approve bounds it;
+    an Outcome with no refs.decision key, or no refs, is no decision's effect and bounds nothing (18.157)."""
+    d1 = event_iri("d1")
+    for refs, approved in (({"decision": None}, False), ({}, True), (None, True)):
+        approval = _approval("a1", ALICE)
+        approval["time"] = "2026-01-10T05:00:00Z"
+        outcome = _event("o1", "Outcome", {} if refs is None else {"refs": refs})
+        outcome["time"] = "2026-01-10T01:00:00Z"
+        events = [decision("d1", "2026-01-10T00:00:00Z"), approval, outcome, *LOGINS]
+        store = build_graph(events, domain=DOMAIN)
+        assert store.objects(d1, "agentce:approvedBy") == (
+            [event_iri("a1")] if approved else []
+        ), refs
+
+
 def test_a_later_reject_by_the_same_human_withdraws_the_approval() -> None:
     """Each human's most recent decision before the action governs (18.142): the same human's reject or edit at or
     after an approve, or at a time that cannot be placed against it, withdraws it unless it came after every ToolCall;
