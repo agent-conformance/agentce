@@ -171,6 +171,33 @@ case(
     ["d1"],
     exit=1,
 )
+# The guard's read supplies ROB-02's minimum evidence, so without it the held records read insufficient_evidence, not
+# conformant: delivered after a later write of the guard's stream it is still judged with them, reads non-conformant
+# and exits 1 as on time (18.149).
+LATER_WRITE = write_("w3", 5, "mem:r9", "trusted", "allow")
+WRITES = [write_("w1", 1, "mem:r1", "trusted", "allow"), write_("w2", 2, "mem:r1", "untrusted", "block")]
+case(
+    "rob02-late-read-supplies-minimum-evidence",
+    "rob02_untrusted",
+    ROB,
+    "ROB-02",
+    [*WRITES, DECIDE, LATER_WRITE, READ],
+    IE,
+    quarantined=1,
+    exit=1,
+    evidence=["m1"],
+    withheld=True,
+)
+case(
+    "rob02-read-supplies-minimum-evidence-in-order",
+    "rob02_untrusted",
+    ROB,
+    "ROB-02",
+    [*WRITES, READ, DECIDE, LATER_WRITE],
+    NC,
+    ["d1"],
+    exit=1,
+)
 case(
     "rob02-benign-time-order",
     "rob02_untrusted",
