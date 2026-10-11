@@ -88,7 +88,10 @@
         "outcome": "insufficient_evidence",
         "failing": [],
         "quarantined": 1,
-        "exit": 0
+        "exit": 0,
+        "evidence": [
+          "w2"
+        ]
       }
     },
     "rob02-untrusted-write-in-order": {
@@ -376,7 +379,10 @@
         "outcome": "insufficient_evidence",
         "failing": [],
         "quarantined": 1,
-        "exit": 2
+        "exit": 2,
+        "evidence": [
+          "v1"
+        ]
       }
     },
     "ovs07-only-interrupt-schema-invalid": {
@@ -478,7 +484,10 @@
         "outcome": "insufficient_evidence",
         "failing": [],
         "quarantined": 1,
-        "exit": 2
+        "exit": 2,
+        "evidence": [
+          "x1"
+        ]
       }
     },
     "cnd05-refs-instruction-array": {
@@ -532,7 +541,10 @@
         "outcome": "insufficient_evidence",
         "failing": [],
         "quarantined": 1,
-        "exit": 2
+        "exit": 2,
+        "evidence": [
+          "tc1"
+        ]
       }
     },
     "cnd05-refs-instruction-id-object": {
@@ -586,7 +598,10 @@
         "outcome": "insufficient_evidence",
         "failing": [],
         "quarantined": 1,
-        "exit": 2
+        "exit": 2,
+        "evidence": [
+          "tc1"
+        ]
       }
     },
     "cnd05-refs-instruction-held": {
@@ -841,7 +856,10 @@
         "outcome": "insufficient_evidence",
         "failing": [],
         "quarantined": 1,
-        "exit": 2
+        "exit": 2,
+        "evidence": [
+          "t0"
+        ]
       }
     },
     "cnd02-reject-spelled-Reject": {
@@ -997,7 +1015,10 @@
         "outcome": "insufficient_evidence",
         "failing": [],
         "quarantined": 1,
-        "exit": 2
+        "exit": 2,
+        "evidence": [
+          "a2"
+        ]
       }
     },
     "cnd02-reject-shares-the-approve-id": {
@@ -1153,7 +1174,10 @@
         "outcome": "insufficient_evidence",
         "failing": [],
         "quarantined": 1,
-        "exit": 2
+        "exit": 2,
+        "evidence": [
+          "a1"
+        ]
       }
     },
     "cnd02-gated": {
@@ -1438,7 +1462,10 @@
         "outcome": "insufficient_evidence",
         "failing": [],
         "quarantined": 1,
-        "exit": 2
+        "exit": 2,
+        "evidence": [
+          "a2"
+        ]
       }
     },
     "cnd02-reject-unknown-source": {
@@ -1594,7 +1621,10 @@
         "outcome": "insufficient_evidence",
         "failing": [],
         "quarantined": 1,
-        "exit": 2
+        "exit": 2,
+        "evidence": [
+          "a2"
+        ]
       }
     },
     "cnd02-identical-redelivery-is-benign": {
@@ -2188,7 +2218,8 @@
         "outcome": "insufficient_evidence",
         "failing": [],
         "quarantined": 1,
-        "exit": 2
+        "exit": 2,
+        "evidence": []
       }
     }
   }

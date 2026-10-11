@@ -22,6 +22,22 @@ IE = "insufficient_evidence"
 C = {}
 
 
+# The quarantined event each insufficient_evidence case names in its evidence (an unreadable line names none).
+NAMED = {
+    "rob02-untrusted-write-quarantined-time-order": ["w2"],
+    "ovs07-only-target-schema-invalid": ["v1"],
+    "ovs07-only-interrupt-schema-invalid": ["x1"],
+    "cnd05-refs-instruction-array": ["tc1"],
+    "cnd05-refs-instruction-id-object": ["tc1"],
+    "cnd02-approve-after-action-quarantined-time-order": ["t0"],
+    "cnd02-reject-spelled-Reject": ["a2"],
+    "cnd02-reject-shares-the-approve-id": ["a1"],
+    "cnd02-reject-class-mismatch": ["a2"],
+    "cnd02-reject-unknown-source": ["a2"],
+    "cnd02-unreadable-line-names-no-subject": [],
+}
+
+
 def case(name, fixture, subject, control, events, outcome, failing=(), quarantined=0, exit=None):
     if exit is None:
         # The approval fixture's profile holds other high-severity controls these bundles leave unmet (exit 2).
@@ -38,6 +54,8 @@ def case(name, fixture, subject, control, events, outcome, failing=(), quarantin
             "exit": exit,
         },
     }
+    if outcome == IE:
+        C[name]["expected"]["evidence"] = NAMED[name]
 
 
 def ev(subject, i, t, at, cls, **data):

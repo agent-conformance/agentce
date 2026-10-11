@@ -6,7 +6,8 @@
 # outcome of its subject, or of every subject when it names none. Each case in fixtures/quarantine_no_pass/cases.json
 # names the fixture folder whose profile and domain it is assessed under, its subject and its control; a string event
 # is written as one raw line. The real Python, TypeScript and Java CLIs assess it, and the control must give the
-# expected outcome and failing events in every engine, with the expected quarantined record count and exit code.
+# expected outcome and failing events in every engine, with the expected quarantined record count and exit code, and an
+# insufficient_evidence case's evidence must name the quarantined events it lists.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 label="quarantine-no-pass"
@@ -51,6 +52,10 @@ for name, case in cases.items():
     (bundle.parent / "expected").write_text(
         f"{expected['outcome']} {failing} {expected['quarantined']} {expected['exit']}\n", encoding="utf-8"
     )
+    if "evidence" in expected:
+        # The quarantined events an insufficient_evidence outcome must name (18.119), comma-joined, sorted.
+        named = ",".join(sorted(expected["evidence"]))
+        (bundle.parent / "evidence").write_text(f"{named}\n", encoding="utf-8")
 PY
 
 (cd "$root/engines/typescript" && pnpm --silent build >/dev/null)
@@ -71,6 +76,12 @@ run() {
 outcome() {
   jq -r --arg control "$2" --arg subject "$3" '[.[]? // .assertions[] | select(.control == $control and .subject == $subject)][0]
     | "\(.outcome) \([.violations[]?.focus | sub("^agentce:event/"; "")] | unique | join(","))"' "$1"
+}
+
+# The event ids the case control's evidence names, sorted and comma-joined.
+evidence() {
+  jq -r --arg control "$2" --arg subject "$3" '[.[]? // .assertions[] | select(.control == $control and .subject == $subject)][0]
+    | [.evidence[]?.ref | sub("^agentce:event/"; "")] | sort | join(",")' "$1"
 }
 
 # One engine over its share of the cases (every case whose position modulo $3 is $2); returns non-zero on any
@@ -103,6 +114,14 @@ check_cases() {
       echo "$label: $engine $name gave '$got', expected '$want' (outcome failing quarantined exit)" >&2
       touch "$work/.stop"
       return 1
+    fi
+    if [ -f "$dir/evidence" ]; then
+      got="$(evidence "$out/assertions.json" "$(cat "$dir/control")" "$(cat "$dir/subject")")"
+      if [ "$got" != "$(cat "$dir/evidence")" ]; then
+        echo "$label: $engine $name names '$got' in its evidence, expected '$(cat "$dir/evidence")'" >&2
+        touch "$work/.stop"
+        return 1
+      fi
     fi
   done
 }

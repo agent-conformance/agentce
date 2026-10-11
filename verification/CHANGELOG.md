@@ -18,8 +18,9 @@ fails if a gate in `gates.json` is not named in this file.
   is judged again with the subject's readable quarantined records; when the outcome changes, or a record ingest could
   not read may belong to the subject, it reads `insufficient_evidence` and its evidence names the quarantined records.
   A quarantine that changes nothing leaves the outcome as it is. The gate runs 18 cases through the real Python,
-  TypeScript and Java CLIs, each failing case beside a benign twin. Six seeded faults, two per engine: a `time_order`
-  record left out, and the unreadable records ignored. `VG-APPROVAL-ORDER` gains one case and `VG-APPROVAL-WITHDRAWAL`
+  TypeScript and Java CLIs, each failing case beside a benign twin, and checks that each `insufficient_evidence` case
+  names the quarantined events in its evidence. Seven seeded faults: in each engine a `time_order` record left out and
+  the unreadable records ignored, and in Python the evidence left empty. `VG-APPROVAL-ORDER` gains one case and `VG-APPROVAL-WITHDRAWAL`
   two, each a quarantine that now reads `insufficient_evidence`. In `VG-DUPLICATE-ID-CLASS` the agent's own Decision
   that reuses the identity provider's login id still never displaces the login, but that Decision has no approval, so
   CND-02 and OVS-08 there read `insufficient_evidence` instead of conformant.
