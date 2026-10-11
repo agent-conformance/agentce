@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build gate helper for VG-APPROVAL-OUTCOME (18.136) and, given a fixture name, VG-APPROVAL-ORDER (approval_order,
-# 18.141) and VG-APPROVAL-WITHDRAWAL (approval_withdrawal, 18.142). An approval gates a decision only when its outcome
+# 18.141), VG-APPROVAL-WITHDRAWAL (approval_withdrawal, 18.142) and VG-DUPLICATE-ID-CLASS (duplicate_id_class, 18.143:
+# a record of a lower source class never displaces a higher-class record with the same event id). An approval gates a decision only when its outcome
 # is approve (SPEC §6.2 ApprovalDecided.outcome approve|edit|reject), it is recorded at or before every action that
 # executes the decision, and the same human did not withdraw it before the action ran. CND-02 and OVS-08 count
 # only such an approve (the agentce:approvedBy edge and OVS-08's distinct approvers); OVS-01, INC-03 and RSK-02 ask for
@@ -39,10 +40,16 @@ for name, case in cases.items():
                 "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
             }
         ],
-        # Declared classes, so the login records keep the class their stream has (SPEC §6.4).
+        # Declared classes, so the login records keep the class their stream has (SPEC §6.4); a source named
+        # urn:src:unclassed... is declared with no class, so ingest trusts its records as self_report.
         "sources": [
             {"id": f"urn:src:{cls}", "class": cls}
             for cls in ("enforcement_point", "independent_system", "self_report")
+        ]
+        + [
+            {"id": source}
+            for source in sorted({e["source"] for e in case["events"]})
+            if source.startswith("urn:src:unclassed")
         ],
     }
     (bundle / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")

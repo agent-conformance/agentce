@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.84.0
+
+- `VG-DUPLICATE-ID-CLASS` (18.143, new, tier quick) checks that a record of a lower source class never displaces a
+  record of a higher class with the same event id, in all three engines. Ingest used to keep the first record it read
+  for each id, whatever its class. An agent could write its own `self_report` record with the id of the enforcement
+  point's `ToolCall`, read first, and get the `ToolCall` quarantined, so CND-02 ("High-effect actions are gated by a
+  recorded approval") went from non-conformant to `insufficient_evidence`; the same trick dropped an identity
+  provider's login. Now the id belongs to the highest class ingest trusts (`independent_system` above
+  `enforcement_point` above `self_report`, with an undeclared source's records counted as `self_report`), and the
+  ingest quarantines the lower record as `duplicate_id` wherever it sits in the file. Of two records of one class with
+  one id, ingest still keeps the first. The gate runs 14 cases through the real Python, TypeScript and Java CLIs with the `VG-APPROVAL-OUTCOME`
+  runner, each shadow case against a twin without the shadow. Six seeded faults, two per engine: the class ignored
+  at the id check, and the rank read from the class a record asserts instead of the class ingest trusts.
+
 ## 0.83.0
 
 - `VG-APPROVAL-WITHDRAWAL` (18.142, new, tier quick) checks that each human's own most recent decision on a decision

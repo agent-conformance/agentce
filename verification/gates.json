@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.83.0",
+  "suite_version": "0.84.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3563,6 +3563,69 @@
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "String who = human != null ? human : actor != null && !approve ? Iri.principalIri(actor, key) : null;",
           "replace": "String who = human;"
+        }
+      ]
+    },
+    {
+      "id": "VG-DUPLICATE-ID-CLASS",
+      "title": "A record of a lower source class never displaces a higher-class record with the same event id at ingest, in all three engines: the id belongs to the highest class ingest trusts (independent_system above enforcement_point above self_report, an undeclared source counting as self_report), the lower record is quarantined duplicate_id wherever it sits, and one class keeps the first record (18.143)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/approval_outcome.sh",
+        "duplicate_id_class"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/duplicate_id_class/cases.json (14: CND-02 with the agent's own self_report Decision reusing the enforcement point's ToolCall id before it, after it, and from an undeclared source asserting independent_system, against the twin with no shadow; the same Decision reusing the identity provider's login id for CND-02 and OVS-08, and an enforcement-point record reusing it, against the twin; two enforcement-point ToolCalls with one id; the ToolCall quarantined for time order with the shadow before or after it, against the twin; a record quarantined class_mismatch, and a schema-invalid ToolCall, holding no id) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs, so each shadow case reads like its twin plus the quarantined shadow",
+        "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
+      },
+      "fix_hint": "Run bash verification/gates/approval_outcome.sh duplicate_id_class; it names the engine, the case and what it gave against what was expected. Ingest (ingest.py / ingest.ts / Ingest.java) checks each record on its own in pass 1 and records the highest class rank per id (owner_rank / ownerRank) from the class it trusts (after the undeclared-source correction); pass 2 quarantines a record whose rank is below its id's owner, then runs the first-wins id check and the per-stream time check.",
+      "faults": [
+        {
+          "description": "Python ignores the source class at the id check, so the agent's own record read first displaces the enforcement point's ToolCall or the identity provider's login with the same id",
+          "file": "engines/python/agentce/ingest.py",
+          "search": "if event_id in seen_ids or rank < owner_rank[event_id]:",
+          "replace": "if event_id in seen_ids:"
+        },
+        {
+          "description": "Python ranks a record by the class it asserts, not the class ingest trusts, so an undeclared source asserting independent_system displaces the enforcement point's ToolCall",
+          "file": "engines/python/agentce/ingest.py",
+          "search": "rank = _CLASS_RANK[str(event[\"agentcesourceclass\"])]",
+          "replace": "rank = _CLASS_RANK[str(raw_event[\"agentcesourceclass\"])]"
+        },
+        {
+          "description": "TypeScript ignores the source class at the id check (first record wins)",
+          "file": "engines/typescript/src/ingest.ts",
+          "search": "if (seenIds.has(eventId) || rank < (ownerRank.get(eventId) as number)) {",
+          "replace": "if (seenIds.has(eventId)) {"
+        },
+        {
+          "description": "TypeScript ranks a record by the class it asserts, not the class ingest trusts",
+          "file": "engines/typescript/src/ingest.ts",
+          "search": "const rank = CLASS_RANK[String(effectiveEvent.agentcesourceclass)];",
+          "replace": "const rank = CLASS_RANK[String(rawEvent.agentcesourceclass)];"
+        },
+        {
+          "description": "Java ignores the source class at the id check (first record wins)",
+          "file": "engines/java/src/main/java/org/agentce/Ingest.java",
+          "search": "if (seenIds.contains(eventId) || candidate.rank() < ownerRank.get(eventId)) {",
+          "replace": "if (seenIds.contains(eventId)) {"
+        },
+        {
+          "description": "Java ranks a record by the class it asserts, not the class ingest trusts",
+          "file": "engines/java/src/main/java/org/agentce/Ingest.java",
+          "search": "int rank = CLASS_RANK.get(event.get(\"agentcesourceclass\").asText());",
+          "replace": "int rank = CLASS_RANK.get(rawEvent.get(\"agentcesourceclass\").asText());"
         }
       ]
     }
