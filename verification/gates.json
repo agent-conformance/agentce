@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.90.0",
+  "suite_version": "0.91.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3405,8 +3405,8 @@
         {
           "description": "TypeScript counts a verified approval toward OVS-08's distinct approvers whatever its outcome",
           "file": "engines/typescript/src/graph.ts",
-          "search": "          if (\n            !approve ||\n            !beforeEvery(time, actions) ||\n            !beforeEvery(time, outcomes) ||\n            !withdrawals.every((w) => compareLiterals(time, w) === 1)\n          ) {\n            continue;\n          }\n          this.store.addEdge(decision, \"agentce:approvedBy\", node);\n          let approvers",
-          "replace": "          if (\n            approve &&\n            beforeEvery(time, actions) &&\n            beforeEvery(time, outcomes) &&\n            withdrawals.every((w) => compareLiterals(time, w) === 1)\n          ) {\n            this.store.addEdge(decision, \"agentce:approvedBy\", node);\n          }\n          let approvers"
+          "search": "          if (\n            !approve ||\n            !beforeEvery(time, actions) ||\n            !beforeEvery(time, outcomes) ||\n            !beforeEvery(time, unresolvedTimes) ||\n            !withdrawals.every((w) => compareLiterals(time, w) === 1)\n          ) {\n            continue;\n          }\n          this.store.addEdge(decision, \"agentce:approvedBy\", node);\n          let approvers",
+          "replace": "          if (\n            approve &&\n            beforeEvery(time, actions) &&\n            beforeEvery(time, outcomes) &&\n            beforeEvery(time, unresolvedTimes) &&\n            withdrawals.every((w) => compareLiterals(time, w) === 1)\n          ) {\n            this.store.addEdge(decision, \"agentce:approvedBy\", node);\n          }\n          let approvers"
         },
         {
           "description": "Java records every verified approval as an approve whatever its outcome (CND-02, nist-ai-rmf OVS-08)",
@@ -3657,8 +3657,8 @@
         {
           "description": "Python leaves the decision's Outcomes out of the approval bound, so an approve recorded after the decision took effect gates it for CND-02 and OVS-08",
           "file": "engines/python/agentce/graph.py",
-          "search": "            if ptype in (\"ToolCall\", \"Outcome\") and isinstance(decision, str):\n",
-          "replace": "            if ptype == \"ToolCall\" and isinstance(decision, str):\n"
+          "search": "            times = action_times if ptype == \"ToolCall\" else outcome_times\n",
+          "replace": "            times = action_times if ptype == \"ToolCall\" else {}\n"
         },
         {
           "description": "Python compares the approval and Outcome times as text, so an approval written in another offset that sorts earlier as text gates a decision that took effect before it",
@@ -3669,8 +3669,8 @@
         {
           "description": "TypeScript leaves the decision's Outcomes out of the approval bound (CND-02, OVS-08)",
           "file": "engines/typescript/src/graph.ts",
-          "search": "      if ((ptype === \"ToolCall\" || ptype === \"Outcome\") && typeof decision === \"string\") {\n",
-          "replace": "      if (ptype === \"ToolCall\" && typeof decision === \"string\") {\n"
+          "search": "      const map = ptype === \"ToolCall\" ? actionTimes : outcomeTimes;\n",
+          "replace": "      const map = ptype === \"ToolCall\" ? actionTimes : new Map<string, string[]>();\n"
         },
         {
           "description": "TypeScript compares the approval and Outcome times as text",
@@ -3681,8 +3681,8 @@
         {
           "description": "Java leaves the decision's Outcomes out of the approval bound (CND-02, OVS-08)",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
-          "search": "                if ((\"ToolCall\".equals(type) || \"Outcome\".equals(type)) && decision != null) {\n",
-          "replace": "                if (\"ToolCall\".equals(type) && decision != null) {\n"
+          "search": "(\"ToolCall\".equals(type) ? actionTimes : outcomeTimes)",
+          "replace": "(\"ToolCall\".equals(type) ? actionTimes : new LinkedHashMap<String, List<String>>())"
         },
         {
           "description": "Java compares the approval and Outcome times as text",
@@ -3931,6 +3931,75 @@
           "file": "engines/java/src/main/java/org/agentce/Ingest.java",
           "search": "return order == null ? Json.byteCompare(time, previous) < 0 : order < 0;",
           "replace": "return Json.byteCompare(time, previous) < 0;"
+        }
+      ]
+    },
+    {
+      "id": "VG-APPROVAL-REFS-RESOLVED",
+      "title": "The approval bound reads every refs.decision as the held decision it names, in all three engines: a ToolCall, Outcome or ApprovalDecided naming the decision by its bare id or with padding at either end is that decision's, and a ToolCall or Outcome naming no held decision bounds every decision's approvals, so CND-02 and OVS-08 never count an approve recorded after the decision took effect (18.148)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/approval_outcome.sh",
+        "approval_refs_resolve"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/approval_refs_resolve/cases.json (25: CND-02 with an approve after an Outcome or ToolCall naming the decision as a bare id, with a trailing space, a leading tab or a leading no-break space; a bare-id approve after the Outcome and before a ToolCall; a padded approve before a bare-id Outcome; a bare-id reject withdrawing; approvals naming an unheld id, another event's id, the IRI in another letter case or only whitespace; an Outcome or ToolCall naming an unheld id, another letter case, a urn:, another held event's bare id or an empty string before the approve, and an unheld Outcome after it; a reject after an unresolved ToolCall still withdrawing; OVS-08 with a bare-id Outcome, dual control with two humans naming the decision in two forms and one human in two forms; OVS-01 counting a bare-id approve as a review) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
+      },
+      "fix_hint": "Run bash verification/gates/approval_outcome.sh approval_refs_resolve; it names the engine, the case and what it gave against what was expected. The resolution is each engine's graph builder _held_decision / heldDecision (the ref, else trimmed of ID_PAD, else agentce:event/<trimmed>, each checked against the held Decisions in decision_time / decisionTime); _map_oversight / mapOversight reads every refs.decision through it and puts the time of a ToolCall or Outcome naming no held decision in unresolved_times / unresolvedTimes, which bounds every approve.",
+      "faults": [
+        {
+          "description": "Python groups the decision's ToolCalls and Outcomes by the raw refs.decision again, so one naming the decision by bare id bounds no approval (CND-02, OVS-08)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "            decision = self._held_decision(ref)\n            if decision is None:\n",
+          "replace": "            decision = ref if ref in self.decision_time else None\n            if decision is None:\n"
+        },
+        {
+          "description": "Python lets a ToolCall or Outcome naming no held decision bound nothing",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                    and _before_every(time, unresolved_times)\n",
+          "replace": ""
+        },
+        {
+          "description": "Python resolves a bare id against every held event, not only the held Decisions",
+          "file": "engines/python/agentce/graph.py",
+          "search": "        for name in (trimmed, event_iri(trimmed)):\n            if name in self.decision_time:\n                return name\n",
+          "replace": "        for name in (trimmed, event_iri(trimmed)):\n            if name in self.decision_time:\n                return name\n            if name in self.event_info:\n                return name\n"
+        },
+        {
+          "description": "TypeScript groups ToolCalls and Outcomes by the raw refs.decision again (no trim, no bare id)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "    const trimmed = ruleId(ref) ?? \"\";\n",
+          "replace": "    const trimmed = \"\\u0000\";\n"
+        },
+        {
+          "description": "TypeScript lets a ToolCall or Outcome naming no held decision bound nothing",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "            !beforeEvery(time, unresolvedTimes) ||\n",
+          "replace": ""
+        },
+        {
+          "description": "Java groups ToolCalls and Outcomes by the raw refs.decision again (no trim, no bare id)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "            String trimmed = Objects.requireNonNullElse(ruleId(ref), \"\");\n",
+          "replace": "            String trimmed = \"\\u0000\";\n"
+        },
+        {
+          "description": "Java lets a ToolCall or Outcome naming no held decision bound nothing",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "                                && beforeEvery(d.time(), unresolvedTimes)\n",
+          "replace": ""
         }
       ]
     }

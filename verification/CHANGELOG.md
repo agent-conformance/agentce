@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.91.0
+
+- `VG-APPROVAL-REFS-RESOLVED` (18.148, new, tier quick) checks that the approval bound reads every `refs.decision` as
+  the held decision it names, in all three engines. CND-02 and OVS-08 grouped the ToolCalls, Outcomes and approvals of
+  a decision by the exact `refs.decision` text, so an Outcome naming the decision as `d1` or `agentce:event/d1 `, while
+  the approval named `agentce:event/d1`, bounded nothing, and an approve logged hours after the decision took effect
+  read conformant. A reject written as `d1` did not withdraw the same human's approve either. Each engine now
+  resolves a `refs.decision` to a held decision: the name itself, else the name trimmed of the human-actor rule's id
+  padding, else `agentce:event/<trimmed name>`. An approval naming no held decision approves and reviews none. A
+  ToolCall or Outcome naming no held decision (another letter case, a `urn:`, another event's id, an empty string) may
+  be any decision's effect, so its time bounds every decision's approvals, though it withdraws none. The gate holds 25
+  cases and seven seeded faults: raw grouping in all three engines, an unresolved effect bounding nothing in all three,
+  and a bare id resolved against any held event in Python.
+
 ## 0.90.0
 
 - `VG-STREAM-SOURCE-BOUND` (18.151, changed) also checks that a record's claimed integrity stream never joins it to
