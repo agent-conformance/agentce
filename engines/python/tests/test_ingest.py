@@ -114,6 +114,30 @@ def test_time_order(
     assert result.quarantined[0].stream
 
 
+def test_a_record_never_joins_another_sources_time_order_by_claiming_its_stream(
+    make_bundle: Callable[..., Any],
+    clone: Callable[[dict[str, Any]], dict[str, Any]],
+    example_event: dict[str, Any],
+) -> None:
+    # 18.147: the agent's own later record names the enforcement point's stream; time order is per source, so the
+    # enforcement point's earlier record is not quarantined.
+    genuine = str(example_event["source"])
+    claimed = example_event["data"].get("integrity", {}).get("stream") or genuine
+    hijack = clone(example_event)
+    hijack["id"] = "b" * 64
+    hijack["source"] = "urn:example:agent"
+    hijack["agentcesourceclass"] = "self_report"
+    hijack["time"] = "2099-01-01T00:00:00.000Z"
+    hijack["data"]["integrity"] = {
+        **hijack["data"].get("integrity", {}),
+        "stream": claimed,
+    }
+    classes = {genuine: "enforcement_point", "urn:example:agent": "self_report"}
+    result = _ingest(make_bundle, [hijack, example_event], source_classes=classes)
+    assert [e["id"] for e in result.accepted] == [hijack["id"], example_event["id"]]
+    assert result.quarantined == []
+
+
 def test_unknown_source(
     make_bundle: Callable[..., Any], example_event: dict[str, Any]
 ) -> None:

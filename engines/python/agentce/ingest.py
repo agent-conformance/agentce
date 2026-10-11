@@ -251,7 +251,9 @@ def ingest(
             records.append((event, raw_event, source, type_value, rank))
 
     seen_ids: set[str] = set()
-    last_time: dict[str, str] = {}
+    # Time order is checked per (source, stream): the stream a record claims names a stream of its own source, so a
+    # record never joins another source's ordering group by naming that source's stream (18.147).
+    last_time: dict[tuple[str, str], str] = {}
     # Each duplicate_id record with the raw record it was read from: withheld unless it is an identical
     # redelivery of the record held under its id, which is known only once every record is placed.
     duplicates: list[tuple[Withheld, dict[str, Any]]] = []
@@ -285,8 +287,9 @@ def ingest(
             continue
 
         stream = _stream_of(event)
+        order_key = (source, stream)
         time_value = str(event["time"])
-        previous = last_time.get(stream)
+        previous = last_time.get(order_key)
         if previous is not None and time_value < previous:
             late = _readable(
                 QuarantineRecord(
@@ -304,7 +307,7 @@ def ingest(
             continue
 
         seen_ids.add(event_id)
-        last_time[stream] = time_value
+        last_time[order_key] = time_value
         result.accepted.append(event)
         result.raw_accepted.append(raw_event)
 

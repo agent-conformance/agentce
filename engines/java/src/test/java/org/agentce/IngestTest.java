@@ -181,6 +181,23 @@ class IngestTest {
     }
 
     @Test
+    void aRecordNeverJoinsAnotherSourcesTimeOrderByClaimingItsStream(@TempDir Path tempDir) throws IOException {
+        // 18.147: the agent's own later record names the enforcement point's stream; time order is per source, so
+        // the enforcement point's earlier record is not quarantined.
+        String agent = "urn:example:agent";
+        JsonNode genuine = Fixtures.buildIngestEvent(SOURCE, "enforcement_point", "e1", "gw");
+        ObjectNode hijack = Fixtures.buildIngestEvent(agent, "self_report", "e2", "gw");
+        hijack.put("time", "2099-01-01T00:00:00.000Z");
+        ArrayNode sources = Json.nodes().arrayNode();
+        sources.addObject().put("id", SOURCE).put("class", "enforcement_point");
+        sources.addObject().put("id", agent).put("class", "self_report");
+        Ingest.Result result =
+                Ingest.ingest(Fixtures.writeIngestBundle(tempDir, List.of(hijack, genuine), sources));
+        assertEquals(List.of(hijack, genuine), result.accepted);
+        assertEquals(List.of(), result.quarantined);
+    }
+
+    @Test
     void withheldListsTheQuarantinedRecordsThatMayHoldEvidence(@TempDir Path tempDir) throws IOException {
         // 18.119: a record refused for where it sits stays readable (read with the declared class); one ingest
         // cannot read has no event; an identical redelivery holds nothing new.

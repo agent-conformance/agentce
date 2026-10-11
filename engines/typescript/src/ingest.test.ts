@@ -265,6 +265,36 @@ test("a lower-class record never displaces a higher-class record with the same i
   assert.equal(result.quarantined[0].source, "urn:example:agent");
 });
 
+test("a record never joins another source's time order by claiming its stream (18.147)", () => {
+  const genuine = enforcementPointEvent();
+  const hijack = {
+    ...genuine,
+    id: "evt-agent",
+    source: "urn:example:agent",
+    agentcesourceclass: "self_report",
+    time: "2099-01-01T00:00:00.000Z",
+    data: {
+      ...(genuine.data as Record<string, unknown>),
+      integrity: {
+        hash: "0".repeat(64),
+        prev: "0".repeat(64),
+        stream: String(genuine.source),
+        strength: "export_chained",
+      },
+    },
+  };
+  const classes: Array<[string, string]> = [
+    [String(genuine.source), "enforcement_point"],
+    ["urn:example:agent", "self_report"],
+  ];
+  const result = ingest(loadBundle(writeBundle([hijack, genuine], classes)));
+  assert.deepEqual(
+    result.accepted.map((e) => e.id),
+    ["evt-agent", genuine.id],
+  );
+  assert.deepEqual(result.quarantined, []);
+});
+
 test("withheld lists the quarantined records that may hold evidence (18.119)", () => {
   // A record refused for where it sits stays readable; one ingest cannot read has no event; an identical redelivery
   // and an unknown type hold nothing new.

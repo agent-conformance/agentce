@@ -352,6 +352,8 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
   }
 
   const seenIds = new Set<string>();
+  // Time order is checked per (source, stream): the stream a record claims names a stream of its own source, so a record
+  // never joins another source's ordering group by naming that source's stream (18.147).
   const lastTime = new Map<string, string>();
   // Each duplicate_id record with the raw record it was read from: withheld unless it is an identical redelivery of
   // the record held under its id, which is known only once every record is placed.
@@ -387,8 +389,9 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
     }
 
     const stream = streamOf(event);
+    const orderKey = JSON.stringify([source, stream]);
     const timeValue = String(event.time);
-    const previous = lastTime.get(stream);
+    const previous = lastTime.get(orderKey);
     if (previous !== undefined && byteCompare(timeValue, previous) < 0) {
       const late = readable(
         {
@@ -407,7 +410,7 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
     }
 
     seenIds.add(eventId);
-    lastTime.set(stream, timeValue);
+    lastTime.set(orderKey, timeValue);
     result.accepted.push(event);
     result.rawAccepted.push(rawEvent);
   }

@@ -245,7 +245,9 @@ public final class Ingest {
         }
 
         Set<String> seenIds = new HashSet<>();
-        Map<String, String> lastTime = new HashMap<>();
+        // Time order is checked per (source, stream): the stream a record claims names a stream of its own source, so
+        // a record never joins another source's ordering group by naming that source's stream (18.147).
+        Map<List<String>, String> lastTime = new HashMap<>();
         // Each duplicate_id record with the raw record it was read from: withheld unless it is an identical
         // redelivery of the record held under its id, which is known only once every record is placed.
         List<Map.Entry<Withheld, JsonNode>> duplicates = new ArrayList<>();
@@ -275,8 +277,9 @@ public final class Ingest {
             }
 
             String stream = streamOf(event);
+            List<String> orderKey = List.of(candidate.source(), stream);
             String timeValue = event.get("time").asText();
-            String previous = lastTime.get(stream);
+            String previous = lastTime.get(orderKey);
             if (previous != null && Json.byteCompare(timeValue, previous) < 0) {
                 Withheld late = readable(new Quarantine.Record(Quarantine.Reason.TIME_ORDER)
                         .eventId(eventId)
@@ -290,7 +293,7 @@ public final class Ingest {
             }
 
             seenIds.add(eventId);
-            lastTime.put(stream, timeValue);
+            lastTime.put(orderKey, timeValue);
             result.accepted.add(event);
             result.rawAccepted.add(candidate.rawEvent());
         }
