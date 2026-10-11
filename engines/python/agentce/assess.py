@@ -204,6 +204,10 @@ def _assert_control(
     )
 
 
+def _events_by_iri(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {event_iri(str(e["id"])): e for e in events if "id" in e}
+
+
 def _counterfactual(
     subject_events: list[dict[str, Any]], readable: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
@@ -299,21 +303,21 @@ def assess_subjects(
     for subject in profile.subjects:
         subject_events = events_by_subject.get(subject.id, [])
         store = build_graph(subject_events, domain=domain)
-        events_by_iri = {
-            event_iri(str(e["id"])): e for e in subject_events if "id" in e
-        }
+        events_by_iri = _events_by_iri(subject_events)
         roles = set(effective_roles(subject.role))
         window = _window(profile, subject_events)
         own = [w for w in withheld if w.subject in (subject.id, None)]
+        # A readable record always names its subject (the schema requires it), so it is this subject's.
         unreadable = any(w.event is None for w in own)
-        readable = [
-            w.event
-            for w in own
-            if w.event is not None and str(w.event.get("subject", "")) == subject.id
-        ]
-        cf_events = _counterfactual(subject_events, readable) if readable else []
-        cf_store = build_graph(cf_events, domain=domain) if readable else store
-        cf_by_iri = {event_iri(str(e["id"])): e for e in cf_events if "id" in e}
+        readable = [w.event for w in own if w.event is not None]
+        # The comparison graph is needed only when no unreadable record already decides the outcome.
+        cf_events = (
+            _counterfactual(subject_events, readable)
+            if readable and not unreadable
+            else []
+        )
+        cf_store = build_graph(cf_events, domain=domain) if cf_events else store
+        cf_by_iri = _events_by_iri(cf_events)
         for catalog in catalogs:
             for control in catalog.controls:
                 assertion = _assert_control(

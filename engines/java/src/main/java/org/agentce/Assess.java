@@ -291,6 +291,16 @@ public final class Assess {
         return copy;
     }
 
+    private static Map<String, JsonNode> eventsByIriOf(List<JsonNode> events) {
+        Map<String, JsonNode> byIri = new java.util.HashMap<>();
+        for (JsonNode event : events) {
+            if (event.has("id")) {
+                byIri.put(Iri.eventIri(event.get("id").asText()), event);
+            }
+        }
+        return byIri;
+    }
+
     /** Evaluate every catalog control against every subject and return the assertions, with no withheld records. */
     public static List<Assertions.Assertion> assessSubjects(
             List<JsonNode> accepted, Profile profile, List<Catalog> catalogs, DomainBinding domain) {
@@ -315,12 +325,7 @@ public final class Assess {
         for (Profile.Subject subject : profile.subjects) {
             List<JsonNode> subjectEvents = eventsBySubject.getOrDefault(subject.id, java.util.List.of());
             GraphStore store = Graph.buildGraph(subjectEvents, domain);
-            Map<String, JsonNode> eventsByIri = new java.util.HashMap<>();
-            for (JsonNode event : subjectEvents) {
-                if (event.has("id")) {
-                    eventsByIri.put(Iri.eventIri(event.get("id").asText()), event);
-                }
-            }
+            Map<String, JsonNode> eventsByIri = eventsByIriOf(subjectEvents);
             Set<String> roles = new LinkedHashSet<>(Applicability.effectiveRoles(subject.role));
             String[] win = window(profile, subjectEvents);
             List<Ingest.Withheld> own = new ArrayList<>();
@@ -331,19 +336,18 @@ public final class Assess {
                     continue;
                 }
                 own.add(w);
-                unreadable |= w.event() == null;
-                if (w.event() != null && subject.id.equals(Readiness.pyStr(w.event().get("subject")))) {
+                // A readable record always names its subject (the schema requires it), so it is this subject's.
+                if (w.event() == null) {
+                    unreadable = true;
+                } else {
                     readable.add(w.event());
                 }
             }
-            List<JsonNode> cfEvents = readable.isEmpty() ? List.of() : counterfactual(subjectEvents, readable);
-            GraphStore cfStore = readable.isEmpty() ? store : Graph.buildGraph(cfEvents, domain);
-            Map<String, JsonNode> cfByIri = new java.util.HashMap<>();
-            for (JsonNode event : cfEvents) {
-                if (event.has("id")) {
-                    cfByIri.put(Iri.eventIri(event.get("id").asText()), event);
-                }
-            }
+            // The comparison graph is needed only when no unreadable record already decides the outcome.
+            List<JsonNode> cfEvents =
+                    readable.isEmpty() || unreadable ? List.of() : counterfactual(subjectEvents, readable);
+            GraphStore cfStore = cfEvents.isEmpty() ? store : Graph.buildGraph(cfEvents, domain);
+            Map<String, JsonNode> cfByIri = eventsByIriOf(cfEvents);
             for (Catalog catalog : catalogs) {
                 for (Catalog.ControlSpec control : catalog.controls) {
                     Assertions.Assertion assertion =

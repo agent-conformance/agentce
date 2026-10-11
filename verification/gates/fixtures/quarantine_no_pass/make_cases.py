@@ -9,36 +9,19 @@ late record that changes nothing, an unreadable record of another subject) leave
 names the fixture folder whose profile and domain it is assessed under."""
 
 import copy
-import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from approval_events import TWO, appr, dec, ran  # noqa: E402
+from approval_events import CTX, NC, TWO, C, appr, dec, ran, write  # noqa: E402
+from approval_events import SUBJECT as OVS  # noqa: E402
 
-CTX = "https://agent-conformance.org/contexts/evidence/v1"
-NC = "non-conformant"
 IE = "insufficient_evidence"
-C = {}
 
 
-# The quarantined event each insufficient_evidence case names in its evidence (an unreadable line names none).
-NAMED = {
-    "rob02-untrusted-write-quarantined-time-order": ["w2"],
-    "ovs07-only-target-schema-invalid": ["v1"],
-    "ovs07-only-interrupt-schema-invalid": ["x1"],
-    "cnd05-refs-instruction-array": ["tc1"],
-    "cnd05-refs-instruction-id-object": ["tc1"],
-    "cnd02-approve-after-action-quarantined-time-order": ["t0"],
-    "cnd02-reject-spelled-Reject": ["a2"],
-    "cnd02-reject-shares-the-approve-id": ["a1"],
-    "cnd02-reject-class-mismatch": ["a2"],
-    "cnd02-reject-unknown-source": ["a2"],
-    "cnd02-unreadable-line-names-no-subject": [],
-}
 
-
-def case(name, fixture, subject, control, events, outcome, failing=(), quarantined=0, exit=None):
+def case(name, fixture, subject, control, events, outcome, failing=(), quarantined=0, exit=None, evidence=None):
+    """``evidence`` is the quarantined event ids an insufficient_evidence case names (an unreadable line names none)."""
     if exit is None:
         # The approval fixture's profile holds other high-severity controls these bundles leave unmet (exit 2).
         exit = 2 if fixture == "approval_outcome" else 0
@@ -55,7 +38,7 @@ def case(name, fixture, subject, control, events, outcome, failing=(), quarantin
         },
     }
     if outcome == IE:
-        C[name]["expected"]["evidence"] = NAMED[name]
+        C[name]["expected"]["evidence"] = list(evidence)
 
 
 def ev(subject, i, t, at, cls, **data):
@@ -97,6 +80,7 @@ case(
     [write_("w1", 1, "mem:r1", "trusted", "allow"), READ, write_("w2", 2, "mem:r1", "untrusted", "block"), DECIDE],
     IE,
     quarantined=1,
+    evidence=["w2"],
 )
 case(
     "rob02-untrusted-write-in-order",
@@ -120,7 +104,6 @@ case(
 
 # OVS-07 (eu-ai-act): its only target record, an Override, fails the schema; the control has records it cannot read,
 # so it does not read not_applicable.
-OVS = "spiffe://corp/agents/approval-outcome"
 override = ev(
     OVS,
     "v1",
@@ -143,6 +126,7 @@ case(
     [dec(), *TWO, bad_override],
     IE,
     quarantined=1,
+    evidence=["v1"],
 )
 bad_interrupt = ev(
     OVS,
@@ -163,6 +147,7 @@ case(
     [dec(), *TWO, bad_interrupt],
     IE,
     quarantined=1,
+    evidence=["x1"],
 )
 
 # CND-05 (Conduct overlay): a ToolCall whose refs.instruction is an array or an {"@id": ...} object fails the schema.
@@ -195,6 +180,7 @@ case(
     IE,
     quarantined=1,
     exit=2,
+    evidence=["tc1"],
 )
 case(
     "cnd05-refs-instruction-id-object",
@@ -205,6 +191,7 @@ case(
     IE,
     quarantined=1,
     exit=2,
+    evidence=["tc1"],
 )
 case(
     "cnd05-refs-instruction-held",
@@ -234,7 +221,7 @@ LATE_ACTION = [
     at(appr("approve", i="a2", d="d2"), "02:00:00"),
     at(appr("approve"), "02:00:00"),
 ]
-case("cnd02-approve-after-action-quarantined-time-order", "approval_outcome", OVS, "CND-02", LATE_ACTION, IE, quarantined=1, exit=2)
+case("cnd02-approve-after-action-quarantined-time-order", "approval_outcome", OVS, "CND-02", LATE_ACTION, IE, quarantined=1, evidence=["t0"])
 case(
     "cnd02-reject-spelled-Reject",
     "approval_outcome",
@@ -243,7 +230,7 @@ case(
     [dec(), *TWO, at(appr("approve"), "01:00:00"), at(appr("Reject", i="a2"), "02:00:00"), at(ran(), "03:00:00")],
     IE,
     quarantined=1,
-    exit=2,
+    evidence=["a2"],
 )
 case(
     "cnd02-reject-shares-the-approve-id",
@@ -253,7 +240,7 @@ case(
     [dec(), *TWO, at(appr("approve"), "01:00:00"), at(appr("reject"), "02:00:00"), at(ran(), "03:00:00")],
     IE,
     quarantined=1,
-    exit=2,
+    evidence=["a1"],
 )
 GATED = [dec(), *TWO, at(appr("approve"), "01:00:00"), at(ran(), "03:00:00")]
 case("cnd02-gated", "approval_outcome", OVS, "CND-02", GATED, "conformant")
@@ -269,7 +256,7 @@ case(
     [dec(), *TWO, at(appr("approve"), "01:00:00"), mismatch, at(ran(), "03:00:00")],
     IE,
     quarantined=1,
-    exit=2,
+    evidence=["a2"],
 )
 # The same reject from a source the manifest does not declare (unknown_source) is read as self_report, as an
 # undeclared source's record is (SPEC §6.4); the same human's reject still withdraws the approve.
@@ -283,7 +270,7 @@ case(
     [dec(), *TWO, at(appr("approve"), "01:00:00"), undeclared, at(ran(), "03:00:00")],
     IE,
     quarantined=1,
-    exit=2,
+    evidence=["a2"],
 )
 case(
     "cnd02-identical-redelivery-is-benign",
@@ -316,8 +303,7 @@ case(
     [*GATED, '{"id": "a9", "type": '],
     IE,
     quarantined=1,
-    exit=2,
+    evidence=[],
 )
 
-Path("cases.json").write_text(json.dumps({"cases": C}, indent=2) + "\n", encoding="utf-8")
-print(len(C), "cases")
+write()

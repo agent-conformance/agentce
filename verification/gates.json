@@ -3755,7 +3755,7 @@
         {
           "description": "Java ignores the records ingest could not read (OVS-07, CND-05)",
           "file": "engines/java/src/main/java/org/agentce/Assess.java",
-          "search": "                unreadable |= w.event() == null;\n",
+          "search": "                    unreadable = true;\n",
           "replace": ""
         }
       ]

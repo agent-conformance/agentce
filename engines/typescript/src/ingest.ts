@@ -402,7 +402,11 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
     result.accepted.push(event);
     result.rawAccepted.push(rawEvent);
   }
-  const held = new Map(result.rawAccepted.map((e) => [String(e.id), digestOf(e)]));
+  // Only ids that were delivered twice are compared, so only their held records are hashed.
+  const ids = new Set(duplicates.map(([, rawEvent]) => String(rawEvent.id)));
+  const held = new Map(
+    result.rawAccepted.filter((e) => ids.has(String(e.id))).map((e) => [String(e.id), digestOf(e)]),
+  );
   for (const [duplicate, rawEvent] of duplicates) {
     const digest = digestOf(rawEvent);
     if (digest === null || held.get(String(rawEvent.id)) !== digest) {

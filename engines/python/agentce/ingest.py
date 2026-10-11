@@ -308,7 +308,11 @@ def ingest(
         result.accepted.append(event)
         result.raw_accepted.append(raw_event)
 
-    held = {str(e["id"]): _digest(e) for e in result.raw_accepted}
+    # Only ids that were delivered twice are compared, so only their held records are hashed.
+    ids = {str(raw_event["id"]) for _, raw_event in duplicates}
+    held = {
+        str(e["id"]): _digest(e) for e in result.raw_accepted if str(e["id"]) in ids
+    }
     result.withheld.extend(
         duplicate
         for duplicate, raw_event in duplicates

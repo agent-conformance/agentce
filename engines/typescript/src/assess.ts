@@ -227,8 +227,16 @@ export function indexBySubject(accepted: Event[]): Map<string, Event[]> {
   return index;
 }
 
-/** Evaluate every catalog control against every subject and return the assertions.
- * `applicabilityDeclared` is false only for a records-folder run, whose profile nobody declared. */
+function eventsByIriOf(events: Event[]): Map<string, Event> {
+  const byIri = new Map<string, Event>();
+  for (const event of events) {
+    if ("id" in event) {
+      byIri.set(eventIri(String(event.id)), event);
+    }
+  }
+  return byIri;
+}
+
 /** The subject's held events plus the readable withheld ones (18.119). A withheld record whose id is taken (a
  * duplicate_id) joins under a fresh id, so it is judged as the record it is instead of merging with the held one. */
 function counterfactual(subjectEvents: Event[], readable: Event[]): Event[] {
@@ -280,6 +288,9 @@ function notEnoughWithWithheld(assertion: Assertion, withheld: Withheld[]): Asse
 }
 
 /**
+ * Evaluate every catalog control against every subject and return the assertions.
+ * `applicabilityDeclared` is false only for a records-folder run, whose profile nobody declared.
+ *
  * `withheld` is ingest's quarantined records that may hold evidence (18.119): quarantine never gives a better
  * outcome. A control that reads conformant, or not_applicable for want of a population, reads insufficient_evidence
  * naming them when a record ingest could not read may belong to the subject, or when judging the subject's readable
@@ -298,27 +309,18 @@ export function assessSubjects(
   for (const subject of profile.subjects) {
     const subjectEvents = eventsBySubject.get(subject.id) ?? [];
     const store = buildGraph(subjectEvents, { domain });
-    const eventsByIri = new Map<string, Event>();
-    for (const event of subjectEvents) {
-      if ("id" in event) {
-        eventsByIri.set(eventIri(String(event.id)), event);
-      }
-    }
+    const eventsByIri = eventsByIriOf(subjectEvents);
     const roles = new Set(effectiveRoles(subject.role));
     const win = window(profile, subjectEvents);
     const own = withheld.filter((w) => w.subject === null || w.subject === subject.id);
+    // A readable record always names its subject (the schema requires it), so it is this subject's.
     const unreadable = own.some((w) => w.event === null);
-    const readable = own
-      .map((w) => w.event)
-      .filter((e): e is Event => e !== null && String(e.subject ?? "") === subject.id);
-    const cfEvents = readable.length > 0 ? counterfactual(subjectEvents, readable) : [];
-    const cfStore = readable.length > 0 ? buildGraph(cfEvents, { domain }) : store;
-    const cfByIri = new Map<string, Event>();
-    for (const event of cfEvents) {
-      if ("id" in event) {
-        cfByIri.set(eventIri(String(event.id)), event);
-      }
-    }
+    const readable = own.map((w) => w.event).filter((e): e is Event => e !== null);
+    // The comparison graph is needed only when no unreadable record already decides the outcome.
+    const cfEvents =
+      readable.length > 0 && !unreadable ? counterfactual(subjectEvents, readable) : [];
+    const cfStore = cfEvents.length > 0 ? buildGraph(cfEvents, { domain }) : store;
+    const cfByIri = eventsByIriOf(cfEvents);
     for (const catalog of catalogs) {
       for (const control of catalog.controls) {
         let assertion = assertControl(

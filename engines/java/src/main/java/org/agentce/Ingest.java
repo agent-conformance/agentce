@@ -284,9 +284,16 @@ public final class Ingest {
             result.accepted.add(event);
             result.rawAccepted.add(candidate.rawEvent());
         }
+        // Only ids that were delivered twice are compared, so only their held records are hashed.
+        Set<String> ids = new HashSet<>();
+        for (Map.Entry<Withheld, JsonNode> entry : duplicates) {
+            ids.add(entry.getValue().get("id").asText());
+        }
         Map<String, String> held = new HashMap<>();
         for (JsonNode e : result.rawAccepted) {
-            held.put(e.get("id").asText(), digestOf(e));
+            if (ids.contains(e.get("id").asText())) {
+                held.put(e.get("id").asText(), digestOf(e));
+            }
         }
         for (Map.Entry<Withheld, JsonNode> entry : duplicates) {
             String digest = digestOf(entry.getValue());
