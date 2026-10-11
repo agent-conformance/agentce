@@ -230,17 +230,19 @@ def test_apply_deviations_of_empty_inputs_is_a_no_op() -> None:
 _ROB02 = _REPO_ROOT / "verification" / "gates" / "fixtures" / "rob02_untrusted"
 
 
-def _rob02(case: str) -> Any:
-    cases = json.loads((_ROB02 / "cases.json").read_text(encoding="utf-8"))["cases"]
+def _assess_rob02(events: list[Any], withheld: Any = ()) -> Any:
     profile = Profile.from_dict(
         {"subjects": [{"id": "spiffe://corp/agents/rob02-fixture", "role": "both"}]}
     )
     catalog = load_catalog(_REPO_ROOT / "spec" / "catalogs" / "base" / "baseline")
     domain = DomainBinding.load(_ROB02 / "domain.linkml.yaml")
-    assertions = assess_subjects(
-        cases[case]["events"], profile, [catalog], domain, withheld=()
-    )
+    assertions = assess_subjects(events, profile, [catalog], domain, withheld=withheld)
     return next(a for a in assertions if a.control == "ROB-02")
+
+
+def _rob02(case: str) -> Any:
+    cases = json.loads((_ROB02 / "cases.json").read_text(encoding="utf-8"))["cases"]
+    return _assess_rob02(cases[case]["events"])
 
 
 def test_a_decision_the_guard_never_ruled_on_reads_insufficient_evidence() -> None:
@@ -270,15 +272,7 @@ def _quarantine_rob02(make_bundle: Any, case: str) -> Any:
         source_classes={f"urn:src:{cls}": cls for cls in _CLASSES},
     )
     ingested = ingest(load_bundle(bundle))
-    profile = Profile.from_dict(
-        {"subjects": [{"id": "spiffe://corp/agents/rob02-fixture", "role": "both"}]}
-    )
-    catalog = load_catalog(_REPO_ROOT / "spec" / "catalogs" / "base" / "baseline")
-    domain = DomainBinding.load(_ROB02 / "domain.linkml.yaml")
-    assertions = assess_subjects(
-        ingested.accepted, profile, [catalog], domain, withheld=ingested.withheld
-    )
-    return next(a for a in assertions if a.control == "ROB-02")
+    return _assess_rob02(ingested.accepted, ingested.withheld)
 
 
 def test_a_late_record_that_reads_non_conformant_is_marked_for_the_exit_code(

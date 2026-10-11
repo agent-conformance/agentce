@@ -1642,13 +1642,14 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             result.note(limitation)
     # An insufficient_evidence outcome whose withheld records read non-conformant with the held ones exits as
     # a non-conformant outcome would, so a late record never gives a better exit code (SPEC §8.5, 18.149).
-    withheld_non_conformant = [a for a in evaluated if a.withheld_non_conformant]
+    withheld_non_conformant = sorted(
+        (a for a in evaluated if a.withheld_non_conformant),
+        key=lambda a: (a.control, a.subject),
+    )
     if withheld_non_conformant:
         result.data["withheld_non_conformant"] = [
             {"control": a.control, "subject": a.subject, "key": WITHHELD_KEY}
-            for a in sorted(
-                withheld_non_conformant, key=lambda a: (a.control, a.subject)
-            )
+            for a in withheld_non_conformant
         ]
     if fail_on_predicate is not None:
         # A policy-scoped gate replaces the default any-non-conformant rule: the exit code reflects
@@ -1714,7 +1715,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     if withheld_non_conformant:
         result.note(
             f"{WITHHELD_KEY}: "
-            + ", ".join(sorted({a.control for a in withheld_non_conformant}))
+            + ", ".join(dict.fromkeys(a.control for a in withheld_non_conformant))
             + f": {MESSAGE_KEYS[WITHHELD_KEY].cause}"
         )
     return result

@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -148,19 +149,13 @@ class AssessTest {
         Path fixtures = TestPaths.repoRoot().resolve("verification/gates/fixtures");
         JsonNode events = Json.parseFile(fixtures.resolve("quarantine_no_pass/cases.json"))
                 .get("cases").get(kase).get("events");
-        StringBuilder content = new StringBuilder();
-        for (JsonNode e : events) {
-            content.append(e.isTextual() ? e.asText() : Json.compact(e)).append('\n');
+        List<JsonNode> list = new ArrayList<>();
+        events.forEach(list::add);
+        ArrayNode sources = Json.nodes().arrayNode();
+        for (String cls : List.of("enforcement_point", "independent_system", "self_report")) {
+            sources.addObject().put("id", "urn:src:" + cls).put("class", cls);
         }
-        Files.createDirectories(root.resolve("events"));
-        Files.writeString(root.resolve("events/subject.jsonl"), content.toString(), StandardCharsets.UTF_8);
-        String manifest = "{\"files\":[{\"path\":\"events/subject.jsonl\",\"sha256\":"
-                + Json.quote("sha256:" + Canonical.sha256Hex(content.toString().getBytes(StandardCharsets.UTF_8))) + "}],\"sources\":["
-                + "{\"id\":\"urn:src:enforcement_point\",\"class\":\"enforcement_point\"},"
-                + "{\"id\":\"urn:src:independent_system\",\"class\":\"independent_system\"},"
-                + "{\"id\":\"urn:src:self_report\",\"class\":\"self_report\"}]}";
-        Files.writeString(root.resolve("manifest.json"), manifest, StandardCharsets.UTF_8);
-        Ingest.Result ingested = Ingest.ingest(Bundle.load(root));
+        Ingest.Result ingested = Ingest.ingest(Fixtures.writeIngestBundle(root, list, sources));
         Profile profile = Profile.fromDict(
                 Json.parse("{\"subjects\":[{\"id\":\"spiffe://corp/agents/rob02-fixture\",\"role\":\"both\"}]}"));
         Catalog catalog = Catalog.load(TestPaths.repoRoot().resolve("spec/catalogs/base/baseline"));

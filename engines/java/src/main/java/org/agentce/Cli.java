@@ -15,6 +15,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -1287,16 +1288,11 @@ global options:
         }
         // An insufficient_evidence outcome whose withheld records read non-conformant with the held ones exits as a
         // non-conformant outcome would, so a late record never gives a better exit code (SPEC §8.5, 18.149).
-        List<Assertions.Assertion> withheldNonConformant = new ArrayList<>();
-        for (Assertions.Assertion a : evaluated) {
-            if (a.withheldNonConformant) {
-                withheldNonConformant.add(a);
-            }
-        }
-        withheldNonConformant.sort((a, b) -> {
-            int byControl = Json.byteCompare(a.control, b.control);
-            return byControl != 0 ? byControl : Json.byteCompare(a.subject, b.subject);
-        });
+        List<Assertions.Assertion> withheldNonConformant = evaluated.stream()
+                .filter(a -> a.withheldNonConformant)
+                .sorted(Comparator.comparing((Assertions.Assertion a) -> a.control, Json::byteCompare)
+                        .thenComparing(a -> a.subject, Json::byteCompare))
+                .toList();
         if (!withheldNonConformant.isEmpty()) {
             ArrayNode withheldArr = result.data.putArray("withheld_non_conformant");
             for (Assertions.Assertion a : withheldNonConformant) {
