@@ -3,6 +3,19 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.85.0
+
+- `VG-APPROVAL-OUTCOME-BOUND` (18.144, new, tier quick) checks that an approval gates a decision only when it is
+  recorded before the decision took effect, in all three engines. Every engine bounded an approval by the `ToolCall`s
+  that execute the decision only, so a decision with an `Outcome` on record and no `ToolCall`, approved hours after that
+  `Outcome`, still read conformant on CND-02 ("High-effect actions are gated by a recorded approval") and on OVS-08.
+  Now the approve must be at or before every `ToolCall` that executes the decision and every `Outcome` that names it,
+  compared as instants, never as text; an `Outcome` listed after the approval in the file still counts by its time.
+  OVS-01 still counts a late approval as a review, and a `reject` still withdraws an `approve` against the `ToolCall`s
+  only, as in 0.83.0. The gate runs 20 cases through the real Python, TypeScript and Java CLIs with the
+  `VG-APPROVAL-OUTCOME` runner. Six seeded faults, two per engine: the `Outcome`s left out of the bound, and the times
+  compared as text. `VG-APPROVAL-OUTCOME`'s TypeScript fault now names the new bound.
+
 ## 0.84.0
 
 - `VG-DUPLICATE-ID-CLASS` (18.143, new, tier quick) checks that a record of a lower source class never displaces a

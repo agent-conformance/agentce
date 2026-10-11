@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.84.0",
+  "suite_version": "0.85.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3405,8 +3405,8 @@
         {
           "description": "TypeScript counts a verified approval toward OVS-08's distinct approvers whatever its outcome",
           "file": "engines/typescript/src/graph.ts",
-          "search": "          if (\n            !approve ||\n            !beforeEvery(time, actions) ||\n            !withdrawals.every((w) => compareLiterals(time, w) === 1)\n          ) {\n            continue;\n          }\n          this.store.addEdge(decision, \"agentce:approvedBy\", node);\n          let approvers",
-          "replace": "          if (\n            approve &&\n            beforeEvery(time, actions) &&\n            withdrawals.every((w) => compareLiterals(time, w) === 1)\n          ) {\n            this.store.addEdge(decision, \"agentce:approvedBy\", node);\n          }\n          let approvers"
+          "search": "          if (\n            !approve ||\n            !beforeEvery(time, effects) ||\n            !withdrawals.every((w) => compareLiterals(time, w) === 1)\n          ) {\n            continue;\n          }\n          this.store.addEdge(decision, \"agentce:approvedBy\", node);\n          let approvers",
+          "replace": "          if (\n            approve &&\n            beforeEvery(time, effects) &&\n            withdrawals.every((w) => compareLiterals(time, w) === 1)\n          ) {\n            this.store.addEdge(decision, \"agentce:approvedBy\", node);\n          }\n          let approvers"
         },
         {
           "description": "Java records every verified approval as an approve whatever its outcome (CND-02, nist-ai-rmf OVS-08)",
@@ -3626,6 +3626,69 @@
           "file": "engines/java/src/main/java/org/agentce/Ingest.java",
           "search": "int rank = CLASS_RANK.get(event.get(\"agentcesourceclass\").asText());",
           "replace": "int rank = CLASS_RANK.get(rawEvent.get(\"agentcesourceclass\").asText());"
+        }
+      ]
+    },
+    {
+      "id": "VG-APPROVAL-OUTCOME-BOUND",
+      "title": "An approval gates a decision only when it is recorded before the decision took effect, in all three engines: CND-02 and OVS-08 count a verified approve only when its time is at or before every ToolCall that executes the decision and every Outcome that names it, compared as instants, while OVS-01 still counts a late approval as a review (18.144)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/approval_outcome.sh",
+        "approval_outcome_bound"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/approval_outcome_bound/cases.json (20: CND-02 and OVS-08 with the approve after the decision's Outcome and no ToolCall of the decision, before it, at the same instant and one second after, an Outcome before a ToolCall with the approve between them, the approve between two Outcomes, after or before in another offset whose text sorts the other way, an approval time with no offset, a self-reported Outcome, another decision's earlier Outcome, an Outcome listed after the approval but earlier in time, dual control with one approver after the Outcome and both before, OVS-01 counting a late approval as a review, and a reject after the Outcome still withdrawing) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
+      },
+      "fix_hint": "Run bash verification/gates/approval_outcome.sh approval_outcome_bound; it names the engine, the case and what it gave against what was expected. The bound sits in each engine's graph builder (_map_oversight / mapOversight): effect_times / effectTimes holds the time of every held ToolCall and Outcome whose refs.decision names the decision, collected before any approval is judged, and _before_every / beforeEvery compares the approve's time with each through the structural literal comparison (instants, never text). Withdrawals still read ToolCall times only (action_times / actionTimes).",
+      "faults": [
+        {
+          "description": "Python leaves the decision's Outcomes out of the approval bound, so an approve recorded after the decision took effect gates it for CND-02 and OVS-08",
+          "file": "engines/python/agentce/graph.py",
+          "search": "            if ptype in (\"ToolCall\", \"Outcome\") and isinstance(decision, str):\n",
+          "replace": "            if ptype == \"ToolCall\" and isinstance(decision, str):\n"
+        },
+        {
+          "description": "Python compares the approval and Outcome times as text, so an approval written in another offset that sorts earlier as text gates a decision that took effect before it",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                    and _before_every(time, effect_times.get(decision, ()))\n",
+          "replace": "                    and all(time <= t for t in effect_times.get(decision, ()))\n"
+        },
+        {
+          "description": "TypeScript leaves the decision's Outcomes out of the approval bound (CND-02, OVS-08)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "      if ((ptype === \"ToolCall\" || ptype === \"Outcome\") && typeof decision === \"string\") {\n",
+          "replace": "      if (ptype === \"ToolCall\" && typeof decision === \"string\") {\n"
+        },
+        {
+          "description": "TypeScript compares the approval and Outcome times as text",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "            !beforeEvery(time, effects) ||\n",
+          "replace": "            !effects.every((e) => compareLiterals(time, e) !== null && time <= e) ||\n"
+        },
+        {
+          "description": "Java leaves the decision's Outcomes out of the approval bound (CND-02, OVS-08)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "                if ((\"ToolCall\".equals(type) || \"Outcome\".equals(type)) && decision != null) {\n",
+          "replace": "                if (\"ToolCall\".equals(type) && decision != null) {\n"
+        },
+        {
+          "description": "Java compares the approval and Outcome times as text",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "if (d.approve() && beforeEvery(d.time(), effects) &&",
+          "replace": "if (d.approve() && effects.stream().allMatch(e -> Structural.compareLiterals(d.time(), e) != null && d.time().compareTo(e) <= 0) &&"
         }
       ]
     }
