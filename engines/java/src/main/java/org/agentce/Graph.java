@@ -567,10 +567,13 @@ public final class Graph {
             if (actor == null || loginInfo == null) {
                 return null;
             }
-            String decision = heldDecision(refsOf(event).get("decision"));
+            JsonNode ref = refsOf(event).get("decision");
+            // The name as written and the held decision it resolves to: a name that leads to another held event, or
+            // to none, still counts that event's agents, so resolving never loosens the rule (fail closed).
+            List<String> named = Stream.of(str(ref), heldDecision(ref)).filter(Objects::nonNull).toList();
             Set<String> concerned = new LinkedHashSet<>(eventAgents.get(node));
-            if (decision != null) {
-                concerned.addAll(eventAgents.getOrDefault(decision, Set.of()));
+            for (String name : named) {
+                concerned.addAll(eventAgents.getOrDefault(name, Set.of()));
             }
             if (!"SessionStart".equals(loginInfo.type())
                     || loginInfo.sourceClass() == null
@@ -585,8 +588,8 @@ public final class Graph {
                 return null;
             }
             Set<String> chain = new LinkedHashSet<>(actedFor.get(node));
-            if (decision != null) {
-                chain.addAll(actedFor.getOrDefault(decision, Set.of()));
+            for (String name : named) {
+                chain.addAll(actedFor.getOrDefault(name, Set.of()));
             }
             for (String agentId : concerned) {
                 chain.addAll(agentChain.getOrDefault(agentId, Set.of()));

@@ -527,10 +527,15 @@ class Builder {
     if (actor === null || typeof login !== "string" || loginInfo === undefined) {
       return null;
     }
-    const decision = this.heldDecision(refsOf(event).decision);
+    const ref = refsOf(event).decision;
+    // The name as written and the held decision it resolves to: a name that leads to another held event, or to
+    // none, still counts that event's agents, so resolving never loosens the rule (fail closed).
+    const named = [ref, this.heldDecision(ref)].filter(
+      (name): name is string => typeof name === "string",
+    );
     const concerned = new Set([
       ...(this.eventAgents.get(node) ?? []),
-      ...((typeof decision === "string" ? this.eventAgents.get(decision) : undefined) ?? []),
+      ...named.flatMap((name) => [...(this.eventAgents.get(name) ?? [])]),
     ]);
     const [loginType, loginClass, loginAgent, loginPrincipal] = loginInfo;
     if (loginType !== "SessionStart" || loginClass === null || !LOGIN_CLASSES.has(loginClass)) {
@@ -544,8 +549,8 @@ class Builder {
       return null;
     }
     const chain = new Set(this.actedFor.get(node));
-    if (typeof decision === "string") {
-      for (const p of this.actedFor.get(decision) ?? []) {
+    for (const name of named) {
+      for (const p of this.actedFor.get(name) ?? []) {
         chain.add(p);
       }
     }

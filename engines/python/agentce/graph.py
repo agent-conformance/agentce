@@ -454,11 +454,14 @@ class _Builder:
         login = data.get("session_ref")
         if actor is None or not isinstance(login, str) or login not in self.event_info:
             return None
-        decision = self._held_decision(_refs(event).get("decision"))
-        concerned = self.event_agents[node] | (
-            self.event_agents.get(decision, frozenset())
-            if isinstance(decision, str)
-            else frozenset()
+        ref = _refs(event).get("decision")
+        # The name as written and the held decision it resolves to: a name that leads to another held event, or to
+        # none, still counts that event's agents, so resolving never loosens the rule (fail closed).
+        named = [
+            name for name in (ref, self._held_decision(ref)) if isinstance(name, str)
+        ]
+        concerned = self.event_agents[node].union(
+            *(self.event_agents.get(name, frozenset()) for name in named)
         )
         login_type, login_class, login_agent, login_principal = self.event_info[login]
         if login_type != "SessionStart" or login_class not in _LOGIN_CLASSES:
@@ -469,8 +472,8 @@ class _Builder:
         if login_principal != actor_iri:
             return None
         chain = set(self.acted_for[node])
-        if isinstance(decision, str):
-            chain |= self.acted_for.get(decision, set())
+        for name in named:
+            chain |= self.acted_for.get(name, set())
         for agent_id in concerned:
             chain |= self.agent_chain.get(agent_id, set())
         return None if actor_iri in chain else actor_iri
