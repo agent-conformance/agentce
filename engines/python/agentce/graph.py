@@ -322,7 +322,12 @@ class _Builder:
             "prov:Entity",
         }
         for event in events:
-            self.event_iris.add(event_iri(str(event["id"])))
+            node = event_iri(str(event["id"]))
+            self.event_iris.add(node)
+            # The held decisions, known before the first pass so a refs.decision read before its Decision still
+            # resolves to it (18.156).
+            if self._ptype(event) == "Decision":
+                self.decision_time[node] = str(event.get("time", ""))
         for event in events:
             used_classes.add(f"agentce:{self._ptype(event)}")
             if self._ptype(event) in _COMPONENT_RECORD_TYPES:
@@ -404,7 +409,6 @@ class _Builder:
             self._map_delegation_principals(data.get("chain"))
 
         if ptype == "Decision":
-            self.decision_time[node] = str(event.get("time", ""))
             dtype = data.get("decision_type")
             if isinstance(dtype, str):
                 self.decision_type[node] = dtype
@@ -488,9 +492,12 @@ class _Builder:
             self.store.add_literal(p_iri, "agentce:chainIndex", str(index), INTEGER)
 
     def _map_decision_links(self, node: str, ptype: str, event: dict[str, Any]) -> None:
+        """The SPEC §6.3 glue edges of a refs.decision, read through ``_held_decision`` as approvedBy reads it; a ref
+        naming no held decision keeps its text (18.156)."""
         refs = _refs(event)
         decision = refs.get("decision")
         if isinstance(decision, str):
+            decision = self._held_decision(decision) or decision
             self.ref_decision[node] = decision
             if ptype == "ToolCall":
                 self.store.add_edge(node, "agentce:executes", decision)
@@ -931,10 +938,8 @@ class _Builder:
         by a human when its actor meets the SPEC §10.4 human-actor rule."""
         data = _data(event)
         if ptype == "Override":
-            decision = _refs(event).get("decision")
             effective = (
-                isinstance(decision, str)
-                and decision in self.decision_time
+                self._held_decision(_refs(event).get("decision")) is not None
                 and data.get("replacement") is not None
                 and data.get("replacement") != data.get("original")
             )
@@ -967,12 +972,11 @@ class _Builder:
         )
 
     def _executes_consequential(self, node: str, refs: dict[str, Any]) -> None:
-        decision = refs.get("decision")
-        consequential = False
-        if isinstance(decision, str):
-            consequential = (
-                self.decision_type.get(decision, "") in self.domain.consequential
-            )
+        decision = self._held_decision(refs.get("decision"))
+        consequential = (
+            decision is not None
+            and self.decision_type.get(decision, "") in self.domain.consequential
+        )
         self.store.add_literal(
             node,
             "agentce:executesConsequential",

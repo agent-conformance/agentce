@@ -420,7 +420,14 @@ public final class Graph {
             usedClasses.add("prov:Activity");
             usedClasses.add("prov:Entity");
             for (JsonNode event : events) {
-                eventIris.add(Iri.eventIri(event.get("id").asText()));
+                String node = Iri.eventIri(event.get("id").asText());
+                eventIris.add(node);
+                // The held decisions, known before the first pass so a refs.decision read before its Decision still
+                // resolves to it (18.156).
+                if ("Decision".equals(ptype(event))) {
+                    String time = str(event.get("time"));
+                    decisionTime.put(node, time != null ? time : "");
+                }
             }
             for (JsonNode event : events) {
                 usedClasses.add("agentce:" + ptype(event));
@@ -511,7 +518,6 @@ public final class Graph {
             }
 
             if ("Decision".equals(ptype)) {
-                decisionTime.put(node, time != null ? time : "");
                 String dtype = str(data.get("decision_type"));
                 if (dtype != null) {
                     decisionType.put(node, dtype);
@@ -612,10 +618,13 @@ public final class Graph {
             }
         }
 
+        /** The SPEC §6.3 glue edges of a refs.decision, read through {@link #heldDecision} as approvedBy reads it; a
+         * ref naming no held decision keeps its text (18.156). */
         private void mapDecisionLinks(String node, String ptype, JsonNode event) {
             JsonNode refs = refsOf(event);
-            String decision = str(refs.get("decision"));
-            if (decision != null) {
+            String ref = str(refs.get("decision"));
+            if (ref != null) {
+                String decision = Objects.requireNonNullElse(heldDecision(refs.get("decision")), ref);
                 refDecision.put(node, decision);
                 switch (ptype) {
                     case "ToolCall" -> store.addEdge(node, "agentce:executes", decision);
@@ -1127,9 +1136,7 @@ public final class Graph {
             JsonNode data = dataOf(event);
             boolean effective;
             if ("Override".equals(ptype)) {
-                String decision = str(refsOf(event).get("decision"));
-                effective = decision != null
-                        && decisionTime.containsKey(decision)
+                effective = heldDecision(refsOf(event).get("decision")) != null
                         && !isAbsent(data.get("replacement"))
                         && !jsonEquals(data.get("replacement"), data.get("original"));
             } else {
@@ -1250,11 +1257,9 @@ public final class Graph {
         }
 
         private void executesConsequential(String node, JsonNode refs) {
-            String decision = str(refs.get("decision"));
-            boolean consequential = false;
-            if (decision != null) {
-                consequential = domain.consequential.contains(decisionType.getOrDefault(decision, ""));
-            }
+            String decision = heldDecision(refs.get("decision"));
+            boolean consequential = decision != null
+                    && domain.consequential.contains(decisionType.getOrDefault(decision, ""));
             store.addLiteral(node, "agentce:executesConsequential", consequential ? "true" : "false", BOOL);
         }
 

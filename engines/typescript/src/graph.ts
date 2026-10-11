@@ -370,7 +370,13 @@ class Builder {
     usedClasses.add("prov:Activity");
     usedClasses.add("prov:Entity");
     for (const event of events) {
-      this.eventIris.add(eventIri(String(event.id)));
+      const node = eventIri(String(event.id));
+      this.eventIris.add(node);
+      // The held decisions, known before the first pass so a refs.decision read before its Decision still resolves
+      // to it (18.156).
+      if (this.ptype(event) === "Decision") {
+        this.decisionTime.set(node, typeof event.time === "string" ? event.time : "");
+      }
     }
     for (const event of events) {
       usedClasses.add(`agentce:${this.ptype(event)}`);
@@ -471,7 +477,6 @@ class Builder {
     }
 
     if (ptype === "Decision") {
-      this.decisionTime.set(node, typeof event.time === "string" ? event.time : "");
       const dtype = data.decision_type;
       if (typeof dtype === "string") {
         this.decisionType.set(node, dtype);
@@ -577,10 +582,13 @@ class Builder {
     });
   }
 
+  /** The SPEC §6.3 glue edges of a refs.decision, read through `heldDecision` as approvedBy reads it; a ref naming
+   * no held decision keeps its text (18.156). */
   private mapDecisionLinks(node: string, ptype: string, event: Event): void {
     const refs = refsOf(event);
-    const decision = refs.decision;
-    if (typeof decision === "string") {
+    const ref = refs.decision;
+    if (typeof ref === "string") {
+      const decision = this.heldDecision(ref) ?? ref;
       this.refDecision.set(node, decision);
       if (ptype === "ToolCall") {
         this.store.addEdge(node, "agentce:executes", decision);
@@ -1109,11 +1117,9 @@ class Builder {
     const data = dataOf(event);
     let effective: boolean;
     if (ptype === "Override") {
-      const decision = refsOf(event).decision;
       const replacement = data.replacement ?? null;
       effective =
-        typeof decision === "string" &&
-        this.decisionTime.has(decision) &&
+        this.heldDecision(refsOf(event).decision) !== null &&
         replacement !== null &&
         !pyEquals(replacement, data.original ?? null);
     } else {
@@ -1234,11 +1240,9 @@ class Builder {
   }
 
   private executesConsequential(node: string, refs: Record<string, unknown>): void {
-    const decision = refs.decision;
-    let consequential = false;
-    if (typeof decision === "string") {
-      consequential = this.domain.consequential.has(this.decisionType.get(decision) ?? "");
-    }
+    const decision = this.heldDecision(refs.decision);
+    const consequential =
+      decision !== null && this.domain.consequential.has(this.decisionType.get(decision) ?? "");
     this.store.addLiteral(
       node,
       "agentce:executesConsequential",
