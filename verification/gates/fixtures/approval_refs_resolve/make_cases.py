@@ -22,6 +22,7 @@ from approval_events import (  # noqa: E402
     dual,
     ev,
     idp,
+    ref,
     write,
 )
 
@@ -55,11 +56,11 @@ def login_at(t, i="s1", who="u2"):
     return timed(idp(i, who), t)
 
 
-def approve_at(t, name="agentce:event/d1", **k):
+def approve_at(t, name=ref("d1"), **k):
     return timed(named(appr("approve", **k), name), t)
 
 
-def reject_at(t, name="agentce:event/d1", **k):
+def reject_at(t, name=ref("d1"), **k):
     return timed(named(appr("reject", **k), name), t)
 
 
@@ -108,26 +109,47 @@ cnd02(
 # The approval names the decision in another form; the bound holds whichever form the action uses.
 cnd02(
     "cnd02-bareid-approve-after-outcome",
-    [dec(), outcome_at(at(1), "agentce:event/d1"), login_at(at(4)), approve_at(at(5), "d1")],
+    [
+        dec(),
+        outcome_at(at(1), "agentce:event/d1"),
+        login_at(at(4)),
+        approve_at(at(5), "d1"),
+    ],
     NC,
     ["d1"],
 )
 case(
     "cnd02-bareid-approve-before-toolcall",
     "CND-02",
-    [dec(), login_at(at(1)), approve_at(at(1), "d1"), run_at(at(2), "agentce:event/d1")],
+    [
+        dec(),
+        login_at(at(1)),
+        approve_at(at(1), "d1"),
+        run_at(at(2), "agentce:event/d1"),
+    ],
     "conformant",
 )
 cnd02(
     "cnd02-padded-approve-before-bareid-outcome",
-    [dec(), login_at(at(1)), approve_at(at(1), " agentce:event/d1 "), outcome_at(at(2), "d1")],
+    [
+        dec(),
+        login_at(at(1)),
+        approve_at(at(1), " agentce:event/d1 "),
+        outcome_at(at(2), "d1"),
+    ],
     "conformant",
 )
 # A resolved bare id keeps the bound per decision: another decision's bare-id Outcome does not bound this one, and a
 # reject after a bare-id ToolCall of the decision came after the action ran, so it withdraws nothing (18.142).
 cnd02(
     "cnd02-other-decision-bareid-outcome-earlier",
-    [dec(), dec("d2"), outcome_at(at(1), "d2", i="o2"), login_at(at(4)), approve_at(at(5))],
+    [
+        dec(),
+        dec("d2"),
+        outcome_at(at(1), "d2", i="o2"),
+        login_at(at(4)),
+        approve_at(at(5)),
+    ],
     NC,
     ["d2"],
 )

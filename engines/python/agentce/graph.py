@@ -774,7 +774,7 @@ class _Builder:
             return None
         if ref in self.decision_time:
             return ref
-        trimmed = ref.strip(_ID_PAD)
+        trimmed = _rule_id(ref) or ""
         for name in (trimmed, event_iri(trimmed)):
             if name in self.decision_time:
                 return name

@@ -1054,12 +1054,13 @@ public final class Graph {
                 String node = Iri.eventIri(event.get("id").asText());
                 String human = verifiedActor(node, event);
                 byHuman.put(node, human != null);
-                String ref = str(refsOf(event).get("decision"));
+                JsonNode refNode = refsOf(event).get("decision");
+                String ref = str(refNode);
                 if (!"ApprovalDecided".equals(ptype) || ref == null) {
                     continue;
                 }
                 // A name that leads to no held decision keeps its own key: it reviews and approves no held decision.
-                String held = heldDecision(refsOf(event).get("decision"));
+                String held = heldDecision(refNode);
                 String decision = held != null ? held : ref;
                 boolean approve = "approve".equals(str(dataOf(event).get("outcome")));
                 String actor = humanId(dataOf(event).get("actor"));
