@@ -454,12 +454,9 @@ class _Builder:
         login = data.get("session_ref")
         if actor is None or not isinstance(login, str) or login not in self.event_info:
             return None
-        ref = _refs(event).get("decision")
-        # The name as written and the held decision it resolves to: a name that leads to another held event, or to
-        # none, still counts that event's agents, so resolving never loosens the rule (fail closed).
-        named = [
-            name for name in (ref, self._held_decision(ref)) if isinstance(name, str)
-        ]
+        # Every name the ref may mean an event by, the held decision among them: a name that leads to another held
+        # event, or to none, still counts that event's agents, so resolving never loosens the rule (fail closed).
+        named = self._ref_names(_refs(event).get("decision"))
         concerned = self.event_agents[node].union(
             *(self.event_agents.get(name, frozenset()) for name in named)
         )
@@ -769,16 +766,20 @@ class _Builder:
         self._conduct_scope_budget(events)
         self._preceded_by()
 
+    @staticmethod
+    def _ref_names(ref: Any) -> tuple[str, ...]:
+        """The names a ``refs.decision`` may mean an event by, in the order they are tried: as written, trimmed of
+        ``_ID_PAD``, and ``agentce:event/<trimmed ref>`` (a bare id); none when the ref is no string."""
+        if not isinstance(ref, str):
+            return ()
+        trimmed = _rule_id(ref) or ""
+        return (ref, trimmed, event_iri(trimmed))
+
     def _held_decision(self, ref: Any) -> str | None:
         """The held decision a ``refs.decision`` names (SPEC §6.3 approvedBy): its IRI, else the ref trimmed of
         ``_ID_PAD`` when that is a held decision's IRI, else ``agentce:event/<trimmed ref>`` when that is (a bare id);
         ``None`` when it names no held decision. Exact match first, so no name resolves to another held decision."""
-        if not isinstance(ref, str):
-            return None
-        if ref in self.decision_time:
-            return ref
-        trimmed = _rule_id(ref) or ""
-        for name in (trimmed, event_iri(trimmed)):
+        for name in self._ref_names(ref):
             if name in self.decision_time:
                 return name
         return None

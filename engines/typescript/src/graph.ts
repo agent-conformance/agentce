@@ -527,16 +527,15 @@ class Builder {
     if (actor === null || typeof login !== "string" || loginInfo === undefined) {
       return null;
     }
-    const ref = refsOf(event).decision;
-    // The name as written and the held decision it resolves to: a name that leads to another held event, or to
-    // none, still counts that event's agents, so resolving never loosens the rule (fail closed).
-    const named = [ref, this.heldDecision(ref)].filter(
-      (name): name is string => typeof name === "string",
-    );
-    const concerned = new Set([
-      ...(this.eventAgents.get(node) ?? []),
-      ...named.flatMap((name) => [...(this.eventAgents.get(name) ?? [])]),
-    ]);
+    // Every name the ref may mean an event by, the held decision among them: a name that leads to another held
+    // event, or to none, still counts that event's agents, so resolving never loosens the rule (fail closed).
+    const named = this.refNames(refsOf(event).decision);
+    const concerned = new Set(this.eventAgents.get(node));
+    for (const name of named) {
+      for (const agent of this.eventAgents.get(name) ?? []) {
+        concerned.add(agent);
+      }
+    }
     const [loginType, loginClass, loginAgent, loginPrincipal] = loginInfo;
     if (loginType !== "SessionStart" || loginClass === null || !LOGIN_CLASSES.has(loginClass)) {
       return null;
@@ -977,20 +976,18 @@ class Builder {
   /** The held decision a `refs.decision` names (SPEC §6.3 approvedBy): its IRI, else the ref trimmed of `ID_PAD` when
    * that is a held decision's IRI, else `agentce:event/<trimmed ref>` when that is (a bare id); `null` when it names
    * no held decision. Exact match first, so no name resolves to another held decision. */
-  private heldDecision(ref: unknown): string | null {
+  /** The names a refs.decision may mean an event by, in the order they are tried: as written, trimmed of ID_PAD,
+   * and agentce:event/<trimmed ref> (a bare id); none when the ref is no string. */
+  private refNames(ref: unknown): string[] {
     if (typeof ref !== "string") {
-      return null;
-    }
-    if (this.decisionTime.has(ref)) {
-      return ref;
+      return [];
     }
     const trimmed = ruleId(ref) ?? "";
-    for (const name of [trimmed, eventIri(trimmed)]) {
-      if (this.decisionTime.has(name)) {
-        return name;
-      }
-    }
-    return null;
+    return [ref, trimmed, eventIri(trimmed)];
+  }
+
+  private heldDecision(ref: unknown): string | null {
+    return this.refNames(ref).find((name) => this.decisionTime.has(name)) ?? null;
   }
 
   /** Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An ApprovalDecided

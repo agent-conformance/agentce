@@ -567,10 +567,9 @@ public final class Graph {
             if (actor == null || loginInfo == null) {
                 return null;
             }
-            JsonNode ref = refsOf(event).get("decision");
-            // The name as written and the held decision it resolves to: a name that leads to another held event, or
-            // to none, still counts that event's agents, so resolving never loosens the rule (fail closed).
-            List<String> named = Stream.of(str(ref), heldDecision(ref)).filter(Objects::nonNull).toList();
+            // Every name the ref may mean an event by, the held decision among them: a name that leads to another
+            // held event, or to none, still counts that event's agents, so resolving never loosens the rule (fail closed).
+            List<String> named = refNames(refsOf(event).get("decision"));
             Set<String> concerned = new LinkedHashSet<>(eventAgents.get(node));
             for (String name : named) {
                 concerned.addAll(eventAgents.getOrDefault(name, Set.of()));
@@ -1002,16 +1001,19 @@ public final class Graph {
          * {@link #ID_PAD} when that is a held decision's IRI, else {@code agentce:event/<trimmed ref>} when that is (a
          * bare id); null when it names no held decision. Exact match first, so no name resolves to another held
          * decision. */
-        private String heldDecision(JsonNode node) {
+        /** The names a refs.decision may mean an event by, in the order they are tried: as written, trimmed of
+         * ID_PAD, and agentce:event/&lt;trimmed ref&gt; (a bare id); none when the ref is no string. */
+        private List<String> refNames(JsonNode node) {
             String ref = str(node);
             if (ref == null) {
-                return null;
-            }
-            if (decisionTime.containsKey(ref)) {
-                return ref;
+                return List.of();
             }
             String trimmed = Objects.requireNonNullElse(ruleId(ref), "");
-            for (String name : List.of(trimmed, Iri.eventIri(trimmed))) {
+            return List.of(ref, trimmed, Iri.eventIri(trimmed));
+        }
+
+        private String heldDecision(JsonNode node) {
+            for (String name : refNames(node)) {
                 if (decisionTime.containsKey(name)) {
                     return name;
                 }
