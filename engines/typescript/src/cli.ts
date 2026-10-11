@@ -13,7 +13,13 @@ import { summarizeActivity } from "./activity";
 import { resolve as resolveApplicability } from "./applicability";
 import { type Grammar, NEGATIVE_NUMBER, scanArgv } from "./argv";
 import { type Assertion, aggregate, assertionFromJson, assertionToJson } from "./assertions";
-import { applyDeviations, assessSubjects, deviationsByControl, evaluatedNothing } from "./assess";
+import {
+  WITHHELD_KEY,
+  applyDeviations,
+  assessSubjects,
+  deviationsByControl,
+  evaluatedNothing,
+} from "./assess";
 import { computeBlindSpots } from "./blindSpots";
 import { loadBundle } from "./bundle";
 import { DEFAULT_LENS, catalogsDir as bundledCatalogsDir, quickstartDir } from "./bundled";
@@ -1153,15 +1159,32 @@ function runAssess(options: AssessOptions): CommandResult {
       result.note(limitation);
     }
   }
+  // An insufficient_evidence outcome whose withheld records read non-conformant with the held ones exits as a
+  // non-conformant outcome would, so a late record never gives a better exit code (SPEC §8.5, 18.149).
+  const withheldNonConformant = evaluated
+    .filter((a) => a.withheldNonConformant === true)
+    .sort((a, b) => byteCompare(a.control, b.control) || byteCompare(a.subject, b.subject));
+  if (withheldNonConformant.length > 0) {
+    result.data.withheld_non_conformant = withheldNonConformant.map((a) => ({
+      control: a.control,
+      subject: a.subject,
+      key: WITHHELD_KEY,
+    }));
+  }
   if (failOnPredicate !== undefined) {
     // A policy-scoped gate replaces the default any-non-conformant rule: the exit code reflects only
-    // the assertions the expression names, never the whole run (SPEC §8.5, finding #29).
-    const matched = evaluated.filter(failOnPredicate).length;
+    // the assertions the expression names, never the whole run (SPEC §8.5, finding #29). A withheld
+    // non-conformant outcome is matched as the non-conformant outcome it would be on time.
+    const matched = evaluated.filter(
+      (a) =>
+        failOnPredicate(a) ||
+        (a.withheldNonConformant === true && failOnPredicate({ ...a, outcome: "non-conformant" })),
+    ).length;
     result.data.fail_on = { expression: options.failOn, matched };
     if (matched > 0) {
       result.addCode(ExitCode.FINDINGS);
     }
-  } else if (nonConformant > 0) {
+  } else if (nonConformant > 0 || withheldNonConformant.length > 0) {
     result.addCode(ExitCode.FINDINGS);
   }
   // SPEC.md:1076 (SPEC Sec.8.5): exit 2 whenever any assertion is both insufficient_evidence and
@@ -1197,6 +1220,10 @@ function runAssess(options: AssessOptions): CommandResult {
     result.note(
       `insufficient evidence on severity-high control(s): ${highInsufficient.join(", ")}`,
     );
+  }
+  if (withheldNonConformant.length > 0) {
+    const controls = [...new Set(withheldNonConformant.map((a) => a.control))];
+    result.note(`${WITHHELD_KEY}: ${controls.join(", ")}: ${errorCause(WITHHELD_KEY)}`);
   }
   return result;
 }

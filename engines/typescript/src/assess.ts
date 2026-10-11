@@ -274,8 +274,16 @@ function withheldEvidence(withheld: Withheld[]): EvidencePointer[] {
     .map((key) => pointers.get(key) as EvidencePointer);
 }
 
-/** A control quarantine may have flattered reads insufficient_evidence naming the withheld records (18.119). */
-function notEnoughWithWithheld(assertion: Assertion, withheld: Withheld[]): Assertion {
+/** The message key naming an insufficient_evidence outcome whose withheld records read non-conformant (18.149). */
+export const WITHHELD_KEY = "withheld_reads_non_conformant";
+
+/** A control quarantine may have flattered reads insufficient_evidence naming the withheld records (18.119).
+ * `nonConformant` says judging the readable withheld records with the held ones reads non-conformant (18.149). */
+function notEnoughWithWithheld(
+  assertion: Assertion,
+  withheld: Withheld[],
+  nonConformant: boolean,
+): Assertion {
   return {
     ...assertion,
     outcome: "insufficient_evidence",
@@ -284,6 +292,7 @@ function notEnoughWithWithheld(assertion: Assertion, withheld: Withheld[]): Asse
     evidence: withheldEvidence(withheld),
     sourceClassSatisfied: null,
     evidenceStrength: null,
+    withheldNonConformant: nonConformant,
   };
 }
 
@@ -316,9 +325,9 @@ export function assessSubjects(
     // A readable record always names its subject (the schema requires it), so it is this subject's.
     const unreadable = own.some((w) => w.event === null);
     const readable = own.map((w) => w.event).filter((e): e is Event => e !== null);
-    // The comparison graph is needed only when no unreadable record already decides the outcome.
-    const cfEvents =
-      readable.length > 0 && !unreadable ? counterfactual(subjectEvents, readable) : [];
+    // The comparison runs whenever a readable record is withheld, even beside an unreadable one: the unreadable record
+    // already decides the outcome, but the exit code still needs what the readable ones show (18.149).
+    const cfEvents = readable.length > 0 ? counterfactual(subjectEvents, readable) : [];
     const cfStore = cfEvents.length > 0 ? buildGraph(cfEvents, { domain }) : store;
     const cfByIri = eventsByIriOf(cfEvents);
     for (const catalog of catalogs) {
@@ -338,22 +347,26 @@ export function assessSubjects(
           own.length > 0 &&
           (assertion.outcome === "conformant" ||
             (assertion.outcome === "not_applicable" && roleApplies(roles, control.appliesToRoles)));
-        if (
-          flattered &&
-          (unreadable ||
-            assertControl(
-              cfStore,
-              catalog,
-              control,
-              subject,
-              roles,
-              cfEvents,
-              cfByIri,
-              win,
-              applicabilityDeclared,
-            ).outcome !== assertion.outcome)
-        ) {
-          assertion = notEnoughWithWithheld(assertion, own);
+        if (!flattered) {
+          assertions.push(assertion);
+          continue;
+        }
+        const withWithheld =
+          readable.length === 0
+            ? assertion.outcome
+            : assertControl(
+                cfStore,
+                catalog,
+                control,
+                subject,
+                roles,
+                cfEvents,
+                cfByIri,
+                win,
+                applicabilityDeclared,
+              ).outcome;
+        if (unreadable || withWithheld !== assertion.outcome) {
+          assertion = notEnoughWithWithheld(assertion, own, withWithheld === "non-conformant");
         }
         assertions.push(assertion);
       }

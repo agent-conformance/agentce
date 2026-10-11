@@ -51,6 +51,10 @@ export interface Assertion {
   evidenceStrength: string | null;
   deviation: string | null;
   crosswalk: Array<Record<string, string | boolean>>;
+  /** True when this insufficient_evidence outcome comes from withheld records and judging them with the held ones
+   * reads non-conformant (18.149): assess exits as for a non-conformant outcome. Run state for the exit code only;
+   * never written to assertions.json. */
+  withheldNonConformant?: boolean;
 }
 
 /** Build an assertion, defaulting the optional collections and nullable fields (mirrors the dataclass). */

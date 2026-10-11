@@ -1285,12 +1285,34 @@ global options:
                 result.note(limitation);
             }
         }
+        // An insufficient_evidence outcome whose withheld records read non-conformant with the held ones exits as a
+        // non-conformant outcome would, so a late record never gives a better exit code (SPEC §8.5, 18.149).
+        List<Assertions.Assertion> withheldNonConformant = new ArrayList<>();
+        for (Assertions.Assertion a : evaluated) {
+            if (a.withheldNonConformant) {
+                withheldNonConformant.add(a);
+            }
+        }
+        withheldNonConformant.sort((a, b) -> {
+            int byControl = Json.byteCompare(a.control, b.control);
+            return byControl != 0 ? byControl : Json.byteCompare(a.subject, b.subject);
+        });
+        if (!withheldNonConformant.isEmpty()) {
+            ArrayNode withheldArr = result.data.putArray("withheld_non_conformant");
+            for (Assertions.Assertion a : withheldNonConformant) {
+                ObjectNode entry = withheldArr.addObject();
+                entry.put("control", a.control);
+                entry.put("subject", a.subject);
+                entry.put("key", Assess.WITHHELD_KEY);
+            }
+        }
         if (failOn != null) {
             // A policy-scoped gate replaces the default any-non-conformant rule: the exit code reflects
-            // only the assertions the expression names, never the whole run (SPEC §8.5).
+            // only the assertions the expression names, never the whole run (SPEC §8.5). A withheld
+            // non-conformant outcome is matched as the non-conformant outcome it would be on time.
             int failOnMatches = 0;
             for (Assertions.Assertion a : evaluated) {
-                if (failOn.matches(a)) {
+                if (failOn.matches(a) || (a.withheldNonConformant && failOn.matches(asNonConformant(a)))) {
                     failOnMatches++;
                 }
             }
@@ -1300,7 +1322,7 @@ global options:
             if (failOnMatches > 0) {
                 result.addCode(ExitCode.FINDINGS.code);
             }
-        } else if (nonConformant > 0) {
+        } else if (nonConformant > 0 || !withheldNonConformant.isEmpty()) {
             result.addCode(ExitCode.FINDINGS.code);
         }
         // SPEC.md:1076 (SPEC Sec.8.5): exit 2 whenever any assertion is both insufficient_evidence and
@@ -1330,7 +1352,20 @@ global options:
         if (!highInsufficient.isEmpty()) {
             result.note("insufficient evidence on severity-high control(s): " + String.join(", ", highInsufficient));
         }
+        if (!withheldNonConformant.isEmpty()) {
+            LinkedHashSet<String> controls = new LinkedHashSet<>();
+            withheldNonConformant.forEach(a -> controls.add(a.control));
+            result.note(Assess.WITHHELD_KEY + ": " + String.join(", ", controls) + ": "
+                    + ErrorCatalogue.errorCause(Assess.WITHHELD_KEY));
+        }
         return result;
+    }
+
+    /** {@code a} with its outcome read as non-conformant, for a --fail-on match on a withheld non-conformant outcome. */
+    private static Assertions.Assertion asNonConformant(Assertions.Assertion a) {
+        Assertions.Assertion copy = Assertions.copyOf(a);
+        copy.outcome = "non-conformant";
+        return copy;
     }
 
     /** Python's {@code COLUMNS=80 agentce assess --help}, word for word. */

@@ -278,9 +278,14 @@ public final class Assess {
         return out;
     }
 
-    /** A control quarantine may have flattered reads insufficient_evidence naming the withheld records (18.119). */
+    /** The message key naming an insufficient_evidence outcome whose withheld records read non-conformant (18.149). */
+    public static final String WITHHELD_KEY = "withheld_reads_non_conformant";
+
+    /** A control quarantine may have flattered reads insufficient_evidence naming the withheld records (18.119).
+     * {@code nonConformant} says judging the readable withheld records with the held ones reads non-conformant
+     * (18.149). */
     private static Assertions.Assertion notEnoughWithWithheld(
-            Assertions.Assertion assertion, List<Ingest.Withheld> withheld) {
+            Assertions.Assertion assertion, List<Ingest.Withheld> withheld, boolean nonConformant) {
         Assertions.Assertion copy = Assertions.copyOf(assertion);
         copy.outcome = "insufficient_evidence";
         copy.population = new int[] {assertion.population[0], 0};
@@ -288,6 +293,7 @@ public final class Assess {
         copy.evidence = withheldEvidence(withheld);
         copy.sourceClassSatisfied = null;
         copy.evidenceStrength = null;
+        copy.withheldNonConformant = nonConformant;
         return copy;
     }
 
@@ -337,9 +343,10 @@ public final class Assess {
                     readable.add(w.event());
                 }
             }
-            // The comparison graph is needed only when no unreadable record already decides the outcome.
-            List<JsonNode> cfEvents =
-                    readable.isEmpty() || unreadable ? List.of() : counterfactual(subjectEvents, readable);
+            // The comparison runs whenever a readable record is withheld, even beside an unreadable one: the
+            // unreadable record already decides the outcome, but the exit code still needs what the readable ones
+            // show (18.149).
+            List<JsonNode> cfEvents = readable.isEmpty() ? List.of() : counterfactual(subjectEvents, readable);
             GraphStore cfStore = cfEvents.isEmpty() ? store : Graph.buildGraph(cfEvents, domain);
             Map<String, JsonNode> cfByIri = eventsByIriOf(cfEvents);
             for (Catalog catalog : catalogs) {
@@ -350,12 +357,15 @@ public final class Assess {
                             && ("conformant".equals(assertion.outcome)
                                     || ("not_applicable".equals(assertion.outcome)
                                             && roleApplies(roles, control.appliesToRoles)));
-                    if (flattered
-                            && (unreadable
-                                    || !assertControl(cfStore, catalog, control, subject, roles, cfEvents, cfByIri, win)
-                                            .outcome
-                                            .equals(assertion.outcome))) {
-                        assertion = notEnoughWithWithheld(assertion, own);
+                    if (!flattered) {
+                        assertions.add(assertion);
+                        continue;
+                    }
+                    String withWithheld = readable.isEmpty()
+                            ? assertion.outcome
+                            : assertControl(cfStore, catalog, control, subject, roles, cfEvents, cfByIri, win).outcome;
+                    if (unreadable || !assertion.outcome.equals(withWithheld)) {
+                        assertion = notEnoughWithWithheld(assertion, own, "non-conformant".equals(withWithheld));
                     }
                     assertions.add(assertion);
                 }

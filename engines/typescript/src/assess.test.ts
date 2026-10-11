@@ -8,16 +8,19 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { type Assertion, assertionToJson, makeAssertion } from "./assertions";
 import { applyDeviations, assessSubjects } from "./assess";
+import { loadBundle } from "./bundle";
 import { canonicalString } from "./canonical";
 import { loadCatalog } from "./catalog";
 import { DomainBinding } from "./domain";
 import { InputError } from "./errors";
+import { ingest } from "./ingest";
 import { profileFromDict } from "./profile";
 import { loadDeviationRegister } from "./readiness";
 
@@ -153,4 +156,61 @@ test("loadDeviationRegister refuses non-UTF-8 bytes instead of decoding them los
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+const QUARANTINE = join(REPO, "verification", "gates", "fixtures", "quarantine_no_pass");
+const ROB02 = join(REPO, "verification", "gates", "fixtures", "rob02_untrusted");
+
+/** ROB-02 over a VG-QUARANTINE-NO-PASS case, ingested from a bundle that declares the gate's three sources. */
+function quarantineRob02(kase: string): Assertion {
+  const cases = JSON.parse(readFileSync(join(QUARANTINE, "cases.json"), "utf-8")).cases;
+  const dir = mkdtempSync(join(tmpdir(), "agentce-assess-"));
+  try {
+    mkdirSync(join(dir, "events"));
+    const lines = cases[kase].events
+      .map((e: unknown) => (typeof e === "string" ? e : JSON.stringify(e)))
+      .join("\n");
+    writeFileSync(join(dir, "events", "subject.jsonl"), `${lines}\n`);
+    const hash = createHash("sha256").update(`${lines}\n`).digest("hex");
+    const sources = ["enforcement_point", "independent_system", "self_report"].map((cls) => ({
+      id: `urn:src:${cls}`,
+      class: cls,
+    }));
+    writeFileSync(
+      join(dir, "manifest.json"),
+      JSON.stringify({
+        bundle_format: "1.0",
+        files: [{ path: "events/subject.jsonl", sha256: `sha256:${hash}` }],
+        sources,
+      }),
+    );
+    const ingested = ingest(loadBundle(dir));
+    const profile = profileFromDict({
+      subjects: [{ id: "spiffe://corp/agents/rob02-fixture", role: "both" }],
+    });
+    const catalog = loadCatalog(join(REPO, "spec", "catalogs", "base", "baseline"));
+    const domain = DomainBinding.load(join(ROB02, "domain.linkml.yaml"));
+    const assertions = assessSubjects(
+      ingested.accepted,
+      profile,
+      [catalog],
+      domain,
+      true,
+      ingested.withheld,
+    );
+    return assertions.find((a) => a.control === "ROB-02") as Assertion;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("a late record that reads non-conformant is marked for the exit code (18.149)", () => {
+  const late = quarantineRob02("rob02-untrusted-write-quarantined-time-order");
+  assert.equal(late.outcome, "insufficient_evidence");
+  assert.equal(late.withheldNonConformant, true);
+  // Run state for the exit code only: assertions.json keeps its shape.
+  assert.equal("withheld_non_conformant" in assertionToJson(late), false);
+  const benign = quarantineRob02("rob02-benign-time-order");
+  assert.equal(benign.outcome, "conformant");
+  assert.notEqual(benign.withheldNonConformant, true);
 });

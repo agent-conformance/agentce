@@ -48,6 +48,7 @@ from ..safe_json import JSONError, load_json
 from ..applicability import resolve as resolve_applicability
 from ..assertions import Assertion, aggregate
 from ..assess import (
+    WITHHELD_KEY,
     apply_deviations,
     assess_subjects,
     deviations_by_control,
@@ -1639,14 +1640,33 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         result.data["limitations"] = limitations
         for limitation in limitations:
             result.note(limitation)
+    # An insufficient_evidence outcome whose withheld records read non-conformant with the held ones exits as
+    # a non-conformant outcome would, so a late record never gives a better exit code (SPEC §8.5, 18.149).
+    withheld_non_conformant = [a for a in evaluated if a.withheld_non_conformant]
+    if withheld_non_conformant:
+        result.data["withheld_non_conformant"] = [
+            {"control": a.control, "subject": a.subject, "key": WITHHELD_KEY}
+            for a in sorted(
+                withheld_non_conformant, key=lambda a: (a.control, a.subject)
+            )
+        ]
     if fail_on_predicate is not None:
         # A policy-scoped gate replaces the default any-non-conformant rule: the exit code reflects
-        # only the assertions the expression names, never the whole run (SPEC §8.5, finding #29).
-        fail_on_matches = sum(1 for a in evaluated if fail_on_predicate(a))
+        # only the assertions the expression names, never the whole run (SPEC §8.5, finding #29). A
+        # withheld non-conformant outcome is matched as the non-conformant outcome it would be on time.
+        fail_on_matches = sum(
+            1
+            for a in evaluated
+            if fail_on_predicate(a)
+            or (
+                a.withheld_non_conformant
+                and fail_on_predicate(replace(a, outcome="non-conformant"))
+            )
+        )
         result.data["fail_on"] = {"expression": fail_on_raw, "matched": fail_on_matches}
         if fail_on_matches:
             result.add_code(int(ExitCode.FINDINGS))
-    elif non_conformant:
+    elif non_conformant or withheld_non_conformant:
         result.add_code(int(ExitCode.FINDINGS))
     high_insufficient: list[str] = []
     if scanned is None:
@@ -1690,6 +1710,12 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         result.note(
             "insufficient evidence on severity-high control(s): "
             + ", ".join(high_insufficient)
+        )
+    if withheld_non_conformant:
+        result.note(
+            f"{WITHHELD_KEY}: "
+            + ", ".join(sorted({a.control for a in withheld_non_conformant}))
+            + f": {MESSAGE_KEYS[WITHHELD_KEY].cause}"
         )
     return result
 

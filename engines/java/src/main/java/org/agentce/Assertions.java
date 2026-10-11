@@ -67,6 +67,7 @@ public final class Assertions {
         c.evidenceStrength = a.evidenceStrength;
         c.deviation = a.deviation;
         c.crosswalk = new ArrayList<>(a.crosswalk);
+        c.withheldNonConformant = a.withheldNonConformant;
         return c;
     }
 
@@ -89,6 +90,10 @@ public final class Assertions {
         public String evidenceStrength;
         public String deviation;
         public List<JsonNode> crosswalk = new ArrayList<>();
+        /** True when this insufficient_evidence outcome comes from withheld records and judging them with the held
+         * ones reads non-conformant (18.149): assess exits as for a non-conformant outcome. Run state for the exit
+         * code only; never written to assertions.json. */
+        public boolean withheldNonConformant;
 
         public ObjectNode toJson() {
             ObjectNode record = Json.nodes().objectNode();

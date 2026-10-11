@@ -207,3 +207,4 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | Key | Cause | Fix |
 |---|---|---|
 | `insufficient_evidence` | the minimum evidence to judge the control was not present in the window. | ask the agent's developer to instrument the missing corroborating stream (see the control's techniques). |
+| `withheld_reads_non_conformant` | a record the engine set aside (quarantined) reads non-conformant when judged with the records it holds, so assess exits 1 as it would for a non-conformant outcome, whatever order the records arrived in. | look at the quarantined record the outcome names (quarantine.jsonl gives the reason); deliver it in order and valid, then fix the behavior it shows. |

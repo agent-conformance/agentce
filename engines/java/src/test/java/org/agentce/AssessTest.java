@@ -142,4 +142,44 @@ class AssessTest {
         assertEquals("input.deviation_invalid", error.key);
         assertTrue(error.reason.startsWith("the deviation register at '" + path + "' is not valid UTF-8"));
     }
+
+    /** ROB-02 over a VG-QUARANTINE-NO-PASS case, ingested from a bundle that declares the gate's three sources. */
+    private static Assertions.Assertion quarantineRob02(Path root, String kase) throws IOException {
+        Path fixtures = TestPaths.repoRoot().resolve("verification/gates/fixtures");
+        JsonNode events = Json.parseFile(fixtures.resolve("quarantine_no_pass/cases.json"))
+                .get("cases").get(kase).get("events");
+        StringBuilder content = new StringBuilder();
+        for (JsonNode e : events) {
+            content.append(e.isTextual() ? e.asText() : Json.compact(e)).append('\n');
+        }
+        Files.createDirectories(root.resolve("events"));
+        Files.writeString(root.resolve("events/subject.jsonl"), content.toString(), StandardCharsets.UTF_8);
+        String manifest = "{\"files\":[{\"path\":\"events/subject.jsonl\",\"sha256\":"
+                + Json.quote("sha256:" + Canonical.sha256Hex(content.toString().getBytes(StandardCharsets.UTF_8))) + "}],\"sources\":["
+                + "{\"id\":\"urn:src:enforcement_point\",\"class\":\"enforcement_point\"},"
+                + "{\"id\":\"urn:src:independent_system\",\"class\":\"independent_system\"},"
+                + "{\"id\":\"urn:src:self_report\",\"class\":\"self_report\"}]}";
+        Files.writeString(root.resolve("manifest.json"), manifest, StandardCharsets.UTF_8);
+        Ingest.Result ingested = Ingest.ingest(Bundle.load(root));
+        Profile profile = Profile.fromDict(
+                Json.parse("{\"subjects\":[{\"id\":\"spiffe://corp/agents/rob02-fixture\",\"role\":\"both\"}]}"));
+        Catalog catalog = Catalog.load(TestPaths.repoRoot().resolve("spec/catalogs/base/baseline"));
+        DomainBinding domain = DomainBinding.load(fixtures.resolve("rob02_untrusted/domain.linkml.yaml"));
+        return Assess.assessSubjects(ingested.accepted, profile, List.of(catalog), domain, ingested.withheld).stream()
+                .filter(a -> "ROB-02".equals(a.control))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    @Test
+    void aLateRecordThatReadsNonConformantIsMarkedForTheExitCode(@TempDir Path tmp) throws IOException {
+        Assertions.Assertion late = quarantineRob02(tmp.resolve("late"), "rob02-untrusted-write-quarantined-time-order");
+        assertEquals("insufficient_evidence", late.outcome);
+        assertTrue(late.withheldNonConformant);
+        // Run state for the exit code only: assertions.json keeps its shape.
+        assertTrue(!late.toJson().has("withheld_non_conformant"));
+        Assertions.Assertion benign = quarantineRob02(tmp.resolve("benign"), "rob02-benign-time-order");
+        assertEquals("conformant", benign.outcome);
+        assertTrue(!benign.withheldNonConformant);
+    }
 }

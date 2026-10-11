@@ -252,3 +252,45 @@ def test_a_decision_the_guard_never_ruled_on_reads_insufficient_evidence() -> No
 
 def test_a_tainted_decision_beats_an_unruled_one() -> None:
     assert _rob02("tainted-and-unguarded").outcome == "non-conformant"
+
+
+_QUARANTINE = _REPO_ROOT / "verification" / "gates" / "fixtures" / "quarantine_no_pass"
+_CLASSES = ("enforcement_point", "independent_system", "self_report")
+
+
+def _quarantine_rob02(make_bundle: Any, case: str) -> Any:
+    from agentce.bundle import load_bundle
+    from agentce.ingest import ingest
+
+    cases = json.loads((_QUARANTINE / "cases.json").read_text(encoding="utf-8"))[
+        "cases"
+    ]
+    bundle = make_bundle(
+        cases[case]["events"],
+        source_classes={f"urn:src:{cls}": cls for cls in _CLASSES},
+    )
+    ingested = ingest(load_bundle(bundle))
+    profile = Profile.from_dict(
+        {"subjects": [{"id": "spiffe://corp/agents/rob02-fixture", "role": "both"}]}
+    )
+    catalog = load_catalog(_REPO_ROOT / "spec" / "catalogs" / "base" / "baseline")
+    domain = DomainBinding.load(_ROB02 / "domain.linkml.yaml")
+    assertions = assess_subjects(
+        ingested.accepted, profile, [catalog], domain, withheld=ingested.withheld
+    )
+    return next(a for a in assertions if a.control == "ROB-02")
+
+
+def test_a_late_record_that_reads_non_conformant_is_marked_for_the_exit_code(
+    make_bundle: Any,
+) -> None:
+    late = _quarantine_rob02(
+        make_bundle, "rob02-untrusted-write-quarantined-time-order"
+    )
+    assert late.outcome == "insufficient_evidence"
+    assert late.withheld_non_conformant is True
+    # Run state for the exit code only: assertions.json keeps its shape.
+    assert "withheld_non_conformant" not in late.to_json()
+    benign = _quarantine_rob02(make_bundle, "rob02-benign-time-order")
+    assert benign.outcome == "conformant"
+    assert benign.withheld_non_conformant is False

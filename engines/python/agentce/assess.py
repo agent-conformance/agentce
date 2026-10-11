@@ -243,10 +243,15 @@ def _withheld_evidence(withheld: list[Withheld]) -> list[EvidencePointer]:
     ]
 
 
+#: The message key naming an insufficient_evidence outcome whose withheld records read non-conformant (18.149).
+WITHHELD_KEY = "withheld_reads_non_conformant"
+
+
 def _not_enough_with_withheld(
-    assertion: Assertion, withheld: list[Withheld]
+    assertion: Assertion, withheld: list[Withheld], *, non_conformant: bool
 ) -> Assertion:
-    """A control quarantine may have flattered reads insufficient_evidence naming the withheld records (18.119)."""
+    """A control quarantine may have flattered reads insufficient_evidence naming the withheld records (18.119).
+    ``non_conformant`` says judging the readable withheld records with the held ones reads non-conformant (18.149)."""
     return dataclasses.replace(
         assertion,
         outcome="insufficient_evidence",
@@ -255,6 +260,7 @@ def _not_enough_with_withheld(
         evidence=_withheld_evidence(withheld),
         source_class_satisfied=None,
         evidence_strength=None,
+        withheld_non_conformant=non_conformant,
     )
 
 
@@ -310,12 +316,9 @@ def assess_subjects(
         # A readable record always names its subject (the schema requires it), so it is this subject's.
         unreadable = any(w.event is None for w in own)
         readable = [w.event for w in own if w.event is not None]
-        # The comparison graph is needed only when no unreadable record already decides the outcome.
-        cf_events = (
-            _counterfactual(subject_events, readable)
-            if readable and not unreadable
-            else []
-        )
+        # The comparison runs whenever a readable record is withheld, even beside an unreadable one: the unreadable
+        # record already decides the outcome, but the exit code still needs what the readable ones show (18.149).
+        cf_events = _counterfactual(subject_events, readable) if readable else []
         cf_store = build_graph(cf_events, domain=domain) if cf_events else store
         cf_by_iri = _events_by_iri(cf_events)
         for catalog in catalogs:
@@ -338,9 +341,13 @@ def assess_subjects(
                         and _role_applies(roles, control.applies_to_roles)
                     )
                 )
-                if flattered and (
-                    unreadable
-                    or _assert_control(
+                if not flattered:
+                    assertions.append(assertion)
+                    continue
+                with_withheld = (
+                    assertion.outcome
+                    if not readable
+                    else _assert_control(
                         cf_store,
                         catalog,
                         control,
@@ -351,9 +358,13 @@ def assess_subjects(
                         window,
                         applicability_declared=applicability_declared,
                     ).outcome
-                    != assertion.outcome
-                ):
-                    assertion = _not_enough_with_withheld(assertion, own)
+                )
+                if unreadable or with_withheld != assertion.outcome:
+                    assertion = _not_enough_with_withheld(
+                        assertion,
+                        own,
+                        non_conformant=with_withheld == "non-conformant",
+                    )
                 assertions.append(assertion)
     return assertions
 

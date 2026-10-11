@@ -39,6 +39,7 @@ _KINDS: dict[str, str] = {
     "context_mismatch": "quarantine",
     # Outcome explanation.
     "insufficient_evidence": "explanation",
+    "withheld_reads_non_conformant": "explanation",
     # Errors.
     "input.bundle_manifest_missing": "error",
     "input.bundle_manifest_mismatch": "error",

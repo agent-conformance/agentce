@@ -69,6 +69,10 @@ class Assertion:
     evidence_strength: str | None = None
     deviation: str | None = None
     crosswalk: list[dict[str, Any]] = field(default_factory=list)
+    #: True when this insufficient_evidence outcome comes from withheld records and judging them with the
+    #: held ones reads non-conformant (18.149): assess exits as for a non-conformant outcome. Run state for
+    #: the exit code only; never written to assertions.json.
+    withheld_non_conformant: bool = False
 
     def to_json(self) -> dict[str, Any]:
         record: dict[str, Any] = {

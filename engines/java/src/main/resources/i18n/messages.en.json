@@ -105,6 +105,8 @@
   "errors.input.collect_config.fix": "fix the config file the error names, then re-run collect.",
   "errors.insufficient_evidence.cause": "the minimum evidence to judge the control was not present in the window.",
   "errors.insufficient_evidence.fix": "ask the agent's developer to instrument the missing corroborating stream (see the control's techniques).",
+  "errors.withheld_reads_non_conformant.cause": "a record the engine set aside (quarantined) reads non-conformant when judged with the records it holds, so assess exits 1 as it would for a non-conformant outcome, whatever order the records arrived in.",
+  "errors.withheld_reads_non_conformant.fix": "look at the quarantined record the outcome names (quarantine.jsonl gives the reason); deliver it in order and valid, then fix the behavior it shows.",
   "errors.internal.unexpected.cause": "an unexpected internal error occurred.",
   "errors.internal.unexpected.fix": "re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate.",
   "errors.oversize.cause": "the event exceeds the size limit and was refused.",
