@@ -5,7 +5,10 @@ recorded approval) and OVS-08 (a recorded approval decision, two under dual cont
 time is at or before the time of every ToolCall that executes the decision. Times compare as instants (an offset, a
 fraction of a second), never as text; a time that cannot be compared with the action's gates nothing. A decision no
 ToolCall executes is gated by an approval at any time, and OVS-01 and RSK-02 still count a late approval as a review.
-Event times stay non-decreasing within each stream (one per source class), so ingest quarantines nothing for order."""
+Event times stay non-decreasing within each stream (one per source class), so ingest quarantines nothing for order,
+except in the case named for it: quarantine never gives a better outcome (18.119), so when d1's own ToolCall reaches
+the bundle after a later ToolCall of the enforcement point's stream and is quarantined for time_order, the approve
+recorded after it does not leave CND-02 conformant."""
 
 import sys
 from pathlib import Path
@@ -235,6 +238,23 @@ case(
     [dec(), run_at(at(5)), login_at(at(0)), approve_at(at(0, ":00:01"))],
     NC,
     ["d1"],
+)
+# d1's ToolCall (01:00) arrives after d2's (03:00) in the enforcement point's stream: ingest quarantines it for
+# time_order, and judged with it the approve at 02:00 came after the action (18.119).
+case(
+    "cnd02-approve-after-action-quarantined-time-order",
+    "CND-02",
+    [
+        dec(),
+        dec("d2"),
+        run_at(at(3), d="d2", i="t2"),
+        run_at(at(1)),
+        login_at(at(0)),
+        approve_at(at(2), i="a2", d="d2"),
+        approve_at(at(2)),
+    ],
+    "insufficient_evidence",
+    quarantined=1,
 )
 
 write()

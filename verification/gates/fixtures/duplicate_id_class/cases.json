@@ -726,7 +726,7 @@
         }
       ],
       "expected": {
-        "outcome": "conformant",
+        "outcome": "insufficient_evidence",
         "failing": [],
         "quarantined": 1,
         "exit": 2
@@ -960,7 +960,7 @@
         }
       ],
       "expected": {
-        "outcome": "conformant",
+        "outcome": "insufficient_evidence",
         "failing": [],
         "quarantined": 1,
         "exit": 2

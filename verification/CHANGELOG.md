@@ -3,6 +3,27 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.86.0
+
+- `VG-QUARANTINE-NO-PASS` (18.119, new, tier quick) checks that quarantine never gives a better outcome, in all three
+  engines. A record ingest quarantined dropped out of the assessment, so the quarantine itself could pass a control:
+  an enforcement-point guard's late ruling that marked `mem:r1` untrusted, quarantined for `time_order` because real
+  exports arrive out of order (SPEC §13), left ROB-02 conformant; a schema-invalid Override or Interrupt left OVS-07
+  `not_applicable`; a ToolCall whose `refs.instruction` is an array or an `{"@id": ...}` object left CND-05
+  `not_applicable`; and CND-02 read conformant when the action's record was quarantined for `time_order` or the same
+  human's reject was quarantined (spelled `Reject`, or sharing the approve's id). Now ingest keeps the quarantined
+  records that may hold evidence: the ones it could read but refused for where they sit (`time_order`, a
+  `duplicate_id` that is not an identical redelivery, `class_mismatch`, `unknown_source`) and the ones it could not
+  read (`schema_invalid`, `oversize`). A control that reads conformant, or `not_applicable` for want of a population,
+  is judged again with the subject's readable quarantined records; when the outcome changes, or a record ingest could
+  not read may belong to the subject, it reads `insufficient_evidence` and its evidence names the quarantined records.
+  A quarantine that changes nothing leaves the outcome as it is. The gate runs 18 cases through the real Python,
+  TypeScript and Java CLIs, each failing case beside a benign twin. Six seeded faults, two per engine: a `time_order`
+  record left out, and the unreadable records ignored. `VG-APPROVAL-ORDER` gains one case and `VG-APPROVAL-WITHDRAWAL`
+  two, each a quarantine that now reads `insufficient_evidence`. In `VG-DUPLICATE-ID-CLASS` the agent's own Decision
+  that reuses the identity provider's login id still never displaces the login, but that Decision has no approval, so
+  CND-02 and OVS-08 there read `insufficient_evidence` instead of conformant.
+
 ## 0.85.0
 
 - `VG-APPROVAL-OUTCOME-BOUND` (18.144, new, tier quick) checks that an approval gates a decision only when it is

@@ -8,7 +8,10 @@ second action ran without it). One human's approve and reject at the same instan
 against each other, is no approval (fail closed). Times compare as instants, never as text. Two distinct humans who
 each decide once are unaffected: approve(A) plus reject(B) stays conformant for CND-02 outside dual control, and
 OVS-08 dual control still needs two approvals. Event times stay non-decreasing within each stream (one per source
-class), so ingest quarantines nothing for order."""
+class), so ingest quarantines nothing for order.
+Quarantine never gives a better outcome (18.119): the same human's reject spelled "Reject" (quarantined
+schema_invalid) or sharing the approve's id (quarantined duplicate_id) leaves CND-02 insufficient_evidence, not
+conformant."""
 
 import sys
 from pathlib import Path
@@ -329,6 +332,22 @@ case(
     "OVS-01",
     [dec(), *TWO, decide("approve", at(1), "a1"), decide("reject", at(2), "a2"), run_at(at(3))],
     "conformant",
+)
+
+# The same human's reject is quarantined, so the withdrawal it records is out of sight; the control does not pass.
+case(
+    "cnd02-same-human-reject-spelled-Reject-quarantined",
+    "CND-02",
+    [dec(), *TWO, decide("approve", at(1), "a1"), decide("Reject", at(2), "a2"), run_at(at(3))],
+    "insufficient_evidence",
+    quarantined=1,
+)
+case(
+    "cnd02-same-human-reject-shares-the-approve-id-quarantined",
+    "CND-02",
+    [dec(), *TWO, decide("approve", at(1), "a1"), decide("reject", at(2), "a1"), run_at(at(3))],
+    "insufficient_evidence",
+    quarantined=1,
 )
 
 write()

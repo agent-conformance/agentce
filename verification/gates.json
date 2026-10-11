@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.85.0",
+  "suite_version": "0.86.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3442,7 +3442,7 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/approval_order/cases.json (21: CND-02 with the approve after the action ran, before it, at the same instant, one second and one millisecond after, the same instant written with trailing zeros or another offset, after or before in another offset whose text sorts the other way, between two actions, after a self-reported record of the action, one approval before and one after, another decision's earlier action, and an approval time with no offset; eu-ai-act and nist-ai-rmf OVS-08 with the approve after the action ran, under dual control one approver before and one after and both before, and an approve with no action; OVS-01 and RSK-02 counting a late approval as a review) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "pass": "every case in verification/gates/fixtures/approval_order/cases.json (22: CND-02 with the approve after the action ran, before it, at the same instant, one second and one millisecond after, the same instant written with trailing zeros or another offset, after or before in another offset whose text sorts the other way, between two actions, after a self-reported record of the action, one approval before and one after, another decision's earlier action, an approval time with no offset, and the action's record quarantined for time_order so only a late approve is held (never conformant, 18.119); eu-ai-act and nist-ai-rmf OVS-08 with the approve after the action ran, under dual control one approver before and one after and both before, and an approve with no action; OVS-01 and RSK-02 counting a late approval as a review) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
         "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
       },
       "fix_hint": "Run bash verification/gates/approval_outcome.sh approval_order; it names the engine, the case and what it gave against what was expected. The order test sits in each engine's graph builder beside the outcome test: _before_every / beforeEvery, which compares the approval's time with each executing ToolCall's time through the structural literal comparison (instants, never text).",
@@ -3505,7 +3505,7 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/approval_withdrawal/cases.json (28: CND-02 with one human's approve then reject, reject then approve, approve then edit, approve reject approve, approve then the action then reject, a reject at the action's own instant, a reject between two actions, approve and reject at the same instant, a reject time with no offset, a later reject or approve written in another offset whose text sorts the other way, one human's reject on another decision, the same human's reject with no login, citing another human's login, self-reported or with a padded id, an approve followed by a decision with no outcome, a verified reject followed by an approve with no login, and two distinct humans' approve and reject in either order; eu-ai-act and nist-ai-rmf OVS-08 with one human's approve then reject, dual control with one human's approve and another's reject, one of two approvers withdrawing and withdrawing then restoring, and the same human's approve and reject with no action in either order; OVS-01 counting a withdrawn approval as a review) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "pass": "every case in verification/gates/fixtures/approval_withdrawal/cases.json (30: CND-02 with one human's approve then reject, reject then approve, approve then edit, approve reject approve, approve then the action then reject, a reject at the action's own instant, a reject between two actions, approve and reject at the same instant, a reject time with no offset, a later reject or approve written in another offset whose text sorts the other way, one human's reject on another decision, the same human's reject with no login, citing another human's login, self-reported or with a padded id, an approve followed by a decision with no outcome, a verified reject followed by an approve with no login, two distinct humans' approve and reject in either order, and the same human's reject quarantined, spelled \"Reject\" (schema_invalid) or sharing the approve's id (duplicate_id), which never reads conformant (18.119); eu-ai-act and nist-ai-rmf OVS-08 with one human's approve then reject, dual control with one human's approve and another's reject, one of two approvers withdrawing and withdrawing then restoring, and the same human's approve and reject with no action in either order; OVS-01 counting a withdrawn approval as a review) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
         "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
       },
       "fix_hint": "Run bash verification/gates/approval_outcome.sh approval_withdrawal; it names the engine, the case and what it gave against what was expected. The withdrawal test sits in each engine's graph builder after the human-actor pass (_map_oversight / mapOversight): per decision and human (a verified actor, or for a non-approve any human actor with the same trimmed id: fail closed), a non-approve recorded at or before some executing ToolCall (_after_every / afterEvery false) withdraws every approve of that human not strictly later than it, compared through the structural literal comparison (instants, never text).",
@@ -3586,7 +3586,7 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/duplicate_id_class/cases.json (14: CND-02 with the agent's own self_report Decision reusing the enforcement point's ToolCall id before it, after it, and from an undeclared source asserting independent_system, against the twin with no shadow; the same Decision reusing the identity provider's login id for CND-02 and OVS-08, and an enforcement-point record reusing it, against the twin; two enforcement-point ToolCalls with one id; the ToolCall quarantined for time order with the shadow before or after it, against the twin; a record quarantined class_mismatch, and a schema-invalid ToolCall, holding no id) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs, so each shadow case reads like its twin plus the quarantined shadow",
+        "pass": "every case in verification/gates/fixtures/duplicate_id_class/cases.json (14: CND-02 with the agent's own self_report Decision reusing the enforcement point's ToolCall id before it, after it, and from an undeclared source asserting independent_system, against the twin with no shadow; the same Decision reusing the identity provider's login id for CND-02 and OVS-08, and an enforcement-point record reusing it, against the twin; two enforcement-point ToolCalls with one id; the ToolCall quarantined for time order with the shadow before or after it, against the twin; a record quarantined class_mismatch, and a schema-invalid ToolCall, holding no id) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs, so each shadow case reads like its twin plus the quarantined shadow; where the shadow is the agent's own Decision reusing the login id, that Decision has no approval, so CND-02 and OVS-08 read insufficient_evidence, never conformant, since quarantine never gives a better outcome (18.119)",
         "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
       },
       "fix_hint": "Run bash verification/gates/approval_outcome.sh duplicate_id_class; it names the engine, the case and what it gave against what was expected. Ingest (ingest.py / ingest.ts / Ingest.java) checks each record on its own in pass 1 and records the highest class rank per id (owner_rank / ownerRank) from the class it trusts (after the undeclared-source correction); pass 2 quarantines a record whose rank is below its id's owner, then runs the first-wins id check and the per-stream time check.",
@@ -3689,6 +3689,68 @@
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "beforeEvery(d.time(), outcomes)",
           "replace": "outcomes.stream().allMatch(e -> Structural.compareLiterals(d.time(), e) != null && d.time().compareTo(e) <= 0)"
+        }
+      ]
+    },
+    {
+      "id": "VG-QUARANTINE-NO-PASS",
+      "title": "Quarantine never gives a better outcome, in all three engines: a control that reads conformant, or not_applicable for want of a population, reads insufficient_evidence naming the quarantined records when a record ingest refused for where it sits (time_order, a duplicate_id that is not an identical redelivery, class_mismatch, unknown_source) would change that outcome, or when a record ingest could not read (schema_invalid, oversize) may belong to the subject (18.119)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/quarantine_no_pass.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/quarantine_no_pass/cases.json (18: ROB-02 with an enforcement-point guard's untrusted write of mem:r1 quarantined for time_order (insufficient_evidence, not conformant), the same write held in order (non-conformant) and a benign time_order quarantine that changes nothing (conformant); OVS-07 whose only Override or Interrupt is quarantined schema_invalid (insufficient_evidence, not not_applicable); CND-05 with a ToolCall quarantined schema_invalid because its refs.instruction is an array or an {\"@id\": ...} object (insufficient_evidence, not not_applicable) and the same ToolCall held (non-conformant); CND-02 with the action's record quarantined for time_order, the same human's reject spelled \"Reject\" (schema_invalid) sharing the approve's id (duplicate_id), claiming another class than the manifest declares (class_mismatch, read with the declared class) or from a source the manifest does not declare (unknown_source, read as self_report), each insufficient_evidence; and the benign twins that stay conformant: a gated decision, an identical redelivery, an unknown_type record, and an unreadable record of another subject, while an unreadable line naming no subject reads insufficient_evidence) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
+      },
+      "fix_hint": "Run bash verification/gates/quarantine_no_pass.sh; it names the engine, the case and what it gave against what was expected. Ingest (ingest.py / ingest.ts / Ingest.java) lists the quarantined records that may hold evidence as withheld: the readable ones (time_order, a duplicate_id that is not an identical redelivery, class_mismatch, unknown_source) with the event as readers would see it, the unreadable ones (schema_invalid, oversize) with no event. assess_subjects / assessSubjects judges each conformant or applicable not_applicable outcome again over the subject's held events plus its readable withheld ones, and reads insufficient_evidence naming the withheld records when the outcome changes or an unreadable record may belong to the subject.",
+      "faults": [
+        {
+          "description": "Python drops a record quarantined for time_order from the withheld list, so a late guard ruling no longer stops ROB-02 reading conformant",
+          "file": "engines/python/agentce/ingest.py",
+          "search": "            result.withheld.append(late)\n",
+          "replace": ""
+        },
+        {
+          "description": "Python ignores the records ingest could not read, so a schema-invalid Override, Interrupt or ToolCall leaves OVS-07 or CND-05 not_applicable",
+          "file": "engines/python/agentce/assess.py",
+          "search": "        unreadable = any(w.event is None for w in own)\n",
+          "replace": "        unreadable = False\n"
+        },
+        {
+          "description": "TypeScript drops a record quarantined for time_order from the withheld list (ROB-02)",
+          "file": "engines/typescript/src/ingest.ts",
+          "search": "      result.withheld.push(late);\n",
+          "replace": ""
+        },
+        {
+          "description": "TypeScript ignores the records ingest could not read (OVS-07, CND-05)",
+          "file": "engines/typescript/src/assess.ts",
+          "search": "    const unreadable = own.some((w) => w.event === null);\n",
+          "replace": "    const unreadable = false;\n"
+        },
+        {
+          "description": "Java drops a record quarantined for time_order from the withheld list (ROB-02)",
+          "file": "engines/java/src/main/java/org/agentce/Ingest.java",
+          "search": "                result.withheld.add(late);\n",
+          "replace": ""
+        },
+        {
+          "description": "Java ignores the records ingest could not read (OVS-07, CND-05)",
+          "file": "engines/java/src/main/java/org/agentce/Assess.java",
+          "search": "                unreadable |= w.event() == null;\n",
+          "replace": ""
         }
       ]
     }

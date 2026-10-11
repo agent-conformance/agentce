@@ -59,6 +59,8 @@ case(
     quarantined=1,
 )
 # The agent's own Decision reuses the identity provider's login id.
+# The login keeps its id; the quarantined Decision is a decision with no approval, so judged as the record it
+# is it would fail the control, and quarantine never gives a better outcome (18.119): insufficient_evidence.
 case(
     "cnd02-login-no-shadow",
     "CND-02",
@@ -69,7 +71,7 @@ case(
     "cnd02-self-report-shadows-login",
     "CND-02",
     [shadow("s1"), dec(), ran(), idp(), appr("approve")],
-    "conformant",
+    "insufficient_evidence",
     quarantined=1,
 )
 # An enforcement-point record ranks below the identity provider's independent_system login.
@@ -84,7 +86,7 @@ case(
     "ovs08-self-report-shadows-login",
     "OVS-08",
     [shadow("s1"), dec(), idp(), appr("approve")],
-    "conformant",
+    "insufficient_evidence",
     quarantined=1,
 )
 # One class, one id: the later record is quarantined, as before.
