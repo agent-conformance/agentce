@@ -52,6 +52,10 @@ for name, case in cases.items():
     (bundle.parent / "expected").write_text(
         f"{expected['outcome']} {failing} {expected['quarantined']} {expected['exit']}\n", encoding="utf-8"
     )
+    # Whether the --json output lists the case control under withheld_non_conformant (18.149).
+    (bundle.parent / "withheld").write_text(f"{str(expected['withheld']).lower()}\n", encoding="utf-8")
+    if "fail_on" in case:
+        (bundle.parent / "fail_on").write_text(case["fail_on"], encoding="utf-8")
     if "evidence" in expected:
         # The quarantined events an insufficient_evidence outcome must name (18.119), comma-joined, sorted.
         named = ",".join(sorted(expected["evidence"]))
@@ -88,7 +92,7 @@ evidence() {
 # mismatch. All workers run side by side, Python on three since its CLI starts slowest, so the gate's wall time is
 # the slowest worker's; the first mismatch in any worker stops them all (the $work/.stop marker).
 check_cases() {
-  local engine="$1" worker="$2" workers="$3" position=-1 dir name want out code got quarantined fixture
+  local engine="$1" worker="$2" workers="$3" position=-1 dir name want out code got quarantined fixture extra
   for dir in "$work"/*/; do
     [ -e "$work/.stop" ] && return 1
     position=$((position + 1))
@@ -98,9 +102,11 @@ check_cases() {
     out="$dir/out-$engine"
     code=0
     fixture="$fixtures/$(cat "$dir/fixture")"
-    run "$engine" assess --bundle "$dir/bundle" --profile "$fixture/applicability.yaml" \
-      --domain "$fixture/domain.linkml.yaml" --out "$out" \
-      >/dev/null 2>"$dir/err-$engine" || code=$?
+    extra=()
+    [ -f "$dir/fail_on" ] && extra=(--fail-on "$(cat "$dir/fail_on")")
+    run "$engine" assess --json --bundle "$dir/bundle" --profile "$fixture/applicability.yaml" \
+      --domain "$fixture/domain.linkml.yaml" --out "$out" ${extra[@]+"${extra[@]}"} \
+      >"$dir/json-$engine" 2>"$dir/err-$engine" || code=$?
     if [ ! -f "$out/assertions.json" ]; then
       echo "$label: $engine wrote no assertions.json for $name (exit $code)" >&2
       tail -3 "$dir/err-$engine" >&2
@@ -112,6 +118,21 @@ check_cases() {
     got="$(outcome "$out/assertions.json" "$(cat "$dir/control")" "$(cat "$dir/subject")") $quarantined $code"
     if [ "$got" != "$want" ]; then
       echo "$label: $engine $name gave '$got', expected '$want' (outcome failing quarantined exit)" >&2
+      touch "$work/.stop"
+      return 1
+    fi
+    # The control is listed under withheld_non_conformant, with the stable message key, exactly when expected.
+    got="$(jq -r --arg control "$(cat "$dir/control")" --arg subject "$(cat "$dir/subject")" \
+      'any(.withheld_non_conformant[]?; .control == $control and .subject == $subject
+        and .key == "withheld_reads_non_conformant")' "$dir/json-$engine")"
+    if [ "$got" != "$(cat "$dir/withheld")" ]; then
+      echo "$label: $engine $name lists the control under withheld_non_conformant: $got, expected $(cat "$dir/withheld")" >&2
+      touch "$work/.stop"
+      return 1
+    fi
+    # A listed control's finding is in the JSON exit codes even when a higher code wins the process exit (18.149).
+    if [ "$(cat "$dir/withheld")" = true ] && ! jq -e '.exit_codes | index(1)' "$dir/json-$engine" >/dev/null; then
+      echo "$label: $engine $name lists the control under withheld_non_conformant but exit_codes lacks 1" >&2
       touch "$work/.stop"
       return 1
     fi

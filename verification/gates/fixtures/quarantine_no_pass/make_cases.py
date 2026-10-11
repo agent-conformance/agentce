@@ -20,8 +20,24 @@ IE = "insufficient_evidence"
 
 
 
-def case(name, fixture, subject, control, events, outcome, failing=(), quarantined=0, exit=None, evidence=None):
-    """``evidence`` is the quarantined event ids an insufficient_evidence case names (an unreadable line names none)."""
+def case(
+    name,
+    fixture,
+    subject,
+    control,
+    events,
+    outcome,
+    failing=(),
+    quarantined=0,
+    exit=None,
+    evidence=None,
+    withheld=False,
+    fail_on=None,
+):
+    """``evidence`` is the quarantined event ids an insufficient_evidence case names (an unreadable line names none).
+    ``withheld`` says the --json output lists the case control under withheld_non_conformant: its withheld records
+    read non-conformant with the held ones, so assess exits as for a non-conformant outcome (18.149). ``fail_on`` is a
+    --fail-on expression the case is assessed with."""
     if exit is None:
         # The approval fixture's profile holds other high-severity controls these bundles leave unmet (exit 2).
         exit = 2 if fixture == "approval_outcome" else 0
@@ -35,10 +51,13 @@ def case(name, fixture, subject, control, events, outcome, failing=(), quarantin
             "failing": list(failing),
             "quarantined": quarantined,
             "exit": exit,
+            "withheld": withheld,
         },
     }
     if outcome == IE:
         C[name]["expected"]["evidence"] = list(evidence)
+    if fail_on is not None:
+        C[name]["fail_on"] = fail_on
 
 
 def ev(subject, i, t, at, cls, **data):
@@ -72,15 +91,33 @@ READ = rob("m1", "MemoryRead", 3, store="kb", record_refs=["mem:r1"], refs={"con
 DECIDE = rob(
     "d1", "Decision", 4, cls="self_report", decision_type="dom:CreditDecision", agent={"id": ROB}, inputs=["mem:r1"]
 )
+# Delivered on time the write makes ROB-02 non-conformant (exit 1), so delivered late it exits 1 too (18.149).
+LATE_WRITE = [write_("w1", 1, "mem:r1", "trusted", "allow"), READ, write_("w2", 2, "mem:r1", "untrusted", "block"), DECIDE]
 case(
     "rob02-untrusted-write-quarantined-time-order",
     "rob02_untrusted",
     ROB,
     "ROB-02",
-    [write_("w1", 1, "mem:r1", "trusted", "allow"), READ, write_("w2", 2, "mem:r1", "untrusted", "block"), DECIDE],
+    LATE_WRITE,
     IE,
     quarantined=1,
+    exit=1,
     evidence=["w2"],
+    withheld=True,
+)
+# A --fail-on expression that names non-conformant outcomes matches the late write as the outcome it would be on time.
+case(
+    "rob02-late-write-fail-on-non-conformant",
+    "rob02_untrusted",
+    ROB,
+    "ROB-02",
+    LATE_WRITE,
+    IE,
+    quarantined=1,
+    exit=1,
+    evidence=["w2"],
+    withheld=True,
+    fail_on='outcome=="non-conformant"',
 )
 # The same late write holding a lone surrogate, which UTF-8 cannot carry: unreadable, it has no canonical form, so
 # no engine names a digest for it, and the control still does not pass.
@@ -96,6 +133,33 @@ case(
     quarantined=1,
     exit=2,
     evidence=[],
+)
+# An unreadable line beside the late write (it names no subject, so it counts for every subject) does not turn the
+# exit rule off: the readable late write still reads non-conformant with the held records, so exit_codes carries 1
+# beside the 2 the unreadable line gives; the in-order twin with the same line carries 1 for its non-conformant outcome.
+BAD_LINE = '{"id": "zz", "type": '
+case(
+    "rob02-late-write-beside-an-unreadable-line",
+    "rob02_untrusted",
+    ROB,
+    "ROB-02",
+    [*LATE_WRITE, BAD_LINE],
+    IE,
+    quarantined=2,
+    exit=2,
+    evidence=["w2"],
+    withheld=True,
+)
+case(
+    "rob02-in-order-write-beside-an-unreadable-line",
+    "rob02_untrusted",
+    ROB,
+    "ROB-02",
+    [write_("w1", 1, "mem:r1", "trusted", "allow"), write_("w2", 2, "mem:r1", "untrusted", "block"), READ, DECIDE, BAD_LINE],
+    NC,
+    ["d1"],
+    quarantined=1,
+    exit=2,
 )
 case(
     "rob02-untrusted-write-in-order",
@@ -115,6 +179,16 @@ case(
     [write_("w1", 1, "mem:r1", "trusted", "allow"), READ, write_("w2", 2, "mem:r9", "untrusted", "block"), DECIDE],
     "conformant",
     quarantined=1,
+)
+case(
+    "rob02-benign-fail-on-non-conformant",
+    "rob02_untrusted",
+    ROB,
+    "ROB-02",
+    [write_("w1", 1, "mem:r1", "trusted", "allow"), READ, write_("w2", 2, "mem:r9", "untrusted", "block"), DECIDE],
+    "conformant",
+    quarantined=1,
+    fail_on='outcome=="non-conformant"',
 )
 
 # OVS-07 (eu-ai-act): its only target record, an Override, fails the schema; the control has records it cannot read,
@@ -236,7 +310,7 @@ LATE_ACTION = [
     at(appr("approve", i="a2", d="d2"), "02:00:00"),
     at(appr("approve"), "02:00:00"),
 ]
-case("cnd02-approve-after-action-quarantined-time-order", "approval_outcome", OVS, "CND-02", LATE_ACTION, IE, quarantined=1, evidence=["t0"])
+case("cnd02-approve-after-action-quarantined-time-order", "approval_outcome", OVS, "CND-02", LATE_ACTION, IE, quarantined=1, evidence=["t0"], withheld=True)
 case(
     "cnd02-reject-spelled-Reject",
     "approval_outcome",
@@ -256,6 +330,7 @@ case(
     IE,
     quarantined=1,
     evidence=["a1"],
+    withheld=True,
 )
 GATED = [dec(), *TWO, at(appr("approve"), "01:00:00"), at(ran(), "03:00:00")]
 case("cnd02-gated", "approval_outcome", OVS, "CND-02", GATED, "conformant")
@@ -272,6 +347,7 @@ case(
     IE,
     quarantined=1,
     evidence=["a2"],
+    withheld=True,
 )
 # The same reject from a source the manifest does not declare (unknown_source) is read as self_report, as an
 # undeclared source's record is (SPEC §6.4); the same human's reject still withdraws the approve.
@@ -286,6 +362,7 @@ case(
     IE,
     quarantined=1,
     evidence=["a2"],
+    withheld=True,
 )
 case(
     "cnd02-identical-redelivery-is-benign",

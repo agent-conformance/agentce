@@ -3,6 +3,21 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.87.0
+
+- `VG-QUARANTINE-NO-PASS` (18.149, changed) checks the exit code a late record gives. A guard's untrusted write of
+  `mem:r1` held in order makes ROB-02 non-conformant and `assess` exits 1. Delivered late, the same write is
+  quarantined for `time_order` and ROB-02 reads `insufficient_evidence`, which exited 0 because ROB-02 is not severity
+  high, so a CI job on the default exit code passed when the record arrived late. Now, when judging a control's
+  readable quarantined records with its held ones reads non-conformant, `assess` exits 1 as it would for a
+  non-conformant outcome, lists the control under `withheld_non_conformant` in the `--json` output with the message key
+  `withheld_reads_non_conformant`, and a `--fail-on` expression matches it as the non-conformant outcome it would be on
+  time. The outcome stays `insufficient_evidence` naming the late record. A quarantine that changes nothing, and a
+  record ingest could not read, keep today's exit code. The gate grows to 23 cases (two run with
+  `--fail-on 'outcome=="non-conformant"'`, two put an unreadable line beside the write), checks the `withheld_non_conformant` listing and `exit_codes` in every case, and gains five
+  seeded faults: in each engine the exit rule ignores the withheld outcome, and in Python `--fail-on` stops matching it
+  and the comparison is skipped beside an unreadable record.
+
 ## 0.86.0
 
 - `VG-QUARANTINE-NO-PASS` (18.119, new, tier quick) checks that quarantine never gives a better outcome, in all three

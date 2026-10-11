@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.86.0",
+  "suite_version": "0.87.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3694,7 +3694,7 @@
     },
     {
       "id": "VG-QUARANTINE-NO-PASS",
-      "title": "Quarantine never gives a better outcome, in all three engines: a control that reads conformant, or not_applicable for want of a population, reads insufficient_evidence naming the quarantined records when a record ingest refused for where it sits (time_order, a duplicate_id that is not an identical redelivery, class_mismatch, unknown_source) would change that outcome, or when a record ingest could not read (schema_invalid, oversize) may belong to the subject (18.119)",
+      "title": "Quarantine never gives a better outcome, in all three engines: a control that reads conformant, or not_applicable for want of a population, reads insufficient_evidence naming the quarantined records when a record ingest refused for where it sits (time_order, a duplicate_id that is not an identical redelivery, class_mismatch, unknown_source) would change that outcome, or when a record ingest could not read (schema_invalid, oversize) may belong to the subject; and when judging the readable quarantined records with the held ones reads non-conformant, assess exits 1 as for a non-conformant outcome, so a late record never gives a better exit code (18.119, 18.149)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -3711,10 +3711,10 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/quarantine_no_pass/cases.json (18: ROB-02 with an enforcement-point guard's untrusted write of mem:r1 quarantined for time_order (insufficient_evidence, not conformant), the same write held in order (non-conformant) and a benign time_order quarantine that changes nothing (conformant); OVS-07 whose only Override or Interrupt is quarantined schema_invalid (insufficient_evidence, not not_applicable); CND-05 with a ToolCall quarantined schema_invalid because its refs.instruction is an array or an {\"@id\": ...} object (insufficient_evidence, not not_applicable) and the same ToolCall held (non-conformant); CND-02 with the action's record quarantined for time_order, the same human's reject spelled \"Reject\" (schema_invalid) sharing the approve's id (duplicate_id), claiming another class than the manifest declares (class_mismatch, read with the declared class) or from a source the manifest does not declare (unknown_source, read as self_report), each insufficient_evidence; and the benign twins that stay conformant: a gated decision, an identical redelivery, an unknown_type record, and an unreadable record of another subject, while an unreadable line naming no subject reads insufficient_evidence) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs, and each insufficient_evidence case's evidence names the quarantined events it lists",
-        "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
+        "pass": "every case in verification/gates/fixtures/quarantine_no_pass/cases.json (23: ROB-02 with an enforcement-point guard's untrusted write of mem:r1 quarantined for time_order (insufficient_evidence, not conformant, and exit code 1 as the write held in order gives, also under --fail-on 'outcome==\"non-conformant\"', and still carrying exit code 1 in exit_codes beside an unreadable line that names no subject), the same write held in order (non-conformant) and a benign time_order quarantine that changes nothing (conformant); OVS-07 whose only Override or Interrupt is quarantined schema_invalid (insufficient_evidence, not not_applicable); CND-05 with a ToolCall quarantined schema_invalid because its refs.instruction is an array or an {\"@id\": ...} object (insufficient_evidence, not not_applicable) and the same ToolCall held (non-conformant); CND-02 with the action's record quarantined for time_order, the same human's reject spelled \"Reject\" (schema_invalid) sharing the approve's id (duplicate_id), claiming another class than the manifest declares (class_mismatch, read with the declared class) or from a source the manifest does not declare (unknown_source, read as self_report), each insufficient_evidence; and the benign twins that stay conformant: a gated decision, an identical redelivery, an unknown_type record, and an unreadable record of another subject, while an unreadable line naming no subject reads insufficient_evidence) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs, each insufficient_evidence case's evidence names the quarantined events it lists, and the --json output lists the case control under withheld_non_conformant with the message key withheld_reads_non_conformant exactly when its readable quarantined records read non-conformant with the held ones (a benign quarantine and an unreadable record keep today's exit code)",
+        "fail": "any case gives another outcome, another set of failing events, another quarantined count, another exit code or another withheld_non_conformant listing in any engine"
       },
-      "fix_hint": "Run bash verification/gates/quarantine_no_pass.sh; it names the engine, the case and what it gave against what was expected. Ingest (ingest.py / ingest.ts / Ingest.java) lists the quarantined records that may hold evidence as withheld: the readable ones (time_order, a duplicate_id that is not an identical redelivery, class_mismatch, unknown_source) with the event as readers would see it, the unreadable ones (schema_invalid, oversize) with no event. assess_subjects / assessSubjects judges each conformant or applicable not_applicable outcome again over the subject's held events plus its readable withheld ones, and reads insufficient_evidence naming the withheld records when the outcome changes or an unreadable record may belong to the subject.",
+      "fix_hint": "Run bash verification/gates/quarantine_no_pass.sh; it names the engine, the case and what it gave against what was expected. Ingest (ingest.py / ingest.ts / Ingest.java) lists the quarantined records that may hold evidence as withheld: the readable ones (time_order, a duplicate_id that is not an identical redelivery, class_mismatch, unknown_source) with the event as readers would see it, the unreadable ones (schema_invalid, oversize) with no event. assess_subjects / assessSubjects judges each conformant or applicable not_applicable outcome again over the subject's held events plus its readable withheld ones, and reads insufficient_evidence naming the withheld records when the outcome changes or an unreadable record may belong to the subject. assess (commands/__init__.py / cli.ts / Cli.java) adds exit code 1 for an assertion marked withheld_non_conformant, lists it under withheld_non_conformant in the --json output, and matches it under --fail-on as the non-conformant outcome it would be on time (18.149).",
       "faults": [
         {
           "description": "Python drops a record quarantined for time_order from the withheld list, so a late guard ruling no longer stops ROB-02 reading conformant",
@@ -3757,6 +3757,36 @@
           "file": "engines/java/src/main/java/org/agentce/Assess.java",
           "search": "                    unreadable = true;\n",
           "replace": ""
+        },
+        {
+          "description": "Python ignores a withheld non-conformant outcome in the exit code, so the late untrusted write exits 0 where the same write in order exits 1",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    elif non_conformant or withheld_non_conformant:\n",
+          "replace": "    elif non_conformant:\n"
+        },
+        {
+          "description": "Python's --fail-on no longer matches a withheld non-conformant outcome as non-conformant, so --fail-on 'outcome==\"non-conformant\"' exits 0 on the late write",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "                and fail_on_predicate(replace(a, outcome=\"non-conformant\"))\n",
+          "replace": "                and False\n"
+        },
+        {
+          "description": "TypeScript ignores a withheld non-conformant outcome in the exit code (exit 0 for the late write, not 1)",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "  } else if (nonConformant > 0 || withheldNonConformant.length > 0) {\n",
+          "replace": "  } else if (nonConformant > 0) {\n"
+        },
+        {
+          "description": "Java ignores a withheld non-conformant outcome in the exit code (exit 0 for the late write, not 1)",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "        } else if (nonConformant > 0 || !withheldNonConformant.isEmpty()) {\n",
+          "replace": "        } else if (nonConformant > 0) {\n"
+        },
+        {
+          "description": "Python skips the readable comparison when an unreadable record is also withheld, so an unreadable line beside the late write drops exit code 1 from exit_codes (and exits 0 where only ROB-02 is assessed)",
+          "file": "engines/python/agentce/assess.py",
+          "search": "        cf_events = _counterfactual(subject_events, readable) if readable else []\n",
+          "replace": "        cf_events = []\n        readable = [] if unreadable else readable\n"
         }
       ]
     }
