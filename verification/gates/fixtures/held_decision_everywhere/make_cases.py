@@ -34,34 +34,34 @@ FORMS = {
 NA = "not_applicable"
 
 
-def tool(name, i="t0", **k):
+def tool(name, **k):
     """The enforcement point ran a tool for the decision, naming it as `name`."""
-    return ev(i, "ToolCall", tool={"name": "x"}, refs={"decision": name, **k})
+    return ev("t0", "ToolCall", tool={"name": "x"}, refs={"decision": name, **k})
 
 
-def override(name, i="v1", who="u2", s="s1"):
+def override(name):
     """A human's Override of the decision, naming it as `name`, with a replacement that differs (OVS-07)."""
-    actor = {"id": who, "kind": "human", "authority_ref": "ref:authority/reviewers"}
+    actor = {"id": "u2", "kind": "human", "authority_ref": "ref:authority/reviewers"}
     return ev(
-        i,
+        "v1",
         "Override",
         refs={"decision": name},
         actor=actor,
-        session_ref=ref(s),
+        session_ref=ref("s1"),
         original="approve",
         replacement="reject",
         reason_code="harm",
     )
 
 
-def notice(name, i="n1"):
+def notice(name):
     """The affected person's Notice of the decision, naming it as `name` (TRN-01, TRN-03)."""
-    return ev(i, "Notice", refs={"decision": name}, notice_type="adverse_action")
+    return ev("n1", "Notice", refs={"decision": name}, notice_type="adverse_action")
 
 
-def adverse(name, i="o1"):
+def adverse(name):
     """An adverse Outcome of the decision, naming it as `name` (INC-01)."""
-    return ev(i, "Outcome", refs={"decision": name}, adverse=True)
+    return ev("o1", "Outcome", refs={"decision": name}, adverse=True)
 
 
 # CND-04 (Conduct): a ToolCall that executes a consequential decision must act on a named instruction. The ToolCall
