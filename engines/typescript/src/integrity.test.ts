@@ -52,6 +52,52 @@ test("a source_signed stream is verified with a sig_ref and unsigned without one
   assert.equal(withoutSig[0]?.status, "unsigned");
 });
 
+test("a record never breaks another source's chain by claiming its stream", () => {
+  // 18.151: chains are keyed on (source, claimed stream), so the agent's bad-hash record naming the gateway's stream
+  // gets its own result and leaves the gateway's chain unbroken; with two sources on one id, neither reads verified.
+  const head = signedEvent("attestations/sg1.sig");
+  const tail: Record<string, unknown> = {
+    id: "sg2",
+    source: "src-1",
+    subject: "subj-A",
+    time: "2026-01-01T00:01:00.000Z",
+    data: {
+      "@type": "Decision",
+      integrity: {
+        hash: "",
+        prev: ((head.data as Record<string, unknown>).integrity as Record<string, unknown>).hash,
+        stream: "s-signed",
+        strength: "source_signed",
+        sig_ref: "attestations/sg2.sig",
+      },
+    },
+  };
+  ((tail.data as Record<string, unknown>).integrity as Record<string, unknown>).hash =
+    recomputeHash(tail);
+  const hijack: Record<string, unknown> = {
+    id: "x9",
+    source: "agent-1",
+    subject: "subj-A",
+    time: "2026-01-01T00:05:00.000Z",
+    data: {
+      "@type": "Decision",
+      integrity: {
+        hash: "f".repeat(64),
+        prev: "e".repeat(64),
+        stream: "s-signed",
+        strength: "source_signed",
+      },
+    },
+  };
+  const statuses = (events: Array<Record<string, unknown>>) =>
+    verifyBundle(events, {}, null).map((r) => [r.stream, r.status]);
+  assert.deepEqual(statuses([head, hijack, tail]), [
+    ["s-signed", "failed"],
+    ["s-signed", "verified_weak"],
+  ]);
+  assert.deepEqual(statuses([head, tail]), [["s-signed", "verified"]]);
+});
+
 // --- A sig_ref is evidence content: a signature file outside the bundle root never counts,
 // --- whether it is reached literally or through a symlink (SPEC §6.6, §8.1).
 

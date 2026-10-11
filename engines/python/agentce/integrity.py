@@ -17,6 +17,7 @@ verified cryptographically with SHA-256.
 from __future__ import annotations
 
 import copy
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -117,6 +118,7 @@ def _verify_stream(
     *,
     bundle_root: Path | None,
     clock_skew_seconds: int,
+    shared: bool,
 ) -> IntegrityResult:
     blocks = [_integrity(e) for e in events]
     strength = next(
@@ -179,6 +181,10 @@ def _verify_stream(
         )
     else:  # export_chained: a chain computed after export proves only "unchanged since export".
         result.status = IntegrityStatus.VERIFIED_WEAK.value
+    # A stream id two sources claim: the manifest's anchors and a sig_ref name no source, so neither chain under that
+    # id reads verified, which fails closed rather than let one source's chain borrow another's anchors (18.151).
+    if shared and result.status == IntegrityStatus.VERIFIED.value:
+        result.status = IntegrityStatus.VERIFIED_WEAK.value
     return result
 
 
@@ -201,21 +207,28 @@ def verify_bundle(
     *,
     clock_skew_seconds: int = DEFAULT_CLOCK_SKEW_SECONDS,
 ) -> list[IntegrityResult]:
-    """Verify every integrity stream in ``events``; return one result per stream, ordered by stream id."""
+    """Verify every integrity stream in ``events``; return one result per stream, ordered by stream id, then source.
+
+    A chain is keyed on (the record's source, the stream it claims): a claimed stream id names a stream of the record's
+    own source (SPEC §6.6), so a record never joins, or breaks, another source's chain by naming it, and no chain under
+    an id two sources claim reads verified (18.151)."""
     anchors_by_stream = _anchors_by_stream(manifest)
-    grouped: dict[str, list[dict[str, Any]]] = {}
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for event in events:
-        grouped.setdefault(_stream_key(event), []).append(event)
+        key = (_stream_key(event), str(event.get("source", "")))
+        grouped.setdefault(key, []).append(event)
+    claimers = Counter(stream for stream, _ in grouped)
 
     results = []
-    for stream in sorted(grouped):
+    for stream, source in sorted(grouped):
         results.append(
             _verify_stream(
                 stream,
-                grouped[stream],
+                grouped[stream, source],
                 anchors_by_stream.get(stream, []),
                 bundle_root=bundle_root,
                 clock_skew_seconds=clock_skew_seconds,
+                shared=claimers[stream] > 1,
             )
         )
     return results

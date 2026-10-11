@@ -135,6 +135,7 @@ function verifyStream(
   events: Array<Record<string, unknown>>,
   anchors: Array<Record<string, unknown>>,
   bundleRoot: string | null,
+  shared: boolean,
 ): IntegrityResult {
   const blocks = events.map(integrityBlock);
   let strength: string = IntegrityStrength.EXPORT_CHAINED;
@@ -210,6 +211,11 @@ function verifyStream(
     // export_chained: a chain computed after export proves only "unchanged since export".
     result.status = IntegrityStatus.VERIFIED_WEAK;
   }
+  // A stream id two sources claim: the manifest's anchors and a sig_ref name no source, so neither chain under that
+  // id reads verified, which fails closed rather than let one source's chain borrow another's anchors (18.151).
+  if (shared && result.status === IntegrityStatus.VERIFIED) {
+    result.status = IntegrityStatus.VERIFIED_WEAK;
+  }
   return result;
 }
 
@@ -228,34 +234,49 @@ function anchorsByStream(
   return out;
 }
 
-/** Verify every integrity stream in `events`; return one result per stream, ordered by stream id. */
+/**
+ * Verify every integrity stream in `events`; return one result per stream, ordered by stream id, then source.
+ *
+ * A chain is keyed on (the record's source, the stream it claims): a claimed stream id names a stream of the record's
+ * own source (SPEC §6.6), so a record never joins, or breaks, another source's chain by naming it, and no chain under
+ * an id two sources claim reads verified (18.151).
+ */
 export function verifyBundle(
   events: Array<Record<string, unknown>>,
   manifest: Record<string, unknown>,
   bundleRoot: string | null = null,
 ): IntegrityResult[] {
   const anchors = anchorsByStream(manifest);
-  const grouped = new Map<string, Array<Record<string, unknown>>>();
+  const grouped = new Map<
+    string,
+    { stream: string; source: string; events: Array<Record<string, unknown>> }
+  >();
   for (const event of events) {
-    const key = streamKey(event);
-    const bucket = grouped.get(key);
-    if (bucket === undefined) {
-      grouped.set(key, [event]);
+    const stream = streamKey(event);
+    const source = String(event.source ?? "");
+    const key = JSON.stringify([stream, source]);
+    const chain = grouped.get(key);
+    if (chain === undefined) {
+      grouped.set(key, { stream, source, events: [event] });
     } else {
-      bucket.push(event);
+      chain.events.push(event);
     }
   }
 
-  const results: IntegrityResult[] = [];
-  for (const stream of [...grouped.keys()].sort(byteCompare)) {
-    results.push(
-      verifyStream(
-        stream,
-        grouped.get(stream) as Array<Record<string, unknown>>,
-        anchors.get(stream) ?? [],
-        bundleRoot,
-      ),
-    );
+  const claimers = new Map<string, number>();
+  for (const chain of grouped.values()) {
+    claimers.set(chain.stream, (claimers.get(chain.stream) ?? 0) + 1);
   }
-  return results;
+  const chains = [...grouped.values()].sort(
+    (a, b) => byteCompare(a.stream, b.stream) || byteCompare(a.source, b.source),
+  );
+  return chains.map((chain) =>
+    verifyStream(
+      chain.stream,
+      chain.events,
+      anchors.get(chain.stream) ?? [],
+      bundleRoot,
+      (claimers.get(chain.stream) ?? 0) > 1,
+    ),
+  );
 }

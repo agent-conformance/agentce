@@ -160,3 +160,48 @@ def test_sig_file_existence_checked_with_bundle_root(tmp_path: Path) -> None:
         events, {}, tmp_path
     )  # attestation file absent under root
     assert result.status == IntegrityStatus.UNSIGNED.value
+
+
+def test_a_record_never_breaks_another_sources_chain_by_claiming_its_stream() -> None:
+    # 18.151: the agent's own record names the gateway's stream with a hash that matches nothing; chains are keyed on
+    # (source, claimed stream), so the gateway's chain reads as it does alone and the hijacker gets its own result.
+    genuine = chain(2, strength="export_chained")
+    hijack = make_event(
+        "x9", "e" * 64, "2026-01-01T00:05:00Z", strength="export_chained"
+    )
+    hijack["source"] = "urn:example:agent"
+    _ig(hijack)["hash"] = "f" * 64
+    results = verify_bundle([genuine[0], hijack, genuine[1]], {})
+    assert [(r.stream, r.status) for r in results] == [
+        (STREAM, IntegrityStatus.VERIFIED_WEAK.value),
+        (STREAM, IntegrityStatus.FAILED.value),
+    ]
+    assert [(r.stream, r.status) for r in verify_bundle(genuine, {})] == [
+        (STREAM, IntegrityStatus.VERIFIED_WEAK.value)
+    ]
+
+
+def test_no_chain_reads_verified_under_a_stream_id_two_sources_claim() -> None:
+    # 18.151: the manifest's anchors name no source, so the agent's own well-formed export_anchored link claiming the
+    # gateway's stream id would borrow the gateway's anchors; with two sources on one id, neither reads verified.
+    manifest = {
+        "streams": [
+            {
+                "stream": STREAM,
+                "anchors": [
+                    {"kind": "rfc3161", "ref": "a.tsr", "at": "2026-01-02T00:00:00Z"}
+                ],
+            }
+        ]
+    }
+    genuine = chain(2, strength="export_anchored")
+    hijack = make_event(
+        "x9", GENESIS_PREV, "2026-01-01T00:05:00Z", strength="export_anchored"
+    )
+    hijack["source"] = "urn:example:agent"
+    _ig(hijack)["hash"] = integrity.recompute_hash(hijack)
+    assert [r.status for r in verify_bundle(genuine, manifest)] == ["verified"]
+    assert [r.status for r in verify_bundle([*genuine, hijack], manifest)] == [
+        IntegrityStatus.VERIFIED_WEAK.value,
+        IntegrityStatus.VERIFIED_WEAK.value,
+    ]

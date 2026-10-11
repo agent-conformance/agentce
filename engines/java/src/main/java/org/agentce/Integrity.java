@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -142,7 +143,8 @@ public final class Integrity {
         return confined != null && Bundle.safeIsFile(confined);
     }
 
-    private static Result verifyStream(String stream, List<JsonNode> events, List<JsonNode> anchors, Path bundleRoot) {
+    private static Result verifyStream(
+            String stream, List<JsonNode> events, List<JsonNode> anchors, Path bundleRoot, boolean shared) {
         List<JsonNode> blocks = new ArrayList<>();
         for (JsonNode event : events) {
             blocks.add(integrityBlock(event));
@@ -216,6 +218,11 @@ public final class Integrity {
         } else {
             result.status = VERIFIED_WEAK;
         }
+        // A stream id two sources claim: the manifest's anchors and a sig_ref name no source, so neither chain under
+        // that id reads verified, which fails closed rather than let one source's chain borrow another's anchors (18.151).
+        if (shared && result.status.equals(VERIFIED)) {
+            result.status = VERIFIED_WEAK;
+        }
         return result;
     }
 
@@ -237,18 +244,35 @@ public final class Integrity {
         return out;
     }
 
-    /** Verify every integrity stream in {@code events}; return one result per stream, ordered by stream id. */
+    /**
+     * Verify every integrity stream in {@code events}; return one result per stream, ordered by stream id, then source.
+     *
+     * <p>A chain is keyed on (the record's source, the stream it claims): a claimed stream id names a stream of the
+     * record's own source (SPEC §6.6), so a record never joins, or breaks, another source's chain by naming it, and no
+     * chain under an id two sources claim reads verified (18.151).
+     */
     public static List<Result> verifyBundle(List<JsonNode> events, JsonNode manifest, Path bundleRoot) {
         Map<String, List<JsonNode>> anchors = anchorsByStream(manifest);
-        Map<String, List<JsonNode>> grouped = new LinkedHashMap<>();
+        Map<List<String>, List<JsonNode>> grouped = new LinkedHashMap<>();
         for (JsonNode event : events) {
-            grouped.computeIfAbsent(streamKey(event), k -> new ArrayList<>()).add(event);
+            JsonNode source = event.get("source");
+            List<String> key = List.of(streamKey(event), source != null ? source.asText() : "");
+            grouped.computeIfAbsent(key, k -> new ArrayList<>()).add(event);
         }
-        List<String> streams = new ArrayList<>(grouped.keySet());
-        streams.sort(Json::byteCompare);
+        Map<String, Integer> claimers = new HashMap<>();
+        for (List<String> chain : grouped.keySet()) {
+            claimers.merge(chain.get(0), 1, Integer::sum);
+        }
+        List<List<String>> chains = new ArrayList<>(grouped.keySet());
+        chains.sort((a, b) -> {
+            int byStream = Json.byteCompare(a.get(0), b.get(0));
+            return byStream != 0 ? byStream : Json.byteCompare(a.get(1), b.get(1));
+        });
         List<Result> results = new ArrayList<>();
-        for (String stream : streams) {
-            results.add(verifyStream(stream, grouped.get(stream), anchors.getOrDefault(stream, List.of()), bundleRoot));
+        for (List<String> chain : chains) {
+            String stream = chain.get(0);
+            results.add(verifyStream(
+                    stream, grouped.get(chain), anchors.getOrDefault(stream, List.of()), bundleRoot, claimers.get(stream) > 1));
         }
         return results;
     }

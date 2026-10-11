@@ -61,6 +61,33 @@ class IntegrityTest {
         assertEquals("unsigned", withoutSig.get(0).status);
     }
 
+    @Test
+    void aRecordNeverBreaksAnotherSourcesChainByClaimingItsStream() {
+        // 18.151: chains are keyed on (source, claimed stream), so the agent's bad-hash record naming the gateway's
+        // stream gets its own result and leaves the gateway's chain unbroken; with two sources on one id, neither reads
+        // verified.
+        JsonNode head = signedEvent("attestations/sg1.sig");
+        ObjectNode tail = signedEvent("attestations/sg2.sig").deepCopy();
+        tail.put("id", "sg2");
+        ObjectNode tailBlock = (ObjectNode) tail.get("data").get("integrity");
+        tailBlock.put("prev", head.get("data").get("integrity").get("hash").textValue());
+        tailBlock.put("hash", Integrity.recomputeHash(tail));
+        ObjectNode hijack = signedEvent(null).deepCopy();
+        hijack.put("id", "x9");
+        hijack.put("source", "agent-1");
+        ObjectNode hijackBlock = (ObjectNode) hijack.get("data").get("integrity");
+        hijackBlock.put("hash", "f".repeat(64));
+        hijackBlock.put("prev", "e".repeat(64));
+        assertEquals(List.of("s-signed failed", "s-signed verified_weak"), statuses(List.of(head, hijack, tail)));
+        assertEquals(List.of("s-signed verified"), statuses(List.of(head, tail)));
+    }
+
+    private static List<String> statuses(List<JsonNode> events) {
+        return Integrity.verifyBundle(events, Json.nodes().objectNode(), null).stream()
+                .map(r -> r.stream + " " + r.status)
+                .toList();
+    }
+
     private static JsonNode block(String sigRef) {
         ObjectNode integrity = Json.nodes().objectNode();
         integrity.put("sig_ref", sigRef);
