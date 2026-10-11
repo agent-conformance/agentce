@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.89.0",
+  "suite_version": "0.90.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3810,7 +3810,7 @@
     },
     {
       "id": "VG-STREAM-SOURCE-BOUND",
-      "title": "A record's claimed integrity stream never joins it to another source's time-order group at ingest, in all three engines: time order is checked per (source, claimed stream), so an agent's own record that names the enforcement point's stream cannot get the enforcement point's genuine ToolCall quarantined time_order (18.147)",
+      "title": "A record's claimed integrity stream never joins it to another source's time-order group or hash chain, in all three engines: time order and integrity chains are keyed on (source, claimed stream), so an agent's own record that names the enforcement point's stream can neither get the enforcement point's genuine ToolCall quarantined time_order (18.147) nor break its chain (18.151)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -3828,10 +3828,10 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/stream_source_bound/cases.json (12: CND-02 with the agent's own routine Decision x9, recorded later than the enforcement point's ToolCall, claiming the enforcement point's stream from a self_report source, an undeclared source and an independent_system source, claiming the gateway's own claimed stream id, arriving after the ToolCall with an earlier time, and naming another subject, against the twin where x9 claims nothing; x9 claiming the identity provider's stream before an approve through the login and before a reject, against their twins; and one source's own later record quarantining its earlier ToolCall in the stream both claim) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs, so each hijack case reads exactly like its twin (non-conformant, failing d1, nothing quarantined) and one source still keeps time order within its own stream",
-        "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
+        "pass": "every case in verification/gates/fixtures/stream_source_bound/cases.json (18: CND-02 with the agent's own routine Decision x9, recorded later than the enforcement point's ToolCall, claiming the enforcement point's stream from a self_report source, an undeclared source and an independent_system source, claiming the gateway's own claimed stream id, arriving after the ToolCall with an earlier time, and naming another subject, against the twin where x9 claims nothing; x9 claiming the identity provider's stream before an approve through the login and before a reject, against their twins; and one source's own later record quarantining its earlier ToolCall in the stream both claim; and the agent's bad-hash record read between the gateway's two chained ToolCalls claiming their stream, against the twin where it claims nothing; and the gateway's export_anchored chain with the manifest's anchor, later or earlier than the records, against the agent's own well-formed export_anchored link claiming the same id; every integrity stream and status pinned) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs, so each hijack case reads exactly like its twin (non-conformant, failing d1, nothing quarantined) one source still keeps time order within its own stream, and the gateway's chain reads verified_weak with or without the hijacker, which gets its own failed entry under the same stream id; with two sources on one anchored id neither chain reads verified, and an early anchor still marks every chain time_suspect",
+        "fail": "any case gives another outcome, another set of failing events, another quarantined count, another exit code or other integrity streams and statuses in any engine"
       },
-      "fix_hint": "Run bash verification/gates/approval_outcome.sh stream_source_bound; it names the engine, the case and what it gave against what was expected. Ingest (ingest.py / ingest.ts / Ingest.java) keeps the last time per ordering key, order_key / orderKey = (the record's source, the stream it claims or its source); the quarantine record's stream field keeps the claimed stream.",
+      "fix_hint": "Run bash verification/gates/approval_outcome.sh stream_source_bound; it names the engine, the case and what it gave against what was expected. Ingest (ingest.py / ingest.ts / Ingest.java) keeps the last time per ordering key, order_key / orderKey = (the record's source, the stream it claims or its source); the quarantine record's stream field keeps the claimed stream. Integrity (integrity.py / integrity.ts / Integrity.java) groups chains on (claimed stream, source) orders results by stream, then source, and caps verified at verified_weak for a stream id two sources claim.",
       "faults": [
         {
           "description": "Python keys time order on the claimed stream alone, so the agent's record naming the enforcement point's stream quarantines the genuine ToolCall time_order",
@@ -3850,6 +3850,42 @@
           "file": "engines/java/src/main/java/org/agentce/Ingest.java",
           "search": "List<String> orderKey = List.of(candidate.source(), stream);",
           "replace": "List<String> orderKey = List.of(\"\", stream);"
+        },
+        {
+          "description": "Python keys integrity chains on the claimed stream alone, so the agent's bad-hash record breaks the gateway's chain",
+          "file": "engines/python/agentce/integrity.py",
+          "search": "key = (_stream_key(event), str(event.get(\"source\", \"\")))",
+          "replace": "key = (_stream_key(event), \"\")"
+        },
+        {
+          "description": "TypeScript keys integrity chains on the claimed stream alone",
+          "file": "engines/typescript/src/integrity.ts",
+          "search": "const key = JSON.stringify([stream, source]);",
+          "replace": "const key = JSON.stringify([stream, \"\"]);"
+        },
+        {
+          "description": "Java keys integrity chains on the claimed stream alone",
+          "file": "engines/java/src/main/java/org/agentce/Integrity.java",
+          "search": "List<String> key = List.of(streamKey(event), source != null ? source.asText() : \"\");",
+          "replace": "List<String> key = List.of(streamKey(event), \"\");"
+        },
+        {
+          "description": "Python lets a chain under a stream id two sources claim read verified, so the agent's own export_anchored chain borrows the gateway's anchors",
+          "file": "engines/python/agentce/integrity.py",
+          "search": "if shared and result.status == IntegrityStatus.VERIFIED.value:",
+          "replace": "if shared and result.status == IntegrityStatus.UNSIGNED.value:"
+        },
+        {
+          "description": "TypeScript lets a chain under a shared stream id read verified",
+          "file": "engines/typescript/src/integrity.ts",
+          "search": "if (shared && result.status === IntegrityStatus.VERIFIED) {",
+          "replace": "if (shared && result.status === IntegrityStatus.UNSIGNED) {"
+        },
+        {
+          "description": "Java lets a chain under a shared stream id read verified",
+          "file": "engines/java/src/main/java/org/agentce/Integrity.java",
+          "search": "if (shared && result.status.equals(VERIFIED)) {",
+          "replace": "if (shared && result.status.equals(UNSIGNED)) {"
         }
       ]
     },

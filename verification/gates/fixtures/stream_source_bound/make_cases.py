@@ -6,11 +6,12 @@ group by naming that source's stream. Each hijack case reads exactly like its tw
 stream, so the enforcement point's genuine ToolCall is never quarantined time_order and CND-02 still fails d1."""
 
 import hashlib
+import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from approval_events import CHAIN, NC, appr, case, dec, ev, idp, ran, write  # noqa: E402
+from approval_events import C, CHAIN, NC, SUBJECT, appr, case, dec, ev, idp, ran, write  # noqa: E402
 
 EP = "urn:src:enforcement_point"
 LATER = "2026-01-10T01:00:00Z"
@@ -149,5 +150,121 @@ case(
     NC,
     ["d1"],
     quarantined=1,
+)
+# Integrity chains (18.151) are bound the same way: SPEC §6.6 verifies a hash chain per stream, and a record's claimed
+# stream names a chain of its own source. The gateway's two ToolCalls form a real export_chained chain; in the hijack
+# case the agent's Decision x9, read between them, claims that chain with a hash that matches nothing. Each case's
+# expected.integrity is every {stream, status} its integrity.jsonl holds, ordered as the engines write it; the
+# genuine chain reads verified_weak in both, and the hijacker's own entry under the same claimed id reads failed.
+GW = "urn:stream:gw"
+
+
+def chained(e, prev, strength="export_chained"):
+    """Give e a real link in GW: the SHA-256 of its RFC 8785 form without data.integrity (ASCII only, so sorted
+    compact JSON is that form)."""
+    text = json.dumps(e, sort_keys=True, separators=(",", ":"))
+    e["data"]["integrity"] = {
+        "hash": hashlib.sha256(text.encode()).hexdigest(),
+        "prev": prev,
+        "stream": GW,
+        "strength": strength,
+    }
+    return e
+
+
+def gateway(strength="export_chained"):
+    head = chained(ran(), "0" * 64, strength)
+    tail = chained(
+        ev("t8", "ToolCall", tool={"name": "x"}),
+        head["data"]["integrity"]["hash"],
+        strength,
+    )
+    return head, tail
+
+
+def fallback(cls):
+    """The stream of a source's records that claim none: (source, subject)."""
+    return f"urn:src:{cls}|{SUBJECT}"
+
+
+UNCHAINED = [
+    {"stream": fallback("independent_system"), "status": "failed"},
+    {"stream": fallback("self_report"), "status": "failed"},
+]
+head, tail = gateway()
+case(
+    "integrity-chain-no-hijack",
+    "CND-02",
+    [dec(), head, note(), tail, idp(), appr("reject")],
+    NC,
+    ["d1"],
+    integrity=UNCHAINED + [{"stream": GW, "status": "verified_weak"}],
+)
+head, tail = gateway()
+case(
+    "integrity-chain-hijack",
+    "CND-02",
+    [dec(), head, note(stream=GW), tail, idp(), appr("reject")],
+    NC,
+    ["d1"],
+    integrity=UNCHAINED
+    + [{"stream": GW, "status": "verified_weak"}, {"stream": GW, "status": "failed"}],
+)
+
+
+# Anchors (SPEC §6.6): the manifest anchors GW's head, naming no source. The gateway's export_anchored chain reads
+# verified alone. The agent's own record claims GW with a well-formed export_anchored link of its own (a genesis prev
+# and its real hash), so it forms a chain that would borrow GW's anchors: with two sources on one id, neither chain
+# reads verified (fails closed), and an anchor earlier than the records still marks every chain time_suspect.
+def anchored(name, at, hijack, integrity):
+    head, tail = gateway("export_anchored")
+    middle = chained(note(), "0" * 64, "export_anchored") if hijack else note()
+    case(
+        name,
+        "CND-02",
+        [dec(), head, middle, tail, idp(), appr("reject")],
+        NC,
+        ["d1"],
+        integrity=UNCHAINED + integrity,
+    )
+    C[name]["streams"] = [
+        {
+            "stream": GW,
+            "anchors": [{"kind": "rfc3161", "ref": "anchors/gw-head.tsr", "at": at}],
+        }
+    ]
+
+
+ANCHOR_AT = "2026-01-10T02:00:00Z"
+anchored(
+    "integrity-anchor-no-hijack",
+    ANCHOR_AT,
+    False,
+    [{"stream": GW, "status": "verified"}],
+)
+anchored(
+    "integrity-anchor-hijack",
+    ANCHOR_AT,
+    True,
+    [
+        {"stream": GW, "status": "verified_weak"},
+        {"stream": GW, "status": "verified_weak"},
+    ],
+)
+EARLY_AT = "2026-01-09T23:00:00Z"
+anchored(
+    "integrity-anchor-time-suspect-no-hijack",
+    EARLY_AT,
+    False,
+    [{"stream": GW, "status": "time_suspect"}],
+)
+anchored(
+    "integrity-anchor-time-suspect-hijack",
+    EARLY_AT,
+    True,
+    [
+        {"stream": GW, "status": "time_suspect"},
+        {"stream": GW, "status": "time_suspect"},
+    ],
 )
 write()

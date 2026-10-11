@@ -2,7 +2,8 @@
 # Build gate helper for VG-APPROVAL-OUTCOME (18.136) and, given a fixture name, VG-APPROVAL-ORDER (approval_order,
 # 18.141), VG-APPROVAL-WITHDRAWAL (approval_withdrawal, 18.142), VG-DUPLICATE-ID-CLASS (duplicate_id_class, 18.143:
 # a record of a lower source class never displaces a higher-class record with the same event id), VG-STREAM-SOURCE-BOUND
-# (stream_source_bound, 18.147: a record's claimed stream never joins another source's time-order group) and
+# (stream_source_bound, 18.147: a record's claimed stream never joins another source's time-order group, nor, 18.151,
+# another source's integrity chain) and
 # VG-TIME-ORDER-INSTANT (time_order_instant, 18.145: ingest compares stream times as instants). An approval gates a decision only when its outcome
 # is approve (SPEC §6.2 ApprovalDecided.outcome approve|edit|reject), it is recorded at or before every action that
 # executes the decision, and the same human did not withdraw it before the action ran. CND-02 and OVS-08 count
@@ -11,7 +12,7 @@
 # and the domain are fixtures/approval_outcome's for both) becomes one bundle assessed under its profile
 # (eu: eu-ai-act and Conduct; nist: nist-ai-rmf); the real Python, TypeScript and Java CLIs assess it, and the case's
 # control must give the expected outcome and failing events in every engine, with the expected quarantined record count
-# and exit code.
+# and exit code, and, where the case gives expected.integrity, every integrity stream and status integrity.jsonl holds.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 name="${1:-approval_outcome}"
@@ -54,6 +55,8 @@ for name, case in cases.items():
             if source.startswith("urn:src:unclassed")
         ],
     }
+    if "streams" in case:  # a case's integrity streams and their anchors (SPEC §6.6), as the manifest lists them
+        manifest["streams"] = case["streams"]
     (bundle / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     expected = case["expected"]
     failing = ",".join(sorted(expected["failing"]))
@@ -63,6 +66,9 @@ for name, case in cases.items():
     (bundle.parent / "expected").write_text(
         f"{expected['outcome']} {failing} {expected['quarantined']} {expected['exit']}\n", encoding="utf-8"
     )
+    if "integrity" in expected:
+        lines = "".join(f"{e['stream']} {e['status']}\n" for e in expected["integrity"])
+        (bundle.parent / "integrity").write_text(lines, encoding="utf-8")
 PY
 
 (cd "$root/engines/typescript" && pnpm --silent build >/dev/null)
@@ -112,6 +118,16 @@ check_cases() {
     got="$(outcome "$out/assertions.json" "$(cat "$dir/control")") $quarantined $code"
     if [ "$got" != "$want" ]; then
       echo "$label: $engine $name gave '$got', expected '$want' (outcome failing quarantined exit)" >&2
+      touch "$work/.stop"
+      return 1
+    fi
+    # A case with expected integrity also pins every {stream, status} of integrity.jsonl, in the order written.
+    if [ -f "$dir/integrity" ] &&
+      ! jq -r '"\(.stream) \(.status)"' "$out/integrity.jsonl" | cmp -s - "$dir/integrity"; then
+      echo "$label: $engine $name wrote integrity streams" >&2
+      jq -r '"  \(.stream) \(.status)"' "$out/integrity.jsonl" >&2
+      echo "expected" >&2
+      sed 's/^/  /' "$dir/integrity" >&2
       touch "$work/.stop"
       return 1
     fi

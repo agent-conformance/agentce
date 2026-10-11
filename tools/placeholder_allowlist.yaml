@@ -784,3 +784,9 @@ allow:
     count: 1
     class: legitimate
     justification: "Generated from spec/report/buyer.schema.json's description by docs/build.py, which carries the same hit for the reason its own entry gives; --check-links and --check-publish hold the page equal to the schema."
+
+  - path: verification/gates/fixtures/stream_source_bound/cases.json
+    pattern: zero-digest
+    count: 8
+    class: legitimate
+    justification: "Genesis all-zero prev pointer at the head of each VG-STREAM-SOURCE-BOUND integrity chain case (no predecessor block)."

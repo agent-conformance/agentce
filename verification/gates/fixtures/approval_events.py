@@ -87,7 +87,15 @@ C = {}
 
 
 def case(
-    name, control, events, outcome, failing=(), quarantined=0, profile="eu", exit=2
+    name,
+    control,
+    events,
+    outcome,
+    failing=(),
+    quarantined=0,
+    profile="eu",
+    exit=2,
+    integrity=None,
 ):
     C[name] = {
         "control": control,
@@ -100,6 +108,8 @@ def case(
             "exit": exit,
         },
     }
+    if integrity is not None:
+        C[name]["expected"]["integrity"] = integrity
 
 
 TWO = [idp("s1"), idp("s2", who="u3")]

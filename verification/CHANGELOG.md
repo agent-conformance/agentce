@@ -3,6 +3,23 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.90.0
+
+- `VG-STREAM-SOURCE-BOUND` (18.151, changed) also checks that a record's claimed integrity stream never joins it to
+  another source's hash chain, in all three engines. Integrity verification grouped chains by the stream a record
+  names in `data.integrity.stream`, so an agent's own record naming the gateway's chain, with a hash that matches
+  nothing, turned the gateway's chain from `verified_weak` to `failed`. Chains are now keyed on the record's source and
+  the stream it claims, and results are ordered by stream, then source. The manifest's anchors and a `sig_ref` name no
+  source, so when two sources claim one stream id, neither chain under it reads `verified`: it reads `verified_weak`
+  instead, and an agent's own chain can't borrow the gateway's anchors. The gate gains six cases, each pinning every
+  integrity stream and status `integrity.jsonl` holds. In two, the agent's bad-hash record sits between the gateway's
+  two chained ToolCalls and claims their stream, against a twin where it claims nothing: the gateway's chain reads
+  `verified_weak` in both, and the hijacker gets its own `failed` entry. In four, the gateway's chain is
+  `export_anchored` with the manifest's anchor, against the agent's own well-formed anchored link claiming that id:
+  alone the gateway reads `verified`, shared neither chain does, and an anchor earlier than the records marks every
+  chain `time_suspect`. The gate gains two seeded faults per engine: one keys the chain on the claimed stream alone, and
+  one lets a shared id read `verified`.
+
 ## 0.89.0
 
 - `VG-TIME-ORDER-INSTANT` (18.145, new, tier quick) checks that ingest compares event times as instants when it checks
