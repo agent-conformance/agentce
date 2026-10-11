@@ -13,10 +13,11 @@ fails if a gate in `gates.json` is not named in this file.
   resolves a `refs.decision` to a held decision: the name itself, else the name trimmed of the human-actor rule's id
   padding, else `agentce:event/<trimmed name>`. An approval naming no held decision approves and reviews none. A
   ToolCall or Outcome naming no held decision (another letter case, a `urn:`, another event's id, an empty string) may
-  be any decision's effect, so its time bounds every decision's approvals, though it withdraws none. The gate holds 29
+  be any decision's effect, so its time bounds every decision's approvals, though it withdraws none. The gate holds 31
   cases and ten seeded faults: raw grouping in all three engines, an unresolved effect bounding nothing in all three,
   a bare id resolved against any held event in Python, and, in all three, a human-actor check that counts only the
-  resolved decision's agents, so an Interrupt naming a ToolCall would accept a login from that ToolCall's own agent.
+  resolved decision's agents, so an Interrupt naming a ToolCall (by IRI, bare id or padded) would accept a login from
+  that ToolCall's own agent.
 
 ## 0.90.0
 
