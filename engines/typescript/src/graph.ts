@@ -1018,7 +1018,7 @@ class Builder {
         unresolvedTimes.push(time);
         continue;
       }
-      const map = ptype === "ToolCall" ? actionTimes : new Map<string, string[]>();
+      const map = ptype === "ToolCall" ? actionTimes : outcomeTimes;
       const times = map.get(decision) ?? [];
       times.push(time);
       map.set(decision, times);
