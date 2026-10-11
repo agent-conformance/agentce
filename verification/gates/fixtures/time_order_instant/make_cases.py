@@ -48,7 +48,7 @@ case(
 case(
     "cnd02-equal-instant-twin",
     "CND-02",
-    withdraw(APPROVE, approve_at=APPROVE),
+    withdraw(APPROVE),
     NC,
     ["d1"],
 )
