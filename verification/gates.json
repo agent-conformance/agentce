@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.92.0",
+  "suite_version": "0.93.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -4036,6 +4036,87 @@
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "|| \"Outcome\".equals(type)) || ref == null) {\n",
           "replace": "|| \"Outcome\".equals(type)) || ref == null || ref.isNull()) {\n"
+        }
+      ]
+    },
+    {
+      "id": "VG-HELD-DECISION-EVERYWHERE",
+      "title": "Every glue read of refs.decision names the held decision approvedBy names, in all three engines: the executes, resultedIn, overriddenBy, interruptedBy and notifiedBy edges, executesConsequential and OVS-07's Override check resolve a decision named by bare id or with padding at either end to that decision, whatever the file order, and a name for no held Decision links none, so CND-04 and OVS-03 never drop a consequential ToolCall from scope for the way it spells its decision (18.156)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/approval_outcome.sh",
+        "held_decision_everywhere"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/held_decision_everywhere/cases.json (32: CND-04 with a consequential ToolCall naming its decision by IRI, bare id, padded IRI or padded bare id, a bare-id ToolCall read before its Decision, an unheld name, a bare id naming a held Outcome, and a bare-id ToolCall acting on a held instruction; OVS-03 with a dual-control decision recorded with no modality, by IRI and bare id; OVS-07 with a human's Override by IRI, bare id, padded IRI, padded bare id, a bare-id Override read before its Decision, an unheld name, and a bare id or IRI naming a held ToolCall; TRN-01 with a Notice by IRI, bare id, padded, read before its Decision, and unheld; TRN-03 by IRI and bare id; INC-01 with an adverse Outcome by IRI, bare id, padded and unheld; INC-03 with an Incident naming an Outcome whose decision is named by IRI, bare id or an unheld name) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
+      },
+      "fix_hint": "Run bash verification/gates/approval_outcome.sh held_decision_everywhere; it names the engine, the case and what it gave against what was expected. Each engine's graph builder resolves refs.decision through _held_decision / heldDecision (Decisions only) in _map_decision_links / mapDecisionLinks, _executes_consequential / executesConsequential and the Override branch of _intervention / intervention; the held decisions (decision_time / decisionTime) are filled in the id-collection loop before the first pass.",
+      "faults": [
+        {
+          "description": "Python builds the executes, resultedIn, overriddenBy, interruptedBy and notifiedBy edges from the raw refs.decision again, so a Notice naming its decision by bare id notifies no held decision (TRN-01, TRN-03, INC-01)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "            decision = self._held_decision(decision) or decision\n",
+          "replace": ""
+        },
+        {
+          "description": "Python reads executesConsequential from the raw refs.decision again, so a ToolCall naming its consequential decision by bare id leaves CND-04's scope",
+          "file": "engines/python/agentce/graph.py",
+          "search": "        decision = self._held_decision(refs.get(\"decision\"))\n        consequential = (\n",
+          "replace": "        decision = refs.get(\"decision\")\n        consequential = (\n"
+        },
+        {
+          "description": "Python's Override check resolves refs.decision against every held event, not only the held Decisions, so an Override naming a held ToolCall reads effective (OVS-07)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                self._held_decision(_refs(event).get(\"decision\")) is not None\n",
+          "replace": "                any(n in self.event_iris for n in self._ref_names(_refs(event).get(\"decision\")))\n"
+        },
+        {
+          "description": "TypeScript builds the decision glue edges from the raw refs.decision again (TRN-01, TRN-03, INC-01)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "    if (typeof ref === \"string\") {\n      const decision = this.heldDecision(ref) ?? ref;\n",
+          "replace": "    if (typeof ref === \"string\") {\n      const decision = ref;\n"
+        },
+        {
+          "description": "TypeScript reads executesConsequential from the raw refs.decision again (CND-04, OVS-03)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "    const decision = this.heldDecision(refs.decision);\n",
+          "replace": "    const decision = typeof refs.decision === \"string\" ? refs.decision : null;\n"
+        },
+        {
+          "description": "TypeScript's Override check resolves refs.decision against every held event, not only the held Decisions (OVS-07)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "        this.heldDecision(refsOf(event).decision) !== null &&\n",
+          "replace": "        this.refNames(refsOf(event).decision).some((name) => this.eventIris.has(name)) &&\n"
+        },
+        {
+          "description": "Java builds the decision glue edges from the raw refs.decision again (TRN-01, TRN-03, INC-01)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "                String decision = Objects.requireNonNullElse(heldDecision(refs.get(\"decision\")), ref);\n",
+          "replace": "                String decision = ref;\n"
+        },
+        {
+          "description": "Java reads executesConsequential from the raw refs.decision again (CND-04, OVS-03)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "            String decision = heldDecision(refs.get(\"decision\"));\n            boolean consequential",
+          "replace": "            String decision = str(refs.get(\"decision\"));\n            boolean consequential"
+        },
+        {
+          "description": "Java's Override check resolves refs.decision against every held event, not only the held Decisions (OVS-07)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "                effective = heldDecision(refsOf(event).get(\"decision\")) != null\n",
+          "replace": "                effective = refNames(refsOf(event).get(\"decision\")).stream().anyMatch(eventIris::contains)\n"
         }
       ]
     }

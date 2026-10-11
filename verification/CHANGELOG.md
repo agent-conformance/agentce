@@ -3,6 +3,19 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.93.0
+
+- `VG-HELD-DECISION-EVERYWHERE` (18.156, new, tier quick) checks that every glue read of `refs.decision` names the
+  held decision the approval bound names since 18.148, in all three engines. The `executes`, `resultedIn`,
+  `overriddenBy`, `interruptedBy` and `notifiedBy` edges, `executesConsequential` and OVS-07's Override check compared
+  the exact `refs.decision` text, so a ToolCall naming its consequential decision as `d1` dropped out of CND-04 and
+  OVS-03 (not applicable where `agentce:event/d1` read non-conformant), and a bare-id Override, Notice or adverse
+  Outcome read as linked to no decision. Each read now resolves the name the same way: the name itself, else trimmed of
+  the human-actor rule's id padding, else `agentce:event/<trimmed name>`, checked against the held Decisions only,
+  which each engine now knows before it reads the first record. A name for no held Decision links none, as before.
+  The gate holds 32 cases and nine seeded faults: in each engine, the glue edges and `executesConsequential` reading
+  the raw text again, and the Override check resolving against every held event.
+
 ## 0.92.0
 
 - `VG-APPROVAL-REFS-RESOLVED` (18.157, changed) now also covers a `refs.decision` that is present and null. Each engine
