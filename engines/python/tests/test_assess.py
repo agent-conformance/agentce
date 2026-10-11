@@ -39,7 +39,11 @@ def test_conformant_assessment_with_evidence() -> None:
     catalog = load_catalog(_BASE)
     domain = DomainBinding.load(_BASE / "test" / "domain.yaml")
     assertions = assess_subjects(
-        _events("OVS-03/passed.jsonl"), _profile(), [catalog], domain
+        _events("OVS-03/passed.jsonl"),
+        _profile(),
+        [catalog],
+        domain,
+        withheld=(),
     )
     outcomes = _outcomes(assertions)
     assert outcomes["OVS-03"] == "conformant"
@@ -54,7 +58,11 @@ def test_non_conformant_assessment() -> None:
     catalog = load_catalog(_BASE)
     domain = DomainBinding.load(_BASE / "test" / "domain.yaml")
     assertions = assess_subjects(
-        _events("OVS-03/failed.jsonl"), _profile(), [catalog], domain
+        _events("OVS-03/failed.jsonl"),
+        _profile(),
+        [catalog],
+        domain,
+        withheld=(),
     )
     ovs = next(a for a in assertions if a.control == "OVS-03")
     assert ovs.outcome == "non-conformant"
@@ -66,7 +74,11 @@ def test_assessment_report_is_dc5_valid(tmp_path: Path) -> None:
     catalog = load_catalog(_BASE)
     domain = DomainBinding.load(_BASE / "test" / "domain.yaml")
     assertions = assess_subjects(
-        _events("OVS-03/passed.jsonl"), _profile(), [catalog], domain
+        _events("OVS-03/passed.jsonl"),
+        _profile(),
+        [catalog],
+        domain,
+        withheld=(),
     )
     # write_report enforces DC-5; a supporting verdict without evidence would raise here.
     write_report(
@@ -86,7 +98,11 @@ def test_crosswalk_is_carried_from_the_control_and_never_verified() -> None:
     catalog = load_catalog(_BASE)
     domain = DomainBinding.load(_BASE / "test" / "domain.yaml")
     assertions = assess_subjects(
-        _events("OVS-03/passed.jsonl"), _profile(), [catalog], domain
+        _events("OVS-03/passed.jsonl"),
+        _profile(),
+        [catalog],
+        domain,
+        withheld=(),
     )
     doc01 = next(a for a in assertions if a.control == "DOC-01")
     source = yaml.safe_load(
@@ -108,7 +124,11 @@ def test_role_mismatch_is_not_applicable() -> None:
     # A provider-only subject: INC-02 applies to [deployer, provider], OVS-03 to both.
     profile = Profile.from_dict({"subjects": [{"id": SUBJECT, "role": "provider"}]})
     assertions = assess_subjects(
-        _events("OVS-03/passed.jsonl"), profile, [catalog], domain
+        _events("OVS-03/passed.jsonl"),
+        profile,
+        [catalog],
+        domain,
+        withheld=(),
     )
     assert _outcomes(assertions)["OVS-03"] == "conformant"
 
@@ -134,7 +154,11 @@ def _non_conformant_ovs03() -> Any:
     catalog = load_catalog(_BASE)
     domain = DomainBinding.load(_BASE / "test" / "domain.yaml")
     assertions = assess_subjects(
-        _events("OVS-03/failed.jsonl"), _profile(), [catalog], domain
+        _events("OVS-03/failed.jsonl"),
+        _profile(),
+        [catalog],
+        domain,
+        withheld=(),
     )
     return next(a for a in assertions if a.control == "OVS-03")
 
@@ -155,7 +179,11 @@ def test_apply_deviations_leaves_conformant_and_insufficient_evidence_untouched(
     catalog = load_catalog(_BASE)
     domain = DomainBinding.load(_BASE / "test" / "domain.yaml")
     assertions = assess_subjects(
-        _events("OVS-03/passed.jsonl"), _profile(), [catalog], domain
+        _events("OVS-03/passed.jsonl"),
+        _profile(),
+        [catalog],
+        domain,
+        withheld=(),
     )
     conformant = next(a for a in assertions if a.control == "OVS-03")
     assert conformant.outcome == "conformant"
@@ -209,7 +237,9 @@ def _rob02(case: str) -> Any:
     )
     catalog = load_catalog(_REPO_ROOT / "spec" / "catalogs" / "base" / "baseline")
     domain = DomainBinding.load(_ROB02 / "domain.linkml.yaml")
-    assertions = assess_subjects(cases[case]["events"], profile, [catalog], domain)
+    assertions = assess_subjects(
+        cases[case]["events"], profile, [catalog], domain, withheld=()
+    )
     return next(a for a in assertions if a.control == "ROB-02")
 
 

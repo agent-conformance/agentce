@@ -48,7 +48,7 @@ def _scans(num_subjects: int) -> int:
         {"subjects": [{"id": f"s{j}"} for j in range(num_subjects)]}
     )
     accepted = _CountingList(_events(), counter=counter)
-    assess_subjects(accepted, profile, [], DomainBinding.empty())
+    assess_subjects(accepted, profile, [], DomainBinding.empty(), withheld=())
     return counter["n"]
 
 

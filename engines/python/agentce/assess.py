@@ -286,7 +286,7 @@ def assess_subjects(
     domain: DomainBinding,
     *,
     applicability_declared: bool = True,
-    withheld: Sequence[Withheld] = (),
+    withheld: Sequence[Withheld],
 ) -> list[Assertion]:
     """Evaluate every catalog control against every subject and return the assertions.
 
@@ -294,7 +294,7 @@ def assess_subjects(
     the adopter has declared no decision types, so a control with no population in the records is
     reported as ``insufficient_evidence``, never ``not_applicable``.
 
-    ``withheld`` is ingest's quarantined records that may hold evidence (18.119): quarantine never gives a
+    ``withheld`` is required, so every caller decides what ingest withheld; it is ingest's quarantined records that may hold evidence (18.119): quarantine never gives a
     better outcome. A control that reads conformant, or not_applicable for want of a population, reads
     insufficient_evidence naming them when a record ingest could not read may belong to the subject, or when
     judging the subject's readable withheld records with its held ones changes that outcome."""

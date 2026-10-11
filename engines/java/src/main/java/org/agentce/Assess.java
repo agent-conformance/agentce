@@ -301,15 +301,9 @@ public final class Assess {
         return byIri;
     }
 
-    /** Evaluate every catalog control against every subject and return the assertions, with no withheld records. */
-    public static List<Assertions.Assertion> assessSubjects(
-            List<JsonNode> accepted, Profile profile, List<Catalog> catalogs, DomainBinding domain) {
-        return assessSubjects(accepted, profile, catalogs, domain, List.of());
-    }
-
     /**
      * Evaluate every catalog control against every subject and return the assertions. {@code withheld} is
-     * ingest's quarantined records that may hold evidence (18.119): quarantine never gives a better outcome. A
+     * required, so every caller decides what ingest withheld; it is ingest's quarantined records that may hold evidence (18.119): quarantine never gives a better outcome. A
      * control that reads conformant, or not_applicable for want of a population, reads insufficient_evidence
      * naming them when a record ingest could not read may belong to the subject, or when judging the subject's
      * readable withheld records with its held ones changes that outcome.

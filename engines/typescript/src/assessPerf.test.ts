@@ -40,7 +40,7 @@ function scans(numSubjects: number): number {
     subjects: Array.from({ length: numSubjects }, (_, j) => ({ id: `s${j}` })),
   });
   const accepted = countingProxy(events(), counter);
-  assessSubjects(accepted, profile, [], DomainBinding.empty());
+  assessSubjects(accepted, profile, [], DomainBinding.empty(), true, []);
   return counter.n;
 }
 

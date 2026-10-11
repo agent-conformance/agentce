@@ -109,7 +109,7 @@ def build_assess_golden(catalog: Catalog, domain: DomainBinding) -> dict[str, ob
     }
     result: dict[str, object] = {}
     for name, events in scenarios.items():
-        assertions = assess_subjects(events, profile, [catalog], domain)
+        assertions = assess_subjects(events, profile, [catalog], domain, withheld=())
         result[name] = [a.to_json() for a in assertions]
     return result
 
@@ -205,7 +205,9 @@ def build_report_golden(catalog: Catalog, domain: DomainBinding) -> dict[str, ob
     """Mirrors ReportTest's ovsFailedAssertions() and both its test methods."""
     profile = Profile.from_dict({"subjects": [{"id": SUBJECT, "role": "both"}]})
     events = events_of("OVS-03", "failed")
-    assertions: list[Assertion] = assess_subjects(events, profile, [catalog], domain)
+    assertions: list[Assertion] = assess_subjects(
+        events, profile, [catalog], domain, withheld=()
+    )
     counts = aggregate(assertions)
 
     return {

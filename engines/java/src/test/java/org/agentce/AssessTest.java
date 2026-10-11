@@ -50,7 +50,7 @@ class AssessTest {
         ObjectNode result = Json.nodes().objectNode();
         for (Map.Entry<String, List<JsonNode>> e : scenarios.entrySet()) {
             ArrayNode arr = result.putArray(e.getKey());
-            for (Assertions.Assertion a : Assess.assessSubjects(e.getValue(), profile, List.of(catalog), domain)) {
+            for (Assertions.Assertion a : Assess.assessSubjects(e.getValue(), profile, List.of(catalog), domain, List.of())) {
                 arr.add(a.toJson());
             }
         }

@@ -63,7 +63,7 @@ function ovsFailedAssertions() {
     .split("\n")
     .filter((line) => line.trim())
     .map((line) => JSON.parse(line));
-  return assessSubjects(events, profile, [catalog], domain);
+  return assessSubjects(events, profile, [catalog], domain, true, []);
 }
 
 test("report canonical machine outputs match the Python reference golden", () => {

@@ -51,7 +51,9 @@ test("assess_subjects over the base catalog matches the Python reference", () =>
 
   const result: Record<string, unknown> = {};
   for (const [name, events] of Object.entries(scenarios)) {
-    result[name] = assessSubjects(events, profile, [catalog], domain).map(assertionToJson);
+    result[name] = assessSubjects(events, profile, [catalog], domain, true, []).map(
+      assertionToJson,
+    );
   }
   assert.equal(canonicalString(result), canonicalString(golden));
 });
