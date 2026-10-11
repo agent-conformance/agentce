@@ -777,16 +777,14 @@ class _Builder:
         the rule is no human's review."""
         by_human: dict[str, bool] = {}
         action_times: dict[str, list[str]] = {}
-        effect_times: dict[str, list[str]] = {}
+        outcome_times: dict[str, list[str]] = {}
         decided: dict[tuple[str, str], list[tuple[str, str, bool]]] = {}
         for event in events:
             decision = _refs(event).get("decision")
             ptype = self._ptype(event)
             if ptype in ("ToolCall", "Outcome") and isinstance(decision, str):
-                time = str(event.get("time", ""))
-                effect_times.setdefault(decision, []).append(time)
-                if ptype == "ToolCall":
-                    action_times.setdefault(decision, []).append(time)
+                times = action_times if ptype == "ToolCall" else outcome_times
+                times.setdefault(decision, []).append(str(event.get("time", "")))
         for event in events:
             ptype = self._ptype(event)
             if ptype not in _OVERSIGHT_TYPES:
@@ -814,6 +812,7 @@ class _Builder:
             )
         for (decision, key), records in decided.items():
             actions = action_times.get(decision, ())
+            outcomes = outcome_times.get(decision, ())
             withdrawals = [
                 time
                 for _, time, approve in records
@@ -822,7 +821,8 @@ class _Builder:
             for node, time, approve in records:
                 if (
                     approve
-                    and _before_every(time, effect_times.get(decision, ()))
+                    and _before_every(time, actions)
+                    and _before_every(time, outcomes)
                     and all(compare_literals(time, w) == 1 for w in withdrawals)
                 ):
                     self.store.add_edge(decision, "agentce:approvedBy", node)

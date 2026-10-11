@@ -1005,16 +1005,14 @@ public final class Graph {
         private Map<String, Boolean> mapOversight(List<JsonNode> events) {
             Map<String, Boolean> byHuman = new LinkedHashMap<>();
             Map<String, List<String>> actionTimes = new LinkedHashMap<>();
-            Map<String, List<String>> effectTimes = new LinkedHashMap<>();
+            Map<String, List<String>> outcomeTimes = new LinkedHashMap<>();
             Map<String, Map<String, List<Decided>>> decided = new LinkedHashMap<>();
             for (JsonNode event : events) {
                 String decision = str(refsOf(event).get("decision"));
                 String type = ptype(event);
                 if (("ToolCall".equals(type) || "Outcome".equals(type)) && decision != null) {
-                    effectTimes.computeIfAbsent(decision, k -> new ArrayList<>()).add(timeOf(event));
-                    if ("ToolCall".equals(type)) {
-                        actionTimes.computeIfAbsent(decision, k -> new ArrayList<>()).add(timeOf(event));
-                    }
+                    ("ToolCall".equals(type) ? actionTimes : outcomeTimes)
+                            .computeIfAbsent(decision, k -> new ArrayList<>()).add(timeOf(event));
                 }
             }
             for (JsonNode event : events) {
@@ -1047,14 +1045,15 @@ public final class Graph {
             for (Map.Entry<String, Map<String, List<Decided>>> byDecision : decided.entrySet()) {
                 String decision = byDecision.getKey();
                 List<String> actions = actionTimes.getOrDefault(decision, List.of());
-                List<String> effects = effectTimes.getOrDefault(decision, List.of());
+                List<String> outcomes = outcomeTimes.getOrDefault(decision, List.of());
                 for (Map.Entry<String, List<Decided>> byActor : byDecision.getValue().entrySet()) {
                     List<String> withdrawals = byActor.getValue().stream()
                             .filter(d -> !d.approve() && !afterEvery(d.time(), actions))
                             .map(Decided::time)
                             .toList();
                     for (Decided d : byActor.getValue()) {
-                        if (d.approve() && beforeEvery(d.time(), effects) && withdrawals.stream().allMatch(w -> {
+                        if (d.approve() && beforeEvery(d.time(), actions) && beforeEvery(d.time(), outcomes)
+                                && withdrawals.stream().allMatch(w -> {
                             Integer order = Structural.compareLiterals(d.time(), w);
                             return order != null && order > 0;
                         })) {

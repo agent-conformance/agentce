@@ -979,21 +979,17 @@ class Builder {
   private mapOversight(events: Event[]): Map<string, boolean> {
     const byHuman = new Map<string, boolean>();
     const actionTimes = new Map<string, string[]>();
-    const effectTimes = new Map<string, string[]>();
+    const outcomeTimes = new Map<string, string[]>();
     // decision -> human -> that human's decisions on it: [node, time, approve]
     const decided = new Map<string, Map<string, Array<[string, string, boolean]>>>();
-    const push = (map: Map<string, string[]>, decision: string, time: string): void => {
-      const times = map.get(decision) ?? [];
-      times.push(time);
-      map.set(decision, times);
-    };
     for (const event of events) {
       const decision = refsOf(event).decision;
       const ptype = this.ptype(event);
       if ((ptype === "ToolCall" || ptype === "Outcome") && typeof decision === "string") {
-        const time = String(event.time ?? "");
-        push(effectTimes, decision, time);
-        if (ptype === "ToolCall") push(actionTimes, decision, time);
+        const map = ptype === "ToolCall" ? actionTimes : outcomeTimes;
+        const times = map.get(decision) ?? [];
+        times.push(String(event.time ?? ""));
+        map.set(decision, times);
       }
     }
     for (const event of events) {
@@ -1030,7 +1026,7 @@ class Builder {
     }
     for (const [decision, byActor] of decided) {
       const actions = actionTimes.get(decision) ?? [];
-      const effects = effectTimes.get(decision) ?? [];
+      const outcomes = outcomeTimes.get(decision) ?? [];
       for (const [key, records] of byActor) {
         const withdrawals = records
           .filter(([, time, approve]) => !approve && !afterEvery(time, actions))
@@ -1038,7 +1034,8 @@ class Builder {
         for (const [node, time, approve] of records) {
           if (
             !approve ||
-            !beforeEvery(time, effects) ||
+            !beforeEvery(time, actions) ||
+            !beforeEvery(time, outcomes) ||
             !withdrawals.every((w) => compareLiterals(time, w) === 1)
           ) {
             continue;

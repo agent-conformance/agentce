@@ -3405,8 +3405,8 @@
         {
           "description": "TypeScript counts a verified approval toward OVS-08's distinct approvers whatever its outcome",
           "file": "engines/typescript/src/graph.ts",
-          "search": "          if (\n            !approve ||\n            !beforeEvery(time, effects) ||\n            !withdrawals.every((w) => compareLiterals(time, w) === 1)\n          ) {\n            continue;\n          }\n          this.store.addEdge(decision, \"agentce:approvedBy\", node);\n          let approvers",
-          "replace": "          if (\n            approve &&\n            beforeEvery(time, effects) &&\n            withdrawals.every((w) => compareLiterals(time, w) === 1)\n          ) {\n            this.store.addEdge(decision, \"agentce:approvedBy\", node);\n          }\n          let approvers"
+          "search": "          if (\n            !approve ||\n            !beforeEvery(time, actions) ||\n            !beforeEvery(time, outcomes) ||\n            !withdrawals.every((w) => compareLiterals(time, w) === 1)\n          ) {\n            continue;\n          }\n          this.store.addEdge(decision, \"agentce:approvedBy\", node);\n          let approvers",
+          "replace": "          if (\n            approve &&\n            beforeEvery(time, actions) &&\n            beforeEvery(time, outcomes) &&\n            withdrawals.every((w) => compareLiterals(time, w) === 1)\n          ) {\n            this.store.addEdge(decision, \"agentce:approvedBy\", node);\n          }\n          let approvers"
         },
         {
           "description": "Java records every verified approval as an approve whatever its outcome (CND-02, nist-ai-rmf OVS-08)",
@@ -3663,8 +3663,8 @@
         {
           "description": "Python compares the approval and Outcome times as text, so an approval written in another offset that sorts earlier as text gates a decision that took effect before it",
           "file": "engines/python/agentce/graph.py",
-          "search": "                    and _before_every(time, effect_times.get(decision, ()))\n",
-          "replace": "                    and all(time <= t for t in effect_times.get(decision, ()))\n"
+          "search": "                    and _before_every(time, outcomes)\n",
+          "replace": "                    and all(time <= t for t in outcomes)\n"
         },
         {
           "description": "TypeScript leaves the decision's Outcomes out of the approval bound (CND-02, OVS-08)",
@@ -3675,8 +3675,8 @@
         {
           "description": "TypeScript compares the approval and Outcome times as text",
           "file": "engines/typescript/src/graph.ts",
-          "search": "            !beforeEvery(time, effects) ||\n",
-          "replace": "            !effects.every((e) => compareLiterals(time, e) !== null && time <= e) ||\n"
+          "search": "            !beforeEvery(time, outcomes) ||\n",
+          "replace": "            !outcomes.every((e) => compareLiterals(time, e) !== null && time <= e) ||\n"
         },
         {
           "description": "Java leaves the decision's Outcomes out of the approval bound (CND-02, OVS-08)",
@@ -3687,8 +3687,8 @@
         {
           "description": "Java compares the approval and Outcome times as text",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
-          "search": "if (d.approve() && beforeEvery(d.time(), effects) &&",
-          "replace": "if (d.approve() && effects.stream().allMatch(e -> Structural.compareLiterals(d.time(), e) != null && d.time().compareTo(e) <= 0) &&"
+          "search": "beforeEvery(d.time(), outcomes)",
+          "replace": "outcomes.stream().allMatch(e -> Structural.compareLiterals(d.time(), e) != null && d.time().compareTo(e) <= 0)"
         }
       ]
     }
