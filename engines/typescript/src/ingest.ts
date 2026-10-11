@@ -25,6 +25,7 @@ import { InputError } from "./errors";
 import { parseJson } from "./json";
 import { QuarantineReason, type QuarantineRecord } from "./quarantine";
 import { eventTypes, validateEvent } from "./schema";
+import { compareInstants } from "./structural";
 import { byteCompare, decodeUtf8Strict } from "./util";
 import { MAX_JSON_DEPTH } from "./verify";
 
@@ -205,6 +206,17 @@ function streamOf(event: Record<string, unknown>): string {
     }
   }
   return String(event.source ?? "");
+}
+
+/**
+ * Whether `time` is before `previous`, compared as instants (SPEC §6.7), so a UTC offset or a
+ * fraction of a second never puts a later record before an earlier one (18.145). Two times that are
+ * not comparable instants (not date-times, or one naive and one aware) keep the byte order ingest
+ * has always used.
+ */
+function precedes(time: string, previous: string): boolean {
+  const order = compareInstants(time, previous);
+  return order === null ? byteCompare(time, previous) < 0 : order < 0;
 }
 
 function optStr(event: Record<string, unknown>, key: string): string | undefined {
@@ -392,7 +404,7 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
     const orderKey = JSON.stringify([source, stream]);
     const timeValue = String(event.time);
     const previous = lastTime.get(orderKey);
-    if (previous !== undefined && byteCompare(timeValue, previous) < 0) {
+    if (previous !== undefined && precedes(timeValue, previous)) {
       const late = readable(
         {
           reason: QuarantineReason.TIME_ORDER,

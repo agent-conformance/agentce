@@ -198,6 +198,26 @@ class IngestTest {
     }
 
     @Test
+    void timeOrderComparesTimesAsInstants(@TempDir Path tempDir) throws IOException {
+        // 18.145: 00:30 two hours behind UTC is 02:30Z, after 01:00Z; 01:30 two hours ahead is 23:30Z the day before.
+        ObjectNode first = Fixtures.buildIngestEvent(SOURCE, "enforcement_point", "e1", "s1");
+        first.put("time", "2026-01-10T01:00:00Z");
+        ObjectNode later = Fixtures.buildIngestEvent(SOURCE, "enforcement_point", "e2", "s1");
+        later.put("time", "2026-01-10T00:30:00-02:00");
+        ObjectNode earlier = Fixtures.buildIngestEvent(SOURCE, "enforcement_point", "e3", "s1");
+        earlier.put("time", "2026-01-10T01:30:00+02:00");
+        ArrayNode sources = Json.nodes().arrayNode();
+        sources.addObject().put("id", SOURCE).put("class", "enforcement_point");
+        Ingest.Result result =
+                Ingest.ingest(Fixtures.writeIngestBundle(tempDir, List.of(first, later, earlier), sources));
+        assertEquals(List.of(first, later), result.accepted);
+        assertEquals(1, result.quarantined.size());
+        ObjectNode q = result.quarantined.get(0).toJson();
+        assertEquals("e3", q.get("event_id").asText());
+        assertEquals("time_order", q.get("reason").asText());
+    }
+
+    @Test
     void withheldListsTheQuarantinedRecordsThatMayHoldEvidence(@TempDir Path tempDir) throws IOException {
         // 18.119: a record refused for where it sits stays readable (read with the declared class); one ingest
         // cannot read has no event; an identical redelivery holds nothing new.

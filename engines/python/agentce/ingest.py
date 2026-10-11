@@ -30,6 +30,7 @@ from .quarantine import QuarantineReason, QuarantineRecord
 from .safe_json import JSONError, load_json
 from .schema import event_types, validate_event
 from .signing import MAX_JSON_DEPTH
+from .structural import compare_instants
 
 #: Default maximum size of a single event line, in bytes (SPEC App. F ``oversize``).
 DEFAULT_MAX_EVENT_BYTES = 1_048_576
@@ -88,6 +89,14 @@ def _stream_of(event: dict[str, Any]) -> str:
             if isinstance(stream, str) and stream:
                 return stream
     return str(event.get("source", ""))
+
+
+def _precedes(time: str, previous: str) -> bool:
+    """Whether ``time`` is before ``previous``, compared as instants (SPEC §6.7), so a UTC offset or a fraction of a
+    second never puts a later record before an earlier one (18.145). Two times that are not comparable instants (not
+    date-times, or one naive and one aware) keep the byte order ingest has always used."""
+    order = compare_instants(time, previous)
+    return time < previous if order is None else order < 0
 
 
 def ingest(
@@ -290,7 +299,7 @@ def ingest(
         order_key = (source, stream)
         time_value = str(event["time"])
         previous = last_time.get(order_key)
-        if previous is not None and time_value < previous:
+        if previous is not None and _precedes(time_value, previous):
             late = _readable(
                 QuarantineRecord(
                     QuarantineReason.TIME_ORDER,

@@ -138,6 +138,28 @@ def test_a_record_never_joins_another_sources_time_order_by_claiming_its_stream(
     assert result.quarantined == []
 
 
+def test_time_order_compares_times_as_instants(
+    make_bundle: Callable[..., Any],
+    clone: Callable[[dict[str, Any]], dict[str, Any]],
+    example_event: dict[str, Any],
+) -> None:
+    # 18.145: 00:30 two hours behind UTC is 02:30Z, after 01:00Z, so it is not quarantined; 01:30 two hours ahead of
+    # UTC is 23:30Z the day before, so it is.
+    first, later, earlier = (clone(example_event) for _ in range(3))
+    for event, ident, time in (
+        (first, "a", "2026-01-10T01:00:00Z"),
+        (later, "b", "2026-01-10T00:30:00-02:00"),
+        (earlier, "c", "2026-01-10T01:30:00+02:00"),
+    ):
+        event["id"] = ident * 64
+        event["time"] = time
+    result = _ingest(make_bundle, [first, later, earlier])
+    assert [e["id"] for e in result.accepted] == [first["id"], later["id"]]
+    assert [(q.event_id, q.reason) for q in result.quarantined] == [
+        (earlier["id"], QuarantineReason.TIME_ORDER)
+    ]
+
+
 def test_unknown_source(
     make_bundle: Callable[..., Any], example_event: dict[str, Any]
 ) -> None:

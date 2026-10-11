@@ -165,6 +165,15 @@ export function compareLiterals(a: string, b: string): -1 | 0 | 1 | null {
     const ib = BigInt(b);
     return ia < ib ? -1 : ia > ib ? 1 : 0;
   }
+  return compareInstants(a, b);
+}
+
+/**
+ * Order two `xsd:dateTime` lexical forms as instants (SPEC §6.7): -1, 0, 1, or null when either is
+ * not a date-time or one is aware and the other naive. A UTC offset is applied, and fractions
+ * compare exactly.
+ */
+export function compareInstants(a: string, b: string): -1 | 0 | 1 | null {
   const da = parseDatetime(a);
   const db = parseDatetime(b);
   if (da === null || db === null || da.aware !== db.aware) {

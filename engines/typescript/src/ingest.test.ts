@@ -295,6 +295,25 @@ test("a record never joins another source's time order by claiming its stream (1
   assert.deepEqual(result.quarantined, []);
 });
 
+test("time order compares times as instants (18.145)", () => {
+  // 00:30 two hours behind UTC is 02:30Z, after 01:00Z; 01:30 two hours ahead is 23:30Z the day before.
+  const genuine = enforcementPointEvent();
+  const at = (id: string, time: string) => ({ ...genuine, id, time });
+  const first = at("evt-first", "2026-01-10T01:00:00Z");
+  const later = at("evt-later", "2026-01-10T00:30:00-02:00");
+  const earlier = at("evt-earlier", "2026-01-10T01:30:00+02:00");
+  const classes: Array<[string, string]> = [[String(genuine.source), "enforcement_point"]];
+  const result = ingest(loadBundle(writeBundle([first, later, earlier], classes)));
+  assert.deepEqual(
+    result.accepted.map((e) => e.id),
+    ["evt-first", "evt-later"],
+  );
+  assert.deepEqual(
+    result.quarantined.map((q) => [q.eventId, q.reason]),
+    [["evt-earlier", "time_order"]],
+  );
+});
+
 test("withheld lists the quarantined records that may hold evidence (18.119)", () => {
   // A record refused for where it sits stays readable; one ingest cannot read has no event; an identical redelivery
   // and an unknown type hold nothing new.

@@ -117,6 +117,16 @@ public final class Ingest {
         return source != null ? source.asText() : "";
     }
 
+    /**
+     * Whether {@code time} is before {@code previous}, compared as instants (SPEC §6.7), so a UTC offset or a fraction
+     * of a second never puts a later record before an earlier one (18.145). Two times that are not comparable instants
+     * (not date-times, or one naive and one aware) keep the byte order ingest has always used.
+     */
+    private static boolean precedes(String time, String previous) {
+        Integer order = Structural.compareInstants(time, previous);
+        return order == null ? Json.byteCompare(time, previous) < 0 : order < 0;
+    }
+
     private static String opt(JsonNode event, String key) {
         JsonNode v = event.get(key);
         return v != null && v.isTextual() ? v.textValue() : null;
@@ -280,7 +290,7 @@ public final class Ingest {
             List<String> orderKey = List.of(candidate.source(), stream);
             String timeValue = event.get("time").asText();
             String previous = lastTime.get(orderKey);
-            if (previous != null && Json.byteCompare(timeValue, previous) < 0) {
+            if (previous != null && precedes(timeValue, previous)) {
                 Withheld late = readable(new Quarantine.Record(Quarantine.Reason.TIME_ORDER)
                         .eventId(eventId)
                         .source(candidate.source())

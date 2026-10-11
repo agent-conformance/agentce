@@ -200,6 +200,14 @@ public final class Structural {
             return Integer.signum(new BigInteger(a.startsWith("+") ? a.substring(1) : a)
                     .compareTo(new BigInteger(b.startsWith("+") ? b.substring(1) : b)));
         }
+        return compareInstants(a, b);
+    }
+
+    /**
+     * Order two {@code xsd:dateTime} lexical forms as instants (SPEC §6.7): -1, 0, 1, or {@code null} when either is
+     * not a date-time or one is aware and the other naive. A UTC offset is applied, and fractions compare exactly.
+     */
+    public static Integer compareInstants(String a, String b) {
         Instant da = parseDatetime(a);
         Instant db = parseDatetime(b);
         if (da == null || db == null || da.aware() != db.aware()) {

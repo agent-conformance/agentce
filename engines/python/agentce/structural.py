@@ -155,6 +155,12 @@ def compare_literals(a: str, b: str) -> int | None:
     if _INTEGER.fullmatch(a) and _INTEGER.fullmatch(b):
         ia, ib = int(a), int(b)
         return (ia > ib) - (ia < ib)
+    return compare_instants(a, b)
+
+
+def compare_instants(a: str, b: str) -> int | None:
+    """Order two ``xsd:dateTime`` lexical forms as instants (SPEC §6.7): ``-1``, ``0``, ``1``, or ``None`` when either
+    is not a date-time or one is aware and the other naive. A UTC offset is applied, and fractions compare exactly."""
     da, db = _parse_datetime(a), _parse_datetime(b)
     if da is None or db is None or da[0] != db[0]:
         return None
