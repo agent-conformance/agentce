@@ -96,6 +96,7 @@ def case(
     profile="eu",
     exit=2,
     integrity=None,
+    streams=None,
 ):
     C[name] = {
         "control": control,
@@ -110,6 +111,8 @@ def case(
     }
     if integrity is not None:
         C[name]["expected"]["integrity"] = integrity
+    if streams is not None:
+        C[name]["streams"] = streams
 
 
 TWO = [idp("s1"), idp("s2", who="u3")]

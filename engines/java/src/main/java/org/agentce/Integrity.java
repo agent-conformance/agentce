@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -143,8 +142,7 @@ public final class Integrity {
         return confined != null && Bundle.safeIsFile(confined);
     }
 
-    private static Result verifyStream(
-            String stream, List<JsonNode> events, List<JsonNode> anchors, Path bundleRoot, boolean shared) {
+    private static Result verifyStream(String stream, List<JsonNode> events, List<JsonNode> anchors, Path bundleRoot) {
         List<JsonNode> blocks = new ArrayList<>();
         for (JsonNode event : events) {
             blocks.add(integrityBlock(event));
@@ -218,11 +216,6 @@ public final class Integrity {
         } else {
             result.status = VERIFIED_WEAK;
         }
-        // A stream id two sources claim: the manifest's anchors and a sig_ref name no source, so neither chain under
-        // that id reads verified, which fails closed rather than let one source's chain borrow another's anchors (18.151).
-        if (shared && result.status.equals(VERIFIED)) {
-            result.status = VERIFIED_WEAK;
-        }
         return result;
     }
 
@@ -253,26 +246,31 @@ public final class Integrity {
      */
     public static List<Result> verifyBundle(List<JsonNode> events, JsonNode manifest, Path bundleRoot) {
         Map<String, List<JsonNode>> anchors = anchorsByStream(manifest);
-        Map<List<String>, List<JsonNode>> grouped = new LinkedHashMap<>();
+        Map<String, Map<String, List<JsonNode>>> grouped = new LinkedHashMap<>();
         for (JsonNode event : events) {
             JsonNode source = event.get("source");
-            List<String> key = List.of(streamKey(event), source != null ? source.asText() : "");
-            grouped.computeIfAbsent(key, k -> new ArrayList<>()).add(event);
+            grouped.computeIfAbsent(streamKey(event), k -> new LinkedHashMap<>())
+                    .computeIfAbsent(source != null ? source.asText() : "", k -> new ArrayList<>())
+                    .add(event);
         }
-        Map<String, Integer> claimers = new HashMap<>();
-        for (List<String> chain : grouped.keySet()) {
-            claimers.merge(chain.get(0), 1, Integer::sum);
-        }
-        List<List<String>> chains = new ArrayList<>(grouped.keySet());
-        chains.sort((a, b) -> {
-            int byStream = Json.byteCompare(a.get(0), b.get(0));
-            return byStream != 0 ? byStream : Json.byteCompare(a.get(1), b.get(1));
-        });
+        List<String> streams = new ArrayList<>(grouped.keySet());
+        streams.sort(Json::byteCompare);
         List<Result> results = new ArrayList<>();
-        for (List<String> chain : chains) {
-            String stream = chain.get(0);
-            results.add(verifyStream(
-                    stream, grouped.get(chain), anchors.getOrDefault(stream, List.of()), bundleRoot, claimers.get(stream) > 1));
+        for (String stream : streams) {
+            Map<String, List<JsonNode>> bySource = grouped.get(stream);
+            List<String> sources = new ArrayList<>(bySource.keySet());
+            sources.sort(Json::byteCompare);
+            for (String source : sources) {
+                Result result = verifyStream(
+                        stream, bySource.get(source), anchors.getOrDefault(stream, List.of()), bundleRoot);
+                // A stream id two sources claim: the manifest's anchors and a sig_ref name no source, so neither chain
+                // under that id reads verified, which fails closed rather than let one source's chain borrow another's
+                // anchors (18.151).
+                if (bySource.size() > 1 && result.status.equals(VERIFIED)) {
+                    result.status = VERIFIED_WEAK;
+                }
+                results.add(result);
+            }
         }
         return results;
     }

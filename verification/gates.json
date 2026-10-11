@@ -3854,38 +3854,38 @@
         {
           "description": "Python keys integrity chains on the claimed stream alone, so the agent's bad-hash record breaks the gateway's chain",
           "file": "engines/python/agentce/integrity.py",
-          "search": "key = (_stream_key(event), str(event.get(\"source\", \"\")))",
-          "replace": "key = (_stream_key(event), \"\")"
+          "search": "str(event.get(\"source\", \"\")), []",
+          "replace": "\"\", []"
         },
         {
           "description": "TypeScript keys integrity chains on the claimed stream alone",
           "file": "engines/typescript/src/integrity.ts",
-          "search": "const key = JSON.stringify([stream, source]);",
-          "replace": "const key = JSON.stringify([stream, \"\"]);"
+          "search": "const source = String(event.source ?? \"\");",
+          "replace": "const source = \"\";"
         },
         {
           "description": "Java keys integrity chains on the claimed stream alone",
           "file": "engines/java/src/main/java/org/agentce/Integrity.java",
-          "search": "List<String> key = List.of(streamKey(event), source != null ? source.asText() : \"\");",
-          "replace": "List<String> key = List.of(streamKey(event), \"\");"
+          "search": ".computeIfAbsent(source != null ? source.asText() : \"\", k -> new ArrayList<>())",
+          "replace": ".computeIfAbsent(\"\", k -> new ArrayList<>())"
         },
         {
           "description": "Python lets a chain under a stream id two sources claim read verified, so the agent's own export_anchored chain borrows the gateway's anchors",
           "file": "engines/python/agentce/integrity.py",
-          "search": "if shared and result.status == IntegrityStatus.VERIFIED.value:",
-          "replace": "if shared and result.status == IntegrityStatus.UNSIGNED.value:"
+          "search": "if len(by_source) > 1 and result.status == IntegrityStatus.VERIFIED.value:",
+          "replace": "if len(by_source) > 1 and result.status == IntegrityStatus.UNSIGNED.value:"
         },
         {
           "description": "TypeScript lets a chain under a shared stream id read verified",
           "file": "engines/typescript/src/integrity.ts",
-          "search": "if (shared && result.status === IntegrityStatus.VERIFIED) {",
-          "replace": "if (shared && result.status === IntegrityStatus.UNSIGNED) {"
+          "search": "if (bySource.size > 1 && result.status === IntegrityStatus.VERIFIED) {",
+          "replace": "if (bySource.size > 1 && result.status === IntegrityStatus.UNSIGNED) {"
         },
         {
           "description": "Java lets a chain under a shared stream id read verified",
           "file": "engines/java/src/main/java/org/agentce/Integrity.java",
-          "search": "if (shared && result.status.equals(VERIFIED)) {",
-          "replace": "if (shared && result.status.equals(UNSIGNED)) {"
+          "search": "if (bySource.size() > 1 && result.status.equals(VERIFIED)) {",
+          "replace": "if (bySource.size() > 1 && result.status.equals(UNSIGNED)) {"
         }
       ]
     },

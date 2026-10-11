@@ -135,7 +135,6 @@ function verifyStream(
   events: Array<Record<string, unknown>>,
   anchors: Array<Record<string, unknown>>,
   bundleRoot: string | null,
-  shared: boolean,
 ): IntegrityResult {
   const blocks = events.map(integrityBlock);
   let strength: string = IntegrityStrength.EXPORT_CHAINED;
@@ -211,11 +210,6 @@ function verifyStream(
     // export_chained: a chain computed after export proves only "unchanged since export".
     result.status = IntegrityStatus.VERIFIED_WEAK;
   }
-  // A stream id two sources claim: the manifest's anchors and a sig_ref name no source, so neither chain under that
-  // id reads verified, which fails closed rather than let one source's chain borrow another's anchors (18.151).
-  if (shared && result.status === IntegrityStatus.VERIFIED) {
-    result.status = IntegrityStatus.VERIFIED_WEAK;
-  }
   return result;
 }
 
@@ -247,36 +241,40 @@ export function verifyBundle(
   bundleRoot: string | null = null,
 ): IntegrityResult[] {
   const anchors = anchorsByStream(manifest);
-  const grouped = new Map<
-    string,
-    { stream: string; source: string; events: Array<Record<string, unknown>> }
-  >();
+  const grouped = new Map<string, Map<string, Array<Record<string, unknown>>>>();
   for (const event of events) {
     const stream = streamKey(event);
     const source = String(event.source ?? "");
-    const key = JSON.stringify([stream, source]);
-    const chain = grouped.get(key);
+    let bySource = grouped.get(stream);
+    if (bySource === undefined) {
+      bySource = new Map();
+      grouped.set(stream, bySource);
+    }
+    const chain = bySource.get(source);
     if (chain === undefined) {
-      grouped.set(key, { stream, source, events: [event] });
+      bySource.set(source, [event]);
     } else {
-      chain.events.push(event);
+      chain.push(event);
     }
   }
 
-  const claimers = new Map<string, number>();
-  for (const chain of grouped.values()) {
-    claimers.set(chain.stream, (claimers.get(chain.stream) ?? 0) + 1);
+  const results: IntegrityResult[] = [];
+  for (const stream of [...grouped.keys()].sort(byteCompare)) {
+    const bySource = grouped.get(stream) as Map<string, Array<Record<string, unknown>>>;
+    for (const source of [...bySource.keys()].sort(byteCompare)) {
+      const result = verifyStream(
+        stream,
+        bySource.get(source) as Array<Record<string, unknown>>,
+        anchors.get(stream) ?? [],
+        bundleRoot,
+      );
+      // A stream id two sources claim: the manifest's anchors and a sig_ref name no source, so neither chain under
+      // that id reads verified, which fails closed rather than let one source's chain borrow another's anchors (18.151).
+      if (bySource.size > 1 && result.status === IntegrityStatus.VERIFIED) {
+        result.status = IntegrityStatus.VERIFIED_WEAK;
+      }
+      results.push(result);
+    }
   }
-  const chains = [...grouped.values()].sort(
-    (a, b) => byteCompare(a.stream, b.stream) || byteCompare(a.source, b.source),
-  );
-  return chains.map((chain) =>
-    verifyStream(
-      chain.stream,
-      chain.events,
-      anchors.get(chain.stream) ?? [],
-      bundleRoot,
-      (claimers.get(chain.stream) ?? 0) > 1,
-    ),
-  );
+  return results;
 }

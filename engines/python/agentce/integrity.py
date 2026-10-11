@@ -17,7 +17,6 @@ verified cryptographically with SHA-256.
 from __future__ import annotations
 
 import copy
-from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -118,7 +117,6 @@ def _verify_stream(
     *,
     bundle_root: Path | None,
     clock_skew_seconds: int,
-    shared: bool,
 ) -> IntegrityResult:
     blocks = [_integrity(e) for e in events]
     strength = next(
@@ -181,10 +179,6 @@ def _verify_stream(
         )
     else:  # export_chained: a chain computed after export proves only "unchanged since export".
         result.status = IntegrityStatus.VERIFIED_WEAK.value
-    # A stream id two sources claim: the manifest's anchors and a sig_ref name no source, so neither chain under that
-    # id reads verified, which fails closed rather than let one source's chain borrow another's anchors (18.151).
-    if shared and result.status == IntegrityStatus.VERIFIED.value:
-        result.status = IntegrityStatus.VERIFIED_WEAK.value
     return result
 
 
@@ -213,24 +207,29 @@ def verify_bundle(
     own source (SPEC §6.6), so a record never joins, or breaks, another source's chain by naming it, and no chain under
     an id two sources claim reads verified (18.151)."""
     anchors_by_stream = _anchors_by_stream(manifest)
-    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    grouped: dict[str, dict[str, list[dict[str, Any]]]] = {}
     for event in events:
-        key = (_stream_key(event), str(event.get("source", "")))
-        grouped.setdefault(key, []).append(event)
-    claimers = Counter(stream for stream, _ in grouped)
+        grouped.setdefault(_stream_key(event), {}).setdefault(
+            str(event.get("source", "")), []
+        ).append(event)
 
     results = []
-    for stream, source in sorted(grouped):
-        results.append(
-            _verify_stream(
+    for stream in sorted(grouped):
+        by_source = grouped[stream]
+        for source in sorted(by_source):
+            result = _verify_stream(
                 stream,
-                grouped[stream, source],
+                by_source[source],
                 anchors_by_stream.get(stream, []),
                 bundle_root=bundle_root,
                 clock_skew_seconds=clock_skew_seconds,
-                shared=claimers[stream] > 1,
             )
-        )
+            # A stream id two sources claim: the manifest's anchors and a sig_ref name no source, so neither chain
+            # under that id reads verified, which fails closed rather than let one source's chain borrow another's
+            # anchors (18.151).
+            if len(by_source) > 1 and result.status == IntegrityStatus.VERIFIED.value:
+                result.status = IntegrityStatus.VERIFIED_WEAK.value
+            results.append(result)
     return results
 
 

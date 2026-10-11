@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from approval_events import C, CHAIN, NC, SUBJECT, appr, case, dec, ev, idp, ran, write  # noqa: E402
+from approval_events import CHAIN, NC, SUBJECT, appr, case, dec, ev, idp, ran, write  # noqa: E402
 
 EP = "urn:src:enforcement_point"
 LATER = "2026-01-10T01:00:00Z"
@@ -191,24 +191,40 @@ UNCHAINED = [
     {"stream": fallback("independent_system"), "status": "failed"},
     {"stream": fallback("self_report"), "status": "failed"},
 ]
-head, tail = gateway()
-case(
-    "integrity-chain-no-hijack",
-    "CND-02",
-    [dec(), head, note(), tail, idp(), appr("reject")],
-    NC,
-    ["d1"],
-    integrity=UNCHAINED + [{"stream": GW, "status": "verified_weak"}],
+
+
+def integrity_case(name, middle, integrity, strength="export_chained", anchor_at=None):
+    """The gateway's two-link GW chain with `middle` (the agent's Decision) read between them; anchor_at, if given,
+    makes the manifest anchor GW's head at that time."""
+    head, tail = gateway(strength)
+    streams = None
+    if anchor_at is not None:
+        streams = [
+            {
+                "stream": GW,
+                "anchors": [
+                    {"kind": "rfc3161", "ref": "anchors/gw-head.tsr", "at": anchor_at}
+                ],
+            }
+        ]
+    case(
+        name,
+        "CND-02",
+        [dec(), head, middle, tail, idp(), appr("reject")],
+        NC,
+        ["d1"],
+        integrity=UNCHAINED + integrity,
+        streams=streams,
+    )
+
+
+integrity_case(
+    "integrity-chain-no-hijack", note(), [{"stream": GW, "status": "verified_weak"}]
 )
-head, tail = gateway()
-case(
+integrity_case(
     "integrity-chain-hijack",
-    "CND-02",
-    [dec(), head, note(stream=GW), tail, idp(), appr("reject")],
-    NC,
-    ["d1"],
-    integrity=UNCHAINED
-    + [{"stream": GW, "status": "verified_weak"}, {"stream": GW, "status": "failed"}],
+    note(stream=GW),
+    [{"stream": GW, "status": "verified_weak"}, {"stream": GW, "status": "failed"}],
 )
 
 
@@ -217,22 +233,8 @@ case(
 # and its real hash), so it forms a chain that would borrow GW's anchors: with two sources on one id, neither chain
 # reads verified (fails closed), and an anchor earlier than the records still marks every chain time_suspect.
 def anchored(name, at, hijack, integrity):
-    head, tail = gateway("export_anchored")
     middle = chained(note(), "0" * 64, "export_anchored") if hijack else note()
-    case(
-        name,
-        "CND-02",
-        [dec(), head, middle, tail, idp(), appr("reject")],
-        NC,
-        ["d1"],
-        integrity=UNCHAINED + integrity,
-    )
-    C[name]["streams"] = [
-        {
-            "stream": GW,
-            "anchors": [{"kind": "rfc3161", "ref": "anchors/gw-head.tsr", "at": at}],
-        }
-    ]
+    integrity_case(name, middle, integrity, "export_anchored", at)
 
 
 ANCHOR_AT = "2026-01-10T02:00:00Z"
