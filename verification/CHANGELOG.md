@@ -3,6 +3,17 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.92.0
+
+- `VG-APPROVAL-REFS-RESOLVED` (18.157, changed) now also covers a `refs.decision` that is present and null. Each engine
+  skipped a ToolCall or Outcome with `"decision": null`, so an approve logged after it still gated the decision and
+  CND-02 and OVS-08 read conformant. The same records naming `d1` or an unknown id read non-conformant. A null now names no
+  held decision, so its time bounds the approvals of every held decision, as an unknown name has since 18.148; it
+  withdraws none. A ToolCall or Outcome with no `refs.decision` key is still no decision's action. The gate grows from
+  31 to 40 cases (four null-effect cases that read conformant before the fix, a later null ToolCall that bounds nothing,
+  a reject after a null ToolCall, a null on the approval, and two cases with no decision reference) and from ten to
+  thirteen seeded faults: each engine skipping a null again.
+
 ## 0.91.0
 
 - `VG-APPROVAL-REFS-RESOLVED` (18.148, new, tier quick) checks that the approval bound reads every `refs.decision` as

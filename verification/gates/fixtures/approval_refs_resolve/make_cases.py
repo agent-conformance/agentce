@@ -367,4 +367,82 @@ case(
     "conformant",
 )
 
+# A present refs.decision that is null names no held decision, so a ToolCall or Outcome carrying it may be any
+# decision's effect and bounds every held decision's approvals, as an unheld name does (18.157); it withdraws none.
+# A ToolCall or Outcome with no refs.decision key makes no claim and stays no decision's action.
+case(
+    "cnd02-approve-after-toolcall-null-decision",
+    "CND-02",
+    [dec(), run_at(at(1), None), login_at(at(4)), approve_at(at(5))],
+    NC,
+    ["d1"],
+)
+cnd02(
+    "cnd02-approve-after-outcome-null-decision",
+    [dec(), outcome_at(at(1), None), login_at(at(4)), approve_at(at(5))],
+    NC,
+    ["d1"],
+)
+case(
+    "ovs08-approve-after-outcome-null-decision",
+    "OVS-08",
+    [dec(), outcome_at(at(1), None), login_at(at(4)), approve_at(at(5))],
+    NC,
+    ["d1"],
+)
+case(
+    "cnd02-approve-before-null-decision-toolcall",
+    "CND-02",
+    [dec(), login_at(at(1)), approve_at(at(1)), run_at(at(2), None)],
+    "conformant",
+)
+cnd02(
+    "cnd02-null-outcome-bounds-every-decision",
+    [
+        dec(),
+        dec("d2"),
+        outcome_at(at(1), None),
+        login_at(at(4)),
+        approve_at(at(5)),
+        approve_at(at(5), ref("d2"), i="a2"),
+    ],
+    NC,
+    ["d1", "d2"],
+)
+case(
+    "cnd02-reject-after-null-decision-toolcall-still-withdraws",
+    "CND-02",
+    [
+        dec(),
+        login_at(at(1)),
+        approve_at(at(1)),
+        run_at(at(2), None),
+        reject_at(at(3), i="a2"),
+    ],
+    NC,
+    ["d1"],
+)
+cnd02(
+    "cnd02-approve-null-decision",
+    [dec(), login_at(at(1)), approve_at(at(1), None)],
+    NC,
+    ["d1"],
+)
+case(
+    "cnd02-approve-after-toolcall-without-decision-ref",
+    "CND-02",
+    [
+        dec(),
+        ev("t1", "ToolCall", at=at(1), tool={"name": "x"}, refs={}),
+        login_at(at(4)),
+        approve_at(at(5)),
+    ],
+    "conformant",
+)
+cnd02(
+    "cnd02-approve-after-outcome-without-refs",
+    [dec(), ev("o1", "Outcome", at=at(1)), login_at(at(4)), approve_at(at(5))],
+    "conformant",
+)
+
 write()
