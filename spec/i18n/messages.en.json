@@ -3,7 +3,7 @@
   "errors.class_mismatch.fix": "ask whoever wrote the source adapter to align the emitted agentceSourceClass with the profile's declared class.",
   "errors.context_mismatch.cause": "the event's JSON-LD @context is not the canonical evidence context.",
   "errors.context_mismatch.fix": "ask whoever wrote the source adapter to set @context to https://agent-conformance.org/contexts/evidence/v1.",
-  "errors.duplicate_id.cause": "two events share the same id; the later one was quarantined.",
+  "errors.duplicate_id.cause": "two events share the same id; the one from the lower trust class was quarantined, or the later one if both have the same class.",
   "errors.duplicate_id.fix": "ask whoever instruments the source to give every event a stable, unique id.",
   "errors.environment.cryptography_source_build.cause": "cryptography was built from source because no prebuilt wheel is published for this platform.",
   "errors.environment.cryptography_source_build.fix": "install Rust and OpenSSL 3 before `uv sync` (macOS: `brew install openssl@3`, then set OPENSSL_DIR to its prefix).",

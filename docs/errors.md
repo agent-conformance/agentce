@@ -192,7 +192,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 |---|---|---|
 | `class_mismatch` | the event's source class differs from the class declared for its source. | ask whoever wrote the source adapter to align the emitted agentceSourceClass with the profile's declared class. |
 | `context_mismatch` | the event's JSON-LD @context is not the canonical evidence context. | ask whoever wrote the source adapter to set @context to https://agent-conformance.org/contexts/evidence/v1. |
-| `duplicate_id` | two events share the same id; the later one was quarantined. | ask whoever instruments the source to give every event a stable, unique id. |
+| `duplicate_id` | two events share the same id; the one from the lower trust class was quarantined, or the later one if both have the same class. | ask whoever instruments the source to give every event a stable, unique id. |
 | `oversize` | the event exceeds the size limit and was refused. | ask whoever wrote the source adapter to reference bulk content by an opaque locator instead of inlining it (SPEC R12). |
 | `schema_invalid` | an event failed schema validation and was not ingested. | ask whoever wrote the emitter or adapter to fix it so the event matches agentce-evidence.schema.json. |
 | `time_order` | an event's timestamp is out of order within its stream. | ask whoever instruments the source to emit events in time order, or correct the source clock. |
