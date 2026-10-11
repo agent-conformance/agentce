@@ -721,6 +721,36 @@ test("a bare id names the decision in the approval bound, and an unresolved effe
   }
 });
 
+test("a bare decision ref links every decision edge, read before its Decision (18.156)", () => {
+  const d1 = "agentce:event/d1";
+  const events: Record<string, unknown>[] = [
+    memoryEvent("t0", "ToolCall", { refs: { decision: "d1" } }),
+    memoryEvent("o1", "Outcome", { refs: { decision: " d1" } }),
+    memoryEvent("v1", "Override", { refs: { decision: `${d1}\t` } }),
+    memoryEvent("x1", "Interrupt", { refs: { decision: "d1" } }),
+    memoryEvent("n1", "Notice", { refs: { decision: "\u00a0d1 " } }),
+    memoryEvent("t1", "ToolCall", { refs: { decision: "nope" } }),
+    decisionEvent("d1"),
+  ];
+  const store = buildGraph(events, { domain: MINOR_DOMAIN });
+  assert.deepEqual(store.objects("agentce:event/t0", "agentce:executes"), [d1]);
+  for (const [predicate, node] of [
+    ["agentce:resultedIn", "o1"],
+    ["agentce:overriddenBy", "v1"],
+    ["agentce:interruptedBy", "x1"],
+    ["agentce:notifiedBy", "n1"],
+  ]) {
+    assert.deepEqual(store.objects(d1, predicate), [`agentce:event/${node}`], predicate);
+  }
+  assert.deepEqual(store.literalValues("agentce:event/t0", "agentce:executesConsequential"), [
+    "true",
+  ]);
+  assert.deepEqual(store.literalValues("agentce:event/t1", "agentce:executesConsequential"), [
+    "false",
+  ]);
+  assert.deepEqual(store.objects("agentce:event/t1", "agentce:executes"), ["nope"]);
+});
+
 test("a null decision ref bounds every approval, and an absent one bounds none (18.157)", () => {
   const d1 = "agentce:event/d1";
   for (const [data, approved] of [

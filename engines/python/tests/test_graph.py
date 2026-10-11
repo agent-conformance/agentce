@@ -1049,6 +1049,39 @@ def test_a_null_decision_ref_bounds_every_approval() -> None:
         ), refs
 
 
+def test_a_bare_decision_ref_links_every_decision_edge() -> None:
+    """Every glue read of refs.decision resolves it as approvedBy does (18.156): records naming the decision by bare id
+    or padded, read before the Decision itself, still build each edge to its IRI and mark the ToolCall as executing a
+    consequential decision; a name for no held Decision links none."""
+    d1 = event_iri("d1")
+    linked = [
+        _event("t0", "ToolCall", {"refs": {"decision": "d1"}}),
+        _event("o1", "Outcome", {"refs": {"decision": " d1"}}),
+        _event("v1", "Override", {"refs": {"decision": f"{d1}\t"}}),
+        _event("x1", "Interrupt", {"refs": {"decision": "d1"}}),
+        _event("n1", "Notice", {"refs": {"decision": "\u00a0d1 "}}),
+        _event("t1", "ToolCall", {"refs": {"decision": "nope"}}),
+    ]
+    store = build_graph(
+        [*linked, decision("d1", "2026-01-10T00:00:00Z")], domain=DOMAIN
+    )
+    assert store.objects(event_iri("t0"), "agentce:executes") == [d1]
+    for predicate, node in (
+        ("agentce:resultedIn", "o1"),
+        ("agentce:overriddenBy", "v1"),
+        ("agentce:interruptedBy", "x1"),
+        ("agentce:notifiedBy", "n1"),
+    ):
+        assert store.objects(d1, predicate) == [event_iri(node)], predicate
+    assert store.literal_values(event_iri("t0"), "agentce:executesConsequential") == [
+        "true"
+    ]
+    assert store.literal_values(event_iri("t1"), "agentce:executesConsequential") == [
+        "false"
+    ]
+    assert store.objects(event_iri("t1"), "agentce:executes") == ["nope"]
+
+
 def test_a_later_reject_by_the_same_human_withdraws_the_approval() -> None:
     """Each human's most recent decision before the action governs (18.142): the same human's reject or edit at or
     after an approve, or at a time that cannot be placed against it, withdraws it unless it came after every ToolCall;

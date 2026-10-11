@@ -595,6 +595,36 @@ class GraphTest {
     }
 
     @Test
+    void aBareDecisionRefLinksEveryDecisionEdge() {
+        // Every glue read of refs.decision resolves it as approvedBy does (18.156): records naming the decision by bare
+        // id or padded, read before the Decision itself, still build each edge to its IRI; a name for no held
+        // Decision links none.
+        String d1 = "agentce:event/d1";
+        List<JsonNode> events = List.of(
+                event("t0", "ToolCall", "\"refs\": {\"decision\": \"d1\"}"),
+                event("o1", "Outcome", "\"refs\": {\"decision\": \" d1\"}"),
+                event("v1", "Override", "\"refs\": {\"decision\": \"agentce:event/d1\\t\"}"),
+                event("x1", "Interrupt", "\"refs\": {\"decision\": \"d1\"}"),
+                event("n1", "Notice", "\"refs\": {\"decision\": \"\\u00a0d1 \"}"),
+                event("t1", "ToolCall", "\"refs\": {\"decision\": \"nope\"}"),
+                decisionEvent("d1"));
+        GraphStore store = Graph.buildGraph(events, DomainBinding.fromDict(CREDIT_DOMAIN));
+        assertEquals(List.of(d1), store.objects("agentce:event/t0", "agentce:executes"));
+        String[][] edges = {
+            {"agentce:resultedIn", "o1"},
+            {"agentce:overriddenBy", "v1"},
+            {"agentce:interruptedBy", "x1"},
+            {"agentce:notifiedBy", "n1"},
+        };
+        for (String[] e : edges) {
+            assertEquals(List.of("agentce:event/" + e[1]), store.objects(d1, e[0]), e[0]);
+        }
+        assertEquals(List.of("true"), store.literalValues("agentce:event/t0", "agentce:executesConsequential"));
+        assertEquals(List.of("false"), store.literalValues("agentce:event/t1", "agentce:executesConsequential"));
+        assertEquals(List.of("nope"), store.objects("agentce:event/t1", "agentce:executes"));
+    }
+
+    @Test
     void aNullDecisionRefBoundsEveryApproval() {
         // A present null refs.decision names no held decision, so it bounds the approve; an Outcome with no
         // refs.decision key, or no refs, is no decision's effect (18.157).
