@@ -312,4 +312,46 @@ case(
     "conformant",
 )
 
+# OVS-07 (verifier 18.148 r1): an Interrupt's human-actor check still counts the agents of the event its
+# refs.decision names when that event is no Decision, so a login from that agent's own session is no human's login.
+WORKER = "spiffe://corp/agents/worker"
+
+
+def interrupt_on(target, login):
+    """A ToolCall t2 by the worker agent, and an Interrupt by u2 through `login` whose refs.decision names `target`."""
+    run = ev("t2", "ToolCall", tool={"name": "x"})
+    run["data"]["agent"] = {"id": WORKER}
+    stop = ev(
+        "x1",
+        "Interrupt",
+        mechanism="kill_switch",
+        effect="halted",
+        actor={"id": "u2", "kind": "human", "authority_ref": "ref:authority/reviewers"},
+        session_ref=ref("s2"),
+        refs={"decision": target},
+    )
+    stop["data"]["agent"] = {"id": "spiffe://corp/agents/other"}
+    return [dec(), login, run, stop]
+
+
+def worker_login():
+    login = idp("s2")
+    login["data"]["agent"] = {"id": WORKER}
+    return login
+
+
+case(
+    "ovs07-interrupt-names-toolcall-login-is-its-agent",
+    "OVS-07",
+    interrupt_on(ref("t2"), worker_login()),
+    NC,
+    ["x1"],
+)
+case(
+    "ovs07-interrupt-names-toolcall-idp-login",
+    "OVS-07",
+    interrupt_on(ref("t2"), idp("s2")),
+    "conformant",
+)
+
 write()

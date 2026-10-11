@@ -3379,7 +3379,7 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/approval_outcome/cases.json (27: CND-02 with an approve, a reject, an edit, no outcome and the out-of-enum spelling 'approved' (quarantined), a reject by the agent itself, a reject and an approve by two verified humans in both orders, an approve that names another decision, a reject with no enforcement-point call; eu-ai-act OVS-08 with an approve, a reject, an edit and no outcome, and under dual control two approves, an approve and a reject in both orders and two rejects; nist-ai-rmf OVS-08 with an approve, a reject and no outcome; OVS-01, RSK-02 and INC-03 each counting a reject as a review, and OVS-01 refusing a reject by the agent) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "pass": "every case in verification/gates/fixtures/approval_outcome/cases.json (25: CND-02 with an approve, a reject, an edit, no outcome and the out-of-enum spelling 'approved' (quarantined), a reject by the agent itself, a reject and an approve by two verified humans in both orders, an approve that names another decision, a reject with no enforcement-point call; eu-ai-act OVS-08 with an approve, a reject, an edit and no outcome, and under dual control two approves, an approve and a reject in both orders and two rejects; nist-ai-rmf OVS-08 with an approve, a reject and no outcome; OVS-01, RSK-02 and INC-03 each counting a reject as a review, and OVS-01 refusing a reject by the agent) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
         "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
       },
       "fix_hint": "Run verification/gates/approval_outcome.sh; it names the engine, the case and what it gave against what was expected. The outcome test sits in each engine's graph builder beside the human-actor rule: the agentce:approvedBy edge and human_approvers / humanApprovers, which OVS-08's oversightCoverageComplete counts.",
@@ -3649,7 +3649,7 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/approval_outcome_bound/cases.json (20: CND-02 and OVS-08 with the approve after the decision's Outcome and no ToolCall of the decision, before it, at the same instant and one second after, an Outcome before a ToolCall with the approve between them, the approve between two Outcomes, after or before in another offset whose text sorts the other way, an approval time with no offset, a self-reported Outcome, , an Outcome listed after the approval but earlier in time, dual control with one approver after the Outcome and both before, OVS-01 counting a late approval as a review, and a reject after the Outcome still withdrawing) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "pass": "every case in verification/gates/fixtures/approval_outcome_bound/cases.json (20: CND-02 and OVS-08 with the approve after the decision's Outcome and no ToolCall of the decision, before it, at the same instant and one second after, an Outcome before a ToolCall with the approve between them, the approve between two Outcomes, after or before in another offset whose text sorts the other way, an approval time with no offset, a self-reported Outcome, another decision's earlier Outcome, an Outcome listed after the approval but earlier in time, dual control with one approver after the Outcome and both before, OVS-01 counting a late approval as a review, and a reject after the Outcome still withdrawing) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
         "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
       },
       "fix_hint": "Run bash verification/gates/approval_outcome.sh approval_outcome_bound; it names the engine, the case and what it gave against what was expected. The bound sits in each engine's graph builder (_map_oversight / mapOversight): effect_times / effectTimes holds the time of every held ToolCall and Outcome whose refs.decision names the decision, collected before any approval is judged, and _before_every / beforeEvery compares the approve's time with each through the structural literal comparison (instants, never text). Withdrawals still read ToolCall times only (action_times / actionTimes).",
@@ -3954,7 +3954,7 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/approval_refs_resolve/cases.json (27: CND-02 with an approve after an Outcome or ToolCall naming the decision as a bare id, with a trailing space, a leading tab or a leading no-break space; a bare-id approve after the Outcome and before a ToolCall; a padded approve before a bare-id Outcome; a bare-id reject withdrawing; another decision's bare-id Outcome not bounding this one; a reject after a bare-id ToolCall withdrawing nothing; approvals naming an unheld id, another event's id, the IRI in another letter case or only whitespace; an Outcome or ToolCall naming an unheld id, another letter case, a urn:, another held event's bare id or an empty string before the approve, and an unheld Outcome after it; a reject after an unresolved ToolCall still withdrawing; OVS-08 with a bare-id Outcome, dual control with two humans naming the decision in two forms and one human in two forms; OVS-01 counting a bare-id approve as a review) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "pass": "every case in verification/gates/fixtures/approval_refs_resolve/cases.json (29: CND-02 with an approve after an Outcome or ToolCall naming the decision as a bare id, with a trailing space, a leading tab or a leading no-break space; a bare-id approve after the Outcome and before a ToolCall; a padded approve before a bare-id Outcome; a bare-id reject withdrawing; another decision's bare-id Outcome not bounding this one; a reject after a bare-id ToolCall withdrawing nothing; approvals naming an unheld id, another event's id, the IRI in another letter case or only whitespace; an Outcome or ToolCall naming an unheld id, another letter case, a urn:, another held event's bare id or an empty string before the approve, and an unheld Outcome after it; a reject after an unresolved ToolCall still withdrawing; OVS-08 with a bare-id Outcome, dual control with two humans naming the decision in two forms and one human in two forms; OVS-01 counting a bare-id approve as a review; OVS-07 with an Interrupt naming a ToolCall, through a login from that ToolCall's own agent and through the identity provider's) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs",
         "fail": "any case gives another outcome, another set of failing events, another quarantined count or another exit code in any engine"
       },
       "fix_hint": "Run bash verification/gates/approval_outcome.sh approval_refs_resolve; it names the engine, the case and what it gave against what was expected. The resolution is each engine's graph builder _held_decision / heldDecision (the ref, else trimmed of ID_PAD, else agentce:event/<trimmed>, each checked against the held Decisions in decision_time / decisionTime); _map_oversight / mapOversight reads every refs.decision through it and puts the time of a ToolCall or Outcome naming no held decision in unresolved_times / unresolvedTimes, which bounds every approve.",
@@ -4000,6 +4000,24 @@
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "                                && beforeEvery(d.time(), unresolvedTimes)\n",
           "replace": ""
+        },
+        {
+          "description": "Python's human-actor check counts only the resolved decision's agents again, so an Interrupt naming a ToolCall accepts a login from that ToolCall's own agent (OVS-07)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "            name for name in (ref, self._held_decision(ref)) if isinstance(name, str)\n",
+          "replace": "            name for name in (self._held_decision(ref),) if isinstance(name, str)\n"
+        },
+        {
+          "description": "TypeScript's human-actor check counts only the resolved decision's agents again, so an Interrupt naming a ToolCall accepts a login from that ToolCall's own agent (OVS-07)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "    const named = [ref, this.heldDecision(ref)].filter(",
+          "replace": "    const named = [this.heldDecision(ref)].filter("
+        },
+        {
+          "description": "Java's human-actor check counts only the resolved decision's agents again, so an Interrupt naming a ToolCall accepts a login from that ToolCall's own agent (OVS-07)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "List<String> named = Stream.of(str(ref), heldDecision(ref))",
+          "replace": "List<String> named = Stream.of(heldDecision(ref))"
         }
       ]
     }
