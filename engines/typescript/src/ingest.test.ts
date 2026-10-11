@@ -276,8 +276,8 @@ test("a record never joins another source's time order by claiming its stream (1
     data: {
       ...(genuine.data as Record<string, unknown>),
       integrity: {
-        hash: "0".repeat(64),
-        prev: "0".repeat(64),
+        hash: GENESIS_PREV,
+        prev: GENESIS_PREV,
         stream: String(genuine.source),
         strength: "export_chained",
       },

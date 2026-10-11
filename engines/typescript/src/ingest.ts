@@ -5,7 +5,7 @@
  * refused with a stable reason: an oversize line, malformed JSON or a schema violation
  * (`schema_invalid`), an unrecognised type (`unknown_type`), an undeclared source (`unknown_source`),
  * an event whose class differs from the declared one (`class_mismatch`), a repeated id
- * (`duplicate_id`), or an out-of-order timestamp within a stream (`time_order`). Quarantine is an
+ * (`duplicate_id`), or an out-of-order timestamp within a source's stream (`time_order`). Quarantine is an
  * output, never a silent drop. This is a faithful port of the Python reference.
  *
  * A source the manifest declares with no trust class (or a bundle with no manifest classes at all) is

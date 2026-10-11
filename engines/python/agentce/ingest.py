@@ -6,7 +6,7 @@ oversize line, malformed JSON or a schema violation (``schema_invalid``), an unr
 (``unknown_type``), an event from a source the bundle does not declare (``unknown_source``), an event
 whose ``agentcesourceclass`` differs from the class the bundle declares for its source
 (``class_mismatch``, SPEC §6.4), a repeated id (``duplicate_id``), or an out-of-order timestamp within
-a stream (``time_order``). Quarantine is an output, never a silent drop.
+a source's stream (``time_order``). Quarantine is an output, never a silent drop.
 
 A source the manifest declares with no trust class (or a bundle with no manifest classes at all) is
 "undeclared": its events keep flowing, but ``accepted`` never trusts the event's own self-asserted
