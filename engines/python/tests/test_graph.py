@@ -1003,6 +1003,36 @@ def test_an_approve_after_the_outcome_is_a_review_not_an_approval() -> None:
         ), approved_at
 
 
+def test_a_bare_id_names_the_decision() -> None:
+    """The approval bound reads every refs.decision as the held decision it names (18.148): an Outcome naming the
+    decision by bare id or padded bounds an approve that names it by IRI, an approve naming it by bare id approves it,
+    and an Outcome naming no held decision bounds every decision's approvals."""
+    d1 = event_iri("d1")
+    for outcome_ref, approval_ref, approved in (
+        ("d1", d1, False),
+        (f"{d1} ", d1, False),
+        ("\u00a0d1", d1, False),
+        ("AGENTCE:EVENT/D1", d1, False),
+        ("a1", d1, False),
+        (d1, "d1", False),
+        (None, "d1", True),
+        (None, f" {d1}", True),
+    ):
+        approval = _approval("a1", ALICE)
+        approval["data"]["refs"]["decision"] = approval_ref
+        approval["time"] = "2026-01-10T05:00:00Z"
+        events = [decision("d1", "2026-01-10T00:00:00Z"), approval, *LOGINS]
+        if outcome_ref is not None:
+            outcome = _event("o1", "Outcome", {"refs": {"decision": outcome_ref}})
+            outcome["time"] = "2026-01-10T01:00:00Z"
+            events.append(outcome)
+        store = build_graph(events, domain=DOMAIN)
+        assert store.objects(d1, "agentce:reviewedBy") == [event_iri("a1")]
+        assert store.objects(d1, "agentce:approvedBy") == (
+            [event_iri("a1")] if approved else []
+        ), (outcome_ref, approval_ref)
+
+
 def test_a_later_reject_by_the_same_human_withdraws_the_approval() -> None:
     """Each human's most recent decision before the action governs (18.142): the same human's reject or edit at or
     after an approve, or at a time that cannot be placed against it, withdraws it unless it came after every ToolCall;

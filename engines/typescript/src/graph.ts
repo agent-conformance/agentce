@@ -527,7 +527,7 @@ class Builder {
     if (actor === null || typeof login !== "string" || loginInfo === undefined) {
       return null;
     }
-    const decision = refsOf(event).decision;
+    const decision = this.heldDecision(refsOf(event).decision);
     const concerned = new Set([
       ...(this.eventAgents.get(node) ?? []),
       ...((typeof decision === "string" ? this.eventAgents.get(decision) : undefined) ?? []),
@@ -969,28 +969,59 @@ class Builder {
     );
   }
 
+  /** The held decision a `refs.decision` names (SPEC §6.3 approvedBy): its IRI, else the ref trimmed of `ID_PAD` when
+   * that is a held decision's IRI, else `agentce:event/<trimmed ref>` when that is (a bare id); `null` when it names
+   * no held decision. Exact match first, so no name resolves to another held decision. */
+  private heldDecision(ref: unknown): string | null {
+    if (typeof ref !== "string") {
+      return null;
+    }
+    if (this.decisionTime.has(ref)) {
+      return ref;
+    }
+    const trimmed = ruleId(ref) ?? "";
+    for (const name of [trimmed, eventIri(trimmed)]) {
+      if (this.decisionTime.has(name)) {
+        return name;
+      }
+    }
+    return null;
+  }
+
   /** Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An ApprovalDecided
    * reviews the decision it names (`agentce:reviewedBy`; OVS-01, INC-03, RSK-02) only when it does, whatever its
    * outcome; it also approves it (`agentce:approvedBy`; CND-02, OVS-08) only when its outcome is approve, it is
    * recorded at or before every ToolCall that executes the decision (18.141) and every Outcome that names it (18.144:
    * the decision had already taken effect), and the same human recorded no other
    * decision on it at or after it, or at a time that cannot be placed against it, unless that decision came after
-   * every such ToolCall (18.142: each human's most recent decision governs); one that fails it is no human's review. */
+   * every such ToolCall (18.142: each human's most recent decision governs); one that fails it is no human's review.
+   * Every refs.decision is read through `heldDecision` (18.148), and a ToolCall or Outcome naming no held decision
+   * bounds every decision's approvals. */
   private mapOversight(events: Event[]): Map<string, boolean> {
     const byHuman = new Map<string, boolean>();
     const actionTimes = new Map<string, string[]>();
     const outcomeTimes = new Map<string, string[]>();
     // decision -> human -> that human's decisions on it: [node, time, approve]
+    // The time of every ToolCall and Outcome whose refs.decision names no held decision: it may be any decision's
+    // effect, so it bounds every decision's approvals (fails closed, 18.148), though it withdraws none.
+    const unresolvedTimes: string[] = [];
     const decided = new Map<string, Map<string, Array<[string, string, boolean]>>>();
     for (const event of events) {
-      const decision = refsOf(event).decision;
       const ptype = this.ptype(event);
-      if ((ptype === "ToolCall" || ptype === "Outcome") && typeof decision === "string") {
-        const map = ptype === "ToolCall" ? actionTimes : outcomeTimes;
-        const times = map.get(decision) ?? [];
-        times.push(String(event.time ?? ""));
-        map.set(decision, times);
+      const ref = refsOf(event).decision;
+      if ((ptype !== "ToolCall" && ptype !== "Outcome") || ref === undefined || ref === null) {
+        continue;
       }
+      const time = String(event.time ?? "");
+      const decision = this.heldDecision(ref);
+      if (decision === null) {
+        unresolvedTimes.push(time);
+        continue;
+      }
+      const map = ptype === "ToolCall" ? actionTimes : new Map<string, string[]>();
+      const times = map.get(decision) ?? [];
+      times.push(time);
+      map.set(decision, times);
     }
     for (const event of events) {
       const ptype = this.ptype(event);
@@ -1000,10 +1031,12 @@ class Builder {
       const node = eventIri(String(event.id));
       const key = this.verifiedActor(node, event);
       byHuman.set(node, key !== null);
-      const decision = refsOf(event).decision;
-      if (ptype !== "ApprovalDecided" || typeof decision !== "string") {
+      const ref = refsOf(event).decision;
+      if (ptype !== "ApprovalDecided" || typeof ref !== "string") {
         continue;
       }
+      // A name that leads to no held decision keeps its own key: it reviews and approves no held decision.
+      const decision = this.heldDecision(ref) ?? ref;
       const approve = dataOf(event).outcome === "approve";
       const actor = humanId(dataOf(event).actor);
       // A human's own no withdraws that human's approve even when it fails §10.4 (fail closed, 18.142).
@@ -1036,6 +1069,7 @@ class Builder {
             !approve ||
             !beforeEvery(time, actions) ||
             !beforeEvery(time, outcomes) ||
+            !beforeEvery(time, unresolvedTimes) ||
             !withdrawals.every((w) => compareLiterals(time, w) === 1)
           ) {
             continue;

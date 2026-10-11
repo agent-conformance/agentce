@@ -567,7 +567,7 @@ public final class Graph {
             if (actor == null || loginInfo == null) {
                 return null;
             }
-            String decision = str(refsOf(event).get("decision"));
+            String decision = heldDecision(refsOf(event).get("decision"));
             Set<String> concerned = new LinkedHashSet<>(eventAgents.get(node));
             if (decision != null) {
                 concerned.addAll(eventAgents.getOrDefault(decision, Set.of()));
@@ -995,25 +995,56 @@ public final class Graph {
             literal(node, "agentce:riskReviewed", gated);
         }
 
+        /** The held decision a {@code refs.decision} names (SPEC §6.3 approvedBy): its IRI, else the ref trimmed of
+         * {@link #ID_PAD} when that is a held decision's IRI, else {@code agentce:event/<trimmed ref>} when that is (a
+         * bare id); null when it names no held decision. Exact match first, so no name resolves to another held
+         * decision. */
+        private String heldDecision(JsonNode node) {
+            String ref = str(node);
+            if (ref == null) {
+                return null;
+            }
+            if (decisionTime.containsKey(ref)) {
+                return ref;
+            }
+            String trimmed = Objects.requireNonNullElse(ruleId(ref), "");
+            for (String name : List.of(trimmed, Iri.eventIri(trimmed))) {
+                if (decisionTime.containsKey(name)) {
+                    return name;
+                }
+            }
+            return null;
+        }
+
         /** Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An
          * ApprovalDecided reviews the decision it names ({@code agentce:reviewedBy}; OVS-01, INC-03, RSK-02) only when
          * it does, whatever its outcome; it also approves it ({@code agentce:approvedBy}; CND-02, OVS-08) only when its
          * outcome is approve, it is recorded at or before every ToolCall that executes the decision (18.141) and every
          * Outcome that names it (18.144: the decision had already taken effect), and the same human recorded no other decision on it at or after it, or at a time that cannot be placed against it,
          * unless that decision came after every such ToolCall (18.142: each human's most recent decision governs).
-         * One that fails the rule is no human's review. */
+         * One that fails the rule is no human's review. Every refs.decision is read through {@link #heldDecision}
+         * (18.148), and a ToolCall or Outcome naming no held decision bounds every decision's approvals. */
         private Map<String, Boolean> mapOversight(List<JsonNode> events) {
             Map<String, Boolean> byHuman = new LinkedHashMap<>();
             Map<String, List<String>> actionTimes = new LinkedHashMap<>();
             Map<String, List<String>> outcomeTimes = new LinkedHashMap<>();
+            // The time of every ToolCall and Outcome whose refs.decision names no held decision: it may be any
+            // decision's effect, so it bounds every decision's approvals (fails closed, 18.148), though it withdraws none.
+            List<String> unresolvedTimes = new ArrayList<>();
             Map<String, Map<String, List<Decided>>> decided = new LinkedHashMap<>();
             for (JsonNode event : events) {
-                String decision = str(refsOf(event).get("decision"));
                 String type = ptype(event);
-                if (("ToolCall".equals(type) || "Outcome".equals(type)) && decision != null) {
-                    ("ToolCall".equals(type) ? actionTimes : outcomeTimes)
-                            .computeIfAbsent(decision, k -> new ArrayList<>()).add(timeOf(event));
+                JsonNode ref = refsOf(event).get("decision");
+                if (!("ToolCall".equals(type) || "Outcome".equals(type)) || ref == null || ref.isNull()) {
+                    continue;
                 }
+                String decision = heldDecision(ref);
+                if (decision == null) {
+                    unresolvedTimes.add(timeOf(event));
+                    continue;
+                }
+                ("ToolCall".equals(type) ? actionTimes : outcomeTimes)
+                        .computeIfAbsent(decision, k -> new ArrayList<>()).add(timeOf(event));
             }
             for (JsonNode event : events) {
                 String ptype = ptype(event);
@@ -1023,10 +1054,13 @@ public final class Graph {
                 String node = Iri.eventIri(event.get("id").asText());
                 String human = verifiedActor(node, event);
                 byHuman.put(node, human != null);
-                String decision = str(refsOf(event).get("decision"));
-                if (!"ApprovalDecided".equals(ptype) || decision == null) {
+                String ref = str(refsOf(event).get("decision"));
+                if (!"ApprovalDecided".equals(ptype) || ref == null) {
                     continue;
                 }
+                // A name that leads to no held decision keeps its own key: it reviews and approves no held decision.
+                String held = heldDecision(refsOf(event).get("decision"));
+                String decision = held != null ? held : ref;
                 boolean approve = "approve".equals(str(dataOf(event).get("outcome")));
                 String actor = humanId(dataOf(event).get("actor"));
                 // A human's own no withdraws that human's approve even when it fails §10.4 (fail closed, 18.142).
@@ -1053,6 +1087,7 @@ public final class Graph {
                             .toList();
                     for (Decided d : byActor.getValue()) {
                         if (d.approve() && beforeEvery(d.time(), actions) && beforeEvery(d.time(), outcomes)
+                                && beforeEvery(d.time(), unresolvedTimes)
                                 && withdrawals.stream().allMatch(w -> {
                             Integer order = Structural.compareLiterals(d.time(), w);
                             return order != null && order > 0;

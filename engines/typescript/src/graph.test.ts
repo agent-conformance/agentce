@@ -680,6 +680,47 @@ test("an approve after the outcome is a review, not an approval, wherever the Ou
   }
 });
 
+test("a bare id names the decision in the approval bound, and an unresolved effect bounds every decision", () => {
+  const d1 = "agentce:event/d1";
+  for (const [outcomeRef, approvalRef, approved] of [
+    ["d1", d1, false],
+    [`${d1} `, d1, false],
+    ["\u00a0d1", d1, false],
+    ["AGENTCE:EVENT/D1", d1, false],
+    ["a1", d1, false],
+    [d1, "d1", false],
+    [null, "d1", true],
+    [null, ` ${d1}`, true],
+  ] as const) {
+    const events: Record<string, unknown>[] = [
+      decisionEvent("d1"),
+      {
+        ...memoryEvent("a1", "ApprovalDecided", {
+          outcome: "approve",
+          actor: HUMAN_A,
+          session_ref: sessionOf(HUMAN_A),
+          refs: { decision: approvalRef },
+        }),
+        time: "2026-01-10T05:00:00Z",
+      },
+      ...LOGINS,
+    ];
+    if (outcomeRef !== null) {
+      events.push({
+        ...memoryEvent("o1", "Outcome", { refs: { decision: outcomeRef } }),
+        time: "2026-01-10T01:00:00Z",
+      });
+    }
+    const store = buildGraph(events, { domain: MINOR_DOMAIN });
+    assert.deepEqual(store.objects(d1, "agentce:reviewedBy"), ["agentce:event/a1"]);
+    assert.deepEqual(
+      store.objects(d1, "agentce:approvedBy"),
+      approved ? ["agentce:event/a1"] : [],
+      `${outcomeRef} ${approvalRef}`,
+    );
+  }
+});
+
 test("OVS-07: an override is effective when it replaces a held decision's outcome", () => {
   const effective = (data: Record<string, unknown>, decision = "d1") =>
     lit(

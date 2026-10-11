@@ -454,7 +454,7 @@ class _Builder:
         login = data.get("session_ref")
         if actor is None or not isinstance(login, str) or login not in self.event_info:
             return None
-        decision = _refs(event).get("decision")
+        decision = self._held_decision(_refs(event).get("decision"))
         concerned = self.event_agents[node] | (
             self.event_agents.get(decision, frozenset())
             if isinstance(decision, str)
@@ -766,6 +766,20 @@ class _Builder:
         self._conduct_scope_budget(events)
         self._preceded_by()
 
+    def _held_decision(self, ref: Any) -> str | None:
+        """The held decision a ``refs.decision`` names (SPEC §6.3 approvedBy): its IRI, else the ref trimmed of
+        ``_ID_PAD`` when that is a held decision's IRI, else ``agentce:event/<trimmed ref>`` when that is (a bare id);
+        ``None`` when it names no held decision. Exact match first, so no name resolves to another held decision."""
+        if not isinstance(ref, str):
+            return None
+        if ref in self.decision_time:
+            return ref
+        trimmed = ref.strip(_ID_PAD)
+        for name in (trimmed, event_iri(trimmed)):
+            if name in self.decision_time:
+                return name
+        return None
+
     def _map_oversight(self, events: list[dict[str, Any]]) -> dict[str, bool]:
         """Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An
         ApprovalDecided reviews the decision it names (``agentce:reviewedBy``; OVS-01, INC-03, RSK-02) only when it
@@ -774,17 +788,27 @@ class _Builder:
         that names it (18.144: the decision had already taken effect), and the same human
         recorded no other decision on it at or after it, or at a time that cannot be placed against it, unless that
         decision came after every such ToolCall (18.142: each human's most recent decision governs). One that fails
-        the rule is no human's review."""
+        the rule is no human's review. Every refs.decision is read through ``_held_decision`` (18.148), and a ToolCall
+        or Outcome naming no held decision bounds every decision's approvals."""
         by_human: dict[str, bool] = {}
         action_times: dict[str, list[str]] = {}
         outcome_times: dict[str, list[str]] = {}
+        # The time of every ToolCall and Outcome whose refs.decision names no held decision: it may be any decision's
+        # effect, so it bounds every decision's approvals (fails closed, 18.148), though it withdraws none.
+        unresolved_times: list[str] = []
         decided: dict[tuple[str, str], list[tuple[str, str, bool]]] = {}
         for event in events:
-            decision = _refs(event).get("decision")
             ptype = self._ptype(event)
-            if ptype in ("ToolCall", "Outcome") and isinstance(decision, str):
-                times = action_times if ptype == "ToolCall" else outcome_times
-                times.setdefault(decision, []).append(str(event.get("time", "")))
+            ref = _refs(event).get("decision")
+            if ptype not in ("ToolCall", "Outcome") or ref is None:
+                continue
+            time = str(event.get("time", ""))
+            decision = self._held_decision(ref)
+            if decision is None:
+                unresolved_times.append(time)
+                continue
+            times = action_times if ptype == "ToolCall" else outcome_times
+            times.setdefault(decision, []).append(time)
         for event in events:
             ptype = self._ptype(event)
             if ptype not in _OVERSIGHT_TYPES:
@@ -792,9 +816,11 @@ class _Builder:
             node = event_iri(str(event["id"]))
             key = self._verified_actor(node, event)
             by_human[node] = key is not None
-            decision = _refs(event).get("decision")
-            if ptype != "ApprovalDecided" or not isinstance(decision, str):
+            ref = _refs(event).get("decision")
+            if ptype != "ApprovalDecided" or not isinstance(ref, str):
                 continue
+            # A name that leads to no held decision keeps its own key: it reviews and approves no held decision.
+            decision = self._held_decision(ref) or ref
             data = _data(event)
             approve = data.get("outcome") == "approve"
             actor = _human_id(data.get("actor"))
@@ -823,6 +849,7 @@ class _Builder:
                     approve
                     and _before_every(time, actions)
                     and _before_every(time, outcomes)
+                    and _before_every(time, unresolved_times)
                     and all(compare_literals(time, w) == 1 for w in withdrawals)
                 ):
                     self.store.add_edge(decision, "agentce:approvedBy", node)

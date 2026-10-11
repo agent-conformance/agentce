@@ -559,6 +559,41 @@ class GraphTest {
         });
     }
 
+    /** The approval bound reads every refs.decision as the held decision it names (18.148): an Outcome naming the
+     * decision by bare id or padded bounds an approve that names it by IRI, an approve naming it by bare id approves
+     * it, and an Outcome naming no held decision bounds every decision's approvals. */
+    @Test
+    void aBareIdNamesTheDecision() {
+        String d1 = "agentce:event/d1";
+        String[][] cases = {
+            {"d1", d1, "false"},
+            {d1 + " ", d1, "false"},
+            {"\u00a0d1", d1, "false"},
+            {"AGENTCE:EVENT/D1", d1, "false"},
+            {"a1", d1, "false"},
+            {d1, "d1", "false"},
+            {null, "d1", "true"},
+            {null, " " + d1, "true"},
+        };
+        for (String[] c : cases) {
+            ObjectNode approval = (ObjectNode) approval("a1", "d1", "alice");
+            ((ObjectNode) approval.get("data").get("refs")).put("decision", c[1]);
+            approval.put("time", "2026-01-10T05:00:00Z");
+            List<JsonNode> events = withLogins(List.of(decisionEvent("d1"), approval));
+            if (c[0] != null) {
+                ObjectNode outcome = (ObjectNode) event("o1", "Outcome", decisionRef("d1"));
+                ((ObjectNode) outcome.get("data").get("refs")).put("decision", c[0]);
+                outcome.put("time", "2026-01-10T01:00:00Z");
+                events.add(outcome);
+            }
+            GraphStore store = Graph.buildGraph(events, DomainBinding.fromDict(CREDIT_DOMAIN));
+            String label = c[0] + " " + c[1];
+            assertEquals(List.of("agentce:event/a1"), store.objects(d1, "agentce:reviewedBy"), label);
+            assertEquals(Boolean.parseBoolean(c[2]) ? List.of("agentce:event/a1") : List.of(),
+                    store.objects(d1, "agentce:approvedBy"), label);
+        }
+    }
+
     @Test
     void ovs08OneHumanReviewerCoversADecision() {
         assertEquals(List.of("false"), flag(List.of(decisionEvent("d1")), "d1", "oversightCoverageComplete"));
