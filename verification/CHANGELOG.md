@@ -5,18 +5,21 @@ fails if a gate in `gates.json` is not named in this file.
 
 ## 0.87.0
 
-- `VG-QUARANTINE-NO-PASS` (18.149, changed) checks the exit code a late record gives. A guard's untrusted write of
-  `mem:r1` held in order makes ROB-02 non-conformant and `assess` exits 1. Delivered late, the same write is
-  quarantined for `time_order` and ROB-02 reads `insufficient_evidence`, which exited 0 because ROB-02 is not severity
-  high, so a CI job on the default exit code passed when the record arrived late. Now, when judging a control's
-  readable quarantined records with its held ones reads non-conformant, `assess` exits 1 as it would for a
-  non-conformant outcome, lists the control under `withheld_non_conformant` in the `--json` output with the message key
-  `withheld_reads_non_conformant`, and a `--fail-on` expression matches it as the non-conformant outcome it would be on
-  time. The outcome stays `insufficient_evidence` naming the late record. A quarantine that changes nothing, and a
-  record ingest could not read, keep today's exit code. The gate grows to 23 cases (two run with
-  `--fail-on 'outcome=="non-conformant"'`, two put an unreadable line beside the write), checks the `withheld_non_conformant` listing and `exit_codes` in every case, and gains five
-  seeded faults: in each engine the exit rule ignores the withheld outcome, and in Python `--fail-on` stops matching it
-  and the comparison is skipped beside an unreadable record.
+- `VG-QUARANTINE-NO-PASS` (18.149, changed) checks the exit code a late record gives. When a guard's untrusted write
+  of `mem:r1` arrives in order, ROB-02 is non-conformant and `assess` exits 1. When the same write arrives late, ingest
+  quarantines it for `time_order` and ROB-02 reads `insufficient_evidence`. That exited 0, because ROB-02 is not
+  severity high, so a CI job on the default exit code passed when the record arrived late. Now the engine judges the
+  readable quarantined records with the held ones, also when the held records alone lack the control's minimum
+  evidence. When that reads non-conformant, `assess` exits 1 and the `--json` output lists the control under
+  `withheld_non_conformant` with the message key `withheld_reads_non_conformant`. A `--fail-on` expression matches it
+  as the non-conformant outcome it would be on time. The outcome stays `insufficient_evidence` and names the late
+  record. A quarantine that changes nothing keeps today's exit code, and so does a record ingest could not read. The
+  gate grows to 25 cases. Two run with `--fail-on 'outcome=="non-conformant"'`, two put an unreadable line beside the
+  write, and two deliver the guard's read late when it supplies ROB-02's minimum evidence. Every case checks the
+  `withheld_non_conformant` listing and `exit_codes`. The gate gains eight seeded faults. In each engine, one makes the
+  exit rule ignore the withheld outcome and one compares withheld records only for a conformant or not_applicable
+  outcome. In Python, one stops `--fail-on` matching the withheld outcome and one skips the comparison beside an
+  unreadable record.
 
 ## 0.86.0
 
