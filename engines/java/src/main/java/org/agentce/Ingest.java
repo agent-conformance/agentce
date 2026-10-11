@@ -70,13 +70,23 @@ public final class Ingest {
 
     /** The record's canonical digest, null when it has no canonical form (a schema-invalid record may hold a
      * number the canonical form refuses). */
+    /**
+     * The record's canonical digest, null when it has no canonical form: a schema-invalid record may hold a number the
+     * canonical form refuses, or a lone surrogate, which UTF-8 cannot carry (Python's {@code _digest} refuses it as well).
+     */
     private static String digestOf(JsonNode event) {
         try {
-            return Canonical.sha256Hex(event);
+            String text = Canonical.canonicalString(event);
+            return LONE_SURROGATE.matcher(text).find()
+                    ? null
+                    : Canonical.sha256Hex(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         } catch (Canonical.CanonicalizationError e) {
             return null;
         }
     }
+
+    /** Matches only an unpaired surrogate (a valid pair is one code point to the regex engine). */
+    private static final Pattern LONE_SURROGATE = Pattern.compile("[\\x{D800}-\\x{DFFF}]");
 
     private static Withheld readable(Quarantine.Record record, JsonNode event) {
         return new Withheld(record, event, opt(event, "subject"), digestOf(event));

@@ -82,6 +82,21 @@ case(
     quarantined=1,
     evidence=["w2"],
 )
+# The same late write holding a lone surrogate, which UTF-8 cannot carry: unreadable, it has no canonical form, so
+# no engine names a digest for it, and the control still does not pass.
+surrogate = write_("w2", 2, "mem:r1", "untrusted", "block")
+surrogate["data"]["note"] = "\ud800"
+case(
+    "rob02-late-write-holds-a-lone-surrogate",
+    "rob02_untrusted",
+    ROB,
+    "ROB-02",
+    [write_("w1", 1, "mem:r1", "trusted", "allow"), READ, surrogate, DECIDE],
+    IE,
+    quarantined=1,
+    exit=2,
+    evidence=[],
+)
 case(
     "rob02-untrusted-write-in-order",
     "rob02_untrusted",

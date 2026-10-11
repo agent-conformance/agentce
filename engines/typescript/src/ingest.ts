@@ -17,9 +17,10 @@
  * must hash what was actually signed, not the engine's trust-corrected copy.
  */
 
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { Bundle } from "./bundle";
-import { CanonicalizationError, sha256Hex } from "./canonical";
+import { CanonicalizationError, canonicalString } from "./canonical";
 import { InputError } from "./errors";
 import { parseJson } from "./json";
 import { QuarantineReason, type QuarantineRecord } from "./quarantine";
@@ -151,9 +152,17 @@ export interface IngestResult {
 
 /** The record's canonical digest, null when it has no canonical form (a schema-invalid record may hold a number the
  * canonical form refuses). */
+/** Matches only an unpaired surrogate: in `u` mode a valid pair is one code point. */
+const LONE_SURROGATE_RE = /[\uD800-\uDFFF]/u;
+
+/** The record's canonical digest, `null` when it has no canonical form: a schema-invalid record may hold a number the
+ * canonical form refuses, or a lone surrogate, which UTF-8 cannot carry (Python's `_digest` refuses it as well). */
 function digestOf(event: Record<string, unknown>): string | null {
   try {
-    return sha256Hex(event);
+    const text = canonicalString(event);
+    return LONE_SURROGATE_RE.test(text)
+      ? null
+      : createHash("sha256").update(text, "utf8").digest("hex");
   } catch (exc) {
     if (exc instanceof CanonicalizationError) {
       return null;
