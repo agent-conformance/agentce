@@ -122,16 +122,17 @@ check_cases() {
       return 1
     fi
     # The control is listed under withheld_non_conformant, with the stable message key, exactly when expected.
-    got="$(jq -r --arg control "$(cat "$dir/control")" --arg subject "$(cat "$dir/subject")" \
-      'any(.withheld_non_conformant[]?; .control == $control and .subject == $subject
-        and .key == "withheld_reads_non_conformant")' "$dir/json-$engine")"
-    if [ "$got" != "$(cat "$dir/withheld")" ]; then
-      echo "$label: $engine $name lists the control under withheld_non_conformant: $got, expected $(cat "$dir/withheld")" >&2
+    # A listed control's finding is in the JSON exit codes even when a higher code wins the process exit (18.149).
+    withheld="$(cat "$dir/withheld")"
+    read -r listed has_one < <(jq -r --arg control "$(cat "$dir/control")" --arg subject "$(cat "$dir/subject")" \
+      '"\(any(.withheld_non_conformant[]?; .control == $control and .subject == $subject
+        and .key == "withheld_reads_non_conformant")) \(.exit_codes | index(1) != null)"' "$dir/json-$engine")
+    if [ "$listed" != "$withheld" ]; then
+      echo "$label: $engine $name lists the control under withheld_non_conformant: $listed, expected $withheld" >&2
       touch "$work/.stop"
       return 1
     fi
-    # A listed control's finding is in the JSON exit codes even when a higher code wins the process exit (18.149).
-    if [ "$(cat "$dir/withheld")" = true ] && ! jq -e '.exit_codes | index(1)' "$dir/json-$engine" >/dev/null; then
+    if [ "$withheld" = true ] && [ "$has_one" != true ]; then
       echo "$label: $engine $name lists the control under withheld_non_conformant but exit_codes lacks 1" >&2
       touch "$work/.stop"
       return 1

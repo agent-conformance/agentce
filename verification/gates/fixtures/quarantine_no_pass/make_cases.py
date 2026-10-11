@@ -87,12 +87,14 @@ def write_(i, sec, record, trust, verdict):
     return rob(i, "MemoryWrite", sec, store="kb", record_ref=record, trust=trust, guard_verdict=verdict)
 
 
+W1 = write_("w1", 1, "mem:r1", "trusted", "allow")
+W2 = write_("w2", 2, "mem:r1", "untrusted", "block")
 READ = rob("m1", "MemoryRead", 3, store="kb", record_refs=["mem:r1"], refs={"consumer": "agentce:event/d1"})
 DECIDE = rob(
     "d1", "Decision", 4, cls="self_report", decision_type="dom:CreditDecision", agent={"id": ROB}, inputs=["mem:r1"]
 )
 # Delivered on time the write makes ROB-02 non-conformant (exit 1), so delivered late it exits 1 too (18.149).
-LATE_WRITE = [write_("w1", 1, "mem:r1", "trusted", "allow"), READ, write_("w2", 2, "mem:r1", "untrusted", "block"), DECIDE]
+LATE_WRITE = [W1, READ, W2, DECIDE]
 case(
     "rob02-untrusted-write-quarantined-time-order",
     "rob02_untrusted",
@@ -121,14 +123,14 @@ case(
 )
 # The same late write holding a lone surrogate, which UTF-8 cannot carry: unreadable, it has no canonical form, so
 # no engine names a digest for it, and the control still does not pass.
-surrogate = write_("w2", 2, "mem:r1", "untrusted", "block")
+surrogate = copy.deepcopy(W2)
 surrogate["data"]["note"] = "\ud800"
 case(
     "rob02-late-write-holds-a-lone-surrogate",
     "rob02_untrusted",
     ROB,
     "ROB-02",
-    [write_("w1", 1, "mem:r1", "trusted", "allow"), READ, surrogate, DECIDE],
+    [W1, READ, surrogate, DECIDE],
     IE,
     quarantined=1,
     exit=2,
@@ -155,7 +157,7 @@ case(
     "rob02_untrusted",
     ROB,
     "ROB-02",
-    [write_("w1", 1, "mem:r1", "trusted", "allow"), write_("w2", 2, "mem:r1", "untrusted", "block"), READ, DECIDE, BAD_LINE],
+    [W1, W2, READ, DECIDE, BAD_LINE],
     NC,
     ["d1"],
     quarantined=1,
@@ -166,7 +168,7 @@ case(
     "rob02_untrusted",
     ROB,
     "ROB-02",
-    [write_("w1", 1, "mem:r1", "trusted", "allow"), write_("w2", 2, "mem:r1", "untrusted", "block"), READ, DECIDE],
+    [W1, W2, READ, DECIDE],
     NC,
     ["d1"],
     exit=1,
@@ -175,13 +177,12 @@ case(
 # conformant: delivered after a later write of the guard's stream it is still judged with them, reads non-conformant
 # and exits 1 as on time (18.149).
 LATER_WRITE = write_("w3", 5, "mem:r9", "trusted", "allow")
-WRITES = [write_("w1", 1, "mem:r1", "trusted", "allow"), write_("w2", 2, "mem:r1", "untrusted", "block")]
 case(
     "rob02-late-read-supplies-minimum-evidence",
     "rob02_untrusted",
     ROB,
     "ROB-02",
-    [*WRITES, DECIDE, LATER_WRITE, READ],
+    [W1, W2, DECIDE, LATER_WRITE, READ],
     IE,
     quarantined=1,
     exit=1,
@@ -193,7 +194,7 @@ case(
     "rob02_untrusted",
     ROB,
     "ROB-02",
-    [*WRITES, READ, DECIDE, LATER_WRITE],
+    [W1, W2, READ, DECIDE, LATER_WRITE],
     NC,
     ["d1"],
     exit=1,
@@ -203,7 +204,7 @@ case(
     "rob02_untrusted",
     ROB,
     "ROB-02",
-    [write_("w1", 1, "mem:r1", "trusted", "allow"), READ, write_("w2", 2, "mem:r9", "untrusted", "block"), DECIDE],
+    [W1, READ, write_("w2", 2, "mem:r9", "untrusted", "block"), DECIDE],
     "conformant",
     quarantined=1,
 )
@@ -212,7 +213,7 @@ case(
     "rob02_untrusted",
     ROB,
     "ROB-02",
-    [write_("w1", 1, "mem:r1", "trusted", "allow"), READ, write_("w2", 2, "mem:r9", "untrusted", "block"), DECIDE],
+    [W1, READ, write_("w2", 2, "mem:r9", "untrusted", "block"), DECIDE],
     "conformant",
     quarantined=1,
     fail_on='outcome=="non-conformant"',
