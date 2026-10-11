@@ -123,6 +123,26 @@ cnd02(
     [dec(), login_at(at(1)), approve_at(at(1), " agentce:event/d1 "), outcome_at(at(2), "d1")],
     "conformant",
 )
+# A resolved bare id keeps the bound per decision: another decision's bare-id Outcome does not bound this one, and a
+# reject after a bare-id ToolCall of the decision came after the action ran, so it withdraws nothing (18.142).
+cnd02(
+    "cnd02-other-decision-bareid-outcome-earlier",
+    [dec(), dec("d2"), outcome_at(at(1), "d2", i="o2"), login_at(at(4)), approve_at(at(5))],
+    NC,
+    ["d2"],
+)
+case(
+    "cnd02-reject-after-bareid-toolcall-withdraws-nothing",
+    "CND-02",
+    [
+        dec(),
+        login_at(at(1)),
+        approve_at(at(1)),
+        run_at(at(2), "d1"),
+        reject_at(at(3), i="a2"),
+    ],
+    "conformant",
+)
 # A same human's reject in another form still withdraws the approve (18.142).
 case(
     "cnd02-reject-bareid-withdraws",
