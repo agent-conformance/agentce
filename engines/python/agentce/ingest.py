@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .bundle import Bundle
+from .canonical import CanonicalizationError, sha256_hex
 from .errors import InputError
 from .quarantine import QuarantineReason, QuarantineRecord
 from .safe_json import JSONError, load_json
@@ -41,6 +42,22 @@ _CLASS_RANK = {"self_report": 0, "enforcement_point": 1, "independent_system": 2
 _TYPE_RE = re.compile(r"^org\.agent-conformance\.evidence\.(?P<name>[A-Za-z0-9]+)\.v1$")
 
 
+@dataclass(frozen=True)
+class Withheld:
+    """A quarantined record that may hold evidence a control needs (18.119): quarantine never gives a better
+    outcome. ``event`` is the record as readers would see it (class corrected as for an accepted event) when
+    ingest could read it but refused it for where it sits (``time_order``, ``duplicate_id`` that is not an
+    identical redelivery, ``class_mismatch``, ``unknown_source``); it is ``None`` when ingest could not read
+    it at all (``schema_invalid``, ``oversize``). ``subject`` is the record's own subject, ``None`` when
+    unknown (then the record may belong to any subject). An ``unknown_type`` record is not withheld: the
+    engine reads nothing from a type it does not model."""
+
+    record: QuarantineRecord
+    event: dict[str, Any] | None
+    subject: str | None
+    digest: str | None
+
+
 @dataclass
 class IngestResult:
     """The outcome of ingest: the accepted events, in order, and the quarantine records.
@@ -54,6 +71,7 @@ class IngestResult:
     accepted: list[dict[str, Any]] = field(default_factory=list)
     raw_accepted: list[dict[str, Any]] = field(default_factory=list)
     quarantined: list[QuarantineRecord] = field(default_factory=list)
+    withheld: list[Withheld] = field(default_factory=list)
 
 
 def _event_type_name(type_value: str) -> str | None:
@@ -82,7 +100,9 @@ def ingest(
     # (the event as readers see it, as received, its source, type and class rank). `owner_rank` is the highest trusted
     # class among the candidates that carry each id: a record of a lower class never displaces it (18.143).
     records: list[
-        QuarantineRecord | tuple[dict[str, Any], dict[str, Any], str, str, int]
+        QuarantineRecord
+        | Withheld
+        | tuple[dict[str, Any], dict[str, Any], str, str, int]
     ] = []
     owner_rank: dict[str, int] = {}
 
@@ -96,8 +116,10 @@ def ingest(
                 raw = raw_line.decode("utf-8")
             except UnicodeDecodeError:
                 records.append(
-                    QuarantineRecord(
-                        QuarantineReason.SCHEMA_INVALID, detail="invalid UTF-8"
+                    _unreadable(
+                        QuarantineRecord(
+                            QuarantineReason.SCHEMA_INVALID, detail="invalid UTF-8"
+                        )
                     )
                 )
                 continue
@@ -106,9 +128,11 @@ def ingest(
                 continue
             if len(line.encode("utf-8")) > max_event_bytes:
                 records.append(
-                    QuarantineRecord(
-                        QuarantineReason.OVERSIZE,
-                        detail=f"event exceeds {max_event_bytes} bytes",
+                    _unreadable(
+                        QuarantineRecord(
+                            QuarantineReason.OVERSIZE,
+                            detail=f"event exceeds {max_event_bytes} bytes",
+                        )
                     )
                 )
                 continue
@@ -122,9 +146,11 @@ def ingest(
                 event = load_json(line)
             except JSONError as exc:
                 records.append(
-                    QuarantineRecord(
-                        QuarantineReason.SCHEMA_INVALID,
-                        detail=f"invalid JSON: {exc.msg}",
+                    _unreadable(
+                        QuarantineRecord(
+                            QuarantineReason.SCHEMA_INVALID,
+                            detail=f"invalid JSON: {exc.msg}",
+                        )
                     )
                 )
                 continue
@@ -132,9 +158,11 @@ def ingest(
                 raise _too_deep() from exc
             if not isinstance(event, dict):
                 records.append(
-                    QuarantineRecord(
-                        QuarantineReason.SCHEMA_INVALID,
-                        detail="event is not a JSON object",
+                    _unreadable(
+                        QuarantineRecord(
+                            QuarantineReason.SCHEMA_INVALID,
+                            detail="event is not a JSON object",
+                        )
                     )
                 )
                 continue
@@ -142,12 +170,15 @@ def ingest(
             errors = validate_event(event)
             if errors:
                 records.append(
-                    QuarantineRecord(
-                        QuarantineReason.SCHEMA_INVALID,
-                        event_id=_opt(event, "id"),
-                        source=_opt(event, "source"),
-                        type=_opt(event, "type"),
-                        detail=errors[0],
+                    _unreadable(
+                        QuarantineRecord(
+                            QuarantineReason.SCHEMA_INVALID,
+                            event_id=_opt(event, "id"),
+                            source=_opt(event, "source"),
+                            type=_opt(event, "type"),
+                            detail=errors[0],
+                        ),
+                        event,
                     )
                 )
                 continue
@@ -169,12 +200,15 @@ def ingest(
             source = str(event["source"])
             if bundle.sources is not None and source not in bundle.sources:
                 records.append(
-                    QuarantineRecord(
-                        QuarantineReason.UNKNOWN_SOURCE,
-                        event_id=str(event["id"]),
-                        source=source,
-                        type=type_value,
-                        detail="source is not declared in the bundle manifest",
+                    _readable(
+                        QuarantineRecord(
+                            QuarantineReason.UNKNOWN_SOURCE,
+                            event_id=str(event["id"]),
+                            source=source,
+                            type=type_value,
+                            detail="source is not declared in the bundle manifest",
+                        ),
+                        {**event, "agentcesourceclass": "self_report"},
                     )
                 )
                 continue
@@ -189,15 +223,18 @@ def ingest(
                 event_class = str(event["agentcesourceclass"])
                 if event_class != declared_class:
                     records.append(
-                        QuarantineRecord(
-                            QuarantineReason.CLASS_MISMATCH,
-                            event_id=str(event["id"]),
-                            source=source,
-                            type=type_value,
-                            detail=(
-                                f"event class {event_class!r} differs from the "
-                                f"declared class {declared_class!r} for this source"
+                        _readable(
+                            QuarantineRecord(
+                                QuarantineReason.CLASS_MISMATCH,
+                                event_id=str(event["id"]),
+                                source=source,
+                                type=type_value,
+                                detail=(
+                                    f"event class {event_class!r} differs from the "
+                                    f"declared class {declared_class!r} for this source"
+                                ),
                             ),
+                            {**event, "agentcesourceclass": declared_class},
                         )
                     )
                     continue
@@ -215,14 +252,21 @@ def ingest(
 
     seen_ids: set[str] = set()
     last_time: dict[str, str] = {}
+    # Each duplicate_id record with the raw record it was read from: withheld unless it is an identical
+    # redelivery of the record held under its id, which is known only once every record is placed.
+    duplicates: list[tuple[Withheld, dict[str, Any]]] = []
     for record in records:
         if isinstance(record, QuarantineRecord):
             result.quarantined.append(record)
             continue
+        if isinstance(record, Withheld):
+            result.quarantined.append(record.record)
+            result.withheld.append(record)
+            continue
         event, raw_event, source, type_value, rank = record
         event_id = str(event["id"])
         if event_id in seen_ids or rank < owner_rank[event_id]:
-            result.quarantined.append(
+            duplicate = _readable(
                 QuarantineRecord(
                     QuarantineReason.DUPLICATE_ID,
                     event_id=event_id,
@@ -233,15 +277,18 @@ def ingest(
                         if event_id in seen_ids
                         else "a record of a higher source class has this event id"
                     ),
-                )
+                ),
+                event,
             )
+            result.quarantined.append(duplicate.record)
+            duplicates.append((duplicate, raw_event))
             continue
 
         stream = _stream_of(event)
         time_value = str(event["time"])
         previous = last_time.get(stream)
         if previous is not None and time_value < previous:
-            result.quarantined.append(
+            late = _readable(
                 QuarantineRecord(
                     QuarantineReason.TIME_ORDER,
                     event_id=event_id,
@@ -249,8 +296,11 @@ def ingest(
                     stream=stream,
                     type=type_value,
                     detail=f"time {time_value} precedes {previous} in the stream",
-                )
+                ),
+                event,
             )
+            result.quarantined.append(late.record)
+            result.withheld.append(late)
             continue
 
         seen_ids.add(event_id)
@@ -258,7 +308,38 @@ def ingest(
         result.accepted.append(event)
         result.raw_accepted.append(raw_event)
 
+    held = {str(e["id"]): _digest(e) for e in result.raw_accepted}
+    result.withheld.extend(
+        duplicate
+        for duplicate, raw_event in duplicates
+        if (digest := _digest(raw_event)) is None
+        or held.get(str(raw_event["id"])) != digest
+    )
     return result
+
+
+def _digest(event: dict[str, Any]) -> str | None:
+    """The record's canonical digest, ``None`` when it has no canonical form (a schema-invalid record may hold a
+    number the canonical form refuses, or one too long to print)."""
+    try:
+        return sha256_hex(event)
+    except (CanonicalizationError, ValueError):
+        return None
+
+
+def _readable(record: QuarantineRecord, event: dict[str, Any]) -> Withheld:
+    return Withheld(record, event, _opt(event, "subject"), _digest(event))
+
+
+def _unreadable(
+    record: QuarantineRecord, event: dict[str, Any] | None = None
+) -> Withheld:
+    return Withheld(
+        record,
+        None,
+        _opt(event, "subject") if event is not None else None,
+        _digest(event) if event is not None else None,
+    )
 
 
 def _too_deep() -> InputError:

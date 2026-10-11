@@ -343,3 +343,46 @@ def test_manifest_class_empty_null_or_non_string_is_treated_as_undeclared(
     assert len(result.accepted) == 3
     assert result.quarantined == []
     assert all(e["agentcesourceclass"] == "self_report" for e in result.accepted)
+
+
+def test_withheld_lists_the_quarantined_records_that_may_hold_evidence(
+    make_bundle: Callable[..., Any],
+    clone: Callable[[dict[str, Any]], dict[str, Any]],
+    example_event: dict[str, Any],
+) -> None:
+    # 18.119: a record refused for where it sits stays readable; one ingest cannot read has no event; an identical
+    # redelivery and an unknown type hold nothing new.
+    late = clone(example_event)
+    late["id"] = "b" * 64
+    late["time"] = "2020-01-01T00:00:00.000Z"
+    other = clone(example_event)
+    other["time"] = "2030-01-01T00:00:00.000Z"
+    unknown = clone(example_event)
+    unknown["id"] = "c" * 64
+    unknown["type"] = "org.agent-conformance.evidence.Heartbeat.v1"
+    items = [example_event, late, clone(example_event), other, unknown, "{"]
+    result = _ingest(make_bundle, items)
+    reasons = [w.record.reason for w in result.withheld]
+    # File order, then each non-identical duplicate once every record is placed.
+    assert reasons == [
+        QuarantineReason.TIME_ORDER,
+        QuarantineReason.SCHEMA_INVALID,
+        QuarantineReason.DUPLICATE_ID,
+    ]
+    time_order, unreadable, duplicate = result.withheld
+    assert unreadable.event is None and unreadable.subject is None
+    # Each readable record is the event as readers see it: this undeclared source's class reads self_report.
+    read_as = {"agentcesourceclass": "self_report"}
+    assert time_order.event == {**late, **read_as}
+    assert time_order.subject == late["subject"]
+    assert duplicate.event == {**other, **read_as} and duplicate.digest is not None
+    assert len(result.quarantined) == 5
+
+
+def test_withheld_oversize_has_no_event(
+    make_bundle: Callable[..., Any], example_event: dict[str, Any]
+) -> None:
+    result = ingest(load_bundle(make_bundle([example_event])), max_event_bytes=10)
+    assert [(w.record.reason, w.event, w.subject) for w in result.withheld] == [
+        (QuarantineReason.OVERSIZE, None, None)
+    ]

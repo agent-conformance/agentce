@@ -19,6 +19,7 @@
 
 import { readFileSync } from "node:fs";
 import type { Bundle } from "./bundle";
+import { CanonicalizationError, sha256Hex } from "./canonical";
 import { InputError } from "./errors";
 import { parseJson } from "./json";
 import { QuarantineReason, type QuarantineRecord } from "./quarantine";
@@ -122,6 +123,21 @@ interface Candidate {
   rank: number;
 }
 
+/**
+ * A quarantined record that may hold evidence a control needs (18.119): quarantine never gives a better outcome.
+ * `event` is the record as readers would see it (class corrected as for an accepted event) when ingest could read it
+ * but refused it for where it sits (time_order, a duplicate_id that is not an identical redelivery, class_mismatch,
+ * unknown_source); it is null when ingest could not read it at all (schema_invalid, oversize). `subject` is the
+ * record's own subject, null when unknown (then the record may belong to any subject). An unknown_type record is not
+ * withheld: the engine reads nothing from a type it does not model.
+ */
+export interface Withheld {
+  record: QuarantineRecord;
+  event: Record<string, unknown> | null;
+  subject: string | null;
+  digest: string | null;
+}
+
 export interface IngestResult {
   /** What assessment, activity, and graph building read; an undeclared source's event carries
    * `agentcesourceclass: "self_report"` here, never its own unproven self-assertion. */
@@ -130,6 +146,33 @@ export interface IngestResult {
    * (SPEC §6.6), which must hash what the source actually signed. */
   rawAccepted: Array<Record<string, unknown>>;
   quarantined: QuarantineRecord[];
+  withheld: Withheld[];
+}
+
+/** The record's canonical digest, null when it has no canonical form (a schema-invalid record may hold a number the
+ * canonical form refuses). */
+function digestOf(event: Record<string, unknown>): string | null {
+  try {
+    return sha256Hex(event);
+  } catch (exc) {
+    if (exc instanceof CanonicalizationError) {
+      return null;
+    }
+    throw exc;
+  }
+}
+
+function readable(record: QuarantineRecord, event: Record<string, unknown>): Withheld {
+  return { record, event, subject: optStr(event, "subject") ?? null, digest: digestOf(event) };
+}
+
+function unreadable(record: QuarantineRecord, event?: Record<string, unknown>): Withheld {
+  return {
+    record,
+    event: null,
+    subject: event !== undefined ? (optStr(event, "subject") ?? null) : null,
+    digest: event !== undefined ? digestOf(event) : null,
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -161,12 +204,12 @@ function optStr(event: Record<string, unknown>, key: string): string | undefined
 }
 
 export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES): IngestResult {
-  const result: IngestResult = { accepted: [], rawAccepted: [], quarantined: [] };
+  const result: IngestResult = { accepted: [], rawAccepted: [], quarantined: [], withheld: [] };
   const validTypes = eventTypes();
   // Pass 1 checks each record on its own; `records` keeps, in file order, each quarantine record and each candidate
   // (the event as readers see it, as received, its source, type and class rank). `ownerRank` is the highest trusted
   // class among the candidates that carry each id: a record of a lower class never displaces it (18.143).
-  const records: Array<QuarantineRecord | Candidate> = [];
+  const records: Array<QuarantineRecord | Withheld | Candidate> = [];
   const ownerRank = new Map<string, number>();
 
   for (const path of bundle.eventFiles) {
@@ -175,10 +218,9 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
       try {
         raw = decodeUtf8Strict(rawLine);
       } catch {
-        records.push({
-          reason: QuarantineReason.SCHEMA_INVALID,
-          detail: "invalid UTF-8",
-        });
+        records.push(
+          unreadable({ reason: QuarantineReason.SCHEMA_INVALID, detail: "invalid UTF-8" }),
+        );
         continue;
       }
       const line = trimJsonWhitespace(raw);
@@ -186,10 +228,12 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
         continue;
       }
       if (Buffer.byteLength(line, "utf-8") > maxEventBytes) {
-        records.push({
-          reason: QuarantineReason.OVERSIZE,
-          detail: `event exceeds ${maxEventBytes} bytes`,
-        });
+        records.push(
+          unreadable({
+            reason: QuarantineReason.OVERSIZE,
+            detail: `event exceeds ${maxEventBytes} bytes`,
+          }),
+        );
         continue;
       }
       // The bracket count bounds the nesting, so most lines skip the character scan.
@@ -200,29 +244,35 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
       try {
         event = parseJson(line);
       } catch (exc) {
-        records.push({
-          reason: QuarantineReason.SCHEMA_INVALID,
-          detail: `invalid JSON: ${exc}`,
-        });
+        records.push(
+          unreadable({ reason: QuarantineReason.SCHEMA_INVALID, detail: `invalid JSON: ${exc}` }),
+        );
         continue;
       }
       if (!isRecord(event)) {
-        records.push({
-          reason: QuarantineReason.SCHEMA_INVALID,
-          detail: "event is not a JSON object",
-        });
+        records.push(
+          unreadable({
+            reason: QuarantineReason.SCHEMA_INVALID,
+            detail: "event is not a JSON object",
+          }),
+        );
         continue;
       }
 
       const errors = validateEvent(event);
       if (errors.length > 0) {
-        records.push({
-          reason: QuarantineReason.SCHEMA_INVALID,
-          eventId: optStr(event, "id"),
-          source: optStr(event, "source"),
-          type: optStr(event, "type"),
-          detail: errors[0],
-        });
+        records.push(
+          unreadable(
+            {
+              reason: QuarantineReason.SCHEMA_INVALID,
+              eventId: optStr(event, "id"),
+              source: optStr(event, "source"),
+              type: optStr(event, "type"),
+              detail: errors[0],
+            },
+            event,
+          ),
+        );
         continue;
       }
 
@@ -241,13 +291,18 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
 
       const source = String(event.source);
       if (bundle.sources !== null && !bundle.sources.has(source)) {
-        records.push({
-          reason: QuarantineReason.UNKNOWN_SOURCE,
-          eventId: String(event.id),
-          source,
-          type: typeValue,
-          detail: "source is not declared in the bundle manifest",
-        });
+        records.push(
+          readable(
+            {
+              reason: QuarantineReason.UNKNOWN_SOURCE,
+              eventId: String(event.id),
+              source,
+              type: typeValue,
+              detail: "source is not declared in the bundle manifest",
+            },
+            { ...event, agentcesourceclass: "self_report" },
+          ),
+        );
         continue;
       }
 
@@ -258,13 +313,18 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
       if (declaredClass !== undefined) {
         const eventClass = String(event.agentcesourceclass);
         if (eventClass !== declaredClass) {
-          records.push({
-            reason: QuarantineReason.CLASS_MISMATCH,
-            eventId: String(event.id),
-            source,
-            type: typeValue,
-            detail: `event class '${eventClass}' differs from the declared class '${declaredClass}' for this source`,
-          });
+          records.push(
+            readable(
+              {
+                reason: QuarantineReason.CLASS_MISMATCH,
+                eventId: String(event.id),
+                source,
+                type: typeValue,
+                detail: `event class '${eventClass}' differs from the declared class '${declaredClass}' for this source`,
+              },
+              { ...event, agentcesourceclass: declaredClass },
+            ),
+          );
           continue;
         }
       } else if (String(event.agentcesourceclass) !== "self_report") {
@@ -284,7 +344,15 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
 
   const seenIds = new Set<string>();
   const lastTime = new Map<string, string>();
+  // Each duplicate_id record with the raw record it was read from: withheld unless it is an identical redelivery of
+  // the record held under its id, which is known only once every record is placed.
+  const duplicates: Array<[Withheld, Record<string, unknown>]> = [];
   for (const record of records) {
+    if ("digest" in record) {
+      result.quarantined.push(record.record);
+      result.withheld.push(record);
+      continue;
+    }
     if (!("event" in record)) {
       result.quarantined.push(record);
       continue;
@@ -292,15 +360,20 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
     const { event, rawEvent, source, typeValue, rank } = record;
     const eventId = String(event.id);
     if (seenIds.has(eventId) || rank < (ownerRank.get(eventId) as number)) {
-      result.quarantined.push({
-        reason: QuarantineReason.DUPLICATE_ID,
-        eventId,
-        source,
-        type: typeValue,
-        detail: seenIds.has(eventId)
-          ? "event id already seen in this bundle"
-          : "a record of a higher source class has this event id",
-      });
+      const duplicate = readable(
+        {
+          reason: QuarantineReason.DUPLICATE_ID,
+          eventId,
+          source,
+          type: typeValue,
+          detail: seenIds.has(eventId)
+            ? "event id already seen in this bundle"
+            : "a record of a higher source class has this event id",
+        },
+        event,
+      );
+      result.quarantined.push(duplicate.record);
+      duplicates.push([duplicate, rawEvent]);
       continue;
     }
 
@@ -308,14 +381,19 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
     const timeValue = String(event.time);
     const previous = lastTime.get(stream);
     if (previous !== undefined && byteCompare(timeValue, previous) < 0) {
-      result.quarantined.push({
-        reason: QuarantineReason.TIME_ORDER,
-        eventId,
-        source,
-        stream,
-        type: typeValue,
-        detail: `time ${timeValue} precedes ${previous} in the stream`,
-      });
+      const late = readable(
+        {
+          reason: QuarantineReason.TIME_ORDER,
+          eventId,
+          source,
+          stream,
+          type: typeValue,
+          detail: `time ${timeValue} precedes ${previous} in the stream`,
+        },
+        event,
+      );
+      result.quarantined.push(late.record);
+      result.withheld.push(late);
       continue;
     }
 
@@ -323,6 +401,13 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
     lastTime.set(stream, timeValue);
     result.accepted.push(event);
     result.rawAccepted.push(rawEvent);
+  }
+  const held = new Map(result.rawAccepted.map((e) => [String(e.id), digestOf(e)]));
+  for (const [duplicate, rawEvent] of duplicates) {
+    const digest = digestOf(rawEvent);
+    if (digest === null || held.get(String(rawEvent.id)) !== digest) {
+      result.withheld.push(duplicate);
+    }
   }
   return result;
 }

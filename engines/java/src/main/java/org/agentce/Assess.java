@@ -237,9 +237,79 @@ public final class Assess {
         return index;
     }
 
-    /** Evaluate every catalog control against every subject and return the assertions. */
+    /** The subject's held events plus the readable withheld ones (18.119). A withheld record whose id is taken
+     * (a duplicate_id) joins under a fresh id, so it is judged as the record it is instead of merging with the
+     * held one. */
+    private static List<JsonNode> counterfactual(List<JsonNode> subjectEvents, List<JsonNode> readable) {
+        Set<String> taken = new java.util.HashSet<>();
+        for (JsonNode e : subjectEvents) {
+            taken.add(Readiness.pyStr(e.get("id")));
+        }
+        List<JsonNode> events = new ArrayList<>(subjectEvents);
+        for (int position = 0; position < readable.size(); position++) {
+            JsonNode event = readable.get(position);
+            String eventId = Readiness.pyStr(event.get("id"));
+            if (taken.contains(eventId)) {
+                event = ((ObjectNode) event).deepCopy().put("id", eventId + "#withheld-" + position);
+            }
+            taken.add(event.get("id").asText());
+            events.add(event);
+        }
+        return events;
+    }
+
+    private static List<Assertions.EvidencePointer> withheldEvidence(List<Ingest.Withheld> withheld) {
+        Map<String, Assertions.EvidencePointer> pointers = new java.util.HashMap<>();
+        for (Ingest.Withheld w : withheld) {
+            if (w.record().eventId == null || w.digest() == null) {
+                continue;
+            }
+            String sc = w.event() != null ? sourceClassOf(w.event()) : "";
+            Assertions.EvidencePointer pointer = new Assertions.EvidencePointer(
+                    Iri.eventIri(w.record().eventId), "sha256:" + w.digest(), sc.isEmpty() ? "self_report" : sc);
+            pointers.put(pointer.ref + "\u0000" + pointer.digest + "\u0000" + pointer.sourceClass, pointer);
+        }
+        List<String> keys = new ArrayList<>(pointers.keySet());
+        keys.sort(Json::byteCompare);
+        List<Assertions.EvidencePointer> out = new ArrayList<>();
+        for (String key : keys.subList(0, Math.min(keys.size(), EVIDENCE_CAP))) {
+            out.add(pointers.get(key));
+        }
+        return out;
+    }
+
+    /** A control quarantine may have flattered reads insufficient_evidence naming the withheld records (18.119). */
+    private static Assertions.Assertion notEnoughWithWithheld(
+            Assertions.Assertion assertion, List<Ingest.Withheld> withheld) {
+        Assertions.Assertion copy = Assertions.copyOf(assertion);
+        copy.outcome = "insufficient_evidence";
+        copy.population = new int[] {assertion.population[0], 0};
+        copy.violations = new ArrayList<>();
+        copy.evidence = withheldEvidence(withheld);
+        copy.sourceClassSatisfied = null;
+        copy.evidenceStrength = null;
+        return copy;
+    }
+
+    /** Evaluate every catalog control against every subject and return the assertions, with no withheld records. */
     public static List<Assertions.Assertion> assessSubjects(
             List<JsonNode> accepted, Profile profile, List<Catalog> catalogs, DomainBinding domain) {
+        return assessSubjects(accepted, profile, catalogs, domain, List.of());
+    }
+
+    /**
+     * Evaluate every catalog control against every subject and return the assertions. {@code withheld} is
+     * ingest's quarantined records that may hold evidence (18.119): quarantine never gives a better outcome. A
+     * control that reads conformant, or not_applicable for want of a population, reads insufficient_evidence
+     * naming them when a record ingest could not read may belong to the subject, or when judging the subject's
+     * readable withheld records with its held ones changes that outcome.
+     */
+    public static List<Assertions.Assertion> assessSubjects(
+            List<JsonNode> accepted,
+            Profile profile,
+            List<Catalog> catalogs,
+            DomainBinding domain,
+            List<Ingest.Withheld> withheld) {
         List<Assertions.Assertion> assertions = new ArrayList<>();
         Map<String, List<JsonNode>> eventsBySubject = indexBySubject(accepted);
         for (Profile.Subject subject : profile.subjects) {
@@ -253,9 +323,43 @@ public final class Assess {
             }
             Set<String> roles = new LinkedHashSet<>(Applicability.effectiveRoles(subject.role));
             String[] win = window(profile, subjectEvents);
+            List<Ingest.Withheld> own = new ArrayList<>();
+            List<JsonNode> readable = new ArrayList<>();
+            boolean unreadable = false;
+            for (Ingest.Withheld w : withheld) {
+                if (w.subject() != null && !w.subject().equals(subject.id)) {
+                    continue;
+                }
+                own.add(w);
+                unreadable |= w.event() == null;
+                if (w.event() != null && subject.id.equals(Readiness.pyStr(w.event().get("subject")))) {
+                    readable.add(w.event());
+                }
+            }
+            List<JsonNode> cfEvents = readable.isEmpty() ? List.of() : counterfactual(subjectEvents, readable);
+            GraphStore cfStore = readable.isEmpty() ? store : Graph.buildGraph(cfEvents, domain);
+            Map<String, JsonNode> cfByIri = new java.util.HashMap<>();
+            for (JsonNode event : cfEvents) {
+                if (event.has("id")) {
+                    cfByIri.put(Iri.eventIri(event.get("id").asText()), event);
+                }
+            }
             for (Catalog catalog : catalogs) {
                 for (Catalog.ControlSpec control : catalog.controls) {
-                    assertions.add(assertControl(store, catalog, control, subject, roles, subjectEvents, eventsByIri, win));
+                    Assertions.Assertion assertion =
+                            assertControl(store, catalog, control, subject, roles, subjectEvents, eventsByIri, win);
+                    boolean flattered = !own.isEmpty()
+                            && ("conformant".equals(assertion.outcome)
+                                    || ("not_applicable".equals(assertion.outcome)
+                                            && roleApplies(roles, control.appliesToRoles)));
+                    if (flattered
+                            && (unreadable
+                                    || !assertControl(cfStore, catalog, control, subject, roles, cfEvents, cfByIri, win)
+                                            .outcome
+                                            .equals(assertion.outcome))) {
+                        assertion = notEnoughWithWithheld(assertion, own);
+                    }
+                    assertions.add(assertion);
                 }
             }
         }

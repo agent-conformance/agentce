@@ -1427,6 +1427,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         catalogs,
         domain,
         applicability_declared=scanned is None,
+        withheld=ingested.withheld,
     )
     # A records run that judged nothing renders no report: its headline would read "Conformant".
     if scanned is not None and evaluated_nothing(evaluated):

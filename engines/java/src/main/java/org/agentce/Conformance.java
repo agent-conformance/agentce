@@ -122,7 +122,8 @@ public final class Conformance {
         Profile profile = Profile.load(proj.resolve("applicability.yaml"));
         Coverage.computeCoverage(ingested.accepted, profile, bundle.root);
         Applicability.resolve(profile, ingested.accepted, List.of());
-        List<Assertions.Assertion> assertions = Assess.assessSubjects(ingested.accepted, profile, cat.catalogs, domain);
+        List<Assertions.Assertion> assertions = Assess.assessSubjects(
+                ingested.accepted, profile, cat.catalogs, domain, ingested.withheld);
         var activity = Activity.summarizeActivity(ingested.accepted, profile);
         var blindSpots = BlindSpots.computeBlindSpots(assertions, profile, cat.catalogs, ingested.accepted);
         Report.writeReport(

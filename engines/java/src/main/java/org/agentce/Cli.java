@@ -1167,7 +1167,8 @@ global options:
 
         // Stage 6: catalog evaluation and report artifacts.
         List<Assertions.Assertion> evaluated =
-                Assess.assessSubjects(ingested.accepted, profileObj, resolved.catalogs(), domain);
+                Assess.assessSubjects(
+                        ingested.accepted, profileObj, resolved.catalogs(), domain, ingested.withheld);
 
         // Stage 6a: incremental state (SPEC §5.4 B7, HR-10).
         String newWindowEnd = StateDir.windowEnd(profileObj.observationWindow, ingested.accepted);

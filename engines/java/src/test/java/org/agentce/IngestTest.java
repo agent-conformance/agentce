@@ -179,4 +179,37 @@ class IngestTest {
             assertEquals(run[2], q.get("detail").asText());
         }
     }
+
+    @Test
+    void withheldListsTheQuarantinedRecordsThatMayHoldEvidence(@TempDir Path tempDir) throws IOException {
+        // 18.119: a record refused for where it sits stays readable (read with the declared class); one ingest
+        // cannot read has no event; an identical redelivery holds nothing new.
+        ObjectNode first = Fixtures.buildIngestEvent(SOURCE, "enforcement_point", "e1", "gw");
+        ObjectNode late = first.deepCopy().put("id", "e2").put("time", "2020-01-01T00:00:00.000Z");
+        ObjectNode invalid = first.deepCopy().put("id", "e3").put("time", 7);
+        ObjectNode other = first.deepCopy().put("time", "2030-01-01T00:00:00.000Z");
+        ArrayNode sources = Json.nodes().arrayNode();
+        sources.addObject().put("id", SOURCE).put("class", "enforcement_point");
+        Ingest.Result result = Ingest.ingest(Fixtures.writeIngestBundle(
+                tempDir.resolve("b"), List.of(first, late, invalid, first.deepCopy(), other), sources));
+        // File order, then each non-identical duplicate once every record is placed.
+        List<String> reasons = new ArrayList<>();
+        result.withheld.forEach(w -> reasons.add(w.record().toJson().get("reason").asText()));
+        assertEquals(List.of("time_order", "schema_invalid", "duplicate_id"), reasons);
+        assertEquals(late, result.withheld.get(0).event());
+        assertEquals(null, result.withheld.get(1).event());
+        assertEquals(other, result.withheld.get(2).event());
+        assertEquals(4, result.quarantined.size());
+    }
+
+    @Test
+    void anOversizeRecordIsWithheldWithNoEvent(@TempDir Path tempDir) throws IOException {
+        JsonNode event = Fixtures.buildIngestEvent(SOURCE, "enforcement_point");
+        Ingest.Result result =
+                Ingest.ingest(Fixtures.writeIngestBundle(tempDir.resolve("bundle"), event, SOURCE, null), 10);
+        assertEquals(1, result.withheld.size());
+        assertEquals("oversize", result.withheld.get(0).record().toJson().get("reason").asText());
+        assertEquals(null, result.withheld.get(0).event());
+        assertEquals(null, result.withheld.get(0).subject());
+    }
 }

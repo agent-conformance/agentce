@@ -11,6 +11,7 @@ evaluated in Phase 1; other rungs become ``not_assessed`` until their evaluators
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Sequence
 from typing import Any
 
 from .applicability import effective_roles
@@ -19,6 +20,7 @@ from .canonical import sha256_hex
 from .catalog import Catalog, ControlSpec
 from .domain import DomainBinding
 from .graph import build_graph
+from .ingest import Withheld
 from .iri import event_iri
 from .profile import Profile, Subject
 from .readiness import parse_date
@@ -202,6 +204,56 @@ def _assert_control(
     )
 
 
+def _counterfactual(
+    subject_events: list[dict[str, Any]], readable: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """The subject's held events plus the readable withheld ones (18.119). A withheld record whose id is taken
+    (a duplicate_id) joins under a fresh id, so it is judged as the record it is instead of merging with the
+    held one."""
+    taken = {str(e.get("id")) for e in subject_events}
+    events = list(subject_events)
+    for position, event in enumerate(readable):
+        event_id = str(event.get("id"))
+        if event_id in taken:
+            event = {**event, "id": f"{event_id}#withheld-{position}"}
+        taken.add(str(event["id"]))
+        events.append(event)
+    return events
+
+
+def _withheld_evidence(withheld: list[Withheld]) -> list[EvidencePointer]:
+    pointers = {
+        (
+            event_iri(w.record.event_id),
+            "sha256:" + w.digest,
+            str(w.event.get("agentcesourceclass") or "self_report")
+            if w.event is not None
+            else "self_report",
+        )
+        for w in withheld
+        if w.record.event_id is not None and w.digest is not None
+    }
+    return [
+        EvidencePointer(ref=ref, digest=digest, source_class=source_class)
+        for ref, digest, source_class in sorted(pointers)[:_EVIDENCE_CAP]
+    ]
+
+
+def _not_enough_with_withheld(
+    assertion: Assertion, withheld: list[Withheld]
+) -> Assertion:
+    """A control quarantine may have flattered reads insufficient_evidence naming the withheld records (18.119)."""
+    return dataclasses.replace(
+        assertion,
+        outcome="insufficient_evidence",
+        population=(assertion.population[0], 0),
+        violations=[],
+        evidence=_withheld_evidence(withheld),
+        source_class_satisfied=None,
+        evidence_strength=None,
+    )
+
+
 #: The outcomes that mean a control was actually judged. A run with none of them evaluated nothing:
 #: every pair was inapplicable or beyond the engine's rungs, so its clean tally says nothing.
 VERDICT_OUTCOMES = frozenset({"conformant", "non-conformant", "insufficient_evidence"})
@@ -230,12 +282,18 @@ def assess_subjects(
     domain: DomainBinding,
     *,
     applicability_declared: bool = True,
+    withheld: Sequence[Withheld] = (),
 ) -> list[Assertion]:
     """Evaluate every catalog control against every subject and return the assertions.
 
     ``applicability_declared`` is False only for a profile the engine derived from a records folder:
     the adopter has declared no decision types, so a control with no population in the records is
-    reported as ``insufficient_evidence``, never ``not_applicable``."""
+    reported as ``insufficient_evidence``, never ``not_applicable``.
+
+    ``withheld`` is ingest's quarantined records that may hold evidence (18.119): quarantine never gives a
+    better outcome. A control that reads conformant, or not_applicable for want of a population, reads
+    insufficient_evidence naming them when a record ingest could not read may belong to the subject, or when
+    judging the subject's readable withheld records with its held ones changes that outcome."""
     assertions: list[Assertion] = []
     events_by_subject = index_by_subject(accepted)
     for subject in profile.subjects:
@@ -246,21 +304,53 @@ def assess_subjects(
         }
         roles = set(effective_roles(subject.role))
         window = _window(profile, subject_events)
+        own = [w for w in withheld if w.subject in (subject.id, None)]
+        unreadable = any(w.event is None for w in own)
+        readable = [
+            w.event
+            for w in own
+            if w.event is not None and str(w.event.get("subject", "")) == subject.id
+        ]
+        cf_events = _counterfactual(subject_events, readable) if readable else []
+        cf_store = build_graph(cf_events, domain=domain) if readable else store
+        cf_by_iri = {event_iri(str(e["id"])): e for e in cf_events if "id" in e}
         for catalog in catalogs:
             for control in catalog.controls:
-                assertions.append(
-                    _assert_control(
-                        store,
+                assertion = _assert_control(
+                    store,
+                    catalog,
+                    control,
+                    subject,
+                    roles,
+                    subject_events,
+                    events_by_iri,
+                    window,
+                    applicability_declared=applicability_declared,
+                )
+                flattered = bool(own) and (
+                    assertion.outcome == "conformant"
+                    or (
+                        assertion.outcome == "not_applicable"
+                        and _role_applies(roles, control.applies_to_roles)
+                    )
+                )
+                if flattered and (
+                    unreadable
+                    or _assert_control(
+                        cf_store,
                         catalog,
                         control,
                         subject,
                         roles,
-                        subject_events,
-                        events_by_iri,
+                        cf_events,
+                        cf_by_iri,
                         window,
                         applicability_declared=applicability_declared,
-                    )
-                )
+                    ).outcome
+                    != assertion.outcome
+                ):
+                    assertion = _not_enough_with_withheld(assertion, own)
+                assertions.append(assertion)
     return assertions
 
 

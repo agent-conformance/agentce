@@ -129,7 +129,14 @@ function assessProject(
   const profile = loadProfile(join(proj, "applicability.yaml"));
   computeCoverage(ingested.accepted, profile, bundle.root);
   resolveApplicability(profile, ingested.accepted);
-  const assertions = assessSubjects(ingested.accepted, profile, catalogs, domain);
+  const assertions = assessSubjects(
+    ingested.accepted,
+    profile,
+    catalogs,
+    domain,
+    true,
+    ingested.withheld,
+  );
   const activity = summarizeActivity(ingested.accepted, profile);
   const blindSpots = computeBlindSpots(assertions, profile, catalogs, ingested.accepted);
   writeReport(outDir, assertions, {

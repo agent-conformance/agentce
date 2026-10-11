@@ -114,7 +114,9 @@ def _assess_project(
     profile = Profile.load(proj / "applicability.yaml")
     compute_coverage(ingested.accepted, profile, bundle.root)
     resolve_applicability(profile, ingested.accepted)
-    assertions = assess_subjects(ingested.accepted, profile, catalogs, domain)
+    assertions = assess_subjects(
+        ingested.accepted, profile, catalogs, domain, withheld=ingested.withheld
+    )
     write_report(
         out_dir,
         assertions,

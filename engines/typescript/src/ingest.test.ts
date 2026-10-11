@@ -264,3 +264,44 @@ test("a lower-class record never displaces a higher-class record with the same i
   assert.deepEqual(result.accepted, [genuine]);
   assert.equal(result.quarantined[0].source, "urn:example:agent");
 });
+
+test("withheld lists the quarantined records that may hold evidence (18.119)", () => {
+  // A record refused for where it sits stays readable; one ingest cannot read has no event; an identical redelivery
+  // and an unknown type hold nothing new.
+  const first = enforcementPointEvent();
+  const late = { ...first, id: "evt-late", time: "2020-01-01T00:00:00.000Z" };
+  const invalid = { ...first, id: "evt-invalid", time: 7 };
+  const other = { ...first, time: "2030-01-01T00:00:00.000Z" };
+  const unknown = {
+    ...first,
+    id: "evt-unknown",
+    type: "org.agent-conformance.evidence.Heartbeat.v1",
+  };
+  const result = ingest(
+    loadBundle(
+      writeBundle([first, late, invalid, { ...first }, other, unknown], [String(first.source)]),
+    ),
+  );
+  // File order, then each non-identical duplicate once every record is placed.
+  assert.deepEqual(
+    result.withheld.map((w) => w.record.reason),
+    ["time_order", "schema_invalid", "duplicate_id"],
+  );
+  const [timeOrder, unreadable, duplicate] = result.withheld;
+  // Each readable record is the event as readers see it: this undeclared source's class reads self_report.
+  assert.deepEqual(timeOrder.event, { ...late, agentcesourceclass: "self_report" });
+  assert.equal(timeOrder.subject, first.subject);
+  assert.equal(unreadable.event, null);
+  assert.equal(unreadable.subject, first.subject);
+  assert.deepEqual(duplicate.event, { ...other, agentcesourceclass: "self_report" });
+  assert.notEqual(duplicate.digest, null);
+  assert.equal(result.quarantined.length, 5);
+});
+
+test("an oversize record is withheld with no event (18.119)", () => {
+  const result = ingest(loadBundle(writeBundle([enforcementPointEvent()], null)), 10);
+  assert.deepEqual(
+    result.withheld.map((w) => [w.record.reason, w.event, w.subject]),
+    [["oversize", null, null]],
+  );
+});

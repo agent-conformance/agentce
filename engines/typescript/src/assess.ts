@@ -15,6 +15,7 @@ import { sha256Hex } from "./canonical";
 import { type Catalog, type ControlSpec, evidenceShapeFor, shapeFor } from "./catalog";
 import type { DomainBinding } from "./domain";
 import { buildGraph } from "./graph";
+import type { Withheld } from "./ingest";
 import { eventIri } from "./iri";
 import type { Profile, Subject } from "./profile";
 import { compareDate, parseDate } from "./readiness";
@@ -228,12 +229,69 @@ export function indexBySubject(accepted: Event[]): Map<string, Event[]> {
 
 /** Evaluate every catalog control against every subject and return the assertions.
  * `applicabilityDeclared` is false only for a records-folder run, whose profile nobody declared. */
+/** The subject's held events plus the readable withheld ones (18.119). A withheld record whose id is taken (a
+ * duplicate_id) joins under a fresh id, so it is judged as the record it is instead of merging with the held one. */
+function counterfactual(subjectEvents: Event[], readable: Event[]): Event[] {
+  const taken = new Set(subjectEvents.map((e) => String(e.id)));
+  const events = [...subjectEvents];
+  readable.forEach((original, position) => {
+    let event = original;
+    const eventId = String(event.id);
+    if (taken.has(eventId)) {
+      event = { ...event, id: `${eventId}#withheld-${position}` };
+    }
+    taken.add(String(event.id));
+    events.push(event);
+  });
+  return events;
+}
+
+function withheldEvidence(withheld: Withheld[]): EvidencePointer[] {
+  const pointers = new Map<string, EvidencePointer>();
+  for (const w of withheld) {
+    if (w.record.eventId === undefined || w.digest === null) {
+      continue;
+    }
+    const pointer = {
+      ref: eventIri(w.record.eventId),
+      digest: `sha256:${w.digest}`,
+      sourceClass:
+        w.event !== null ? String(w.event.agentcesourceclass || "self_report") : "self_report",
+    };
+    pointers.set(`${pointer.ref}\u0000${pointer.digest}\u0000${pointer.sourceClass}`, pointer);
+  }
+  return [...pointers.keys()]
+    .sort(byteCompare)
+    .slice(0, EVIDENCE_CAP)
+    .map((key) => pointers.get(key) as EvidencePointer);
+}
+
+/** A control quarantine may have flattered reads insufficient_evidence naming the withheld records (18.119). */
+function notEnoughWithWithheld(assertion: Assertion, withheld: Withheld[]): Assertion {
+  return {
+    ...assertion,
+    outcome: "insufficient_evidence",
+    population: [assertion.population[0], 0],
+    violations: [],
+    evidence: withheldEvidence(withheld),
+    sourceClassSatisfied: null,
+    evidenceStrength: null,
+  };
+}
+
+/**
+ * `withheld` is ingest's quarantined records that may hold evidence (18.119): quarantine never gives a better
+ * outcome. A control that reads conformant, or not_applicable for want of a population, reads insufficient_evidence
+ * naming them when a record ingest could not read may belong to the subject, or when judging the subject's readable
+ * withheld records with its held ones changes that outcome.
+ */
 export function assessSubjects(
   accepted: Event[],
   profile: Profile,
   catalogs: Catalog[],
   domain: DomainBinding,
   applicabilityDeclared = true,
+  withheld: Withheld[] = [],
 ): Assertion[] {
   const assertions: Assertion[] = [];
   const eventsBySubject = indexBySubject(accepted);
@@ -248,21 +306,54 @@ export function assessSubjects(
     }
     const roles = new Set(effectiveRoles(subject.role));
     const win = window(profile, subjectEvents);
+    const own = withheld.filter((w) => w.subject === null || w.subject === subject.id);
+    const unreadable = own.some((w) => w.event === null);
+    const readable = own
+      .map((w) => w.event)
+      .filter((e): e is Event => e !== null && String(e.subject ?? "") === subject.id);
+    const cfEvents = readable.length > 0 ? counterfactual(subjectEvents, readable) : [];
+    const cfStore = readable.length > 0 ? buildGraph(cfEvents, { domain }) : store;
+    const cfByIri = new Map<string, Event>();
+    for (const event of cfEvents) {
+      if ("id" in event) {
+        cfByIri.set(eventIri(String(event.id)), event);
+      }
+    }
     for (const catalog of catalogs) {
       for (const control of catalog.controls) {
-        assertions.push(
-          assertControl(
-            store,
-            catalog,
-            control,
-            subject,
-            roles,
-            subjectEvents,
-            eventsByIri,
-            win,
-            applicabilityDeclared,
-          ),
+        let assertion = assertControl(
+          store,
+          catalog,
+          control,
+          subject,
+          roles,
+          subjectEvents,
+          eventsByIri,
+          win,
+          applicabilityDeclared,
         );
+        const flattered =
+          own.length > 0 &&
+          (assertion.outcome === "conformant" ||
+            (assertion.outcome === "not_applicable" && roleApplies(roles, control.appliesToRoles)));
+        if (
+          flattered &&
+          (unreadable ||
+            assertControl(
+              cfStore,
+              catalog,
+              control,
+              subject,
+              roles,
+              cfEvents,
+              cfByIri,
+              win,
+              applicabilityDeclared,
+            ).outcome !== assertion.outcome)
+        ) {
+          assertion = notEnoughWithWithheld(assertion, own);
+        }
+        assertions.push(assertion);
       }
     }
   }

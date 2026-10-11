@@ -1023,6 +1023,7 @@ function runAssess(options: AssessOptions): CommandResult {
     catalogs,
     domain,
     scanned === undefined,
+    ingested.withheld,
   );
   // A records run that judged nothing renders no report: its headline would read "Conformant".
   if (scanned !== undefined && evaluatedNothing(evaluated)) {

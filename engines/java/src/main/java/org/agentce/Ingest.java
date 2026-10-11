@@ -54,6 +54,37 @@ public final class Ingest {
          * verification (SPEC §6.6), which must hash what the source actually signed. */
         public final List<JsonNode> rawAccepted = new ArrayList<>();
         public final List<Quarantine.Record> quarantined = new ArrayList<>();
+        public final List<Withheld> withheld = new ArrayList<>();
+    }
+
+    /**
+     * A quarantined record that may hold evidence a control needs (18.119): quarantine never gives a better
+     * outcome. {@code event} is the record as readers would see it (class corrected as for an accepted event)
+     * when ingest could read it but refused it for where it sits (time_order, a duplicate_id that is not an
+     * identical redelivery, class_mismatch, unknown_source); it is null when ingest could not read it at all
+     * (schema_invalid, oversize). {@code subject} is the record's own subject, null when unknown (then the
+     * record may belong to any subject). An unknown_type record is not withheld: the engine reads nothing from
+     * a type it does not model.
+     */
+    public record Withheld(Quarantine.Record record, JsonNode event, String subject, String digest) {}
+
+    /** The record's canonical digest, null when it has no canonical form (a schema-invalid record may hold a
+     * number the canonical form refuses). */
+    private static String digestOf(JsonNode event) {
+        try {
+            return Canonical.sha256Hex(event);
+        } catch (Canonical.CanonicalizationError e) {
+            return null;
+        }
+    }
+
+    private static Withheld readable(Quarantine.Record record, JsonNode event) {
+        return new Withheld(record, event, opt(event, "subject"), digestOf(event));
+    }
+
+    private static Withheld unreadable(Quarantine.Record record, JsonNode event) {
+        return new Withheld(
+                record, null, event != null ? opt(event, "subject") : null, event != null ? digestOf(event) : null);
     }
 
     private static String typeNameOf(String typeValue) {
@@ -106,8 +137,8 @@ public final class Ingest {
                 try {
                     raw = Verify.decodeStrict(rawLine).toString();
                 } catch (CharacterCodingException e) {
-                    records.add(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
-                            .detail("invalid UTF-8"));
+                    records.add(unreadable(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
+                            .detail("invalid UTF-8"), null));
                     continue;
                 }
                 String line = trimJsonWhitespace(raw);
@@ -115,8 +146,8 @@ public final class Ingest {
                     continue;
                 }
                 if (line.getBytes(StandardCharsets.UTF_8).length > maxEventBytes) {
-                    records.add(new Quarantine.Record(Quarantine.Reason.OVERSIZE)
-                            .detail("event exceeds " + maxEventBytes + " bytes"));
+                    records.add(unreadable(new Quarantine.Record(Quarantine.Reason.OVERSIZE)
+                            .detail("event exceeds " + maxEventBytes + " bytes"), null));
                     continue;
                 }
                 // The bracket count bounds the nesting, so most lines skip the character scan.
@@ -132,23 +163,23 @@ public final class Ingest {
                 try {
                     event = Json.parse(line);
                 } catch (RuntimeException exc) {
-                    records.add(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
-                            .detail("invalid JSON"));
+                    records.add(unreadable(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
+                            .detail("invalid JSON"), null));
                     continue;
                 }
                 if (event == null || !event.isObject()) {
-                    records.add(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
-                            .detail("event is not a JSON object"));
+                    records.add(unreadable(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
+                            .detail("event is not a JSON object"), null));
                     continue;
                 }
 
                 List<String> errors = Schema.validateEvent(event);
                 if (!errors.isEmpty()) {
-                    records.add(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
+                    records.add(unreadable(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
                             .eventId(opt(event, "id"))
                             .source(opt(event, "source"))
                             .type(opt(event, "type"))
-                            .detail(errors.get(0)));
+                            .detail(errors.get(0)), event));
                     continue;
                 }
 
@@ -165,11 +196,12 @@ public final class Ingest {
 
                 String source = event.get("source").asText();
                 if (bundle.sources != null && !bundle.sources.contains(source)) {
-                    records.add(new Quarantine.Record(Quarantine.Reason.UNKNOWN_SOURCE)
+                    records.add(readable(new Quarantine.Record(Quarantine.Reason.UNKNOWN_SOURCE)
                             .eventId(event.get("id").asText())
                             .source(source)
                             .type(typeValue)
-                            .detail("source is not declared in the bundle manifest"));
+                            .detail("source is not declared in the bundle manifest"),
+                            ((ObjectNode) event).deepCopy().put("agentcesourceclass", "self_report")));
                     continue;
                 }
 
@@ -178,12 +210,13 @@ public final class Ingest {
                 if (declaredClass != null) {
                     String eventClass = event.get("agentcesourceclass").asText();
                     if (!eventClass.equals(declaredClass)) {
-                        records.add(new Quarantine.Record(Quarantine.Reason.CLASS_MISMATCH)
+                        records.add(readable(new Quarantine.Record(Quarantine.Reason.CLASS_MISMATCH)
                                 .eventId(event.get("id").asText())
                                 .source(source)
                                 .type(typeValue)
                                 .detail("event class '" + eventClass + "' differs from the declared class '"
-                                        + declaredClass + "' for this source"));
+                                        + declaredClass + "' for this source"),
+                                ((ObjectNode) event).deepCopy().put("agentcesourceclass", declaredClass)));
                         continue;
                     }
                 } else if (!"self_report".equals(event.get("agentcesourceclass").asText())) {
@@ -203,7 +236,15 @@ public final class Ingest {
 
         Set<String> seenIds = new HashSet<>();
         Map<String, String> lastTime = new HashMap<>();
+        // Each duplicate_id record with the raw record it was read from: withheld unless it is an identical
+        // redelivery of the record held under its id, which is known only once every record is placed.
+        List<Map.Entry<Withheld, JsonNode>> duplicates = new ArrayList<>();
         for (Object record : records) {
+            if (record instanceof Withheld withheld) {
+                result.quarantined.add(withheld.record());
+                result.withheld.add(withheld);
+                continue;
+            }
             if (!(record instanceof Candidate candidate)) {
                 result.quarantined.add((Quarantine.Record) record);
                 continue;
@@ -211,13 +252,15 @@ public final class Ingest {
             JsonNode event = candidate.event();
             String eventId = event.get("id").asText();
             if (seenIds.contains(eventId) || candidate.rank() < ownerRank.get(eventId)) {
-                result.quarantined.add(new Quarantine.Record(Quarantine.Reason.DUPLICATE_ID)
+                Withheld duplicate = readable(new Quarantine.Record(Quarantine.Reason.DUPLICATE_ID)
                         .eventId(eventId)
                         .source(candidate.source())
                         .type(candidate.typeValue())
                         .detail(seenIds.contains(eventId)
                                 ? "event id already seen in this bundle"
-                                : "a record of a higher source class has this event id"));
+                                : "a record of a higher source class has this event id"), event);
+                result.quarantined.add(duplicate.record());
+                duplicates.add(Map.entry(duplicate, candidate.rawEvent()));
                 continue;
             }
 
@@ -225,12 +268,14 @@ public final class Ingest {
             String timeValue = event.get("time").asText();
             String previous = lastTime.get(stream);
             if (previous != null && Json.byteCompare(timeValue, previous) < 0) {
-                result.quarantined.add(new Quarantine.Record(Quarantine.Reason.TIME_ORDER)
+                Withheld late = readable(new Quarantine.Record(Quarantine.Reason.TIME_ORDER)
                         .eventId(eventId)
                         .source(candidate.source())
                         .stream(stream)
                         .type(candidate.typeValue())
-                        .detail("time " + timeValue + " precedes " + previous + " in the stream"));
+                        .detail("time " + timeValue + " precedes " + previous + " in the stream"), event);
+                result.quarantined.add(late.record());
+                result.withheld.add(late);
                 continue;
             }
 
@@ -238,6 +283,16 @@ public final class Ingest {
             lastTime.put(stream, timeValue);
             result.accepted.add(event);
             result.rawAccepted.add(candidate.rawEvent());
+        }
+        Map<String, String> held = new HashMap<>();
+        for (JsonNode e : result.rawAccepted) {
+            held.put(e.get("id").asText(), digestOf(e));
+        }
+        for (Map.Entry<Withheld, JsonNode> entry : duplicates) {
+            String digest = digestOf(entry.getValue());
+            if (digest == null || !digest.equals(held.get(entry.getValue().get("id").asText()))) {
+                result.withheld.add(entry.getKey());
+            }
         }
         return result;
     }
