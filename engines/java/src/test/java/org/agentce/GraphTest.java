@@ -536,6 +536,29 @@ class GraphTest {
         });
     }
 
+    /** An Outcome that names the decision shows it had taken effect (18.144): an approve gates it only when recorded
+     * at or before every such Outcome too, compared as instants, wherever the Outcome sits in the input. */
+    @Test
+    void anApproveAfterTheOutcomeIsAReviewNotAnApproval() {
+        Map<String, Boolean> cases = new LinkedHashMap<>();
+        cases.put("2026-01-10T01:00:00Z", true);
+        cases.put("2026-01-10T01:00:01Z", false);
+        cases.put("2026-01-10T00:30:00-05:00", false);
+        cases.put("2026-01-10T00:30:00", false);
+        cases.forEach((approvedAt, approved) -> {
+            ObjectNode outcome = (ObjectNode) event("o1", "Outcome", decisionRef("d1"));
+            outcome.put("time", "2026-01-10T01:00:00Z");
+            ObjectNode approval = (ObjectNode) approval("a1", "d1", "alice");
+            approval.put("time", approvedAt);
+            List<JsonNode> events = withLogins(List.of(decisionEvent("d1"), approval));
+            events.add(outcome);
+            GraphStore store = Graph.buildGraph(events, DomainBinding.fromDict(CREDIT_DOMAIN));
+            assertEquals(List.of("agentce:event/a1"), store.objects("agentce:event/d1", "agentce:reviewedBy"), approvedAt);
+            assertEquals(approved ? List.of("agentce:event/a1") : List.of(),
+                    store.objects("agentce:event/d1", "agentce:approvedBy"), approvedAt);
+        });
+    }
+
     @Test
     void ovs08OneHumanReviewerCoversADecision() {
         assertEquals(List.of("false"), flag(List.of(decisionEvent("d1")), "d1", "oversightCoverageComplete"));
