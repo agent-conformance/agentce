@@ -982,6 +982,27 @@ def test_an_approve_after_the_action_ran_is_a_review_not_an_approval() -> None:
         ]
 
 
+def test_an_approve_after_the_outcome_is_a_review_not_an_approval() -> None:
+    """An Outcome that names the decision shows it had taken effect (18.144): an approve gates it only when recorded at
+    or before every such Outcome too, compared as instants, wherever the Outcome sits in the input."""
+    d1 = event_iri("d1")
+    for approved_at, approved in (
+        ("2026-01-10T01:00:00Z", True),
+        ("2026-01-10T01:00:01Z", False),
+        ("2026-01-10T00:30:00-05:00", False),
+        ("2026-01-10T00:30:00", False),
+    ):
+        outcome = _event("o1", "Outcome", {"refs": {"decision": d1}})
+        outcome["time"] = "2026-01-10T01:00:00Z"
+        approval = {**_approval("a1", ALICE), "time": approved_at}
+        events = [decision("d1", "2026-01-10T00:00:00Z"), approval, *LOGINS, outcome]
+        store = build_graph(events, domain=DOMAIN)
+        assert store.objects(d1, "agentce:reviewedBy") == [event_iri("a1")]
+        assert store.objects(d1, "agentce:approvedBy") == (
+            [event_iri("a1")] if approved else []
+        ), approved_at
+
+
 def test_a_later_reject_by_the_same_human_withdraws_the_approval() -> None:
     """Each human's most recent decision before the action governs (18.142): the same human's reject or edit at or
     after an approve, or at a time that cannot be placed against it, withdraws it unless it came after every ToolCall;

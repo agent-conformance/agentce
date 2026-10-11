@@ -972,20 +972,28 @@ class Builder {
   /** Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An ApprovalDecided
    * reviews the decision it names (`agentce:reviewedBy`; OVS-01, INC-03, RSK-02) only when it does, whatever its
    * outcome; it also approves it (`agentce:approvedBy`; CND-02, OVS-08) only when its outcome is approve, it is
-   * recorded at or before every ToolCall that executes the decision (18.141), and the same human recorded no other
+   * recorded at or before every ToolCall that executes the decision (18.141) and every Outcome that names it (18.144:
+   * the decision had already taken effect), and the same human recorded no other
    * decision on it at or after it, or at a time that cannot be placed against it, unless that decision came after
    * every such ToolCall (18.142: each human's most recent decision governs); one that fails it is no human's review. */
   private mapOversight(events: Event[]): Map<string, boolean> {
     const byHuman = new Map<string, boolean>();
     const actionTimes = new Map<string, string[]>();
+    const effectTimes = new Map<string, string[]>();
     // decision -> human -> that human's decisions on it: [node, time, approve]
     const decided = new Map<string, Map<string, Array<[string, string, boolean]>>>();
+    const push = (map: Map<string, string[]>, decision: string, time: string): void => {
+      const times = map.get(decision) ?? [];
+      times.push(time);
+      map.set(decision, times);
+    };
     for (const event of events) {
       const decision = refsOf(event).decision;
-      if (this.ptype(event) === "ToolCall" && typeof decision === "string") {
-        const times = actionTimes.get(decision) ?? [];
-        times.push(String(event.time ?? ""));
-        actionTimes.set(decision, times);
+      const ptype = this.ptype(event);
+      if ((ptype === "ToolCall" || ptype === "Outcome") && typeof decision === "string") {
+        const time = String(event.time ?? "");
+        push(effectTimes, decision, time);
+        if (ptype === "ToolCall") push(actionTimes, decision, time);
       }
     }
     for (const event of events) {
@@ -1022,6 +1030,7 @@ class Builder {
     }
     for (const [decision, byActor] of decided) {
       const actions = actionTimes.get(decision) ?? [];
+      const effects = effectTimes.get(decision) ?? [];
       for (const [key, records] of byActor) {
         const withdrawals = records
           .filter(([, time, approve]) => !approve && !afterEvery(time, actions))
@@ -1029,7 +1038,7 @@ class Builder {
         for (const [node, time, approve] of records) {
           if (
             !approve ||
-            !beforeEvery(time, actions) ||
+            !beforeEvery(time, effects) ||
             !withdrawals.every((w) => compareLiterals(time, w) === 1)
           ) {
             continue;

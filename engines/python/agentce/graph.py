@@ -770,17 +770,23 @@ class _Builder:
         """Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An
         ApprovalDecided reviews the decision it names (``agentce:reviewedBy``; OVS-01, INC-03, RSK-02) only when it
         does, whatever its outcome; it also approves it (``agentce:approvedBy``; CND-02, OVS-08) only when its outcome
-        is approve, it is recorded at or before every ToolCall that executes the decision (18.141), and the same human
+        is approve, it is recorded at or before every ToolCall that executes the decision (18.141) and every Outcome
+        that names it (18.144: the decision had already taken effect), and the same human
         recorded no other decision on it at or after it, or at a time that cannot be placed against it, unless that
         decision came after every such ToolCall (18.142: each human's most recent decision governs). One that fails
         the rule is no human's review."""
         by_human: dict[str, bool] = {}
         action_times: dict[str, list[str]] = {}
+        effect_times: dict[str, list[str]] = {}
         decided: dict[tuple[str, str], list[tuple[str, str, bool]]] = {}
         for event in events:
             decision = _refs(event).get("decision")
-            if self._ptype(event) == "ToolCall" and isinstance(decision, str):
-                action_times.setdefault(decision, []).append(str(event.get("time", "")))
+            ptype = self._ptype(event)
+            if ptype in ("ToolCall", "Outcome") and isinstance(decision, str):
+                time = str(event.get("time", ""))
+                effect_times.setdefault(decision, []).append(time)
+                if ptype == "ToolCall":
+                    action_times.setdefault(decision, []).append(time)
         for event in events:
             ptype = self._ptype(event)
             if ptype not in _OVERSIGHT_TYPES:
@@ -816,7 +822,7 @@ class _Builder:
             for node, time, approve in records:
                 if (
                     approve
-                    and _before_every(time, actions)
+                    and _before_every(time, effect_times.get(decision, ()))
                     and all(compare_literals(time, w) == 1 for w in withdrawals)
                 ):
                     self.store.add_edge(decision, "agentce:approvedBy", node)

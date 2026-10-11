@@ -998,18 +998,23 @@ public final class Graph {
         /** Whether each ApprovalDecided, Override and Interrupt meets the SPEC §10.4 human-actor rule. An
          * ApprovalDecided reviews the decision it names ({@code agentce:reviewedBy}; OVS-01, INC-03, RSK-02) only when
          * it does, whatever its outcome; it also approves it ({@code agentce:approvedBy}; CND-02, OVS-08) only when its
-         * outcome is approve, it is recorded at or before every ToolCall that executes the decision (18.141), and the
-         * same human recorded no other decision on it at or after it, or at a time that cannot be placed against it,
+         * outcome is approve, it is recorded at or before every ToolCall that executes the decision (18.141) and every
+         * Outcome that names it (18.144: the decision had already taken effect), and the same human recorded no other decision on it at or after it, or at a time that cannot be placed against it,
          * unless that decision came after every such ToolCall (18.142: each human's most recent decision governs).
          * One that fails the rule is no human's review. */
         private Map<String, Boolean> mapOversight(List<JsonNode> events) {
             Map<String, Boolean> byHuman = new LinkedHashMap<>();
             Map<String, List<String>> actionTimes = new LinkedHashMap<>();
+            Map<String, List<String>> effectTimes = new LinkedHashMap<>();
             Map<String, Map<String, List<Decided>>> decided = new LinkedHashMap<>();
             for (JsonNode event : events) {
                 String decision = str(refsOf(event).get("decision"));
-                if ("ToolCall".equals(ptype(event)) && decision != null) {
-                    actionTimes.computeIfAbsent(decision, k -> new ArrayList<>()).add(timeOf(event));
+                String type = ptype(event);
+                if (("ToolCall".equals(type) || "Outcome".equals(type)) && decision != null) {
+                    effectTimes.computeIfAbsent(decision, k -> new ArrayList<>()).add(timeOf(event));
+                    if ("ToolCall".equals(type)) {
+                        actionTimes.computeIfAbsent(decision, k -> new ArrayList<>()).add(timeOf(event));
+                    }
                 }
             }
             for (JsonNode event : events) {
@@ -1042,13 +1047,14 @@ public final class Graph {
             for (Map.Entry<String, Map<String, List<Decided>>> byDecision : decided.entrySet()) {
                 String decision = byDecision.getKey();
                 List<String> actions = actionTimes.getOrDefault(decision, List.of());
+                List<String> effects = effectTimes.getOrDefault(decision, List.of());
                 for (Map.Entry<String, List<Decided>> byActor : byDecision.getValue().entrySet()) {
                     List<String> withdrawals = byActor.getValue().stream()
                             .filter(d -> !d.approve() && !afterEvery(d.time(), actions))
                             .map(Decided::time)
                             .toList();
                     for (Decided d : byActor.getValue()) {
-                        if (d.approve() && beforeEvery(d.time(), actions) && withdrawals.stream().allMatch(w -> {
+                        if (d.approve() && beforeEvery(d.time(), effects) && withdrawals.stream().allMatch(w -> {
                             Integer order = Structural.compareLiterals(d.time(), w);
                             return order != null && order > 0;
                         })) {
