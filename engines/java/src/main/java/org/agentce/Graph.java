@@ -403,6 +403,9 @@ public final class Graph {
         // event that leaves out the optional agent still concerns the subject.
         private final Map<String, Set<String>> eventAgents = new LinkedHashMap<>();
         private final Map<String, Set<String>> actedFor = new LinkedHashMap<>();
+        // agent id -> how many held events concern it, built on first use by an oversight record whose refs.decision
+        // names no held event (18.158).
+        private Map<String, Integer> agentEvents;
         // OVS-08: decision IRI -> the actor IRI of every verified ApprovalDecided whose outcome is approve.
         private final Map<String, Set<String>> humanApprovers = new LinkedHashMap<>();
         // INC-03: event IRI -> the decision its refs.decision names, whatever the event type.
@@ -575,7 +578,11 @@ public final class Graph {
             }
             // Every name the ref may mean an event by, the held decision among them: a name that leads to another
             // held event, or to none, still counts that event's agents, so resolving never loosens the rule (fail closed).
-            List<String> named = refNames(refsOf(event).get("decision"));
+            JsonNode ref = refsOf(event).get("decision");
+            List<String> named = refNames(ref);
+            // A present refs.decision that names no held event (null or empty included) may mean any of them, so the
+            // record concerns every held event but its own login (18.158).
+            boolean unresolved = ref != null && named.stream().noneMatch(eventInfo::containsKey);
             Set<String> concerned = new LinkedHashSet<>(eventAgents.get(node));
             for (String name : named) {
                 concerned.addAll(eventAgents.getOrDefault(name, Set.of()));
@@ -586,6 +593,10 @@ public final class Graph {
                 return null;
             }
             if (loginInfo.agent() == null || concerned.contains(loginInfo.agent())) {
+                return null;
+            }
+            // The login itself is one event concerning its agent; any other makes it that agent's session (fail closed).
+            if (unresolved && agentEventCounts().getOrDefault(loginInfo.agent(), 0) > 1) {
                 return null;
             }
             String actorIri = Iri.principalIri(actor, key);
@@ -600,6 +611,19 @@ public final class Graph {
                 chain.addAll(agentChain.getOrDefault(agentId, Set.of()));
             }
             return chain.contains(actorIri) ? null : actorIri;
+        }
+
+        /** How many held events concern each agent (their own agent or CloudEvents subject; 18.158). */
+        private Map<String, Integer> agentEventCounts() {
+            if (agentEvents == null) {
+                agentEvents = new LinkedHashMap<>();
+                for (Set<String> agents : eventAgents.values()) {
+                    for (String agent : agents) {
+                        agentEvents.merge(agent, 1, Integer::sum);
+                    }
+                }
+            }
+            return agentEvents;
         }
 
         private void mapChain(String agentId, JsonNode actedFor) {
