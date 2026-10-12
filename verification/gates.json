@@ -4171,7 +4171,7 @@
       "timeout_s": 3600,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "verification/gates/python_versions.sh runs `uv run --isolated --python <v> --project engines/python --frozen python -m pytest engines/python/tests` for 3.14, 3.13, 3.12.10 and 3.12.3 one after another and every run exits 0: a symlink-loop manifest member, a `--` where a command's action goes, an unreadable release folder and a too-deep or non-object coverage denominator manifest get the same answer on each version",
+        "pass": "verification/gates/python_versions.sh runs `uv run --isolated --python <v> --project engines/python --frozen python -m pytest engines/python/tests` for 3.14, 3.13, 3.12.10 and 3.12.3 at the same time, each in its own copy of the working tree, and every run exits 0: a symlink-loop manifest member, a `--` where a command's action goes, an unreadable release folder and a too-deep or non-object coverage denominator manifest get the same answer on each version",
         "fail": "any version's suite exits non-zero, or uv cannot provide that interpreter (never a skip)"
       },
       "faults": [

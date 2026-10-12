@@ -64,13 +64,10 @@ def _denominator_counts(
                 )
             data = json.loads(raw.decode("utf-8"))
             # A root that is not an object declares no counts: fall through, as TypeScript and Java do.
-            declared = (
-                (data.get("counts") or data.get("expected") or {})
-                if isinstance(data, dict)
-                else None
-            )
-            if isinstance(declared, dict):
-                return {str(k): int(v) for k, v in declared.items()}
+            if isinstance(data, dict):
+                declared = data.get("counts") or data.get("expected") or {}
+                if isinstance(declared, dict):
+                    return {str(k): int(v) for k, v in declared.items()}
     # Otherwise count the denominator source's own ingested events, per type.
     counts: dict[str, int] = {}
     for (source, event_type), count in by_source_type.items():
