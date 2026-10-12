@@ -44,7 +44,8 @@ class FailOnTest {
     @Test
     void parseAcceptsWhatPythonAccepts() {
         assertTrue(matches("outcome==\"non-conformant\" and severity==\"high\"", AUV04)); // F1
-        assertFalse(matches("severity==\"critical\"", AUV04)); // F2
+        assertFalse(matches("control==\"AUV-99\"", AUV04));
+        assertTrue(matches("severity=='hi\\gh'", AUV04)); // an escape that unescapes to a closed value
         // and binds tighter than or (F4): AUV-04 matches the first group, AUV-01 high neither.
         String f4 = "control==\"AUV-04\" or control==\"AUV-01\" and severity==\"low\"";
         assertTrue(matches(f4, AUV04));
@@ -67,6 +68,27 @@ class FailOnTest {
         noMode.mode = null;
         assertFalse(matches("mode==\"manual\"", noMode));
         assertTrue(matches("mode==\"manual\" or control==\"AUV-05\"", noMode));
+    }
+
+    @Test
+    void refusesALiteralOutsideTheClosedVocabulary() {
+        String[][] cases = {
+            {"outcome==\"non_conformant\"", "outcome 'non_conformant' is not one of: conformant, non-conformant, "
+                    + "partial, not_applicable, not_assessed, insufficient_evidence"},
+            {"severity==\"critical\"", "severity 'critical' is not one of: high, medium, low"},
+            {"mode==\"auto\"", "mode 'auto' is not one of: automated, semi-automated, manual"},
+            {"outcome==\"non-conformant\" or severity==\"critical\"", "severity 'critical' is not one of: high, medium, low"},
+            // A syntax error or an unknown field is reported before a value outside the vocabulary.
+            {"severity==\"critical\" foo", "unexpected token 'foo' after a complete expression"},
+            {"severity==\"critical\" and foo==\"x\"", "unknown field 'foo'; choose from: "
+                    + "control, family, mode, outcome, rung, severity, subject"},
+        };
+        for (String[] c : cases) {
+            InputError err = assertThrows(InputError.class, () -> FailOn.parse(c[0]), c[0]);
+            assertEquals("input.fail_on_invalid_expression", err.key, c[0]);
+            assertEquals("--fail-on " + Readiness.pyRepr(c[0]) + " is not a valid expression: " + c[1], err.reason, c[0]);
+        }
+        assertFalse(matches("mode==\"semi-automated\"", AUV04));
     }
 
     @Test

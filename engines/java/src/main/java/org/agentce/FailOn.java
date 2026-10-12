@@ -2,6 +2,7 @@ package org.agentce;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -28,6 +29,14 @@ public final class FailOn {
 
     private static final String FIX = "use comparisons of the form field==\"literal\" joined by and/or, over: "
             + String.join(", ", ALLOWED_FIELDS) + ".";
+
+    /** The fields whose values are a closed vocabulary (SPEC §8.5; spec/report/auditor.schema.json for outcome and
+     * mode, spec/rules/control.schema.json for severity). A literal outside it could never match, so it is refused
+     * rather than read as a rule that holds nothing to account. control, subject, family and rung stay free text. */
+    private static final Map<String, List<String>> CLOSED_VALUES = Map.of(
+            "outcome", Assertions.OUTCOMES,
+            "severity", List.of("high", "medium", "low"),
+            "mode", List.of("automated", "semi-automated", "manual"));
 
     /** One {@code field=="literal"} comparison. */
     record Comparison(String field, String literal) {}
@@ -221,16 +230,32 @@ public final class FailOn {
         }
     }
 
+    /** Refuse the first comparison, left to right, whose field is closed and whose literal is not one of its
+     * values. It runs after the whole expression parses, so a syntax error or an unknown field is reported first. */
+    private static void checkClosedValues(List<List<Comparison>> groups) {
+        for (List<Comparison> group : groups) {
+            for (Comparison c : group) {
+                List<String> allowed = CLOSED_VALUES.get(c.field());
+                if (allowed != null && !allowed.contains(c.literal())) {
+                    throw new ExprError(c.field() + " " + Readiness.pyRepr(c.literal()) + " is not one of: "
+                            + String.join(", ", allowed));
+                }
+            }
+        }
+    }
+
     /** Parse a {@code --fail-on} expression. Throws {@link InputError} with the stable
-     * {@code input.fail_on_invalid_expression} key on any syntax error, unknown field or disallowed
-     * token, before any assertion is evaluated against it (SPEC §7: never eval). */
+     * {@code input.fail_on_invalid_expression} key on any syntax error, unknown field, outcome, severity or
+     * mode literal outside its closed vocabulary, or disallowed token, before any assertion is evaluated against it (SPEC §7: never eval). */
     public static Expression parse(String expr) {
         try {
             List<Token> tokens = tokenize(expr.codePoints().toArray());
             if (tokens.isEmpty()) {
                 throw new ExprError("the --fail-on expression is empty");
             }
-            return new Expression(new Parser(tokens).parse());
+            List<List<Comparison>> groups = new Parser(tokens).parse();
+            checkClosedValues(groups);
+            return new Expression(groups);
         } catch (ExprError exc) {
             throw new InputError(
                     "input.fail_on_invalid_expression",

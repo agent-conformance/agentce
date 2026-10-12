@@ -615,13 +615,18 @@ class CliTest {
         assertEquals("[\"findings\"]", env.get("exit_status").toString());
         assertEquals("outcome==\"non-conformant\" and severity==\"high\"", env.get("fail_on").get("expression").asText());
         assertEquals(2, env.get("fail_on").get("matched").asInt());
-        // F2: nothing matches, so the run exits 0 although it holds non-conformant assertions.
-        Path f2 = dir.resolve("f2");
-        env = runAssess(auditorAssessArgs(f2), "--fail-on", "severity==\"critical\"");
+        // F2b: nothing matches, so the run exits 0 although it holds non-conformant assertions.
+        Path f2b = dir.resolve("f2b");
+        env = runAssess(auditorAssessArgs(f2b), "--fail-on", "control==\"NONE-00\"");
         assertEquals(0, env.get("exit_code").asInt());
         assertEquals("[\"ok\"]", env.get("exit_status").toString());
         assertEquals(0, env.get("fail_on").get("matched").asInt());
-        assertTrue(Files.isRegularFile(f2.resolve("assertions.json")));
+        assertTrue(Files.isRegularFile(f2b.resolve("assertions.json")));
+        // F2: a severity the report never uses would match nothing, so it is refused and nothing is written.
+        Path f2 = dir.resolve("f2");
+        assertFailOnRefused(runAssess(auditorAssessArgs(f2), "--fail-on", "severity==\"critical\""), f2,
+                "--fail-on 'severity==\"critical\"' is not a valid expression: "
+                        + "severity 'critical' is not one of: high, medium, low");
         // F4b: and binds tighter than or.
         env = runAssess(auditorAssessArgs(dir.resolve("f4b")), "--fail-on",
                 "control==\"AUV-01\" and severity==\"low\" or control==\"AUV-02\" and severity==\"low\"");
@@ -661,9 +666,11 @@ class CliTest {
     @Test
     void assessFailOnEqualsFormAndLastWins(@TempDir Path dir) {
         // F7: --fail-on=<expression>, split at the first '=' only.
-        JsonNode env = runAssess(auditorAssessArgs(dir.resolve("f7")), "--fail-on=severity==\"critical\"");
-        assertEquals(0, env.get("exit_code").asInt());
-        assertEquals("severity==\"critical\"", env.get("fail_on").get("expression").asText());
+        Path f7 = dir.resolve("f7");
+        assertFailOnRefused(runAssess(auditorAssessArgs(f7), "--fail-on=severity==\"critical\""), f7,
+                "--fail-on 'severity==\"critical\"' is not a valid expression: "
+                        + "severity 'critical' is not one of: high, medium, low");
+        JsonNode env;
         // F8/F8b: the last occurrence wins, whichever spelling it uses.
         env = runAssess(auditorAssessArgs(dir.resolve("f8")),
                 "--fail-on", "control==\"AUV-01\"", "--fail-on", "control==\"none\"");
