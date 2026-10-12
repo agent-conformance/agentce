@@ -621,7 +621,7 @@ def _verify_report(
     with os.scandir(report_dir):
         pass  # an unlistable report folder is unreadable, not a report with no claim
     claim_path = report_dir / "claim.json"
-    if not claim_path.is_file():
+    if not _is_regular_file(claim_path):
         raise InputError(
             "verify.report_no_claim",
             f"{report_dir} has no claim.json.",
@@ -661,7 +661,7 @@ def _verify_report(
         trust = _load_report_trust_root(trust_root_path)
     else:
         embedded_path = report_dir / "trust-root.json"
-        if not embedded_path.is_file():
+        if not _is_regular_file(embedded_path):
             raise InputError(
                 "verify.report_no_trust_root",
                 f"{report_dir} has no embedded trust-root.json, and --signer-trust-root was not given.",
@@ -747,7 +747,7 @@ def _verify_report(
                 "re-sign the report: `agentce sign <report-dir> --as claimant`.",
             )
     manifest_path = report_dir / "manifest.json"
-    if not manifest_path.is_file():
+    if not _is_regular_file(manifest_path):
         raise InputError(
             "verify.report_output_tampered",
             f"{report_dir} has no manifest.json.",
@@ -812,7 +812,7 @@ def _verify_report(
     tampered: list[str] = []
     for name, expected in manifest.get("outputs", {}).items():
         candidate_path = report_dir / name
-        if not candidate_path.is_file():
+        if not _is_regular_file(candidate_path):
             tampered.append(name)
             continue
         actual = signing.sha256_prefixed(candidate_path.read_bytes())
@@ -827,7 +827,7 @@ def _verify_report(
 
     packaging_fix = "regenerate the report with `agentce assess --package-for-sharing`."
     packaging_path = report_dir / "packaging.json"
-    if not packaging_path.is_file():
+    if not _is_regular_file(packaging_path):
         raise InputError(
             "verify.report_output_tampered",
             f"{report_dir} has no packaging.json.",
@@ -879,7 +879,7 @@ def _verify_report(
             "the packaged evidence was altered after signing; regenerate and re-sign the report.",
         )
     profile_path = report_dir / "bundle" / "applicability.yaml"
-    if not profile_path.is_file() or signing.sha256_prefixed(
+    if not _is_regular_file(profile_path) or signing.sha256_prefixed(
         profile_path.read_bytes()
     ) != inputs.get("applicability_profile_digest"):
         raise InputError(
@@ -891,7 +891,7 @@ def _verify_report(
     domain_path = report_dir / "bundle" / "domain.linkml.yaml"
     if domain_digest is not None:
         if (
-            not domain_path.is_file()
+            not _is_regular_file(domain_path)
             or signing.sha256_prefixed(domain_path.read_bytes()) != domain_digest
         ):
             raise InputError(
@@ -904,7 +904,7 @@ def _verify_report(
     deviations_path = report_dir / "bundle" / "deviations.yaml"
     if deviation_digest is not None:
         if (
-            not deviations_path.is_file()
+            not _is_regular_file(deviations_path)
             or signing.sha256_prefixed(deviations_path.read_bytes()) != deviation_digest
         ):
             raise InputError(
@@ -1002,7 +1002,7 @@ def _verify_report(
         for name in _RERUN_COMPARE_FILES:
             shipped = report_dir / name
             produced = scratch / "out" / name
-            if not produced.is_file() or not shipped.is_file():
+            if not produced.is_file() or not _is_regular_file(shipped):
                 mismatched_files.append(name)
                 continue
             if produced.read_bytes() != shipped.read_bytes():
@@ -1060,7 +1060,8 @@ def _verify_release_soft_fail(
 
 def _is_regular_file(path: Path) -> bool:
     """``Path.is_file`` as Python 3.12 answers it: a PermissionError propagates (the caller's
-    input.release_unreadable), where 3.14's ``is_file`` swallows it and returns False."""
+    input.release_unreadable or verify.report_unreadable), where 3.14's ``is_file`` swallows it and
+    returns False."""
     try:
         return stat.S_ISREG(path.stat().st_mode)
     except OSError as exc:

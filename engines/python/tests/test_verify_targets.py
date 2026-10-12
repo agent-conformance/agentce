@@ -736,6 +736,22 @@ def test_verify_unreadable_input_report_file(
 
 
 @not_root
+def test_verify_report_folder_listable_but_not_searchable(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Mode 600: Path.is_file() inside it raises on 3.12 and 3.13 but returns False on 3.14 (18.114).
+    out, _key = _packaged_and_signed(tmp_path)
+    capsys.readouterr()  # discard the setup commands' output
+    out.chmod(0o600)
+    try:
+        code, env = run(["verify", "--report", str(out), "--json"], capsys)
+    finally:
+        out.chmod(0o755)
+    assert code == 3
+    assert _refusal(env)[0] == "verify.report_unreadable"
+
+
+@not_root
 def test_verify_unreadable_input_report_packaged_catalog(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
