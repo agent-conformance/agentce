@@ -5,6 +5,6 @@
 # own helpers, signing.is_regular_file and is_directory, answer the same on every Python.
 set -uo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
-check=(env -u VIRTUAL_ENV uv run --project "$root/tools" --frozen python "$root/verification/gates/pathlib_predicates_check.py")
+check=(env -u VIRTUAL_ENV uv run --no-project python "$root/verification/gates/pathlib_predicates_check.py")
 "${check[@]}" --self-test || exit 1
 "${check[@]}" "$root/engines/python/agentce" "$root/verification/gates/fixtures/pathlib_predicates/baseline.json"

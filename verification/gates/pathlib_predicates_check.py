@@ -32,7 +32,8 @@ PREDICATES = frozenset({"is_file", "is_dir", "exists", "is_symlink"})
 
 
 def sites_in(source: str, module: str) -> Counter[str]:
-    """Every bare predicate call in ``source`` (no arguments), keyed by site."""
+    """Every bare predicate call in ``source`` (no positional argument; keywords such as
+    ``follow_symlinks`` still count), keyed by site."""
     found: Counter[str] = Counter()
     scope: list[str] = []
 
@@ -52,7 +53,6 @@ def sites_in(source: str, module: str) -> Counter[str]:
                 isinstance(func, ast.Attribute)
                 and func.attr in PREDICATES
                 and not node.args
-                and not node.keywords
             ):
                 found[
                     f"{module}::{'.'.join(scope) or '<module>'}::{ast.unparse(func)}"
@@ -95,7 +95,7 @@ def self_test() -> int:
         "def f(p, q):\n"
         "    if p.is_file() and (q / 'x').exists():\n"
         "        return p.is_file()\n"
-        "    return p.is_dir(follow_symlinks=False)\n"
+        "    return p.is_dir(follow_symlinks=False) or os.path.exists(p)\n"
         "class C:\n"
         "    def g(self):\n"
         "        return self.path.is_symlink()\n"
@@ -108,6 +108,7 @@ def self_test() -> int:
             "agentce/m.py::f::(q / 'x').exists": 1,
             "agentce/m.py::C.g::self.path.is_symlink": 1,
             "agentce/m.py::<module>::Path('x').is_dir": 1,
+            "agentce/m.py::f::p.is_dir": 1,
         }
     ), found
     exact = dict(found)
