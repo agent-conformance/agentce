@@ -208,11 +208,11 @@ def test_digest_tree_is_order_independent_and_excludes(tmp_path: Path) -> None:
 def _linked_tree(tmp_path: Path) -> tuple[Path, Path]:
     """A catalog-like tree whose controls/ is a symlink to a folder outside it, and its real twin."""
     real, linked, target = tmp_path / "real", tmp_path / "linked", tmp_path / "target"
-    for root in (real, target):
-        (root / "controls" if root is real else root).mkdir(parents=True)
+    (real / "controls").mkdir(parents=True)
+    target.mkdir()
+    linked.mkdir()
     for folder in (real / "controls", target):
         (folder / "DOC-01.yaml").write_text("id: DOC-01\n", encoding="utf-8")
-    linked.mkdir()
     (real / "catalog.yaml").write_text("id: x\n", encoding="utf-8")
     (linked / "catalog.yaml").write_text("id: x\n", encoding="utf-8")
     (linked / "controls").symlink_to(target, target_is_directory=True)
@@ -236,9 +236,10 @@ def test_digest_tree_covers_a_symlinked_folder_as_the_loader_reads_it(
     )
     assert signing.digest_tree(linked) != signing.digest_tree(real)
     # A dangling folder link and a link to itself are skipped, as at base.
+    unlinked = signing.digest_tree(real)
     (real / "gone").symlink_to(tmp_path / "nowhere", target_is_directory=True)
     (real / "self").symlink_to("self")
-    assert signing.digest_tree(real) == signing.digest_tree(linked.parent / "real")
+    assert signing.digest_tree(real) == unlinked
 
 
 @pytest.mark.parametrize("shape", ["ancestor", "diamond", "fan-out", "case-variant"])
