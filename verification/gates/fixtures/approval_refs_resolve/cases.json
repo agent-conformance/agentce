@@ -5967,92 +5967,6 @@
         "exit": 2
       }
     },
-    "ovs07-interrupt-names-its-login-agent-seen-only-there": {
-      "control": "OVS-07",
-      "profile": "eu",
-      "events": [
-        {
-          "specversion": "1.0",
-          "id": "d1",
-          "source": "urn:src:self_report",
-          "subject": "spiffe://corp/agents/approval-outcome",
-          "type": "org.agent-conformance.evidence.Decision.v1",
-          "datacontenttype": "application/ld+json",
-          "agentcesourceclass": "self_report",
-          "time": "2026-01-10T00:00:00Z",
-          "data": {
-            "@context": "https://agent-conformance.org/contexts/evidence/v1",
-            "@type": "Decision",
-            "agent": {
-              "id": "spiffe://corp/agents/approval-outcome"
-            },
-            "decision_type": "dom:CreditDecision",
-            "acted_for": [
-              "urn:example:service:orchestrator",
-              "urn:example:person:owner-1"
-            ]
-          }
-        },
-        {
-          "specversion": "1.0",
-          "id": "s2",
-          "source": "urn:src:independent_system",
-          "subject": "spiffe://corp/agents/approval-outcome",
-          "type": "org.agent-conformance.evidence.SessionStart.v1",
-          "datacontenttype": "application/ld+json",
-          "agentcesourceclass": "independent_system",
-          "time": "2026-01-10T00:00:00Z",
-          "data": {
-            "@context": "https://agent-conformance.org/contexts/evidence/v1",
-            "@type": "SessionStart",
-            "agent": {
-              "id": "spiffe://corp/agents/worker"
-            },
-            "environment": "idp-login",
-            "principal": {
-              "id": "u2",
-              "kind": "human"
-            }
-          }
-        },
-        {
-          "specversion": "1.0",
-          "id": "x1",
-          "source": "urn:src:independent_system",
-          "subject": "spiffe://corp/agents/approval-outcome",
-          "type": "org.agent-conformance.evidence.Interrupt.v1",
-          "datacontenttype": "application/ld+json",
-          "agentcesourceclass": "independent_system",
-          "time": "2026-01-10T00:00:00Z",
-          "data": {
-            "@context": "https://agent-conformance.org/contexts/evidence/v1",
-            "@type": "Interrupt",
-            "agent": {
-              "id": "spiffe://corp/agents/other"
-            },
-            "mechanism": "kill_switch",
-            "effect": "halted",
-            "actor": {
-              "id": "u2",
-              "kind": "human",
-              "authority_ref": "ref:authority/reviewers"
-            },
-            "session_ref": "agentce:event/s2",
-            "refs": {
-              "decision": "agentce:event/s2"
-            }
-          }
-        }
-      ],
-      "expected": {
-        "outcome": "non-conformant",
-        "failing": [
-          "x1"
-        ],
-        "quarantined": 0,
-        "exit": 2
-      }
-    },
     "ovs07-interrupt-names-run-session-unresolved-login-is-its-agent": {
       "control": "OVS-07",
       "profile": "eu",
@@ -6144,6 +6058,92 @@
             "session_ref": "agentce:event/s2",
             "refs": {
               "decision": "nope"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "x1"
+        ],
+        "quarantined": 0,
+        "exit": 2
+      }
+    },
+    "ovs07-interrupt-names-its-login-agent-seen-only-there": {
+      "control": "OVS-07",
+      "profile": "eu",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/approval-outcome",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/approval-outcome"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "urn:example:service:orchestrator",
+              "urn:example:person:owner-1"
+            ]
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "s2",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/approval-outcome",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "spiffe://corp/agents/worker"
+            },
+            "environment": "idp-login",
+            "principal": {
+              "id": "u2",
+              "kind": "human"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "x1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/approval-outcome",
+          "type": "org.agent-conformance.evidence.Interrupt.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Interrupt",
+            "agent": {
+              "id": "spiffe://corp/agents/other"
+            },
+            "mechanism": "kill_switch",
+            "effect": "halted",
+            "actor": {
+              "id": "u2",
+              "kind": "human",
+              "authority_ref": "ref:authority/reviewers"
+            },
+            "session_ref": "agentce:event/s2",
+            "refs": {
+              "decision": "agentce:event/s2"
             }
           }
         }

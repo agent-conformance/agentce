@@ -404,6 +404,8 @@ case(
     NC,
     ["x1"],
 )
+
+
 def worker_session_only(target, principal=None):
     """The worker agent's own run session s9 (naming `principal` when given) in place of its ToolCall, and an Interrupt
     naming `target`."""
@@ -414,11 +416,15 @@ def worker_session_only(target, principal=None):
     return events
 
 
-for name, target in (("unresolved", "nope"), ("names-it", ref("s9"))):
+for name, target, principal in (
+    ("run-session-naming-a-human-unresolved", "nope", "u7"),
+    ("run-session-naming-a-human-names-it", ref("s9"), "u7"),
+    ("names-run-session-unresolved", "nope", None),
+):
     case(
-        f"ovs07-interrupt-run-session-naming-a-human-{name}-login-is-its-agent",
+        f"ovs07-interrupt-{name}-login-is-its-agent",
         "OVS-07",
-        worker_session_only(target, "u7"),
+        worker_session_only(target, principal),
         NC,
         ["x1"],
     )
@@ -426,18 +432,23 @@ for name, target in (("unresolved", "nope"), ("names-it", ref("s9"))):
 # single login (the -idp-login cases), so no rule can refuse it there without refusing every such login.
 login_only = interrupt_on(ref("s2"), worker_login())
 del login_only[2]
-case("ovs07-interrupt-names-its-login-agent-seen-only-there", "OVS-07", login_only, NC, ["x1"])
 case(
-    "ovs07-interrupt-names-run-session-unresolved-login-is-its-agent",
+    "ovs07-interrupt-names-its-login-agent-seen-only-there",
     "OVS-07",
-    worker_session_only("nope"),
+    login_only,
     NC,
     ["x1"],
 )
 # The ToolCall acted for u2: the subject's chain holds every event's acted_for, so this reads non-conformant at base too.
 in_chain = interrupt_on("nope", idp("s2"))
 in_chain[2]["data"]["acted_for"] = ["u2"]
-case("ovs07-interrupt-names-toolcall-unresolved-actor-in-its-chain", "OVS-07", in_chain, NC, ["x1"])
+case(
+    "ovs07-interrupt-names-toolcall-unresolved-actor-in-its-chain",
+    "OVS-07",
+    in_chain,
+    NC,
+    ["x1"],
+)
 stop_first = interrupt_on("nope", worker_login())
 case(
     "ovs07-interrupt-names-toolcall-unresolved-before-its-toolcall-login-is-its-agent",
@@ -448,7 +459,9 @@ case(
 )
 no_ref = interrupt_on("nope", worker_login())
 del no_ref[3]["data"]["refs"]
-case("ovs07-interrupt-without-decision-ref-worker-login", "OVS-07", no_ref, "conformant")
+case(
+    "ovs07-interrupt-without-decision-ref-worker-login", "OVS-07", no_ref, "conformant"
+)
 
 # A present refs.decision that is null names no held decision, so a ToolCall or Outcome carrying it may be any
 # decision's effect and bounds every held decision's approvals, as an unheld name does (18.157); it withdraws none.
