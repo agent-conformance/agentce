@@ -349,6 +349,23 @@ def _identity(folder: Path) -> tuple[int, int]:
     return st.st_dev, st.st_ino
 
 
+def skipped_part(part: str) -> bool:
+    """A path part the catalog digest never hashes below: a dot-named file or folder, or ``__pycache__``."""
+    return part.startswith(".") or part == "__pycache__"
+
+
+def covered_files(root: Path, *, exclude: frozenset[str] = frozenset()) -> list[str]:
+    """The POSIX relative paths ``digest_tree`` hashes, sorted: every file `_walk_files` reaches, less any
+    path with a `skipped_part` and any name in ``exclude``. The catalog loaders read only these, by exact
+    name (18.168), so nothing a loader reads can change without changing the digest."""
+    rels = sorted(path.relative_to(root).as_posix() for path in _walk_files(root))
+    return [
+        rel
+        for rel in rels
+        if rel not in exclude and not any(skipped_part(part) for part in rel.split("/"))
+    ]
+
+
 def digest_tree(root: Path, *, exclude: frozenset[str] = frozenset()) -> str:
     """Content-address a directory: ``sha256:`` over the sorted ``<relpath>\\0<filehash>`` lines.
 
@@ -357,15 +374,8 @@ def digest_tree(root: Path, *, exclude: frozenset[str] = frozenset()) -> str:
     directory yields the same digest on any host — the basis of the offline catalog/release check.
     """
     lines: list[bytes] = []
-    paths = sorted(_walk_files(root), key=lambda p: p.relative_to(root).as_posix())
-    for path in paths:
-        rel = path.relative_to(root).as_posix()
-        if rel in exclude or any(
-            part.startswith(".") or part == "__pycache__"
-            for part in path.relative_to(root).parts
-        ):
-            continue
-        file_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+    for rel in covered_files(root, exclude=exclude):
+        file_hash = hashlib.sha256((root / rel).read_bytes()).hexdigest()
         lines.append(rel.encode("utf-8") + b"\x00" + file_hash.encode("ascii"))
     return "sha256:" + hashlib.sha256(b"\n".join(lines)).hexdigest()
 

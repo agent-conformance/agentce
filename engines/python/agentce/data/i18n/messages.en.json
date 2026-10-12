@@ -171,6 +171,8 @@
   "errors.catalog.shape.script_forbidden.fix": "remove the sh:js constraint; express it with the profile's declarative vocabulary instead (spec/rules/psp.md).",
   "errors.catalog.shape.outside_profile.cause": "the shape file {path} uses {feature}, which the Portable Shape Profile excludes (spec/rules/psp.md).",
   "errors.catalog.shape.outside_profile.fix": "remove it or rewrite the constraint with the profile's permitted terms (spec/rules/psp.md, Permitted).",
+  "errors.catalog.shape.unresolved.cause": "control {control} names '{path}' as its shape, but that is not a file the catalog's signature covers: a file inside the catalog folder, named exactly as it is on disk, with no part that starts with a dot or is __pycache__.",
+  "errors.catalog.shape.unresolved.fix": "name the shape file by its exact path inside the catalog folder (for example shapes/<control>.ttl), outside any dot-named or __pycache__ folder, or remove evaluation.shape from the control.",
   "errors.catalog.shape.parse_error.cause": "the shape file {path} is not valid Turtle: {detail}",
   "errors.catalog.shape.parse_error.fix": "fix the Turtle syntax at the position named.",
   "errors.catalog.evidence_shape.unresolved.cause": "control {control} names '{path}' as its evidence shape, but that is not a file inside the catalog folder holding exactly one node shape with a target, so the control could not tell which records it can judge.",

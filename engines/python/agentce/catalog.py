@@ -33,6 +33,7 @@ from .structural import evaluate_control, evaluate_shape
 
 _EXPECTED_TO_CHECK = {"passed", "failed", "inapplicable"}
 _EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved"
+_SHAPE_UNRESOLVED = "catalog.shape.unresolved"
 _EVIDENCE_SHAPE_PASSED_CASE = "catalog.evidence_shape.passed_case_unjudged"
 
 #: Files left out of the provenance digest: the detached signature and ``catalog.yaml`` itself (which
@@ -132,7 +133,14 @@ def _control_from_dict(data: dict[str, Any]) -> ControlSpec:
         severity=str(data.get("severity", "")),
         min_source_class=str(evaluation.get("min_source_class", "any")),
         minimum_evidence=list(evaluation.get("minimum_evidence", [])),
-        shape_path=evaluation.get("shape"),
+        # A non-string shape is kept as "" (not a covered file), which load refuses; null stays "no shape".
+        shape_path=(
+            None
+            if (value := evaluation.get("shape")) is None
+            else value
+            if isinstance(value, str)
+            else ""
+        ),
         tolerance=data.get("tolerance", {"kind": "count", "max": 0}),
         test_cases=list(data.get("test_cases", [])),
         raw=data,
@@ -146,46 +154,74 @@ def _control_from_dict(data: dict[str, Any]) -> ControlSpec:
     )
 
 
+def _refuse_uncovered(key: str, control_id: str, path: str) -> InputError:
+    entry = MESSAGE_KEYS[key]
+    return InputError(
+        key, format_message(entry.cause, control=control_id, path=path), entry.fix
+    )
+
+
 def _load_evidence_shape(
-    directory: Path, control_id: str, path: str
+    directory: Path, control_id: str, path: str, covered: set[str]
 ) -> tuple[str, dict[str, Shape]]:
-    """The shapes in the file a control names as ``evaluation.evidence_shape``. The file must hold
-    exactly one node shape with a target, whose IRI is returned with the file's shapes; anything else,
-    including a file outside the catalog directory (which its signature would not cover), is
-    refused, so a declared evidence shape can never be skipped and read as a pass."""
+    """The shapes in the file a control names as ``evaluation.evidence_shape``. The file must be one the
+    catalog digest covers, named exactly (18.168), and hold exactly one node shape with a target, whose IRI
+    is returned with the file's shapes; anything else, including a file outside the catalog directory
+    (which its signature would not cover), is refused, so a declared evidence shape can never be skipped
+    and read as a pass."""
     resolved = (directory / path).resolve()
-    inside = path != "" and resolved.is_relative_to(directory.resolve())
+    inside = path in covered and resolved.is_relative_to(directory.resolve())
     loaded = load_shapes(resolved, path) if inside and resolved.is_file() else {}
     targeted = [iri for iri, shape in loaded.items() if shape.has_target]
     if len(targeted) != 1:
-        entry = MESSAGE_KEYS[_EVIDENCE_SHAPE_UNRESOLVED]
-        raise InputError(
-            _EVIDENCE_SHAPE_UNRESOLVED,
-            format_message(entry.cause, control=control_id, path=path),
-            entry.fix,
-        )
+        raise _refuse_uncovered(_EVIDENCE_SHAPE_UNRESOLVED, control_id, path)
     return targeted[0], loaded
 
 
+def _covered(directory: Path) -> set[str]:
+    return set(
+        signing.covered_files(
+            directory, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME})
+        )
+    )
+
+
+def _control_files(covered: set[str]) -> list[str]:
+    """The covered ``controls/<name>.yaml`` files, one level deep as the listing always was, sorted."""
+    return sorted(
+        rel
+        for rel in covered
+        if rel.startswith("controls/") and rel.count("/") == 1 and rel.endswith(".yaml")
+    )
+
+
 def load_catalog(directory: Path) -> Catalog:
-    """Load ``catalog.yaml`` and every control and shape in ``directory``."""
+    """Load ``catalog.yaml`` and every control and shape in ``directory``. Only files the catalog digest
+    covers are read, each by its exact name (`signing.covered_files`, 18.168): a dot-named control file
+    is never loaded, and a shape path that names anything else is refused, so a signed catalog cannot
+    change what it loads without changing its digest."""
     meta = (
         yaml.safe_load((directory / "catalog.yaml").read_text(encoding="utf-8")) or {}
     )
+    covered = _covered(directory)
     controls: list[ControlSpec] = []
     shapes: dict[str, Shape] = {}
     evidence_shape_iris: dict[str, str] = {}
-    for control_file in sorted((directory / "controls").glob("*.yaml")):
-        data = yaml.safe_load(control_file.read_text(encoding="utf-8"))
+    for rel in _control_files(covered):
+        data = yaml.safe_load((directory / rel).read_text(encoding="utf-8"))
         control = _control_from_dict(data)
         controls.append(control)
-        if control.shape_path:
+        if control.shape_path is not None:
+            if control.shape_path not in covered:
+                raise _refuse_uncovered(
+                    _SHAPE_UNRESOLVED, control.id, control.shape_path
+                )
             shapes.update(
                 load_shapes(directory / control.shape_path, control.shape_path)
             )
         if control.evidence_shape_path is not None:
             iri, loaded = _load_evidence_shape(
-                directory, control.id, control.evidence_shape_path
+                directory, control.id, control.evidence_shape_path, covered
             )
             evidence_shape_iris[control.evidence_shape_path] = iri
             shapes.update(loaded)
@@ -450,12 +486,12 @@ def lint_catalog(
         floor = 0
 
     domain = _load_test_domain(directory)
-    for control_file in sorted((directory / "controls").glob("*.yaml")):
-        data = yaml.safe_load(control_file.read_text(encoding="utf-8"))
+    for rel in _control_files(_covered(directory)):
+        data = yaml.safe_load((directory / rel).read_text(encoding="utf-8"))
         try:
             jsonschema.validate(data, schema)
         except jsonschema.ValidationError as exc:
-            problems.append(f"{control_file.name}: schema: {exc.message}")
+            problems.append(f"{rel.removeprefix('controls/')}: schema: {exc.message}")
             continue
         control = _control_from_dict(data)
         cited = {entry["framework"] for entry in data.get("crosswalk", [])}

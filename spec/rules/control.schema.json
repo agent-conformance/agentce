@@ -104,7 +104,7 @@
         },
         "shape": {
           "type": "string",
-          "description": "Path to the Portable Shape Profile shape for a rung-2 structural expectation."
+          "description": "Path to the Portable Shape Profile shape for a rung-2 structural expectation, relative to the catalog folder and named exactly as on disk. It must be a file the catalog's signature covers (no part that starts with a dot or is __pycache__); anything else, or a missing file, is refused when the catalog loads (catalog.shape.unresolved)."
         },
         "evidence_shape": {
           "type": "string",

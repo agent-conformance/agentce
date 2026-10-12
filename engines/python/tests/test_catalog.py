@@ -6,6 +6,7 @@ scaffold, the guided path's first step.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -13,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from agentce import cli, commands
+from agentce import cli, commands, signing
 from agentce.catalog import lint_catalog, load_catalog
 from agentce.domain import DomainBinding
 from agentce.errors import InputError
@@ -564,3 +565,142 @@ def test_lint_refuses_an_evidence_shape_that_targets_nothing_in_the_passed_case(
     assert [p.split(":")[0] for p in lint_catalog(catalog_dir)] == [
         "catalog.evidence_shape.passed_case_unjudged"
     ]
+
+
+# --- 18.168: the loaders read only files the catalog digest covers, by exact name. ---
+
+
+def _with_control_value(
+    tmp_path: Path, control: str, field: str, value: str, place: str | None = None
+) -> tuple[Path, str]:
+    """A copy of the base catalog whose ``control`` names ``value`` as ``evaluation.<field>``, with a
+    copy of the original file at ``place`` (relative to the catalog) when given."""
+    catalog_dir = tmp_path / "cat"
+    shutil.copytree(_BASE, catalog_dir)
+    doc = catalog_dir / "controls" / f"{control}.yaml"
+    text = doc.read_text(encoding="utf-8")
+    original = next(
+        line.split(":", 1)[1].strip()
+        for line in text.splitlines()
+        if line.strip().startswith(f"{field}:")
+    )
+    doc.write_text(
+        text.replace(f"{field}: {original}", f"{field}: {value}", 1), encoding="utf-8"
+    )
+    if place is not None:
+        target = catalog_dir / place
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(catalog_dir / original, target)
+    return catalog_dir, original
+
+
+def test_covered_path_or_dot_named_covered_files_is_what_the_digest_hashes(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "tree"
+    (root / "a" / ".hidden").mkdir(parents=True)
+    (root / "a" / "__pycache__").mkdir()
+    (tmp_path / "real").mkdir()
+    (root / "a" / "x.ttl").write_text("x")
+    (root / "a" / ".x.ttl").write_text("x")
+    (root / "a" / ".hidden" / "y.ttl").write_text("y")
+    (root / "a" / "__pycache__" / "z.ttl").write_text("z")
+    (tmp_path / "real" / "w.ttl").write_text("w")
+    (root / "linked").symlink_to(tmp_path / "real", target_is_directory=True)
+    (root / "a" / "v.ttl").symlink_to(tmp_path / "real" / "w.ttl")
+    (root / "catalog.sig.json").write_text("{}")
+    covered = signing.covered_files(root, exclude=frozenset({"catalog.sig.json"}))
+    assert covered == ["a/v.ttl", "a/x.ttl", "linked/w.ttl"]
+    lines = [
+        f"{rel}\0{hashlib.sha256((root / rel).read_bytes()).hexdigest()}".encode()
+        for rel in covered
+    ]
+    assert (
+        signing.digest_tree(root, exclude=frozenset({"catalog.sig.json"}))
+        == "sha256:" + hashlib.sha256(b"\n".join(lines)).hexdigest()
+    )
+
+
+@pytest.mark.parametrize(
+    "name", [".DOC-99.yaml", "._DOC-01.yaml"], ids=["dot", "appledouble"]
+)
+def test_covered_path_or_dot_named_control_file_is_never_read(
+    tmp_path: Path, name: str
+) -> None:
+    catalog_dir = tmp_path / "cat"
+    shutil.copytree(_BASE, catalog_dir)
+    before = [c.id for c in load_catalog(catalog_dir).controls]
+    # Not a control at all: a loader that read it would fail, not merely add a control.
+    (catalog_dir / "controls" / name).write_text("{not: [a control\n", encoding="utf-8")
+    assert [c.id for c in load_catalog(catalog_dir).controls] == before
+    assert lint_catalog(catalog_dir) == []
+
+
+_UNCOVERED = [
+    ("dot-file", "shapes/.X.ttl", "shapes/.X.ttl"),
+    ("appledouble", "shapes/._X.ttl", "shapes/._X.ttl"),
+    ("dot-folder", ".hidden/X.ttl", ".hidden/X.ttl"),
+    ("pycache", "shapes/__pycache__/X.ttl", "shapes/__pycache__/X.ttl"),
+    ("pycache-upper", "shapes/__PYCACHE__/X.ttl", "shapes/__pycache__/X.ttl"),
+    ("dotdot", "../outside.ttl", None),
+    ("inner-dotdot", "shapes/../shapes/X.ttl", "shapes/X.ttl"),
+    ("dot-slash", "./shapes/X.ttl", "shapes/X.ttl"),
+    ("empty-part", "shapes//X.ttl", "shapes/X.ttl"),
+    ("absolute", "/abs/X.ttl", None),
+    ("missing", "shapes/MISSING.ttl", None),
+    ("empty", '""', None),
+    ("number", "5", None),
+]
+
+
+@pytest.mark.parametrize(
+    ("field", "control", "key"),
+    [
+        ("shape", "DOC-01", "catalog.shape.unresolved"),
+        ("evidence_shape", "ROB-02", "catalog.evidence_shape.unresolved"),
+    ],
+)
+@pytest.mark.parametrize(
+    ("value", "place"), [c[1:] for c in _UNCOVERED], ids=[c[0] for c in _UNCOVERED]
+)
+def test_covered_path_or_dot_named_shape_path_outside_the_digest_is_refused(
+    tmp_path: Path, field: str, control: str, key: str, value: str, place: str | None
+) -> None:
+    if value == "../outside.ttl":
+        place = None
+        (tmp_path / "outside.ttl").write_text("")
+    if value.startswith("/abs/"):
+        value = str(tmp_path / "abs" / "X.ttl")
+    catalog_dir, original = _with_control_value(tmp_path, control, field, value, place)
+    if value == str(tmp_path / "abs" / "X.ttl"):
+        (tmp_path / "abs").mkdir()
+        shutil.copy(catalog_dir / original, tmp_path / "abs" / "X.ttl")
+    if value == "../outside.ttl":
+        shutil.copy(catalog_dir / original, tmp_path / "outside.ttl")
+    with pytest.raises(InputError) as excinfo:
+        load_catalog(catalog_dir)
+    assert excinfo.value.key == key
+    if value not in (
+        '""',
+        "5",
+    ):  # R4: the cause names the control and the declared path
+        assert control in excinfo.value.cause and value in excinfo.value.cause
+    assert [p.split(":")[0] for p in lint_catalog(catalog_dir)] == [key]
+
+
+def test_covered_path_or_dot_named_symlinked_shape_inside_the_catalog_loads(
+    tmp_path: Path,
+) -> None:
+    catalog_dir, original = _with_control_value(
+        tmp_path, "DOC-01", "shape", "shapes/linked.ttl"
+    )
+    (catalog_dir / "shapes" / "linked.ttl").symlink_to(catalog_dir / original)
+    catalog = load_catalog(catalog_dir)
+    doc = next(c for c in catalog.controls if c.id == "DOC-01")
+    assert catalog.shape_for(doc) is not None
+
+
+def test_covered_path_or_dot_named_null_shape_is_no_shape(tmp_path: Path) -> None:
+    catalog_dir, _ = _with_control_value(tmp_path, "DOC-01", "shape", "null")
+    doc = next(c for c in load_catalog(catalog_dir).controls if c.id == "DOC-01")
+    assert doc.shape_path is None
