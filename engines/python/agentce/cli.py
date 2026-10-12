@@ -130,6 +130,8 @@ class _Parser(argparse.ArgumentParser):
         pending: argparse.Action | None = None
         for token in args:
             if token == "--":
+                if self._subparsers is not None and pending is None:
+                    self._refuse_dashdash_action()
                 return
             if pending is not None:
                 needs_value, pending = pending.nargs not in ("?", "*"), None
@@ -151,6 +153,20 @@ class _Parser(argparse.ArgumentParser):
             ):
                 assert self._argv_errors is not None
                 raise self._argv_errors.unknown(token)
+
+    def _refuse_dashdash_action(self) -> NoReturn:
+        """A `--` where the action goes is an unknown action, as on Python 3.12.3 and in TypeScript
+        and Java. argparse in 3.12.10 and 3.13+ drops it and reads the next token as the action."""
+        assert self._subparsers is not None
+        sub = next(
+            a
+            for a in self._subparsers._group_actions
+            if isinstance(a, argparse._SubParsersAction)
+        )
+        choices = ", ".join(repr(c) for c in sub.choices)
+        self.error(
+            f"argument {argparse._get_action_name(sub)}: invalid choice: '--' (choose from {choices})"
+        )
 
 
 def _flag_fix(command: str) -> str:

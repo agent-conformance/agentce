@@ -1530,6 +1530,25 @@ def test_keyless_cert_window_ignores_the_clock(
         ),
         (["catalog", "lint", "-hx"], "catalog", "input.catalog_unrecognized_flag"),
         (["conformance", "nope"], "conformance", "input.conformance_action"),
+        # A `--` where the action goes is an unknown action on every Python (18.114).
+        (
+            ["conformance", "--", "run", "--engine", "x", "--corpus", "y"],
+            "conformance",
+            "input.conformance_action",
+        ),
+        (
+            ["conformance", "--json", "--", "run"],
+            "conformance",
+            "input.conformance_action",
+        ),
+        (["conformance", "--json", "--"], "conformance", "input.conformance_action"),
+        (["config", "--", "show"], "config", "input.config_action"),
+        (["catalog", "--", "lint", "x"], "catalog", "input.catalog_action"),
+        (
+            ["conformance", "run", "--", "--engine", "x"],
+            "conformance",
+            "input.conformance_unrecognized_flag",
+        ),
         (["conformance", "run", "--engine"], "conformance", "input.engine_missing"),
         (["conformance", "run", "--corpus"], "conformance", "input.corpus_missing"),
         (
