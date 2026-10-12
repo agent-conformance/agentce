@@ -2027,7 +2027,10 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "bundle-manifest",
     ),
     "agentce.bundle.safe_is_file: path.is_file()": ("bundle-manifest", "bundle-files"),
-    "agentce.commands._is_regular_file: path.stat()": ("manifest-file", "signatures-file"),
+    "agentce.commands._is_regular_file: path.stat()": (
+        "manifest-file",
+        "signatures-file",
+    ),
     "agentce.commands._load_release_json: signing.read_verify_input(path)": (
         "release-file",
         "manifest-file",
