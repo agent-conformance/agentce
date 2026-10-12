@@ -11,10 +11,11 @@ import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { join, sep } from "node:path";
 import { load } from "js-yaml";
 import { errorCause, errorFix } from "./errorCatalogue";
-import { InputError } from "./errors";
+import { AgentceError, InputError, catalogUnreadable } from "./errors";
 import { type Shape, loadShapes } from "./psp";
 import { coveredFiles } from "./report";
 import { byteCompare, formatTemplate } from "./util";
+import { CATALOG_SIGNATURE_NAME } from "./verify";
 
 const EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved";
 const SHAPE_UNRESOLVED = "catalog.shape.unresolved";
@@ -52,7 +53,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** The catalog files the digest covers (`coveredFiles`, less the signature): the only files load reads. */
 function covered(directory: string): Set<string> {
-  return new Set(coveredFiles(directory, new Set(["catalog.sig.json"])));
+  return new Set(coveredFiles(directory, new Set([CATALOG_SIGNATURE_NAME])));
 }
 
 /** The covered `controls/<name>.yaml` files, one level deep as the listing always was, sorted. */
@@ -155,8 +156,23 @@ function loadEvidenceShape(
 /** Load `catalog.yaml` and every control and shape in `directory`. Only files the catalog digest covers
  * are read, each by its exact name (`coveredFiles`, 18.168): a dot-named control file is never loaded,
  * and a shape path that names anything else is refused, so a signed catalog cannot change what it
- * loads without changing its digest. */
+ * loads without changing its digest. The load walks the folder as the digest does, so a folder it
+ * cannot read is refused as input.catalog_unreadable, as verify and sign refuse it. */
 export function loadCatalog(directory: string): Catalog {
+  try {
+    return loadCovered(directory);
+  } catch (err) {
+    if (
+      err instanceof AgentceError ||
+      typeof (err as { code?: unknown } | null)?.code !== "string"
+    ) {
+      throw err;
+    }
+    throw catalogUnreadable(directory, err);
+  }
+}
+
+function loadCovered(directory: string): Catalog {
   const meta = load(readFileSync(join(directory, "catalog.yaml"), "utf-8"));
   const metaRecord = isRecord(meta) ? meta : {};
   const controls: ControlSpec[] = [];

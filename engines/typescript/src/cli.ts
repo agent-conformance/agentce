@@ -93,7 +93,6 @@ import {
 import { summarize } from "./verdict";
 import {
   type TrustRoot,
-  catalogUnreadable,
   loadTrustRoot,
   parseUntrustedJson,
   vendoredTrust,
@@ -404,23 +403,6 @@ function verifyCatalogDirs(
   return limitations;
 }
 
-/** Load a --catalog-dir catalog; the load walks the folder as the digest does (18.168), so a folder it
- * cannot read is refused as input.catalog_unreadable, the same as verify and sign refuse it (Python's
- * `_load_catalog_dir`). */
-function loadCatalogDir(dir: string): Catalog {
-  try {
-    return loadCatalog(dir);
-  } catch (err) {
-    if (
-      err instanceof AgentceError ||
-      typeof (err as { code?: unknown } | null)?.code !== "string"
-    ) {
-      throw err;
-    }
-    throw catalogUnreadable(dir, err);
-  }
-}
-
 /**
  * The catalogs an assessment evaluates, and their `id@version` labels (mirrors the Python reference's
  * `_resolve_catalogs`). Each `--catalog-dir` is loaded as given and its signature verified against
@@ -440,7 +422,7 @@ function resolveCatalogs(
   allowUnverified: boolean,
 ): { catalogs: Catalog[]; labels: string[]; limitations: string[] } {
   const loaded = catalogDirs.map((d) =>
-    loadCatalogDir(requireDir(d, "catalog-dir", "the catalog directory")),
+    loadCatalog(requireDir(d, "catalog-dir", "the catalog directory")),
   );
   const limitations = verifyCatalogDirs(loaded, trust, allowUnverified);
   const byLabel = new Map<string, Catalog>();

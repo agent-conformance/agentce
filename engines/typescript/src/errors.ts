@@ -82,3 +82,15 @@ export function unreadableError(
     `make every file and folder in the ${noun} readable, then re-run.`,
   );
 }
+
+/** `input.catalog_unreadable`, naming the file or folder that cannot be read (Python's
+ * `_catalog_unreadable`, 18.68). */
+export function catalogUnreadable(dir: string, err: unknown): InputError {
+  return unreadableError(
+    "input.catalog_unreadable",
+    "the catalog directory",
+    dir,
+    unreadableRel(dir, err),
+    "catalog directory",
+  );
+}

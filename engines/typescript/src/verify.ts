@@ -17,6 +17,7 @@ import { CanonicalizationError, canonicalize, sha256Hex } from "./canonical";
 import { errorCause } from "./errorCatalogue";
 import {
   InputError,
+  catalogUnreadable,
   isPermissionError,
   readPermissionError,
   unreadableError,
@@ -526,18 +527,6 @@ export interface CatalogVerifyResult {
   readonly keyless?: boolean;
   readonly reason?: string;
   readonly reason_keys?: readonly string[];
-}
-
-/** `input.catalog_unreadable`, naming the file or folder that cannot be read (Python's
- * `_catalog_unreadable`, 18.68). */
-export function catalogUnreadable(dir: string, err: unknown): InputError {
-  return unreadableError(
-    "input.catalog_unreadable",
-    "the catalog directory",
-    dir,
-    unreadableRel(dir, err),
-    "catalog directory",
-  );
 }
 
 /** Verifies a catalog directory's detached signature against `trust` (mirrors `_verify_catalog`/
