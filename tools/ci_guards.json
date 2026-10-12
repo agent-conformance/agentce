@@ -24,6 +24,14 @@
     "run_in_eval": false
   },
   {
+    "name": "python-versions",
+    "description": "Reference engine tests on every Python requires-python admits (VG-PYTHON-VERSIONS), one job per version.",
+    "roles": ["tests"],
+    "workflow": ".github/workflows/tests.yml",
+    "command": "bash verification/gates/python_versions.sh ${{ matrix.python }}",
+    "run_in_eval": false
+  },
+  {
     "name": "typescript-lint",
     "description": "TypeScript engine lint.",
     "roles": ["lint"],
