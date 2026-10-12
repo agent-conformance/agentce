@@ -2030,6 +2030,10 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.commands._is_regular_file: path.stat()": (
         "manifest-file",
         "signatures-file",
+        "report-claim",
+        "report-trust-root",
+        "report-manifest",
+        "report-packaging",
     ),
     "agentce.commands._load_release_json: signing.read_verify_input(path)": (
         "release-file",
@@ -2048,20 +2052,13 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.commands._require_dir: path.is_dir()": ("target-argument",),
     "agentce.commands._verify_release: artifact_file.read_bytes()": ("artifact-path",),
     "agentce.commands._verify_release: release_path.is_file()": ("release-file",),
-    "agentce.commands._verify_report: candidate_path.is_file()": ("report-manifest",),
     "agentce.commands._verify_report: candidate_path.read_bytes()": _HASHED_ONLY,
     "agentce.commands._verify_report: catalog_path.is_dir()": ("report-packaging",),
-    "agentce.commands._verify_report: claim_path.is_file()": ("report-claim",),
     "agentce.commands._verify_report: claim_path.read_bytes()": ("report-claim",),
-    "agentce.commands._verify_report: deviations_path.is_file()": ("report-packaging",),
     "agentce.commands._verify_report: deviations_path.read_bytes()": _HASHED_ONLY,
-    "agentce.commands._verify_report: domain_path.is_file()": ("report-packaging",),
     "agentce.commands._verify_report: domain_path.read_bytes()": _HASHED_ONLY,
-    "agentce.commands._verify_report: embedded_path.is_file()": ("report-trust-root",),
-    "agentce.commands._verify_report: manifest_path.is_file()": ("report-manifest",),
     "agentce.commands._verify_report: manifest_path.read_bytes()": ("report-manifest",),
     "agentce.commands._verify_report: os.scandir(report_dir)": ("report-claim",),
-    "agentce.commands._verify_report: packaging_path.is_file()": ("report-packaging",),
     "agentce.commands._verify_report: packaging_path.read_bytes()": (
         "report-packaging",
     ),
@@ -2069,9 +2066,7 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "output in a scratch directory this command created",
     "agentce.commands._verify_report: produced.read_bytes()": "disposition: the assess re-run's "
     "own output, compared byte for byte with the shipped file",
-    "agentce.commands._verify_report: profile_path.is_file()": ("report-packaging",),
     "agentce.commands._verify_report: profile_path.read_bytes()": _HASHED_ONLY,
-    "agentce.commands._verify_report: shipped.is_file()": ("report-manifest",),
     "agentce.commands._verify_report: shipped.read_bytes()": "disposition: compared byte for byte "
     "with the re-run's output; never parsed",
     "agentce.commands._verify_report: signing.parse_verify_input(v.payload)": (
