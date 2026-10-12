@@ -742,6 +742,8 @@ def verify_catalog_directory(directory: Path, trust: TrustRoot) -> Verified:
     absent signature raises the :class:`UnsignedError` subclass, so a caller that reports "unsigned"
     differently from "did not verify" can tell them apart. Never contacts the network.
     """
+    # Walk first, as TypeScript and Java do: a tree that cannot be read is unreadable, signed or not.
+    recomputed = digest_tree(directory, exclude=frozenset({CATALOG_SIGNATURE_NAME}))
     sig_path = directory / CATALOG_SIGNATURE_NAME
     if not sig_path.is_file():
         raise UnsignedError.refusal("verify.catalog_unsigned")
@@ -751,7 +753,6 @@ def verify_catalog_directory(directory: Path, trust: TrustRoot) -> Verified:
     )
     verified = verify_envelope(envelope, trust)
     signed_digest = statement_subject_digest(verified.payload)
-    recomputed = digest_tree(directory, exclude=frozenset({CATALOG_SIGNATURE_NAME}))
     if signed_digest != recomputed:
         raise VerificationError.refusal("verify.catalog_digest_mismatch")
     return verified

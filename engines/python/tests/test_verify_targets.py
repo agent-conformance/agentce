@@ -467,20 +467,26 @@ def test_verify_catalog_unreadable_file_is_refused(
     assert env["error"]["key"] == "input.catalog_unreadable"
 
 
-def test_verify_catalog_symlinked_directory_is_not_descended(
+def test_verify_catalog_link_to_an_ancestor_is_refused_as_unreadable(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """digest_tree lists a symlinked directory but neither descends it nor hashes it, so a link to
-    the catalog's own parent neither loops nor changes the digest (the TS and Java walks match)."""
+    """digest_tree descends a symlinked folder (18.164), so a link to the catalog's own parent is a
+    folder reached twice: refused as unreadable naming the link, never looped or left out (the TS
+    and Java walks match). A broken link is still skipped."""
     key = Ed25519PrivateKey.generate()
     monkeypatch.setattr(signing, "vendored_trust", lambda: _trust_for(key))
-    (tmp_path / "catalog.yaml").write_text("id: demo\n", encoding="utf-8")
-    _sign_catalog(tmp_path, key)
-    (tmp_path / "link-out").symlink_to(tmp_path.parent)
-    (tmp_path / "broken").symlink_to(tmp_path / "no-such-file")
-    code, env = run(["verify", "--catalog", str(tmp_path), "--json"], capsys)
+    catalog = tmp_path / "c"
+    catalog.mkdir()
+    (catalog / "catalog.yaml").write_text("id: demo\n", encoding="utf-8")
+    (catalog / "broken").symlink_to(catalog / "no-such-file")
+    _sign_catalog(catalog, key)
+    code, env = run(["verify", "--catalog", str(catalog), "--json"], capsys)
     assert code == 0
     assert env["verified"] is True
+    (catalog / "link-out").symlink_to(tmp_path)
+    code, env = run(["verify", "--catalog", str(catalog), "--json"], capsys)
+    assert code == 3
+    assert env["error"]["key"] == "input.catalog_unreadable"
 
 
 @pytest.mark.parametrize("sig", ["!" * 88, "A" * 86, "AAAA AAAA"])

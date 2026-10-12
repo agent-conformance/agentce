@@ -32,6 +32,20 @@ cp -R "$work/unsigned-cat" "$work/rebrand-cat"
 sed -i.bak 's/^id: eu-ai-act$/id: eu-ai-act-rebrand/' "$work/rebrand-cat/catalog.yaml"
 rm "$work/rebrand-cat/catalog.yaml.bak"
 sign_catalog "$work/rebrand-cat" rebrand "$work/rebrand-trust-root.json"
+# 18.164: a catalog whose controls/ is a symlink, signed, then edited behind the link; and one with a link
+# back to an ancestor folder.
+cp -R "$work/unsigned-cat" "$work/linked-cat"
+mv "$work/linked-cat/controls" "$work/linked-controls"
+ln -s "$work/linked-controls" "$work/linked-cat/controls"
+sign_catalog "$work/linked-cat" linked "$work/linked-trust-root.json"
+cp -R "$work/linked-cat" "$work/edited-cat"
+rm "$work/edited-cat/controls"
+cp -R "$work/linked-controls" "$work/edited-controls"
+ln -s "$work/edited-controls" "$work/edited-cat/controls"
+sed -i.bak '1,/^title: /s/^title: /title: EDITED AFTER SIGNING /' "$work/edited-controls/$(ls "$work/edited-controls" | head -1)"
+rm "$work"/edited-controls/*.bak
+cp -R "$work/unsigned-cat" "$work/loop-cat"
+ln -s .. "$work/loop-cat/controls/up"
 printf '{not json' > "$work/bad-root.json"
 printf '[]' > "$work/array-root.json"
 
@@ -138,10 +152,16 @@ scenario "9 bad --trust-root with no --catalog-dir" 3 input.trust_root_not_a_fil
 scenario "11 trust root that is not an object" 3 input.trust_root_invalid - -- \
   "${base[@]}" --catalog-dir "$work/unsigned-cat" --allow-unverified-catalog \
   --trust-root "$work/array-root.json"
+scenario "12 catalog signed with controls/ linked" 0 - - -- \
+  "${base[@]}" --catalog-dir "$work/linked-cat" --trust-root "$work/linked-trust-root.json"
+scenario "13 linked catalog edited behind the link" 3 input.catalog_unverified - -- \
+  "${base[@]}" --catalog-dir "$work/edited-cat" --trust-root "$work/linked-trust-root.json"
+scenario "14 catalog with a link to an ancestor folder" 3 input.catalog_unreadable - -- \
+  "${base[@]}" --catalog-dir "$work/loop-cat" --allow-unverified-catalog
 export AGENTCE_TRUST_ROOT="$work/bad-root.json"
 scenario "10 quickstart under AGENTCE_TRUST_ROOT" 3 input.trust_root_invalid "is not readable JSON: " -- \
   quickstart
 unset AGENTCE_TRUST_ROOT
 
-[ "$status" -eq 0 ] && echo "byo-catalog: all three engines verify --catalog-dir signatures identically across 12 scenarios"
+[ "$status" -eq 0 ] && echo "byo-catalog: all three engines verify --catalog-dir signatures identically across 15 scenarios"
 exit "$status"
