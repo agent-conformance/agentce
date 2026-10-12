@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.98.0",
+  "suite_version": "0.99.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -1978,7 +1978,7 @@
     },
     {
       "id": "VG-BYO-CATALOG-PARITY",
-      "title": "An operator's own --catalog-dir is checked against the trust root the same way in all three engines: refused when unsigned, untrusted, rebranded, edited behind a symlinked folder or looping back to an ancestor folder, recorded as a limitation under --allow-unverified-catalog, with Python's exit code, error key, cause and fix",
+      "title": "An operator's own --catalog-dir is checked against the trust root the same way in all three engines: refused when unsigned, untrusted, rebranded, edited behind a symlinked folder, looping back to an ancestor folder or naming a shape its signature does not cover, and never reading a dot-named control file, recorded as a limitation under --allow-unverified-catalog, with Python's exit code, error key, cause and fix",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -1994,7 +1994,7 @@
       "timeout_s": 900,
       "invariant": "An attestation is reported as verified only after its signature verifies against a trusted key.",
       "rubric": {
-        "pass": "for each of 15 scenarios (untrusted, unsigned, unsigned with the override, trusted with --trust-root, missing/malformed/non-object --trust-root, a bad --trust-root with no --catalog-dir, a rebranded catalog with and without the override, an ordinary run, quickstart under AGENTCE_TRUST_ROOT, a catalog signed with controls/ symlinked, the same catalog edited behind the link, a catalog with a link back to an ancestor folder) Python gives the expected exit code and key, and TypeScript and Java give the same exit code, error key, cause (up to the JSON parser's own message for a malformed trust root), fix, envelope limitations and manifest.json limitations",
+        "pass": "for each of 18 scenarios (untrusted, unsigned, unsigned with the override, trusted with --trust-root, missing/malformed/non-object --trust-root, a bad --trust-root with no --catalog-dir, a rebranded catalog with and without the override, an ordinary run, quickstart under AGENTCE_TRUST_ROOT, a catalog signed with controls/ symlinked, the same catalog edited behind the link, a catalog with a link back to an ancestor folder, a signed catalog given a dot-named control file after signing, which assesses because no engine reads it, and a control whose shape is a dot-named file or sits under __PYCACHE__, refused as catalog.shape.unresolved) Python gives the expected exit code and key, and TypeScript and Java give the same exit code, error key, cause (up to the JSON parser's own message for a malformed trust root), fix, envelope limitations and manifest.json limitations",
         "fail": "any engine assesses a catalog Python refuses, refuses one Python assesses, or differs from Python in exit code, error key, cause, fix or the recorded limitation"
       },
       "faults": [
@@ -2051,6 +2051,42 @@
           "file": "engines/java/src/main/java/org/agentce/Catalog.java",
           "search": "            if (Files.isDirectory(full)) {\n                if (!entered.add(folderIdentity(full))) {",
           "replace": "            if (Files.isDirectory(full, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {\n                if (!entered.add(folderIdentity(full))) {"
+        },
+        {
+          "description": "Python's loader lists the controls folder instead of the files the digest covers, so a dot-named control file added after signing is read",
+          "file": "engines/python/agentce/catalog.py",
+          "search": "    for rel in _control_files(covered):",
+          "replace": "    for rel in _control_files({f\"controls/{p.name}\" for p in (directory / \"controls\").iterdir()}):"
+        },
+        {
+          "description": "TypeScript's loader lists the controls folder instead of the files the digest covers, so a dot-named control file added after signing is read",
+          "file": "engines/typescript/src/catalog.ts",
+          "search": "  for (const rel of controlFiles(files)) {",
+          "replace": "  for (const rel of controlFiles(new Set(readdirSync(join(directory, \"controls\")).map((n) => `controls/${n}`)))) {"
+        },
+        {
+          "description": "Java's loader lists the controls folder instead of the files the digest covers, so a dot-named control file added after signing is read",
+          "file": "engines/java/src/main/java/org/agentce/Catalog.java",
+          "search": "        for (String rel : controlFiles(files)) {",
+          "replace": "        for (String rel : controlFiles(new HashSet<>(java.util.Arrays.stream(directory.resolve(\"controls\").toFile().list()).map(n -> \"controls/\" + n).toList()))) {"
+        },
+        {
+          "description": "Python's loader drops the shape membership check, so a shape the digest does not cover is loaded",
+          "file": "engines/python/agentce/catalog.py",
+          "search": "            if control.shape_path not in covered:",
+          "replace": "            if False:"
+        },
+        {
+          "description": "TypeScript's loader drops the shape membership check, so a shape the digest does not cover is loaded",
+          "file": "engines/typescript/src/catalog.ts",
+          "search": "      if (!files.has(control.shapePath)) {",
+          "replace": "      if (false) {"
+        },
+        {
+          "description": "Java's loader drops the shape membership check, so a shape the digest does not cover is loaded",
+          "file": "engines/java/src/main/java/org/agentce/Catalog.java",
+          "search": "                if (!files.contains(control.shapePath)) {",
+          "replace": "                if (false) {"
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/commands/__init__.py's _effective_trust_root, _verify_catalog_dirs and _resolve_catalogs plus signing.load_trust_root, ported in engines/typescript/src/cli.ts + verify.ts and engines/java/src/main/java/org/agentce/Cli.java + Verify.java."

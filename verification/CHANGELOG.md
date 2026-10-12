@@ -3,6 +3,17 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.99.0
+
+- `VG-BYO-CATALOG-PARITY` (18.168, changed) now runs 18 scenarios. A catalog's signature left out dot-named files
+  and anything under `__pycache__`, while the loaders read a dot-named control file and whatever file a control
+  named as its shape. So a control could be added, or a shape edited, after signing, and
+  `assess --catalog-dir --trust-root` accepted the catalog in all three engines. The loaders now read only the
+  files the signature covers, by their exact names: a dot-named control file is never read, and a shape that names
+  any other file is refused as `catalog.shape.unresolved`. The new scenarios add a dot-named control file to a
+  signed catalog, and name DOC-01's shape as a dot-named file and through `__PYCACHE__`. Six new seeded faults,
+  two per engine, make the loader list the controls folder itself or skip the shape check.
+
 ## 0.98.0
 
 - `VG-BYO-CATALOG-PARITY` (18.164, changed) now runs 15 scenarios. A catalog's signature left out the files behind

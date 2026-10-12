@@ -46,6 +46,39 @@ sed -i.bak '1,/^title: /s/^title: /title: EDITED AFTER SIGNING /' "$work/edited-
 rm "$work"/edited-controls/*.bak
 cp -R "$work/unsigned-cat" "$work/loop-cat"
 ln -s .. "$work/loop-cat/controls/up"
+# 18.168: a signed catalog that gains a dot-named control file after signing (text no loader can read as a
+# control, so a loader that reads it errors); and two catalogs whose DOC-01 shape names a file the digest
+# skips, signed by the Python library with no lint, as an older release would sign them.
+cp -R "$work/trusted-cat" "$work/dot-control-cat"
+printf 'not: [a control\n' > "$work/dot-control-cat/controls/.DOC-99.yaml"
+sign_without_lint() {
+  # sign_without_lint <dir> <trust-root path>
+  (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen python - "$1" "$2" <<'PY'
+import json, sys
+from pathlib import Path
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from agentce import signing
+cat, tr = Path(sys.argv[1]), Path(sys.argv[2])
+signer = signing.KmsSigner(private_key=Ed25519PrivateKey.generate())
+digest = signing.digest_tree(cat, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME}))
+st = signing.intoto_statement("eu-ai-act", digest, "https://agent-conformance.org/attestation/catalog/v1",
+                              {"kind": "catalog", "id": "eu-ai-act"})
+(cat / signing.CATALOG_SIGNATURE_NAME).write_text(json.dumps(signing.sign_statement(st, signer), indent=2))
+tr.write_text(json.dumps(signing.TrustRoot.document(signer.keyid, signer.public_key_b64, "unset")))
+PY
+  )
+}
+shape_elsewhere() {
+  # shape_elsewhere <dir> <where the file goes> <what DOC-01 names>
+  cp -R "$work/unsigned-cat" "$1"
+  mkdir -p "$(dirname "$1/$2")"
+  mv "$1/shapes/DOC-01.ttl" "$1/$2"
+  sed -i.bak "s#^  shape: shapes/DOC-01.ttl\$#  shape: $3#" "$1/controls/DOC-01.yaml"
+  rm "$1/controls/DOC-01.yaml.bak"
+  sign_without_lint "$1" "$1-trust-root.json"
+}
+shape_elsewhere "$work/dot-shape-cat" shapes/.DOC-01.ttl shapes/.DOC-01.ttl
+shape_elsewhere "$work/pycache-shape-cat" shapes/__pycache__/DOC-01.ttl shapes/__PYCACHE__/DOC-01.ttl
 printf '{not json' > "$work/bad-root.json"
 printf '[]' > "$work/array-root.json"
 
@@ -158,10 +191,16 @@ scenario "13 linked catalog edited behind the link" 3 input.catalog_unverified -
   "${base[@]}" --catalog-dir "$work/edited-cat" --trust-root "$work/linked-trust-root.json"
 scenario "14 catalog with a link to an ancestor folder" 3 input.catalog_unreadable - -- \
   "${base[@]}" --catalog-dir "$work/loop-cat" --allow-unverified-catalog
+scenario "15 signed catalog with a dot-named control file added after signing" 0 - - -- \
+  "${base[@]}" --catalog-dir "$work/dot-control-cat" --trust-root "$work/trust-root.json"
+scenario "16 shape named as a dot-named file the digest skips" 3 catalog.shape.unresolved - -- \
+  "${base[@]}" --catalog-dir "$work/dot-shape-cat" --trust-root "$work/dot-shape-cat-trust-root.json"
+scenario "17 shape named through __PYCACHE__, a folder the digest skips on any host" 3 catalog.shape.unresolved - -- \
+  "${base[@]}" --catalog-dir "$work/pycache-shape-cat" --trust-root "$work/pycache-shape-cat-trust-root.json"
 export AGENTCE_TRUST_ROOT="$work/bad-root.json"
 scenario "10 quickstart under AGENTCE_TRUST_ROOT" 3 input.trust_root_invalid "is not readable JSON: " -- \
   quickstart
 unset AGENTCE_TRUST_ROOT
 
-[ "$status" -eq 0 ] && echo "byo-catalog: all three engines verify --catalog-dir signatures identically across 15 scenarios"
+[ "$status" -eq 0 ] && echo "byo-catalog: all three engines verify --catalog-dir signatures identically across 18 scenarios"
 exit "$status"
