@@ -3,6 +3,15 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.95.0
+
+- `VG-APPROVAL-REFS-RESOLVED` (18.158, changed) now covers interrupts whose decision name points at nothing. Such an
+  interrupt counted as a human's even when the human logged in through the halted tool call's own agent, while the same
+  interrupt naming the tool call correctly did not. Each engine now refuses that login when any held record other than
+  the login itself concerns its agent. 26 OVS-07 cases (66 in all) cover other letter case, misspellings, unheld ids,
+  null, empty and padded names, and twins through an identity provider that still read conformant. Three new seeded
+  faults, one per engine, drop the check.
+
 ## 0.94.0
 
 - `VG-FAIL-ON-PARITY` (18.150, changed) no longer accepts a `--fail-on` value that the report never uses. A typo such as
