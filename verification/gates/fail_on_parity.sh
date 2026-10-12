@@ -43,12 +43,12 @@ IE="$work/corpus/projects/credit/langgraph/insufficient-evidence"
 
 # The scenarios (one NUL-separated argv file each, plus the job list) and the parser corpus's
 # expressions. Written by Python so every expression is the same string whatever the shell.
-python3 - "$work" "$F" "$IE" <<'PY'
+python3 - "$work" "$F" "$IE" "$root" <<'PY'
 import json
 import random
 import sys
 
-work, F, IE = sys.argv[1:4]
+work, F, IE, root = sys.argv[1:5]
 A = ["--bundle", f"{F}/evidence", "--profile", f"{F}/applicability.yaml", "--domain",
      f"{F}/domain.linkml.yaml", "--catalog-dir", f"{F}/catalog", "--allow-unverified-catalog"]
 I = ["--bundle", f"{IE}/evidence", "--profile", f"{IE}/applicability.yaml", "--domain",
@@ -205,9 +205,26 @@ fuzz += [mutated() for _ in range(3000)]
 # 500 more, drawn after the 6,000 so those keep their bytes: outcome, severity and mode mostly take one of their own
 # values (the only ones they accept since 18.150), sometimes a near miss of one, so both the evaluator and the
 # closed-vocabulary refusal are fuzzed.
-CLOSED = {"outcome": ["conformant", "non-conformant", "partial", "not_applicable", "not_assessed",
-                      "insufficient_evidence"],
-          "severity": ["high", "medium", "low"], "mode": ["automated", "semi-automated", "manual"]}
+# The closed values come from the specification, so engines that agree on a stale list still fail.
+def enum_of(name, field):
+    """The enum of the first property named `field` anywhere in spec/<name>."""
+    stack = [json.load(open(f"{root}/spec/{name}", encoding="utf-8"))]
+    while stack:
+        node = stack.pop(0)
+        if isinstance(node, dict):
+            if isinstance(node.get("properties"), dict) and "enum" in node["properties"].get(field, {}):
+                return node["properties"][field]["enum"]
+            if field in node.get("$defs", {}) and "enum" in node["$defs"][field]:
+                return node["$defs"][field]["enum"]
+            stack += node.values()
+        elif isinstance(node, list):
+            stack += node
+    raise SystemExit(f"no {field} enum in spec/{name}")
+
+
+CLOSED = {"outcome": enum_of("report/auditor.schema.json", "outcome"),
+          "severity": enum_of("rules/control.schema.json", "severity"),
+          "mode": enum_of("report/auditor.schema.json", "mode")}
 
 
 def near_miss(value):
@@ -227,7 +244,7 @@ fuzz += [" or ".join(" and ".join(closed_comparison() for _ in range(rng.randint
                      for _ in range(rng.randint(1, 3))) for _ in range(500)]
 named = [EXPR[k] for k in EXPR if k[0] in "RFDV"]
 with open(f"{work}/expressions.json", "w", encoding="utf-8") as f:
-    json.dump({"named": len(named), "expressions": named + fuzz, "expr": EXPR}, f)
+    json.dump({"named": len(named), "expressions": named + fuzz, "expr": EXPR, "closed": CLOSED}, f)
 PY
 
 # run_one <engine> <scenario>: the engine's envelope in <engine>/<name>.json, its stderr in .err, its
@@ -319,8 +336,9 @@ FIX = ('use comparisons of the form field=="literal" joined by and/or, over: '
 EMPTY = "the --fail-on expression is empty"
 DASH = "unexpected character '-' at position 0"
 UNKNOWN_FOO = "unknown field 'foo'; choose from: control, family, mode, outcome, rung, severity, subject"
-OUTCOMES = "conformant, non-conformant, partial, not_applicable, not_assessed, insufficient_evidence"
-CRITICAL = "severity 'critical' is not one of: high, medium, low"
+CLOSED = json.load(open(f"{work}/expressions.json", encoding="utf-8"))["closed"]
+OUTCOMES = ", ".join(CLOSED["outcome"])
+CRITICAL = "severity 'critical' is not one of: " + ", ".join(CLOSED["severity"])
 # Python's results (python-reference.md): exit, exit_status, fail_on.matched (None: no --fail-on).
 SUCCESSES = {
     "F0": (1, ["findings"], None), "F1": (1, ["findings"], 2),
@@ -353,7 +371,7 @@ REFUSALS = {
     "F2": ("input.fail_on_invalid_expression", CRITICAL),
     "F7": ("input.fail_on_invalid_expression", CRITICAL),
     "V1": ("input.fail_on_invalid_expression", f"outcome 'non_conformant' is not one of: {OUTCOMES}"),
-    "V2": ("input.fail_on_invalid_expression", "mode 'auto' is not one of: automated, semi-automated, manual"),
+    "V2": ("input.fail_on_invalid_expression", "mode 'auto' is not one of: " + ", ".join(CLOSED["mode"])),
     "V3": ("input.fail_on_invalid_expression", f"outcome '' is not one of: {OUTCOMES}"),
     "V4": ("input.fail_on_invalid_expression", f"outcome 'Non-conformant' is not one of: {OUTCOMES}"),
     "V5": ("input.fail_on_invalid_expression", "unexpected token 'foo' after a complete expression"),
