@@ -32,6 +32,7 @@ public final class Catalog {
     public final Map<String, String> evidenceShapeIris;
 
     private static final String EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved";
+    private static final String SHAPE_UNRESOLVED = "catalog.shape.unresolved";
 
     private Catalog(
             String id,
@@ -98,7 +99,8 @@ public final class Catalog {
             minEvidence.forEach(control.minimumEvidence::add);
         }
         JsonNode shape = evaluation.get("shape");
-        control.shapePath = shape != null && shape.isTextual() ? shape.textValue() : null;
+        // A non-string shape reads as "" (not a covered file), which load refuses; null stays "no shape".
+        control.shapePath = shape == null || shape.isNull() ? null : shape.isTextual() ? shape.textValue() : "";
         // A declared evidence shape is always resolved: a value that is not a path reads as "", which
         // load refuses, so it can never be skipped into a pass.
         if (evaluation.has("evidence_shape")) {
@@ -122,41 +124,57 @@ public final class Catalog {
         return control;
     }
 
-    private static List<String> yamlFiles(Path directory) {
-        List<String> names = new ArrayList<>();
-        if (!Files.isDirectory(directory)) {
-            return names;
-        }
-        try (Stream<Path> stream = Files.list(directory)) {
-            stream.map(p -> p.getFileName().toString())
-                    .filter(n -> n.endsWith(".yaml"))
-                    .forEach(names::add);
-        } catch (IOException e) {
-            return names;
-        }
-        names.sort(Json::byteCompare);
-        return names;
+    /** The catalog files the digest covers ({@link #coveredFiles}, less the signature): the only files
+     * {@link #load} reads. */
+    private static Set<String> covered(Path directory) {
+        return new HashSet<>(coveredFiles(directory, Set.of("catalog.sig.json")));
     }
 
-    /** Load {@code catalog.yaml} and every control and shape in {@code directory}. */
+    /** The covered {@code controls/<name>.yaml} files, one level deep as the listing always was, sorted. */
+    private static List<String> controlFiles(Set<String> files) {
+        List<String> rels = new ArrayList<>();
+        for (String rel : files) {
+            if (rel.startsWith("controls/") && rel.indexOf('/', "controls/".length()) < 0 && rel.endsWith(".yaml")) {
+                rels.add(rel);
+            }
+        }
+        rels.sort(Json::byteCompare);
+        return rels;
+    }
+
+    private static InputError refuseUncovered(String key, ControlSpec control, String path) {
+        return new InputError(
+                key,
+                ErrorCatalogue.errorCause(key).replace("{control}", control.id).replace("{path}", path),
+                ErrorCatalogue.errorFix(key));
+    }
+
+    /** Load {@code catalog.yaml} and every control and shape in {@code directory}. Only files the catalog
+     * digest covers are read, each by its exact name ({@link #coveredFiles}, 18.168): a dot-named control
+     * file is never loaded, and a shape path that names anything else is refused, so a signed catalog
+     * cannot change what it loads without changing its digest. */
     public static Catalog load(Path directory) {
         JsonNode meta = Yaml.parseFile(directory.resolve("catalog.yaml"));
         JsonNode metaRecord = meta != null && meta.isObject() ? meta : Json.nodes().objectNode();
         List<ControlSpec> controls = new ArrayList<>();
         Map<String, Psp.Shape> shapes = new LinkedHashMap<>();
         Map<String, String> evidenceShapeIris = new LinkedHashMap<>();
-        for (String controlFile : yamlFiles(directory.resolve("controls"))) {
-            JsonNode data = Yaml.parseFile(directory.resolve("controls").resolve(controlFile));
+        Set<String> files = covered(directory);
+        for (String rel : controlFiles(files)) {
+            JsonNode data = Yaml.parseFile(directory.resolve(rel));
             if (data == null || !data.isObject()) {
                 continue;
             }
             ControlSpec control = controlFromDict(data);
             controls.add(control);
             if (control.shapePath != null) {
+                if (!files.contains(control.shapePath)) {
+                    throw refuseUncovered(SHAPE_UNRESOLVED, control, control.shapePath);
+                }
                 shapes.putAll(Psp.loadShapes(directory.resolve(control.shapePath), control.shapePath));
             }
             if (control.evidenceShapePath != null) {
-                Map.Entry<String, Map<String, Psp.Shape>> loaded = loadEvidenceShape(directory, control);
+                Map.Entry<String, Map<String, Psp.Shape>> loaded = loadEvidenceShape(directory, control, files);
                 evidenceShapeIris.put(control.evidenceShapePath, loaded.getKey());
                 shapes.putAll(loaded.getValue());
             }
@@ -182,10 +200,11 @@ public final class Catalog {
      * the catalog folder after symlinks (where the catalog's signature covers it) and hold exactly one node
      * shape with a target; anything else is refused, so a declared evidence shape can never be skipped and
      * read as a pass. Returns the targeted shape's IRI with the file's shapes. */
-    private static Map.Entry<String, Map<String, Psp.Shape>> loadEvidenceShape(Path directory, ControlSpec control) {
+    private static Map.Entry<String, Map<String, Psp.Shape>> loadEvidenceShape(
+            Path directory, ControlSpec control, Set<String> files) {
         String path = control.evidenceShapePath;
         Map<String, Psp.Shape> loaded = Map.of();
-        if (!path.isEmpty()) {
+        if (files.contains(path)) {
             try {
                 Path root = directory.toRealPath();
                 Path resolved = directory.resolve(path).toRealPath();
@@ -198,12 +217,7 @@ public final class Catalog {
         }
         List<String> targeted = targeted(loaded);
         if (targeted.size() != 1) {
-            throw new InputError(
-                    EVIDENCE_SHAPE_UNRESOLVED,
-                    ErrorCatalogue.errorCause(EVIDENCE_SHAPE_UNRESOLVED)
-                            .replace("{control}", control.id)
-                            .replace("{path}", path),
-                    ErrorCatalogue.errorFix(EVIDENCE_SHAPE_UNRESOLVED));
+            throw refuseUncovered(EVIDENCE_SHAPE_UNRESOLVED, control, path);
         }
         return Map.entry(targeted.get(0), loaded);
     }
@@ -268,14 +282,16 @@ public final class Catalog {
         }
     }
 
-    /** Content-address a directory: {@code sha256:} over the sorted {@code <relpath>\0<filehash>}
-     * lines. Ports the Python reference's {@code signing.digest_tree} exactly: sorted by the full
-     * POSIX relpath string (byte order, so {@code a-b} sorts before {@code a/x}), {@code exclude}
-     * matched against the full relpath (a nested {@code controls/catalog.yaml} is never excluded, only
-     * a top-level one), and any path segment that is a dotfile or named {@code __pycache__} is skipped
-     * regardless of {@code exclude}. Recomputed from the directory's real bytes every call -- never
-     * read from a catalog's stored {@code provenance.digest} field. */
-    public static String digestTree(Path dir, Set<String> exclude) {
+    /** A path part the catalog digest never hashes below: a dot-named file or folder, or {@code __pycache__}. */
+    static boolean skippedPart(String part) {
+        return part.startsWith(".") || part.equals("__pycache__");
+    }
+
+    /** The POSIX relpaths {@link #digestTree} hashes, sorted (byte order): every file {@code collectFiles}
+     * reaches, less any path with a {@link #skippedPart} and any name in {@code exclude}. As Python's
+     * {@code signing.covered_files}: the catalog loaders read only these, by exact name (18.168), so nothing
+     * a loader reads can change without changing the digest. */
+    public static List<String> coveredFiles(Path dir, Set<String> exclude) {
         List<String> rels = new ArrayList<>();
         if (Files.isDirectory(dir)) {
             Set<Object> entered = new HashSet<>();
@@ -283,21 +299,21 @@ public final class Catalog {
             collectFiles(dir, "", rels, entered);
         }
         rels.sort(Json::byteCompare);
+        rels.removeIf(rel -> exclude.contains(rel)
+                || java.util.Arrays.stream(rel.split("/")).anyMatch(Catalog::skippedPart));
+        return rels;
+    }
+
+    /** Content-address a directory: {@code sha256:} over the sorted {@code <relpath>\0<filehash>}
+     * lines. Ports the Python reference's {@code signing.digest_tree} exactly: sorted by the full
+     * POSIX relpath string (byte order, so {@code a-b} sorts before {@code a/x}), {@code exclude}
+     * matched against the full relpath (a nested {@code controls/catalog.yaml} is never excluded, only
+     * a top-level one), and any path segment that is a dotfile or named {@code __pycache__} is skipped
+     * regardless of {@code exclude} ({@link #coveredFiles}). Recomputed from the directory's real bytes
+     * every call -- never read from a catalog's stored {@code provenance.digest} field. */
+    public static String digestTree(Path dir, Set<String> exclude) {
         List<byte[]> lines = new ArrayList<>();
-        for (String rel : rels) {
-            if (exclude.contains(rel)) {
-                continue;
-            }
-            boolean skip = false;
-            for (String part : rel.split("/")) {
-                if (part.startsWith(".") || part.equals("__pycache__")) {
-                    skip = true;
-                    break;
-                }
-            }
-            if (skip) {
-                continue;
-            }
+        for (String rel : coveredFiles(dir, exclude)) {
             byte[] content;
             try {
                 content = Files.readAllBytes(dir.resolve(rel));
