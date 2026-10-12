@@ -1,5 +1,6 @@
 package org.agentce;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
@@ -10,6 +11,7 @@ import java.nio.file.FileSystemLoopException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -127,7 +129,24 @@ public final class Catalog {
     /** The catalog files the digest covers ({@link #coveredFiles}, less the signature): the only files
      * {@link #load} reads. */
     private static Set<String> covered(Path directory) {
-        return new HashSet<>(coveredFiles(directory, Set.of("catalog.sig.json")));
+        try {
+            return new HashSet<>(coveredFiles(directory, Set.of(Verify.CATALOG_SIGNATURE_NAME)));
+        } catch (IllegalStateException e) {
+            throw Verify.catalogUnreadable(directory, e);
+        }
+    }
+
+    /** A catalog file read as YAML; a file that cannot be read (not one that does not parse) is refused as
+     * input.catalog_unreadable, as verify and sign refuse it (18.168). */
+    private static JsonNode readYaml(Path directory, String rel) {
+        try {
+            return Yaml.parseFile(directory.resolve(rel));
+        } catch (IllegalArgumentException e) {
+            if (e.getCause() instanceof IOException io && !(io instanceof JsonProcessingException)) {
+                throw Verify.catalogUnreadable(directory, io);
+            }
+            throw e;
+        }
     }
 
     /** The covered {@code controls/<name>.yaml} files, one level deep as the listing always was, sorted. */
@@ -152,16 +171,17 @@ public final class Catalog {
     /** Load {@code catalog.yaml} and every control and shape in {@code directory}. Only files the catalog
      * digest covers are read, each by its exact name ({@link #coveredFiles}, 18.168): a dot-named control
      * file is never loaded, and a shape path that names anything else is refused, so a signed catalog
-     * cannot change what it loads without changing its digest. */
+     * cannot change what it loads without changing its digest. The load walks the folder as the digest
+     * does, so a folder it cannot read is refused as input.catalog_unreadable, as verify and sign refuse it. */
     public static Catalog load(Path directory) {
-        JsonNode meta = Yaml.parseFile(directory.resolve("catalog.yaml"));
+        JsonNode meta = readYaml(directory, "catalog.yaml");
         JsonNode metaRecord = meta != null && meta.isObject() ? meta : Json.nodes().objectNode();
         List<ControlSpec> controls = new ArrayList<>();
         Map<String, Psp.Shape> shapes = new LinkedHashMap<>();
         Map<String, String> evidenceShapeIris = new LinkedHashMap<>();
         Set<String> files = covered(directory);
         for (String rel : controlFiles(files)) {
-            JsonNode data = Yaml.parseFile(directory.resolve(rel));
+            JsonNode data = readYaml(directory, rel);
             if (data == null || !data.isObject()) {
                 continue;
             }
@@ -300,7 +320,7 @@ public final class Catalog {
         }
         rels.sort(Json::byteCompare);
         rels.removeIf(rel -> exclude.contains(rel)
-                || java.util.Arrays.stream(rel.split("/")).anyMatch(Catalog::skippedPart));
+                || Arrays.stream(rel.split("/")).anyMatch(Catalog::skippedPart));
         return rels;
     }
 

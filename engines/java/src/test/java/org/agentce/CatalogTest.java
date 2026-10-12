@@ -147,7 +147,7 @@ class CatalogTest {
     @Test
     void provenanceDigestChangesWhenTheCatalogContentChangesAndIgnoresAStaleStoredDigest(@TempDir Path tmp)
             throws IOException {
-        copyTree(DIGEST_FIXTURE, tmp);
+        Fixtures.copyTree(DIGEST_FIXTURE, tmp);
         String before = Catalog.provenanceDigest(tmp);
         assertEquals(digestExpected(), before);
         // Tamper a non-excluded file's content; catalog.yaml's own (unrelated) content is untouched, so
@@ -163,7 +163,7 @@ class CatalogTest {
 
     @Test
     void loadRefusesAShapeUsingShSparql(@TempDir Path tmp) throws IOException {
-        copyTree(Fixtures.BASE, tmp);
+        Fixtures.copyTree(Fixtures.BASE, tmp);
         mutateShape(tmp, "sh:sparql [] ");
         InputError err = assertThrows(InputError.class, () -> Catalog.load(tmp));
         assertEquals("catalog.shape.sparql_forbidden", err.key);
@@ -171,7 +171,7 @@ class CatalogTest {
 
     @Test
     void loadRefusesAShapeUsingShJs(@TempDir Path tmp) throws IOException {
-        copyTree(Fixtures.BASE, tmp);
+        Fixtures.copyTree(Fixtures.BASE, tmp);
         mutateShape(tmp, "sh:js [] ");
         InputError err = assertThrows(InputError.class, () -> Catalog.load(tmp));
         assertEquals("catalog.shape.script_forbidden", err.key);
@@ -179,7 +179,7 @@ class CatalogTest {
 
     @Test
     void loadRefusesAShapeUsingShJavascript(@TempDir Path tmp) throws IOException {
-        copyTree(Fixtures.BASE, tmp);
+        Fixtures.copyTree(Fixtures.BASE, tmp);
         mutateShape(tmp, "sh:javascript [] ");
         InputError err = assertThrows(InputError.class, () -> Catalog.load(tmp));
         assertEquals("catalog.shape.script_forbidden", err.key);
@@ -190,7 +190,7 @@ class CatalogTest {
     // never whichever one Rdf.Store happened to insert first.
     @Test
     void loadRefusesAShapeCarryingBothPredicatesAsSparqlDeterministically(@TempDir Path tmp) throws IOException {
-        copyTree(Fixtures.BASE, tmp);
+        Fixtures.copyTree(Fixtures.BASE, tmp);
         mutateShape(tmp, "sh:js [] ; sh:sparql [] ");
         InputError err = assertThrows(InputError.class, () -> Catalog.load(tmp));
         assertEquals("catalog.shape.sparql_forbidden", err.key);
@@ -198,7 +198,7 @@ class CatalogTest {
 
     @Test
     void loadRefusesAForbiddenShapePredicateRegardlessOfCase(@TempDir Path tmp) throws IOException {
-        copyTree(Fixtures.BASE, tmp);
+        Fixtures.copyTree(Fixtures.BASE, tmp);
         mutateShape(tmp, "sh:SPARQL [] ");
         InputError err = assertThrows(InputError.class, () -> Catalog.load(tmp));
         assertEquals("catalog.shape.sparql_forbidden", err.key);
@@ -206,7 +206,7 @@ class CatalogTest {
 
     @Test
     void loadRefusesAForbiddenShapePredicateRegardlessOfCaseJavaScript(@TempDir Path tmp) throws IOException {
-        copyTree(Fixtures.BASE, tmp);
+        Fixtures.copyTree(Fixtures.BASE, tmp);
         mutateShape(tmp, "sh:JavaScript [] ");
         InputError err = assertThrows(InputError.class, () -> Catalog.load(tmp));
         assertEquals("catalog.shape.script_forbidden", err.key);
@@ -214,7 +214,7 @@ class CatalogTest {
 
     @Test
     void loadRefusesForbiddenPredicateUnderAnAliasedPrefixOrBareIri(@TempDir Path tmp) throws IOException {
-        copyTree(Fixtures.BASE, tmp);
+        Fixtures.copyTree(Fixtures.BASE, tmp);
         Path shape = tmp.resolve("shapes/DAT-01.ttl");
         String original = Files.readString(shape);
         String aliased =
@@ -238,7 +238,7 @@ class CatalogTest {
 
     @Test
     void loadDoesNotRefuseALiteralOrACommentThatMerelyMentionsShSparql(@TempDir Path tmp) throws IOException {
-        copyTree(Fixtures.BASE, tmp);
+        Fixtures.copyTree(Fixtures.BASE, tmp);
         Path shape = tmp.resolve("shapes/DAT-01.ttl");
         String original = Files.readString(shape);
         Files.writeString(
@@ -254,7 +254,7 @@ class CatalogTest {
 
     @Test
     void loadRefusesForbiddenPredicateNestedInsideAPropertyShape(@TempDir Path tmp) throws IOException {
-        copyTree(Fixtures.BASE, tmp);
+        Fixtures.copyTree(Fixtures.BASE, tmp);
         Path shape = tmp.resolve("shapes/DAT-01.ttl");
         Files.writeString(
                 shape,
@@ -271,7 +271,7 @@ class CatalogTest {
         // Turtle's IRIREF grammar allows backslash-u (four hex digits) and backslash-U (eight hex
         // digits) escapes inside <...>; a parser that kept the raw, undecoded IRI text (rather than
         // the resolved IRI) would miss this, since it is the same IRI as sh:sparql once decoded.
-        copyTree(Fixtures.BASE, tmp);
+        Fixtures.copyTree(Fixtures.BASE, tmp);
         // Built by concatenation, not a literal escape, so javac's own raw unicode-escape
         // preprocessing (which runs before string literals are even recognised) does not decode
         // the backslash-u sequence itself -- the Turtle parser under test must do that decoding.
@@ -292,20 +292,6 @@ class CatalogTest {
         Files.writeString(shape, original.replace("sh:name \"S1\" ] .", "sh:name \"S1\" ] ; " + triple + " ."));
     }
 
-    private static void copyTree(Path source, Path target) throws IOException {
-        try (java.util.stream.Stream<Path> walk = Files.walk(source)) {
-            for (Path path : (Iterable<Path>) walk::iterator) {
-                Path dest = target.resolve(source.relativize(path).toString());
-                if (Files.isDirectory(path)) {
-                    Files.createDirectories(dest);
-                } else {
-                    Files.createDirectories(dest.getParent());
-                    Files.copy(path, dest);
-                }
-            }
-        }
-    }
-
     // --- 18.37k: ROB-02's evidence shape resolves from the file the control declares; a declared
     // evidence shape that is not exactly one targeted node shape inside the catalog is refused. ---
 
@@ -315,7 +301,7 @@ class CatalogTest {
             + " sh:property [ sh:path agentce:untrustedContentRuledOn ; sh:hasValue true ] .\n";
 
     private static Path withEvidenceShape(Path tmp, String text) throws IOException {
-        copyTree(Fixtures.BASE, tmp);
+        Fixtures.copyTree(Fixtures.BASE, tmp);
         Path shape = tmp.resolve("shapes/ROB-02-evidence.ttl");
         if (text == null) {
             Files.delete(shape);
@@ -326,7 +312,7 @@ class CatalogTest {
     }
 
     private static Path withEvidenceShapeValue(Path tmp, String value) throws IOException {
-        copyTree(Fixtures.BASE, tmp);
+        Fixtures.copyTree(Fixtures.BASE, tmp);
         Path control = tmp.resolve("controls/ROB-02.yaml");
         String declared = "evidence_shape: shapes/ROB-02-evidence.ttl";
         String text = Files.readString(control);

@@ -19,26 +19,12 @@ import org.junit.jupiter.api.io.TempDir;
 /** 18.168: the catalog loaders read only files the catalog digest covers, by exact name. */
 class CatalogCoveredPathTest {
 
-    private static void copyTree(Path source, Path target) throws IOException {
-        try (java.util.stream.Stream<Path> walk = Files.walk(source)) {
-            for (Path path : (Iterable<Path>) walk::iterator) {
-                Path dest = target.resolve(source.relativize(path).toString());
-                if (Files.isDirectory(path)) {
-                    Files.createDirectories(dest);
-                } else {
-                    Files.createDirectories(dest.getParent());
-                    Files.copy(path, dest);
-                }
-            }
-        }
-    }
-
     /** A copy of the base catalog whose {@code control} names {@code value} as {@code evaluation.<field>},
      * with a copy of the original file at {@code place} (relative to the catalog, or absolute) when given. */
     private static Path withControlValue(Path tmp, String control, String field, String value, String place)
             throws IOException {
         Path dir = tmp.resolve("cat");
-        copyTree(Fixtures.BASE, dir);
+        Fixtures.copyTree(Fixtures.BASE, dir);
         Path doc = dir.resolve("controls").resolve(control + ".yaml");
         String text = Files.readString(doc);
         String original = text.lines()
@@ -87,7 +73,7 @@ class CatalogCoveredPathTest {
         List<String> before = Catalog.load(Fixtures.BASE).controls.stream().map(c -> c.id).toList();
         for (String name : List.of(".DOC-99.yaml", "._DOC-01.yaml")) {
             Path dir = tmp.resolve(name);
-            copyTree(Fixtures.BASE, dir);
+            Fixtures.copyTree(Fixtures.BASE, dir);
             // Not a control at all: a loader that read it would fail, not merely add a control.
             Files.writeString(dir.resolve("controls").resolve(name), "{not: [a control\n");
             assertEquals(before, Catalog.load(dir).controls.stream().map(c -> c.id).toList(), name);

@@ -190,4 +190,19 @@ final class Fixtures {
         Files.writeString(root.resolve("manifest.json"), Json.compact(manifest), StandardCharsets.UTF_8);
         return Bundle.load(root);
     }
+
+    /** Copies the folder {@code source} to {@code target}, files and folders. */
+    static void copyTree(Path source, Path target) throws IOException {
+        try (java.util.stream.Stream<Path> walk = Files.walk(source)) {
+            for (Path path : (Iterable<Path>) walk::iterator) {
+                Path dest = target.resolve(source.relativize(path).toString());
+                if (Files.isDirectory(path)) {
+                    Files.createDirectories(dest);
+                } else {
+                    Files.createDirectories(dest.getParent());
+                    Files.copy(path, dest);
+                }
+            }
+        }
+    }
 }
