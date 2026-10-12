@@ -437,6 +437,29 @@ def test_confine_to_root_handles_symlink_loop_without_raising(tmp_path: Path) ->
     assert confine_to_root(tmp_path, "a") is None
 
 
+def test_confine_to_root_refuses_a_self_loop(tmp_path: Path) -> None:
+    (tmp_path / "events").mkdir()
+    (tmp_path / "events" / "loop.jsonl").symlink_to("loop.jsonl")
+
+    assert confine_to_root(tmp_path, "events/loop.jsonl") is None
+
+
+def test_confine_to_root_reads_a_long_symlink_chain_with_no_loop(
+    tmp_path: Path,
+) -> None:
+    events = tmp_path / "events"
+    events.mkdir()
+    (events / "real.jsonl").write_text("{}\n", encoding="utf-8")
+    (events / "c0.jsonl").symlink_to("real.jsonl")
+    for i in range(1, 45):
+        (events / f"c{i}.jsonl").symlink_to(f"c{i - 1}.jsonl")
+
+    assert (
+        confine_to_root(tmp_path, "events/c44.jsonl")
+        == tmp_path / "events" / "c44.jsonl"
+    )
+
+
 def test_confine_to_root_handles_embedded_nul_without_raising(tmp_path: Path) -> None:
     assert confine_to_root(tmp_path, "evil\x00name") is None
 

@@ -8,8 +8,10 @@ with exit code 3 (an :class:`~agentce.errors.InputError`), never a silent partia
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
+import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -105,9 +107,22 @@ def confine_to_root(root: Path, rel: str) -> Path | None:
         resolved_root = root.resolve(strict=False)
     except (OSError, RuntimeError, ValueError):
         return None
+    if _meets_symlink_loop(resolved):
+        return None
     if resolved != resolved_root and not resolved.is_relative_to(resolved_root):
         return None
     return candidate
+
+
+def _meets_symlink_loop(resolved: Path) -> bool:
+    """True when ``resolved`` still ends in a symlink loop. Python 3.12's ``resolve(strict=False)``
+    raises on a loop; 3.13 and newer return the looping path unchanged, so ask the OS the same
+    question 3.12 does (stat the resolved path, ELOOP) to keep one answer on every version."""
+    try:
+        os.stat(resolved)
+    except OSError as exc:
+        return exc.errno == errno.ELOOP
+    return False
 
 
 def _safe_member(root: Path, rel: str) -> Path:
