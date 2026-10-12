@@ -6,6 +6,7 @@ golden as well as roundtrip, tamper, and order/clock-independence checks.
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 from pathlib import Path
@@ -202,6 +203,97 @@ def test_digest_tree_is_order_independent_and_excludes(tmp_path: Path) -> None:
     assert (
         signing.digest_tree(tmp_path, exclude=frozenset({"catalog.sig.json"})) != first
     )
+
+
+def _linked_tree(tmp_path: Path) -> tuple[Path, Path]:
+    """A catalog-like tree whose controls/ is a symlink to a folder outside it, and its real twin."""
+    real, linked, target = tmp_path / "real", tmp_path / "linked", tmp_path / "target"
+    for root in (real, target):
+        (root / "controls" if root is real else root).mkdir(parents=True)
+    for folder in (real / "controls", target):
+        (folder / "DOC-01.yaml").write_text("id: DOC-01\n", encoding="utf-8")
+    linked.mkdir()
+    (real / "catalog.yaml").write_text("id: x\n", encoding="utf-8")
+    (linked / "catalog.yaml").write_text("id: x\n", encoding="utf-8")
+    (linked / "controls").symlink_to(target, target_is_directory=True)
+    return real, linked
+
+
+def test_digest_tree_covers_a_symlinked_folder_as_the_loader_reads_it(
+    tmp_path: Path,
+) -> None:
+    # 18.164: a linked controls/ digests like a real one, so an edit behind the link changes it.
+    real, linked = _linked_tree(tmp_path)
+    before = signing.digest_tree(linked)
+    assert before == signing.digest_tree(real)
+    (tmp_path / "target" / "DOC-01.yaml").write_text("id: EDITED\n", encoding="utf-8")
+    assert signing.digest_tree(linked) != before
+    # A link nested inside a linked folder is walked too.
+    (tmp_path / "more").mkdir()
+    (tmp_path / "more" / "x.yaml").write_text("x\n", encoding="utf-8")
+    (tmp_path / "target" / "more").symlink_to(
+        tmp_path / "more", target_is_directory=True
+    )
+    assert signing.digest_tree(linked) != signing.digest_tree(real)
+    # A dangling folder link and a link to itself are skipped, as at base.
+    (real / "gone").symlink_to(tmp_path / "nowhere", target_is_directory=True)
+    (real / "self").symlink_to("self")
+    assert signing.digest_tree(real) == signing.digest_tree(linked.parent / "real")
+
+
+@pytest.mark.parametrize("shape", ["ancestor", "diamond", "fan-out", "case-variant"])
+def test_digest_tree_refuses_a_folder_reached_twice(tmp_path: Path, shape: str) -> None:
+    # 18.164: a cycle or two names for one folder raises ELOOP naming the second name, without
+    # walking the 2**30 paths a chain of diamonds would give.
+    root = tmp_path / "c"
+    (root / "controls").mkdir(parents=True)
+    if shape == "ancestor":
+        (root / "controls" / "up").symlink_to("..", target_is_directory=True)
+        expected = root / "controls" / "up"
+    elif shape == "diamond":
+        (tmp_path / "shared").mkdir()
+        for name in ("a", "b"):
+            (root / name).symlink_to(tmp_path / "shared", target_is_directory=True)
+        expected = root / "b"
+    elif shape == "fan-out":
+        for i in range(30, -1, -1):
+            (tmp_path / str(i)).mkdir()
+            for name in ("a", "b") if i < 30 else ():
+                (tmp_path / str(i) / name).symlink_to(tmp_path / str(i + 1))
+        (root / "deep").symlink_to(tmp_path / "0", target_is_directory=True)
+        expected = None
+    else:
+        (tmp_path / "Probe").mkdir()
+        if not (tmp_path / "probe").exists():
+            pytest.skip("needs a case-insensitive filesystem")
+        level = root / "deep"
+        level.mkdir()
+        for _ in range(12):
+            (level / "xx").mkdir()
+            (level / "a").symlink_to("xX", target_is_directory=True)
+            (level / "b").symlink_to("Xx", target_is_directory=True)
+            level = level / "xx"
+        expected = None
+    with pytest.raises(OSError) as info:
+        signing.digest_tree(root)
+    assert info.value.errno == errno.ELOOP
+    assert expected is None or info.value.filename == str(expected)
+    assert str(info.value.filename).endswith("/b") or shape == "ancestor"
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root ignores permission bits")
+def test_digest_tree_raises_for_a_linked_folder_it_cannot_list(tmp_path: Path) -> None:
+    root, locked = tmp_path / "c", tmp_path / "locked"
+    root.mkdir()
+    locked.mkdir()
+    (root / "locked").symlink_to(locked, target_is_directory=True)
+    locked.chmod(0o300)
+    try:
+        with pytest.raises(PermissionError) as info:
+            signing.digest_tree(root)
+        assert info.value.filename == str(root / "locked")
+    finally:
+        locked.chmod(0o700)
 
 
 def test_vendored_trust_loads() -> None:

@@ -95,6 +95,56 @@ class CatalogTest {
     }
 
     @Test
+    void digestTreeCoversASymlinkedFolderAsTheLoaderReadsIt(@TempDir Path tmp) throws IOException {
+        // 18.164: a linked controls/ digests like a real one, so an edit behind the link changes it.
+        Path real = Files.createDirectories(tmp.resolve("real/controls")).getParent();
+        Path linked = Files.createDirectories(tmp.resolve("linked"));
+        Path target = Files.createDirectories(tmp.resolve("target"));
+        for (Path dir : List.of(real, linked)) {
+            Files.writeString(dir.resolve("catalog.yaml"), "id: x\n");
+        }
+        Files.writeString(real.resolve("controls/DOC-01.yaml"), "id: DOC-01\n");
+        Files.writeString(target.resolve("DOC-01.yaml"), "id: DOC-01\n");
+        Files.createSymbolicLink(linked.resolve("controls"), target);
+        String before = Catalog.digestTree(linked, Set.of());
+        assertEquals(Catalog.digestTree(real, Set.of()), before);
+        Files.writeString(target.resolve("DOC-01.yaml"), "id: EDITED\n");
+        assertNotEquals(before, Catalog.digestTree(linked, Set.of()));
+        // A dangling folder link and a link to itself are skipped, as at base.
+        String unlinked = Catalog.digestTree(real, Set.of());
+        Files.createSymbolicLink(real.resolve("gone"), tmp.resolve("nowhere"));
+        Files.createSymbolicLink(real.resolve("self"), Path.of("self"));
+        assertEquals(unlinked, Catalog.digestTree(real, Set.of()));
+    }
+
+    @Test
+    void digestTreeRefusesAFolderReachedTwice(@TempDir Path tmp) throws IOException {
+        // 18.164: a cycle, a diamond or a chain of diamonds is refused naming the second name reached,
+        // without walking the 2^30 paths the chain would give.
+        Path ancestor = Files.createDirectories(tmp.resolve("ancestor/controls")).getParent();
+        Files.createSymbolicLink(ancestor.resolve("controls/up"), Path.of(".."));
+        Path diamond = Files.createDirectories(tmp.resolve("diamond"));
+        Path shared = Files.createDirectories(tmp.resolve("shared"));
+        Files.createSymbolicLink(diamond.resolve("a"), shared);
+        Files.createSymbolicLink(diamond.resolve("b"), shared);
+        Path fanOut = Files.createDirectories(tmp.resolve("fan-out"));
+        for (int i = 30; i >= 0; i--) {
+            Path level = Files.createDirectories(tmp.resolve("levels/" + i));
+            if (i < 30) {
+                Files.createSymbolicLink(level.resolve("a"), tmp.resolve("levels/" + (i + 1)));
+                Files.createSymbolicLink(level.resolve("b"), tmp.resolve("levels/" + (i + 1)));
+            }
+        }
+        Files.createSymbolicLink(fanOut.resolve("deep"), tmp.resolve("levels/0"));
+        for (Path root : List.of(ancestor, diamond, fanOut)) {
+            IllegalStateException e =
+                    assertThrows(IllegalStateException.class, () -> Catalog.digestTree(root, Set.of()));
+            String rel = InputError.unreadableRel(root, e);
+            assertEquals(true, root == ancestor ? rel.equals("controls/up") : rel.endsWith("b"), rel);
+        }
+    }
+
+    @Test
     void provenanceDigestChangesWhenTheCatalogContentChangesAndIgnoresAStaleStoredDigest(@TempDir Path tmp)
             throws IOException {
         copyTree(DIGEST_FIXTURE, tmp);

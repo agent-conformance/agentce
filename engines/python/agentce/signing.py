@@ -316,24 +316,49 @@ def _mode_matches(
 # --- Statements and certificates. ---
 
 
+def _walk_files(root: Path) -> list[Path]:
+    """Every regular file under ``root``, reached the way a loader opening paths by name reaches it:
+    a symlinked folder is descended like a real one (18.164), so a signature covers the files behind
+    it. Each folder is listed with ``os.listdir``, so one that cannot be listed raises the OSError
+    naming it (18.68). A folder entered a second time (a cycle, or two names for one folder) raises
+    ELOOP naming the second name, so the walk enters each folder once; identity is device and inode,
+    never a path string, which case-insensitive filesystems spell many ways."""
+    files: list[Path] = []
+    if not is_directory(root):
+        return files
+    entered = {_identity(root)}
+
+    def walk(folder: Path) -> None:
+        for name in sorted(os.listdir(folder)):
+            path = folder / name
+            if is_directory(path):
+                identity = _identity(path)
+                if identity in entered:
+                    raise OSError(errno.ELOOP, "folder reached twice", str(path))
+                entered.add(identity)
+                walk(path)
+            elif is_regular_file(path):
+                files.append(path)
+
+    walk(root)
+    return files
+
+
+def _identity(folder: Path) -> tuple[int, int]:
+    st = folder.stat()
+    return st.st_dev, st.st_ino
+
+
 def digest_tree(root: Path, *, exclude: frozenset[str] = frozenset()) -> str:
     """Content-address a directory: ``sha256:`` over the sorted ``<relpath>\\0<filehash>`` lines.
 
-    The walk is filesystem-based (no git), sorted by POSIX relative path, and skips dotfiles,
-    ``__pycache__``, and any name in ``exclude`` (e.g. the signature file itself), so the same
+    The walk is filesystem-based (no git), follows symlinked folders and files (`_walk_files`), is
+    sorted by POSIX relative path, and skips dotfiles, ``__pycache__``, and any name in ``exclude`` (e.g. the signature file itself), so the same
     directory yields the same digest on any host — the basis of the offline catalog/release check.
     """
     lines: list[bytes] = []
-    paths = sorted(root.rglob("*"), key=lambda p: p.relative_to(root).as_posix())
-    # `rglob` skips a folder it cannot list without saying so, which would sign or check a digest
-    # that silently leaves the folder out: list each real folder it descends, so one that cannot
-    # be listed raises the OSError (naming it) before any digest is formed (18.68).
-    for folder in (root, *paths):
-        if is_directory(folder) and not folder.is_symlink():
-            os.listdir(folder)
+    paths = sorted(_walk_files(root), key=lambda p: p.relative_to(root).as_posix())
     for path in paths:
-        if not is_regular_file(path):
-            continue
         rel = path.relative_to(root).as_posix()
         if rel in exclude or any(
             part.startswith(".") or part == "__pycache__"

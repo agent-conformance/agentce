@@ -3389,9 +3389,12 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
     signer = signing.KmsSigner(private_key=key)
 
     catalog_id = catalog_dir.name
-    digest = signing.digest_tree(
-        directory, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME})
-    )
+    try:
+        digest = signing.digest_tree(
+            directory, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME})
+        )
+    except (OSError, UnicodeError) as exc:  # as verify --catalog: unreadable or a cycle
+        raise _catalog_unreadable(directory, exc) from exc
     statement = signing.intoto_statement(
         subject_name=catalog_id,
         digest=digest,

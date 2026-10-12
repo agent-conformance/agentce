@@ -18,7 +18,16 @@
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -614,6 +623,70 @@ test("digestTree excludes only the exact top-level name, never a nested one of t
   const withoutExclude = digestTree(DIGEST_FIXTURE, new Set());
   assert.notEqual(withNested, withoutExclude);
 });
+
+test("digestTree covers a symlinked folder as the loader reads it (18.164)", () => {
+  const tmp = mkdtempSync(join(tmpdir(), "agentce-digest-link-"));
+  try {
+    for (const root of ["real", "linked"]) {
+      mkdirSync(join(tmp, root));
+      writeFileSync(join(tmp, root, "catalog.yaml"), "id: x\n");
+    }
+    mkdirSync(join(tmp, "real", "controls"));
+    mkdirSync(join(tmp, "target"));
+    writeFileSync(join(tmp, "real", "controls", "DOC-01.yaml"), "id: DOC-01\n");
+    writeFileSync(join(tmp, "target", "DOC-01.yaml"), "id: DOC-01\n");
+    symlinkSync(join(tmp, "target"), join(tmp, "linked", "controls"), "dir");
+    const before = digestTree(join(tmp, "linked"));
+    assert.equal(before, digestTree(join(tmp, "real")));
+    writeFileSync(join(tmp, "target", "DOC-01.yaml"), "id: EDITED\n");
+    assert.notEqual(digestTree(join(tmp, "linked")), before);
+    // A dangling folder link and a link to itself are skipped, as at base.
+    const unlinked = digestTree(join(tmp, "real"));
+    symlinkSync(join(tmp, "nowhere"), join(tmp, "real", "gone"), "dir");
+    symlinkSync("self", join(tmp, "real", "self"));
+    assert.equal(digestTree(join(tmp, "real")), unlinked);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+for (const shape of ["ancestor", "diamond", "fan-out"]) {
+  test(`digestTree refuses a folder reached twice: ${shape} (18.164)`, () => {
+    const tmp = mkdtempSync(join(tmpdir(), "agentce-digest-twice-"));
+    try {
+      const root = join(tmp, "c");
+      mkdirSync(join(root, "controls"), { recursive: true });
+      let expected: string | null = null;
+      if (shape === "ancestor") {
+        symlinkSync("..", join(root, "controls", "up"), "dir");
+        expected = join(root, "controls", "up");
+      } else if (shape === "diamond") {
+        mkdirSync(join(tmp, "shared"));
+        symlinkSync(join(tmp, "shared"), join(root, "a"), "dir");
+        symlinkSync(join(tmp, "shared"), join(root, "b"), "dir");
+        expected = join(root, "b");
+      } else {
+        for (let i = 30; i >= 0; i--) {
+          mkdirSync(join(tmp, String(i)));
+          if (i < 30) {
+            symlinkSync(join(tmp, String(i + 1)), join(tmp, String(i), "a"), "dir");
+            symlinkSync(join(tmp, String(i + 1)), join(tmp, String(i), "b"), "dir");
+          }
+        }
+        symlinkSync(join(tmp, "0"), join(root, "deep"), "dir");
+      }
+      assert.throws(
+        () => digestTree(root),
+        (err: NodeJS.ErrnoException) =>
+          err.code === "ELOOP" &&
+          typeof err.path === "string" &&
+          (expected === null ? err.path.endsWith("/b") : err.path === expected),
+      );
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+}
 
 test("catalogProvenanceDigest changes when the catalog content changes, and ignores a stale stored digest", () => {
   const tmp = mkdtempSync(join(tmpdir(), "agentce-digest-"));

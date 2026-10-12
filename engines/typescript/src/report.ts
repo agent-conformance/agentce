@@ -10,7 +10,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { lstatSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { arch, platform } from "node:os";
 import { dirname, join } from "node:path";
 import type { Activity } from "./activity";
@@ -50,18 +50,47 @@ function isFileFollowingLinks(path: string): boolean {
   }
 }
 
-/** Every file's POSIX relpath under `dir`, unsorted. */
-function walkFiles(dir: string, base: string): string[] {
+/** A folder's identity: device and inode, never a path string, which a case-insensitive filesystem
+ * spells many ways. */
+function folderIdentity(path: string): string {
+  const st = statSync(path, { bigint: true });
+  return `${st.dev}:${st.ino}`;
+}
+
+/** Whether `path`, following links, is a folder: a missing target or a link loop is not, and any
+ * other error (a parent that cannot be entered) propagates, as Python's `signing.is_directory`. */
+function isDirFollowingLinks(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR" || code === "ELOOP") {
+      return false;
+    }
+    throw err;
+  }
+}
+
+/** Every file's POSIX relpath under `dir`, unsorted. As Python's `signing._walk_files`: a symlinked
+ * folder is descended like a real one and a symlinked file is followed (18.164), a broken link is
+ * skipped, and a folder entered a second time (a cycle, or two names for one folder) throws ELOOP
+ * naming the second name, so each folder is entered once. */
+function walkFiles(dir: string, base: string, entered: Set<string>): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir).sort(byteCompare)) {
     const full = join(dir, name);
     const rel = base === "" ? name : `${base}/${name}`;
-    // As Python's `rglob`: never descend a symlinked directory, follow a symlinked file, skip a
-    // broken link.
-    const entry = lstatSync(full);
-    if (entry.isDirectory()) {
-      out.push(...walkFiles(full, rel));
-    } else if (entry.isFile() || (entry.isSymbolicLink() && isFileFollowingLinks(full))) {
+    if (isDirFollowingLinks(full)) {
+      const identity = folderIdentity(full);
+      if (entered.has(identity)) {
+        throw Object.assign(new Error(`folder reached twice: ${full}`), {
+          code: "ELOOP",
+          path: full,
+        });
+      }
+      entered.add(identity);
+      out.push(...walkFiles(full, rel, entered));
+    } else if (isFileFollowingLinks(full)) {
       out.push(rel);
     }
   }
@@ -76,7 +105,7 @@ function walkFiles(dir: string, base: string): string[] {
  * from the directory's real bytes every call -- never read from a catalog's stored
  * `provenance.digest` field. */
 export function digestTree(dir: string, exclude: ReadonlySet<string> = new Set()): string {
-  const rels = walkFiles(dir, "").sort(byteCompare);
+  const rels = walkFiles(dir, "", new Set([folderIdentity(dir)])).sort(byteCompare);
   const lines: Buffer[] = [];
   for (const rel of rels) {
     if (exclude.has(rel)) {

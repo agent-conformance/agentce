@@ -6,9 +6,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
+import java.nio.file.FileSystemLoopException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -227,10 +229,22 @@ public final class Catalog {
      * TypeScript port's {@code PROVENANCE_EXCLUDE}). */
     private static final Set<String> PROVENANCE_EXCLUDE = Set.of("catalog.sig.json", "catalog.yaml");
 
-    private static void collectFiles(Path dir, String base, List<String> out) {
-        if (!Files.isDirectory(dir)) {
-            return;
+    /** A folder's identity: its file key (device and inode on Unix), never a path string, which a
+     * case-insensitive filesystem spells many ways; its real path where the filesystem gives no key. */
+    private static Object folderIdentity(Path dir) {
+        try {
+            Object key = Files.readAttributes(dir, BasicFileAttributes.class).fileKey();
+            return key != null ? key : dir.toRealPath();
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot read " + dir + ": " + e.getMessage(), e);
         }
+    }
+
+    /** Every file's POSIX relpath under {@code dir}. As Python's {@code signing._walk_files}: a
+     * symlinked folder is descended like a real one and a symlinked file is followed (18.164), a broken
+     * link is skipped, and a folder entered a second time (a cycle, or two names for one folder) is
+     * refused naming the second name, so each folder is entered once. */
+    private static void collectFiles(Path dir, String base, List<String> out, Set<Object> entered) {
         List<String> names = new ArrayList<>();
         try (Stream<Path> stream = Files.list(dir)) {
             stream.map(p -> p.getFileName().toString()).forEach(names::add);
@@ -241,10 +255,13 @@ public final class Catalog {
         for (String name : names) {
             Path full = dir.resolve(name);
             String rel = base.isEmpty() ? name : base + "/" + name;
-            // As Python's `rglob`: never descend a symlinked directory, follow a symlinked file, skip
-            // a broken link.
-            if (Files.isDirectory(full, LinkOption.NOFOLLOW_LINKS)) {
-                collectFiles(full, rel, out);
+            if (Files.isDirectory(full)) {
+                if (!entered.add(folderIdentity(full))) {
+                    throw new IllegalStateException(
+                            "folder reached twice: " + full,
+                            new FileSystemLoopException(full.toString()));
+                }
+                collectFiles(full, rel, out, entered);
             } else if (Files.isRegularFile(full)) {
                 out.add(rel);
             }
@@ -260,7 +277,11 @@ public final class Catalog {
      * read from a catalog's stored {@code provenance.digest} field. */
     public static String digestTree(Path dir, Set<String> exclude) {
         List<String> rels = new ArrayList<>();
-        collectFiles(dir, "", rels);
+        if (Files.isDirectory(dir)) {
+            Set<Object> entered = new HashSet<>();
+            entered.add(folderIdentity(dir));
+            collectFiles(dir, "", rels, entered);
+        }
         rels.sort(Json::byteCompare);
         List<byte[]> lines = new ArrayList<>();
         for (String rel : rels) {
