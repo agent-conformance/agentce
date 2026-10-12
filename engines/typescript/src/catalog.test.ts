@@ -14,10 +14,12 @@
  */
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
   copyFileSync,
   cpSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -31,6 +33,7 @@ import { canonicalString } from "./canonical";
 import { evidenceShapeFor, loadCatalog, shapeFor } from "./catalog";
 import { DomainBinding } from "./domain";
 import { buildGraph } from "./graph";
+import { coveredFiles, digestTree } from "./report";
 import { controlOutcomeToJson, evaluateControl } from "./structural";
 
 const REPO = join(__dirname, "..", "..", "..");
@@ -158,4 +161,135 @@ test("a declared evidence shape that is not a file in the catalog is refused", (
     });
     assert.equal(refusalKey(dir), "catalog.evidence_shape.unresolved", value);
   }
+});
+
+// 18.168: the loaders read only files the catalog digest covers, by exact name ("covered path" tests).
+
+function withControlValue(
+  control: string,
+  field: string,
+  value: string,
+  place: string | null,
+): { dir: string; tmp: string } {
+  let tmpDir = "";
+  const dir = withCatalogCopy((d, tmp) => {
+    tmpDir = tmp;
+    const doc = join(d, "controls", `${control}.yaml`);
+    const text = readFileSync(doc, "utf-8");
+    const line = text.split("\n").find((l) => l.trim().startsWith(`${field}:`)) ?? "";
+    const original = line.split(":", 2)[1]?.trim() ?? "";
+    writeFileSync(doc, text.replace(`${field}: ${original}`, `${field}: ${value}`));
+    const copyTo = place === null ? null : place.startsWith("/") ? place : join(d, place);
+    if (copyTo !== null) {
+      mkdirSync(join(copyTo, ".."), { recursive: true });
+      copyFileSync(join(d, original), copyTo);
+    }
+  });
+  return { dir, tmp: tmpDir };
+}
+
+function refusal(dir: string): { key: string; cause: string } {
+  try {
+    loadCatalog(dir);
+    return { key: "loaded", cause: "" };
+  } catch (error) {
+    const e = error as { key?: string; cause?: unknown; message?: string };
+    return { key: e.key ?? String(error), cause: String(e.cause ?? e.message ?? "") };
+  } finally {
+    rmSync(join(dir, ".."), { recursive: true, force: true });
+  }
+}
+
+test("covered path: coveredFiles is what digestTree hashes", () => {
+  const tmp = mkdtempSync(join(tmpdir(), "agentce-covered-"));
+  const root = join(tmp, "tree");
+  for (const d of ["a/.hidden", "a/__pycache__"]) {
+    mkdirSync(join(root, d), { recursive: true });
+  }
+  mkdirSync(join(tmp, "real"));
+  writeFileSync(join(root, "a", "x.ttl"), "x");
+  writeFileSync(join(root, "a", ".x.ttl"), "x");
+  writeFileSync(join(root, "a", ".hidden", "y.ttl"), "y");
+  writeFileSync(join(root, "a", "__pycache__", "z.ttl"), "z");
+  writeFileSync(join(tmp, "real", "w.ttl"), "w");
+  symlinkSync(join(tmp, "real"), join(root, "linked"), "dir");
+  symlinkSync(join(tmp, "real", "w.ttl"), join(root, "a", "v.ttl"));
+  writeFileSync(join(root, "catalog.sig.json"), "{}");
+  const exclude = new Set(["catalog.sig.json"]);
+  const covered = coveredFiles(root, exclude);
+  assert.deepEqual(covered, ["a/v.ttl", "a/x.ttl", "linked/w.ttl"]);
+  const lines = covered.map(
+    (rel) =>
+      `${rel}\0${createHash("sha256")
+        .update(readFileSync(join(root, rel)))
+        .digest("hex")}`,
+  );
+  assert.equal(
+    digestTree(root, exclude),
+    `sha256:${createHash("sha256").update(lines.join("\n")).digest("hex")}`,
+  );
+  rmSync(tmp, { recursive: true, force: true });
+});
+
+test("covered path: a dot-named or AppleDouble control file is never read", () => {
+  for (const name of [".DOC-99.yaml", "._DOC-01.yaml"]) {
+    const plain = withCatalogCopy(() => undefined);
+    const before = loadCatalog(plain).controls.map((c) => c.id);
+    rmSync(join(plain, ".."), { recursive: true, force: true });
+    // Not a control at all: a loader that read it would fail, not merely add a control.
+    const dir = withCatalogCopy((d) =>
+      writeFileSync(join(d, "controls", name), "{not: [a control\n"),
+    );
+    assert.deepEqual(
+      loadCatalog(dir).controls.map((c) => c.id),
+      before,
+      name,
+    );
+    rmSync(join(dir, ".."), { recursive: true, force: true });
+  }
+});
+
+test("covered path: a shape or evidence shape outside the digest is refused, naming control and path", () => {
+  const cases: Array<[string, string | null]> = [
+    ["shapes/.X.ttl", "shapes/.X.ttl"],
+    ["shapes/._X.ttl", "shapes/._X.ttl"],
+    [".hidden/X.ttl", ".hidden/X.ttl"],
+    ["shapes/__pycache__/X.ttl", "shapes/__pycache__/X.ttl"],
+    ["shapes/__PYCACHE__/X.ttl", "shapes/__pycache__/X.ttl"],
+    ["../outside.ttl", "../outside.ttl"],
+    ["shapes/../shapes/X.ttl", "shapes/X.ttl"],
+    ["./shapes/X.ttl", "shapes/X.ttl"],
+    ["shapes//X.ttl", "shapes/X.ttl"],
+    ["ABS", "ABS"],
+    ["shapes/MISSING.ttl", null],
+    ['""', null],
+    ["5", null],
+  ];
+  for (const [field, control, key] of [
+    ["shape", "DOC-01", "catalog.shape.unresolved"],
+    ["evidence_shape", "ROB-02", "catalog.evidence_shape.unresolved"],
+  ] as const) {
+    for (const [declared, place] of cases) {
+      const abs = join(mkdtempSync(join(tmpdir(), "agentce-abs-")), "X.ttl");
+      const value = declared === "ABS" ? abs : declared;
+      const { dir } = withControlValue(control, field, value, place === "ABS" ? abs : place);
+      const got = refusal(dir);
+      assert.equal(got.key, key, `${field} ${value}`);
+      if (value !== '""' && value !== "5") {
+        assert.ok(got.cause.includes(control) && got.cause.includes(value), got.cause);
+      }
+    }
+  }
+});
+
+test("covered path: a symlinked shape inside the catalog loads; a null shape is no shape", () => {
+  const { dir } = withControlValue("DOC-01", "shape", "shapes/linked.ttl", null);
+  symlinkSync(join(dir, "shapes", "DOC-01.ttl"), join(dir, "shapes", "linked.ttl"));
+  const catalog = loadCatalog(dir);
+  const doc = catalog.controls.find((c) => c.id === "DOC-01");
+  assert.ok(doc && shapeFor(catalog, doc) !== null);
+  rmSync(join(dir, ".."), { recursive: true, force: true });
+  const nulled = withControlValue("DOC-01", "shape", "null", null).dir;
+  assert.equal(loadCatalog(nulled).controls.find((c) => c.id === "DOC-01")?.shapePath, null);
+  rmSync(join(nulled, ".."), { recursive: true, force: true });
 });

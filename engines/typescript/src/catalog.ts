@@ -13,9 +13,11 @@ import { load } from "js-yaml";
 import { errorCause, errorFix } from "./errorCatalogue";
 import { InputError } from "./errors";
 import { type Shape, loadShapes } from "./psp";
+import { coveredFiles } from "./report";
 import { byteCompare, formatTemplate } from "./util";
 
 const EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved";
+const SHAPE_UNRESOLVED = "catalog.shape.unresolved";
 
 export interface ControlSpec {
   id: string;
@@ -48,14 +50,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function yamlFiles(directory: string): string[] {
-  try {
-    return readdirSync(directory)
-      .filter((name) => name.endsWith(".yaml"))
-      .sort(byteCompare);
-  } catch {
-    return [];
-  }
+/** The catalog files the digest covers (`coveredFiles`, less the signature): the only files load reads. */
+function covered(directory: string): Set<string> {
+  return new Set(coveredFiles(directory, new Set(["catalog.sig.json"])));
+}
+
+/** The covered `controls/<name>.yaml` files, one level deep as the listing always was, sorted. */
+function controlFiles(files: Set<string>): string[] {
+  return [...files]
+    .filter(
+      (rel) => rel.startsWith("controls/") && rel.split("/").length === 2 && rel.endsWith(".yaml"),
+    )
+    .sort(byteCompare);
+}
+
+function refuseUncovered(key: string, control: ControlSpec, path: string): InputError {
+  return new InputError(
+    key,
+    formatTemplate(errorCause(key), { control: control.id, path }),
+    errorFix(key),
+  );
 }
 
 function controlFromDict(data: Record<string, unknown>): ControlSpec {
@@ -75,7 +89,13 @@ function controlFromDict(data: Record<string, unknown>): ControlSpec {
     minimumEvidence: Array.isArray(evaluation.minimum_evidence)
       ? (evaluation.minimum_evidence as Array<Record<string, string>>)
       : [],
-    shapePath: typeof evaluation.shape === "string" ? evaluation.shape : null,
+    // A non-string shape reads as "" (not a covered file), which load refuses; null stays "no shape".
+    shapePath:
+      evaluation.shape === undefined || evaluation.shape === null
+        ? null
+        : typeof evaluation.shape === "string"
+          ? evaluation.shape
+          : "",
     // A declared evidence shape is always resolved: a value that is not a path reads as "", which load
     // refuses, so it can never be skipped into a pass.
     evidenceShapePath:
@@ -117,36 +137,43 @@ function fileInside(directory: string, path: string): string | null {
  * node shape with a target, whose IRI is returned with the file's shapes; anything else, including a file
  * outside the catalog folder, is refused, so a declared evidence shape can never be skipped and read as a
  * pass. */
-function loadEvidenceShape(directory: string, control: ControlSpec): [string, Map<string, Shape>] {
+function loadEvidenceShape(
+  directory: string,
+  control: ControlSpec,
+  files: Set<string>,
+): [string, Map<string, Shape>] {
   const path = control.evidenceShapePath ?? "";
-  const file = fileInside(directory, path);
+  const file = files.has(path) ? fileInside(directory, path) : null;
   const loaded = file === null ? new Map<string, Shape>() : loadShapes(file, path);
   const targeted = [...loaded].filter(([, shape]) => hasTarget(shape)).map(([iri]) => iri);
   if (targeted.length !== 1) {
-    throw new InputError(
-      EVIDENCE_SHAPE_UNRESOLVED,
-      formatTemplate(errorCause(EVIDENCE_SHAPE_UNRESOLVED), { control: control.id, path }),
-      errorFix(EVIDENCE_SHAPE_UNRESOLVED),
-    );
+    throw refuseUncovered(EVIDENCE_SHAPE_UNRESOLVED, control, path);
   }
   return [targeted[0] as string, loaded];
 }
 
-/** Load `catalog.yaml` and every control and shape in `directory`. */
+/** Load `catalog.yaml` and every control and shape in `directory`. Only files the catalog digest covers
+ * are read, each by its exact name (`coveredFiles`, 18.168): a dot-named control file is never loaded,
+ * and a shape path that names anything else is refused, so a signed catalog cannot change what it
+ * loads without changing its digest. */
 export function loadCatalog(directory: string): Catalog {
   const meta = load(readFileSync(join(directory, "catalog.yaml"), "utf-8"));
   const metaRecord = isRecord(meta) ? meta : {};
   const controls: ControlSpec[] = [];
   const shapes = new Map<string, Shape>();
   const evidenceShapeIris = new Map<string, string>();
-  for (const controlFile of yamlFiles(join(directory, "controls"))) {
-    const data = load(readFileSync(join(directory, "controls", controlFile), "utf-8"));
+  const files = covered(directory);
+  for (const rel of controlFiles(files)) {
+    const data = load(readFileSync(join(directory, rel), "utf-8"));
     if (!isRecord(data)) {
       continue;
     }
     const control = controlFromDict(data);
     controls.push(control);
-    if (control.shapePath) {
+    if (control.shapePath !== null) {
+      if (!files.has(control.shapePath)) {
+        throw refuseUncovered(SHAPE_UNRESOLVED, control, control.shapePath);
+      }
       for (const [iri, shape] of loadShapes(
         join(directory, control.shapePath),
         control.shapePath,
@@ -155,7 +182,7 @@ export function loadCatalog(directory: string): Catalog {
       }
     }
     if (control.evidenceShapePath !== null) {
-      const [iri, loaded] = loadEvidenceShape(directory, control);
+      const [iri, loaded] = loadEvidenceShape(directory, control, files);
       evidenceShapeIris.set(control.evidenceShapePath, iri);
       for (const [shapeIri, shape] of loaded) {
         shapes.set(shapeIri, shape);

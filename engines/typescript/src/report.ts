@@ -97,28 +97,35 @@ function walkFiles(dir: string, base: string, entered: Set<string>): string[] {
   return out;
 }
 
+/** A path part the catalog digest never hashes below: a dot-named file or folder, or `__pycache__`. */
+export function skippedPart(part: string): boolean {
+  return part.startsWith(".") || part === "__pycache__";
+}
+
+/** The POSIX relpaths `digestTree` hashes, sorted (code-point/byte order): every file `walkFiles`
+ * reaches, less any path with a `skippedPart` and any name in `exclude`. As Python's
+ * `signing.covered_files`: the catalog loaders read only these, by exact name (18.168), so nothing a
+ * loader reads can change without changing the digest. */
+export function coveredFiles(dir: string, exclude: ReadonlySet<string> = new Set()): string[] {
+  return walkFiles(dir, "", new Set([folderIdentity(dir)]))
+    .sort(byteCompare)
+    .filter((rel) => !exclude.has(rel) && !rel.split("/").some(skippedPart));
+}
+
 /** Content-address a directory: `sha256:` over the sorted `<relpath>\0<filehash>` lines. Ports
  * the Python reference's `signing.digest_tree` exactly: sorted by the full POSIX relpath string
  * (code-point/byte order, so `a-b` sorts before `a/x`), `exclude` matched against the *full*
  * relpath (a nested `controls/catalog.yaml` is never excluded, only a top-level one), and any path
- * segment that is a dotfile or named `__pycache__` is skipped regardless of `exclude`. Recomputed
- * from the directory's real bytes every call -- never read from a catalog's stored
- * `provenance.digest` field. */
+ * segment that is a dotfile or named `__pycache__` is skipped regardless of `exclude`
+ * (`coveredFiles`). Recomputed from the directory's real bytes every call -- never read from a
+ * catalog's stored `provenance.digest` field. */
 export function digestTree(dir: string, exclude: ReadonlySet<string> = new Set()): string {
-  const rels = walkFiles(dir, "", new Set([folderIdentity(dir)])).sort(byteCompare);
-  const lines: Buffer[] = [];
-  for (const rel of rels) {
-    if (exclude.has(rel)) {
-      continue;
-    }
-    if (rel.split("/").some((part) => part.startsWith(".") || part === "__pycache__")) {
-      continue;
-    }
+  const lines = coveredFiles(dir, exclude).map((rel) => {
     const fileHash = createHash("sha256")
       .update(readFileSync(join(dir, rel)))
       .digest("hex");
-    lines.push(Buffer.from(`${rel}\0${fileHash}`, "utf-8"));
-  }
+    return Buffer.from(`${rel}\0${fileHash}`, "utf-8");
+  });
   const joined = Buffer.concat(
     lines.flatMap((line, i) => (i === 0 ? [line] : [Buffer.from("\n"), line])),
   );
