@@ -1329,12 +1329,12 @@ def test_verify_report_packaging_missing_at_direct_check(
     goes missing between that loop and this later, separate check (a TOCTOU race a real filesystem
     could also produce). Simulated by making only the second regular-file check on that path
     return False (18.8.R1 branch-coverage gate)."""
-    from agentce import commands
+    from agentce import signing
 
     out, _key = _packaged_and_signed(tmp_path)
     packaging_path = out / "packaging.json"
     calls: list[None] = []
-    real = commands._is_regular_file
+    real = signing.is_regular_file
 
     def _true_once_then_false(path: Path) -> bool:
         if path != packaging_path:
@@ -1342,7 +1342,7 @@ def test_verify_report_packaging_missing_at_direct_check(
         calls.append(None)
         return len(calls) == 1
 
-    monkeypatch.setattr(commands, "_is_regular_file", _true_once_then_false)
+    monkeypatch.setattr(signing, "is_regular_file", _true_once_then_false)
     code, envelope = _verify_report_json(capsys, str(out))
     assert code == 3
     assert envelope["error"]["key"] == "verify.report_output_tampered"

@@ -31,13 +31,15 @@ Signing profiles (SPEC §9.1):
 from __future__ import annotations
 
 import base64
+import errno
 import hashlib
 import json
 import os
 import re
+import stat
 from dataclasses import dataclass, field
 from pathlib import Path
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any
 
 from cryptography.exceptions import InvalidSignature
@@ -280,6 +282,30 @@ def _pae(payload_type: str, payload: bytes) -> bytes:
     return b"DSSEv1 %d %s %d %s" % (len(pt), pt, len(payload), payload)
 
 
+# --- Path kinds. ---
+
+
+def is_regular_file(path: Path) -> bool:
+    """``Path.is_file`` as Python 3.12 answers it: a PermissionError (a parent folder that can be
+    listed but not entered) propagates for the caller to report as unreadable, where 3.14's
+    ``is_file`` swallows it and returns False (18.114)."""
+    return _mode_matches(path, stat.S_ISREG)
+
+
+def is_directory(path: Path) -> bool:
+    """``Path.is_dir`` as Python 3.12 answers it; see `is_regular_file`."""
+    return _mode_matches(path, stat.S_ISDIR)
+
+
+def _mode_matches(path: Path, test: Callable[[int], bool]) -> bool:
+    try:
+        return test(path.stat().st_mode)
+    except OSError as exc:
+        if exc.errno in (errno.ENOENT, errno.ENOTDIR, errno.EBADF, errno.ELOOP):
+            return False
+        raise
+
+
 # --- Statements and certificates. ---
 
 
@@ -296,10 +322,10 @@ def digest_tree(root: Path, *, exclude: frozenset[str] = frozenset()) -> str:
     # that silently leaves the folder out: list each real folder it descends, so one that cannot
     # be listed raises the OSError (naming it) before any digest is formed (18.68).
     for folder in (root, *paths):
-        if folder.is_dir() and not folder.is_symlink():
+        if is_directory(folder) and not folder.is_symlink():
             os.listdir(folder)
     for path in paths:
-        if not path.is_file():
+        if not is_regular_file(path):
             continue
         rel = path.relative_to(root).as_posix()
         if rel in exclude or any(

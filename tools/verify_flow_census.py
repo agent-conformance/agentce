@@ -2027,14 +2027,6 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "bundle-manifest",
     ),
     "agentce.bundle.safe_is_file: path.is_file()": ("bundle-manifest", "bundle-files"),
-    "agentce.commands._mode_matches: path.stat()": (
-        "manifest-file",
-        "signatures-file",
-        "report-claim",
-        "report-trust-root",
-        "report-manifest",
-        "report-packaging",
-    ),
     "agentce.commands._load_release_json: signing.read_verify_input(path)": (
         "release-file",
         "manifest-file",
@@ -2077,9 +2069,16 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.schema.evidence_schema: json.loads(text)": _PACKAGED,
     "agentce.schema.evidence_schema: resources.files('agentce.data')"
     ".joinpath('agentce-evidence.schema.json').read_text()": _PACKAGED,
-    "agentce.signing.digest_tree: folder.is_dir()": ("catalog-tree",),
+    "agentce.signing._mode_matches: path.stat()": (
+        "manifest-file",
+        "signatures-file",
+        "report-claim",
+        "report-trust-root",
+        "report-manifest",
+        "report-packaging",
+        "catalog-tree",
+    ),
     "agentce.signing.digest_tree: os.listdir(folder)": ("catalog-tree",),
-    "agentce.signing.digest_tree: path.is_file()": ("catalog-tree",),
     "agentce.signing.digest_tree: path.read_bytes()": ("catalog-tree",),
     "agentce.signing.digest_tree: root.rglob('*')": ("catalog-tree",),
     "agentce.signing.load_trust_root: parse_untrusted_json(path.read_bytes())": (

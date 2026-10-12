@@ -13,18 +13,16 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import errno
 import hashlib
 import io
 import json
 import os
 import re
 import shutil
-import stat
 import subprocess
 import sys
 import tempfile
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import redirect_stdout
 from dataclasses import dataclass, replace
 from datetime import date
@@ -621,7 +619,7 @@ def _verify_report(
     with os.scandir(report_dir):
         pass  # an unlistable report folder is unreadable, not a report with no claim
     claim_path = report_dir / "claim.json"
-    if not _is_regular_file(claim_path):
+    if not signing.is_regular_file(claim_path):
         raise InputError(
             "verify.report_no_claim",
             f"{report_dir} has no claim.json.",
@@ -661,7 +659,7 @@ def _verify_report(
         trust = _load_report_trust_root(trust_root_path)
     else:
         embedded_path = report_dir / "trust-root.json"
-        if not _is_regular_file(embedded_path):
+        if not signing.is_regular_file(embedded_path):
             raise InputError(
                 "verify.report_no_trust_root",
                 f"{report_dir} has no embedded trust-root.json, and --signer-trust-root was not given.",
@@ -747,7 +745,7 @@ def _verify_report(
                 "re-sign the report: `agentce sign <report-dir> --as claimant`.",
             )
     manifest_path = report_dir / "manifest.json"
-    if not _is_regular_file(manifest_path):
+    if not signing.is_regular_file(manifest_path):
         raise InputError(
             "verify.report_output_tampered",
             f"{report_dir} has no manifest.json.",
@@ -812,7 +810,7 @@ def _verify_report(
     tampered: list[str] = []
     for name, expected in manifest.get("outputs", {}).items():
         candidate_path = report_dir / name
-        if not _is_regular_file(candidate_path):
+        if not signing.is_regular_file(candidate_path):
             tampered.append(name)
             continue
         actual = signing.sha256_prefixed(candidate_path.read_bytes())
@@ -827,7 +825,7 @@ def _verify_report(
 
     packaging_fix = "regenerate the report with `agentce assess --package-for-sharing`."
     packaging_path = report_dir / "packaging.json"
-    if not _is_regular_file(packaging_path):
+    if not signing.is_regular_file(packaging_path):
         raise InputError(
             "verify.report_output_tampered",
             f"{report_dir} has no packaging.json.",
@@ -879,7 +877,7 @@ def _verify_report(
             "the packaged evidence was altered after signing; regenerate and re-sign the report.",
         )
     profile_path = report_dir / "bundle" / "applicability.yaml"
-    if not _is_regular_file(profile_path) or signing.sha256_prefixed(
+    if not signing.is_regular_file(profile_path) or signing.sha256_prefixed(
         profile_path.read_bytes()
     ) != inputs.get("applicability_profile_digest"):
         raise InputError(
@@ -891,7 +889,7 @@ def _verify_report(
     domain_path = report_dir / "bundle" / "domain.linkml.yaml"
     if domain_digest is not None:
         if (
-            not _is_regular_file(domain_path)
+            not signing.is_regular_file(domain_path)
             or signing.sha256_prefixed(domain_path.read_bytes()) != domain_digest
         ):
             raise InputError(
@@ -904,7 +902,7 @@ def _verify_report(
     deviations_path = report_dir / "bundle" / "deviations.yaml"
     if deviation_digest is not None:
         if (
-            not _is_regular_file(deviations_path)
+            not signing.is_regular_file(deviations_path)
             or signing.sha256_prefixed(deviations_path.read_bytes()) != deviation_digest
         ):
             raise InputError(
@@ -917,7 +915,7 @@ def _verify_report(
     catalog_dir_digests = packaging.get("catalog_dir_digests", {})
     for position, label in enumerate(catalog_dir_order):
         catalog_path = report_dir / "bundle" / "catalog" / str(position)
-        if not _is_directory(catalog_path) or signing.digest_tree(
+        if not signing.is_directory(catalog_path) or signing.digest_tree(
             catalog_path
         ) != catalog_dir_digests.get(label):
             raise InputError(
@@ -1002,7 +1000,7 @@ def _verify_report(
         for name in _RERUN_COMPARE_FILES:
             shipped = report_dir / name
             produced = scratch / "out" / name
-            if not produced.is_file() or not _is_regular_file(shipped):
+            if not produced.is_file() or not signing.is_regular_file(shipped):
                 mismatched_files.append(name)
                 continue
             if produced.read_bytes() != shipped.read_bytes():
@@ -1058,27 +1056,6 @@ def _verify_release_soft_fail(
     return result
 
 
-def _is_regular_file(path: Path) -> bool:
-    """``Path.is_file`` as Python 3.12 answers it: a PermissionError propagates (the caller's
-    input.release_unreadable or verify.report_unreadable), where 3.14's ``is_file`` swallows it and
-    returns False."""
-    return _mode_matches(path, stat.S_ISREG)
-
-
-def _is_directory(path: Path) -> bool:
-    """``Path.is_dir`` as Python 3.12 answers it; see `_is_regular_file`."""
-    return _mode_matches(path, stat.S_ISDIR)
-
-
-def _mode_matches(path: Path, test: Callable[[int], bool]) -> bool:
-    try:
-        return test(path.stat().st_mode)
-    except OSError as exc:
-        if exc.errno in (errno.ENOENT, errno.ENOTDIR, errno.EBADF, errno.ELOOP):
-            return False
-        raise
-
-
 def _load_release_json(
     path: Path, expected_type: type, unreadable_key: str, what: str
 ) -> tuple[Any, signing.VerificationError | None]:
@@ -1128,7 +1105,9 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
         return result
     manifest_path = release_path / "release-manifest.json"
     signatures_path = release_path / "signatures.json"
-    if not _is_regular_file(manifest_path) or not _is_regular_file(signatures_path):
+    if not signing.is_regular_file(manifest_path) or not signing.is_regular_file(
+        signatures_path
+    ):
         raise InputError(
             "input.release_bundle",
             f"{release_path} is not a release bundle (release-manifest.json/signatures.json).",

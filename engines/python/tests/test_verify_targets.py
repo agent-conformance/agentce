@@ -680,19 +680,26 @@ def test_verify_unreadable_input_link_out_into_unreadable_folder(
 
 
 @not_root
+@pytest.mark.parametrize(
+    ("mode", "unread"),
+    [(0, "controls"), (0o600, "controls/c.yaml")],
+    ids=["000", "600"],
+)
 def test_verify_unreadable_input_catalog_subdirectory(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], mode: int, unread: str
 ) -> None:
+    # Mode 600 (listed, not entered): 3.14's is_dir/is_file inside it return False where 3.12
+    # raises, which digest_tree must not read as an empty folder (18.114).
     (tmp_path / "catalog.yaml").write_text("id: demo\n", encoding="utf-8")
     (tmp_path / "controls").mkdir()
     (tmp_path / "controls" / "c.yaml").write_text("id: c\n", encoding="utf-8")
-    with _unreadable(tmp_path / "controls"):
+    with _unreadable(tmp_path / "controls", mode):
         code, env = run(["verify", "--catalog", str(tmp_path), "--json"], capsys)
     assert code == 3
     assert _refusal(env) == (
         "input.catalog_unreadable",
         f"the catalog directory {tmp_path} holds a file or folder that cannot be read: "
-        "controls.",
+        f"{unread}.",
     )
 
 
@@ -737,7 +744,9 @@ def test_verify_unreadable_input_report_file(
 
 @not_root
 @pytest.mark.parametrize(
-    "rel", ["", "bundle/catalog"], ids=["report-folder", "catalog-folder"]
+    "rel",
+    ["", "bundle/catalog", "bundle/catalog/0", "bundle/catalog/0/controls"],
+    ids=["report-folder", "catalog-folder", "catalog-copy", "catalog-copy-subfolder"],
 )
 def test_verify_report_folder_listable_but_not_searchable(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], rel: str
