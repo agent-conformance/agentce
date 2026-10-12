@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.96.0",
+  "suite_version": "0.97.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -4182,6 +4182,40 @@
           "replace": ""
         }
       ]
+    },
+    {
+      "id": "VG-PATHLIB-PREDICATES",
+      "title": "No new bare Path.is_file/is_dir/exists/is_symlink call in the Python engine beyond a committed, shrink-only baseline (18.163), so the next site whose answer depends on the Python version is caught by a check, not by a verifier",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/pathlib_predicates.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 120,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "verification/gates/pathlib_predicates_check.py's --self-test judges a new site, a raised count, a stale entry and an exact match correctly, then every bare is_file/is_dir/exists/is_symlink call (no arguments) in engines/python/agentce, keyed <path under engines/python>::<qualified function>::<receiver>.<predicate>, matches verification/gates/fixtures/pathlib_predicates/baseline.json count for count",
+        "fail": "a site not in the baseline or above its count (a new bare predicate, which answers a path under a folder that can be listed but not entered differently on 3.12/3.13 and 3.14), or a baseline count above the code's (a paid-down site whose entry was not removed)"
+      },
+      "faults": [
+        {
+          "description": "_require_dir goes back to a bare path.is_dir(), the 18.163 site that crashed with internal.unexpected on Python 3.12 and 3.13 for a --bundle inside a mode-600 folder",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    if (empty_is_no_dir and raw == \"\") or not signing.is_directory(\n        path, unreadable_is_absent=True\n    ):\n",
+          "replace": "    if (empty_is_no_dir and raw == \"\") or not path.is_dir():\n"
+        },
+        {
+          "description": "sign's claim check goes back to a bare claim_path.is_file(), which crashed on 3.12 and 3.13 for a claim.json symlinked into a mode-600 folder",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    if not signing.is_regular_file(claim_path, unreadable_is_absent=True):\n",
+          "replace": "    if not claim_path.is_file():\n"
+        }
+      ],
+      "fix_hint": "Run verification/gates/pathlib_predicates.sh and read the site it names: route the call through signing.is_regular_file or signing.is_directory (unreadable_is_absent=True where 'not there' is the right answer and safe, the default where the caller must report the folder as unreadable), or, if the call is on an engine-owned path, add it to verification/gates/fixtures/pathlib_predicates/baseline.json in review."
     }
   ]
 }

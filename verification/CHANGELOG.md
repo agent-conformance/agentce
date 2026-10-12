@@ -3,6 +3,16 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.97.0
+
+- `VG-PATHLIB-PREDICATES` (18.163, new, quick tier) lists every bare `Path.is_file()`, `is_dir()`, `exists()` and
+  `is_symlink()` call in the Python engine and fails on one that is not in a committed baseline, which only shrinks.
+  Those four answer a path inside a folder that can be listed but not entered differently by Python version: 3.12
+  and 3.13 raise, 3.14 says the path is not there. So `validate --bundle`, `assess --profile` and `sign` crashed
+  with `internal.unexpected` on 3.12 and 3.13 for such a path, where 3.14, TypeScript and Java give the ordinary
+  refusal. Those three sites now go through the engine's own path helpers, which answer the same on every Python.
+  Its seeded faults put the bare call back in two of them.
+
 ## 0.96.0
 
 - `VG-PYTHON-VERSIONS` (18.114, new, full tier) runs the Python engine's whole test suite on 3.14, 3.13, 3.12.10 and
