@@ -66,7 +66,13 @@ from ..coverage_matrix import MATRIX_FILE, check_matrix, write_matrix
 from ..domain import DomainBinding
 from ..environment import inspect_environment
 from ..error_catalogue import MESSAGE_KEYS, render_errors_md
-from ..errors import AgentceError, InputError, UnreadableError
+from ..errors import (
+    AgentceError,
+    InputError,
+    UnreadableError,
+    catalog_unreadable as _catalog_unreadable,
+    unreadable_rel,
+)
 from ..exit_codes import ExitCode
 from ..fail_on import parse_fail_on
 from ..graph import build_graph
@@ -405,19 +411,6 @@ def cmd_verify(ns: argparse.Namespace) -> CommandResult:
         ) from exc
 
 
-def unreadable_rel(root: Path, exc: BaseException) -> str:
-    """The path an OSError names, relative to ``root`` ("" for ``root`` itself or no path): the
-    file or folder an unreadable-input refusal names (18.68)."""
-    name = getattr(exc, "filename", None)
-    if not name:
-        return ""
-    try:
-        rel = Path(name).relative_to(root).as_posix()
-    except ValueError:
-        return ""
-    return "" if rel == "." else rel
-
-
 def _report_unreadable(report_dir: Path, rel: str) -> UnreadableError:
     return UnreadableError(
         "verify.report_unreadable",
@@ -426,25 +419,6 @@ def _report_unreadable(report_dir: Path, rel: str) -> UnreadableError:
         rel,
         "report directory",
     )
-
-
-def _catalog_unreadable(catalog_dir: Path, exc: BaseException) -> UnreadableError:
-    return UnreadableError(
-        "input.catalog_unreadable",
-        "the catalog directory",
-        catalog_dir,
-        unreadable_rel(catalog_dir, exc),
-        "catalog directory",
-    )
-
-
-def _load_catalog_dir(catalog_dir: Path) -> Catalog:
-    """Load a --catalog-dir catalog; the load walks the folder as the digest does (18.168), so a folder
-    it cannot read is refused as input.catalog_unreadable, the same as verify and sign refuse it."""
-    try:
-        return load_catalog(catalog_dir)
-    except (OSError, UnicodeError) as exc:
-        raise _catalog_unreadable(catalog_dir, exc) from exc
 
 
 def _refused(result: CommandResult, *refusals: signing.VerificationError) -> None:
@@ -1993,9 +1967,7 @@ def _resolve_catalogs(
     The returned limitations are the signature checks ``--allow-unverified-catalog`` waived, for the
     manifest and the claim to record; the list is empty on an ordinary run."""
     loaded = [
-        _load_catalog_dir(
-            _require_dir(d, key="catalog-dir", what="the catalog directory")
-        )
+        load_catalog(_require_dir(d, key="catalog-dir", what="the catalog directory"))
         for d in catalog_dirs
     ]
     limitations = _verify_catalog_dirs(loaded, trust, allow_unverified=allow_unverified)

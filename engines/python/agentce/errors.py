@@ -9,6 +9,7 @@ a file to edit, or a technique to apply). The CLI renders these deterministicall
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from .exit_codes import ExitCode
 
@@ -63,3 +64,27 @@ class UnreadableError(InputError):
             f"make every file and folder in the {noun} readable, then re-run.",
         )
         self.rel = rel
+
+
+def unreadable_rel(root: Path, exc: BaseException) -> str:
+    """The path an OSError names, relative to ``root`` ("" for ``root`` itself or no path): the
+    file or folder an unreadable-input refusal names (18.68)."""
+    name = getattr(exc, "filename", None)
+    if not name:
+        return ""
+    try:
+        rel = Path(name).relative_to(root).as_posix()
+    except ValueError:
+        return ""
+    return "" if rel == "." else rel
+
+
+def catalog_unreadable(catalog_dir: Path, exc: BaseException) -> UnreadableError:
+    """input.catalog_unreadable, naming the unreadable file or folder in ``catalog_dir`` (18.68)."""
+    return UnreadableError(
+        "input.catalog_unreadable",
+        "the catalog directory",
+        catalog_dir,
+        unreadable_rel(catalog_dir, exc),
+        "catalog directory",
+    )

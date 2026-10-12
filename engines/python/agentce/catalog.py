@@ -25,7 +25,7 @@ import yaml
 from . import signing
 from .domain import DomainBinding
 from .error_catalogue import MESSAGE_KEYS
-from .errors import InputError
+from .errors import InputError, catalog_unreadable
 from .graph import build_graph
 from .i18n_format import format_message
 from .psp import PropertyShape, Shape, load_shapes
@@ -121,6 +121,8 @@ class Catalog:
 
 def _control_from_dict(data: dict[str, Any]) -> ControlSpec:
     evaluation = data.get("evaluation", {})
+    # A non-string shape is kept as "" (not a covered file), which load refuses; null stays "no shape".
+    shape = evaluation.get("shape")
     return ControlSpec(
         id=str(data.get("id", "")),
         version=str(data.get("version", "")),
@@ -133,14 +135,7 @@ def _control_from_dict(data: dict[str, Any]) -> ControlSpec:
         severity=str(data.get("severity", "")),
         min_source_class=str(evaluation.get("min_source_class", "any")),
         minimum_evidence=list(evaluation.get("minimum_evidence", [])),
-        # A non-string shape is kept as "" (not a covered file), which load refuses; null stays "no shape".
-        shape_path=(
-            None
-            if (value := evaluation.get("shape")) is None
-            else value
-            if isinstance(value, str)
-            else ""
-        ),
+        shape_path=shape if shape is None or isinstance(shape, str) else "",
         tolerance=data.get("tolerance", {"kind": "count", "max": 0}),
         test_cases=list(data.get("test_cases", [])),
         raw=data,
@@ -199,7 +194,15 @@ def load_catalog(directory: Path) -> Catalog:
     """Load ``catalog.yaml`` and every control and shape in ``directory``. Only files the catalog digest
     covers are read, each by its exact name (`signing.covered_files`, 18.168): a dot-named control file
     is never loaded, and a shape path that names anything else is refused, so a signed catalog cannot
-    change what it loads without changing its digest."""
+    change what it loads without changing its digest. The load walks the folder as the digest does, so
+    a folder it cannot read is refused as input.catalog_unreadable, as verify and sign refuse it."""
+    try:
+        return _load_catalog(directory)
+    except (OSError, UnicodeError) as exc:
+        raise catalog_unreadable(directory, exc) from exc
+
+
+def _load_catalog(directory: Path) -> Catalog:
     meta = (
         yaml.safe_load((directory / "catalog.yaml").read_text(encoding="utf-8")) or {}
     )
