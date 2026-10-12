@@ -12,6 +12,7 @@ import {
   generateKeyPairSync,
 } from "node:crypto";
 import {
+  chmodSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -2647,3 +2648,47 @@ test("validate, diff and conformance read = forms, the last repeat and intermixe
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+for (const extra of [[], ["--allow-unverified-catalog"]]) {
+  test(
+    `assess --catalog-dir refuses a catalog its load cannot walk as input.catalog_unreadable ${extra.join(" ") || "(strict)"} (18.168)`,
+    {
+      skip: process.getuid?.() === 0,
+    },
+    () => {
+      // Unreadable is not unverified: --allow-unverified-catalog does not cover it (Python's
+      // test_verify_unreadable_input_assess_catalog_dir).
+      const dir = mkdtempSync(join(tmpdir(), "agentce-cli-unreadable-catalog-"));
+      const catalog = join(dir, "catalog");
+      mkdirSync(join(catalog, "controls"), { recursive: true });
+      writeFileSync(join(catalog, "catalog.yaml"), "id: demo\nversion: '1'\n");
+      writeFileSync(join(catalog, "controls", "c.yaml"), "id: c\n");
+      const quickstart = quickstartDir();
+      chmodSync(join(catalog, "controls"), 0);
+      try {
+        const { exitCode, envelope } = runJson([
+          "assess",
+          "--bundle",
+          join(quickstart, "evidence"),
+          "--profile",
+          join(quickstart, "applicability.yaml"),
+          "--catalog-dir",
+          catalog,
+          ...extra,
+          "--out",
+          join(dir, "out"),
+        ]);
+        const error = envelope.error as { message_key: string; detail: string };
+        assert.equal(exitCode, 3);
+        assert.equal(error.message_key, "input.catalog_unreadable");
+        assert.equal(
+          error.detail,
+          `the catalog directory ${catalog} holds a file or folder that cannot be read: controls.`,
+        );
+      } finally {
+        chmodSync(join(catalog, "controls"), 0o755);
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
+}
