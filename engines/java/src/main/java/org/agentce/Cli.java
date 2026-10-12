@@ -1,5 +1,6 @@
 package org.agentce;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -591,6 +592,23 @@ global options:
         return limitations;
     }
 
+    /** Load a --catalog-dir catalog; the load walks the folder as the digest does (18.168), so a folder
+     * it cannot read is refused as input.catalog_unreadable, the same as verify and sign refuse it
+     * (Python's {@code _load_catalog_dir}). A YAML parse error is not a read error and is left alone. */
+    private static Catalog loadCatalogDir(Path dir) {
+        try {
+            return Catalog.load(dir);
+        } catch (IllegalStateException e) {
+            throw Verify.catalogUnreadable(dir, e);
+        } catch (IllegalArgumentException e) {
+            if (e.getCause() instanceof IOException io
+                    && !(io instanceof JsonProcessingException)) {
+                throw Verify.catalogUnreadable(dir, io);
+            }
+            throw e;
+        }
+    }
+
     /**
      * The catalogs an assessment evaluates, and their {@code id@version} labels (mirrors the Python
      * reference's {@code _resolve_catalogs}). Each {@code --catalog-dir} is loaded as given and its
@@ -605,7 +623,7 @@ global options:
             boolean allowUnverified) {
         List<Catalog> loaded = new ArrayList<>();
         for (String d : catalogDirs) {
-            loaded.add(Catalog.load(Paths.get(requireDir(d, "catalog-dir", "the catalog directory"))));
+            loaded.add(loadCatalogDir(Paths.get(requireDir(d, "catalog-dir", "the catalog directory"))));
         }
         List<String> limitations = verifyCatalogDirs(loaded, trust, allowUnverified);
         Map<String, Catalog> byLabel = new LinkedHashMap<>();

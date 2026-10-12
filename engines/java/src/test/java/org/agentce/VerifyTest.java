@@ -1084,4 +1084,30 @@ class VerifyTest {
         assertEquals(
                 "the catalog directory " + dir + " holds a file or folder that cannot be read: controls.", err.reason);
     }
+
+    @Test
+    void assessCatalogDirItsLoadCannotWalkIsUnreadableStrictOrNot(@TempDir Path dir) throws Exception {
+        // Unreadable is not unverified: --allow-unverified-catalog does not cover it (Python's
+        // test_verify_unreadable_input_assess_catalog_dir, 18.168).
+        assumeNotRoot();
+        Path catalog = Files.createDirectories(dir.resolve("catalog/controls")).getParent();
+        Files.writeString(catalog.resolve("catalog.yaml"), "id: demo\nversion: '1'\n");
+        Files.writeString(catalog.resolve("controls/c.yaml"), "id: c\n");
+        Path quickstart = QUICKSTART_EVIDENCE.getParent();
+        for (List<String> extra : List.of(List.<String>of(), List.of("--allow-unverified-catalog"))) {
+            List<String> args = new java.util.ArrayList<>(List.of(
+                    "assess",
+                    "--bundle", QUICKSTART_EVIDENCE.toString(),
+                    "--profile", quickstart.resolve("applicability.yaml").toString(),
+                    "--catalog-dir", catalog.toString()));
+            args.addAll(extra);
+            args.addAll(List.of("--out", dir.resolve("out").toString()));
+            JsonNode env = withUnreadable(catalog.resolve("controls"), () -> Fixtures.runJson(args.toArray(String[]::new)));
+            assertEquals(3, env.get("exit_code").asInt(), env.toString());
+            assertEquals("input.catalog_unreadable", env.get("error").get("message_key").asText(), env.toString());
+            assertEquals(
+                    "the catalog directory " + catalog + " holds a file or folder that cannot be read: controls.",
+                    env.get("error").get("detail").asText());
+        }
+    }
 }
