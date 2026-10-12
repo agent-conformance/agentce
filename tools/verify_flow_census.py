@@ -2015,6 +2015,7 @@ INVENTORY_FLAGS: dict[str, tuple[str, ...] | str] = {
 #: Every read site reachable from `cmd_verify` (`surface_inventory`), keyed by function and the call
 #: as written, mapped to the census rows that mutate what it reads, or to a written disposition.
 INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
+    "agentce.bundle._meets_symlink_loop: os.stat(resolved)": ("bundle-files",),
     "agentce.bundle._sha256_hex: path.open('rb')": ("bundle-files",),
     "agentce.bundle.permission_denied: path.stat()": (
         "bundle-manifest",
@@ -2026,6 +2027,7 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "bundle-manifest",
     ),
     "agentce.bundle.safe_is_file: path.is_file()": ("bundle-manifest", "bundle-files"),
+    "agentce.commands._is_regular_file: path.stat()": ("manifest-file", "signatures-file"),
     "agentce.commands._load_release_json: signing.read_verify_input(path)": (
         "release-file",
         "manifest-file",
@@ -2042,9 +2044,7 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     ),
     "agentce.commands._require_dir: path.is_dir()": ("target-argument",),
     "agentce.commands._verify_release: artifact_file.read_bytes()": ("artifact-path",),
-    "agentce.commands._verify_release: manifest_path.is_file()": ("manifest-file",),
     "agentce.commands._verify_release: release_path.is_file()": ("release-file",),
-    "agentce.commands._verify_release: signatures_path.is_file()": ("signatures-file",),
     "agentce.commands._verify_report: candidate_path.is_file()": ("report-manifest",),
     "agentce.commands._verify_report: candidate_path.read_bytes()": _HASHED_ONLY,
     "agentce.commands._verify_report: catalog_path.is_dir()": ("report-packaging",),
