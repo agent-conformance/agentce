@@ -608,6 +608,22 @@ def test_verify_unreadable_input_release_directory(
     assert cause.startswith(f"the release artifact {release} ")
 
 
+@pytest.mark.parametrize("layout", ["no-signatures", "manifest-is-a-folder"])
+def test_verify_release_folder_that_is_not_a_bundle(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], layout: str
+) -> None:
+    release = tmp_path / "release"
+    release.mkdir()
+    if layout == "no-signatures":
+        (release / "release-manifest.json").write_text("{}", encoding="utf-8")
+    else:
+        (release / "release-manifest.json").mkdir()
+        (release / "signatures.json").write_text("{}", encoding="utf-8")
+    code, env = run(["verify", "--release", str(release), "--json"], capsys)
+    assert code == 3
+    assert _refusal(env)[0] == "input.release_bundle"
+
+
 @not_root
 def test_verify_unreadable_input_release_artifact_folder(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]

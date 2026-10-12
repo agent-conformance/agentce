@@ -13,12 +13,14 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import errno
 import hashlib
 import io
 import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -1056,6 +1058,17 @@ def _verify_release_soft_fail(
     return result
 
 
+def _is_regular_file(path: Path) -> bool:
+    """``Path.is_file`` as Python 3.12 answers it: a PermissionError propagates (the caller's
+    input.release_unreadable), where 3.14's ``is_file`` swallows it and returns False."""
+    try:
+        return stat.S_ISREG(path.stat().st_mode)
+    except OSError as exc:
+        if exc.errno in (errno.ENOENT, errno.ENOTDIR, errno.EBADF, errno.ELOOP):
+            return False
+        raise
+
+
 def _load_release_json(
     path: Path, expected_type: type, unreadable_key: str, what: str
 ) -> tuple[Any, signing.VerificationError | None]:
@@ -1105,7 +1118,7 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
         return result
     manifest_path = release_path / "release-manifest.json"
     signatures_path = release_path / "signatures.json"
-    if not manifest_path.is_file() or not signatures_path.is_file():
+    if not _is_regular_file(manifest_path) or not _is_regular_file(signatures_path):
         raise InputError(
             "input.release_bundle",
             f"{release_path} is not a release bundle (release-manifest.json/signatures.json).",
