@@ -11,7 +11,10 @@ import java.math.BigInteger;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -19,6 +22,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.nodes.MappingNode;
@@ -863,31 +867,40 @@ public final class Readiness {
 
     // --- computeReadiness ------------------------------------------------------------------------
 
-    /** Reads {@code path} as one JSON object per line, skipping blank lines, mirroring {@code
-     * Ingest.java}'s own line-reading pattern -- an empty list, never a thrown exception, when the file
-     * does not exist. */
-    private static List<JsonNode> readJsonl(Path path) {
-        if (!Files.isRegularFile(path)) {
-            return List.of();
-        }
-        List<String> lines;
+    /** The text of one report file, or {@code null} when the report folder has no entry by that name,
+     * ported from {@code _read_report_file}. An entry that is there but cannot be read as a regular file
+     * (a folder, a dangling link, a link into a folder that can be listed but not entered, a file
+     * without read permission) throws {@link IOException}: readiness reports it as a blocking reason
+     * rather than reading it as absent, which would let a coverage gap or an integrity break stop
+     * blocking. Text that is not UTF-8 stays an engine error, as before. */
+    private static String readReportFile(Path path) throws IOException {
         try {
-            lines = Files.readAllLines(path, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new IllegalStateException("cannot read " + path + ": " + e.getMessage(), e);
+            Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+        } catch (NoSuchFileException e) {
+            return null;
         }
+        if (!Files.readAttributes(path, BasicFileAttributes.class).isRegularFile()) {
+            throw new IOException(path + " is not a regular file");
+        }
+        try {
+            return Files.readString(path, StandardCharsets.UTF_8);
+        } catch (CharacterCodingException e) {
+            throw new IllegalArgumentException("cannot read JSON " + path + ": " + e.getMessage(), e);
+        }
+    }
+
+    private static List<JsonNode> parseJsonl(String text) {
         List<JsonNode> out = new ArrayList<>();
-        for (String raw : lines) {
+        if (text == null) {
+            return out;
+        }
+        for (String raw : text.lines().toList()) {
             String line = raw.strip();
             if (!line.isEmpty()) {
                 out.add(Json.parse(line));
             }
         }
         return out;
-    }
-
-    private static JsonNode readJsonFileOr(Path path, JsonNode fallback) {
-        return Files.isRegularFile(path) ? Json.parseFile(path) : fallback;
     }
 
     /** Returns the readiness verdict for a finished report directory (SPEC §13.3.4 stage 4), ported
@@ -906,14 +919,24 @@ public final class Readiness {
         List<String> reasons = new ArrayList<>();
         List<String> limitations = new ArrayList<>();
 
-        for (JsonNode record : readJsonl(reportDir.resolve("integrity.jsonl"))) {
+        Function<String, String> reportFile = name -> {
+            try {
+                return readReportFile(reportDir.resolve(name));
+            } catch (IOException e) {
+                reasons.add("cannot read report file " + name);
+                return null;
+            }
+        };
+
+        for (JsonNode record : parseJsonl(reportFile.apply("integrity.jsonl"))) {
             JsonNode status = record.path("status");
             if (status.isTextual() && GAP_INTEGRITY_STATUSES.contains(status.textValue())) {
                 reasons.add("integrity " + pyStr(status) + " on stream " + pyStr(record.path("stream")));
             }
         }
 
-        JsonNode coverage = readJsonFileOr(reportDir.resolve("coverage.json"), Json.nodes().objectNode());
+        String coverageText = reportFile.apply("coverage.json");
+        JsonNode coverage = coverageText == null ? Json.nodes().objectNode() : Json.parse(coverageText);
         JsonNode subjects = coverage.path("subjects");
         List<String> subjectNames = new ArrayList<>();
         if (subjects.isObject()) {
@@ -945,7 +968,7 @@ public final class Readiness {
             }
         }
 
-        for (JsonNode statement : readJsonl(reportDir.resolve("applicability.jsonl"))) {
+        for (JsonNode statement : parseJsonl(reportFile.apply("applicability.jsonl"))) {
             JsonNode driftRaw = pyGet(statement, "drift", Json.nodes().arrayNode());
             JsonNode drift = pyTruthy(driftRaw) && driftRaw.isArray() ? driftRaw : Json.nodes().arrayNode();
             for (JsonNode d : drift) {
@@ -954,7 +977,8 @@ public final class Readiness {
             }
         }
 
-        JsonNode assertionsRaw = readJsonFileOr(reportDir.resolve("assertions.json"), Json.nodes().arrayNode());
+        String assertionsText = reportFile.apply("assertions.json");
+        JsonNode assertionsRaw = assertionsText == null ? Json.nodes().arrayNode() : Json.parse(assertionsText);
         JsonNode assertions = assertionsRaw.isArray() ? assertionsRaw : Json.nodes().arrayNode();
         for (JsonNode assertion : assertions) {
             if (!"insufficient_evidence".equals(assertion.path("outcome").asText(null))) {

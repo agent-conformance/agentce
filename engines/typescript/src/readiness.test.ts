@@ -7,7 +7,15 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  renameSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -79,6 +87,71 @@ test("a clean report is READY", () => {
   const verdict = computeReadiness(dir, { severities: SEVERITIES });
   assert.equal(verdict.verdict, READY);
   assert.deepEqual(verdict.reasons, []);
+});
+
+const REPORT_FILES = ["coverage.json", "integrity.jsonl", "applicability.jsonl", "assertions.json"];
+const asRoot = process.getuid?.() === 0;
+
+/** Makes `dir/name` present but unreadable; returns a folder to reopen after the check. */
+function makeUnreadable(dir: string, name: string, shape: string): string | undefined {
+  const target = join(dir, name);
+  if (shape === "link into a mode-600 folder") {
+    const locked = mkdtempSync(join(tmpdir(), "agentce-locked-"));
+    renameSync(target, join(locked, name));
+    symlinkSync(join(locked, name), target);
+    chmodSync(locked, 0o600);
+    return locked;
+  }
+  if (shape === "mode 000") {
+    chmodSync(target, 0o000);
+    return undefined;
+  }
+  unlinkSync(target);
+  if (shape === "dangling link") {
+    symlinkSync(join(dir, "nowhere"), target);
+  } else {
+    mkdirSync(target);
+  }
+  return undefined;
+}
+
+// An entry that is there but cannot be read blocks; it never reads as absent, which would let a
+// recorded gap stop blocking (18.165, the same answer Python gives).
+for (const name of REPORT_FILES) {
+  for (const shape of ["link into a mode-600 folder", "mode 000", "dangling link", "folder"]) {
+    test(`an unreadable ${name} (${shape}) is NOT READY`, { skip: asRoot }, () => {
+      const dir = report();
+      const locked = makeUnreadable(dir, name, shape);
+      try {
+        const v = computeReadiness(dir, { severities: SEVERITIES });
+        assert.equal(v.verdict, NOT_READY);
+        assert.deepEqual(v.reasons, [`cannot read report file ${name}`]);
+      } finally {
+        if (locked !== undefined) {
+          chmodSync(locked, 0o700);
+        }
+      }
+    });
+  }
+  test(`an absent ${name} reads as empty`, () => {
+    const dir = report();
+    unlinkSync(join(dir, name));
+    assert.equal(computeReadiness(dir, { severities: SEVERITIES }).verdict, READY);
+  });
+}
+
+test("a report folder that can be listed but not entered is NOT READY", { skip: asRoot }, () => {
+  const dir = report();
+  chmodSync(dir, 0o600);
+  try {
+    const v = computeReadiness(dir, { severities: SEVERITIES });
+    assert.deepEqual(
+      v.reasons,
+      [...REPORT_FILES].sort(byteCompare).map((n) => `cannot read report file ${n}`),
+    );
+  } finally {
+    chmodSync(dir, 0o700);
+  }
 });
 
 test("broken integrity is NOT READY", () => {

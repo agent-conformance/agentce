@@ -6,7 +6,7 @@
  * `cli.ts`'s `cmdReadiness` wires up.
  */
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { lstatSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_SCHEMA, FAILSAFE_SCHEMA, Type as YamlType, load as yamlLoad } from "js-yaml";
 import { InputError } from "./errors";
@@ -645,25 +645,30 @@ export function deviationLint(
 
 // --- compute_readiness ----------------------------------------------------------------------
 
-function readJsonl(path: string): Record<string, unknown>[] {
-  if (!existsSync(path) || !statSync(path).isFile()) {
-    return [];
+/** The text of one report file, or `undefined` when the report folder has no entry by that name,
+ * ported from `_read_report_file`. An entry that is there but cannot be read as a regular file (a
+ * folder, a dangling link, a link into a folder that can be listed but not entered, a file without
+ * read permission) throws: readiness reports it as a blocking reason rather than reading it as
+ * absent, which would let a coverage gap or an integrity break stop blocking. */
+function readReportFile(path: string): string | undefined {
+  if (lstatSync(path, { throwIfNoEntry: false }) === undefined) {
+    return undefined;
   }
+  if (!statSync(path).isFile()) {
+    throw new Error(`${path} is not a regular file`);
+  }
+  return readFileSync(path, "utf-8");
+}
+
+function parseJsonl(text: string | undefined): Record<string, unknown>[] {
   const out: Record<string, unknown>[] = [];
-  for (const rawLine of readFileSync(path, "utf-8").split("\n")) {
+  for (const rawLine of (text ?? "").split("\n")) {
     const line = rawLine.trim();
     if (line) {
       out.push(JSON.parse(line));
     }
   }
   return out;
-}
-
-function readJsonFileOr<T>(path: string, fallback: T): T {
-  if (!existsSync(path) || !statSync(path).isFile()) {
-    return fallback;
-  }
-  return JSON.parse(readFileSync(path, "utf-8")) as T;
 }
 
 export interface ComputeReadinessOptions {
@@ -696,14 +701,25 @@ export function computeReadiness(
   const reasons: string[] = [];
   const limitations: string[] = [];
 
-  for (const record of readJsonl(join(reportDir, "integrity.jsonl"))) {
+  const reportFile = (name: string): string | undefined => {
+    try {
+      return readReportFile(join(reportDir, name));
+    } catch {
+      reasons.push(`cannot read report file ${name}`);
+      return undefined;
+    }
+  };
+
+  for (const record of parseJsonl(reportFile("integrity.jsonl"))) {
     const status = record.status;
     if (typeof status === "string" && GAP_INTEGRITY_STATUSES.has(status)) {
       reasons.push(`integrity ${pyStr(status)} on stream ${pyStr(record.stream)}`);
     }
   }
 
-  const coverage = readJsonFileOr<Record<string, unknown>>(join(reportDir, "coverage.json"), {});
+  const coverageText = reportFile("coverage.json");
+  const coverage: Record<string, unknown> =
+    coverageText === undefined ? {} : JSON.parse(coverageText);
   const subjects = isRecord(coverage.subjects) ? coverage.subjects : {};
   for (const subject of Object.keys(subjects).sort(byteCompare)) {
     const entry = subjects[subject];
@@ -724,7 +740,7 @@ export function computeReadiness(
     }
   }
 
-  for (const statement of readJsonl(join(reportDir, "applicability.jsonl"))) {
+  for (const statement of parseJsonl(reportFile("applicability.jsonl"))) {
     const driftRaw = pyGet(statement, "drift", []);
     const drift = pyTruthy(driftRaw) && Array.isArray(driftRaw) ? driftRaw : [];
     for (const entry of drift) {
@@ -733,10 +749,9 @@ export function computeReadiness(
     }
   }
 
-  const assertions = readJsonFileOr<Record<string, unknown>[]>(
-    join(reportDir, "assertions.json"),
-    [],
-  );
+  const assertionsText = reportFile("assertions.json");
+  const assertions: Record<string, unknown>[] =
+    assertionsText === undefined ? [] : JSON.parse(assertionsText);
   for (const assertion of assertions) {
     if (assertion.outcome !== "insufficient_evidence") {
       continue;

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import date
 from pathlib import Path
 
@@ -63,6 +64,113 @@ def test_clean_report_is_ready(tmp_path: Path) -> None:
     verdict = compute_readiness(report, severities=_SEVERITIES)
     assert verdict["verdict"] == READY
     assert verdict["reasons"] == []
+
+
+_REPORT_FILES = (
+    "coverage.json",
+    "integrity.jsonl",
+    "applicability.jsonl",
+    "assertions.json",
+)
+_not_root = pytest.mark.skipif(
+    os.geteuid() == 0, reason="root reads a mode-000 file and enters a mode-600 folder"
+)
+
+
+def _unreadable(report: Path, name: str, shape: str, tmp_path: Path) -> Path | None:
+    """Make ``report/name`` present but unreadable; returns a folder to reopen after the check."""
+    target = report / name
+    if shape == "link into a mode-600 folder":
+        locked = tmp_path / "locked"
+        locked.mkdir()
+        target.rename(locked / name)
+        target.symlink_to(locked / name)
+        locked.chmod(0o600)
+        return locked
+    if shape == "mode 000":
+        target.chmod(0o000)
+        return None
+    target.unlink()
+    if shape == "dangling link":
+        target.symlink_to(tmp_path / "nowhere")
+    else:
+        target.mkdir()
+    return None
+
+
+@_not_root
+@pytest.mark.parametrize("name", _REPORT_FILES)
+@pytest.mark.parametrize(
+    "shape", ["link into a mode-600 folder", "mode 000", "dangling link", "folder"]
+)
+def test_unreadable_report_file_is_not_ready(
+    tmp_path: Path, name: str, shape: str
+) -> None:
+    # An entry that is there but cannot be read blocks; it never reads as absent, which would
+    # let a recorded gap stop blocking (18.165). Same answer on every supported Python.
+    report = _report(tmp_path)
+    locked = _unreadable(report, name, shape, tmp_path)
+    try:
+        verdict = compute_readiness(report, severities=_SEVERITIES)
+    finally:
+        if locked is not None:
+            locked.chmod(0o700)
+    assert verdict["verdict"] == NOT_READY
+    assert verdict["reasons"] == [f"cannot read report file {name}"]
+
+
+@_not_root
+def test_unreadable_report_folder_is_not_ready(tmp_path: Path) -> None:
+    report = _report(tmp_path)
+    report.chmod(0o600)
+    try:
+        verdict = compute_readiness(report, severities=_SEVERITIES)
+    finally:
+        report.chmod(0o700)
+    assert verdict["reasons"] == [
+        f"cannot read report file {name}" for name in sorted(_REPORT_FILES)
+    ]
+
+
+@pytest.mark.parametrize("name", _REPORT_FILES)
+def test_absent_report_file_reads_as_empty(tmp_path: Path, name: str) -> None:
+    report = _report(tmp_path)
+    (report / name).unlink()
+    assert compute_readiness(report, severities=_SEVERITIES)["verdict"] == READY
+
+
+@_not_root
+def test_sign_refuses_a_report_with_an_unreadable_coverage_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    report = tmp_path / "q"
+    assert cli.main(["quickstart", "--out", str(report)]) == 0
+    locked = _unreadable(
+        report, "coverage.json", "link into a mode-600 folder", tmp_path
+    )
+    capsys.readouterr()
+    try:
+        code = cli.main(
+            [
+                "sign",
+                str(report),
+                "--as",
+                "claimant",
+                "--profile",
+                "kms",
+                "--key",
+                str(tmp_path / "none.pem"),
+                "--dry-run",
+                "--json",
+            ]
+        )
+    finally:
+        assert locked is not None
+        locked.chmod(0o700)
+    doc = json.loads(capsys.readouterr().out)
+    assert code == 3
+    assert doc["error"]["key"] == "sign.not_ready"
+    assert "cannot read report file coverage.json" in doc["error"]["cause"]
 
 
 def test_broken_integrity_is_not_ready(tmp_path: Path) -> None:

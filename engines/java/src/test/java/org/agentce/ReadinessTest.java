@@ -13,13 +13,17 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * {@code Readiness.java} against the Python reference's own fixture data ({@code
@@ -88,6 +92,83 @@ class ReadinessTest {
     private static Path reportWithApplicability(Path dir, List<ObjectNode> applicability) throws IOException {
         writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), applicability);
         return dir;
+    }
+
+    private static final List<String> SHAPES =
+            List.of("link into a mode-600 folder", "mode 000", "dangling link", "folder");
+
+    /** Makes {@code dir/name} present but unreadable; returns a folder to reopen after the check. */
+    private static Path makeUnreadable(Path dir, String name, String shape, Path tmp) throws IOException {
+        Path target = dir.resolve(name);
+        switch (shape) {
+            case "link into a mode-600 folder" -> {
+                Path locked = Files.createDirectories(tmp.resolve("locked-" + name));
+                Files.move(target, locked.resolve(name));
+                Files.createSymbolicLink(target, locked.resolve(name));
+                Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("rw-------"));
+                return locked;
+            }
+            case "mode 000" -> Files.setPosixFilePermissions(target, PosixFilePermissions.fromString("---------"));
+            case "dangling link" -> {
+                Files.delete(target);
+                Files.createSymbolicLink(target, tmp.resolve("nowhere"));
+            }
+            default -> {
+                Files.delete(target);
+                Files.createDirectory(target);
+            }
+        }
+        return null;
+    }
+
+    /** An entry that is there but cannot be read blocks; it never reads as absent, which would let a
+     * recorded gap stop blocking (18.165, the same answer Python gives). */
+    @ParameterizedTest
+    @ValueSource(strings = {"coverage.json", "integrity.jsonl", "applicability.jsonl", "assertions.json"})
+    void unreadableReportFileIsNotReady(String name, @TempDir Path tmp) throws IOException {
+        Assumptions.assumeFalse("root".equals(System.getProperty("user.name")), "running as root");
+        for (String shape : SHAPES) {
+            Path dir = Files.createDirectories(tmp.resolve(shape.replace(' ', '-')));
+            writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
+            Path locked = makeUnreadable(dir, name, shape, tmp);
+            try {
+                Readiness.Verdict v = Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of());
+                assertEquals(Readiness.NOT_READY, v.verdict(), shape);
+                assertEquals(List.of("cannot read report file " + name), v.reasons(), shape);
+            } finally {
+                if (locked != null) {
+                    Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("rwx------"));
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"coverage.json", "integrity.jsonl", "applicability.jsonl", "assertions.json"})
+    void absentReportFileReadsAsEmpty(String name, @TempDir Path dir) throws IOException {
+        writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
+        Files.delete(dir.resolve(name));
+        assertEquals(Readiness.READY, Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).verdict());
+    }
+
+    @Test
+    void reportFolderThatCannotBeEnteredIsNotReady(@TempDir Path tmp) throws IOException {
+        Assumptions.assumeFalse("root".equals(System.getProperty("user.name")), "running as root");
+        Path dir = Files.createDirectories(tmp.resolve("report"));
+        writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
+        Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rw-------"));
+        try {
+            Readiness.Verdict v = Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of());
+            assertEquals(
+                    List.of(
+                            "cannot read report file applicability.jsonl",
+                            "cannot read report file assertions.json",
+                            "cannot read report file coverage.json",
+                            "cannot read report file integrity.jsonl"),
+                    v.reasons());
+        } finally {
+            Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
+        }
     }
 
     private static ObjectNode assertion(String control, String outcome, String subject) {

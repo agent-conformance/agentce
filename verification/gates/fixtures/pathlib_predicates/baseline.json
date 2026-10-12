@@ -1,5 +1,5 @@
 {
-  "note": "Bare pathlib predicate calls in engines/python/agentce at 18.163, by site (VG-PATHLIB-PREDICATES). Shrink-only: route a site through signing.is_regular_file/is_directory and remove or lower its entry; never add one without review. readiness.py's three stay on purpose until inbox row 289 is decided (reading an unreadable report file as absent would let a blocking report read READY).",
+  "note": "Bare pathlib predicate calls in engines/python/agentce at 18.163, by site (VG-PATHLIB-PREDICATES). Shrink-only: route a site through signing.is_regular_file/is_directory and remove or lower its entry; never add one without review. readiness.py reads report files with os.stat (18.165), so an unreadable one blocks rather than reading as absent.",
   "sites": {
     "agentce/bundle.py::safe_is_file::path.is_file": 1,
     "agentce/catalog.py::_fixture_fingerprint::path.is_file": 1,
@@ -31,9 +31,6 @@
     "agentce/conformance.py::_materialise_corpus::generator.is_file": 1,
     "agentce/coverage_matrix.py::check_matrix::committed_path.is_file": 1,
     "agentce/i18n_format.py::load_catalog::path.is_file": 1,
-    "agentce/readiness.py::_load_jsonl::path.is_file": 1,
-    "agentce/readiness.py::compute_readiness::(report_dir / 'assertions.json').is_file": 1,
-    "agentce/readiness.py::compute_readiness::(report_dir / 'coverage.json').is_file": 1,
     "agentce/records/__init__.py::_candidates::(here / d).is_symlink": 1,
     "agentce/records/__init__.py::scan::(stale / 'manifest.json').is_file": 1,
     "agentce/records/__init__.py::scan::out.exists": 1,

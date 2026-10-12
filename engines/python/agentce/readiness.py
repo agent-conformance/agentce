@@ -11,7 +11,9 @@ manual-protocol linters the ``agentce-prepare-to-share`` skill wraps; each retur
 from __future__ import annotations
 
 import json
+import os
 import re
+import stat
 from datetime import date, datetime
 from importlib import resources
 from pathlib import Path
@@ -39,19 +41,25 @@ _DEVIATION_FIELDS = (
 )
 
 
-def _load_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
+def _read_report_file(path: Path) -> str | None:
+    """The text of one report file, or ``None`` when the report folder has no entry by that name.
+    An entry that is there but cannot be read as a regular file (a folder, a dangling link, a link
+    into a folder that can be listed but not entered, a file without read permission) raises
+    ``OSError``: readiness reports it as a blocking reason rather than reading it as absent, which
+    would let a coverage gap or an integrity break stop blocking. ``os.stat`` answers the same on
+    every supported Python, where ``Path.is_file`` does not."""
+    try:
+        os.lstat(path)
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISREG(os.stat(path).st_mode):
+        raise IsADirectoryError(f"{path} is not a regular file")
+    return path.read_text(encoding="utf-8")
 
 
-def _load_jsonl(path: Path) -> list[dict[str, Any]]:
-    if not path.is_file():
-        return []
-    out: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line:
-            out.append(json.loads(line))
-    return out
+def _jsonl(text: str | None) -> list[dict[str, Any]]:
+    lines = (line.strip() for line in (text or "").splitlines())
+    return [json.loads(line) for line in lines if line]
 
 
 def _schema(name: str) -> dict[str, Any]:
@@ -155,17 +163,21 @@ def compute_readiness(
     reasons: list[str] = []
     limitations: list[str] = []
 
-    for record in _load_jsonl(report_dir / "integrity.jsonl"):
+    def report_file(name: str) -> str | None:
+        try:
+            return _read_report_file(report_dir / name)
+        except OSError:
+            reasons.append(f"cannot read report file {name}")
+            return None
+
+    for record in _jsonl(report_file("integrity.jsonl")):
         if record.get("status") in _BAD_INTEGRITY:
             reasons.append(
                 f"integrity {record.get('status')} on stream {record.get('stream')}"
             )
 
-    coverage = (
-        _load_json(report_dir / "coverage.json")
-        if (report_dir / "coverage.json").is_file()
-        else {}
-    )
+    coverage_text = report_file("coverage.json")
+    coverage = json.loads(coverage_text) if coverage_text is not None else {}
     for subject, entry in sorted((coverage.get("subjects") or {}).items()):
         if entry.get("coverage_status") == "gap":
             reasons.append(f"coverage shortfall for subject {subject}")
@@ -175,17 +187,14 @@ def compute_readiness(
             if detail.get("status") == "below_threshold":
                 reasons.append(f"coverage shortfall for {subject} {event_type}")
 
-    for statement in _load_jsonl(report_dir / "applicability.jsonl"):
+    for statement in _jsonl(report_file("applicability.jsonl")):
         for drift in statement.get("drift", []) or []:
             reasons.append(
                 f"applicability drift: {drift.get('kind')} {drift.get('ref')}"
             )
 
-    assertions = (
-        _load_json(report_dir / "assertions.json")
-        if (report_dir / "assertions.json").is_file()
-        else []
-    )
+    assertions_text = report_file("assertions.json")
+    assertions = json.loads(assertions_text) if assertions_text is not None else []
     for assertion in assertions:
         if assertion.get("outcome") != "insufficient_evidence":
             continue
