@@ -2027,7 +2027,7 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "bundle-manifest",
     ),
     "agentce.bundle.safe_is_file: path.is_file()": ("bundle-manifest", "bundle-files"),
-    "agentce.commands._is_regular_file: path.stat()": (
+    "agentce.commands._mode_matches: path.stat()": (
         "manifest-file",
         "signatures-file",
         "report-claim",
@@ -2053,7 +2053,6 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.commands._verify_release: artifact_file.read_bytes()": ("artifact-path",),
     "agentce.commands._verify_release: release_path.is_file()": ("release-file",),
     "agentce.commands._verify_report: candidate_path.read_bytes()": _HASHED_ONLY,
-    "agentce.commands._verify_report: catalog_path.is_dir()": ("report-packaging",),
     "agentce.commands._verify_report: claim_path.read_bytes()": ("report-claim",),
     "agentce.commands._verify_report: deviations_path.read_bytes()": _HASHED_ONLY,
     "agentce.commands._verify_report: domain_path.read_bytes()": _HASHED_ONLY,

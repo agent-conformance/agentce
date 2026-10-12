@@ -24,7 +24,7 @@ import stat
 import subprocess
 import sys
 import tempfile
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import redirect_stdout
 from dataclasses import dataclass, replace
 from datetime import date
@@ -917,7 +917,7 @@ def _verify_report(
     catalog_dir_digests = packaging.get("catalog_dir_digests", {})
     for position, label in enumerate(catalog_dir_order):
         catalog_path = report_dir / "bundle" / "catalog" / str(position)
-        if not catalog_path.is_dir() or signing.digest_tree(
+        if not _is_directory(catalog_path) or signing.digest_tree(
             catalog_path
         ) != catalog_dir_digests.get(label):
             raise InputError(
@@ -1062,8 +1062,17 @@ def _is_regular_file(path: Path) -> bool:
     """``Path.is_file`` as Python 3.12 answers it: a PermissionError propagates (the caller's
     input.release_unreadable or verify.report_unreadable), where 3.14's ``is_file`` swallows it and
     returns False."""
+    return _mode_matches(path, stat.S_ISREG)
+
+
+def _is_directory(path: Path) -> bool:
+    """``Path.is_dir`` as Python 3.12 answers it; see `_is_regular_file`."""
+    return _mode_matches(path, stat.S_ISDIR)
+
+
+def _mode_matches(path: Path, test: Callable[[int], bool]) -> bool:
     try:
-        return stat.S_ISREG(path.stat().st_mode)
+        return test(path.stat().st_mode)
     except OSError as exc:
         if exc.errno in (errno.ENOENT, errno.ENOTDIR, errno.EBADF, errno.ELOOP):
             return False

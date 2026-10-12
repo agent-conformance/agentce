@@ -532,9 +532,9 @@ not_root = pytest.mark.skipif(
 
 
 @contextmanager
-def _unreadable(path: Path) -> Iterator[None]:
+def _unreadable(path: Path, unreadable_mode: int = 0) -> Iterator[None]:
     mode = path.stat().st_mode
-    path.chmod(0)
+    path.chmod(unreadable_mode)
     try:
         yield
     finally:
@@ -712,10 +712,10 @@ def test_verify_unreadable_input_report_directory(
 
 
 def _report_refusal(
-    capsys: pytest.CaptureFixture[str], out: Path, rel: str
+    capsys: pytest.CaptureFixture[str], out: Path, rel: str, mode: int = 0
 ) -> tuple[int, tuple[str, str]]:
     capsys.readouterr()  # discard the setup commands' output
-    with _unreadable(out / rel):
+    with _unreadable(out / rel, mode):
         code, env = run(["verify", "--report", str(out), "--json"], capsys)
     return code, _refusal(env)
 
@@ -736,19 +736,21 @@ def test_verify_unreadable_input_report_file(
 
 
 @not_root
+@pytest.mark.parametrize(
+    "rel", ["", "bundle/catalog"], ids=["report-folder", "catalog-folder"]
+)
 def test_verify_report_folder_listable_but_not_searchable(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], rel: str
 ) -> None:
-    # Mode 600: Path.is_file() inside it raises on 3.12 and 3.13 but returns False on 3.14 (18.114).
-    out, _key = _packaged_and_signed(tmp_path)
-    capsys.readouterr()  # discard the setup commands' output
-    out.chmod(0o600)
-    try:
-        code, env = run(["verify", "--report", str(out), "--json"], capsys)
-    finally:
-        out.chmod(0o755)
-    assert code == 3
-    assert _refusal(env)[0] == "verify.report_unreadable"
+    # Mode 600: Path.is_file()/is_dir() inside it raises on 3.12 but returns False on 3.14 (18.114).
+    out, _key = _packaged_and_signed(
+        tmp_path,
+        "--catalog-dir",
+        str(_AUD_FIXTURE / "catalog"),
+        "--allow-unverified-catalog",
+    )
+    code, (key, _cause) = _report_refusal(capsys, out, rel, 0o600)
+    assert (code, key) == (3, "verify.report_unreadable")
 
 
 @not_root
