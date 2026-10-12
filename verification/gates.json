@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.95.0",
+  "suite_version": "0.96.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -4153,6 +4153,33 @@
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "                effective = heldDecision(refsOf(event).get(\"decision\")) != null\n",
           "replace": "                effective = refNames(refsOf(event).get(\"decision\")).stream().anyMatch(eventIris::contains)\n"
+        }
+      ]
+    },
+    {
+      "id": "VG-PYTHON-VERSIONS",
+      "title": "The Python engine's whole test suite passes on every Python its requires-python admits (3.14, 3.13, 3.12.10 and 3.12.3), each in an isolated environment (18.114), so a library change between Python versions cannot change what the engine refuses",
+      "tier": "full",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/python_versions.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 3600,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "verification/gates/python_versions.sh runs `uv run --isolated --python <v> --project engines/python --frozen python -m pytest engines/python/tests` for 3.14, 3.13, 3.12.10 and 3.12.3 one after another and every run exits 0: a symlink-loop manifest member, a `--` where a command's action goes, an unreadable release folder and a too-deep or non-object coverage denominator manifest get the same answer on each version",
+        "fail": "any version's suite exits non-zero, or uv cannot provide that interpreter (never a skip)"
+      },
+      "faults": [
+        {
+          "description": "the symlink-loop pass-through: confine_to_root no longer stats the resolved path for ELOOP, so on Python 3.13 and newer, where resolve() returns a loop instead of raising, a looping manifest member is confined and read instead of refused",
+          "file": "engines/python/agentce/bundle.py",
+          "search": "    if _meets_symlink_loop(resolved):\n        return None\n",
+          "replace": ""
         }
       ]
     }

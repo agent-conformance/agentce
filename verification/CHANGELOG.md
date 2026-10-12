@@ -3,6 +3,18 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.96.0
+
+- `VG-PYTHON-VERSIONS` (18.114, new, full tier) runs the Python engine's whole test suite on 3.14, 3.13, 3.12.10 and
+  3.12.3, each in its own isolated environment, one version after another. The engine accepts Python 3.12 and newer,
+  but CI tested only 3.12.3, and newer versions gave different answers. On 3.13 and 3.14 the engine read a manifest
+  member that is a symlink loop and failed its hash check, where it should refuse it as an unsafe path. On 3.12.10,
+  3.13 and 3.14 `agentce conformance -- run` ran the suite, where the other engines refuse it. On 3.14 the engine
+  called an unreadable release folder "not a release bundle". On every version, a coverage denominator manifest whose
+  root is a list crashed the engine; it now counts the source's own events, as TypeScript and Java do. The engine now
+  refuses a manifest nested past 1000 levels with `input.coverage_denominator_manifest_invalid` on every version. CI
+  runs the gate as one job per version. Its seeded fault removes the symlink-loop check.
+
 ## 0.95.0
 
 - `VG-APPROVAL-REFS-RESOLVED` (18.158, changed) now covers interrupts whose decision name points at nothing. Such an
