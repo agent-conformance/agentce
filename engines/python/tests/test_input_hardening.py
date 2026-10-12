@@ -481,6 +481,48 @@ def test_manifest_json_with_pathologically_deep_json_is_refused(tmp_path: Path) 
     assert excinfo.value.key == "input.bundle_manifest_invalid"
 
 
+@pytest.mark.parametrize("depth", [1001, 1500])
+def test_coverage_denominator_manifest_past_the_depth_limit_is_refused(
+    tmp_path: Path, depth: int
+) -> None:
+    bundle_root = tmp_path / "bundle"
+    (bundle_root / "reference").mkdir(parents=True)
+    (bundle_root / "reference" / "counts.json").write_text(
+        "[" * depth + "]" * depth, encoding="utf-8"
+    )
+    denominator = CoverageDenominator(
+        kind="registry",
+        source="urn:src:egress",
+        covers=["ToolCall"],
+        manifest="reference/counts.json",
+    )
+    with pytest.raises(InputError) as excinfo:
+        _denominator_counts(denominator, {}, bundle_root)
+    assert excinfo.value.key == "input.coverage_denominator_manifest_invalid"
+
+
+@pytest.mark.parametrize("root", ["[1]", "7", '"counts"', "null"])
+def test_coverage_denominator_manifest_that_is_not_an_object_counts_the_source(
+    tmp_path: Path, root: str
+) -> None:
+    bundle_root = tmp_path / "bundle"
+    (bundle_root / "reference").mkdir(parents=True)
+    (bundle_root / "reference" / "counts.json").write_text(root, encoding="utf-8")
+    denominator = CoverageDenominator(
+        kind="registry",
+        source="urn:src:egress",
+        covers=["ToolCall"],
+        manifest="reference/counts.json",
+    )
+    by_source_type = {
+        ("urn:src:egress", "ToolCall"): 3,
+        ("urn:src:other", "ToolCall"): 9,
+    }
+    assert _denominator_counts(denominator, by_source_type, bundle_root) == {
+        "ToolCall": 3
+    }
+
+
 def test_coverage_denominator_manifest_with_deep_json_is_refused(
     tmp_path: Path,
 ) -> None:

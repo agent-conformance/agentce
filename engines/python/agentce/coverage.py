@@ -18,6 +18,7 @@ from decimal import ROUND_HALF_EVEN, Decimal
 from pathlib import Path
 from typing import Any
 
+from . import signing
 from .bundle import confine_to_root, safe_is_file
 from .errors import InputError
 from .profile import CoverageDenominator, Profile
@@ -51,17 +52,23 @@ def _denominator_counts(
     if denominator.manifest and bundle_root is not None:
         path = confine_to_root(bundle_root, denominator.manifest)
         if path is not None and safe_is_file(path):
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-            except RecursionError as exc:
+            raw = path.read_bytes()
+            # Counted on the bytes, not left to json's recursion limit, which differs by Python.
+            if signing._too_deep(raw):
                 raise InputError(
                     "input.coverage_denominator_manifest_invalid",
                     f"the coverage denominator manifest at {str(path)!r} is nested too deeply "
                     "to parse safely.",
                     "flatten the denominator manifest's structure; it exceeds the engine's safe "
                     "nesting depth.",
-                ) from exc
-            declared = data.get("counts") or data.get("expected") or {}
+                )
+            data = json.loads(raw.decode("utf-8"))
+            # A root that is not an object declares no counts: fall through, as TypeScript and Java do.
+            declared = (
+                (data.get("counts") or data.get("expected") or {})
+                if isinstance(data, dict)
+                else None
+            )
             if isinstance(declared, dict):
                 return {str(k): int(v) for k, v in declared.items()}
     # Otherwise count the denominator source's own ingested events, per type.
