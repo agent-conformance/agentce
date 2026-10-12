@@ -3,6 +3,17 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.98.0
+
+- `VG-BYO-CATALOG-PARITY` (18.164, changed) now runs 15 scenarios. A catalog's signature left out the files behind
+  a symlinked folder, while the loader read them. So a catalog signed with `controls/` linked could be edited behind
+  the link after signing, and `assess --catalog-dir --trust-root` accepted it in all three engines and printed the
+  edited text. Each engine now walks into a symlinked folder the way the loader reads it, so the signature covers
+  those files. A folder reached a second time, such as a link back to an ancestor, is refused as
+  `input.catalog_unreadable`, signed or not. The new scenarios sign a catalog with `controls/` linked, edit it
+  behind the link, and add a link to an ancestor folder. Three new seeded faults, one per engine, stop the walk
+  from entering a symlinked folder.
+
 ## 0.97.0
 
 - `VG-PATHLIB-PREDICATES` (18.163, new, quick tier) lists every bare `Path.is_file()`, `is_dir()`, `exists()` and

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.97.0",
+  "suite_version": "0.98.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -1978,7 +1978,7 @@
     },
     {
       "id": "VG-BYO-CATALOG-PARITY",
-      "title": "An operator's own --catalog-dir is checked against the trust root the same way in all three engines: refused when unsigned, untrusted or rebranded, recorded as a limitation under --allow-unverified-catalog, with Python's exit code, error key, cause and fix",
+      "title": "An operator's own --catalog-dir is checked against the trust root the same way in all three engines: refused when unsigned, untrusted, rebranded, edited behind a symlinked folder or looping back to an ancestor folder, recorded as a limitation under --allow-unverified-catalog, with Python's exit code, error key, cause and fix",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -1994,7 +1994,7 @@
       "timeout_s": 900,
       "invariant": "An attestation is reported as verified only after its signature verifies against a trusted key.",
       "rubric": {
-        "pass": "for each of 12 scenarios (untrusted, unsigned, unsigned with the override, trusted with --trust-root, missing/malformed/non-object --trust-root, a bad --trust-root with no --catalog-dir, a rebranded catalog with and without the override, an ordinary run, quickstart under AGENTCE_TRUST_ROOT) Python gives the expected exit code and key, and TypeScript and Java give the same exit code, error key, cause (up to the JSON parser's own message for a malformed trust root), fix, envelope limitations and manifest.json limitations",
+        "pass": "for each of 15 scenarios (untrusted, unsigned, unsigned with the override, trusted with --trust-root, missing/malformed/non-object --trust-root, a bad --trust-root with no --catalog-dir, a rebranded catalog with and without the override, an ordinary run, quickstart under AGENTCE_TRUST_ROOT, a catalog signed with controls/ symlinked, the same catalog edited behind the link, a catalog with a link back to an ancestor folder) Python gives the expected exit code and key, and TypeScript and Java give the same exit code, error key, cause (up to the JSON parser's own message for a malformed trust root), fix, envelope limitations and manifest.json limitations",
         "fail": "any engine assesses a catalog Python refuses, refuses one Python assesses, or differs from Python in exit code, error key, cause, fix or the recorded limitation"
       },
       "faults": [
@@ -2033,6 +2033,24 @@
           "file": "engines/java/src/main/java/org/agentce/Verify.java",
           "search": "        if (data == null || !data.isObject()) {",
           "replace": "        if (data == null) {"
+        },
+        {
+          "description": "Python's catalog walk no longer descends a symlinked folder, so a catalog signed with controls/ linked can be edited behind the link and still verify",
+          "file": "engines/python/agentce/signing.py",
+          "search": "            if is_directory(path):\n                identity = _identity(path)",
+          "replace": "            if is_directory(path) and not os.path.islink(path):\n                identity = _identity(path)"
+        },
+        {
+          "description": "TypeScript's catalog walk no longer descends a symlinked folder, so its digest leaves out the files behind the link",
+          "file": "engines/typescript/src/report.ts",
+          "search": "    if (isDirFollowingLinks(full)) {\n      const identity = folderIdentity(full);",
+          "replace": "    if (isDirFollowingLinks(full) && readdirSync(dir, { withFileTypes: true }).some((e) => e.name === name && e.isDirectory())) {\n      const identity = folderIdentity(full);"
+        },
+        {
+          "description": "Java's catalog walk no longer descends a symlinked folder, so its digest leaves out the files behind the link",
+          "file": "engines/java/src/main/java/org/agentce/Catalog.java",
+          "search": "            if (Files.isDirectory(full)) {\n                if (!entered.add(folderIdentity(full))) {",
+          "replace": "            if (Files.isDirectory(full, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {\n                if (!entered.add(folderIdentity(full))) {"
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/commands/__init__.py's _effective_trust_root, _verify_catalog_dirs and _resolve_catalogs plus signing.load_trust_root, ported in engines/typescript/src/cli.ts + verify.ts and engines/java/src/main/java/org/agentce/Cli.java + Verify.java."
