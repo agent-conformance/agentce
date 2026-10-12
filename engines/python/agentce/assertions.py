@@ -23,6 +23,9 @@ OUTCOMES = (
     "not_assessed",
     "insufficient_evidence",
 )
+#: The closed severity and mode values (spec/rules/control.schema.json, spec/report/auditor.schema.json).
+SEVERITIES = ("high", "medium", "low")
+MODES = ("automated", "semi-automated", "manual")
 
 #: Outcomes that assert support and therefore require evidence pointers (DC-5).
 _REQUIRE_EVIDENCE = frozenset({"conformant", "non-conformant", "partial"})

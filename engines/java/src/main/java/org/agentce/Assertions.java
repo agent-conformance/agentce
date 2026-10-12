@@ -23,6 +23,10 @@ public final class Assertions {
     public static final List<String> OUTCOMES = List.of(
             "conformant", "non-conformant", "partial", "not_applicable", "not_assessed", "insufficient_evidence");
 
+    /** The closed severity and mode values (spec/rules/control.schema.json, spec/report/auditor.schema.json). */
+    public static final List<String> SEVERITIES = List.of("high", "medium", "low");
+    public static final List<String> MODES = List.of("automated", "semi-automated", "manual");
+
     private static final Set<String> REQUIRE_EVIDENCE = Set.of("conformant", "non-conformant", "partial");
 
     /** An evidence pointer to a focus node (SPEC §9.4). */

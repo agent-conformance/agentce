@@ -35,8 +35,8 @@ public final class FailOn {
      * rather than read as a rule that holds nothing to account. control, subject, family and rung stay free text. */
     private static final Map<String, List<String>> CLOSED_VALUES = Map.of(
             "outcome", Assertions.OUTCOMES,
-            "severity", List.of("high", "medium", "low"),
-            "mode", List.of("automated", "semi-automated", "manual"));
+            "severity", Assertions.SEVERITIES,
+            "mode", Assertions.MODES);
 
     /** One {@code field=="literal"} comparison. */
     record Comparison(String field, String literal) {}

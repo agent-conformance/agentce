@@ -20,6 +20,10 @@ export const OUTCOMES = [
   "insufficient_evidence",
 ] as const;
 
+/** The closed severity and mode values (spec/rules/control.schema.json, spec/report/auditor.schema.json). */
+export const SEVERITIES = ["high", "medium", "low"] as const;
+export const MODES = ["automated", "semi-automated", "manual"] as const;
+
 /** Outcomes that assert support and therefore require evidence pointers (DC-5). */
 const REQUIRE_EVIDENCE = new Set(["conformant", "non-conformant", "partial"]);
 

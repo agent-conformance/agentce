@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from .assertions import OUTCOMES, Assertion
+from .assertions import MODES, OUTCOMES, SEVERITIES, Assertion
 from .errors import InputError
 
 #: The only fields a --fail-on expression may compare against (SPEC §9.4 assertion fields).
@@ -33,8 +33,8 @@ _KEYWORDS = frozenset({"and", "or"})
 #: than read as a rule that holds nothing to account. control, subject, family and rung stay free text.
 _CLOSED_VALUES: dict[str, tuple[str, ...]] = {
     "outcome": OUTCOMES,
-    "severity": ("high", "medium", "low"),
-    "mode": ("automated", "semi-automated", "manual"),
+    "severity": SEVERITIES,
+    "mode": MODES,
 }
 
 #: A parsed expression: OR-groups, each a list of AND-ed ``(field, literal)`` comparisons.

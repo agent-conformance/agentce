@@ -670,9 +670,8 @@ class CliTest {
         assertFailOnRefused(runAssess(auditorAssessArgs(f7), "--fail-on=severity==\"critical\""), f7,
                 "--fail-on 'severity==\"critical\"' is not a valid expression: "
                         + "severity 'critical' is not one of: high, medium, low");
-        JsonNode env;
         // F8/F8b: the last occurrence wins, whichever spelling it uses.
-        env = runAssess(auditorAssessArgs(dir.resolve("f8")),
+        JsonNode env = runAssess(auditorAssessArgs(dir.resolve("f8")),
                 "--fail-on", "control==\"AUV-01\"", "--fail-on", "control==\"none\"");
         assertEquals(0, env.get("exit_code").asInt());
         assertEquals("control==\"none\"", env.get("fail_on").get("expression").asText());

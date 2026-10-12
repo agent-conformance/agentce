@@ -15,7 +15,7 @@
  * position in a message and what counts as whitespace or a letter match the reference exactly.
  */
 
-import { type Assertion, OUTCOMES } from "./assertions";
+import { type Assertion, MODES, OUTCOMES, SEVERITIES } from "./assertions";
 import { InputError } from "./errors";
 import { pyRepr } from "./util";
 
@@ -49,8 +49,8 @@ export const isPySpace = (cp: number): boolean => PY_WHITESPACE.has(cp);
  * rather than read as a rule that holds nothing to account. control, subject, family and rung stay free text. */
 const CLOSED_VALUES: Partial<Record<Field, readonly string[]>> = {
   outcome: OUTCOMES,
-  severity: ["high", "medium", "low"],
-  mode: ["automated", "semi-automated", "manual"],
+  severity: SEVERITIES,
+  mode: MODES,
 };
 
 /** A parsed expression: OR-groups, each a list of AND-ed `[field, literal]` comparisons. */
