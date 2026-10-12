@@ -724,10 +724,16 @@ test("assess --fail-on gates the exit code", () => {
     assert.equal(run.exitCode, 1);
     assert.deepEqual(run.exitStatus, ["findings"]);
     assert.deepEqual(run.failOn, { expression: hit, matched: 2 });
-    run = failOnRun([...auditorAssessArgs(out), "--fail-on", 'severity=="critical"'], out);
+    run = failOnRun([...auditorAssessArgs(out), "--fail-on", 'control=="NONE-00"'], out);
     assert.equal(run.exitCode, 0);
     assert.deepEqual(run.exitStatus, ["ok"]);
-    assert.deepEqual(run.failOn, { expression: 'severity=="critical"', matched: 0 });
+    assert.deepEqual(run.failOn, { expression: 'control=="NONE-00"', matched: 0 });
+    // A closed field's value the report never uses would match nothing, so it is refused.
+    run = failOnRun([...auditorAssessArgs(out), "--fail-on", 'severity=="critical"'], out);
+    assert.equal(run.exitCode, 3);
+    assert.equal(run.error?.message_key, "input.fail_on_invalid_expression");
+    assert.match(run.error?.detail ?? "", /severity 'critical' is not one of: high, medium, low$/);
+    assert.equal(run.written, false);
     // rung compares as its decimal string; the deviation register applies before the match.
     run = failOnRun(
       [...auditorAssessArgs(out), "--fail-on", 'rung=="0" and mode=="manual" and family=="AUV"'],
@@ -768,7 +774,8 @@ test("assess --fail-on gates the exit code", () => {
 test("assess --fail-on=<expr> and the last --fail-on wins", () => {
   withOut("assess-fail-on-last", (out) => {
     let run = failOnRun([...auditorAssessArgs(out), '--fail-on=severity=="critical"'], out);
-    assert.deepEqual(run.failOn, { expression: 'severity=="critical"', matched: 0 });
+    assert.equal(run.exitCode, 3);
+    assert.equal(run.error?.message_key, "input.fail_on_invalid_expression");
     run = failOnRun(
       [...auditorAssessArgs(out), "--fail-on", 'control=="AUV-01"', "--fail-on", 'control=="none"'],
       out,

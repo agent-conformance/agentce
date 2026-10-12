@@ -8,6 +8,7 @@ import { test } from "node:test";
 import { type Assertion, makeAssertion } from "./assertions";
 import { InputError } from "./errors";
 import { parseFailOn } from "./failOn";
+import { pyRepr } from "./util";
 
 const FIX =
   'use comparisons of the form field=="literal" joined by and/or, over: control, family, mode, outcome, rung, severity, subject.';
@@ -45,7 +46,9 @@ function refusal(expr: string): InputError {
 test("parseFailOn accepts what Python accepts", () => {
   const cases: Array<[string, boolean[]]> = [
     ['outcome=="non-conformant" and severity=="high"', [true, false]],
-    ['severity=="critical"', [false, false]],
+    ['control=="AUV-99"', [false, false]],
+    ['mode=="semi-automated"', [false, false]],
+    ["severity=='hi\\gh'", [true, false]],
     ['control=="AUV-04" or control=="AUV-01" and severity=="low"', [false, true]],
     [
       'control=="AUV-01" and severity=="low" or control=="AUV-04" and severity=="low"',
@@ -64,6 +67,29 @@ test("parseFailOn accepts what Python accepts", () => {
     const predicate = parseFailOn(expr);
     assert.deepEqual([HIGH, LOW].map(predicate), expected, expr);
   }
+});
+
+test("parseFailOn refuses a literal outside the closed vocabulary", () => {
+  const cases: Array<[string, string]> = [
+    [
+      'outcome=="non_conformant"',
+      "outcome 'non_conformant' is not one of: conformant, non-conformant, partial, not_applicable, not_assessed, insufficient_evidence",
+    ],
+    ['severity=="critical"', "severity 'critical' is not one of: high, medium, low"],
+    ['mode=="auto"', "mode 'auto' is not one of: automated, semi-automated, manual"],
+    [
+      'outcome=="non-conformant" or severity=="critical"',
+      "severity 'critical' is not one of: high, medium, low",
+    ],
+  ];
+  for (const [expr, tail] of cases) {
+    const exc = refusal(expr);
+    assert.equal(exc.key, "input.fail_on_invalid_expression", expr);
+    assert.equal(exc.cause, `--fail-on ${pyRepr(expr)} is not a valid expression: ${tail}`, expr);
+  }
+  // A syntax error or an unknown field is reported before a value outside the vocabulary.
+  assert.match(refusal('severity=="critical" foo').cause, /unexpected token 'foo'/);
+  assert.match(refusal('severity=="critical" and foo=="x"').cause, /unknown field 'foo'/);
 });
 
 test("parseFailOn refuses with Python's cause", () => {

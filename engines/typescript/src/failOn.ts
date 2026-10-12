@@ -15,7 +15,7 @@
  * position in a message and what counts as whitespace or a letter match the reference exactly.
  */
 
-import type { Assertion } from "./assertions";
+import { type Assertion, OUTCOMES } from "./assertions";
 import { InputError } from "./errors";
 import { pyRepr } from "./util";
 
@@ -43,6 +43,15 @@ const PY_WHITESPACE = new Set([
 
 /** Whether code point `cp` is one Python's `str.isspace()` (and so `str.strip()`) treats as space. */
 export const isPySpace = (cp: number): boolean => PY_WHITESPACE.has(cp);
+
+/** The fields whose values are a closed vocabulary (SPEC §8.5; spec/report/auditor.schema.json for outcome and
+ * mode, spec/rules/control.schema.json for severity). A literal outside it could never match, so it is refused
+ * rather than read as a rule that holds nothing to account. control, subject, family and rung stay free text. */
+const CLOSED_VALUES: Partial<Record<Field, readonly string[]>> = {
+  outcome: OUTCOMES,
+  severity: ["high", "medium", "low"],
+  mode: ["automated", "semi-automated", "manual"],
+};
 
 /** A parsed expression: OR-groups, each a list of AND-ed `[field, literal]` comparisons. */
 type FailOnGroups = Array<Array<[Field, string]>>;
@@ -186,6 +195,19 @@ class Parser {
   }
 }
 
+/** Refuse the first comparison, left to right, whose field is closed and whose literal is not one of its
+ * values. It runs after the whole expression parses, so a syntax error or an unknown field is reported first. */
+function checkClosedValues(groups: FailOnGroups): void {
+  for (const group of groups) {
+    for (const [field, literal] of group) {
+      const allowed = CLOSED_VALUES[field];
+      if (allowed !== undefined && !allowed.includes(literal)) {
+        throw new ExprError(`${field} ${pyRepr(literal)} is not one of: ${allowed.join(", ")}`);
+      }
+    }
+  }
+}
+
 const FIELD_GETTERS: Record<Field, (a: Assertion) => string> = {
   control: (a) => a.control,
   subject: (a) => a.subject,
@@ -197,7 +219,8 @@ const FIELD_GETTERS: Record<Field, (a: Assertion) => string> = {
 };
 
 /** Parse a `--fail-on` expression into a predicate over an `Assertion`. Throws an `InputError` keyed
- * `input.fail_on_invalid_expression` on any syntax error, unknown field, or disallowed token, at
+ * `input.fail_on_invalid_expression` on any syntax error, unknown field, outcome, severity or mode
+ * literal outside its closed vocabulary, or disallowed token, at
  * parse time, before any assertion is evaluated against the expression (SPEC §7: never `eval`). */
 export function parseFailOn(expr: string): (assertion: Assertion) => boolean {
   let groups: FailOnGroups;
@@ -207,6 +230,7 @@ export function parseFailOn(expr: string): (assertion: Assertion) => boolean {
       throw new ExprError("the --fail-on expression is empty");
     }
     groups = new Parser(tokens).parse();
+    checkClosedValues(groups);
   } catch (exc) {
     if (!(exc instanceof ExprError)) {
       throw exc;
