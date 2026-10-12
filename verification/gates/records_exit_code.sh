@@ -92,7 +92,7 @@ check G5 0 '["ok"]' null baseline "$fixture/records"
 high=$(python3 -c 'import json, sys; print(sum(a["severity"] == "high" for a in json.load(open(sys.argv[1]))))' "$work/G5/assertions.json")
 check G6 1 '["findings"]' "$(fail_on_json "$gap" "$high")" baseline "$fixture/records" --fail-on "$gap"
 # G7: an opt-in that matches nothing keeps exit 0.
-check G7 0 '["ok"]' "$(fail_on_json 'severity=="critical"' 0)" baseline "$fixture/records" --fail-on 'severity=="critical"'
+check G7 0 '["ok"]' "$(fail_on_json 'control=="NONE-00"' 0)" baseline "$fixture/records" --fail-on 'control=="NONE-00"'
 # G8: the docs recipe's combined form fails on the gap and on the finding.
 both="$gap or outcome==\"non-conformant\""
 check G8 1 '["findings"]' "$(fail_on_json "$both" 2)" "$rx" "$fixture/records" "${catalog[@]}" --fail-on "$both"

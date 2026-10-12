@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.93.0",
+  "suite_version": "0.94.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2783,12 +2783,12 @@
       "timeout_s": 600,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
-        "pass": "over 38 scenarios run through each engine's real CLI with LC_ALL=C.UTF-8 (matches and misses, and before precedence, a single-quoted literal with an escape, --fail-on=<expression>, the flag given twice in both orders, matches after --deviations, the insufficient-evidence project with and without a match, Unicode whitespace, a 3000-clause chain, refusals including a dunder-import call, an astral character before the error position and a non-ASCII digit in a field name, a missing value trailing, mid-argv, before another option and as the first of two value flags, values that start with `-` including a non-ASCII digit, and the refusal order against a missing bundle or profile, an unknown --catalog and a missing --deviations register) TypeScript and Java give Python's exit code, exit_status and fail_on, or Python's key, cause and fix with no assertions.json written; a value flag with no value exits 3 with argparse's sentence (key input.assess_flag_needs_value in TypeScript and Java); Python's own results match python-reference.md; and Python's parse_fail_on and the TypeScript and Java fail-on-check seams print byte-identical refusals or match vectors for 6,051 expressions (R1-R31, F1-F14, D1, D2 and 6,000 fuzzed from a fixed seed) over seven assertions that cover every field",
-        "fail": "any engine evaluates, counts or refuses an expression differently from Python, differs in exit code, exit_status, fail_on, key, cause or fix, reads a value flag differently, refuses in a different order, writes assertions.json for a refused run, or prints a different line for any corpus expression"
+        "pass": "over 46 scenarios run through each engine's real CLI with LC_ALL=C.UTF-8 (matches and misses, and before precedence, a single-quoted literal with an escape, --fail-on=<expression>, the flag given twice in both orders, matches after --deviations, the insufficient-evidence project with and without a match, Unicode whitespace, a 3000-clause chain, refusals including a dunder-import call, an astral character before the error position and a non-ASCII digit in a field name, a missing value trailing, mid-argv, before another option and as the first of two value flags, values that start with `-` including a non-ASCII digit, the refusal order against a missing bundle or profile, an unknown --catalog and a missing --deviations register, an outcome, severity or mode value outside its closed vocabulary (a typo, a case variant, an empty value, in a later OR group, in both --fail-on spellings) refused with input.fail_on_invalid_expression, a syntax error or unknown field reported before such a value, and an escaped and a hyphenated closed value still accepted) TypeScript and Java give Python's exit code, exit_status and fail_on, or Python's key, cause and fix with no assertions.json written; a value flag with no value exits 3 with argparse's sentence (key input.assess_flag_needs_value in TypeScript and Java); Python's own results match python-reference.md; and Python's parse_fail_on and the TypeScript and Java fail-on-check seams print byte-identical refusals or match vectors for 6,559 expressions (R1-R31, F1-F14, D1, D2, V1-V8 and 6,500 fuzzed from a fixed seed, 500 of them comparing outcome, severity and mode mostly against their own values) over seven assertions that cover every field",
+        "fail": "any engine evaluates, counts or refuses an expression differently from Python, accepts an outcome, severity or mode value outside its closed vocabulary, differs in exit code, exit_status, fail_on, key, cause or fix, reads a value flag differently, refuses in a different order, writes assertions.json for a refused run, or prints a different line for any corpus expression"
       },
       "faults": [
         {
-          "description": "TypeScript's assess skips the --fail-on match count, so the flag is ignored again and the default any-non-conformant rule decides the exit (F2, F7)",
+          "description": "TypeScript's assess skips the --fail-on match count, so the flag is ignored again and the default any-non-conformant rule decides the exit (F4b, F8)",
           "file": "engines/typescript/src/cli.ts",
           "search": "  if (failOnPredicate !== undefined) {\n",
           "replace": "  if (false) {\n"
@@ -2846,6 +2846,24 @@
           "file": "engines/typescript/src/argv.ts",
           "search": "      values[key] = value;\n",
           "replace": "      if (c.explicit === undefined || key !== \"--fail-on\") values[key] = value;\n"
+        },
+        {
+          "description": "Python's parse_fail_on skips its enum check of the closed outcome, severity and mode values, so a typo such as severity==\"critical\" matches nothing and passes the run (F2, F7, V1-V4)",
+          "file": "engines/python/agentce/fail_on.py",
+          "search": "        _check_closed_values(groups)\n",
+          "replace": ""
+        },
+        {
+          "description": "TypeScript's parseFailOn skips its enum check of the closed outcome, severity and mode values, so a typo such as outcome==\"non_conformant\" matches nothing and passes the run (F2, F7, V1-V4)",
+          "file": "engines/typescript/src/failOn.ts",
+          "search": "    checkClosedValues(groups);\n",
+          "replace": ""
+        },
+        {
+          "description": "Java's FailOn.parse skips its enum check of the closed outcome, severity and mode values, so a typo such as mode==\"auto\" matches nothing and passes the run (F2, F7, V1-V4)",
+          "file": "engines/java/src/main/java/org/agentce/FailOn.java",
+          "search": "            checkClosedValues(groups);\n",
+          "replace": ""
         }
       ],
       "fix_hint": "run verification/gates/fail_on_parity.sh and read the FAIL lines; the reference is engines/python/agentce/fail_on.py (parse_fail_on) and cmd_assess's --fail-on handling in engines/python/agentce/commands/__init__.py, ported in engines/typescript/src/failOn.ts and cli.ts (runAssess, assessValueFlags) and engines/java/src/main/java/org/agentce/FailOn.java and Cli.java (runAssess, assessValueFlags)."

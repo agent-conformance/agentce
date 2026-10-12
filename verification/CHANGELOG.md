@@ -3,6 +3,23 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.94.0
+
+- `VG-FAIL-ON-PARITY` (18.150, changed) no longer accepts a `--fail-on` value that the report never uses. A typo such as
+  `outcome=="non_conformant"`, `severity=="critical"` or `mode=="auto"` matched nothing, so the run passed with exit 0
+  even when a control was non-conformant, and the gate's own F2 and F7 pinned that as correct. Each engine now refuses
+  an `outcome`, `severity` or `mode` value outside its schema values with `input.fail_on_invalid_expression`, exit 3,
+  and writes nothing; a syntax error or an unknown field is still reported first, and `control`, `subject`, `family`
+  and `rung` stay free text. F2 and F7 are now refusals, and eight scenarios are added: an outcome typo, a mode typo,
+  an empty outcome, a case variant in a later OR group, a syntax error and an unknown field before a bad value, and an
+  escaped and a hyphenated closed value that are still accepted (46 CLI scenarios). The parser corpus keeps its 6,000
+  fuzzed expressions byte for byte and adds 500 more from the same seed whose outcome, severity and mode comparisons
+  mostly use their own values, sometimes a near miss, so the evaluator is still fuzzed now that random values for
+  those fields are refused (6,559 parser expressions). Three seeded faults are added, one per engine, each removing
+  only that engine's enum check.
+- `VG-RECORDS-EXIT-CODE` (18.150, changed): G7, an opt-in that matches nothing, now uses `control=="NONE-00"`, since
+  its old `severity=="critical"` is refused.
+
 ## 0.93.0
 
 - `VG-HELD-DECISION-EVERYWHERE` (18.156, new, tier quick) checks that every glue read of `refs.decision` names the

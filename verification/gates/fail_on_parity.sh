@@ -4,16 +4,20 @@
 #
 # (1) The real assess CLI of each engine over the scenarios of item 18.73's python-reference.md:
 # matches and misses (F*), the insufficient-evidence project (F10*), Unicode whitespace (F12), a
-# 3000-clause chain (D2), refusals (R*), a missing value and values that start with `-` (M1-M9), and
-# the refusal order (O1-O4). Each engine must give Python's exit code, exit_status and --json fail_on,
+# 3000-clause chain (D2), refusals (R*), a missing value and values that start with `-` (M1-M9), the
+# refusal order (O1-O4), and an outcome, severity or mode value outside its closed vocabulary (F2, F7,
+# V1-V6: refused, since such a gate could never match; a syntax error or an unknown field is reported
+# first) next to closed values that must still be accepted (V7 an escape, V8 a hyphenated mode). Each
+# engine must give Python's exit code, exit_status and --json fail_on,
 # or Python's refusal (key, cause, fix) with no assertions.json written; a missing value must be
 # argparse's own sentence. Some results are also checked against python-reference.md itself, so the
 # gate fails when all three engines agree on a wrong answer.
 #
 # (2) The parser alone, one process per engine: Python's parse_fail_on and the TypeScript and Java
 # `fail-on-check` seams read the same fixture (the auditor-view fixture's four assertions plus
-# synthetic ones that cover every field) and the same expressions (R1-R31, F1-F14, D1, D2 and 6,000
-# expressions fuzzed from a fixed seed), and must print byte-identical lines: each expression's
+# synthetic ones that cover every field) and the same expressions (R1-R31, F1-F14, D1, D2, V1-V8 and 6,500
+# expressions fuzzed from a fixed seed, 500 of them comparing outcome, severity and mode mostly against their own
+# values), and must print byte-identical lines: each expression's
 # refusal or its match vector.
 #
 # Every scenario runs from its engine's own engines/<name> with LC_ALL=C.UTF-8; the CLI runs go four
@@ -82,12 +86,16 @@ EXPR = {
     "R31": 'outcome=="x" OR severity=="y"',
     "D1": " or ".join(['control=="x"'] * 3000),
     "D2": " or ".join(['control=="x"'] * 2999 + ['control=="AUV-01"']),
+    "V1": 'outcome=="non_conformant"', "V2": 'mode=="auto"', "V3": 'outcome==""',
+    "V4": 'control=="AUV-01" or outcome=="Non-conformant"', "V5": 'severity=="critical" foo',
+    "V6": 'severity=="critical" and foo=="x"', "V7": "severity=='hi\\gh'", "V8": 'mode=="semi-automated"',
 }
 fo = lambda name: ["--fail-on", EXPR[name]]
 SCENARIOS = {
     "F0": A,
     **{n: A + fo(n) for n in ("F1", "F2", "F3", "F4", "F4b", "F5", "F6", "F12", "F14", "D2",
-                              "R1", "R4", "R11", "R19", "R24")},
+                              "R1", "R4", "R11", "R19", "R24", "V1", "V2", "V3", "V4", "V5", "V6",
+                              "V7", "V8")},
     "F7": A + ["--fail-on=" + EXPR["F7"]],
     "F8": A + fo("F8b") + fo("F8"),
     "F8b": A + fo("F8") + fo("F8b"),
@@ -194,7 +202,30 @@ def mutated():
 fuzz = ["".join(piece() + (separator() if rng.random() < 0.3 else "") for _ in range(rng.randint(1, 10)))
         for _ in range(3000)]
 fuzz += [mutated() for _ in range(3000)]
-named = [EXPR[k] for k in EXPR if k[0] in "RFD"]
+# 500 more, drawn after the 6,000 so those keep their bytes: outcome, severity and mode mostly take one of their own
+# values (the only ones they accept since 18.150), sometimes a near miss of one, so both the evaluator and the
+# closed-vocabulary refusal are fuzzed.
+CLOSED = {"outcome": ["conformant", "non-conformant", "partial", "not_applicable", "not_assessed",
+                      "insufficient_evidence"],
+          "severity": ["high", "medium", "low"], "mode": ["automated", "semi-automated", "manual"]}
+
+
+def near_miss(value):
+    return rng.choice([value.upper(), value.replace("-", "_") if "-" in value else value.replace("_", "-"),
+                       value + " ", value[:-1], rng.choice(VALUES)])
+
+
+def closed_comparison():
+    field = rng.choice(FIELDS)
+    if field not in CLOSED:
+        return f"{field}=={literal()}"
+    value = rng.choice(CLOSED[field])
+    return f'{field}=="{value if rng.random() < 0.85 else near_miss(value)}"'
+
+
+fuzz += [" or ".join(" and ".join(closed_comparison() for _ in range(rng.randint(1, 2)))
+                     for _ in range(rng.randint(1, 3))) for _ in range(500)]
+named = [EXPR[k] for k in EXPR if k[0] in "RFDV"]
 with open(f"{work}/expressions.json", "w", encoding="utf-8") as f:
     json.dump({"named": len(named), "expressions": named + fuzz, "expr": EXPR}, f)
 PY
@@ -288,17 +319,20 @@ FIX = ('use comparisons of the form field=="literal" joined by and/or, over: '
 EMPTY = "the --fail-on expression is empty"
 DASH = "unexpected character '-' at position 0"
 UNKNOWN_FOO = "unknown field 'foo'; choose from: control, family, mode, outcome, rung, severity, subject"
+OUTCOMES = "conformant, non-conformant, partial, not_applicable, not_assessed, insufficient_evidence"
+CRITICAL = "severity 'critical' is not one of: high, medium, low"
 # Python's results (python-reference.md): exit, exit_status, fail_on.matched (None: no --fail-on).
 SUCCESSES = {
-    "F0": (1, ["findings"], None), "F1": (1, ["findings"], 2), "F2": (0, ["ok"], 0),
+    "F0": (1, ["findings"], None), "F1": (1, ["findings"], 2),
     "F3": (1, ["findings"], 1), "F4": (1, ["findings"], 1), "F4b": (0, ["ok"], 0),
-    "F5": (1, ["findings"], 1), "F6": (1, ["findings"], 1), "F7": (0, ["ok"], 0),
+    "F5": (1, ["findings"], 1), "F6": (1, ["findings"], 1),
     "F8": (0, ["ok"], 0), "F8b": (1, ["findings"], 1), "F9": (1, ["findings"], 1),
     "F9b": (0, ["ok"], 0), "F9c": (1, ["findings"], 1),
     "F10": (2, ["findings", "insufficient_evidence"], None),
     "F10b": (2, ["insufficient_evidence"], 0),
     "F10c": (2, ["findings", "insufficient_evidence"], 7),
     "F12": (1, ["findings"], 2), "F14": (0, ["ok"], 0), "D2": (1, ["findings"], 1),
+    "V7": (1, ["findings"], 2), "V8": (0, ["ok"], 0),
 }
 # Refusals: key and the end of Python's cause.
 REFUSALS = {
@@ -316,6 +350,14 @@ REFUSALS = {
     "O2": ("input.profile_not_a_file", "is not an existing file."),
     "O3": ("input.fail_on_invalid_expression", UNKNOWN_FOO),
     "O4": ("input.fail_on_invalid_expression", UNKNOWN_FOO),
+    "F2": ("input.fail_on_invalid_expression", CRITICAL),
+    "F7": ("input.fail_on_invalid_expression", CRITICAL),
+    "V1": ("input.fail_on_invalid_expression", f"outcome 'non_conformant' is not one of: {OUTCOMES}"),
+    "V2": ("input.fail_on_invalid_expression", "mode 'auto' is not one of: automated, semi-automated, manual"),
+    "V3": ("input.fail_on_invalid_expression", f"outcome '' is not one of: {OUTCOMES}"),
+    "V4": ("input.fail_on_invalid_expression", f"outcome 'Non-conformant' is not one of: {OUTCOMES}"),
+    "V5": ("input.fail_on_invalid_expression", "unexpected token 'foo' after a complete expression"),
+    "V6": ("input.fail_on_invalid_expression", UNKNOWN_FOO),
 }
 # A value flag with no value: argparse's sentence and the TypeScript/Java fix.
 FLAG_FIX = {"--fail-on": "pass --fail-on <expression>.", "--deviations": "pass --deviations <file>."}
@@ -360,7 +402,7 @@ for s, (exit_code, status, matched) in SUCCESSES.items():
         got = run(engine, s)
         check(got == ref, f"{s}: {engine} {got} != python {ref}")
 EXPR = json.load(open(f"{work}/expressions.json", encoding="utf-8"))["expr"]
-for s in ("F2", "F7", "F8", "F8b"):  # the last --fail-on of each is EXPR[s]
+for s in ("F8", "F8b", "V7"):  # the last --fail-on of each is EXPR[s]
     check((run("python", s)[2] or {}).get("expression") == EXPR[s], f"{s}: python's fail_on.expression is not {EXPR[s]!r}")
 
 for s, (key, tail) in REFUSALS.items():
