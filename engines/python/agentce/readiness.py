@@ -13,13 +13,14 @@ from __future__ import annotations
 import json
 import os
 import re
-import stat
 from datetime import date, datetime
 from importlib import resources
 from pathlib import Path
 from typing import Any
 
 import jsonschema
+
+from .signing import is_regular_file
 
 READY = "READY"
 READY_WITH_LIMITATIONS = "READY WITH LIMITATIONS"
@@ -47,13 +48,13 @@ def _read_report_file(path: Path) -> str | None:
     into a folder that can be listed but not entered, a file without read permission) raises
     ``OSError``: readiness reports it as a blocking reason rather than reading it as absent, which
     would let a coverage gap or an integrity break stop blocking. ``os.stat`` answers the same on
-    every supported Python, where ``Path.is_file`` does not."""
+    every supported Python, as ``signing.is_regular_file`` does, where ``Path.is_file`` does not."""
     try:
         os.lstat(path)
     except FileNotFoundError:
         return None
-    if not stat.S_ISREG(os.stat(path).st_mode):
-        raise IsADirectoryError(f"{path} is not a regular file")
+    if not is_regular_file(path):
+        raise OSError(f"{path} is not a regular file")
     return path.read_text(encoding="utf-8")
 
 

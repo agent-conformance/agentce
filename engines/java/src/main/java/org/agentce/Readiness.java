@@ -879,7 +879,7 @@ public final class Readiness {
         } catch (NoSuchFileException e) {
             return null;
         }
-        if (!Files.readAttributes(path, BasicFileAttributes.class).isRegularFile()) {
+        if (!Files.isRegularFile(path)) {
             throw new IOException(path + " is not a regular file");
         }
         try {
@@ -890,17 +890,9 @@ public final class Readiness {
     }
 
     private static List<JsonNode> parseJsonl(String text) {
-        List<JsonNode> out = new ArrayList<>();
-        if (text == null) {
-            return out;
-        }
-        for (String raw : text.lines().toList()) {
-            String line = raw.strip();
-            if (!line.isEmpty()) {
-                out.add(Json.parse(line));
-            }
-        }
-        return out;
+        return text == null
+                ? List.of()
+                : text.lines().map(String::strip).filter(s -> !s.isEmpty()).map(Json::parse).toList();
     }
 
     /** Returns the readiness verdict for a finished report directory (SPEC §13.3.4 stage 4), ported
