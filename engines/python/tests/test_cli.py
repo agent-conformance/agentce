@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable, Sequence
+import os
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -1625,3 +1627,67 @@ def test_help_still_prints_usage(
     """-h and --help are exact option strings, so the cluster refusal leaves them alone."""
     assert cli.main(argv) == 0
     assert f"usage: agentce {argv[0]}" in capsys.readouterr().out
+
+
+# --- A path inside a folder that can be listed but not entered (18.163). ---
+# Mode 600: Path.is_dir()/is_file() inside it raises PermissionError on 3.12 and 3.13 but returns
+# False on 3.14; TypeScript and Java answer "not there". Every Python now answers as they do.
+
+_not_root = pytest.mark.skipif(
+    os.geteuid() == 0, reason="root enters a mode-600 folder anyway"
+)
+
+
+@contextmanager
+def _unsearchable(folder: Path) -> Iterator[Path]:
+    folder.mkdir(exist_ok=True)
+    folder.chmod(0o600)
+    try:
+        yield folder
+    finally:
+        folder.chmod(0o700)
+
+
+@_not_root
+def test_validate_bundle_inside_unsearchable_folder_is_not_a_directory(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with _unsearchable(tmp_path / "s") as s:
+        code, env = run(["validate", "--bundle", str(s / "b"), "--json"], capsys)
+    assert (code, env["error"]["key"]) == (3, "input.bundle_not_a_directory")
+
+
+@_not_root
+def test_assess_profile_inside_unsearchable_folder_is_not_a_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with _unsearchable(tmp_path / "s") as s:
+        code, env = run(
+            [
+                "assess",
+                "--bundle",
+                str(_REPO_ROOT / "corpus" / "quickstart" / "evidence"),
+                "--profile",
+                str(s / "f.yaml"),
+                "--json",
+            ],
+            capsys,
+        )
+    assert (code, env["error"]["key"]) == (3, "input.profile_not_a_file")
+
+
+@_not_root
+def test_sign_claim_behind_unsearchable_folder_is_no_claim(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    (locked / "claim.json").write_text("{}", encoding="utf-8")
+    report = tmp_path / "r"
+    report.mkdir()
+    (report / "claim.json").symlink_to(locked / "claim.json")
+    with _unsearchable(locked):
+        code, env = run(
+            ["sign", str(report), "--as", "claimant", "--dry-run", "--json"], capsys
+        )
+    assert (code, env["error"]["key"]) == (3, "sign.no_claim")

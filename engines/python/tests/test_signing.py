@@ -7,7 +7,9 @@ golden as well as roundtrip, tamper, and order/clock-independence checks.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -353,3 +355,40 @@ def test_keyless_cert_well_formed_windows_verify(fields: dict) -> None:
 
 def test_keyless_cert_algorithm_is_checked_before_the_window() -> None:
     _assert_refused("verify.certificate_algorithm", algorithm="rsa", not_before="junk")
+
+
+# --- Path kinds (18.114, 18.163). ---
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root enters a mode-600 folder anyway")
+@pytest.mark.parametrize("predicate", [signing.is_regular_file, signing.is_directory])
+def test_path_kind_under_unsearchable_folder(tmp_path: Path, predicate: Any) -> None:
+    """Under a folder that can be listed but not entered, the default raises on every Python (the
+    caller reports it as unreadable) and ``unreadable_is_absent`` answers False."""
+    folder = tmp_path / "s"
+    folder.mkdir()
+    (folder / "f").write_text("x")
+    folder.chmod(0o600)
+    try:
+        with pytest.raises(PermissionError):
+            predicate(folder / "f")
+        assert predicate(folder / "f", unreadable_is_absent=True) is False
+    finally:
+        folder.chmod(0o700)
+
+
+def test_path_kind_matches_pathlib(tmp_path: Path) -> None:
+    (tmp_path / "d").mkdir()
+    (tmp_path / "f").write_text("x")
+    (tmp_path / "dangling").symlink_to(tmp_path / "nowhere")
+    (tmp_path / "loop").symlink_to(tmp_path / "loop")
+    (tmp_path / "dlink").symlink_to(tmp_path / "d")
+    for name in ("d", "f", "missing", "f/x", "dangling", "loop", "dlink", "a\0b"):
+        path = tmp_path / name
+        for flag in (False, True):
+            assert signing.is_directory(path, unreadable_is_absent=flag) is (
+                name in ("d", "dlink")
+            ), name
+            assert signing.is_regular_file(path, unreadable_is_absent=flag) is (
+                name == "f"
+            ), name

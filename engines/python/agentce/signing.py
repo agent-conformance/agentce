@@ -285,23 +285,30 @@ def _pae(payload_type: str, payload: bytes) -> bytes:
 # --- Path kinds. ---
 
 
-def is_regular_file(path: Path) -> bool:
-    """``Path.is_file`` as Python 3.12 answers it: a PermissionError (a parent folder that can be
-    listed but not entered) propagates for the caller to report as unreadable, where 3.14's
-    ``is_file`` swallows it and returns False (18.114)."""
-    return _mode_matches(path, stat.S_ISREG)
+def is_regular_file(path: Path, *, unreadable_is_absent: bool = False) -> bool:
+    """``Path.is_file`` with the same answer on every Python. A PermissionError (a parent folder
+    that can be listed but not entered) propagates for the caller to report as unreadable, as on
+    3.12, where 3.14's ``is_file`` swallows it (18.114); with ``unreadable_is_absent`` it reads as
+    False instead, the answer TypeScript and Java give (18.163)."""
+    return _mode_matches(path, stat.S_ISREG, unreadable_is_absent)
 
 
-def is_directory(path: Path) -> bool:
-    """``Path.is_dir`` as Python 3.12 answers it; see `is_regular_file`."""
-    return _mode_matches(path, stat.S_ISDIR)
+def is_directory(path: Path, *, unreadable_is_absent: bool = False) -> bool:
+    """``Path.is_dir`` with the same answer on every Python; see `is_regular_file`."""
+    return _mode_matches(path, stat.S_ISDIR, unreadable_is_absent)
 
 
-def _mode_matches(path: Path, test: Callable[[int], bool]) -> bool:
+def _mode_matches(
+    path: Path, test: Callable[[int], bool], unreadable_is_absent: bool
+) -> bool:
     try:
         return test(path.stat().st_mode)
+    except ValueError:  # an embedded NUL: no such file, as Path.is_file answers
+        return False
     except OSError as exc:
         if exc.errno in (errno.ENOENT, errno.ENOTDIR, errno.EBADF, errno.ELOOP):
+            return False
+        if unreadable_is_absent and exc.errno in (errno.EACCES, errno.EPERM):
             return False
         raise
 

@@ -215,7 +215,9 @@ def _require_dir(
     if raw is None:
         raise InputError(f"input.{key}_missing", f"{what} is required.", fix)
     path = Path(raw)
-    if (empty_is_no_dir and raw == "") or not path.is_dir():
+    if (empty_is_no_dir and raw == "") or not signing.is_directory(
+        path, unreadable_is_absent=True
+    ):
         raise InputError(
             f"input.{key}_not_a_directory",
             f"{what} {raw!r} is not an existing directory.",
@@ -242,7 +244,7 @@ def _require_file(
     if raw is None:
         raise InputError(f"input.{key}_missing", f"{what} is required.", fix)
     path = Path(raw)
-    if not path.is_file():
+    if not signing.is_regular_file(path, unreadable_is_absent=True):
         raise InputError(
             f"input.{key}_not_a_file",
             f"{what} {raw!r} is not an existing file.",
@@ -3105,7 +3107,7 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
     # The claim is read and checked before the dry-run return, so a dry run answers as the real
     # sign would, and before the key is read (TRADEOFFS 2026-10-06 18.53).
     claim_path = report_dir / "claim.json"
-    if not claim_path.is_file():
+    if not signing.is_regular_file(claim_path, unreadable_is_absent=True):
         raise InputError(
             "sign.no_claim",
             "the report directory has no claim.json to sign.",
