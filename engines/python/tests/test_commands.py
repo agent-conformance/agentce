@@ -1327,17 +1327,22 @@ def test_verify_report_packaging_missing_at_direct_check(
     first (commands/__init__.py:708-722); the dedicated `{report_dir} has no packaging.json` check
     at 726-727 -- same `verify.report_output_tampered` key -- is reachable only if packaging.json
     goes missing between that loop and this later, separate check (a TOCTOU race a real filesystem
-    could also produce). Simulated by making only the second `is_file()` call on that path return
-    False (18.8.R1 branch-coverage gate)."""
+    could also produce). Simulated by making only the second regular-file check on that path
+    return False (18.8.R1 branch-coverage gate)."""
+    from agentce import commands
+
     out, _key = _packaged_and_signed(tmp_path)
     packaging_path = out / "packaging.json"
     calls: list[None] = []
+    real = commands._is_regular_file
 
-    def _true_once_then_false() -> bool:
+    def _true_once_then_false(path: Path) -> bool:
+        if path != packaging_path:
+            return real(path)
         calls.append(None)
         return len(calls) == 1
 
-    _patch_path_method(monkeypatch, "is_file", packaging_path, _true_once_then_false)
+    monkeypatch.setattr(commands, "_is_regular_file", _true_once_then_false)
     code, envelope = _verify_report_json(capsys, str(out))
     assert code == 3
     assert envelope["error"]["key"] == "verify.report_output_tampered"
