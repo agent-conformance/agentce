@@ -15,6 +15,7 @@ materialised so class membership needs no inference (SPEC §7.2). Everything is 
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Collection, Iterable
 from typing import Any
 
@@ -310,6 +311,9 @@ class _Builder:
         self.event_agents: dict[str, frozenset[str]] = {}
         self.agent_chain: dict[str, set[str]] = {}
         self.acted_for: dict[str, set[str]] = {}
+        # agent id -> how many held events concern it, built on first use by an oversight record whose refs.decision
+        # names no held event (18.158).
+        self._agent_events: Counter[str] | None = None
         # OVS-08: decision IRI -> the actor IRI of every verified ApprovalDecided whose outcome is approve.
         self.human_approvers: dict[str, set[str]] = {}
         # INC-03: event IRI -> the decision its refs.decision names, whatever the event type.
@@ -460,7 +464,13 @@ class _Builder:
             return None
         # Every name the ref may mean an event by, the held decision among them: a name that leads to another held
         # event, or to none, still counts that event's agents, so resolving never loosens the rule (fail closed).
-        named = self._ref_names(_refs(event).get("decision"))
+        refs = _refs(event)
+        named = self._ref_names(refs.get("decision"))
+        # A present refs.decision that names no held event (null or empty included) may mean any of them, so the
+        # record concerns every held event but its own login (18.158).
+        unresolved = "decision" in refs and not any(
+            name in self.event_info for name in named
+        )
         concerned = self.event_agents[node].union(
             *(self.event_agents.get(name, frozenset()) for name in named)
         )
@@ -468,6 +478,9 @@ class _Builder:
         if login_type != "SessionStart" or login_class not in _LOGIN_CLASSES:
             return None
         if login_agent is None or login_agent in concerned:
+            return None
+        # The login itself is one event concerning its agent; any other makes it that agent's session (fail closed).
+        if unresolved and self._agent_event_counts()[login_agent] > 1:
             return None
         actor_iri = principal_iri(actor, self.key)
         if login_principal != actor_iri:
@@ -478,6 +491,14 @@ class _Builder:
         for agent_id in concerned:
             chain |= self.agent_chain.get(agent_id, set())
         return None if actor_iri in chain else actor_iri
+
+    def _agent_event_counts(self) -> Counter[str]:
+        """How many held events concern each agent (their own agent or CloudEvents subject; 18.158)."""
+        if self._agent_events is None:
+            self._agent_events = Counter(
+                agent for agents in self.event_agents.values() for agent in agents
+            )
+        return self._agent_events
 
     def _map_chain(self, agent_id: str, acted_for: object) -> None:
         if not isinstance(acted_for, list):
