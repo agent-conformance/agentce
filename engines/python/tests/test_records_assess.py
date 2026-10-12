@@ -1357,7 +1357,7 @@ def test_fail_on_opts_a_records_run_into_failing_on_evidence_gaps(
             "assess",
             records,
             "--fail-on",
-            'severity=="critical"',
+            'control=="NONE-00"',
             "--out",
             str(tmp_path / "none"),
         ],

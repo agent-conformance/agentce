@@ -161,12 +161,34 @@ def test_fail_on_long_chain_evaluates_without_recursion(
 ) -> None:
     # A 3000-clause or-chain once built a 3000-deep tree and crashed evaluation with RecursionError
     # (internal.unexpected) after assertions.json was written; the flat OR-of-AND groups evaluate it.
-    chain = " or ".join(['severity=="none"'] * 3000)
+    chain = " or ".join(['control=="none"'] * 3000)
     code, data = _assess(tmp_path, capsys, "--fail-on", chain)
     assert (code, data["fail_on"]["matched"]) == (0, 0), data
     code, data = _assess(
         tmp_path, capsys, "--fail-on", chain + ' or outcome=="conformant"'
     )
+    assert code == 1, data
+    assert data["fail_on"]["matched"] >= 1, data
+
+
+def test_fail_on_refuses_a_literal_outside_the_closed_vocabulary(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # outcome, severity and mode take only their schema values; a typo would match nothing and pass the gate.
+    for expr, tail in {
+        'outcome=="non_conformant"': "outcome 'non_conformant' is not one of: conformant, non-conformant, "
+        "partial, not_applicable, not_assessed, insufficient_evidence",
+        'severity=="critical"': "severity 'critical' is not one of: high, medium, low",
+        'mode=="auto"': "mode 'auto' is not one of: automated, semi-automated, manual",
+    }.items():
+        code, data = _assess(tmp_path, capsys, "--fail-on", expr)
+        assert code == 3, (expr, data)
+        assert data["error"]["key"] == "input.fail_on_invalid_expression", data
+        assert data["error"]["cause"].endswith(tail), data
+        assert data.get("fail_on") is None, data
+
+    # An escape that unescapes to a closed value is that value, not a typo.
+    code, data = _assess(tmp_path, capsys, "--fail-on", "severity=='hi\\gh'")
     assert code == 1, data
     assert data["fail_on"]["matched"] >= 1, data
 

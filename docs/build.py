@@ -75,7 +75,9 @@ _EXIT_CODES = (
     "The run exits `1` when anything matches, and `--json` reports the expression and the number "
     "of matches under `fail_on`. `--fail-on` replaces the default rule, so non-conformant results "
     "no longer fail the run on their own. Add `or outcome==\"non-conformant\"` to fail on both. "
-    "Copy the values exactly as written. A misspelled value matches nothing, and the run exits `0`.\n"
+    "Copy the values exactly as written. An `outcome`, `severity` or `mode` value the report never uses is "
+    "refused with exit `3`. A misspelled `control`, `subject`, `family` or `rung` value matches nothing, and "
+    "the run exits `0`.\n"
 )
 
 def _slug(heading: str) -> str:

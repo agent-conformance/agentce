@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from .assertions import Assertion
+from .assertions import OUTCOMES, Assertion
 from .errors import InputError
 
 #: The only fields a --fail-on expression may compare against (SPEC §9.4 assertion fields).
@@ -27,6 +27,15 @@ ALLOWED_FIELDS = frozenset(
 )
 
 _KEYWORDS = frozenset({"and", "or"})
+
+#: The fields whose values are a closed vocabulary (SPEC §8.5; spec/report/auditor.schema.json for outcome and mode,
+#: spec/rules/control.schema.json for severity). A literal outside it could never match, so it is refused rather
+#: than read as a rule that holds nothing to account. control, subject, family and rung stay free text.
+_CLOSED_VALUES: dict[str, tuple[str, ...]] = {
+    "outcome": OUTCOMES,
+    "severity": ("high", "medium", "low"),
+    "mode": ("automated", "semi-automated", "manual"),
+}
 
 #: A parsed expression: OR-groups, each a list of AND-ed ``(field, literal)`` comparisons.
 _Groups = list[list[tuple[str, str]]]
@@ -147,6 +156,18 @@ class _Parser:
         return field_tok.value, val_tok.value
 
 
+def _check_closed_values(groups: _Groups) -> None:
+    """Refuse the first comparison, left to right, whose field is closed and whose literal is not one of its
+    values. It runs after the whole expression parses, so a syntax error or an unknown field is reported first."""
+    for group in groups:
+        for field, literal in group:
+            allowed = _CLOSED_VALUES.get(field)
+            if allowed is not None and literal not in allowed:
+                raise _ExprError(
+                    f"{field} {literal!r} is not one of: " + ", ".join(allowed)
+                )
+
+
 _FIELD_GETTERS: dict[str, Callable[[Assertion], str]] = {
     "control": lambda a: a.control,
     "subject": lambda a: a.subject,
@@ -162,7 +183,8 @@ def parse_fail_on(expr: str) -> Callable[[Assertion], bool]:
     """Parse a ``--fail-on`` expression into a predicate over an :class:`Assertion`.
 
     Raises :class:`InputError` with a stable ``input.fail_on_invalid_expression`` key on any syntax
-    error, unknown field, or disallowed token — including every attempted code-injection shape (a
+    error, unknown field, outcome, severity or mode literal outside its closed vocabulary, or disallowed
+    token — including every attempted code-injection shape (a
     dunder-import call, a backtick-embedded shell command, a bare function call, or a well-formed
     clause with an evaluable tail appended after ``or``), because the grammar has no rule that could
     ever accept a call, an attribute access, or a bare unquoted identifier as a value. Refusal happens
@@ -174,6 +196,7 @@ def parse_fail_on(expr: str) -> Callable[[Assertion], bool]:
         if not tokens:
             raise _ExprError("the --fail-on expression is empty")
         groups = _Parser(tokens).parse()
+        _check_closed_values(groups)
     except _ExprError as exc:
         raise InputError(
             "input.fail_on_invalid_expression",
