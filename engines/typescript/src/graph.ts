@@ -353,6 +353,9 @@ class Builder {
   // that leaves out the optional agent still concerns the subject.
   private readonly eventAgents = new Map<string, Set<string>>();
   private readonly actedFor = new Map<string, Set<string>>();
+  // agent id -> how many held events concern it, built on first use by an oversight record whose refs.decision names
+  // no held event (18.158).
+  private agentEvents: Map<string, number> | null = null;
   // OVS-08: decision IRI -> the actor IRI of every verified ApprovalDecided whose outcome is approve.
   private readonly humanApprovers = new Map<string, Set<string>>();
   // INC-03: event IRI -> the decision its refs.decision names, whatever the event type.
@@ -534,7 +537,12 @@ class Builder {
     }
     // Every name the ref may mean an event by, the held decision among them: a name that leads to another held
     // event, or to none, still counts that event's agents, so resolving never loosens the rule (fail closed).
-    const named = this.refNames(refsOf(event).decision);
+    const refs = refsOf(event);
+    const named = this.refNames(refs.decision);
+    // A present refs.decision that names no held event (null or empty included) may mean any of them, so the record
+    // concerns every held event but its own login (18.158).
+    const unresolved =
+      Object.hasOwn(refs, "decision") && !named.some((name) => this.eventInfo.has(name));
     const concerned = new Set(this.eventAgents.get(node));
     for (const name of named) {
       for (const agent of this.eventAgents.get(name) ?? []) {
@@ -546,6 +554,10 @@ class Builder {
       return null;
     }
     if (loginAgent === null || concerned.has(loginAgent)) {
+      return null;
+    }
+    // The login itself is one event concerning its agent; any other makes it that agent's session (fail closed).
+    if (unresolved && (this.agentEventCounts().get(loginAgent) ?? 0) > 1) {
       return null;
     }
     const actorIri = principalIri(actor, this.key);
@@ -564,6 +576,19 @@ class Builder {
       }
     }
     return chain.has(actorIri) ? null : actorIri;
+  }
+
+  /** How many held events concern each agent (their own agent or CloudEvents subject; 18.158). */
+  private agentEventCounts(): Map<string, number> {
+    if (this.agentEvents === null) {
+      this.agentEvents = new Map();
+      for (const agents of this.eventAgents.values()) {
+        for (const agent of agents) {
+          this.agentEvents.set(agent, (this.agentEvents.get(agent) ?? 0) + 1);
+        }
+      }
+    }
+    return this.agentEvents;
   }
 
   private mapChain(agentId: string, actedFor: unknown): void {
