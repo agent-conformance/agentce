@@ -438,6 +438,15 @@ def _catalog_unreadable(catalog_dir: Path, exc: BaseException) -> UnreadableErro
     )
 
 
+def _load_catalog_dir(catalog_dir: Path) -> Catalog:
+    """Load a --catalog-dir catalog; the load walks the folder as the digest does (18.168), so a folder
+    it cannot read is refused as input.catalog_unreadable, the same as verify and sign refuse it."""
+    try:
+        return load_catalog(catalog_dir)
+    except (OSError, UnicodeError) as exc:
+        raise _catalog_unreadable(catalog_dir, exc) from exc
+
+
 def _refused(result: CommandResult, *refusals: signing.VerificationError) -> None:
     """Record a verified:false result: the refusals' texts joined as ``reason``, and their keys,
     in the same order, as ``reason_keys``."""
@@ -1984,7 +1993,9 @@ def _resolve_catalogs(
     The returned limitations are the signature checks ``--allow-unverified-catalog`` waived, for the
     manifest and the claim to record; the list is empty on an ordinary run."""
     loaded = [
-        load_catalog(_require_dir(d, key="catalog-dir", what="the catalog directory"))
+        _load_catalog_dir(
+            _require_dir(d, key="catalog-dir", what="the catalog directory")
+        )
         for d in catalog_dirs
     ]
     limitations = _verify_catalog_dirs(loaded, trust, allow_unverified=allow_unverified)
